@@ -245,8 +245,8 @@ describe("Payment Monitor — the listing", () => {
     show();
     const late = screen.getByTestId("monitor-timing-1302");
     const avatar = within(late).getByTestId("monitor-owner-avatar");
-    expect(avatar).toHaveAttribute("aria-label", "Shasha Tan");
-    expect(avatar).toHaveAttribute("title", "Shasha Tan");
+    expect(avatar).toHaveAttribute("aria-label", "Assigned to Shasha Tan");
+    expect(avatar).toHaveAttribute("title", "Assigned to Shasha Tan");
     expect(late).not.toHaveTextContent("Shasha Tan");
     expect(late).toHaveTextContent("Ask customer to pay");
   });
@@ -288,10 +288,10 @@ describe("Payment Monitor — the listing", () => {
     show();
     const late = screen.getByTestId("monitor-timing-1302");
     const avatar = within(late).getByTestId("monitor-owner-avatar");
-    expect(avatar).toHaveAttribute("aria-label", "Yu Jun");
-    expect(avatar).toHaveAttribute("title", "Normal owner: Shasha · Today's cover: Yu Jun");
-    expect(avatar).toHaveAttribute("data-normal-owner", "Shasha");
-    expect(avatar).toHaveAttribute("data-cover", "Yu Jun");
+    expect(avatar).toHaveAttribute("aria-label", "Assigned to Yu Jun");
+    expect(avatar).toHaveAttribute("title", "Assigned to Yu Jun");
+    expect(avatar).not.toHaveAttribute("data-normal-owner");
+    expect(avatar).not.toHaveAttribute("data-cover");
     expect(late).not.toHaveTextContent("Yu Jun");
   });
 
@@ -544,8 +544,8 @@ describe("Payment Monitor — the rail is the Monday–Friday follow-up plan (ow
     show("/finance/monitor");
     expect(screen.getByTestId("payment-monitor-day-2026-09-15")).toHaveTextContent("Ask 1 customer to pay");
     const avatar = within(screen.getByTestId("monitor-timing-1302")).getByTestId("monitor-owner-avatar");
-    expect(avatar).toHaveAttribute("aria-label", "Yu Jun");
-    expect(avatar).toHaveAttribute("title", "Normal owner: Shasha · Today's cover: Yu Jun");
+    expect(avatar).toHaveAttribute("aria-label", "Assigned to Yu Jun");
+    expect(avatar).toHaveAttribute("title", "Assigned to Yu Jun");
   });
 
   it("All unpaid orders keeps every unpaid order reachable, including ones no plan reaches", () => {

@@ -48,19 +48,27 @@ function show(canRead = true) {
 beforeEach(() => { state.owner = SHASHA_OWNS; state.canAssign = false; state.posts = []; });
 
 describe("Collection owner", () => {
-  it("prints normal owner, today's cover and the acting person as three facts", async () => {
+  it("shows the current assignment without implying who completed the job", async () => {
     state.owner = { ...SHASHA_OWNS, is_cover: true, cover_user_id: "u-yujun", cover_user_name: "Yu Jun", acting_user_id: "u-yujun", acting_user_name: "Yu Jun", cover_ends_on: "2026-09-15" };
     show();
-    expect(await screen.findByTestId("collection-owner-normal")).toHaveTextContent("Shasha");
-    expect(screen.getByTestId("collection-owner-cover")).toHaveTextContent("Yu Jun");
-    expect(screen.getByTestId("collection-owner-acting")).toHaveTextContent("Yu Jun");
+    expect(await screen.findByTestId("collection-owner-assigned")).toHaveTextContent("Yu Jun");
+    const facts = screen.getByTestId("collection-owner-facts");
+    expect(facts).toHaveTextContent("Assigned to:");
+    expect(facts).not.toHaveTextContent(/Shasha|Normal owner|cover|Acting|Completed by/i);
+    expect(screen.getByTestId("collection-owner-history")).toHaveTextContent("Established · Shasha");
   });
 
-  it("no cover → the normal owner acts and the cover fact says so", async () => {
+  it("shows Not assigned when the current resolver has no eligible person, even with an original assignment", async () => {
+    state.owner = { ...SHASHA_OWNS, acting_user_id: null, acting_user_name: null };
     show();
-    expect(await screen.findByTestId("collection-owner-cover")).toHaveTextContent("No cover today");
-    expect(screen.getByTestId("collection-owner-acting")).toHaveTextContent("Shasha");
-    expect(screen.getByTestId("collection-owner-history")).toHaveTextContent("Established · Shasha");
+    expect(await screen.findByTestId("collection-owner-assigned")).toHaveTextContent("Not assigned");
+    expect(screen.getByTestId("collection-owner-facts")).not.toHaveTextContent("Shasha");
+  });
+
+  it("shows the existing assignee without inventing a replacement or completion", async () => {
+    show();
+    expect(await screen.findByTestId("collection-owner-assigned")).toHaveTextContent("Shasha");
+    expect(screen.getByTestId("collection-owner-facts")).not.toHaveTextContent(/cover|Completed by/i);
   });
 
   it("nobody established → nobody is assigned to this order, with the Sales Orders door — never Delivery Duty, never a blank", async () => {

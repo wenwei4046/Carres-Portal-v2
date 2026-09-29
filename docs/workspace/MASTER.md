@@ -136,6 +136,14 @@ rights. Ordinary authorised operations are not restricted to the displayed perso
 capabilities, required evidence and business gates still apply. Approval decisions retain their
 specific permissions, while their staff UI uses the same plain assignment/actual-actor vocabulary.
 
+**IMPLEMENTATION STATUS — 2026-09-29, current-assignment display built on branch; not production-verified.**
+Workspace action cards and owner/source disclosure, Payment Monitor, Collection owner details and
+PO send evidence use the plain assignment vocabulary. Missing current assignment never falls back
+to the original person. Source forms and actual send/history actors are preserved. This UI change
+does not deliver §4's Staff & Duties redesign, automatic reassignment, original-occurrence assignment
+snapshots, update/completion assignment snapshots or source-surface audit. Those remain pending;
+no completion actor is inferred from the current assignee.
+
 The operational reassignment policy and its two Settings times are owned by §4.4. Assignment
 changes are explicit recorded movements, not a hidden alternative person behind an unchanged UI.
 
