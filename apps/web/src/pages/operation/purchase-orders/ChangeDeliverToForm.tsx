@@ -10,6 +10,7 @@
  * n IDs, the planner's rule) and `Review changes` shows the version before
  * anything is saved. The words are COPY-STANDARD's Change Deliver To row.
  */
+// design-standard: not-a-list-page — an edit form inside the PO object page; its table is the Review changes preview.
 import { useMemo, useState } from "react";
 import { poDocumentNumberOf, purchasingRefusal } from "@carres/shared";
 import Button from "@/components/kit/Button";
