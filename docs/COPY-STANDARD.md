@@ -4333,6 +4333,13 @@ New words on Finance Settings, Money moves and Settings → Payment (migration 0
 - `Online payment · Stripe checkout` (the Stripe row on Settings → Payment → Payment methods; `POS card` and `Online payment` are already approved)
 - Refusals: `Choose a card account that is in use.` · `Choose a bank that is in use.` · `Choose showroom or dealer.` · `Choose the card account.` · `Choose the bank.`
 
+## PROPOSAL / NOT LAW (card-routing tab)
+
+Card payout banks moves from a block under Money accounts to its own Finance Settings tab (`?tab=card`).
+
+- `Card payout banks` (the tab name, the same word as the section heading above)
+- `A card account and machine that is not listed here fills in no bank. Whoever records the card payout chooses it.` (the line at the top of the tab: there is no catch-all route, so an unlisted card account and machine leaves Paid into empty on the card payout form)
+
 ## PROPOSAL — PENDING APPROVAL (exception-buttons)
 
 BR-7: Finance holds and clears a delivery from the Payment Record overflow (Finance and principal only).

@@ -174,6 +174,8 @@ describe("Finance Settings — a money account's number, changed on its own form
     expect(writes()).toEqual([{ key: CHART_DOOR, body: { name: "Public Bank", code: "310-A000" } }]);
 
     expect(await screen.findByText("310-A000")).toBeInTheDocument();
+    // The payout banks live on their own tab.
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "Card payout banks" }), { button: 0, ctrlKey: false });
     await waitFor(() =>
       expect(screen.getByTestId("card-route-1131-dealer")).toHaveTextContent("1131 · GHL · Dealer → 310-A000 · Public Bank"),
     );
@@ -315,7 +317,7 @@ describe("Finance Settings — card payout banks (0541)", () => {
   it("says what happens to a card account that is not listed", async () => {
     show("/finance/settings?tab=card");
     expect(
-      await screen.findByText(/not listed here fills in no bank — whoever records the card payout chooses it/),
+      await screen.findByText(/not listed here fills in no bank\. Whoever records the card payout chooses it\./),
     ).toBeInTheDocument();
   });
 

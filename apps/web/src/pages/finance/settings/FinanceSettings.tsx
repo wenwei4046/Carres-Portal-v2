@@ -291,7 +291,7 @@ function CardRoutes() {
     <section className="h-full overflow-auto p-6" data-testid="card-routes">
       <div className="flex items-start justify-between gap-4">
         <p className="max-w-[560px] text-meta text-kit-slate-11">
-          A card account and machine that is not listed here fills in no bank — whoever records the
+          A card account and machine that is not listed here fills in no bank. Whoever records the
           card payout chooses it.
         </p>
         <Button variant="neutral" size="sm" onClick={() => setEditing(null)}>
