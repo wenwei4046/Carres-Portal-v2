@@ -41,7 +41,7 @@ import {
 } from "@carres/shared/finance-ledger";
 import { CUSTOMERS, SUPPLIERS } from "@carres/shared/tables";
 import { requireFinance } from "../../lib/auth-guards";
-import { IN_URL_MAX, mapPgError, parseJsonBody, readAllPages, tooManyRows } from "../../lib/route-helpers";
+import { mapPgError, parseJsonBody, readAllPages } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 import { todayIsoMYT } from "../../lib/delivery-order-issue";
@@ -148,9 +148,6 @@ const ENTRY_COLUMNS =
 /** Ids per linked-number read — keeps the `in (…)` list well inside a URL. */
 const LINK_SLICE = 100;
 
-/** The one sentence the Journal refuses a department filter with. */
-const TOO_MANY_DEPARTMENT_ENTRIES = "There are too many entries in this department to list here.";
-
 /**
  * The entry number of every entry these rows point at, through `reverses` or
  * `reversed_by`. Fail closed like `readAllPages`: a slice that cannot be read
@@ -200,43 +197,28 @@ financeLedgerRouter.get("/entries", requireFinance, async (c) => {
 
   // An account narrows to the entries with at least one line on it. `!inner`
   // makes the embedded filter a filter on the entries, and the count follows.
-  const embeds = [account ? "gl_entry_lines!inner(account_code)" : null].filter(Boolean);
-
-  // 0540: a sales invoice, a customer payment and a rental collection take
-  // their department at read time from the order, so it lives in
-  // gl_line_departments and not on the line. Read that view ONCE for the
-  // entries it matches. Not as an embedded computed relationship: PostgREST
-  // rebuilds the whole view per parent row and the read never returns.
   //
-  // TWO ceilings, and the first version of this (PR #1495) had neither. Its
-  // comment claimed the Journal's page cap held the list; that cap bounds the
-  // ENTRIES page, not this read.
-  //   1 · the read itself — unbounded, so past 1000 view rows the entries of
-  //       the lines that never came back silently vanished from the Journal.
-  //       Paged now, and refused rather than cut short.
-  //   2 · the id list — every id is spelt into the `.in()` URL below, so the
-  //       list cannot be chunked (the count and the page come from ONE query)
-  //       and is capped instead.
-  let deptEntries: string[] | null = null;
-  if (departmentType) {
-    // `line_id` is the view's unique column: paging on a non-unique order can
-    // miss or repeat a row across two pages.
-    const read = await readAllPages<{ entry_id: string }>((a, b) => {
-      let d = sb.from("gl_line_departments").select("entry_id").eq("department_type", departmentType);
-      if (departmentId) d = d.eq("department_id", departmentId);
-      return d.order("line_id", { ascending: true }).range(a, b);
-    });
-    if ("error" in read) return ledgerError(c, read.error, "The journal");
-    if (!("rows" in read)) return tooManyRows(c, TOO_MANY_DEPARTMENT_ENTRIES);
-    deptEntries = [...new Set(read.rows.map((r) => String(r.entry_id)))];
-    if (deptEntries.length > IN_URL_MAX) return tooManyRows(c, TOO_MANY_DEPARTMENT_ENTRIES);
-  }
+  // A department narrows the same way, through the gl_line_departments view.
+  // 0540 takes an invoice's or a payment's department from its order, so it
+  // is not on the line. It sits in the same query as the dates: the old list
+  // of entry ids went into the URL and broke past 200 entries. Not through
+  // gl_entry_departments: Postgres cannot inline that function, and it never
+  // returned. On the view it looks up each entry by index.
+  // ponytail: with no dates it looks up every posted entry; about 10 s at
+  // 90,000 entries on a local copy. Default the Journal to a date range, or
+  // put the department on gl_entries, if the ledger grows that big.
+  const embeds = [
+    account ? "gl_entry_lines!inner(account_code)" : null,
+    departmentType ? "gl_line_departments!inner(department_type,department_id)" : null,
+  ].filter(Boolean);
+
   let req = sb
     .from("gl_entries")
     .select([ENTRY_COLUMNS, ...embeds].join(","), { count: "exact" })
     .eq("posted", true);
   if (account) req = req.eq("gl_entry_lines.account_code", account);
-  if (deptEntries) req = req.in("id", deptEntries);
+  if (departmentType) req = req.eq("gl_line_departments.department_type", departmentType);
+  if (departmentId) req = req.eq("gl_line_departments.department_id", departmentId);
   if (from) req = req.gte("entry_date", from);
   if (to) req = req.lte("entry_date", to);
   if (source) req = req.eq("source_type", source);

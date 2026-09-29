@@ -244,21 +244,52 @@ describe("GET /entries", () => {
     expect(ops(c, "range")).toEqual([["range", 500, 599]]);
   });
 
-  it("narrows by department through gl_line_departments, never through an embed", async () => {
-    const { calls } = fakeClient((call) => (call.name === "gl_line_departments"
-      ? ok([{ entry_id: "e1" }, { entry_id: "e1" }, { entry_id: "e2" }], null)
-      : ok([], 0)));
+  // The filter is an inner join on the gl_line_departments view in the SAME
+  // query as the dates. The old version read every entry id the department
+  // ever had, then spelt them into the URL and refused past 200, so a showroom
+  // with 201 entries broke the Journal even for one day.
+  it("narrows by department through an inner join on gl_line_departments, in one query", async () => {
+    const { calls } = fakeClient(() => ok([], 0));
     const res = await get("/entries?departmentType=SHOWROOM&departmentId=11111111-1111-4111-8111-111111111111");
     expect(res.status).toBe(200);
-    const dept = calls.find((x) => x.name === "gl_line_departments")!;
-    expect(ops(dept, "eq")).toContainEqual(["eq", "department_type", "SHOWROOM"]);
-    expect(ops(dept, "eq")).toContainEqual(["eq", "department_id", "11111111-1111-4111-8111-111111111111"]);
-    const entries = calls.find((x) => x.name === "gl_entries")!;
-    // One entry with two lines in the department is one entry, not two.
-    expect(ops(entries, "in")).toEqual([["in", "id", ["e1", "e2"]]]);
-    // 0540's view derives the department of an invoice or a payment; embedding
-    // it as a computed relationship is what made this read never return.
-    expect(String(ops(entries, "select")[0]![1])).not.toContain("gl_entry_departments");
+    expect(calls.map((x) => x.name)).toEqual(["gl_entries"]);
+    const c = calls[0]!;
+    expect(String(ops(c, "select")[0]![1])).toContain("gl_line_departments!inner(department_type,department_id)");
+    expect(ops(c, "eq")).toContainEqual(["eq", "gl_line_departments.department_type", "SHOWROOM"]);
+    expect(ops(c, "eq")).toContainEqual(["eq", "gl_line_departments.department_id", "11111111-1111-4111-8111-111111111111"]);
+    expect(ops(c, "in")).toEqual([]);
+    // The computed relationship over the same view is a SQL function with a
+    // SET clause, so Postgres cannot inline it. That shape never returned.
+    expect(String(ops(c, "select")[0]![1])).not.toContain("gl_entry_departments");
+  });
+
+  it("lists 250 entries of one department for one day, with no id list", async () => {
+    const page = Array.from({ length: 250 }, (_, n) => ({ ...ENTRY, id: `e-${n}`, reverses: null, reversed_by: null }));
+    const { calls } = fakeClient(() => ok(page, 250));
+    const res = await get("/entries?departmentType=SHOWROOM&from=2026-09-10&to=2026-09-10&limit=1000");
+    expect(res.status).toBe(200);
+    const body = await json(res);
+    expect(body.total).toBe(250);
+    expect(body.rows).toHaveLength(250);
+    expect(calls).toHaveLength(1);
+    const c = calls[0]!;
+    expect(ops(c, "in")).toEqual([]);
+    expect(ops(c, "eq")).toContainEqual(["eq", "gl_line_departments.department_type", "SHOWROOM"]);
+    // The dates narrow the same query the department does.
+    expect(ops(c, "gte")).toEqual([["gte", "entry_date", "2026-09-10"]]);
+    expect(ops(c, "lte")).toEqual([["lte", "entry_date", "2026-09-10"]]);
+  });
+
+  it("keeps the department and the account filters together", async () => {
+    const { calls } = fakeClient(() => ok([], 0));
+    await get("/entries?departmentType=OFFICE&account=1210&from=2026-09-01");
+    const c = calls[0]!;
+    const select = String(ops(c, "select")[0]![1]);
+    expect(select).toContain("gl_entry_lines!inner(account_code)");
+    expect(select).toContain("gl_line_departments!inner(department_type,department_id)");
+    expect(ops(c, "eq")).toContainEqual(["eq", "gl_line_departments.department_type", "OFFICE"]);
+    expect(ops(c, "eq").some((o) => o[1] === "gl_line_departments.department_id")).toBe(false);
+    expect(ops(c, "gte")).toEqual([["gte", "entry_date", "2026-09-01"]]);
   });
 
   // The Journal with ?dept= answered 500 on live: the view's customer payment
@@ -277,63 +308,10 @@ describe("GET /entries", () => {
   });
 
   it("answers a department with no entries as empty, never as an error", async () => {
-    fakeClient((call) => (call.name === "gl_line_departments" ? ok([], null) : ok([], 0)));
+    fakeClient(() => ok([], 0));
     const res = await get("/entries?departmentType=OFFICE");
     expect(res.status).toBe(200);
     expect((await json(res)).total).toBe(0);
-  });
-
-  /**
-   * The department read is a read of LINES — one view row per ledger line —
-   * so it runs past PostgREST's 1000-row ceiling long before the department
-   * has 1000 entries. Read once with no `.range()` (PR #1495) every line past
-   * the first 1000 was dropped and its entries silently left the Journal.
-   *
-   * `page` answers like PostgREST: at most 1000 rows per `.range()`.
-   */
-  const pagedDepartment = (total: number, entryOf: (i: number) => string) => (call: Call): Result => {
-    if (call.name !== "gl_line_departments") return ok([], 0);
-    const r = ops(call, "range")[0] as [string, number, number] | undefined;
-    if (!r) return ok([], null);
-    const [, from, to] = r;
-    const data: Array<{ entry_id: string }> = [];
-    for (let i = from; i <= Math.min(to, total - 1); i += 1) data.push({ entry_id: entryOf(i) });
-    return ok(data, null);
-  };
-
-  it("reads the department past 1000 view rows, and keeps the entries on the later pages", async () => {
-    // 1500 lines over 150 entries — ten lines each, so e-149 is on page 2.
-    const { calls } = fakeClient(pagedDepartment(1500, (i) => `e-${Math.floor(i / 10)}`));
-    const res = await get("/entries?departmentType=SHOWROOM");
-    expect(res.status).toBe(200);
-    const dept = calls.filter((x) => x.name === "gl_line_departments");
-    expect(dept.map((d) => ops(d, "range")[0])).toEqual([["range", 0, 999], ["range", 1000, 1999]]);
-    const ids = ops(calls.find((x) => x.name === "gl_entries"), "in")[0]![2] as string[];
-    expect(ids).toHaveLength(150);
-    expect(ids).toContain("e-149");
-  });
-
-  it("refuses a department whose id list would not fit one URL", async () => {
-    // 201 distinct entries — one past IN_URL_MAX, which is 200.
-    const { calls } = fakeClient(pagedDepartment(201, (i) => `e-${i}`));
-    const res = await get("/entries?departmentType=SHOWROOM");
-    expect(res.status).toBe(422);
-    expect(await json(res)).toEqual({
-      error: "invalid_param",
-      code: "too_many_rows",
-      message: "There are too many entries in this department to list here.",
-    });
-    // A refusal, not a short list: the Journal itself was never read.
-    expect(calls.find((x) => x.name === "gl_entries")).toBeUndefined();
-  });
-
-  it("refuses a department read that runs past 20 pages", async () => {
-    const { calls } = fakeClient(pagedDepartment(50_000, () => "e-1"));
-    const res = await get("/entries?departmentType=SHOWROOM");
-    expect(res.status).toBe(422);
-    expect((await json(res)).code).toBe("too_many_rows");
-    expect(calls.filter((x) => x.name === "gl_line_departments")).toHaveLength(20);
-    expect(calls.find((x) => x.name === "gl_entries")).toBeUndefined();
   });
 
   it.each([
