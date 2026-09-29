@@ -1,0 +1,111 @@
+{
+  "scope": "Local Chromium, actual application shell with intercepted fixture API responses. Not production or authorization proof.",
+  "sourceCommit": "37f8597a9",
+  "checks": [
+    {
+      "width": 1440,
+      "scroll": 1440,
+      "catalogue": {
+        "width": 320,
+        "height": 747
+      },
+      "detail": {
+        "width": 824,
+        "height": 747
+      },
+      "header": {
+        "width": 1144,
+        "height": 51
+      },
+      "clipped": [],
+      "keyboardMenu": true,
+      "backFocus": null,
+      "historyDisclosure": true,
+      "errors": []
+    },
+    {
+      "width": 1180,
+      "scroll": 1180,
+      "catalogue": {
+        "width": 272,
+        "height": 747
+      },
+      "detail": {
+        "width": 784,
+        "height": 747
+      },
+      "header": {
+        "width": 1056,
+        "height": 51
+      },
+      "clipped": [],
+      "keyboardMenu": true,
+      "backFocus": null,
+      "historyDisclosure": true,
+      "errors": []
+    },
+    {
+      "width": 820,
+      "scroll": 820,
+      "catalogue": {
+        "width": 0,
+        "height": 0
+      },
+      "detail": {
+        "width": 696,
+        "height": 455
+      },
+      "header": {
+        "width": 696,
+        "height": 51
+      },
+      "clipped": [],
+      "keyboardMenu": true,
+      "backFocus": true,
+      "historyDisclosure": true,
+      "errors": []
+    },
+    {
+      "width": 743,
+      "scroll": 743,
+      "catalogue": {
+        "width": 0,
+        "height": 0
+      },
+      "detail": {
+        "width": 743,
+        "height": 459
+      },
+      "header": {
+        "width": 743,
+        "height": 51
+      },
+      "clipped": [],
+      "keyboardMenu": true,
+      "backFocus": true,
+      "historyDisclosure": true,
+      "errors": []
+    },
+    {
+      "width": 390,
+      "scroll": 390,
+      "catalogue": {
+        "width": 0,
+        "height": 0
+      },
+      "detail": {
+        "width": 390,
+        "height": 459
+      },
+      "header": {
+        "width": 390,
+        "height": 51
+      },
+      "clipped": [],
+      "keyboardMenu": true,
+      "backFocus": true,
+      "historyDisclosure": true,
+      "errors": []
+    }
+  ]
+}
