@@ -25,7 +25,7 @@ is the family's, not the Sales Order's alone. One copy, one truth.
 | **Receipt** | customer | *(none yet)* | ✅ built, no standard |
 | **Payment Voucher** · **Other Debtor Invoice** | finance | *(none yet)* | ✅ built, no standard |
 | **Loan Note** · **Extension Agreement** · **Pickup sheet** · **Listing export** | mixed | *(none yet)* | ✅ built, no standard |
-| **Purchase Return (PR)** | supplier | *(none yet)* · `purchasing/MASTER.md` §9.6 | ❌ **the Register is LIVE, the document is not** (0548 applied, screen deployed 2026-09-19). Money-free (§4) |
+| **Purchase Return (PR)** | supplier | *(none yet)* · `purchasing/MASTER.md` §9.6 | ✅ built on branch 2026-09-29 (`purchase-return-template.tsx`): RO/PO chrome, SUPPLIER · RETURN TO · PR DETAILS, one tracked Unit per row with Pickup Location, `TOTAL`; the issue form previews the `DRAFT` face. No `Reason` box (the claim note may hold internal fault review). Money-free (§4) |
 | **Repair Order (RO)** | supplier | *(none yet)* · `purchasing/MASTER.md` §9.7 | ✅ built on branch 2026-09-29 (`repair-order-template.tsx`): PO chrome, `Reason` box, `DAMAGE PHOTOS · {Unit ID}` pages. Money-free (§4) — a printed price reads as accepting the charge; the payload carries no figure |
 | **Consignment Order (CO)** · **Consignment Return (CRTN)** · **Consignment Sale Notice (CSN)** | supplier (CSN: supplier + finance) | *(none yet)* · `purchasing/MASTER.md` §§9.9–9.11 | ❌ approved, not built. A paired swap shares the CO's one PDF; the CSN prints no customer name and no selling price |
 | **Supplier Claim pack** | supplier | *(none yet)* · `purchasing/MASTER.md` §9.5 | ❌ approved, not built |

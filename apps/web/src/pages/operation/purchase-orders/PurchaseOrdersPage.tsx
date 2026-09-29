@@ -70,6 +70,7 @@ import {
 import { workspaceDutyActor } from "../workspace-duty-owner";
 import PurchasingTabs from "../PurchasingTabs";
 import PoIssueEvidence, { CHANNEL_WORD, doorsForIssuedPo } from "../components/PoIssueEvidence";
+import ChangeDeliverToForm from "./ChangeDeliverToForm";
 import GoodsMiniTable, { goodsCategoryOf, type GoodsMiniLine } from "../components/GoodsMiniTable";
 import { lineConfigBits } from "../../dealer/new-order/special-addons-picker";
 import { personInitials } from "@/lib/staff-avatar";
@@ -1272,7 +1273,7 @@ async function downloadOfficialPdf(poId: string): Promise<void> {
 
 const OBJECT_VIEWS = ["Document", "Revisions", "History", "Order Route"] as const;
 type ObjectView = (typeof OBJECT_VIEWS)[number];
-type DocumentMode = "read" | "issue" | "revise";
+type DocumentMode = "read" | "issue" | "revise" | "deliverTo";
 
 function PurchaseOrderObject({
   row,
@@ -1391,7 +1392,10 @@ function PurchaseOrderObject({
                     Edit <ChevronDown size={14} />
                   </button>
                 }
-                items={[{ key: "revise", label: "Revise quantity or Deliver To", onSelect: () => setMode("revise") }]}
+                items={[
+                  { key: "revise", label: "Revise quantity or Deliver To", onSelect: () => setMode("revise") },
+                  { key: "deliverTo", label: "Change Deliver To", onSelect: () => setMode("deliverTo") },
+                ]}
               />
             ) : null}
           </div>
@@ -1437,7 +1441,7 @@ function PurchaseOrderObject({
             <section className="min-w-0 border border-kit-slate-5 bg-white p-4">
               <div className="mb-3 flex items-center justify-between border-b border-kit-slate-5 pb-3">
                 <div>
-                  <h2 className="text-body font-semibold">{mode === "issue" ? "Issue purchase order" : "Revise purchase order"}</h2>
+                  <h2 className="text-body font-semibold">{mode === "issue" ? "Issue purchase order" : mode === "deliverTo" ? "Change Deliver To" : "Revise purchase order"}</h2>
                   <p className="text-meta text-kit-slate-11">Check the official document beside these fields before you finish.</p>
                 </div>
                 <button type="button" aria-label="Close document work" onClick={() => setMode("read")}><X size={16} /></button>
@@ -1468,6 +1472,16 @@ function PurchaseOrderObject({
                   }, messageTemplate)}
                   onOpened={(channel) => recordOpen.mutate({ channel })}
                   onConfirmed={() => { onChanged(); setMode("read"); }}
+                />
+              ) : mode === "deliverTo" ? (
+                <ChangeDeliverToForm
+                  po={po}
+                  supplierName={row.supplierName}
+                  destinations={destinations}
+                  activeDestinations={activeDestinations}
+                  units={unitsQ.data?.units ?? []}
+                  onSaved={() => { onChanged(); setMode("read"); }}
+                  onCancel={() => setMode("read")}
                 />
               ) : (
                 <RevisionForm

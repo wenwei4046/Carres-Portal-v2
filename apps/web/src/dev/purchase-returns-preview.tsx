@@ -37,7 +37,7 @@ const returns: PurchaseReturnListRow[] = [
     supplier_name: "Hookka",
     claim_no: "SC-1038",
     grn_no: "GRN-20260904-1064",
-    document_sent_at: null,
+    sent_at: null,
     confirmed_pickup_date: null,
     units: [
       {
@@ -76,7 +76,7 @@ const returns: PurchaseReturnListRow[] = [
     supplier_name: "Hookka",
     claim_no: "SC-1035",
     grn_no: "GRN-20260902-1058",
-    document_sent_at: "2026-09-14T06:00:00Z",
+    sent_at: "2026-09-14T06:00:00Z",
     confirmed_pickup_date: "2026-09-17T00:00:00Z",
     units: [
       {
@@ -118,7 +118,7 @@ const returns: PurchaseReturnListRow[] = [
     supplier_name: "Ohana",
     claim_no: "SC-1029",
     grn_no: "GRN-20260830-1041",
-    document_sent_at: "2026-09-11T07:00:00Z",
+    sent_at: "2026-09-11T07:00:00Z",
     confirmed_pickup_date: "2026-09-12T00:00:00Z",
     units: [
       {
@@ -146,7 +146,7 @@ const returns: PurchaseReturnListRow[] = [
     supplier_name: "Hookka",
     claim_no: "SC-1021",
     grn_no: "GRN-20260826-1030",
-    document_sent_at: "2026-09-05T08:00:00Z",
+    sent_at: "2026-09-05T08:00:00Z",
     confirmed_pickup_date: "2026-09-08T00:00:00Z",
     units: [
       {

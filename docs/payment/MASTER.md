@@ -161,8 +161,8 @@ SO No | Customer | Amount needed | Items & Stock | Storage | Requested Delivery 
   {day}`. Line 2 **the shared Work item's own action** beside its owner avatar — when an order
   carries two items, the one whose work is the printed fact (`Storage Invoice not paid` → the
   storage item). **No Work item ⇒ no action and no person**; only `Wait` stands alone, for the
-  waiting facts. The owner is an avatar (accessible name = the acting person; hover `Normal owner:
-  {name} · Today's cover: {name}` when covered), never a word in the line. When no owner resolves
+  waiting facts. The assignment uses `Assigned to {name}` in its readable/accessibility presentation; completed
+  work separately names `Completed by`. No normal/acting/cover tooltip remains (Workspace §3). When no owner resolves
   the avatar is `Not assigned`, whose name is `Nobody is assigned to this order. Assign it in
   Sales Orders → Team` and whose door is the Sales Orders Team (0504: the owner is the individual
   the Sales Order was dealt to). This is the ruled exception to the fact-only register cell (UI
@@ -522,10 +522,16 @@ owner is the Sales Order PIC in `ops_order_control.assigned_staff`, or the curre
 record when one exists. An order without a PIC remains an ownership exception; Payment never
 establishes its collection owner from Delivery Duty.
 
-**Today's acting person** is that Sales Order PIC's governed Buddy cover; when the owner is
-away today (planned leave, or no heartbeat from 10:00 MYT) and no cover was named, it is the
-least-loaded individual who IS in, for that day only; otherwise it is the owner. **Absence is
-cover, never a reassignment** — the order does not move and the work returns when they are back.
+**WORK ASSIGNMENT — OWNER RULING 2026-09-29 / APPROVED TARGET / NOT BUILT.**
+The stable Sales Order PIC remains the source responsibility fact. The Work Engine's current
+`Assigned to` can change through recorded assignment movements under Workspace §§3–4.4, including
+the manager-editable morning/afternoon checkpoints (initially 10:30 AM / 3:00 PM). This replaces
+the old hard-coded 10:00/all-day heartbeat target; the old SQL is implementation evidence, not law.
+A morning stamp does not establish afternoon availability, and late login does not silently undo a
+recorded movement. Ordinary authorised collection help does not require being the assignee.
+Retain assignment snapshots/history, actual updater/completer and originating surface. No automatic
+assignment rule grants payment approval, posting, refund, void or Finance authority. UI uses
+`Assigned to`, `Updated by` and `Completed by`, not competing normal/acting/cover labels.
 
 The responsibility ledger `payment_collection_owners` stays append-only and is written by ONE
 trigger, so the assignment and the ledger can never disagree: a deal appends `established`, a
@@ -535,7 +541,7 @@ append-only ledger whose clock does not advance is not ordered. `payment_collect
 keeps its shape and reads the same authority, so an order dealt before the ledger existed still
 resolves. The owner does not rotate: a changed date, a duty rotation, a later contact by somebody
 else, a filter or a page reload never changes it, and a split delivery has one owner because the
-owner is keyed by the Sales Order. Only two things change who acts: buddy cover (today) and a
+owner is keyed by the Sales Order. Work assignment can change through the shared recorded policy; source PIC changes require a
 formal handover (`payment_collection_owner_handover`, gated like Staff & Duties), which now moves
 the assignment with it and refuses a new owner who is not an individual. Nobody resolvable →
 nothing is established and the action stays visible with its governed failure: `Nobody is

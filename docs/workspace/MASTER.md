@@ -84,81 +84,60 @@ An action enters Work only when its owning module supplies:
 Workspace reads projections and opens the owning write door. It never copies the business record,
 assigns routine work independently, changes its due date or closes it.
 
-## 3 · Assignment and actual performer
+## 3 · Assignment and actual work
 
-**RULING — Jess, 2026-09-29 / APPROVED TARGET, NOT IMPLEMENTATION PROOF.**
-Duty assignment decides who is responsible now. It never prevents another authorised staff person
-from helping or completing ordinary operational work. No reassignment or claim is required first.
+**OWNER RULING 2026-09-29 — APPROVED TARGET / NOT BUILT.** Assignment provides accountability,
+not an execution restriction. The Duty / Work Engine decides who is assigned; any authorised
+staff member may help; the source records the actual person; one business fact completes the job.
 
 ```text
-Duty / Work Engine → Assigned to (current responsibility)
-Any authorised staff person → the owning module's existing write door
-Actual person recorded → one business fact completes the same Work item
+Duty / Work Engine → Assigned to
+→ any authorised staff member records the business result
+→ Updated by / Completed by + date and time + source surface
+→ one source-owned fact completes the Work occurrence everywhere
 ```
 
-Staff UI uses `Assigned to` and `Completed by`. Audit uses `Updated by`, `Assigned by system`,
-`Completed` with date/time, and `Not assigned`. Retire `Normal owner`, `Acting owner`, `Acting today`,
-`Buddy cover`, `Covering {person}`, `Covered for`, `Covered by` and `Temporary owner` everywhere
-staff see responsibility, including tooltips, accessible names and history. Retain the underlying
-assignment provenance; simplifying words never deletes evidence.
+Staff UI exposes two distinct facts: `Assigned to` means who is responsible now; `Completed by`
+means who actually completed the work. Before completion, show the action, its current assignment
+and the authorised source action. After completion, show `Completed`, the assignment effective at
+completion, `Completed by` and the completion date/time. Never infer the completer from assignment.
+A later assignment change cannot rewrite completed evidence. `Updated by` identifies each update.
 
-Before completion show the current assignee. Completed work retains its assignment at completion
-and names the actual completer; later routing changes never rewrite it. Preserve the assignee when
-each Work occurrence opened, every assignment movement and reason/system attribution, every actual
-updater, final completer, timestamps, and entry surface (`Workspace` or `Delivery Monitor`).
-Never infer completion identity from the current assignee, viewer or unrelated evidence uploader.
+Do not expose `Normal owner`, `Acting owner`, `Buddy cover`, `Covering {name}`, `Temporary owner`,
+or equivalent competing-person labels in staff pages, menus, tooltips, accessibility names,
+filters or rendered history. Internal source identities and existing cover records are retained as
+technical evidence; they are rendered as dated assignment movements, never erased or relabelled
+as if a new person had performed somebody else's work.
 
-Any authorised Operation person may update another person's Delivery record, upload evidence,
-record customer or Logistics replies and resolve urgent work without reassignment. Both surfaces
-reuse the same owning-module form, validation, write door and completion fact. One save updates
-that fact, completes the same module/rule/source/occurrence Work item and refreshes both surfaces.
-Opening a form or copying a message completes nothing. Commercial approval and source rights remain.
+**STAFF HELP.** Every active authorised Operation person, including newcomers, may perform ordinary
+operational work without first changing its assignment: place/issue PO, post GRN, update authorised
+Delivery facts, upload evidence, record customer/logistics replies and resolve urgent work. A job
+assigned to Jess can be completed by Ali or Yu Jun. Helping does not itself change `Assigned to`.
+No claim/reassign-first step is introduced. A joining-month PO allocation restriction remains a
+routing rule and does not prevent that newcomer from performing authorised PO work.
 
-At **11:00 AM Asia/Kuala_Lumpur**, no qualifying ERP activity that day by the assigned Duty person
-triggers shared reassignment of unfinished work to another eligible active person. Preserve previous
-and new assignment, system attribution, timestamp and reason, e.g. `Jess was not online by 11:00 AM`.
-This changes responsibility only; any authorised person can still act. Recorded leave remains a
-separate assignment trigger (§4.4). Do not rewrite completed work or the monthly rota.
+The original Work assignment when an occurrence opens, each subsequent assignment movement,
+assignment effective for each update/completion, actual updater/completer, authoritative date/time
+and originating surface must be retained. Completion originating in `Workspace` or `Delivery Monitor`
+is distinguishable. Background processing preserves the human who recorded the completing source
+fact; it must not replace that person with the system account. A historic unknown actor/origin is
+not guessed. Opening a page does not reset the original assignment snapshot.
 
-**FACT — repository a9e64bb86:** `packages/shared/src/schemas/ops-order-control.ts` and migration
-0504's `ops_person_is_in_today` use 10:00 MYT, and the Delivery resolver computes a replacement on
-read. Existing heartbeat capture is reusable, but 11:00 events, opening-assignment snapshots and
-entry-surface audit coverage are implementation gaps to verify. This approval does not approve every
-additional Delivery action listed in the accompanying draft or establish production completion.
+Workspace and Delivery Monitor use the same owning-module writer and completion fact. A failed save
+cannot complete Work; duplicate/concurrent saves cannot create a second completion. Recording a
+reply completes only the action whose governed completion condition that reply satisfies. Due dates,
+other unfinished actions and historical records do not change just because someone helped.
 
-**A DUTY BELONGS TO A PERSON — APPROVED / LOCKED, owner rulings (Jess) 2026-09-18, migration 0533.**
+**PERSON AND PERMISSION BOUNDARY.** Assignment, manual management and execution use active personal
+identities (`app_users.is_person`), not a shared/generic login or email exception. Existing manual
+no-self-assignment gates remain; system allocation is a separately governed act. This ruling never
+auto-grants approval, self-approval, Finance/Principal powers, or separately governed amendment/void
+rights. Ordinary authorised operations are not restricted to the displayed person; source-owned
+capabilities, required evidence and business gates still apply. Approval decisions retain their
+specific permissions, while their staff UI uses the same plain assignment/actual-actor vocabulary.
 
-- Every Duty holder, cover, assigner and executor is an **active person**: an account whose governed
-  person marker `app_users.is_person` is true. The marker — not `staff_code` (the shared owner login
-  carries `CR001`) and not an HR row (the shared login has one too) — separates a person from a
-  shared or generic login. People/HR sets it when it creates an internal person; no signed-in caller
-  may set or clear it (`person_marker_governed`).
-- The shared owner login `principal@carres.com` is **not a person**. It may read everything its role
-  reads, but it never holds, covers, assigns or executes any Duty. The principal role's "decides
-  anything" rung on an approver Duty now requires a principal **person**.
-- `jess@carres.com` is Jess's **personal management identity**, role `principal`, person, `CR002`.
-- **Nobody assigns a Duty to themself or names themself as cover** — every role, the principal
-  included (`self_assignment_refused`). This is the daily control.
-- Absence is expressed as a dated Buddy cover. With no eligible cover, an approval **waits** for
-  its authorised holder; it is never downgraded to another role, position rung or email list.
-  Ordinary operational work follows the owner/actor rule below and is not blocked merely because
-  the normal holder or cover is absent.
-
-**OPERATIONAL EXECUTION ≠ DUTY ALLOCATION — OWNER-APPROVED 2026-09-29 / TARGET / NOT BUILT.**
-Every active authorised Operation staff person, including a newcomer in their joining month, may
-perform ordinary operational work, including placing/issuing PO and posting GRN, without being the
-Duty holder or cover. The first-month PO restriction applies to allocation of normal PO Duty, not
-to executing a PO action. The separately approved joining-month exclusion from automatic PO cover
-selection is also a routing rule, never a reason to refuse that person's ordinary PO execution.
-Record assignment movements and actual performers separately; helping does not take ownership,
-change the monthly rota or mark unrelated Work complete. Unrecorded sudden MC may be handled by
-colleagues through Team Work; recorded leave uses §4.4's automatic operational cover. Do not block
-ordinary work merely because nobody is available as assigned cover. Do not add a claim button.
-
-This ruling does not grant commercial approval, allow self-approval, bypass source-document facts,
-or automatically widen separately governed amendment/void powers. Approver Duties retain their
-own gates. Owning modules must converge their ordinary-action permission doors and actual-actor
-evidence to this target; existing restrictive code is measured implementation, not the final law.
+The operational reassignment policy and its two Settings times are owned by §4.4. Assignment
+changes are explicit recorded movements, not a hidden alternative person behind an unchanged UI.
 
 ## 4 · Staff & Duties
 
@@ -267,7 +246,7 @@ Charge Approver, Stock Adjustment Approver, Service Case Approver and Delivery D
 **Routine Delivery work belongs to the Sales Order's PIC** (owner ruling 2026-09-17). When an
 order enters Operations, `ops_order_control.assigned_staff` names the one normal owner for its
 order, customer, delivery and ordinary collection work. The Work Engine routes today's action to
-that PIC's governed Buddy cover when the PIC is absent without changing the normal owner. Delivery
+the current work assignment, initially that PIC and subsequently any recorded §4.4 assignment movement. The Sales Order PIC remains a separate source fact. Delivery
 Duty is not the routine customer-order owner. For customer-order work it is the explicit fallback
 when a Sales Order has no PIC; that exception stays visible under `Delivery Duty` and prints `Nobody holds Delivery Duty.`
 and `Set the holder in Settings → Staff & Duties`. Delivery Settings never holds a roster or a
@@ -322,13 +301,13 @@ current/future Duty holder, cover, acting person, My Work recipient or Team Work
 
 Staff & Duties answers three questions only:
 
-1. Who normally holds each governed Duty?
-2. Who acts during a dated absence?
-3. What effective assignment/cover history proves that resolution?
+1. Who is assigned now?
+2. Who is assigned next, if a future assignment exists?
+3. What recorded assignment changes explain it?
 
 It is not People, leave management, a roster/calendar, workload balancing, permission administration
 or a manager dashboard. People owns active employment/access/leave facts. Modules name the Duty they
-require. Staff & Duties owns effective primary assignment and Buddy cover; the Shared Duty Resolver
+require. Staff & Duties owns effective Duty assignments and the automatic reassignment settings; the Shared Duty Resolver
 combines those truths. A manager never assigns individual routine Work here.
 
 ### 4.2 · Page composition
@@ -337,8 +316,7 @@ combines those truths. A manager never assigns individual routine Work here.
 Keep one Duty catalogue and one selected-Duty detail. Use the final plain headings `Next` and
 `History`. An authorised personnel manager reaches the existing People surface through the header
 `Manage staff` action; staff who lack that permission do not receive that management entry.
-The detail reads in this order: current resolved person and plain dates → relevant future cover
-when applicable → next effective primary assignment → collapsed
+The detail reads in this order: `Assigned to` and plain dates → next effective assignment → collapsed
 `History`. Future appointments are not presented as if their terms already ran.
 All authorised assignment/cover records remain reachable; collapsing history never deletes evidence.
 
@@ -346,7 +324,7 @@ All authorised assignment/cover records remain reachable; collapsing history nev
 Staff & Duties                         [Manage staff]
 
 Search duties       │ PO Duty                          ⋯
-State: All duties   │ Yu Jun
+State: All duties   │ Assigned to Yu Jun
                     │ Mon, 7 Sep to Wed, 30 Sep
 PO Duty             │
 GRN Duty            │
@@ -373,26 +351,24 @@ and `Ends {date}` do not appear in catalogue rows; effective periods and future 
 in the selected detail's assignment/cover facts and `Next`.
 
 The catalogue never shows workload, performance, a recommended person or a copied module roster.
-Search matches Duty label and authorised current/historical person names; `State` may narrow to
-`All duties` and `Not assigned`. Filtering by scheduled cover
-does not make that cover today's actor. Selecting the whole row opens detail, changes no assignment
+Search matches Duty label and authorised current/historical person names; retain `All duties` and
+`Not assigned`. Remove cover-specific filter words; dated assignment changes remain in `Next` and
+`History`. A scheduled change does not alter today's assignment early. Selecting the whole row opens detail, changes no assignment
 and completes no Work. Long names wrap; rows support keyboard selection. Returning from narrow-screen
 detail restores the catalogue's search/filter and position. Existing read-only users can navigate
 and inspect the same authorised facts.
 
-**PLAIN PERSON DISPLAY — OWNER CORRECTION 2026-09-29 / APPROVED TARGET / NOT BUILT.**
-Show the Duty, `Assigned to {person}` and applicable plain dates. One current assignee; future
-appointments stay separate in `Next`. Missing assignment is `Not assigned`. Completed work uses
-`Completed by {person}` and updates use `Updated by {person}`. History retains previous assignments,
-reasons, effective dates and actual performers using §3's plain language. This applies across staff
-UI, not only Staff & Duties. Assignment never implies exclusive execution permission. Keep future
-arrangements and history in their approved separate sections; do not infer a name from stale history.
+**ASSIGNMENT DISPLAY — OWNER RULING 2026-09-29 / APPROVED TARGET / NOT BUILT.**
+Show `Assigned to {name}` with applicable plain dates, or `Not assigned`. All staff-facing Duty,
+Work, Delivery and collection surfaces use §3's two-fact vocabulary. An avatar retains the full name
+and never replaces the readable assignment. A completed action additionally shows `Completed by`
+and `Completed` date/time; a Duty definition itself is not a completed job.
 
-Avatar initials carry a full-name accessible label and never replace the printed name. Selecting a
-Work configuration failure opens the exact Duty and preserves return context. Manager-only write
-controls retain their actual gates; ordinary readers see facts without a routine permissions lecture.
-The previously reviewed manual form must likewise identify its current person by name and dates,
-without restoring the retired owner/actor labels. This changes wording/presentation, not write rights.
+`History` shows assignment movements and actual work events, including `Assigned by system` and
+`Updated by {name}`. Preserve original source identities, prior assignments and the actual performer.
+Scheduled assignments stay in `Next`/history until effective. Work configuration links retain their
+exact Duty and return context. Ordinary readers retain authorised source actions; only assignment
+management controls remain manager-gated. No competing owner/acting/cover explanation is shown.
 
 At 1440px and 1180px retain catalogue/detail. At 820px, 743px and 390px show the catalogue, then a
 full-width selected detail with `Back to duties`. Settings navigation is available on demand and
@@ -403,12 +379,12 @@ or production completion. This composition is approved; delivery must validate i
 
 **MANUAL ACTION ENTRY — OWNER-APPROVED 2026-09-29 / APPROVED TARGET / NOT BUILT.**
 Place existing authorised manual adjustments in the selected Duty header's visible `⋯` menu,
-accessible name `More actions`. Do not keep `Assign holder` / `Assign for dates` as permanent buttons
+accessible name `More actions`. Do not keep manual assignment actions as permanent buttons
 beside the current person. Only authorised managers see this menu, and only applicable governed
 actions appear; omit an empty menu. Selecting an action opens its existing focused form with the
 Duty fixed. This is an entry-placement ruling, not approval for new override policies or new acts.
 Even an unassigned Duty uses this menu for an authorised manual assignment; the missing-person
-fact remains visible. Ordinary automatic PO/GRN assignment and leave cover need no menu action.
+fact remains visible. Ordinary automatic allocation and §4.4 reassignment need no manual menu action.
 
 Use the existing shared menu kit at all approved widths, with keyboard/touch operation, focus
 return to the trigger and no right-click-only dependency. Readers retain the same person/date view
@@ -418,12 +394,12 @@ and failures; no new token or component is introduced.
 ### 4.3 · Change-holder contract
 
 **FORM PRESENTATION — OWNER-APPROVED 2026-09-28 / APPROVED TARGET / NOT BUILT.**
-`Assign holder` opens one focused action surface. Show read-only `Duty`, the current person's name and applicable
-plain dates above the inputs, followed by required `Holder` and
-`Effective from`, `Until` and a factual `Note`. For a PO/GRN temporary adjustment, both dates
-and the reason in `Note` are required under the ruling below. Other Duties retain their governed
+`Assign` opens one focused action surface. Show read-only `Duty`, the current person's name and applicable
+plain dates above the inputs, followed by required `Assigned to` and
+`From`, `Until` and a factual `Reason`. For a PO/GRN temporary adjustment, both dates
+and `Reason` are required under the ruling below. Other Duties retain their governed
 optional end/note rules. Do not preselect a person or start date. The selected person and effective dates remain visible before the single primary
-`Assign holder` confirmation; `Cancel` closes without a write.
+`Assign` confirmation; `Cancel` closes without a write.
 
 Eligible choices come from People's active authorised Carres staff only; a departed, disabled,
 external Warehouse or ineligible account is not offered and is refused again at the write door.
@@ -462,71 +438,94 @@ server-owned and must not leave two primaries effective on one day. A future ass
 change today's resolution early. A retroactive correction requires the separately authorised
 correction law and preserves what it superseded; the ordinary form cannot rewrite history.
 
-Success says `{name} holds {Duty} from {date}` and refreshes Work resolution from the shared source.
+Success says `{Duty} assigned to {name} from {date}` and refreshes Work resolution from the shared source.
 It does not claim that historical Work changed. Failure prints the governed server reason and keeps
 the entered facts for correction without optimistic owner changes.
 
-### 4.4 · Absence assignment contract
+### 4.4 · Automatic assignment changes and two daily checks
 
-**AUTOMATIC PO/GRN COVER — OWNER-APPROVED 2026-09-29 / APPROVED TARGET / NOT BUILT.**
-A recorded People-owned leave fact activates automatic cover for routine PO/GRN Duties. Starting
-after the day's normal holder in the governed cyclic order, choose the next active, available person
-eligible for that Duty on that business date. Skip the absent holder and anyone unavailable,
-departed, disabled or otherwise ineligible. A newcomer cannot cover PO in their joining calendar
-month; cover cannot bypass the newcomer PO rule. Use recorded leave and governed calendars,
-not inferred live presence. Separately, §3 applies the 11:00 AM qualifying-activity rule to
-unfinished work; registered leave is not a prerequisite for that trigger.
+**OWNER RULING 2026-09-29 — APPROVED TARGET / NOT BUILT.** Settings → Staff & Duties contains
+TWO manager-editable time settings, `Morning check time` and `Afternoon check time`, initially
+**10:30 AM** and **3:00 PM**, in Malaysia/company time. One configuration governs both checks
+across modules; there is no parallel per-module threshold. Store/read one shared configuration with changer, change time and previous values.
+Validate ordered morning/afternoon times and apply them to the applicable working day/calendar.
+No offline browser timer or per-user browser preference is the business authority.
 
-Keep the normal monthly holder and future cyclic order unchanged. After the recorded leave ends,
-resolve back to the normal holder applicable on that date. A leave spanning a month boundary reads
-each date's normal assignment; it never extends an old monthly holder's term. An authorised change
-or cancellation of the source leave re-resolves the affected open/future dates while preserving
-recorded actual actors and prior cover evidence. This is one Workspace cover truth consumed by
-Work and protected module doors, not independent per-page routing.
+**Owner clarification 2026-09-29 — operating hours and flexible starts.** Carres Operation's
+usual hours are **9:00 AM–6:00 PM**. Staff may arrive by **10:00 AM** and finish at
+**7:00 PM**, provided they work **eight hours**. A permitted 10:00 AM start is not an
+absence or late-start finding. The 10:30 AM and 3:00 PM settings are availability checkpoints
+for assigning work; they are not shift start/end times or proof of eight hours worked.
+Office lunch is fixed at **1:00–2:00 PM** (owner ruling, 2026-09-29). This hour is
+excluded from the eight working hours; both permitted schedules therefore provide eight hours.
+This does not introduce an attendance or payroll calculation.
+Two observations cannot prove continuous availability: departure after the afternoon check is
+not automatically detected by that check. Lack of portal activity can also mean telephone,
+receiving or other offline work; the evidence contract must address this before activation.
 
-When nobody qualifies for cover, expose the missing acting person to authorised management; do not
-silently route to an absent normal holder or grant a new capability. Existing source-owned rights
-such as Receiving posting by active Operation staff remain distinct from Duty responsibility.
-Commercial/Principal/Finance approver duties do not inherit this automatic operational selection.
-The page shows the current resolved person and plain dates under §4.2; future cover never becomes
-today's actor early. Automatic cover changes neither due dates nor source-owned completion.
+Each check evaluates its OWN work period. A morning activity stamp does not prove afternoon
+availability: morning attendance followed by afternoon MC must be detectable. Fresh, authenticated
+use by the real person is the intended signal; an overnight/background tab's periodic requests
+cannot establish that the person started a new period. This is work-routing evidence, not an HR
+attendance/MC diagnosis. Do not auto-create leave, mark misconduct, or change employment/access.
+The morning evidence window starts at **9:00 AM** and ends at the configured morning check;
+the afternoon window starts at **2:00 PM**, after lunch, and ends at the configured afternoon
+check. With the default settings these are **9:00–10:30 AM** and **2:00–3:00 PM**.
+A permitted 10:00 AM arrival has until the morning checkpoint to establish activity.
+Lunch and pre-2:00 PM activity never satisfy the afternoon check. Settings validation must keep
+the morning check after the permitted 10:00 AM arrival and before lunch, and the afternoon check
+after 2:00 PM and before the usual 6:00 PM close. These are office rules, not inferred store shifts.
+The exact recognised activity evidence must be measured before engine Build; the repository's
+single all-day `last_seen_at` is NOT sufficient. Do not equate a failed read with absence.
 
-The existing authorised manual cover capability below is retained for governed exceptions and
-other Duties; it is not a required step for ordinary recorded PO/GRN leave. Manual self-assignment
-and eligibility gates remain; automatic selection is the owner-approved system rule, not a user
-self-assignment action. Do not create competing active cover answers.
+At the configured checkpoint, an assigned person without the required current-period evidence
+has their unfinished ordinary work assigned by the system to an active, available, eligible person
+with evidence for that period. Record the assignment movement and the checkpoint reason; show the
+new `Assigned to` consistently in Settings, Workspace and owning-module surfaces. Use the Duty's
+existing selection rule: PO/GRN keep their approved cyclic order and joining-month PO exclusion;
+object-owned work keeps its governed selection rule. No second per-module person list is created.
+Recorded leave and effective departure remain authoritative exclusions and do not wait for a check.
 
-`Assign for dates` is available only when the Duty has a normal holder for the complete selected period.
-It asks for `Assigned to`, `From`, `Until` and `Reason`. The acting person must be active, eligible,
-different from the normal holder and authorised for every protected act the Duty requires. Cover is
-inclusive of the governed business dates and resolves in the company's timezone, never the browser's.
+A system change affects responsibility for unfinished work, never who is authorised to help.
+Completed work, actual performers, source business facts, Sales Order PIC and the monthly Duty
+cycle are not rewritten. Both morning and afternoon checks are distinct: afternoon can change an
+assignment made that morning if its current assignee is unavailable. Late activity does not silently
+bounce an already-moved assignment back; subsequent changes are recorded under the shared policy.
+The next working day resolves its normal allocation and eligibility again. No candidate or
+unreliable evidence produces a visible management exception, not an invented assignee or silent
+permission expansion. Approver Duties do not inherit automatic ordinary-work reassignment rights.
 
-Overlapping active covers for one Duty are refused; the manager must close/correct the conflict
-through a governed append-only act. Cover changes only the acting person for open/future actions
-during the period. It never grants an approval capability the person lacks, rewrites the normal
-owner, changes due dates or attributes another person's completed act to the cover.
+History retains the assignment when the job opened, each change (from/to, system or personal
+assigner, reason, effective/recorded time), every updater and the actual completer/time/origin.
+For example: `Assigned to Jess` → `Assigned to Ali by system` → `Completed by Yu Jun`.
+Use `Assignment reason: {name} was not online by {time}` only when the check actually established
+the configured period's missing activity. An unreadable source or service outage is not that fact.
 
-Success identifies `Assigned to {person}`, the Duty and dates; history retains the previous assignment. Work and protected
-module doors must resolve the same answer immediately after refresh. Ending, replacing or correcting
-cover requires its own recorded reason/actor/time; disappearance from the current view never deletes
-history.
+Recorded leave can also trigger a dated assignment change. Existing manual exceptions retain their
+person, eligibility, date, reason, conflict and no-self-assignment gates, but their UI presents an
+assignment rather than a second cover identity. Existing underlying cover records/RPC names are
+technical compatibility, not user-facing terminology. End/change events remain append-only and
+retain why, by whom and when. Neither automatic nor manual reassignment completes Work.
 
 #### 4.4.1 · Staff & Duties validation and refusal copy
 
+**APPROVED TARGET / NOT BUILT — 2026-09-29.** Existing technical refusal codes keep their
+permission/date/conflict semantics; staff presentation uses assignment vocabulary.
+
 | Condition | Write-door code | Exact sentence |
 |---|---|---|
-| Holder missing | (form) | `Choose a holder.` |
-| Assignment start missing | `invalid_dates` on assign | `Choose when this holder starts.` |
-| Assignment end before start | (form) | `Until must be on or after Effective from.` |
-| Ineligible/inactive/non-person holder, or anyone naming themself as holder | `invalid_holder` · `self_assignment_refused` on assign | `{name} cannot hold {Duty}. Choose an eligible active staff member.` |
-| Anyone naming themself as cover | `self_assignment_refused` on cover | `{name} cannot be assigned to {Duty}. Choose another eligible staff member.` |
-| Conflicting manual exception / otherwise conflicting primary period; automatic PO/GRN baseline alone is not a conflict (§4.3) | (target refusal; current writer does not enforce it) | `{Duty} already has a holder for these dates. Choose different dates.` |
-| Cover person missing | (form) | `Choose who is assigned to this duty.` |
+| Holder missing | (form) | `Choose a person.` |
+| Assignment start missing | `invalid_dates` on assign | `Choose when this assignment starts.` |
+| Assignment end before start | (form) | `Until must be on or after From.` |
+| Ineligible/inactive/non-person holder, or anyone naming themself as holder | `invalid_holder` · `self_assignment_refused` on assign | `{name} cannot be assigned to {Duty}. Choose an eligible active staff member.` |
+| Anyone naming themself as cover | `self_assignment_refused` on cover | `{name} cannot be assigned to {Duty}. Choose an eligible active staff member.` |
+| Conflicting manual exception / otherwise conflicting primary period; automatic PO/GRN baseline alone is not a conflict (§4.3) | (target refusal; current writer does not enforce it) | `{Duty} already has an assignment for these dates. Choose different dates.` |
+| Cover person missing | (form) | `Choose a person.` |
 | Cover is normal holder | `cover_is_holder` | `Choose another person for {Duty}.` |
 | Cover dates missing/reversed | `invalid_dates` on cover | `Choose valid assignment dates.` |
-| No one normal owner for every day of the cover | `no_duty_holder` | `{Duty} has no assignment for all these dates. Assign the holder first.` |
+| No one normal owner for every day of the cover | `no_duty_holder` | `{Duty} has no assignment for all these dates. Assign it first.` |
 | Conflicting cover | `cover_overlap` | `{Duty} already has an assignment for these dates. Choose different dates.` |
-| Eligibility changed before save | `invalid_cover` | `{name} cannot be assigned to {Duty}. Choose another eligible staff member.` |
+| Eligibility changed before save | `invalid_cover` | `{name} cannot be assigned to {Duty}. Choose an eligible active staff member.` |
 | Caller is not a duty manager, or is a shared login (0533) | `not_duty_manager` | `Duty assignments are set by the manager.` |
 | Unknown failure | `unknown` (any other error, a network failure included) | `{Duty} could not be updated. Try again.` |
 
@@ -544,9 +543,9 @@ authoritative. No message says `Invalid`, `Error` or `Something went wrong` with
 | Loading | Catalogue/detail skeletons retain page geometry · `Opening Staff & Duties…` is acceptable accessible status |
 | Empty catalogue | Configuration failure, because the governed catalogue is code-owned; never `No duties yet` |
 | No search match | `No duties match this search` · `Clear search`; catalogue truth remains healthy |
-| Not assigned | `Not assigned` · `Nobody holds {Duty}.` · manager reaches applicable `Assign holder` through `⋯`; Work remains visible under Duty word |
-| Cover active | Show the effective cover as the single current person with plain dates (§4.2); preserve separate normal/cover identities and reason in history |
-| Cover scheduled | Show today's resolved person; future cover and dates remain separate and never replace today's name early |
+| Not assigned | `Not assigned` · `Nobody holds {Duty}.` · manager reaches applicable `Assign` through `⋯`; Work remains visible under Duty word |
+| Current assignment changed | Show `Assigned to {name}` and the applicable dates; history preserves the change, reason and prior person |
+| Assignment scheduled | Show the current `Assigned to`; the future person and dates remain in `Next`/history until effective |
 | Read failed | `Staff & Duties could not be opened` · `Try again`; never infer no holder. On refresh failure retain the last successful catalogue/detail alongside the failure and retry state; do not present cached resolution as freshly confirmed. Loading never flashes an empty/unassigned answer. |
 | Write refused/failed | Exact reason beside action; no local mutation of displayed resolution |
 | History empty | `No assignments yet` within a valid selected Duty |
@@ -598,6 +597,8 @@ convergence and the approved plain-person/detail/history redesign remain unfinis
 | Settings relocation is production verified at PR #1791 — delivered; detail redesign remains a target gap | Staff now open the existing page under Settings | Preserve CARD 02; separately converge plain-person details, `Next`, collapsed `History` and manager-only `⋯` |
 | Migration 0437 prefilled named two-person monthly assignments through September 2027 — red target gap | This does not establish general joiner/leaver automation | The approved cyclic allocation and next-month admission rule must produce the single authoritative assignment source |
 | Existing assign writer accepts overlapping rows; current cover writer validates a whole normal-holder period — red target gap | Manual exceptions and automatic leave could otherwise give inconsistent answers | Dated §4.3 exceptions with impact preview and preserved baseline; §4.4 one effective cover answer and eligibility checks |
+| OperationApp.tsx sends a heartbeat on mount and every 15 minutes, including background tabs; shared `countsAsInToday` and migration 0504 use a single 10:00 MYT/all-day stamp — measured source gap | Existing activity cannot distinguish afternoon MC or a tab left open overnight | Implement one two-period evidence/configuration contract before activating the 10:30/15:00 target; reconcile all consumers and verify production |
+| `operationWorkCompletedSchema` exposes completed actor/time but no assignment snapshots or Workspace/Delivery Monitor origin — measured contract gap | The full newly approved history cannot be claimed from that DTO alone | Preserve existing completion evidence and converge the assignment/update/origin audit across owning-module writers and Work reads |
 | Existing Duty API limits history reads to 200 records — target gap | Older authorised records may not be reachable | Complete bounded history pagination in a separate approved delivery scope |
 | Existing StaffDuties.tsx shows the failure surface on a failed refresh — target gap | Previously known facts disappear during the failure | Preserve known facts and disclose failed refresh in the later page convergence |
 | HrPersonDrawer ExitBlock explicitly separates exit recording and access disablement — red target gap | Manager can finish one step and miss the other | HR §3 one confirmation, honest scheduled/partial effects, default current-only lists and personnel-only former-profile access |
@@ -614,7 +615,8 @@ Reference lessons used during review, never authorities over Carres business rul
 | [Oracle effective-dated updates](https://docs.oracle.com/en/cloud/saas/human-resources/fahdl/options-for-updating-date-effective-objects-with-future-dated.html): explicit future-record effects | Workspace / ADAPT | Show affected arrangements; a temporary exception preserves the rotation baseline. Do not copy external overwrite modes or historical deletion semantics |
 
 **Scope boundary.** This Blueprint does not add a Work claim button, workload-based allocation,
-permission lecture, independent employee store, attendance monitor or destructive employee deletion.
+permission lecture, independent employee store, HR attendance scoring or destructive employee deletion.
+The two work-period checks in §4.4 are operational assignment evidence only.
 No new generic historical-correction UI, permanent rota editor or separate reporting/export surface
 is introduced. Existing governed source records and audit remain reachable; HR-owned sensitive
 records keep their existing gates. Build owns routine delivery mechanics, not new business policy.
@@ -624,7 +626,7 @@ records keep their existing gates. Build owns routine delivery mechanics, not ne
 The page is ready for owner acceptance only when all are demonstrable:
 
 - every shared catalogue Duty appears once and an unknown/missing catalogue response fails visibly;
-- today's normal owner, acting cover and `Not assigned` answer match the Shared Duty Resolver byte
+- the current `Assigned to` or `Not assigned` answer matches the Shared Duty Resolver byte
   for byte on Staff & Duties, Team Work and one protected module door;
 - manager and non-manager sessions see the exact §4.5 capabilities with no leaked write control;
 - current, future and ended assignments/covers resolve on the correct company date boundary;
@@ -838,8 +840,8 @@ Blocked by {dependency} · exceptional state (only when true) wraps below
 
 - Object identity belongs in the item header and is not repeated in the action.
 - Owner belongs in the Team group/avatar or exceptional cover/handover metadata, never the sentence.
-- My Work omits the signed-in person's avatar. Metadata uses `Assigned to {person}`.
-  Team Work groups unfinished work by current assignment; earlier assignments remain in history.
+- My Work and Team Work show current `Assigned to` and use that assignment for their person scope.
+  Changes remain in history; completed work separately shows `Completed by`. No cover labels remain.
 - A future Site queue is an owner state, not a person. It may render only after a governed queue
   identity, permission and atomic acceptance path are built and admitted; until then unresolved
   site work is `Not assigned`.
@@ -945,8 +947,8 @@ Jess reviewed the live page in an 829px window and approved 24 fixes as written 
   `See Team Work`.
 - **Words:** rail section `Page` / `All pages` (not Module) · header `Jump to…` with its keyboard
   hint (the `Search` rename was reverted by Jess 2026-09-26) · `Help` and `Settings` beside their
-  icons · the right rail names each icon. **Assignment wording (Jess, 2026-09-29):** rows use `Assigned to {person}`;
-  the toolbar carries no cover button.
+  icons · the right rail names each icon. **Staff assignment wording follows §3 (Jess, 2026-09-29):** show `Assigned to`; assignment
+  history records changes. No cover badge or cover filter remains.
 - **The Date rail** is the one-line month header and the Monday–Saturday month grid of §5.1
   Panel 1 (Jess, 2026-09-26 — replaces the day cards, `Today` in words, `No work`,
   `Public holiday · {name}`, the two-week column and the one-week strip). `No date` (never
@@ -1755,7 +1757,7 @@ checklist. Revisions 2 to 5 carry her corrections of the same day, made on the d
   - *The act:* a separate occurrence, dated that check day, with Delivery's governed words for the
     Carres-contacts row — line 1 `Call the customer`, line 2 `Get the scheduled delivery date` (no
     new words; the partner-chase row `Call {logistics}` stays its own occurrence).
-  - *Owner:* the Sales Order PIC; Buddy cover acts; the Delivery Duty only when there is no PIC
+  - *Owner:* the current recorded Work assignment, initially Sales Order PIC; Delivery Duty only when there is no PIC
     (Delivery §9, every Delivery act's owner rule).
   - *What closes it:* a Scheduled delivery date recorded, OR a customer contact record written by
     Carres (not on behalf of the partner) with a structured result. Opening or copying WhatsApp
@@ -2216,26 +2218,28 @@ are fixtures, and production keeps the current page until each admitted projecti
 | Purchasing · `purchasing.confirm_balance_delivery_date` | Short receipt left goods owing · balance promise | PO Duty | Opens with short receipt; Calls calendar owns filing | Balance promise for line exists |
 | Receiving · `receiving.check_in` | Promised goods lack a posted session · check in the arrival. **Since 2026-09-26 the date trigger fires only for a PO whose current version is marked sent, on the earliest expected arrival; its fact reads `Supplier date passed · nothing received yet`** | GRN Duty owns the card; **any active Operation person may perform the receipt** (owner ruling 2026-09-25, Stock §7) — capability and owner stay separate | Promised arrival day | Receiving Session posted · stock/issue facts continue from Receiving |
 | Warehouse · `warehouse.outbound_handover` | **Not admitted:** dated pickup has Units not handed over · exact receiver/proof result | Requires governed personal NETS operator or admitted Site queue; neither is currently built. **PROPOSAL / NOT LAW (Stock §7, 2026-09-25):** until then the card resolves to the current GRN Duty so a Carres person sees `{DO No} · {SO No} / {n} items · pickup by {company} today / Load the goods` | Scheduled Site handover date on Warehouse calendar | Every required Unit has accepted handover evidence · admission waits for governed owner/acceptance |
-| Delivery · `arrange_new_delivery_date` | Approved delay requires a reachable new booking · confirmed date/slot | Sales Order PIC; Buddy cover acts; Delivery Duty fallback only when no PIC | Same Office working day as delay decision | Customer-confirmed reachable booking exists |
-| Delivery · `assign_logistics` | Delivery required with no company · company selected | Sales Order PIC; Buddy cover acts; Delivery Duty fallback only when no PIC | 3 delivery working days before promise | Delivery company recorded · booking action may open |
-| Delivery · `confirm_delivery_date` | Company assigned but customer date/slot unconfirmed · evidenced booking | Sales Order PIC; Buddy cover acts; Delivery Duty fallback only when no PIC | Configured call days before promise | Confirmed date and slot with evidence |
-| Delivery · `deliver_today` | Confirmed delivery is today without result · result recorded | Sales Order PIC; Buddy cover acts; Delivery Duty fallback only when no PIC | Confirmed delivery date | Delivery attempt result exists · proof/recovery follows result |
-| Delivery · `upload_delivery_photo` | Delivered result lacks file · proof file recorded | Sales Order PIC; Buddy cover acts; Delivery Duty fallback only when no PIC | 1 delivery working day after delivery | File exists · proof review may open |
-| Delivery · `upload_signed_delivery_order` | Delivered result lacks the signed Delivery Order · signed file recorded | Sales Order PIC; Buddy cover acts; Delivery Duty fallback only when no PIC | 1 delivery working day after delivery | Signed Delivery Order exists · proof review may open |
-| Delivery · `check_delivery_proof` | Latest delivery file is unreviewed · governed review result | Sales Order PIC; Buddy cover acts; Delivery Duty fallback only when no PIC | 1 delivery working day after delivery | Review newer than latest file exists |
-| Delivery · `failed_delivery_next_step` | Failed Delivery has no recorded next step · named recovery fact | Sales Order PIC; Buddy cover acts; Delivery Duty fallback only when no PIC | Same Delivery working day | Named next fact exists · delivery planning continues |
-| Delivery · `collect_loan_item` | Loan item remains out on delivery day · returned evidence | Sales Order PIC; Buddy cover acts; Delivery Duty fallback only when no PIC | Delivery day | Loan row is returned |
+| Delivery · `arrange_new_delivery_date` | Approved delay requires a reachable new booking · confirmed date/slot | Current Work assignment, initially Sales Order PIC; Delivery Duty fallback only when no PIC | Same Office working day as delay decision | Customer-confirmed reachable booking exists |
+| Delivery · `assign_logistics` | Delivery required with no company · company selected | Current Work assignment, initially Sales Order PIC; Delivery Duty fallback only when no PIC | 3 delivery working days before promise | Delivery company recorded · booking action may open |
+| Delivery · `confirm_delivery_date` | Company assigned but customer date/slot unconfirmed · evidenced booking | Current Work assignment, initially Sales Order PIC; Delivery Duty fallback only when no PIC | Configured call days before promise | Confirmed date and slot with evidence |
+| Delivery · `deliver_today` | Confirmed delivery is today without result · result recorded | Current Work assignment, initially Sales Order PIC; Delivery Duty fallback only when no PIC | Confirmed delivery date | Delivery attempt result exists · proof/recovery follows result |
+| Delivery · `upload_delivery_photo` | Delivered result lacks file · proof file recorded | Current Work assignment, initially Sales Order PIC; Delivery Duty fallback only when no PIC | 1 delivery working day after delivery | File exists · proof review may open |
+| Delivery · `upload_signed_delivery_order` | Delivered result lacks the signed Delivery Order · signed file recorded | Current Work assignment, initially Sales Order PIC; Delivery Duty fallback only when no PIC | 1 delivery working day after delivery | Signed Delivery Order exists · proof review may open |
+| Delivery · `check_delivery_proof` | Latest delivery file is unreviewed · governed review result | Current Work assignment, initially Sales Order PIC; Delivery Duty fallback only when no PIC | 1 delivery working day after delivery | Review newer than latest file exists |
+| Delivery · `failed_delivery_next_step` | Failed Delivery has no recorded next step · named recovery fact | Current Work assignment, initially Sales Order PIC; Delivery Duty fallback only when no PIC | Same Delivery working day | Named next fact exists · delivery planning continues |
+| Delivery · `collect_loan_item` | Loan item remains out on delivery day · returned evidence | Current Work assignment, initially Sales Order PIC; Delivery Duty fallback only when no PIC | Delivery day | Loan row is returned |
 | Payment · `payment.collect_customer_balance` / `payment.missed_promise` | Issued Invoice remains owing when collection is actionable · payment obtained | Stable Collection Owner; active cover acts | Collection deadline or customer's promised day | Atomic allocations reduce Invoice/order outstanding to RM 0 |
 | Payment · `payment.send_storage_invoice` | Live Storage Invoice remains unpaid · invoice sent and money collected | Stable Collection Owner | Shared collection deadline, else `No date` | Live storage owing is RM 0 |
 | Payment · `payment.review_overpayment` | Money exceeds live obligations · allocation or approved refund decision | Payment Approver Duty | Governed `No date` | Overpaid amount is RM 0 or approved refund covers it |
 | Payment/Stock · `payment.check_stored_furniture` | **Not admitted:** open storage case reached inspection interval · inspection result | Warehouse capability/owner rule; admission waits for a governed person resolution | Last check/storage start + configured interval | Due inspection recorded |
 | Finance exception · `resolve_payment_exception` | Open Finance exception holds delivery · clearance evidence | Finance owner rule; unresolved must remain Not assigned | Immediate | Exception cleared with evidence · delivery gate re-evaluates |
 | Purchasing · `claims.record_ask` | **APPROVED TARGET / NOT BUILT (2026-09-25, Purchasing §9.5).** Claim open with no recorded ask · record what Carres asks the supplier. Not projected in slice C1: the record page leads with `Record what we asked` in its Current action instead | PO Duty | Next Office working day after intake/evidence readiness | `requested_action` stored with actor/time · `claims.issue_claim` opens |
-| Purchasing · `claims.issue_claim` | **BUILT ON BRANCH 2026-09-29 (Purchasing §9.5 slice C1, 0607 not applied).** Ask recorded and no confirmed `Claim sent to supplier` · fact `The supplier claim is not issued` · `Share the claim with {Supplier} and record the actual message sent` · deep link: the claim record (`/operation?tab=claims&claim={id}`) | PO Duty through the Shared Duty Resolver; Buddy cover acts | Office calendar: next Office working day after the ask | Confirmed send recorded through `Claim sent to supplier` (`document_sends` kind `supplier_claim`) · `claims.obtain_reply` opens |
+| Purchasing · `claims.issue_claim` | **BUILT ON BRANCH 2026-09-29 (Purchasing §9.5 slice C1, 0607 not applied).** Ask recorded and no confirmed `Claim sent to supplier` · fact `The supplier claim is not issued` · `Share the claim with {Supplier} and record the actual message sent` · deep link: the claim record (`/operation?tab=claims&claim={id}`) | PO Duty assignment through the Shared Duty Resolver | Office calendar: next Office working day after the ask | Confirmed send recorded through `Claim sent to supplier` (`document_sends` kind `supplier_claim`) · `claims.obtain_reply` opens |
 | Purchasing · `claims.obtain_reply` | **BUILT ON BRANCH 2026-09-29 (slice C1).** Ask recorded and sent, no supplier reply · fact `{Supplier} has not replied` · `Ask {Supplier} to reply to the supplier claim` (opens the claim record's `Record supplier reply`) · deep link: the claim record | PO Duty; any active Operation person may record and thereby close it (actual recorder stored) | Office calendar: ask + `Reply waiting days` SNAPSHOTTED onto the claim with the ask (0607; Settings 0606, else 2) — a later Settings change never moves it | `supplier_response` stored with scope, date and evidence (`supplier_claim_replies`, 0607) · outcome work continues in Purchasing |
 | Purchasing · `claims.no_reply_decision` | **BUILT ON BRANCH 2026-09-29 (slice C1).** `Reply expected` + Settings `Extra days before escalation` passed with no reply · fact `{Supplier} has not replied` · `Decide how Carres will resolve the item problem` · deep link: the claim record. PO Duty keeps `claims.obtain_reply` beside it | Purchasing Approver through the Shared Duty Resolver | Office calendar: Reply expected + `Extra days before escalation` snapshotted with the ask (0607; else 2) | The supplier's reply recorded (scope, date, evidence). 🟡 An authorised no-reply decision has no writer yet (Purchasing §9.5 Authorised Outcome), so today only the reply closes it |
-| Purchasing · `purchase_return.issue` | **APPROVED TARGET / NOT BUILT (2026-09-25, Purchasing §9.6).** Claim records `Return to supplier` and no PRTN exists · `Issue the purchase return to {Supplier}` (claim record → `Issue Purchase Return`) | PO Duty | Next Office working day after the decision | PRTN row exists · its send occurrence follows the shared send rule |
-| Purchasing · `purchase_return.confirm_tomorrows_pickup` | **APPROVED TARGET / NOT BUILT (2026-09-25).** `Confirmed Pickup Date` is tomorrow and nothing is collected · `Confirm tomorrow's pickup · {Supplier}` | PO Duty; any active Operation person may record the supplier's confirmation | One Office working day before Confirmed Pickup Date | Evidenced pickup confirmation on the PRTN; a passed date with no Outbound handover reads `Pickup missed · Follow up supplier`; Stock's Outbound handover is the physical fact |
+| Purchasing · `purchase_return.issue` | **BUILT ON BRANCH 2026-09-29 (Purchasing §9.6 creation door, slice C2; 0609 not applied).** Open claim records `Return to supplier` and no Purchase Return is issued for it · fact `Not issued` · `Issue the purchase return to {Supplier}` · deep link: the claim record (`/operation?tab=claims&claim={id}`) → `Issue Purchase Return` | PO Duty through the Shared Duty Resolver; Buddy cover acts | Office calendar: next Office working day after `Return to supplier` was recorded | A Purchase Return issued for the claim (`purchase_returns`, through the one 0548/0609 door) · `purchase_return.send` opens |
+| Purchasing · `purchase_return.send` | **BUILT ON BRANCH 2026-09-29.** A Purchase Return has no confirmed `Return document sent to supplier` · fact `Sending not confirmed` · `Send the return document to {Supplier}` · deep link: the PR record (`/operation?tab=purchase-returns&pr={id}`) | PO Duty through the Shared Duty Resolver; any active Operation person may record the send | Office calendar: next Office working day after the PR Doc Date | Confirmed send recorded (`document_sends` kind `purchase_return`, 0609) |
+| Purchasing · `purchase_return.confirm_tomorrows_pickup` | **BUILT ON BRANCH 2026-09-29.** `Confirmed Pickup Date` is the next Office working day and the return is not fully picked up · `Confirm tomorrow's pickup · {Supplier}` (action · recipient) · deep link: the PR record → `Confirmed Pickup` | PO Duty through the Shared Duty Resolver; any active Operation person may record the supplier's confirmation | One Office working day before Confirmed Pickup Date (the PO day-before rule) | An evidenced pickup confirmation FOR THAT DATE recorded on or after the day before (`purchase_return_pickup_confirmations`, 0609); a confirmation taken at issue does not replace the check |
+| Purchasing · `purchase_return.pickup_missed` | **BUILT ON BRANCH 2026-09-29.** Confirmed Pickup Date passed and Stock's Outbound `Return to supplier` handover recorded no Unit collected · `Pickup missed · Follow up supplier` (fact · action) · deep link: the PR record | PO Duty through the Shared Duty Resolver; Buddy cover acts | The Confirmed Pickup Date | A Unit collected (Stock Outbound actual pickup, Stock §12.8 — writer NOT BUILT) or a new confirmed pickup date not yet passed |
 | Purchasing · `repair_order.issue` | **BUILT ON BRANCH 2026-09-29 (Purchasing §9.7 slice B).** Repair Order exists and its current version is not marked sent · `Issue repair order to {supplier}` · deep link: the RO object (`/operation?tab=repair-orders&ro={id}`) | PO Duty through the Shared Duty Resolver; Buddy cover acts | Office calendar: next Office working day after the RO Doc Date | Confirmed send of the current RO version (`document_sends`) recorded through `Issue repair order` · the receipt follow-up opens |
 | Purchasing · `repair_order.confirm_receipt` | **BUILT ON BRANCH 2026-09-29.** Current version sent, Supplier receipt not recorded · `Ask {Supplier} to confirm they received {RO No}` · deep link: the RO object | PO Duty through the Shared Duty Resolver; Buddy cover acts | Office calendar: next Office working day after the first confirmed send of the current version | Evidenced Supplier receipt recorded (`repair_orders.supplier_received_at`, with the snapshotted 14-working-day Carres return target) |
 | Purchasing · `repair_order.return_date_passed` | **BUILT ON BRANCH 2026-09-29.** Carres return target passed and a Unit is not back · `Ask {Supplier} when {Unit ID} will return` (several: `{first Unit ID} + {n} more`) · deep link: the RO object | PO Duty through the Shared Duty Resolver; Buddy cover acts | Office calendar: the Carres return target (14 Office working days from evidenced Supplier receipt) | Every Unit received back on the RO's return leg (posted GRN through Receiving's arrival post) or the RO cancelled; a Supplier reply or new Supplier date is recorded but NEVER closes it |
@@ -2421,7 +2425,7 @@ using an attractive default.
 
 Use: `Management attention` · `Commitment health` · `Material exposure` · `Work health` ·
 `Recent material change` · `Broken` · `Due today` · `Due later` · `Blocked` · `Not assigned` ·
-`Assigned to` · `Completed by` · `Updated by` · `Assigned by system` · `Last available` · `Could not load` · `Open Team Work` · `Open {module}`.
+`Assigned to` · `Last available` · `Could not load` · `Open Team Work` · `Open {module}`.
 
 Do not use: `At Risk` · `SLA` · `Open POs` as an alert · `Active pipeline` as management health ·
 `to action` · `All on track` without source evidence · `No alerts ✓` · `Escalations` for an
@@ -2579,7 +2583,7 @@ honest Work for admitted modules.
   read today's actor from `resolution` alone and take the company date from `appTodayIso()`.
   Built behaviour: catalogue rows equal `WORKSPACE_DUTIES.length` (12, including Finance Approver);
   an unknown `duty` key is corrected with history-replace; readers receive `Duty assignments are set
-  by the manager.` and zero write controls; `Assign holder` and `Add cover` are focused kit `Modal`
+  by the manager.` and zero write controls; the measured pre-convergence `Assign holder` and `Add cover` are focused kit `Modal`
   acts with §4.4.1 sentences, no optimistic owner change, and
   `Add cover` absent while nobody holds the Duty; an empty catalogue renders the read-failure
   sentence; history uses event / who-when / note ranks with no controls.
@@ -2615,7 +2619,8 @@ honest Work for admitted modules.
   ignored, so Khor Yee is never resolved. The API returns refusal codes only, names the normal owner
   the door wrote in the cover success sentence, and exposes `scheduled_cover_id` asked of the
   resolver on the next cover's first day; the detail shows the resolver's cover by `cover_id` /
-  `scheduled_cover_id` with `{acting} covering for {normal}`, dates and reason. Duty pickers list
+  `scheduled_cover_id` using the pre-convergence staff wording. This measured implementation remains
+  a target gap: §3 requires assignment history, not a competing cover identity, on staff UI. Duty pickers list
   active people only — since 0533 the governed `is_person` marker, not `staff_code`; shared logins
   and disabled accounts are not offered. Staff avatars use the one `personInitials` rule (`Shasha → SH`, `Yu Jun → YJ`) on
   Staff & Duties, Purchase Orders, HR People and Principal Accounts. Real-PostgreSQL proof:
@@ -2677,7 +2682,7 @@ honest Work for admitted modules.
   object is the Delivery scope until a Delivery Order exists, then the exact DO where the
   result/proof act belongs; the server supplies the Delivery editor/DO door. Ownership of the
   business fact remains with Delivery while responsibility for the action resolves to the linked
-  Sales Order PIC and today's Buddy cover, with Delivery Duty only when that order has no PIC.
+  the current recorded Work assignment, initially Sales Order PIC, with Delivery Duty only when that order has no PIC.
 - Payment collection now enters from the complete issued-Invoice register, not a second Sales Order
   balance calculation. The shared readiness and collection clock admit only due/late balances whose
   goods are ready or have a real arrival date; the order's ONE collection owner — the Responsible
@@ -2764,7 +2769,7 @@ The execution sequence that implements this authority is recorded in
 
 - one Duty registry resolves every admitted action/approval;
 - one holder change updates all routing, My Work and Team Work;
-- leave activates Buddy cover without overwriting normal owner;
+- leave/checkpoint changes update the Work assignment with history, preserving the source PIC and actual actors;
 - source completion closes one stable Work identity;
 - actual actor and approval evidence remain immutable;
 - no module has an independent staff list, approver name or cover resolver;

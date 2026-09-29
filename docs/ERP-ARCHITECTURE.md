@@ -141,15 +141,15 @@ authoritative business rule and current roster:
 missing customer commitment       → responsible salesperson
 issue PO / confirm supplier date  → current PO Duty
 receive goods                     → current GRN Duty
-order/customer/delivery follow-up → Sales Order PIC, with Buddy cover
-collect customer balance          → Sales Order PIC, with Buddy cover
+order/customer/delivery follow-up → Work assignment, initially Sales Order PIC
+collect customer balance          → Work assignment, initially Sales Order PIC
 ```
 
 The rule resolves automatically. Staff do not assign routine work order by order. **People** owns
 employment/account eligibility facts only; **Settings → Staff & Duties** is the ONE company-wide
 Duty assignment door. An Owner Rule may reference a stable object owner such as the Sales Order PIC
 or a governed Duty key; modules never keep a second staff list. The shared resolver applies the
-governed Buddy cover so absence changes who sees today's work without changing the underlying
+governed recorded assignment changes so absence changes who sees today's work without changing the underlying
 business record or rewriting its history. A manager may see or filter the resolved owner, but Work
 never creates a second assignment truth.
 
@@ -163,31 +163,24 @@ Existing read-only and write permissions are preserved. Settings never becomes a
 
 **OWNER-APPROVED / LOCKED 2026-09-01; OVERWRITTEN 2026-09-17.** No page, module or API reads a
 rota table or calculates a Duty holder or object-owner cover for itself. The same owner-resolution,
-approval-routing and Buddy-cover mechanism applies across the ERP. Each action names an Owner Rule;
+approval-routing and work-assignment mechanism applies across the ERP. Each action names an Owner Rule;
 that rule may resolve a stable object owner such as the Sales Order PIC or a governed Duty. The
 complete resolution chain is:
 
 ```
 People — individual staff identity, active/access, last working date and leave facts
-→ owning object or Settings → Staff & Duties — normal PIC or Duty Primary and optional Buddy cover
+→ owning object or Settings → Staff & Duties — source PIC/Duty allocation and recorded assignment changes
 → Shared Owner Resolver — date + active staff + leave/cover rules
 → Work Engine — resolves the owner of each action from its Owner rule
 → every Register, object, Dashboard, My Work, Team Work and Quick Rail
 ```
 
-An action stores its assignment rule, trigger, completion fact, governed date and source object.
-**RULING — Jess, 2026-09-29 / approved target, not production-verified:** staff UI uses `Assigned to`
-(current responsibility), `Completed by` (actual completer), `Updated by`, `Assigned by system` and
-`Not assigned`. Retire normal/acting/cover labels from staff UI. Any authorised Operation person may
-help and complete ordinary work without reassignment. Preserve assignment at occurrence opening,
-every movement and reason, actual updaters/completer, timestamps and entry surface in immutable
-history. At 11:00 AM MYT, no qualifying activity that day by the assigned Duty person triggers shared
-reassignment of unfinished work to another eligible active person; this never changes execution
-permission. Recorded leave remains a separate trigger. Workspace and Delivery Monitor use the same
-owning form, validation, write door and completion fact; one save completes the same Work item and
-refreshes both. No duplicate task, completion checkbox or page-local assignment engine.
-The displayed assignee is the shared resolver result, never a page-owned assignment record.
-A page may not read `ops_po_duty`, `ops_po_duty_cover`, a GRN
+An action stores its `Owner rule`, trigger, completion fact, governed date and source object. Its
+audit evidence preserves the original assignment, all subsequent assignment movements, assignment
+effective at each update/completion, actual updater/completer, dates/times and originating surface.
+Source PIC and existing technical identities remain available without competing staff-facing labels.
+Historical evidence never changes when an assignment changes later. The displayed assignment is the resolver result,
+not a second stored `assigned_to`. A page may not read `ops_po_duty`, `ops_po_duty_cover`, a GRN
 rota or any equivalent table directly. It may not implement its own rotation arithmetic. Any action
 or owner avatar that did not come from the shared Work Engine's resolved owner is an architecture
 violation, not an acceptable temporary integration.
@@ -204,13 +197,21 @@ The governed Duty catalogue is business-specific, not one fake `ERP Owner`:
 | Service Case decision | `Service Case Approver` |
 | Sales Order has no PIC and routine Delivery work must remain visible | `Delivery Duty` fallback only — never the routine owner |
 
-Each Duty has exactly one active Primary holder and may have one governed Buddy cover. A Sales
-Order has one PIC and may resolve the same governed Buddy cover for absence. When the
-Primary holder is on recorded leave, the Work Engine routes today's open work to the active Cover;
-it does not rewrite the normal owner. Changing staff or approval ownership happens once in
-`Settings → Staff & Duties`, and every module, My Work and Team Work resolves the change together.
-No action sentence, module setting or permission check hard-codes `Jess`, `Manager` or another
-person's name.
+**ASSIGNMENT AND ACTUAL WORK — OWNER RULING 2026-09-29 / APPROVED TARGET / NOT BUILT.**
+Workspace MASTER §§3–4.4 owns the one contract: `Assigned to` is current responsibility;
+`Completed by` is the actual person who completed the source fact. Any active authorised Operation
+person may help without first changing assignment. Ordinary help is not an approval grant.
+Staff UI has no normal/acting/cover identities, badges, filters or tooltips. Existing internal
+identities and historical records survive, rendered as assignment movements and actual work.
+
+Settings owns two manager-editable company-time checkpoints, initially 10:30 AM and 3:00 PM.
+Each needs its own work-period activity evidence; a morning or background heartbeat does not
+establish afternoon availability. Missing current-period activity may trigger a recorded system
+assignment of unfinished ordinary work to an eligible available person. Preserve source PIC,
+monthly allocation, completed facts and actual actors. No source failure is inferred absence.
+The same assignment is consumed by Settings, My Work, Team Work and module surfaces. Record the
+opening assignment, movements, each updater, completer, times and Workspace/Delivery Monitor origin.
+One business fact completes the occurrence everywhere; no independent Work completion writer.
 
 Owner correction 2026-09-28 / APPROVED TARGET / NOT BUILT: routine operational Duties such as
 PO Duty and GRN Duty follow governed automatic allocation over eligible active staff; the owner
@@ -230,12 +231,12 @@ ownership or the monthly order; no eligible cover stays visible, never an invent
 last-working-date change removes the person and re-resolves open and future Work. Only no eligible
 Primary or Cover produces `Not assigned`, with a direct door to People / Staff & Duties. Capability
 remains separate: an authorised actor may perform an act without becoming its resolved owner, and
-history records assignment movements and actual performers separately (Workspace §3).
+history records normal owner, cover and actual actor separately.
 
 Owner clarification 2026-09-29 / TARGET / NOT BUILT: all active authorised Operation staff people,
 including joining-month newcomers, may execute ordinary operational work such as issuing PO and
 posting GRN without becoming its Duty holder. The newcomer PO rule limits allocation, not execution.
-Assignment history and actual performers remain separate. Approval and separately governed amendment/
+Assignment history and actual actors remain separate facts, presented under `Assigned to`, `Updated by` and `Completed by`. Approval and separately governed amendment/
 void gates remain intact (Workspace §3).
 
 Owner-approved departure boundary (2026-09-29 / NOT BUILT, HR §3): one People-owned confirmation
@@ -732,7 +733,7 @@ or correct its event.
 row's expanded panels · record a customer contact · record the delivery result · upload and
 review the proof · maintain the partner's rules in central Delivery Settings. (The SYSTEM issues
 the delivery order; `Request Delivery Order` is the one governed manual door.) Every routine act
-resolves to the linked Sales Order's PIC and today's governed Buddy cover. Only an order with no
+resolves to the linked Sales Order's PIC and the current recorded Work assignment. Only an order with no
 PIC falls back to `Delivery Duty`, where the unresolved work remains visible with the Staff &
 Duties correction door. The Loan offer and decision stay with the Customer Order.
 
@@ -866,7 +867,7 @@ Supplier Claim · Payment/Refund · Guarantee, as applicable.
 
 ### GLOBAL DUTY AND APPROVAL ROUTING — OWNER-APPROVED 2026-09-03
 
-Workspace owns one Staff & Duties registry for governed Duties and Buddy cover. Approval and
+Workspace owns one Staff & Duties registry for governed Duties and assignment changes. Approval and
 specialist work maps to its own Duty (for example Storage Waiver Approver or Purchasing Approver);
 routine order, Delivery and collection work maps to the Sales Order PIC. Delivery Duty is only the
 no-PIC fallback. There is no universal ERP Manager owner. Resolution retains normal owner, today's

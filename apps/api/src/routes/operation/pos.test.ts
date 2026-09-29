@@ -3067,3 +3067,76 @@ describe("GET /api/operation/pos/for-order/:orderId — the Work Supplier card's
     expect(res.status).toBe(403);
   });
 });
+
+describe("POST /api/operation/pos/:id/change-deliver-to (0610 · Purchasing §5.4)", () => {
+  const LINE = "570cc230-d0f3-45ef-a525-f3f061bf7d85";
+  const AL = "818b420c-27f9-4707-a516-b91a6e03f343";
+  const post = async (body: unknown) =>
+    app.fetch(
+      new Request("http://t/api/operation/pos/PO-20260903-4316/change-deliver-to", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${await makeJwt("operation")}`, "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+      env,
+    );
+
+  it("calls the ONE door with the chosen Units and returns its version", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: { version: 2, to_line: "new-line", unit_codes: ["U1-000-026", "U1-000-027"] }, error: null });
+    vi.mocked(userClient).mockReturnValue({ rpc } as never);
+    const res = await post({ lineId: LINE, qty: 2, destinationId: AL, reason: "Customer in Sungai Buloh", unitCodes: ["U1-000-026", "U1-000-027"] });
+    expect(res.status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("purchasing_change_po_deliver_to", {
+      p_po_id: "PO-20260903-4316",
+      p_line_id: LINE,
+      p_qty: 2,
+      p_destination_id: AL,
+      p_reason: "Customer in Sungai Buloh",
+      p_unit_codes: ["U1-000-026", "U1-000-027"],
+    });
+    assertRpcCallShape(rpc, "purchasing_change_po_deliver_to",
+      ["p_po_id", "p_line_id", "p_qty", "p_destination_id", "p_reason", "p_unit_codes"]);
+    expect(await res.json()).toMatchObject({ ok: true, result: { version: 2 } });
+  });
+
+  it("lets the server pick the Units when none are named", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: { version: 2 }, error: null });
+    vi.mocked(userClient).mockReturnValue({ rpc } as never);
+    await post({ lineId: LINE, qty: 1, destinationId: AL, reason: "Nearer the customer" });
+    expect(rpc.mock.calls[0]?.[1]).toMatchObject({ p_unit_codes: null });
+  });
+
+  it("refuses an empty reason before any database call", async () => {
+    const rpc = vi.fn();
+    vi.mocked(userClient).mockReturnValue({ rpc } as never);
+    const res = await post({ lineId: LINE, qty: 1, destinationId: AL, reason: "   " });
+    expect(res.status).toBe(422);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    "same_destination", "all_received", "qty_out_of_range", "unit_chosen_twice",
+    "unit_not_on_line", "unit_count_mismatch", "deliver_to_line_exists", "deliver_to_closed",
+  ])("passes the door's own refusal %s through by code", async (code) => {
+    const rpc = vi.fn().mockResolvedValue({ data: null, error: { code: "P0001", message: "refused", details: code } });
+    vi.mocked(userClient).mockReturnValue({ rpc } as never);
+    const res = await post({ lineId: LINE, qty: 1, destinationId: AL, reason: "x" });
+    expect(res.status).toBe(422);
+    expect(await res.json()).toMatchObject({ code });
+  });
+
+  it("retires 0311's split route: it no longer exists", async () => {
+    const rpc = vi.fn();
+    vi.mocked(userClient).mockReturnValue({ rpc } as never);
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/pos/lines/${LINE}/split`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${await makeJwt("operation")}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ moveQty: 1, destinationId: AL }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(404);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+});

@@ -51,7 +51,7 @@ const doc = (over: Partial<PurchaseReturnListRow> = {}): PurchaseReturnListRow =
   supplier_name: "Hookka",
   claim_no: "SC-1038",
   grn_no: "GRN-20260904-1064",
-  document_sent_at: null,
+  sent_at: null,
   confirmed_pickup_date: null,
   units: [unit()],
   ...over,
@@ -244,7 +244,7 @@ describe("the rail is exactly the confirmed preview", () => {
 describe("the rail conditions are facts, and they overlap", () => {
   it("marks an unsent, unconfirmed, uncollected return under all three", () => {
     expect(purchaseReturnConditions(doc())).toEqual([
-      "Return document not sent",
+      "Sending not confirmed",
       "Pickup date not confirmed",
       "Not picked up",
     ]);
@@ -252,7 +252,7 @@ describe("the rail conditions are facts, and they overlap", () => {
 
   it("separates partly from fully picked up", () => {
     const partly = doc({
-      document_sent_at: "2026-09-15T05:00:00Z",
+      sent_at: "2026-09-15T05:00:00Z",
       confirmed_pickup_date: "2026-09-16T02:00:00Z",
       units: [
         unit({
@@ -265,7 +265,7 @@ describe("the rail conditions are facts, and they overlap", () => {
     expect(purchaseReturnConditions(partly)).toEqual(["Partly picked up"]);
 
     const fully = doc({
-      document_sent_at: "2026-09-15T05:00:00Z",
+      sent_at: "2026-09-15T05:00:00Z",
       confirmed_pickup_date: "2026-09-16T02:00:00Z",
       units: [
         unit({
@@ -279,7 +279,7 @@ describe("the rail conditions are facts, and they overlap", () => {
 
   it("does not claim supplier receipt from a fully picked-up return", () => {
     const row = doc({
-      document_sent_at: "2026-09-15T05:00:00Z",
+      sent_at: "2026-09-15T05:00:00Z",
       confirmed_pickup_date: "2026-09-16T02:00:00Z",
       units: [
         unit({
@@ -351,18 +351,18 @@ describe("rail counts count documents, not Units", () => {
 
   it("respects the active condition when counting suppliers", () => {
     const mixed = [
-      doc({ id: "a", supplier_name: "Hookka", document_sent_at: "2026-09-15T05:00:00Z" }),
+      doc({ id: "a", supplier_name: "Hookka", sent_at: "2026-09-15T05:00:00Z" }),
       doc({ id: "b", supplier_name: "Ohana" }),
     ];
     expect(
-      purchaseReturnSupplierCounts(mixed, { condition: "Return document not sent" }),
+      purchaseReturnSupplierCounts(mixed, { condition: "Sending not confirmed" }),
     ).toEqual([{ supplier: "Ohana", count: 1 }]);
   });
 
   it("respects the active supplier when counting conditions", () => {
     const counts = purchaseReturnConditionCounts(rows, { supplier: "Ohana" });
     expect(counts).toEqual([
-      { condition: "Return document not sent", count: 1 },
+      { condition: "Sending not confirmed", count: 1 },
       { condition: "Pickup date not confirmed", count: 1 },
       { condition: "Not picked up", count: 1 },
     ]);

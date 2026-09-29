@@ -443,6 +443,56 @@ export function purchasingRefusal(
         todo: "Wait for the PDF, then record it as sent.",
       };
 
+    // ── CHANGE DELIVER TO (0610 · Purchasing §5.4) ───────────────────────
+    case "po_not_open":
+      return {
+        wrong: `${po} is not open.`,
+        todo: "Open Purchase Orders and check the live purchase order.",
+      };
+    case "deliver_to_closed":
+      return {
+        wrong: `${dest} is closed.`,
+        todo: "Choose another Deliver To, then Review changes again.",
+      };
+    case "same_destination":
+      return {
+        wrong: `These goods already go to ${dest}.`,
+        todo: "Choose another Deliver To.",
+      };
+    case "all_received":
+      return {
+        wrong: `All ${sku} on ${po} is received.`,
+        todo: "Use a transfer instead.",
+      };
+    case "qty_out_of_range":
+      return {
+        wrong: "Qty to move is more than the qty you can move.",
+        todo: `Enter a whole number from 1 to ${some(
+          facts.qty == null ? null : String(facts.qty),
+          "the qty you can move",
+        )}.`,
+      };
+    case "unit_chosen_twice":
+      return {
+        wrong: "A Unit ID is chosen twice.",
+        todo: "Choose each Unit ID once.",
+      };
+    case "unit_not_on_line":
+      return {
+        wrong: "A chosen Unit ID is no longer on this line.",
+        todo: "Reload the purchase order and choose the Unit IDs again.",
+      };
+    case "unit_count_mismatch":
+      return {
+        wrong: "The Unit IDs chosen do not match Qty to move.",
+        todo: `Choose ${some(facts.qty == null ? null : String(facts.qty), "the same number of")} Unit IDs.`,
+      };
+    case "deliver_to_line_exists":
+      return {
+        wrong: `${sku} already has a line going to ${dest}.`,
+        todo: "Move one less, or use Revise quantity or Deliver To on that line.",
+      };
+
     // ── THE REQUEST ITSELF ────────────────────────────────────────────────
     case "invalid_body":
     case "invalid_param":
@@ -545,6 +595,15 @@ export const PURCHASING_REFUSAL_CODES = [
   "recipient_required",
   "invalid_channel",
   "expected_version_required",
+  "po_not_open",
+  "deliver_to_closed",
+  "same_destination",
+  "all_received",
+  "qty_out_of_range",
+  "unit_chosen_twice",
+  "unit_not_on_line",
+  "unit_count_mismatch",
+  "deliver_to_line_exists",
   "invalid_body",
   "invalid_param",
   "invalid_json",

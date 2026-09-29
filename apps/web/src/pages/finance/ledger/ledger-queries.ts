@@ -85,6 +85,71 @@ export function useLedgerEntries(scope: JournalScope) {
   });
 }
 
+/** One account's balance after each entry that moved it. */
+export interface AccountBalances {
+  /** The account's kind from the chart: it says which side the balance sits on. */
+  kind: string;
+  /** Entry number → the balance after that entry's last line on the account,
+   *  positive on the account's own side (debit for ASSET and EXPENSE, credit
+   *  for the rest), exactly as the database counts it. */
+  after: Map<string, number>;
+}
+
+const BALANCES_FAILED = "The running balances could not be loaded. Try again.";
+
+/**
+ * The account ledger (`gl_account_ledger`, 0540) read as a balance per entry.
+ * The database adds up the running balance itself, starting from the opening
+ * balance (everything posted before `from`), so a date range, a department or
+ * the Journal's own paging never changes the figure on a line. Refused unless
+ * it answered OK for this account, its last running balance is its closing
+ * balance, and every figure is a number: a partial answer is never shown.
+ */
+export function parseAccountBalances(body: unknown, account: string): AccountBalances {
+  const b = body as { status?: unknown; account_code?: unknown; kind?: unknown; rows?: unknown } | null;
+  if (!b || b.status !== "OK" || b.account_code !== account || typeof b.kind !== "string" || !Array.isArray(b.rows)) {
+    throw new Error(BALANCES_FAILED);
+  }
+  const rows = b.rows as Record<string, unknown>[];
+  const closing = rows.filter((r) => r.row_kind === "CLOSING");
+  if (closing.length !== 1 || rows[0]?.row_kind !== "OPENING") throw new Error(BALANCES_FAILED);
+  const after = new Map<string, number>();
+  let last = rows[0].running_balance;
+  for (const r of rows) {
+    if (r.row_kind !== "LINE") continue;
+    if (typeof r.entry_no !== "string" || typeof r.running_balance !== "number") throw new Error(BALANCES_FAILED);
+    // Lines arrive in the ledger's order, so an entry's last line wins.
+    after.set(r.entry_no, r.running_balance);
+    last = r.running_balance;
+  }
+  if (typeof last !== "number" || last !== closing[0]!.running_balance) throw new Error(BALANCES_FAILED);
+  return { kind: b.kind, after };
+}
+
+/**
+ * The balances for the Journal narrowed to one account. `oldest` and `newest`
+ * are the dates of the oldest and newest entries the Journal holds: with no
+ * dates picked the read covers exactly them, and the opening balance carries
+ * everything before the oldest. So a Journal cut to its newest entries still
+ * shows true balances, and the read never grows past the entries on the page.
+ * ponytail: the account ledger refuses more than 20,000 lines (422); a
+ * Journal of 10,000 entries on one account stays inside that unless entries
+ * average two lines on it. Page the ledger read if that ever happens.
+ */
+export function useAccountBalances(scope: JournalScope, oldest: string | null, newest: string | null) {
+  const account = scope.account;
+  const from = scope.from ?? oldest;
+  const to = scope.to ?? newest;
+  return useQuery({
+    queryKey: [...ledgerKeys.all(), "balances", account ?? "", from ?? "", to ?? "", scope.dept ?? ""] as const,
+    queryFn: async () => {
+      const q = new URLSearchParams({ account: account!, from: from!, to: to!, ...departmentSearch(scope.dept) });
+      return parseAccountBalances(await apiFetch<unknown>(`/api/finance/ledger/account-ledger?${q.toString()}`), account!);
+    },
+    enabled: Boolean(account && from && to && from <= to),
+  });
+}
+
 /** One entry with its lines, by entry number or id. */
 export function useLedgerEntry(ref: string | null) {
   return useQuery({

@@ -638,7 +638,7 @@ describe("POST /accounts (0577)", () => {
     expect(res.status).toBe(201);
     expect(await json(res)).toEqual({ code: "900-A001" });
     expect(sb.rpc).toHaveBeenCalledWith("gl_account_add", {
-      p_parent_code: "6000", p_code: "900-A001", p_name: "Freight", p_first_code: null, p_first_name: null,
+      p_parent_code: "6000", p_code: "900-A001", p_name: "Freight", p_first_code: null, p_first_name: null, p_is_heading: false, p_kind: null,
     });
   });
 
@@ -648,7 +648,46 @@ describe("POST /accounts (0577)", () => {
     expect(res.status).toBe(201);
     expect(sb.rpc).toHaveBeenCalledWith("gl_account_add", {
       p_parent_code: "1000", p_code: "1400", p_name: "Deposits paid", p_first_code: "1410", p_first_name: "Rental deposits",
+      p_is_heading: false, p_kind: null,
     });
+  });
+
+  it("adds a heading on its own, with no first account (0608)", async () => {
+    const { sb } = fakeClient(() => ok("8000"));
+    const res = await post({ parentCode: "6000", code: "8000", name: "testhead", isHeading: true });
+    expect(res.status).toBe(201);
+    expect(await json(res)).toEqual({ code: "8000" });
+    expect(sb.rpc).toHaveBeenCalledWith("gl_account_add", {
+      p_parent_code: "6000", p_code: "8000", p_name: "testhead", p_first_code: null, p_first_name: null, p_is_heading: true, p_kind: null,
+    });
+  });
+
+  it("adds a heading at the top of the chart with its kind (0608)", async () => {
+    const { sb } = fakeClient(() => ok("8000"));
+    const res = await post({ parentCode: null, code: "8000", name: "Other income", isHeading: true, kind: "INCOME" });
+    expect(res.status).toBe(201);
+    expect(sb.rpc).toHaveBeenCalledWith("gl_account_add", {
+      p_parent_code: null, p_code: "8000", p_name: "Other income", p_first_code: null, p_first_name: null, p_is_heading: true, p_kind: "INCOME",
+    });
+  });
+
+  it("forwards the refusal of an account at the top that is not a heading", async () => {
+    fakeClient(() => refuse("22023", "add_top_account", "Only a heading goes at the top of the chart. Pick the heading this account goes under."));
+    const res = await post({ parentCode: null, code: "8000", name: "Other income" });
+    expect(res.status).toBe(422);
+    expect((await json(res)).code).toBe("add_top_account");
+  });
+
+  it("refuses a kind the chart does not have before the database", async () => {
+    const { sb } = fakeClient(() => ok("x"));
+    expect((await post({ parentCode: null, code: "8000", name: "Other income", isHeading: true, kind: "OTHER" })).status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
+
+  it("refuses an isHeading that is not true or false", async () => {
+    const { sb } = fakeClient(() => ok("x"));
+    expect((await post({ parentCode: "6000", code: "8000", name: "testhead", isHeading: "yes" })).status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
   });
 
   it("refuses operation, a bad number and a blank name before the database", async () => {
@@ -914,6 +953,23 @@ describe("GET /account-ledger", () => {
     expect(calls).toHaveLength(2);
     expect(calls[0]!.args).toEqual({ p_account_code: "1210", p_from: "2026-09-01", p_to: "2026-09-30", p_department_type: null, p_department_id: null });
     expect(ops(calls[1], "range")).toEqual([["range", 1000, 1999]]);
+  });
+
+  it("hands a credit account's running balance through as the database counted it", async () => {
+    // gl_account_ledger counts a LIABILITY as credit less debit, from the
+    // opening balance (everything before `from`). The route keeps that sign
+    // and the kind, which is how the Journal knows the side.
+    const row = { report_status: "OK", go_live_on: "2026-09-10", account_code: "2110", account_name: "Trade payables", kind: "LIABILITY" };
+    fakeClient(() => ok([
+      { ...row, ordinal: 1, row_kind: "OPENING", running_balance: "1000.00" },
+      { ...row, ordinal: 2, row_kind: "LINE", entry_no: "JE-T-0002", debit: "300.00", credit: "0.00", running_balance: "700.00" },
+      { ...row, ordinal: 3, row_kind: "LINE", entry_no: "JE-T-0003", debit: "0.00", credit: "50.00", running_balance: "750.00" },
+      { ...row, ordinal: 4, row_kind: "CLOSING", debit: "300.00", credit: "50.00", running_balance: "750.00" },
+    ]));
+    const body = await json(await get("/account-ledger?account=2110&from=2026-09-12&to=2026-09-30"));
+    expect(body.kind).toBe("LIABILITY");
+    expect(body.rows.map((r: { row_kind: string; running_balance: number }) => [r.row_kind, r.running_balance]))
+      .toEqual([["OPENING", 1000], ["LINE", 700], ["LINE", 750], ["CLOSING", 750]]);
   });
 
   it("needs an account and both dates", async () => {

@@ -320,6 +320,8 @@ import {
   type DeliveryTemplateRow,
   type DeliverySettingChangeRow,
   type PurchaseReturnListRow,
+  type PurchaseReturnDetail,
+  type PurchaseReturnIssueSource,
   type RepairOrderDetail,
   type RepairOrderEligibleUnit,
   type RepairOrderListRow,
@@ -3973,7 +3975,44 @@ export function useRepairOrderEvidence(id: string | null) {
  * server and the screen cannot hold two ideas of what a purchase return is.
  */
 export interface PurchaseReturnsResponse {
-  returns: PurchaseReturnListRow[];
+  /** The register row plus its send ledger and pickup confirmations (0609). */
+  returns: (PurchaseReturnListRow & Partial<Pick<PurchaseReturnDetail, "supplier_claim_id" | "sends" | "confirmations">>)[];
+}
+
+/** One Purchase Return record (§9.6): Units, send ledger, confirmations. */
+export function usePurchaseReturn(id: string | null) {
+  return useQuery({
+    queryKey: ["operation", "purchase-returns", "record", id] as const,
+    enabled: Boolean(id),
+    queryFn: () => apiFetch<{ purchaseReturn: PurchaseReturnDetail }>(`/api/operation/purchase-returns/${encodeURIComponent(id ?? "")}`),
+  });
+}
+
+/** The `Issue Purchase Return` form's facts, read fresh each time it opens:
+ *  the `seen` token the door compares is only as good as its read. */
+export function usePurchaseReturnIssueSource(claimId: string | null) {
+  return useQuery({
+    queryKey: ["operation", "purchase-returns", "issue-source", claimId] as const,
+    enabled: Boolean(claimId),
+    staleTime: 0,
+    refetchOnWindowFocus: false,
+    queryFn: () => apiFetch<{ source: PurchaseReturnIssueSource }>(`/api/operation/purchase-returns/issue-source?claim=${encodeURIComponent(claimId ?? "")}`),
+  });
+}
+
+/** A Purchase Return write (issue · send · pickup confirmation) or the claim's
+ *  `Record what Carres does next`, refreshing the claim and return reads. A
+ *  refusal is the door's own words. */
+export function usePurchaseReturnWrite<T = unknown>(path: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (body: object) => apiFetch<T>(path, { method: "POST", body: JSON.stringify(body) }),
+    onSettled: () => {
+      void client.invalidateQueries({ queryKey: ["operation", "purchase-returns"] });
+      void client.invalidateQueries({ queryKey: ["operation", "supplier-claims"] });
+      void client.invalidateQueries({ queryKey: qk.operation.supplierClaims("all") });
+    },
+  });
 }
 
 export function useOperationPurchaseReturns(
@@ -4036,6 +4075,19 @@ export interface SupplierClaimRecord {
   purchase_returns: Array<{ id: string; pr_no: string }> | null;
   authorised_outcome: string | null;
   plan_repair: { allowed: boolean; missing: string | null };
+  /** §9.6 `Record what Carres does next` (0409 value, 0609 gate). */
+  carres_execution?: string | null;
+  carres_execution_at?: string | null;
+  carres_execution_by_name?: string | null;
+  /** The server confirms: PO Duty, dated cover or Operations Superuser. */
+  may_record_next?: boolean;
+  /** OWNER RULING 2026-09-29: the ONE supplier-side decision = Authorised Outcome. */
+  decision?: "return_to_supplier" | "repair" | "replacement" | null;
+  decision_at?: string | null;
+  decision_by_name?: string | null;
+  /** Values recorded before the ruling, as history. */
+  legacy_words?: string[];
+  plan_replacement?: { allowed: boolean };
   po_duty_name: string | null;
   approver_name: string | null;
 }
@@ -5501,6 +5553,29 @@ export function useRevisePo(poId: string | null) {
     }) =>
       apiFetch<{ ok: true; result: { version: number } }>(
         `/api/operation/pos/${encodeURIComponent(poId ?? "")}/revise`,
+        { method: "POST", body: JSON.stringify(input) },
+      ),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["operation", "pos"] });
+    },
+  });
+}
+
+/** POST /:id/change-deliver-to — `Change Deliver To` (0610, Purchasing §5.4).
+ *  Part or all of one line's undelivered qty moves to another Deliver To on
+ *  the SAME PO as its next version; exact Units keep their IDs. */
+export function useChangePoDeliverTo(poId: string | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: {
+      lineId: string;
+      qty: number;
+      destinationId: string;
+      reason: string;
+      unitCodes?: string[];
+    }) =>
+      apiFetch<{ ok: true; result: { version: number; to_line: string; unit_codes: string[] } }>(
+        `/api/operation/pos/${encodeURIComponent(poId ?? "")}/change-deliver-to`,
         { method: "POST", body: JSON.stringify(input) },
       ),
     onSuccess: () => {
