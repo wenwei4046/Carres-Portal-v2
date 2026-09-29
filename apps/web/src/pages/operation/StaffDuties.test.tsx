@@ -214,15 +214,18 @@ function wholeCatalogue(canAssign = true): WorkspaceDutiesResponse {
 // ── render ───────────────────────────────────────────────────────────────────
 
 let lastSearch = "";
+let lastState: unknown = null;
 
 function Probe() {
-  lastSearch = useLocation().search;
+  const location = useLocation();
+  lastSearch = location.search;
+  lastState = location.state;
   return null;
 }
 
-function draw(url = "/operation?tab=staff-duties") {
+function draw(url = "/operation?tab=staff-duties", initialState?: unknown) {
   return render(
-    <MemoryRouter initialEntries={[url]}>
+    <MemoryRouter initialEntries={[{ pathname: url.split("?")[0], search: url.includes("?") ? `?${url.split("?")[1]}` : "", state: initialState }]}>
       <Routes>
         <Route
           path="/operation"
@@ -1267,4 +1270,15 @@ describe("approved plain-person Settings view", () => {
     expect(screen.queryByRole("button", { name: "More actions" })).not.toBeInTheDocument();
     expect(screen.queryByText("Duty assignments are set by the manager.")).not.toBeInTheDocument();
   });
+});
+
+
+it("keeps the originating Work context when a duty is chosen and when returning to the catalogue", () => {
+  const origin = { from: "/operation?tab=work&scope=team&selected=order-1" };
+  draw("/operation?tab=staff-duties", origin);
+  fireEvent.click(screen.getByTestId("duty-catalogue-grn_duty"));
+  expect(lastState).toEqual(origin);
+  fireEvent.click(screen.getByRole("button", { name: "Back to duties" }));
+  expect(lastState).toEqual(origin);
+  expect(screen.getByRole("button", { name: "Back to work" })).toBeVisible();
 });

@@ -60,21 +60,21 @@ export default function StaffDuties({ settingsNavigation }: { settingsNavigation
     if (!requested || known || duties.length === 0) return;
     const next = new URLSearchParams(params);
     next.set("duty", duties[0]!.key);
-    setParams(next, { replace: true });
-  }, [requested, known, duties, params, setParams]);
+    setParams(next, { replace: true, state: location.state });
+  }, [requested, known, duties, params, setParams, location.state]);
 
   function select(key: string) {
     lastSelected.current = key;
     const next = new URLSearchParams(params);
     next.set("duty", key);
-    setParams(next);
+    setParams(next, { state: location.state });
   }
 
   function back() {
     focusOnReturn.current = lastSelected.current ?? selectedKey;
     const next = new URLSearchParams(params);
     next.delete("duty");
-    setParams(next);
+    setParams(next, { state: location.state });
   }
 
   useEffect(() => {
