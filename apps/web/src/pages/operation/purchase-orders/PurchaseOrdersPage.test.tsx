@@ -239,6 +239,7 @@ vi.mock("@/lib/queries", () => ({
   useSetDefaultRegisterLayout: () => ({ mutateAsync: vi.fn() }),
   useRecordSupplierAnswers: () => ({ mutate: supplierDateMutate, isPending: false }),
   useRevisePo: () => ({ mutate: reviseMutate, isPending: false }),
+  useChangePoDeliverTo: () => ({ mutate: vi.fn(), isPending: false }),
   useSetPoTermsDays: () => ({ mutate: termsMutate, isPending: false }),
 }));
 
@@ -961,6 +962,19 @@ describe("Purchase Order object", () => {
       },
       expect.any(Object),
     );
+  });
+
+  it("Edit holds Change Deliver To (§5.4), which opens beside the official PDF", () => {
+    renderPage("/operation/procurement?po=PO-20260828-4827");
+    fireEvent.keyDown(screen.getByTestId("po-object-edit"), { key: "Enter" });
+    expect(screen.getAllByRole("menuitem").map((item) => item.textContent)).toEqual([
+      "Revise quantity or Deliver To",
+      "Change Deliver To",
+    ]);
+    fireEvent.click(screen.getByRole("menuitem", { name: "Change Deliver To" }));
+    expect(screen.getByRole("heading", { name: "Change Deliver To" })).toBeInTheDocument();
+    expect(screen.getByTestId("change-deliver-to-form")).toBeInTheDocument();
+    expect(screen.getByTestId("po-document-split")).toHaveAttribute("data-layout", "50-50");
   });
 
   it("shows a closed historical Deliver To but does not offer it for new work", () => {
