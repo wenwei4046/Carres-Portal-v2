@@ -22,6 +22,40 @@
 
 # §1 · Overview
 
+## Shared field-operation UI — owner ruling 2026-09-29
+
+**RULING / APPROVED DIRECTION / IMPLEMENTATION AND OPERATOR VALIDATION PENDING.**
+Jess approved in Opit-Warehouse (task `01a0eb1b-b390-7191-b75b-571d5e43c76c`): office
+staff manage through registers; Warehouse, Delivery and NETS share a simple field-operation
+interaction pattern. The target operator has limited English and computer literacy and should
+only perform the physical work, make the necessary confirmation, take photos and submit.
+
+- Reuse the existing UI kit. Shared means the same interaction and familiar controls across
+  tasks, not identical business steps or merely making every surface a card.
+- Office registers retain management, planning and exception resolution. Field tasks foreground
+  what to do now, with one clear primary next action and system-provided party, place, goods,
+  quantity and related record. Do not shrink the office register into a phone-sized task card.
+- Present only the current necessary step. Prefer scan or selection over typing; request photos
+  where the owning workflow requires evidence. The system supplies known facts and performs
+  calculations, record linking and follow-up routing.
+- A problem door captures the observed problem and required evidence; office staff handle the
+  resulting management work. Do not ask field operators to manage commercial decisions,
+  schedules, stock adjustments or document administration.
+- Photos alone never establish completion. Preserve the owning workflow's Unit/quantity,
+  receiving, loading, handover, recipient and proof requirements where applicable. Loading
+  remains distinct from driver acceptance; no UI simplification creates a second write owner.
+- Show the recorded outcome and any next responsible party after successful submission. A
+  failed upload or submission must not appear completed.
+- Schedules open the owning work record; GRN/DO and other records stay automatically linked.
+  Keep established navigation and PDF family formats. This ruling does not authorize another
+  PDF design or a new standalone warehouse dashboard.
+
+The owner's approved text sketch illustrates the direction; it does not freeze English labels,
+card geometry or an unconditional four-step flow. Use COPY-STANDARD and the existing kit for the
+concrete design. Validate receiving, short/damaged arrivals and delivery, including failure and
+retry states, with the target operators before claiming completion or a 10/10 result. Do not
+reopen this approved direction while resolving those concrete designs.
+
 **Purchase Returns rail — approved target, 2026-09-18:** reuse the Supplier Claims supplier-list
 pattern (heading icon, name + right-aligned document count, active state, click again to clear).
 Supplier filtering combines with operational conditions. Exact page fields and rail sections
