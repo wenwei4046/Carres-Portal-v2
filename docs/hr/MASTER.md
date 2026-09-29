@@ -84,7 +84,9 @@ against a real session.
   required People-owned eligibility. Account creation alone does not enrol them. Departure exclusion
   takes effect immediately on its effective date, not the next month (Workspace §4).
   Owner-approved PO timing 2026-09-28: exclude newcomers from PO in their calendar month of
-  joining; automatically admit them from the following month while active and otherwise eligible.
+  joining for responsibility allocation only; automatically admit them from the following month
+  while active and otherwise eligible. Owner clarification 2026-09-29: newcomers may actually place
+  PO and perform ordinary Operation work in their joining month; no execution waiting period.
   No separate manager competency confirmation or training sign-off is required (Workspace §4).
 - **Checklists are a shared constant, not a config table.**
 - **Departure visibility — owner correction 2026-09-28 / APPROVED TARGET / NOT BUILT:** after

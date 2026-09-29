@@ -223,6 +223,12 @@ Primary or Cover produces `Not assigned`, with a direct door to People / Staff &
 remains separate: an authorised actor may perform an act without becoming its resolved owner, and
 history records normal owner, cover and actual actor separately.
 
+Owner clarification 2026-09-29 / TARGET / NOT BUILT: all active authorised Operation staff people,
+including joining-month newcomers, may execute ordinary operational work such as issuing PO and
+posting GRN without becoming its Duty holder. The newcomer PO rule limits allocation, not execution.
+Normal owner, cover and actual actor remain separate. Approval and separately governed amendment/
+void gates remain intact (Workspace §3).
+
 An action owner and an action capability are separate facts. A governed Operations Superuser may
 perform the operational action without replacing the resolved owner. The event records both the
 actual actor and the normal duty/dated-cover context; UI owner chips continue to show the owner, not

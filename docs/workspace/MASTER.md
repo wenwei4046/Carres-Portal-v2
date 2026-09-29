@@ -110,8 +110,26 @@ future routing everywhere but never rewrites history.
 - `jess@carres.com` is Jess's **personal management identity**, role `principal`, person, `CR002`.
 - **Nobody assigns a Duty to themself or names themself as cover** — every role, the principal
   included (`self_assignment_refused`). This is the daily control.
-- Absence is expressed as a dated Buddy cover. With no eligible cover, the action **waits** for its
-  normal holder; it is never downgraded to another role, a position rung or an email list.
+- Absence is expressed as a dated Buddy cover. With no eligible cover, an approval **waits** for
+  its authorised holder; it is never downgraded to another role, position rung or email list.
+  Ordinary operational work follows the owner/actor rule below and is not blocked merely because
+  the normal holder or cover is absent.
+
+**OPERATIONAL EXECUTION ≠ DUTY ALLOCATION — OWNER-APPROVED 2026-09-29 / TARGET / NOT BUILT.**
+Every active authorised Operation staff person, including a newcomer in their joining month, may
+perform ordinary operational work, including placing/issuing PO and posting GRN, without being the
+Duty holder or cover. The first-month PO restriction applies to allocation of normal PO Duty, not
+to executing a PO action. The separately approved joining-month exclusion from automatic PO cover
+selection is also a routing rule, never a reason to refuse that person's ordinary PO execution.
+Record normal owner, dated cover and actual actor separately; helping does not take ownership,
+change the monthly rota or mark unrelated Work complete. Unrecorded sudden MC may be handled by
+colleagues through Team Work; recorded leave uses §4.4's automatic operational cover. Do not block
+ordinary work merely because nobody is available as assigned cover. Do not add a claim button.
+
+This ruling does not grant commercial approval, allow self-approval, bypass source-document facts,
+or automatically widen separately governed amendment/void powers. Approver Duties retain their
+own gates. Owning modules must converge their ordinary-action permission doors and actual-actor
+evidence to this target; existing restrictive code is measured implementation, not the final law.
 
 ## 4 · Staff & Duties
 
@@ -469,11 +487,9 @@ must converge with this chat's later approved automatic PO/GRN cover from record
 Do not copy its older page composition over this chat's separately approved `Next assignment` and
 catalogue/detail rules or claim its broad operational-permission target is deployed.
 
-**REAL GAP — newcomer execution versus allocation.** This chat approved no first-month PO Duty,
-then automatic next-month rotation entry. The imported operational rule permits active Operation
-staff to execute PO work without being its holder. Whether a joining-month newcomer may actually
-issue PO as a non-holder is not explicitly reconciled. Resolve that boundary with the owner before
-claiming the combined permission Blueprint complete; do not silently treat either reading as law.
+**RESOLVED — OWNER RULING 2026-09-29.** Joining-month newcomers may actually place PO and perform
+ordinary operational work. The first-month restriction governs Duty allocation only (§3); no
+additional PO competency sign-off or execution waiting period is authorised.
 `Who can act`/`End cover` presentation in the pasted third-segment proposal is not approved merely
 because the owner supplied it for reconciliation. Existing module approval, amendment, void and
 commercial gates must be checked against the exact operational-action scope.

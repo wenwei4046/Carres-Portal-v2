@@ -315,13 +315,22 @@ retype it.
 
 ### 5.3 One PO issue authority
 
+**OPERATIONAL PERMISSION — OWNER-APPROVED 2026-09-29 / TARGET / NOT BUILT.** Every active
+Operation staff person, including a joining-month newcomer, may perform ordinary PO work and
+issue a PO without holding PO Duty or cover. The first-month restriction affects allocation to
+PO Duty, not permission to place/issue PO. Record normal Duty holder, cover and actual issuer
+separately. Existing approved-demand, document, quantity and commercial approval gates remain;
+no approval capability or self-approval exception is granted. This overrides the ordinary-Operation
+Duty-only issue gate described in the implementation evidence below; it is not proof of deployment.
+
 Current PO Duty, or the dated cover while one is in force, is the normal work owner and remains
 accountable for PO issuance. A governed Operations Superuser may also complete any operational PO
 action without becoming — or being displayed/audited as — the duty holder. Jess is an Operations
 Superuser through Principal authority as a principal **person** (`is_operations_superuser`, 0533);
 `operation@carres.com` is the explicitly governed shared Operations Superuser (its flag). The shared
-owner login `principal@carres.com` is not a person and executes no duty (owner ruling 2026-09-18). An ordinary Operations login that is neither duty, cover nor superuser is
-refused. Commercial approval remains separate and never follows from issue authority.
+owner login `principal@carres.com` is not a person and executes no duty (owner ruling 2026-09-18). The measured existing implementation refuses an ordinary Operations login that is neither duty,
+cover nor superuser; that restriction must converge to the 2026-09-29 approved target above.
+Commercial approval remains separate and never follows from issue authority.
 
 **HOW IT IS ENFORCED — migrations 0379 / 0380 plus 0403, and the dependent web/API code, are
 production-verified at `98ce4220d15cd81482aef05124dbec470c2ed87b` on 29 Aug 2026. A real
@@ -358,7 +367,8 @@ affected current/future allocation. Workspace §4 owns this shared rule; it does
 capability or rewrite completed Purchasing/Receiving evidence.
 
 **NEWCOMER PO TIMING — OWNER-APPROVED 2026-09-28 / NOT BUILT:** newcomers do not take PO Duty
-in their calendar month of joining. From the first day of the following month, active staff with
+in their calendar month of joining; this limits responsibility allocation only, not their right
+to actually place/issue PO (owner clarification 2026-09-29). From the first day of the following month, active staff with
 the existing role/access eligibility automatically join PO rotation without a separate manager
 competency confirmation or training sign-off. Admission is not a guarantee of holding the next PO
 slot. Workspace §4 owns the timing.
