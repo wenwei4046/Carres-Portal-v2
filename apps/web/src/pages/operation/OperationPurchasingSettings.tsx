@@ -1066,6 +1066,27 @@ export default function OperationPurchasingSettings({
               <ChangeLine settings={data} settingKey="logistics_call_working_days" />
             </NumberRow>
 
+            {/* 0602 · 0603 — §9.7: "the governed setting supplies the period".
+                Each Repair Order keeps the value that applied when the
+                Supplier's receipt was recorded, so a change here never moves an
+                existing RO's target. */}
+            {data.repairReturnWorkingDays != null && (
+              <NumberRow
+                label="Repair return target"
+                hint="Counted from when the Supplier receives the Repair Order."
+                unit="working days"
+                value={data.repairReturnWorkingDays}
+                min={PURCHASING_NUMBER_RANGE.repair_return_working_days.min}
+                max={PURCHASING_NUMBER_RANGE.repair_return_working_days.max}
+                canEdit={canEdit}
+                pending={setNumber.isPending}
+                testId="repair-return-working-days"
+                onSave={(n) => saveNumber("repair_return_working_days", n)}
+              >
+                <ChangeLine settings={data} settingKey="repair_return_working_days" />
+              </NumberRow>
+            )}
+
           </div>
           </Block>
         </div>
