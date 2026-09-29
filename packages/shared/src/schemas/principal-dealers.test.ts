@@ -40,3 +40,23 @@ describe('updateDealerInput code', () => {
     expect(updateDealerInput.safeParse({ code: 'A'.repeat(13) }).success).toBe(false);
   });
 });
+
+describe('updateDealerInput bank account (0598)', () => {
+  it('takes bank, account number and holder, and an empty value clears each', () => {
+    const p = updateDealerInput.parse({ bankName: ' Maybank ', bankAccountNo: ' 514012345678 ', bankAccountHolder: ' JB Sleep Sdn Bhd ' });
+    expect(p).toEqual({ bankName: 'Maybank', bankAccountNo: '514012345678', bankAccountHolder: 'JB Sleep Sdn Bhd' });
+    expect(updateDealerInput.parse({ bankName: '', bankAccountNo: '', bankAccountHolder: '' }))
+      .toEqual({ bankName: '', bankAccountNo: '', bankAccountHolder: '' });
+  });
+  it('accepts an account number of 6 to 20 digits', () => {
+    expect(updateDealerInput.safeParse({ bankAccountNo: '123456' }).success).toBe(true);
+    expect(updateDealerInput.safeParse({ bankAccountNo: '1'.repeat(20) }).success).toBe(true);
+  });
+  it('refuses an account number that is short, long, or not all digits', () => {
+    for (const bad of ['12345', '1'.repeat(21), '5140 1234 5678', '5140-1234-5678', 'ABC123456']) {
+      const r = updateDealerInput.safeParse({ bankAccountNo: bad });
+      expect(r.success, bad).toBe(false);
+      if (!r.success) expect(r.error.issues[0]?.message).toBe('Account number must be 6 to 20 digits.');
+    }
+  });
+});

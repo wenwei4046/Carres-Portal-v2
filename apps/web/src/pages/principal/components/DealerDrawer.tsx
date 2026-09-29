@@ -67,6 +67,9 @@ export default function DealerDrawer({ dealerId, onClose, canSetStatus = true }:
     contactPhone: "",
     code: "",
     state: "",
+    bankName: "",
+    bankAccountNo: "",
+    bankAccountHolder: "",
   });
   const [dirty, setDirty] = useState(false);
   useEffect(() => {
@@ -78,6 +81,9 @@ export default function DealerDrawer({ dealerId, onClose, canSetStatus = true }:
         contactPhone: data.dealer.contact_phone ?? "",
         code: data.dealer.code ?? "",
         state: data.dealer.state ?? "",
+        bankName: data.dealer.bank_name ?? "",
+        bankAccountNo: data.dealer.bank_account_no ?? "",
+        bankAccountHolder: data.dealer.bank_account_holder ?? "",
       });
       setDirty(false);
     }
@@ -140,6 +146,17 @@ export default function DealerDrawer({ dealerId, onClose, canSetStatus = true }:
     }
     if (draft.state !== (dealer.state ?? "")) {
       payload.state = draft.state;
+    }
+    // 0598 — bank fields may be cleared too. The server refuses an account
+    // number that is not 6 to 20 digits and the toast shows its sentence.
+    if (draft.bankName.trim() !== (dealer.bank_name ?? "")) {
+      payload.bankName = draft.bankName.trim();
+    }
+    if (draft.bankAccountNo.trim() !== (dealer.bank_account_no ?? "")) {
+      payload.bankAccountNo = draft.bankAccountNo.trim();
+    }
+    if (draft.bankAccountHolder.trim() !== (dealer.bank_account_holder ?? "")) {
+      payload.bankAccountHolder = draft.bankAccountHolder.trim();
     }
     if (Object.keys(payload).length === 0) {
       toast.info("No changes to save");
@@ -349,6 +366,37 @@ export default function DealerDrawer({ dealerId, onClose, canSetStatus = true }:
                       value={draft.contactPhone}
                       onChange={(e) => setField("contactPhone", e.target.value)}
                       placeholder="e.g. 012-3344556"
+                      className="w-full px-3 py-2 border border-base-200 rounded text-body outline-none focus:border-primary"
+                    />
+                  </ProfileField>
+                </div>
+                {/* 0598 — where a commission payment goes. */}
+                <ProfileField label="Bank">
+                  <input
+                    aria-label="Bank"
+                    value={draft.bankName}
+                    onChange={(e) => setField("bankName", e.target.value)}
+                    maxLength={80}
+                    className="w-full px-3 py-2 border border-base-200 rounded text-body outline-none focus:border-primary"
+                  />
+                </ProfileField>
+                <div className="grid grid-cols-2 gap-3">
+                  <ProfileField label="Account number" hint="Digits only, 6 to 20.">
+                    <input
+                      aria-label="Account number"
+                      value={draft.bankAccountNo}
+                      onChange={(e) => setField("bankAccountNo", e.target.value)}
+                      inputMode="numeric"
+                      maxLength={20}
+                      className="w-full px-3 py-2 border border-base-200 rounded text-body outline-none focus:border-primary font-mono"
+                    />
+                  </ProfileField>
+                  <ProfileField label="Account holder">
+                    <input
+                      aria-label="Account holder"
+                      value={draft.bankAccountHolder}
+                      onChange={(e) => setField("bankAccountHolder", e.target.value)}
+                      maxLength={120}
                       className="w-full px-3 py-2 border border-base-200 rounded text-body outline-none focus:border-primary"
                     />
                   </ProfileField>

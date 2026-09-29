@@ -117,7 +117,7 @@ principalDealersRouter.get("/:id", async (c) => {
   // dealer or one of Carres' own showrooms (which carry no SSM / PIC).
   const { data: extra } = await sb
     .from("dealers")
-    .select("address, ssm_code, contact_name, contact_phone, channel, code, state")
+    .select("address, ssm_code, contact_name, contact_phone, channel, code, state, bank_name, bank_account_no, bank_account_holder")
     .eq("id", id)
     .maybeSingle();
   // Always present, so the drawer's `channel` is never undefined; an absent
@@ -138,6 +138,13 @@ principalDealersRouter.get("/:id", async (c) => {
     (dealer as any).code          = extra.code ?? null;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (dealer as any).state         = extra.state ?? null;
+    // 0598 — where a commission payment goes.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (dealer as any).bank_name           = extra.bank_name ?? null;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (dealer as any).bank_account_no     = extra.bank_account_no ?? null;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (dealer as any).bank_account_holder = extra.bank_account_holder ?? null;
   }
 
   // 2. Fetch last 8 orders with line/addon for total computation.
@@ -212,6 +219,9 @@ principalDealersRouter.patch("/:id", async (c) => {
   if (body.contactPhone !== undefined) patch.contact_phone = body.contactPhone;
   if (body.code        !== undefined) patch.code = body.code;
   if (body.state       !== undefined) patch.state = body.state;
+  if (body.bankName          !== undefined) patch.bank_name = body.bankName;
+  if (body.bankAccountNo     !== undefined) patch.bank_account_no = body.bankAccountNo;
+  if (body.bankAccountHolder !== undefined) patch.bank_account_holder = body.bankAccountHolder;
 
   // Legacy `contact` text column mirrors contact_name + contact_phone for
   // back-compat reads. Recompute only when one of the two changed (otherwise

@@ -648,3 +648,108 @@ describe("0543 — finance keeps the dealer master", () => {
     expect(rpc).not.toHaveBeenCalled();
   });
 });
+
+describe("0598 — the dealer's bank account", () => {
+  it("finance PATCH sends bank, account number and holder to dealer_save_master", async () => {
+    const { sb, rpcCalls } = buildSb({
+      rpcResults: { dealer_save_master: { data: { id: DEALER_ID } } },
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const jwt = await makeJwt("finance");
+    const res = await app.fetch(
+      new Request(`http://t/api/principal/dealers/${DEALER_ID}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          bankName: "Maybank",
+          bankAccountNo: "514012345678",
+          bankAccountHolder: "JB Sleep Sdn Bhd",
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(rpcCalls[0]).toEqual({
+      name: "dealer_save_master",
+      args: {
+        p_dealer_id: DEALER_ID,
+        p_patch: {
+          bank_name: "Maybank",
+          bank_account_no: "514012345678",
+          bank_account_holder: "JB Sleep Sdn Bhd",
+        },
+      },
+    });
+  });
+
+  it("an empty account number is sent so the database clears it", async () => {
+    const { sb, rpcCalls } = buildSb({
+      rpcResults: { dealer_save_master: { data: { id: DEALER_ID } } },
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const jwt = await makeJwt("principal");
+    const res = await app.fetch(
+      new Request(`http://t/api/principal/dealers/${DEALER_ID}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ bankAccountNo: "" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(rpcCalls[0]?.args).toEqual({ p_dealer_id: DEALER_ID, p_patch: { bank_account_no: "" } });
+  });
+
+  it("an account number that is not 6 to 20 digits is refused before the database", async () => {
+    const rpc = vi.fn();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("finance");
+    for (const bad of ["12345", "1".repeat(21), "5140 1234 5678", "ABC123456"]) {
+      const res = await app.fetch(
+        new Request(`http://t/api/principal/dealers/${DEALER_ID}`, {
+          method: "PATCH",
+          headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ bankAccountNo: bad }),
+        }),
+        env,
+      );
+      expect(res.status, bad).toBe(422);
+      const body = (await res.json()) as { message: string };
+      expect(body.message).toBe("Account number must be 6 to 20 digits.");
+    }
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("GET detail returns the bank fields to the drawer", async () => {
+    const { sb, chainCalls } = buildSb({
+      rpcResults: { dealer_with_stats: { data: [{ id: DEALER_ID, name: "JB Sleep" }] } },
+      dealerExtra: {
+        channel: "dealer",
+        bank_name: "Maybank",
+        bank_account_no: "514012345678",
+        bank_account_holder: "JB Sleep Sdn Bhd",
+      },
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const jwt = await makeJwt("finance");
+    const res = await app.fetch(
+      new Request(`http://t/api/principal/dealers/${DEALER_ID}`, {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { dealer: Record<string, unknown> };
+    expect(body.dealer.bank_name).toBe("Maybank");
+    expect(body.dealer.bank_account_no).toBe("514012345678");
+    expect(body.dealer.bank_account_holder).toBe("JB Sleep Sdn Bhd");
+    const select = chainCalls.find(
+      (c) => c.method === "select" && String(c.args[0]).includes("contact_phone"),
+    );
+    expect(String(select?.args[0])).toContain("bank_name, bank_account_no, bank_account_holder");
+  });
+});
