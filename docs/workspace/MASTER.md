@@ -84,22 +84,47 @@ An action enters Work only when its owning module supplies:
 Workspace reads projections and opens the owning write door. It never copies the business record,
 assigns routine work independently, changes its due date or closes it.
 
-## 3 · Duty, owner, cover and actor
+## 3 · Assignment and actual performer
 
-> **An Action has an Owner. A business object does not have one universal action owner.**
+**RULING — Jess, 2026-09-29 / APPROVED TARGET, NOT IMPLEMENTATION PROOF.**
+Duty assignment decides who is responsible now. It never prevents another authorised staff person
+from helping or completing ordinary operational work. No reassignment or claim is required first.
 
 ```text
-Action rule
-→ named Duty or governed person rule
-→ Primary holder / normal owner
-→ active Buddy cover
-→ acting person today
-→ immutable actual actor when the result is recorded
+Duty / Work Engine → Assigned to (current responsibility)
+Any authorised staff person → the owning module's existing write door
+Actual person recorded → one business fact completes the same Work item
 ```
 
-Duty, normal owner, active cover, acting person and actual actor are separate facts. History stores
-the effective assignment, cover, actor, decision and time. A later holder change updates current and
-future routing everywhere but never rewrites history.
+Staff UI uses `Assigned to` and `Completed by`. Audit uses `Updated by`, `Assigned by system`,
+`Completed` with date/time, and `Not assigned`. Retire `Normal owner`, `Acting owner`, `Acting today`,
+`Buddy cover`, `Covering {person}`, `Covered for`, `Covered by` and `Temporary owner` everywhere
+staff see responsibility, including tooltips, accessible names and history. Retain the underlying
+assignment provenance; simplifying words never deletes evidence.
+
+Before completion show the current assignee. Completed work retains its assignment at completion
+and names the actual completer; later routing changes never rewrite it. Preserve the assignee when
+each Work occurrence opened, every assignment movement and reason/system attribution, every actual
+updater, final completer, timestamps, and entry surface (`Workspace` or `Delivery Monitor`).
+Never infer completion identity from the current assignee, viewer or unrelated evidence uploader.
+
+Any authorised Operation person may update another person's Delivery record, upload evidence,
+record customer or Logistics replies and resolve urgent work without reassignment. Both surfaces
+reuse the same owning-module form, validation, write door and completion fact. One save updates
+that fact, completes the same module/rule/source/occurrence Work item and refreshes both surfaces.
+Opening a form or copying a message completes nothing. Commercial approval and source rights remain.
+
+At **11:00 AM Asia/Kuala_Lumpur**, no qualifying ERP activity that day by the assigned Duty person
+triggers shared reassignment of unfinished work to another eligible active person. Preserve previous
+and new assignment, system attribution, timestamp and reason, e.g. `Jess was not online by 11:00 AM`.
+This changes responsibility only; any authorised person can still act. Recorded leave remains a
+separate assignment trigger (§4.4). Do not rewrite completed work or the monthly rota.
+
+**FACT — repository a9e64bb86:** `packages/shared/src/schemas/ops-order-control.ts` and migration
+0504's `ops_person_is_in_today` use 10:00 MYT, and the Delivery resolver computes a replacement on
+read. Existing heartbeat capture is reusable, but 11:00 events, opening-assignment snapshots and
+entry-surface audit coverage are implementation gaps to verify. This approval does not approve every
+additional Delivery action listed in the accompanying draft or establish production completion.
 
 **A DUTY BELONGS TO A PERSON — APPROVED / LOCKED, owner rulings (Jess) 2026-09-18, migration 0533.**
 
@@ -125,7 +150,7 @@ perform ordinary operational work, including placing/issuing PO and posting GRN,
 Duty holder or cover. The first-month PO restriction applies to allocation of normal PO Duty, not
 to executing a PO action. The separately approved joining-month exclusion from automatic PO cover
 selection is also a routing rule, never a reason to refuse that person's ordinary PO execution.
-Record normal owner, dated cover and actual actor separately; helping does not take ownership,
+Record assignment movements and actual performers separately; helping does not take ownership,
 change the monthly rota or mark unrelated Work complete. Unrecorded sudden MC may be handled by
 colleagues through Team Work; recorded leave uses §4.4's automatic operational cover. Do not block
 ordinary work merely because nobody is available as assigned cover. Do not add a claim button.
@@ -349,27 +374,19 @@ in the selected detail's assignment/cover facts and `Next`.
 
 The catalogue never shows workload, performance, a recommended person or a copied module roster.
 Search matches Duty label and authorised current/historical person names; `State` may narrow to
-`All duties`, `Covered today`, `Cover scheduled` and `Not assigned`. Filtering by scheduled cover
+`All duties` and `Not assigned`. Filtering by scheduled cover
 does not make that cover today's actor. Selecting the whole row opens detail, changes no assignment
 and completes no Work. Long names wrap; rows support keyboard selection. Returning from narrow-screen
 detail restores the catalogue's search/filter and position. Existing read-only users can navigate
 and inspect the same authorised facts.
 
 **PLAIN PERSON DISPLAY — OWNER CORRECTION 2026-09-29 / APPROVED TARGET / NOT BUILT.**
-Show the Duty and the name of the person currently responsible for its work, followed by applicable
-plain dates. Do not print `Normal owner`, `Acting today`, `Who can act`, `Effective` or explanatory
-permission paragraphs in the routine catalogue/detail. When a cover is effective, the prominent
-name is that cover; otherwise it is the currently resolved normal person. Show only one current
-person, not competing normal/acting labels. This name identifies responsibility, never exclusive
-permission and never proof that this person completed a task. Other active authorised Operation
-people, including newcomers, can still perform ordinary work under §3.
-
-Current cover source, normal assignment and actual completed actor remain distinct in authoritative
-records and accessible assignment/cover history; simplifying the current display deletes none of
-that evidence. The catalogue follows this same one-current-name grammar, replacing the former
-`{acting person} covering for {normal owner}` line on this surface. Other modules' governed evidence
-presentation is unchanged. Keep future arrangements and history in their approved separate sections.
-A missing current resolved person retains `Not assigned`; never invent a name from stale history.
+Show the Duty, `Assigned to {person}` and applicable plain dates. One current assignee; future
+appointments stay separate in `Next`. Missing assignment is `Not assigned`. Completed work uses
+`Completed by {person}` and updates use `Updated by {person}`. History retains previous assignments,
+reasons, effective dates and actual performers using §3's plain language. This applies across staff
+UI, not only Staff & Duties. Assignment never implies exclusive execution permission. Keep future
+arrangements and history in their approved separate sections; do not infer a name from stale history.
 
 Avatar initials carry a full-name accessible label and never replace the printed name. Selecting a
 Work configuration failure opens the exact Duty and preserves return context. Manager-only write
@@ -386,7 +403,7 @@ or production completion. This composition is approved; delivery must validate i
 
 **MANUAL ACTION ENTRY — OWNER-APPROVED 2026-09-29 / APPROVED TARGET / NOT BUILT.**
 Place existing authorised manual adjustments in the selected Duty header's visible `⋯` menu,
-accessible name `More actions`. Do not keep `Assign holder` / `Add cover` as permanent buttons
+accessible name `More actions`. Do not keep `Assign holder` / `Assign for dates` as permanent buttons
 beside the current person. Only authorised managers see this menu, and only applicable governed
 actions appear; omit an empty menu. Selecting an action opens its existing focused form with the
 Duty fixed. This is an entry-placement ruling, not approval for new override policies or new acts.
@@ -449,7 +466,7 @@ Success says `{name} holds {Duty} from {date}` and refreshes Work resolution fro
 It does not claim that historical Work changed. Failure prints the governed server reason and keeps
 the entered facts for correction without optimistic owner changes.
 
-### 4.4 · Buddy-cover contract
+### 4.4 · Absence assignment contract
 
 **AUTOMATIC PO/GRN COVER — OWNER-APPROVED 2026-09-29 / APPROVED TARGET / NOT BUILT.**
 A recorded People-owned leave fact activates automatic cover for routine PO/GRN Duties. Starting
@@ -457,7 +474,8 @@ after the day's normal holder in the governed cyclic order, choose the next acti
 eligible for that Duty on that business date. Skip the absent holder and anyone unavailable,
 departed, disabled or otherwise ineligible. A newcomer cannot cover PO in their joining calendar
 month; cover cannot bypass the newcomer PO rule. Use recorded leave and governed calendars,
-not login activity, heartbeat or inferred live presence.
+not inferred live presence. Separately, §3 applies the 11:00 AM qualifying-activity rule to
+unfinished work; registered leave is not a prerequisite for that trigger.
 
 Keep the normal monthly holder and future cyclic order unchanged. After the recorded leave ends,
 resolve back to the normal holder applicable on that date. A leave spanning a month boundary reads
@@ -478,8 +496,8 @@ other Duties; it is not a required step for ordinary recorded PO/GRN leave. Manu
 and eligibility gates remain; automatic selection is the owner-approved system rule, not a user
 self-assignment action. Do not create competing active cover answers.
 
-`Add cover` is available only when the Duty has a normal holder for the complete selected period.
-It asks for `Acting person`, `From`, `Until` and `Reason`. The acting person must be active, eligible,
+`Assign for dates` is available only when the Duty has a normal holder for the complete selected period.
+It asks for `Assigned to`, `From`, `Until` and `Reason`. The acting person must be active, eligible,
 different from the normal holder and authorised for every protected act the Duty requires. Cover is
 inclusive of the governed business dates and resolves in the company's timezone, never the browser's.
 
@@ -488,7 +506,7 @@ through a governed append-only act. Cover changes only the acting person for ope
 during the period. It never grants an approval capability the person lacks, rewrites the normal
 owner, changes due dates or attributes another person's completed act to the cover.
 
-Success says `{acting person} covers {normal owner} for {Duty}, {from}–{until}`. Work and protected
+Success identifies `Assigned to {person}`, the Duty and dates; history retains the previous assignment. Work and protected
 module doors must resolve the same answer immediately after refresh. Ending, replacing or correcting
 cover requires its own recorded reason/actor/time; disappearance from the current view never deletes
 history.
@@ -501,14 +519,14 @@ history.
 | Assignment start missing | `invalid_dates` on assign | `Choose when this holder starts.` |
 | Assignment end before start | (form) | `Until must be on or after Effective from.` |
 | Ineligible/inactive/non-person holder, or anyone naming themself as holder | `invalid_holder` · `self_assignment_refused` on assign | `{name} cannot hold {Duty}. Choose an eligible active staff member.` |
-| Anyone naming themself as cover | `self_assignment_refused` on cover | `{name} can no longer cover {Duty}. Choose another eligible staff member.` |
+| Anyone naming themself as cover | `self_assignment_refused` on cover | `{name} cannot be assigned to {Duty}. Choose another eligible staff member.` |
 | Conflicting manual exception / otherwise conflicting primary period; automatic PO/GRN baseline alone is not a conflict (§4.3) | (target refusal; current writer does not enforce it) | `{Duty} already has a holder for these dates. Choose different dates.` |
-| Cover person missing | (form) | `Choose who will cover this duty.` |
-| Cover is normal holder | `cover_is_holder` | `Choose another person to cover {Duty}.` |
-| Cover dates missing/reversed | `invalid_dates` on cover | `Choose valid cover dates.` |
-| No one normal owner for every day of the cover | `no_duty_holder` | `{Duty} has no normal holder for all these dates. Assign the holder first.` |
-| Conflicting cover | `cover_overlap` | `{Duty} already has cover for these dates. Choose different dates.` |
-| Eligibility changed before save | `invalid_cover` | `{name} can no longer cover {Duty}. Choose another eligible staff member.` |
+| Cover person missing | (form) | `Choose who is assigned to this duty.` |
+| Cover is normal holder | `cover_is_holder` | `Choose another person for {Duty}.` |
+| Cover dates missing/reversed | `invalid_dates` on cover | `Choose valid assignment dates.` |
+| No one normal owner for every day of the cover | `no_duty_holder` | `{Duty} has no assignment for all these dates. Assign the holder first.` |
+| Conflicting cover | `cover_overlap` | `{Duty} already has an assignment for these dates. Choose different dates.` |
+| Eligibility changed before save | `invalid_cover` | `{name} cannot be assigned to {Duty}. Choose another eligible staff member.` |
 | Caller is not a duty manager, or is a shared login (0533) | `not_duty_manager` | `Duty assignments are set by the manager.` |
 | Unknown failure | `unknown` (any other error, a network failure included) | `{Duty} could not be updated. Try again.` |
 
@@ -531,7 +549,7 @@ authoritative. No message says `Invalid`, `Error` or `Something went wrong` with
 | Cover scheduled | Show today's resolved person; future cover and dates remain separate and never replace today's name early |
 | Read failed | `Staff & Duties could not be opened` · `Try again`; never infer no holder. On refresh failure retain the last successful catalogue/detail alongside the failure and retry state; do not present cached resolution as freshly confirmed. Loading never flashes an empty/unassigned answer. |
 | Write refused/failed | Exact reason beside action; no local mutation of displayed resolution |
-| History empty | `No assignments yet` / `No covers yet` within a valid selected Duty |
+| History empty | `No assignments yet` within a valid selected Duty |
 
 Use §4.2’s approved catalogue/detail composition and responsive targets. Below 1024px show the
 catalogue first and open the selected Duty as a full-width detail with `Back to duties`; forms are
@@ -820,8 +838,8 @@ Blocked by {dependency} · exceptional state (only when true) wraps below
 
 - Object identity belongs in the item header and is not repeated in the action.
 - Owner belongs in the Team group/avatar or exceptional cover/handover metadata, never the sentence.
-- My Work omits the signed-in person's avatar. It shows `Covered for {normal owner}` when routed by
-  active cover. Team Work keeps the normal owner's group and shows `Covered by {acting person}`.
+- My Work omits the signed-in person's avatar. Metadata uses `Assigned to {person}`.
+  Team Work groups unfinished work by current assignment; earlier assignments remain in history.
 - A future Site queue is an owner state, not a person. It may render only after a governed queue
   identity, permission and atomic acceptance path are built and admitted; until then unresolved
   site work is `Not assigned`.
@@ -927,8 +945,8 @@ Jess reviewed the live page in an 829px window and approved 24 fixes as written 
   `See Team Work`.
 - **Words:** rail section `Page` / `All pages` (not Module) · header `Jump to…` with its keyboard
   hint (the `Search` rename was reverted by Jess 2026-09-26) · `Help` and `Settings` beside their
-  icons · the right rail names each icon. **`Covering` is retired (Jess, 2026-09-26):** a covered row
-  says so on the row itself; the toolbar carries no cover button.
+  icons · the right rail names each icon. **Assignment wording (Jess, 2026-09-29):** rows use `Assigned to {person}`;
+  the toolbar carries no cover button.
 - **The Date rail** is the one-line month header and the Monday–Saturday month grid of §5.1
   Panel 1 (Jess, 2026-09-26 — replaces the day cards, `Today` in words, `No work`,
   `Public holiday · {name}`, the two-week column and the one-week strip). `No date` (never
@@ -2403,7 +2421,7 @@ using an attractive default.
 
 Use: `Management attention` · `Commitment health` · `Material exposure` · `Work health` ·
 `Recent material change` · `Broken` · `Due today` · `Due later` · `Blocked` · `Not assigned` ·
-`Covered by` · `Last available` · `Could not load` · `Open Team Work` · `Open {module}`.
+`Assigned to` · `Completed by` · `Updated by` · `Assigned by system` · `Last available` · `Could not load` · `Open Team Work` · `Open {module}`.
 
 Do not use: `At Risk` · `SLA` · `Open POs` as an alert · `Active pipeline` as management health ·
 `to action` · `All on track` without source evidence · `No alerts ✓` · `Escalations` for an

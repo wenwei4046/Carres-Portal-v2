@@ -175,11 +175,19 @@ People — individual staff identity, active/access, last working date and leave
 → every Register, object, Dashboard, My Work, Team Work and Quick Rail
 ```
 
-An action stores its `Owner rule`, trigger, completion fact, governed date and source object. Its
-audit evidence preserves three distinct identities: the normal PIC or Duty owner, today's resolved
-Cover (when one acts), and the actual person who completed/approved the work. Historical evidence
-never changes when a Duty holder changes later. The displayed owner/avatar is the resolver result,
-not a second stored `assigned_to`. A page may not read `ops_po_duty`, `ops_po_duty_cover`, a GRN
+An action stores its assignment rule, trigger, completion fact, governed date and source object.
+**RULING — Jess, 2026-09-29 / approved target, not production-verified:** staff UI uses `Assigned to`
+(current responsibility), `Completed by` (actual completer), `Updated by`, `Assigned by system` and
+`Not assigned`. Retire normal/acting/cover labels from staff UI. Any authorised Operation person may
+help and complete ordinary work without reassignment. Preserve assignment at occurrence opening,
+every movement and reason, actual updaters/completer, timestamps and entry surface in immutable
+history. At 11:00 AM MYT, no qualifying activity that day by the assigned Duty person triggers shared
+reassignment of unfinished work to another eligible active person; this never changes execution
+permission. Recorded leave remains a separate trigger. Workspace and Delivery Monitor use the same
+owning form, validation, write door and completion fact; one save completes the same Work item and
+refreshes both. No duplicate task, completion checkbox or page-local assignment engine.
+The displayed assignee is the shared resolver result, never a page-owned assignment record.
+A page may not read `ops_po_duty`, `ops_po_duty_cover`, a GRN
 rota or any equivalent table directly. It may not implement its own rotation arithmetic. Any action
 or owner avatar that did not come from the shared Work Engine's resolved owner is an architecture
 violation, not an acceptable temporary integration.
@@ -222,12 +230,12 @@ ownership or the monthly order; no eligible cover stays visible, never an invent
 last-working-date change removes the person and re-resolves open and future Work. Only no eligible
 Primary or Cover produces `Not assigned`, with a direct door to People / Staff & Duties. Capability
 remains separate: an authorised actor may perform an act without becoming its resolved owner, and
-history records normal owner, cover and actual actor separately.
+history records assignment movements and actual performers separately (Workspace §3).
 
 Owner clarification 2026-09-29 / TARGET / NOT BUILT: all active authorised Operation staff people,
 including joining-month newcomers, may execute ordinary operational work such as issuing PO and
 posting GRN without becoming its Duty holder. The newcomer PO rule limits allocation, not execution.
-Normal owner, cover and actual actor remain separate. Approval and separately governed amendment/
+Assignment history and actual performers remain separate. Approval and separately governed amendment/
 void gates remain intact (Workspace §3).
 
 Owner-approved departure boundary (2026-09-29 / NOT BUILT, HR §3): one People-owned confirmation
