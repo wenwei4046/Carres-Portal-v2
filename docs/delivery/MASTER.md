@@ -142,6 +142,29 @@ goods may be arranged
 → proof accepted and the obligation completes, or explicit next Work begins
 ```
 
+### 2.1 · Logistics assignment timing
+
+**OWNER-APPROVED / LOCKED 2026-09-29 · APPROVED TARGET / NOT BUILT.** Assignment opens early;
+the assignment cut-off determines when it is late. For a delivery with no company assigned, the
+`Assign logistics` action becomes available on the day its Purchase Order is issued. A stock-source
+order without a PO opens that action on the day it enters Operations. This is an opening trigger,
+not a same-day completion deadline. Staff may assign immediately; no action waits until the cut-off
+to become visible.
+
+Delivery Settings → Delivery Rules owns the configurable assignment lead, initially **3 Delivery
+working days** before `Scheduled delivery`, or `Requested delivery` until a schedule exists.
+An evidenced earlier logistics booking/pickup requirement takes precedence. Delivery computes the
+one deadline using the governed calendars and partner schedule; Sales Orders, Monitor and Workspace
+read it. Partner booking cut-off, customer-contact timing, scheduled-date deadline, DO lead time and
+Payment's collection clock remain distinct facts with their existing owners.
+
+An order entering inside the cut-off requires immediate action; the system does not fabricate an
+earlier staff omission. Without a customer date or an evidenced partner deadline, the action remains
+visible with no invented countdown. A later customer-date change preserves the original missed
+deadline in history. Completion is a company recorded on the delivery scope, never acceptance by
+that company. The current Work assignment, actual actor and source-owned completion stay under
+§13.1. This ruling changes timing only; it creates no second Work writer, roster or Payment setting.
+
 ## 3 · Delivery Order and goods scope
 
 A Delivery Order is Carres' formal authority for a Warehouse to hand specified goods to a named
@@ -1672,7 +1695,7 @@ effective date on every change. It contains no roster, no owner list and no duty
 | Section | Rows |
 |---|---|
 | `Logistics` (the Settings rail row reads `Logistics`, never `Logistics Partners` — `Partner` is a banned UI word) | one row per company opening its object: `Company details` (owner ruling 2026-09-26; `Partner details` retired) (name, `Active` · `Inactive`, customer-facing number, office contact, address, WhatsApp group) · `Coverage` (states, cities and postcodes covered; excluded locations; the `Klang Valley default` flag and its fallback rule) · `Schedule` (pickup weekdays, delivery weekdays per region, transit days, cut-off time, capacity per day, closed dates) · `Transit points` (the Logistics company's own points — `AL Sungai Buloh`, `HOUZS Balakong`, `HOUZS Penang` — registered once in Warehouse Settings → Sites as kind `Logistics transit point`; never a Carres warehouse; owner correction 2026-09-25, Stock §5) and the two-leg handover locations · `Drivers` and `Vehicles` (templates: driver name and phone; plate, vehicle type, capacity) · `Services & charges` (stair carry, dismantling, disposal, surcharge areas, partner charges) · `Portal access` (Warehouse role, Logistics role, data visibility, API scope) |
-| `Delivery Rules` | `Logistics contacts the customer` is fixed (owner ruling 2026-09-25; Carres contacts the customer only for the four Workspace §5.10 exceptions — no per-company choice any more; `customer_contact_by` survives only as read-only history) · the record-on-behalf policy · the contact lead days (reads the shared `chase` setting, one home) · the payment-clearance read rule and DO availability, both read-only mirrors of Payment's clock and the DO gate · proof required by result and goods type · the supported delivery services |
+| `Delivery Rules` | `Logistics contacts the customer` is fixed (owner ruling 2026-09-25; Carres contacts the customer only for the four Workspace §5.10 exceptions — no per-company choice any more; `customer_contact_by` survives only as read-only history) · the configurable logistics assignment lead and deadline in §2.1 · the record-on-behalf policy · the contact lead days (reads the shared `chase` setting, one home) · the payment-clearance read rule and DO availability, both read-only mirrors of Payment's clock and the DO gate · proof required by result and goods type · the supported delivery services |
 | `Message Templates` | WhatsApp, email and copy-message templates per purpose, versioned, one Default per purpose, the Payment template-library grammar |
 | `Access` | which People hold Delivery capabilities; a link to `Settings → Staff & Duties`, never a copy |
 
