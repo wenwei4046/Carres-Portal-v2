@@ -115,6 +115,11 @@ Delivery facts, upload evidence, record customer/logistics replies and resolve u
 assigned to Jess can be completed by Ali or Yu Jun. Helping does not itself change `Assigned to`.
 No claim/reassign-first step is introduced. A joining-month PO allocation restriction remains a
 routing rule and does not prevent that newcomer from performing authorised PO work.
+Jess, as an active authorised Principal person, may also help with ordinary operational work
+without a reassignment or an employment-tenure check. For example, work assigned to Shasha and
+completed by Jess retains `Assigned to Shasha` and records `Completed by Jess`. Missing joining
+dates never block helping or completion; employment-tenure checks belong only to newcomer
+automatic PO allocation. This does not change the separately governed approval gates.
 
 The original Work assignment when an occurrence opens, each subsequent assignment movement,
 assignment effective for each update/completion, actual updater/completer, authoritative date/time
@@ -473,8 +478,11 @@ tracker 0611 and all-branch maximum 0612 (Supplier Return pickup, owned by anoth
 
 **Measured data gap:** both active Operation people (Shasha and Yu Jun) have NULL
 `hr_employees.join_date` and no `hr_employment_events`; no month-of-joining eligibility may be
-inferred from account creation or an invented employment date. Owner has been asked for their
-joining dates. People owns that fact; there is no second Workspace joining-date field.
+inferred from account creation or an invented employment date. This is an automatic-newcomer-PO
+allocation data gap, not an execution-permission gap or a request for Jess to prove existing staff
+tenure. Do not block existing authorised staff from helping, invalidate their recorded assignments,
+or hold unrelated implementation behind a joining-date question. People owns employment facts;
+there is no second Workspace joining-date field.
 The current assignment source remains dated assignments, not the target's general cyclic roster.
 
 Outstanding before release: period collector wiring, authoritative scheduler/calendar/eligible
