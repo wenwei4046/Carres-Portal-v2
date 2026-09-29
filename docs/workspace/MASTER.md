@@ -195,16 +195,21 @@ not rotate commercial approvers or change source-owned task completion. Existing
 no-eligible-person boundaries remain separate from the illustrated multi-person cycle. Temporary
 absence follows §4.4; do not treat absence as departure.
 
-When a person resigns, the authorised People/account owner records the last working date and
-access change once. When departure is effective, omit that person from default active staff views,
-current/future eligible pickers and Duty routing; preserve historical names, acts and records.
-**OWNER-CONFIRMED 2026-09-29 / NOT BUILT:** default staff views show current employees only;
-former staff profiles are available by deliberate historical lookup, not continually shown in
-routine lists. Existing PO/GRN and other historical records retain the real actor's name. This
-approves hiding former staff from daily operation, not deleting their identity or source records.
-This is not deletion, a second employment switch in Workspace, or permission for ordinary staff to
-disable other accounts. Settings may link to the owning People/account action. The exact entry
-presentation remains under review.
+**DEPARTURE — OWNER-APPROVED 2026-09-29 / APPROVED TARGET / NOT BUILT.** HR MASTER §3 owns
+one departure workflow: an authorised personnel manager chooses the employee, enters the last
+working day, reviews the effects and confirms once. Departure recording and access disablement
+are coordinated; when effective, the account automatically leaves Settings/default staff lists,
+current choices and Duty routing without a second removal step. Workspace consumes those facts
+and re-resolves affected open/future routine allocation. Do not hide a future leaver before the
+recorded departure takes effect or claim a scheduled effect already completed.
+
+Ordinary staff cannot browse former employee accounts/profiles. Only existing personnel-management
+permission permits deliberate historical profile lookup; managers also default to current staff.
+People/account read gates enforce this beyond the visible list. Historical PO, GRN and other
+source evidence retains actual names for authorised document readers, without exposing private
+employee/account details through those names. This is not deletion, a second employment switch,
+or permission for ordinary staff to disable accounts. Entry presentation into the owning People
+surface remains under review; the approved workflow must retain return context when linked.
 
 `Settings → Staff & Duties` is the only Duty assignment/cover surface and shows immutable history.
 Automatic operational allocation does not grant approval capability or randomly rotate Principal/
