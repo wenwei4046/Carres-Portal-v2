@@ -1190,6 +1190,11 @@ profile/account access. Preserve source identities and existing sensitive-field 
 effects are not completed effects; partial failure must show the unfinished work honestly. Reuse
 existing governed components/tokens; the precise People-entry placement is still under review.
 
+**TEMPORARY DUTY ADJUSTMENT — OWNER-APPROVED 2026-09-29 / NOT BUILT.** The manager menu’s
+PO/GRN adjustment shows the affected arrangements before confirmation and requires person, start,
+end and reason. Expiry returns to the system arrangement, not a changed monthly rota. Workspace
+§4.3 owns the business boundary; reuse the governed focused form and plain-name/date presentation.
+
 **STAFF & DUTIES PLAIN PERSON DISPLAY — OWNER CORRECTION 2026-09-29 / NOT BUILT.**
 Workspace §4.2 shows one current resolved person name and plain dates. Remove `Normal owner`,
 `Acting today`, `Who can act`, `Effective` labels and routine permission lectures from that surface.

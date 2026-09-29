@@ -236,6 +236,10 @@ staff lists and Duty eligibility; only personnel managers may look up retained f
 Historical document readers retain real actor names without gaining employee/profile access.
 Workspace consumes the source facts and owns no second employee record or disable switch.
 
+Owner-approved temporary operational adjustments (2026-09-29 / NOT BUILT, Workspace §4.3) require
+start/end dates and reason, preview affected arrangements and return to the system arrangement
+after expiry. They do not reset monthly rotation, rewrite history or grant approval powers.
+
 An action owner and an action capability are separate facts. A governed Operations Superuser may
 perform the operational action without replacing the resolved owner. The event records both the
 actual actor and the normal duty/dated-cover context; UI owner chips continue to show the owner, not

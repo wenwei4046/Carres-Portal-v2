@@ -393,8 +393,9 @@ and failures; no new token or component is introduced.
 **FORM PRESENTATION — OWNER-APPROVED 2026-09-28 / APPROVED TARGET / NOT BUILT.**
 `Assign holder` opens one focused action surface. Show read-only `Duty`, the current person's name and applicable
 plain dates above the inputs, followed by required `Holder` and
-`Effective from`, optional `Until` and optional factual `Note`. Do not preselect a person or start
-date. The selected person and effective dates remain visible before the single primary
+`Effective from`, `Until` and a factual `Note`. For a PO/GRN temporary adjustment, both dates
+and the reason in `Note` are required under the ruling below. Other Duties retain their governed
+optional end/note rules. Do not preselect a person or start date. The selected person and effective dates remain visible before the single primary
 `Assign holder` confirmation; `Cancel` closes without a write.
 
 Eligible choices come from People's active authorised Carres staff only; a departed, disabled,
@@ -411,9 +412,23 @@ content scrolls vertically, and controls remain reachable above the on-screen ke
 returns focus to the originating action. Readers see the plain read view under §4.2
 and no write imitation. This surface introduces no Waiting/Urgent/Missed task state.
 
-This approval covers form presentation only. The conflict between §4.4.1's primary-period refusal
-copy and the current newest-effective-assignment behaviour remains under PLAN review; this approval
-does not settle overlapping-date policy or authorise application Build.
+**TEMPORARY PO/GRN ADJUSTMENT — OWNER-APPROVED 2026-09-29 / APPROVED TARGET / NOT BUILT.**
+The manager's manual PO/GRN adjustment is a dated exception, not a permanent rewrite of automatic
+rotation. Require a person, start date, end date and recorded reason. Before confirmation, display
+the affected existing arrangements and the proposed dates/person. Apply the exception only during
+that period; afterwards resolve the system's normal arrangement applicable on that date, including
+any recorded leave cover. Never blindly restore the person who held the Duty before the adjustment.
+Keep the underlying monthly order and later rotation intact, and retain historical actual actors.
+A month-spanning exception does not move the rotation's monthly position or extend the former
+month's normal assignment. A future exception does not change today's name early.
+
+Existing automatic allocation in the requested dates is expected and must not itself be treated as
+a duplicate-primary refusal. Competing manual exceptions must not silently overwrite one another;
+retain the current governed conflict refusal until an explicit superseding act is approved. Existing
+person/role/active status and no-self-assignment gates remain. This does not grant execution rights
+or make ordinary work depend on holding the temporary assignment. Approval-Duty long-term holder
+settings retain their own law; this bounded exception rule applies to routine PO/GRN only.
+No application Build or new permanent rotation-editing control is authorised by this ruling.
 
 The act appends a new assignment; it never edits or deletes an old row. Overlap resolution is
 server-owned and must not leave two primaries effective on one day. A future assignment does not
@@ -477,7 +492,7 @@ history.
 | Assignment end before start | (form) | `Until must be on or after Effective from.` |
 | Ineligible/inactive/non-person holder, or anyone naming themself as holder | `invalid_holder` · `self_assignment_refused` on assign | `{name} cannot hold {Duty}. Choose an eligible active staff member.` |
 | Anyone naming themself as cover | `self_assignment_refused` on cover | `{name} can no longer cover {Duty}. Choose another eligible staff member.` |
-| Conflicting primary period | (newest assignment wins; no refusal today) | `{Duty} already has a holder for these dates. Choose different dates.` |
+| Conflicting manual exception / otherwise conflicting primary period; automatic PO/GRN baseline alone is not a conflict (§4.3) | (target refusal; current writer does not enforce it) | `{Duty} already has a holder for these dates. Choose different dates.` |
 | Cover person missing | (form) | `Choose who will cover this duty.` |
 | Cover is normal holder | `cover_is_holder` | `Choose another person to cover {Duty}.` |
 | Cover dates missing/reversed | `invalid_dates` on cover | `Choose valid cover dates.` |
