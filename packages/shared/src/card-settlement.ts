@@ -285,6 +285,8 @@ export interface CardSettlementDay {
   gross: number;
   net: number;
   recorded: number | null;
+  /** 0595: matched payments voided since they were matched. Approve day refuses the day while any is. */
+  voided_count: number;
   reference: string;
   payout_status: CardPayoutStatus | null;
   payout_move_no: string | null;
@@ -347,9 +349,18 @@ export interface CardSettlementReview {
 export const dayKey = (r: Pick<CardSettlementDay, "acquirer" | "day_date" | "group_key">) =>
   `${r.acquirer}|${r.day_date}|${r.group_key}`;
 
-/** A day may fill the card payout form once every row is matched and no payout is prepared yet. */
+/** 0595: Recorded in Carres less the Sales total, in sen; 0 when they add up. */
+export function dayRecordedGap(d: Pick<CardSettlementDay, "gross" | "recorded">): number {
+  return sen(Number(d.recorded ?? 0)) - sen(Number(d.gross));
+}
+
+/**
+ * A day may fill the card payout form once every row is matched, no matched
+ * payment was voided since, the matched payments add up to the Sales total
+ * (0595), and no payout is prepared yet. The database refuses the same.
+ */
 export function dayMayApprove(d: CardSettlementDay): boolean {
-  return d.matched_count === d.row_count && d.payout_status === null;
+  return d.matched_count === d.row_count && d.payout_status === null && d.voided_count === 0 && dayRecordedGap(d) === 0;
 }
 
 /** What the card company kept: gross less what reached the bank, in sen. */

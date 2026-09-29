@@ -4558,6 +4558,25 @@ changes, already written into the list below (built in migration 0576 and the we
   - Refusals (database): `Choose a card account that has a payout bank in Finance Settings.` ·
     `Choose the payout bank Finance Settings sets for this card account.`
 
+#### PROPOSAL — PENDING APPROVAL (card-day, migration 0595)
+
+**PROPOSAL / NOT LAW.** New words on Finance → `Card settlement`. Approve day now needs the
+matched payments to add up to the day's Sales total, and no matched payment may be voided since.
+
+- Disabled Approve day names its gap (the Receiving button law; first gap wins; in Finance a colon
+  joins the button and the gap): `Approve day: a matched payment was voided` ·
+  `Approve day: Recorded in Carres is {RM} short` · `Approve day: Recorded in Carres is {RM} over`.
+  A day with a sale not matched keeps the approved line `{n} sales are not matched yet. Match every
+  sale before you approve the day.`
+- A matched day with a voided payment, or whose Recorded in Carres does not add up, keeps the
+  status `To check` and counts in `{n} to check` (no new word).
+- Matched row whose payment was voided since, in red:
+  `{matched word} · Payment voided · {RM} · {date} · {receipt} · SO-{n} · Approval code {typed}`
+- Refusals (database): `A matched payment on this day was voided. Take off its match before you
+  approve the day.` · `Recorded in Carres is {RM} short of the Sales total. Check the matches
+  before you approve the day.` · `Recorded in Carres is {RM} over the Sales total. Check the
+  matches before you approve the day.`
+
 ## Monthly demand words — owner ruling 2026-09-26 · APPROVED TARGET / NOT BUILT
 
 | Meaning | Use exactly | Do NOT use |

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dayFee, dayMayApprove, parseCardFile } from "./card-settlement";
+import { dayFee, dayMayApprove, dayRecordedGap, parseCardFile } from "./card-settlement";
 import { ghlFile, maybankFile, pbbFile } from "./__fixtures__/card-settlement-files";
 
 const sale = { sett: "02092026", trans: "01092026", amt: "100.00", net: "99.00", mid: "900000000001", tid: "90000001", code: "A1B2C3", trace: "000101" };
@@ -114,11 +114,23 @@ describe("parseCardFile — Maybank T41", () => {
 });
 
 describe("day helpers", () => {
-  const day = { acquirer: "PBB" as const, day_date: "2026-09-02", payout_date: "2026-09-02", group_key: "k", row_count: 2, matched_count: 2, gross: 2600, net: 2574.01, recorded: 2600, reference: "r", payout_status: null, payout_move_no: null, holding_codes: [], unlinked_payouts: [] };
+  const day = { acquirer: "PBB" as const, day_date: "2026-09-02", payout_date: "2026-09-02", group_key: "k", row_count: 2, matched_count: 2, gross: 2600, net: 2574.01, recorded: 2600, voided_count: 0, reference: "r", payout_status: null, payout_move_no: null, holding_codes: [], unlinked_payouts: [] };
   it("a day may fill the payout form only when every row is matched and no payout exists", () => {
     expect(dayMayApprove(day)).toBe(true);
     expect(dayMayApprove({ ...day, matched_count: 1 })).toBe(false);
     expect(dayMayApprove({ ...day, payout_status: "prepared" })).toBe(false);
+  });
+  it("0595: a day whose Recorded in Carres does not add up to its Sales total may not be approved", () => {
+    expect(dayRecordedGap(day)).toBe(0);
+    expect(dayRecordedGap({ ...day, recorded: 2589.9 })).toBe(-1010);
+    expect(dayRecordedGap({ ...day, recorded: 2600.01 })).toBe(1);
+    expect(dayMayApprove({ ...day, recorded: 2589.9 })).toBe(false);
+    expect(dayMayApprove({ ...day, recorded: 2600.01 })).toBe(false);
+    // amounts arrive from the database as text
+    expect(dayMayApprove({ ...day, gross: "2600.00" as unknown as number, recorded: "2600" as unknown as number })).toBe(true);
+  });
+  it("0595: a day with a matched payment voided since may not be approved", () => {
+    expect(dayMayApprove({ ...day, voided_count: 1 })).toBe(false);
   });
   it("the fee is gross less net, in whole sen", () => {
     expect(dayFee(day)).toBe(25.99);

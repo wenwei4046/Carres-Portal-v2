@@ -111,6 +111,19 @@ describe("/api/finance/card-settlement", () => {
     expect(await twice.json()).toMatchObject({ code: "payout_exists", message: "The payout for this day is already prepared." });
   });
 
+  it.each([
+    ["day_not_adding_up", "Recorded in Carres is RM 10.00 short of the Sales total. Check the matches before you approve the day."],
+    ["day_payment_voided", "A matched payment on this day was voided. Take off its match before you approve the day."],
+  ])("0595: Approve day keeps the database's %s refusal and its sentence", async (code, message) => {
+    stubRpc({ data: null, error: { code: "22023", message, details: code } });
+    const res = await call("POST", "/days/payout", {
+      acquirer: "PBB", dayDate: "2026-09-18", groupKey: "M / T", moveDate: "2026-09-18",
+      fromAccountCode: "H", toAccountCode: "B", idempotencyKey: PAY_ID,
+    });
+    expect(res.status).toBe(422);
+    expect(await res.json()).toMatchObject({ code, message });
+  });
+
   it("refuses a reversal before the database, in one sentence", async () => {
     const sb = stubRpc({ data: null, error: null });
     const res = await call("POST", "/import", {
