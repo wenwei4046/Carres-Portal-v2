@@ -456,7 +456,9 @@ usual hours are **9:00 AM–6:00 PM**. Staff may arrive by **10:00 AM** and fini
 **7:00 PM**, provided they work **eight hours**. A permitted 10:00 AM start is not an
 absence or late-start finding. The 10:30 AM and 3:00 PM settings are availability checkpoints
 for assigning work; they are not shift start/end times or proof of eight hours worked.
-Break duration, lunch timing and an attendance calculation are not inferred from these examples.
+Office lunch is fixed at **1:00–2:00 PM** (owner ruling, 2026-09-29). This hour is
+excluded from the eight working hours; both permitted schedules therefore provide eight hours.
+This does not introduce an attendance or payroll calculation.
 Two observations cannot prove continuous availability: departure after the afternoon check is
 not automatically detected by that check. Lack of portal activity can also mean telephone,
 receiving or other offline work; the evidence contract must address this before activation.
@@ -466,9 +468,15 @@ availability: morning attendance followed by afternoon MC must be detectable. Fr
 use by the real person is the intended signal; an overnight/background tab's periodic requests
 cannot establish that the person started a new period. This is work-routing evidence, not an HR
 attendance/MC diagnosis. Do not auto-create leave, mark misconduct, or change employment/access.
-The exact recognised-period evidence and its boundary must be measured before engine Build;
-the repository's single all-day `last_seen_at` is NOT sufficient for the afternoon check. Do not
-silently treat all activity since 10:30 as afternoon activity or equate a failed read with absence.
+The morning evidence window starts at **9:00 AM** and ends at the configured morning check;
+the afternoon window starts at **2:00 PM**, after lunch, and ends at the configured afternoon
+check. With the default settings these are **9:00–10:30 AM** and **2:00–3:00 PM**.
+A permitted 10:00 AM arrival has until the morning checkpoint to establish activity.
+Lunch and pre-2:00 PM activity never satisfy the afternoon check. Settings validation must keep
+the morning check after the permitted 10:00 AM arrival and before lunch, and the afternoon check
+after 2:00 PM and before the usual 6:00 PM close. These are office rules, not inferred store shifts.
+The exact recognised activity evidence must be measured before engine Build; the repository's
+single all-day `last_seen_at` is NOT sufficient. Do not equate a failed read with absence.
 
 At the configured checkpoint, an assigned person without the required current-period evidence
 has their unfinished ordinary work assigned by the system to an active, available, eligible person
