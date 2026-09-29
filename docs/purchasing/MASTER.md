@@ -3767,18 +3767,45 @@ Warehouse submits count                (or Operation enters goods directly)
 
 ### 9.5 Supplier Claims — approved complete Blueprint
 
-**Build state — slice C1 BUILT ON BRANCH `build/supplier-claims-reply`, 2026-09-29; migration
-0607 NOT APPLIED; not merged, not deployed.** C1 delivers the confirmed 12-column Register (engine
-`pinnedPrefix`, 51px two-line rows, four closed rail groups), the full-width record in the approved
-order, `Record what we asked` · `Record supplier reply` (answer · Applies to · Supplier's date ·
-Evidence · Note) · `Claim sent to supplier` (`document_sends` kind `supplier_claim`), and the three
-Claim Work rules (Workspace §6.1). Still **APPROVED TARGET / NOT BUILT:** Stock-Unit intake, the
-per-Unit read-only row expansion (C1 keeps the claim-level inspector plus the Unit list), the
-Authorised Outcome writer (so `Plan Repair` never shows yet), Split/Cancel/Reopen, the claim pack
-PDF and the two Settings rows (0606, Settings lane). **0607 snapshots `claim_reply_waiting_days` /
+**Build state — slice C1 MERGED (#1789) with migration 0607 APPLIED; slice C2 BUILT ON BRANCH
+`build/purchase-return-issue`, 2026-09-29, migration 0609 NOT APPLIED; not merged, not deployed.**
+C1 delivers the confirmed 12-column Register (engine `pinnedPrefix`, 51px two-line rows, four
+closed rail groups), the full-width record in the approved order, `Record what we asked` · `Record
+supplier reply` (answer · Applies to · Supplier's date · Evidence · Note) · `Claim sent to supplier`
+(`document_sends` kind `supplier_claim`), and the three Claim Work rules (Workspace §6.1). C2 adds,
+on the record's Result section, the ONE supplier-side decision and Authorised Outcome (owner ruling
+2026-09-29 below) through the existing `POST /:id/carres-execution`, and the server-confirmed `Plan
+Repair` / `Plan Supplier replacement` / `Issue Purchase Return` doors; the missing fact names itself
+(`Authorised Outcome` · `Units` · `PO Duty`). **Still APPROVED TARGET / NOT BUILT:** Stock-Unit
+intake, the per-Unit read-only row expansion, Split/Cancel/Reopen, the claim pack PDF and the two
+Settings rows (0606, Settings lane). **0607 snapshots `claim_reply_waiting_days` /
 `claim_escalation_extra_days` onto the claim when the ask is recorded** (read by name, 2 and 2 when
 the columns are absent); `Reply expected` and escalation read that snapshot, so a later Settings
 change never moves an asked claim's dates. An ask recorded before 0607 reads 2 and 2.
+
+**OWNER RULING (Jess, 2026-09-29, "yes") — ONE SUPPLIER-SIDE DECISION, WHICH IS THE AUTHORISED
+OUTCOME.** `Record what Carres does next` on the Supplier Claim offers ONLY the three supplier-side
+decisions: `Return to supplier` · `Repair` · `Replacement`. The four customer movement choices
+(`Collect defective item` · `Replace first` · `Collect first` · `Exchange on collection`) belong to
+the related Service Case and are not offered on the claim — the customer-arrangement boundary below
+stands. This ONE decision is the claim's Authorised Outcome; there is no second picker and no second
+arithmetic. It is stored as the fact each downstream door already reads (0609,
+`supplier_claim_decision`): `Return to supplier` → `carres_execution = 'return_to_supplier'`
+(Purchase Return door) · `Repair` → `customer_resolution = 'repair'` (Repair Order create door 0602,
+repair-return arrival) · `Replacement` → `customer_resolution = 'replace'` (supplier-replacement
+arrival source). Only PO Duty, its dated cover or an Operations Superuser records it, resolved through
+the ONE Shared Duty Resolver (`workspace_resolve_duty('po_duty')`, the resolver Work owners read;
+the ops_po_duty month path is retired for this door). It cannot change once its execution document
+exists: a Purchase Return (Return), an active Repair Order (Repair) — and, by the same rule, an
+active supplier-replacement arrival source (Replacement; build reading, overturned by one owner
+sentence). Existing legacy values (the four customer movements, Accept As-Is, No Replacement
+Required) stay readable on the record as `Earlier record · {word}` and are never deleted or
+translated; the legacy 0324 customer-resolution door is closed to callers. The record then shows:
+`Issue Purchase Return` for Return to supplier; `Plan Repair` (server-confirmed: decision Repair ·
+exact Units held on the claim · the actor may act) opening the Repair Order create page prefilled
+with the Claim; `Plan Supplier replacement` for Replacement, opening its existing owning door (the
+supplier-replacement arrival source). **BUILT ON BRANCH `build/purchase-return-issue` 2026-09-29
+(PR #1795), 0609 NOT APPLIED.**
 
 **OWNER-APPROVED / LOCKED — 2026-09-06; claim boundary owner-approved 2026-09-14.** This is the
 single complete Supplier Claims operating model. Existing built facts and unbuilt target rules are
@@ -4895,17 +4922,29 @@ reason and only inside comments. Re-applying the exact file is safe whenever a p
 stream bytes exists — every statement in 0548 is idempotent (`create … if not exists`,
 `create or replace`, `drop policy/trigger if exists` then create).
 
-**Still NOT built, and deliberately so.** No screen CREATES a return. §7.4 rules who may — an
-approved claim outcome — and `0548` carries that door in SQL
-(`purchasing_issue_purchase_return`, `operation`/`principal` only), but the confirmed UI was
-the REGISTER, not a creation screen, so the screen that calls it is a later scope with its own
-owner decision. The evidence viewer is not wired either: the entries carry the door and say
-why they are inactive. The populated-record and physical lifecycle walk remains owed.
-
-**CREATION DOOR — OWNER-APPROVED (Jess, 2026-09-25) · NOT BUILT.** Measured the same day: all 71
-claims carry no `carres_execution`; `POST /:id/carres-execution` exists with no web caller; the
-returns API has only `GET /`; `purchasing_issue_purchase_return` (0548) has no screen; the record
-offers `Plan Repair` / `Plan Supplier replacement` links and nothing for a return. The approved
+**CREATION DOOR — OWNER-APPROVED (Jess, 2026-09-25; decision list overwritten by the owner ruling
+of 2026-09-29) · BUILT ON BRANCH `build/purchase-return-issue` 2026-09-29 (slice C2, PR #1795);
+migration 0609 NOT APPLIED; not merged, not deployed.** Built: `Record what Carres does next` on the
+claim record's Result section (the three supplier-side decisions of §9.5's 2026-09-29 ruling); `Issue Purchase Return` once `Return to
+supplier` is recorded — the approved form beside its DRAFT paper, calling the ONE 0548 door
+(`purchasing_issue_purchase_return`, re-issued by 0609 with the same signature: claim must be open,
+every Unit re-checked by `purchase_return_unit_refusal` and against the `seen` token the form read,
+`Return To` read by the door from `suppliers.return_address`, never from the caller; still moves no
+stock) through `POST /api/operation/purchase-returns`; `Return document sent to supplier`
+(`document_sends` kind `purchase_return`, 0609; the sent state is derived from the ledger and the 0548
+column `document_sent_at` is kept and no longer written); `Confirmed Pickup` (append-only
+`purchase_return_pickup_confirmations`, evidenced with who confirmed); the full-width PR record at
+`/operation?tab=purchase-returns&pr={id}` with `Open PDF`; the money-free PR paper
+(`purchase-return-template.tsx`); and four Work rules through their own loader (Workspace §6.1).
+**Dependencies still NOT BUILT, named so nobody assumes them:** (1) ~~`suppliers.return_address`
+editor~~ BUILT 2026-09-29 (0611): Settings → Purchasing → `Supplier addresses` records each
+supplier's `Address` (PO / Repair Order PDF) and `Return address` (this `Return To`) one field at a
+time through `purchasing_set_supplier_address`; blank saves nothing recorded, so Issue still refuses
+`Add the return address of {Supplier}` until it is filled, and one address is never copied into the
+other; (2) Stock's Outbound `Return to
+supplier` handover (Stock §12.8) has no writer, so every return reads `Not picked up` until Stock
+records collector, time, Units and proof onto the return's Units; (3) `Supplier Received Date` has no
+writer; (4) the evidence viewer for pickup/receipt proof is still not wired. The approved
 chain lives on the ONE claim record, both ways to the same facts:
 
 ```text
@@ -4916,10 +4955,11 @@ Chain:        Supplier reply (§9.5) → `Record what Carres does next` → `Iss
               → Supplier Received Date
 ```
 
-- **`Record what Carres does next`** on the record's Result section writes `carres_execution`
-  through the existing route; options are the five stored values, displayed `Return to supplier` ·
-  `Collect defective item` · `Replace first` · `Collect first` · `Exchange on collection`. It is
-  a Carres commitment: PO Duty, dated cover or Operations Superuser only.
+- **`Record what Carres does next`** on the record's Result section — **OWNER RULING (Jess,
+  2026-09-29)**: the three supplier-side decisions `Return to supplier` · `Repair` · `Replacement`,
+  which are the claim's Authorised Outcome (§9.5, same ruling; storage and door there). The four
+  customer movements belong to the related Service Case. PO Duty, dated cover or Operations
+  Superuser only, through the Shared Duty Resolver; locked once its execution document exists.
 - **`Issue Purchase Return`** appears once `Return to supplier` is recorded and calls the 0548 door
   through a new API route (no second SQL writer). The form: `Units to return` (only this claim's
   held tracked Units; counted goods are claimed, never returned by document) · `Pickup Location`
@@ -4936,11 +4976,28 @@ Chain:        Supplier reply (§9.5) → `Record what Carres does next` → `Iss
   Stock's Outbound `Return to supplier` (Stock §12.8) — collector, time, exact Units, proof —
   read here as `Not picked up` · `Partly picked up` · `Fully picked up`. `Supplier Received Date`
   is recorded from supplier evidence; fully picked up never implies it.
-- **Record states:** `What Carres does · Not recorded` → `Return to supplier` (Issue available) →
-  `Return document not sent` → `Return document sent · {channel} · {date}` → `Pickup date not
-  confirmed` / confirmed → picked-up facts → `Supplier Received Date`.
+- **Record states:** `What Carres does · Not recorded` → `What Carres does · Return to supplier` (Issue available) →
+  `Sending not confirmed` → `Return document sent · {channel} · {date}` → `Pickup date not
+  confirmed` / confirmed → picked-up facts → `Supplier Received Date`. **`Sending not confirmed`
+  replaces the ruling's `Return document not sent` (build decision 2026-09-29, resolving the §9.7
+  conflict note):** absent ledger evidence means the Portal has no record of a send, not that nobody
+  sent the paper — the PO/RO family word, reused unchanged. Same change on the register rail.
 - **Responsive:** ≥1180 form + PDF side by side; 820/743 stacked, PDF below; 390 full width, one
   Unit tick per row, 40px bottom actions.
+- **Build decisions that read like business rules — PROPOSAL / NOT LAW until the owner reviews
+  them (2026-09-29).** Each is the narrowest reading the build needed; each is overturned by one
+  owner sentence. (a) Once a Purchase Return is issued, the claim cannot be moved off `Return to
+  supplier` (`purchase_return_issued`) — no approved cancel/void exists for a PR. (b) `Issue
+  Purchase Return` and the send / pickup-confirmation doors are open to any active Operation person
+  (0548's gate, unchanged); only `Record what Carres does next` is PO Duty only (Shared Duty
+  Resolver). (c) A Unit whose
+  claim hold was released reads `Hold released` and is not offered ("this claim's HELD tracked
+  Units"). (d) A Confirmed Pickup date in the past is refused, and a confirmation must say who
+  confirmed (`Who confirmed`). (e) The day-before check closes only on a confirmation for that date
+  recorded on or after the day before; a date confirmed at issue is re-checked. (f) `Pickup missed`
+  reads only when NOTHING was collected (the ruling's words); a partial pickup after the date raises
+  no Work. (g) The PR paper prints Supplier, Return To, PR details and the Units table; it prints no
+  `Reason` box (the claim note may hold internal fault review, §9.5 claim pack exclusions).
 
 **Authenticated readback — 2026-09-24, existing register only.** On production
 `893b7f33d54ecd3c0ab51755d6d98d09f47407d2`, principal opened Purchase Returns from its
@@ -4980,7 +5037,8 @@ Reuse Supplier Claims' rail composition, section icons, spacing, width and activ
 Supplier is a visible list of supplier names with right-aligned matching PR counts, not a dropdown
 (e.g. illustrative `Hookka 2`, `Ohana 1`). Click to filter; click again to deselect. Supplier
 combines with the operational condition and search; counts respect the other active dimensions.
-Return document: `Return document not sent`. Pickup: `Pickup date not confirmed`, `Not picked up`,
+Return document: `Sending not confirmed` (was `Return document not sent`; changed 2026-09-29 with
+the creation door, see Record states). Pickup: `Pickup date not confirmed`, `Not picked up`,
 `Partly picked up`, `Fully picked up`. Evidence: `Pickup proof missing`.
 Counts count matching PR documents, not Units; conditions may overlap. These are factual filters,
 not new stored states. Date-range and Pickup Location rail sections discussed as possibilities
@@ -5358,9 +5416,8 @@ Work. A proposal for one was drafted on 2026-09-20 and withdrawn against that ru
 **`Sending not confirmed` is the PO family's own word** (COPY, 2026-09-16/17), reused unchanged.
 This register never says a document was not sent: absent evidence means the Portal has no record,
 not that nobody sent it on WhatsApp. `Repair order not sent` and `PDF not sent` are refused here.
-🟡 **§9.6's `Return document not sent` contradicts that same principle and §9.7's own COPY rule.**
-It is named here and belongs to Purchase Returns' own round to correct; this section does not
-edit another page's confirmed text.
+§9.6's former `Return document not sent` contradicted that same principle; it was corrected to
+`Sending not confirmed` in Purchase Returns' own round (creation door build, 2026-09-29).
 
 Rail rows are factual predicates with truthful counts, not queues and not stored states. Click to
 filter, click again to clear; there is no Clear filters control in the rail (§9.3 owner correction)

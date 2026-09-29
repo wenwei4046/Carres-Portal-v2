@@ -5,6 +5,7 @@ export * from "./unit-problem";
 export * from "./repair-order";
 export * from "./repair-order-work";
 export * from "./supplier-claim-record";
+export * from "./purchase-return-record";
 
 /* Stair carry — moved out of `apps/web` 2026-08-29 so the SERVER can stamp
    the fee onto the order. The Worker cannot import from the web app, which
@@ -123,6 +124,8 @@ export {
   purchasingSetProductionDaysInput,
   purchasingSetTransitDaysInput,
   purchasingSetSupplierTermsDaysInput,
+  purchasingSetSupplierAddressInput,
+  SUPPLIER_ADDRESS_MAX,
   TRANSIT_DAYS_RANGE,
   purchasingSetWorkWeekInput,
   type PurchasingCategory,
@@ -145,6 +148,7 @@ export {
   type PurchasingSetProductionDaysInput,
   type PurchasingSetTransitDaysInput,
   type PurchasingSetSupplierTermsDaysInput,
+  type PurchasingSetSupplierAddressInput,
   type PurchasingSetWorkWeekInput,
 } from "./purchasing-settings";
 

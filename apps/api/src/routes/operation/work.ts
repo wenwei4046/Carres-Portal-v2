@@ -81,6 +81,7 @@ import issuesRouter from "../ops/issues";
 import purchaseDemandsRouter from "./purchase-demands";
 import { loadRepairOrderWork } from "../../lib/repair-order-work";
 import { loadSupplierClaimWork } from "../../lib/supplier-claim-work";
+import { loadPurchaseReturnWork } from "../../lib/purchase-return-work";
 import {
   invoiceNeeded,
   invoicePaymentTiming,
@@ -1788,6 +1789,7 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
       }),
       ...(await repairOrderWork()),
       ...(await loadSupplierClaimWork(c, { poDuty, approver: dutyResolution(duties, "purchasing_approver", today), today, observedAt })),
+      ...(await loadPurchaseReturnWork(c, { poDuty, today, observedAt })),
     ]),
     loadWorkSource("receiving", observedAt, async () => receivingItems),
     loadWorkSource("delivery", observedAt, async () =>

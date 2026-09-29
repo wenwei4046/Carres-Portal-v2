@@ -23,6 +23,8 @@ const recordQuery = vi.fn();
 const doorMutate = vi.fn();
 const refreshPhotos = vi.fn();
 const apiMock = vi.fn();
+const returnsQuery = vi.fn();
+const writeMutate = vi.fn();
 vi.mock("@/lib/api", () => ({ apiFetch: (...args: unknown[]) => apiMock(...args), ApiError: class ApiError extends Error {} }));
 vi.mock("@/lib/queries", () => ({
   fetchOperationSupplierClaimPhotos: (...args: unknown[]) => refreshPhotos(...args),
@@ -30,6 +32,9 @@ vi.mock("@/lib/queries", () => ({
   useOperationSupplierClaimPhotos: (...args: unknown[]) => photosQuery(...args),
   useSupplierClaimRecord: (...args: unknown[]) => recordQuery(...args),
   useSupplierClaimDoor: (_id: string, door: string) => ({ mutate: (body: unknown, opts?: { onSuccess?: () => void }) => { doorMutate(door, body); opts?.onSuccess?.(); }, isPending: false, error: null }),
+  useOperationPurchaseReturns: (...args: unknown[]) => returnsQuery(...args),
+  usePurchaseReturnWrite: (path: string) => ({ mutate: (body: unknown, opts?: { onSuccess?: (out: unknown) => void }) => { writeMutate(path, body); opts?.onSuccess?.({ id: "pr1" }); }, isPending: false, error: null }),
+  usePurchaseReturnIssueSource: () => ({ data: undefined, isLoading: true, isError: false }),
 }));
 vi.mock("./PurchasingTabs", () => ({ default: () => <header>Supplier Claims</header> }));
 vi.mock("./components/GlobalTopBar", () => ({ TopBarIcons: () => null }));
@@ -74,6 +79,8 @@ beforeEach(() => {
   claimsQuery.mockReturnValue({ data: { claims: [row(), row({ id: "c2", claim_no: "SC-1002", supplier_name: "Hooka", status: "closed" })] }, isLoading: false, isError: false });
   photosQuery.mockReturnValue({ data: { photos: [] }, isLoading: false, isError: false });
   recordQuery.mockReturnValue({ data: RECORD(), isLoading: false, isError: false });
+  returnsQuery.mockReturnValue({ data: { returns: [] }, isLoading: false, isError: false });
+  writeMutate.mockReset();
 });
 afterEach(() => vi.useRealTimers());
 
@@ -242,5 +249,65 @@ describe("the claim record — where the supplier reply is recorded (§9.5, 2026
   it("keeps a missing object distinct from an empty register", () => {
     show("/operation?tab=claims&claim=missing");
     expect(screen.getByText("Claim is not available.")).toBeInTheDocument();
+  });
+});
+
+describe("the claim record's Result — `Record what Carres does next` and `Issue Purchase Return` (§9.6, 2026-09-25)", () => {
+  it("says what Carres does is not recorded, and offers the door only when the server confirms PO Duty", () => {
+    show("/operation?tab=claims&claim=c1");
+    expect(screen.getByTestId("claim-what-carres-does")).toHaveTextContent("What Carres does · Not recorded");
+    expect(screen.queryByTestId("claim-record-next")).not.toBeInTheDocument();
+  });
+  it("records one of the three supplier-side decisions through the existing route", () => {
+    recordQuery.mockReturnValue({ data: RECORD({ may_record_next: true }), isLoading: false });
+    show("/operation?tab=claims&claim=c1");
+    fireEvent.click(screen.getByTestId("claim-record-next"));
+    const dialog = screen.getByRole("dialog");
+    fireEvent.click(within(dialog).getByRole("combobox"));
+    const options = screen.getAllByRole("option").map((o) => o.textContent);
+    // OWNER RULING 2026-09-29: the three supplier-side decisions only.
+    expect(options).toEqual(["Return to supplier", "Repair", "Replacement"]);
+    fireEvent.click(screen.getByRole("option", { name: "Return to supplier" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Record what Carres does next" }));
+    expect(writeMutate).toHaveBeenCalledWith("/api/operation/supplier-claims/c1/carres-execution", { carres_execution: "return_to_supplier" });
+  });
+  it("once `Return to supplier` is recorded, leads with `Issue Purchase Return` and opens the 50/50 form", () => {
+    recordQuery.mockReturnValue({ data: RECORD({ decision: "return_to_supplier", decision_at: "2026-09-29T02:00:00Z", decision_by_name: "Mei", may_record_next: true }), isLoading: false });
+    claimsQuery.mockReturnValue({ data: { claims: [row({ requested_action: "replace", requested_at: "2026-09-28T02:00:00Z", supplier_response: "return_and_replace", carres_execution: "return_to_supplier" })] }, isLoading: false });
+    show("/operation?tab=claims&claim=c1");
+    expect(screen.getByTestId("claim-what-carres-does")).toHaveTextContent("What Carres does · Return to supplier · Tue, 29 Sep · Mei");
+    expect(screen.getByTestId("claim-current-action")).toHaveTextContent("Issue the purchase return to Ohana");
+    expect(screen.getByTestId("claim-primary")).toHaveTextContent("Issue Purchase Return");
+    // One obvious button: the Result does not repeat the door the Current action leads with.
+    expect(screen.queryByTestId("claim-issue-return")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("claim-primary"));
+    expect(screen.queryByTestId("claim-result")).not.toBeInTheDocument();
+  });
+  it("an issued return reads `Sending not confirmed` and Stock's pickup word, never `not sent`", () => {
+    recordQuery.mockReturnValue({ data: RECORD({ decision: "return_to_supplier", purchase_returns: [{ id: "pr1", pr_no: "PR-20260929-1001" }] }), isLoading: false });
+    returnsQuery.mockReturnValue({ data: { returns: [{ id: "pr1", pr_no: "PR-20260929-1001", pr_doc_date: "2026-09-29T02:00:00Z", supplier_id: "s1", supplier_name: "Ohana", claim_no: "SC-1001", grn_no: null, sent_at: null, confirmed_pickup_date: null, sends: [], confirmations: [],
+      units: [{ unit_id: "U1-000-075", po_id: null, category: null, item: null, item_spec: null, pickup_location: null, return_to: "Lot 9", collected_by: null, actual_pickup_date: null, supplier_received_date: null, evidence: [] }] }] }, isLoading: false });
+    show("/operation?tab=claims&claim=c1");
+    const box = screen.getByTestId("claim-purchase-returns");
+    expect(box).toHaveTextContent("PR-20260929-1001");
+    expect(box).toHaveTextContent("Sending not confirmed");
+    expect(box).toHaveTextContent("Pickup date not confirmed · Not picked up");
+    expect(box).toHaveTextContent("Supplier Received Date Not recorded");
+    expect(box).not.toHaveTextContent(/not sent/i);
+    expect(screen.queryByTestId("claim-issue-return")).not.toBeInTheDocument();
+  });
+  it("Replacement opens only its existing owning door; a legacy customer movement stays readable", () => {
+    recordQuery.mockReturnValue({ data: RECORD({ decision: "replacement", decision_at: "2026-09-29T02:00:00Z", decision_by_name: "Mei", legacy_words: ["Collect First"], plan_replacement: { allowed: true } }), isLoading: false });
+    show("/operation?tab=claims&claim=c1");
+    expect(screen.getByTestId("claim-what-carres-does")).toHaveTextContent("What Carres does · Replacement");
+    expect(screen.getByTestId("claim-plan-replacement")).toHaveAttribute("href", "/operation?tab=arrival-source&kind=supplier-replacement&claim=c1");
+    expect(screen.getByTestId("claim-legacy-decision")).toHaveTextContent("Earlier record · Collect First");
+    expect(screen.queryByTestId("claim-plan-repair")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("claim-issue-return")).not.toBeInTheDocument();
+  });
+  it("`Plan Repair` appears only when the server confirms all three facts", () => {
+    recordQuery.mockReturnValue({ data: RECORD({ decision: "repair", authorised_outcome: "Repair", plan_repair: { allowed: true, missing: null } }), isLoading: false });
+    show("/operation?tab=claims&claim=c1");
+    expect(screen.getByTestId("claim-plan-repair")).toHaveAttribute("href", "/operation?tab=repair-orders&create=1&claim=c1");
   });
 });

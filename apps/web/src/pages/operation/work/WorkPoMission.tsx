@@ -110,6 +110,7 @@ export default function WorkPoMission({
       <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
         {acts.map((act, i) => {
           const item = itemOf(act);
+          const assigned = item?.source.owner.acting;
           const formOpen = openForm === act.key;
           return (
             <RouteStop key={act.key} label={act.stop === "supplier" ? "SUPPLIER" : act.stop === "receiving" ? "RECEIVING" : "PURCHASING"} tone={act.missed ? "missed" : "due"} last={i === acts.length - 1}>
@@ -127,6 +128,9 @@ export default function WorkPoMission({
                   ) : undefined
                 }
               >
+                <p className="text-meta text-kit-slate-11" data-testid={`work-assigned-${act.key}`}>
+                  {assigned?.userId ? `Assigned to ${assigned.name ?? "Name not recorded"}` : "Not assigned"}
+                </p>
                 {formOpen ? (
                   <div className="border-t border-kit-slate-5 pt-3">
                     <SupplierAnswerForm poId={poId} supplierName={supplierName ?? ""} onDone={() => { setOpenForm(null); refresh(); }} onCancel={() => setOpenForm(null)} />

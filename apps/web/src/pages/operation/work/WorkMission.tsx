@@ -119,6 +119,7 @@ export default function WorkMission({
 
   const card = (c: WorkStopCard) => {
     const act = c.act;
+    const assigned = act ? itemOf(act)?.source.owner.acting : null;
     /* An act with no in-place form yet keeps its owning object's door —
        never a second copy of the act's words. */
     const doorItem = act && act.kind === "other" ? itemOf(act) : null;
@@ -148,6 +149,9 @@ export default function WorkMission({
             ) : undefined
           }
         >
+          {act ? <p className="text-meta text-kit-slate-11" data-testid={`work-assigned-${act.key}`}>
+            {assigned?.userId ? `Assigned to ${assigned.name ?? "Name not recorded"}` : "Not assigned"}
+          </p> : null}
           {c.checklist.length > 0 ? (
             <div className="flex flex-col">
               {c.checklist.map((row, i) => (
