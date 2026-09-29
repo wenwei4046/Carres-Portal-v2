@@ -1508,3 +1508,10 @@ describe("no rail carries a Settings row, for any role", () => {
     expect(screen.queryByText("Settings")).not.toBeInTheDocument();
   });
 });
+
+
+it("Settings does not select Dashboard or restore a permanent Staff & Duties menu row", () => {
+  renderAt("/operation/settings/staff-duties");
+  expect(child("dashboard")).not.toHaveClass("bg-kit-blue-3");
+  expect(screen.queryByTestId("nav-child-staff-duties")).toBeNull();
+});

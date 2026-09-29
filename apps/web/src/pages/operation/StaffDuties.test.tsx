@@ -7,7 +7,7 @@ import type { WorkspaceDutiesResponse } from "@/lib/queries";
 import { ApiError } from "@/lib/api";
 
 /**
- * `Workspace → Staff & Duties` — the ONE duty assignment surface
+ * `Settings → Staff & Duties` — the ONE duty assignment surface
  * (workspace/MASTER.md §§4.1–4.7).
  *
  * The page answers three questions and no more: who normally holds each
@@ -213,18 +213,21 @@ function wholeCatalogue(canAssign = true): WorkspaceDutiesResponse {
 // ── render ───────────────────────────────────────────────────────────────────
 
 let lastSearch = "";
+let lastState: unknown;
 
 function Probe() {
-  lastSearch = useLocation().search;
+  const location = useLocation();
+  lastSearch = location.search;
+  lastState = location.state;
   return null;
 }
 
-function draw(url = "/operation?tab=staff-duties") {
+function draw(url = "/operation?tab=staff-duties", routerState?: unknown) {
   return render(
-    <MemoryRouter initialEntries={[url]}>
+    <MemoryRouter initialEntries={[{ pathname: url.split("?")[0], search: url.includes("?") ? `?${url.split("?")[1]}` : "", state: routerState }]}>
       <Routes>
         <Route
-          path="/operation"
+          path="/operation/*"
           element={
             <>
               <StaffDuties />
@@ -1228,3 +1231,31 @@ function cleanupAndDraw(url: string) {
   document.body.innerHTML = "";
   draw(url);
 }
+
+
+describe("Settings return navigation", () => {
+  it("keeps the Work context through selecting a duty and returning to the catalogue", async () => {
+    const from = "/operation?tab=work&scope=team&selected=order-1";
+    draw("/operation/settings/staff-duties", { from });
+    fireEvent.click(screen.getByTestId("duty-catalogue-grn_duty"));
+    expect(lastState).toEqual({ from });
+    fireEvent.click(screen.getByRole("button", { name: "Back to duties" }));
+    await waitFor(() => expect(screen.getByTestId("duty-catalogue-grn_duty")).toHaveFocus());
+    expect(lastState).toEqual({ from });
+    fireEvent.click(screen.getByRole("button", { name: "Back to work" }));
+    expect(lastSearch).toBe("?tab=work&scope=team&selected=order-1");
+  });
+
+  it("preserves Work context when correcting an unknown duty", async () => {
+    const from = "/operation?tab=work&scope=team";
+    draw("/operation/settings/staff-duties?duty=unknown", { from });
+    await waitFor(() => expect(lastSearch).toContain("duty=po_duty"));
+    expect(lastState).toEqual({ from });
+    expect(screen.getByRole("button", { name: "Back to work" })).toBeInTheDocument();
+  });
+
+  it.each(["https://example.com/operation?tab=work", "//example.com/operation?tab=work", "/hr?tab=people"])("does not offer an unrelated return target %s", (from) => {
+    draw("/operation/settings/staff-duties", { from });
+    expect(screen.queryByRole("button", { name: "Back to work" })).not.toBeInTheDocument();
+  });
+});

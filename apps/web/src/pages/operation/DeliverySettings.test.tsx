@@ -158,7 +158,7 @@ describe("Message Templates and Access", () => {
 
   it("Access names the two duty keys and links to Staff & Duties — it copies nobody", () => {
     renderAt("/operation/settings/delivery/access");
-    expect(screen.getByTestId("delivery-settings-duty-delivery_duty")).toHaveAttribute("href", "/operation?tab=staff-duties");
+    expect(screen.getByTestId("delivery-settings-duty-delivery_duty")).toHaveAttribute("href", "/operation/settings/staff-duties?duty=delivery_duty");
     expect(screen.getByTestId("delivery-settings-duty-delivery_charge_approver")).toBeInTheDocument();
     expect(screen.queryByText(/Shasha|Yu Jun/)).toBeNull();
   });

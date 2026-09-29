@@ -28,8 +28,9 @@
  * governed panel-left pair, never a chevron, an `X` or a text link.
  */
 import { useState } from "react";
-import { NavLink, Navigate, Route, Routes } from "react-router-dom";
+import { NavLink, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import StaffDuties from "./StaffDuties";
 import OperationPurchasingSettings from "./OperationPurchasingSettings";
 import SalesOrderSettings from "./SalesOrderSettings";
 import IssueTrackerSettings from "./IssueTrackerSettings";
@@ -49,6 +50,7 @@ import { DELIVERY_SETTINGS_SECTIONS } from "@carres/shared";
  * but the navigation between them.
  */
 const SECTIONS = [
+  { group: "Staff & Duties", items: [{ slug: "staff-duties", label: "Staff & Duties" }] },
   { group: "Sales Orders", items: [{ slug: "sales-orders", label: "Sales Order Settings" }] },
   { group: "Purchasing", items: [{ slug: "purchasing", label: "Purchasing Settings" }] },
   { group: "Payment", items: [{ slug: "payment", label: "Payment Settings" }] },
@@ -76,14 +78,19 @@ const SECTIONS = [
 const SETTINGS_RAIL_STORAGE_KEY = "ops-settings-rail";
 
 export default function SettingsWorkspace() {
-  const [railOpen, setRailOpen] = useState(() => {
+  const location = useLocation();
+  const dutiesPage = location.pathname.endsWith("/staff-duties");
+  const [dutyRailOpen, setDutyRailOpen] = useState(false);
+  const [savedRailOpen, setRailOpen] = useState(() => {
     try {
       return localStorage.getItem(SETTINGS_RAIL_STORAGE_KEY) !== "0";
     } catch {
       return true;
     }
   });
+  const railOpen = dutiesPage ? dutyRailOpen : savedRailOpen;
   const setRailVisible = (open: boolean) => {
+    if (dutiesPage) { setDutyRailOpen(open); return; }
     setRailOpen(open);
     try {
       localStorage.setItem(SETTINGS_RAIL_STORAGE_KEY, open ? "1" : "0");
@@ -96,7 +103,7 @@ export default function SettingsWorkspace() {
     <div className="flex h-full min-h-0 bg-base-50" data-testid="settings-workspace">
       {railOpen && (
         <nav
-          className="relative flex w-[240px] min-h-0 shrink-0 flex-col gap-5 overflow-y-auto border-r border-kit-slate-5 bg-white p-3"
+          className={`relative flex ${dutiesPage ? "w-full lg:w-[240px]" : "w-[240px]"} min-h-0 shrink-0 flex-col gap-5 overflow-y-auto border-r border-kit-slate-5 bg-white p-3`}
           aria-label="Settings sections"
           data-testid="settings-rail"
         >
@@ -134,7 +141,9 @@ export default function SettingsWorkspace() {
               {s.items.map((item) => (
                 <NavLink
                   key={item.slug}
-                  to={`/operation/settings/${item.slug}`}
+                  to={`/operation/settings/${item.slug}${dutiesPage && item.slug === "staff-duties" ? location.search : ""}`}
+                  state={item.slug === "staff-duties" ? location.state : undefined}
+                  onClick={() => setDutyRailOpen(false)}
                   className={({ isActive }) =>
                     [
                       "relative flex min-h-[36px] w-full items-start gap-2 rounded-control px-2 py-[9px] text-left text-body",
@@ -163,8 +172,8 @@ export default function SettingsWorkspace() {
         </nav>
       )}
 
-      <div className="min-h-0 flex-1 overflow-auto">
-        {!railOpen && (
+      <div className={`min-w-0 min-h-0 flex-1 overflow-auto ${dutiesPage && railOpen ? "hidden lg:block" : ""}`}>
+        {!railOpen && !dutiesPage && (
           <div className="px-9 pt-6">
             <button
               type="button"
@@ -179,6 +188,13 @@ export default function SettingsWorkspace() {
           </div>
         )}
         <Routes>
+          <Route path="staff-duties" element={<StaffDuties settingsNavigation={!railOpen ? (
+            <button type="button" aria-label="Show settings" title="Show settings" data-testid="settings-show-rail"
+              className="grid h-7 w-7 shrink-0 place-items-center rounded-control border border-kit-slate-6 bg-white text-kit-slate-11 hover:bg-kit-slate-3 hover:text-kit-slate-12"
+              onClick={() => setRailVisible(true)}>
+              <PanelLeftOpen size={16} strokeWidth={1.75} aria-hidden />
+            </button>
+          ) : undefined} />} />
           <Route index element={<Navigate to="sales-orders" replace />} />
           <Route path="sales-orders" element={<SalesOrderSettings />} />
           <Route path="purchasing" element={<OperationPurchasingSettings embedded />} />

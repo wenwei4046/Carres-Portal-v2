@@ -1,8 +1,10 @@
+import type { ReactNode } from "react";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import SettingsWorkspace from "./SettingsWorkspace";
 
+vi.mock("./StaffDuties", () => ({ default: ({ settingsNavigation }: { settingsNavigation?: ReactNode }) => <div data-testid="duties-stub">{settingsNavigation}Duties</div> }));
 vi.mock("./SalesOrderSettings", () => ({ default: () => <div>Sales settings</div> }));
 vi.mock("./OperationPurchasingSettings", () => ({ default: () => <div>Purchasing settings</div> }));
 vi.mock("./IssueTrackerSettings", () => ({ default: () => <div>Issue settings</div> }));
@@ -215,5 +217,21 @@ describe("SettingsWorkspace — the Delivery group", () => {
     expect(screen.getByText("Delivery settings")).toBeInTheDocument();
     renderAt("/operation/settings/delivery/partners/p-nets/schedule");
     expect(screen.getAllByText("Delivery settings").length).toBeGreaterThan(0);
+  });
+});
+
+
+describe("Staff & Duties Settings entry", () => {
+  it("opens with navigation hidden and returns to the same duty after choosing the section", () => {
+    render(<MemoryRouter initialEntries={["/operation/settings/staff-duties"]}><Routes>
+      <Route path="/operation/settings/*" element={<SettingsWorkspace />} />
+    </Routes></MemoryRouter>);
+    expect(screen.getByTestId("duties-stub")).toBeVisible();
+    expect(screen.queryByRole("navigation", { name: "Settings sections" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Show settings" }));
+    expect(screen.getByRole("navigation", { name: "Settings sections" })).toBeVisible();
+    fireEvent.click(screen.getByRole("link", { name: "Staff & Duties" }));
+    expect(screen.queryByRole("navigation", { name: "Settings sections" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Show settings" })).toBeVisible();
   });
 });

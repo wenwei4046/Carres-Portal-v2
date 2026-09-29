@@ -1,15 +1,17 @@
-import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useEffect, useMemo, useState, useRef, type ReactNode } from "react";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import ModuleHeader from "./components/ModuleHeader";
 import DutyCatalogue from "./staff-duties/DutyCatalogue";
 import DutyDetail, { DutyHistory } from "./staff-duties/DutyDetail";
 import type { DutyStateFilter } from "./staff-duties/staff-duties-model";
+import Button from "@/components/kit/Button";
+import { readReturnTo } from "@/lib/return-to";
 import Loading from "@/components/kit/Loading";
 import { appTodayIso } from "@/lib/fmt-date";
 import { useWorkspaceDuties } from "@/lib/queries";
 
 /**
- * `Workspace → Staff & Duties` — the ONE company-wide duty assignment surface
+ * `Settings → Staff & Duties` — the ONE company-wide duty assignment surface
  * (docs/workspace/MASTER.md §§4.1–4.7; ERP-ARCHITECTURE Global Duty Law).
  *
  * It answers three questions and no more: who normally holds each governed
@@ -27,8 +29,13 @@ import { useWorkspaceDuties } from "@/lib/queries";
  * `can_assign` fact and never offers a control the server would refuse: a
  * reader gets the quiet sentence, not a disabled form.
  */
-export default function StaffDuties() {
+export default function StaffDuties({ settingsNavigation }: { settingsNavigation?: ReactNode } = {}) {
   const dutiesQ = useWorkspaceDuties();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const focusOnReturn = useRef<string | null>(null);
+  const origin = readReturnTo(location.state);
+  const workOrigin = origin?.split("?")[0] === "/operation" && new URLSearchParams(origin.split("?")[1]).get("tab") === "work" ? origin : null;
   const [params, setParams] = useSearchParams();
   const [search, setSearch] = useState("");
   const [stateFilter, setStateFilter] = useState<DutyStateFilter>("all");
@@ -50,20 +57,31 @@ export default function StaffDuties() {
     if (!requested || known || duties.length === 0) return;
     const next = new URLSearchParams(params);
     next.set("duty", duties[0]!.key);
-    setParams(next, { replace: true });
-  }, [requested, known, duties, params, setParams]);
+    setParams(next, { replace: true, state: location.state });
+  }, [requested, known, duties, params, setParams, location.state]);
 
   function select(key: string) {
     const next = new URLSearchParams(params);
     next.set("duty", key);
-    setParams(next);
+    setParams(next, { state: location.state });
   }
 
   function back() {
+    focusOnReturn.current = selectedKey;
     const next = new URLSearchParams(params);
     next.delete("duty");
-    setParams(next);
+    setParams(next, { state: location.state });
   }
+
+  useEffect(() => {
+    if (explicit || !focusOnReturn.current) return;
+    const key = focusOnReturn.current;
+    const frame = requestAnimationFrame(() => {
+      document.querySelector<HTMLButtonElement>(`[data-testid="duty-catalogue-${key}"]`)?.focus();
+      focusOnReturn.current = null;
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [explicit, selectedKey]);
 
   const selected = duties.find((d) => d.key === selectedKey) ?? null;
   const canAssign = dutiesQ.data?.can_assign === true;
@@ -78,10 +96,14 @@ export default function StaffDuties() {
       <ModuleHeader
         testId="staff-duties-destination-header"
         word="Staff & Duties"
-        docTitle="Staff & Duties · Workspace · Carres"
+        docTitle="Staff & Duties · Settings · Carres"
         destinationHeader
       />
       <div className="min-h-0 flex-1 bg-white" data-testid="staff-duties">
+        {(settingsNavigation || workOrigin) ? <div className="flex flex-wrap items-center gap-3 px-6 pt-3">
+          {settingsNavigation}
+          {workOrigin ? <Button onClick={() => navigate(workOrigin)}>Back to work</Button> : null}
+        </div> : null}
         {dutiesQ.isLoading ? (
           /* Skeletons keep the page's geometry, so nothing jumps when the read
              lands — and nothing here claims a duty is unheld while it is still

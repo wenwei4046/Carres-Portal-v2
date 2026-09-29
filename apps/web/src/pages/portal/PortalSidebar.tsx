@@ -278,6 +278,8 @@ export default function PortalSidebar({ drawer = false }: {
   // `path` (orders) OR an item's `activeFor` path matcher. Used to suppress the
   // tab-key match for every OTHER item while a path section is showing.
   function onPathSection(group: PortalNavGroup): boolean {
+    // Settings is a routed destination even though it has no permanent menu row.
+    if (group.area === "operation" && location.pathname.startsWith("/operation/settings")) return true;
     return group.items.some((it) => {
       if (it.path && location.pathname.startsWith(it.path)) return true;
       return (

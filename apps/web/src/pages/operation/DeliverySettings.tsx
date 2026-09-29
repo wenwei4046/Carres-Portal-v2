@@ -146,8 +146,8 @@ const DS = {
   proofPartialSigned: "Partially Delivered · signed Delivery Order",
   servicesSupported: "Supported services",
   /* Access */
-  accessRule: "Delivery Duty and Delivery Charge Approver are assigned in Workspace → Staff & Duties. This page names the keys and copies nobody.",
-  openStaffDuties: "Open Workspace → Staff & Duties",
+  accessRule: "Delivery Duty and Delivery Charge Approver are assigned in Settings → Staff & Duties. This page names the keys and copies nobody.",
+  openStaffDuties: "Open Settings → Staff & Duties",
   /* History */
   changes: "Changes",
   noChanges: "No changes recorded yet.",
@@ -1058,7 +1058,7 @@ function AccessPage({ data }: { data: DeliverySettingsResponse }) {
         <SectionCard title={DS.access} blurb={DS.accessRule}>
           {keys.map((d) => (
             <Row key={d.key} label={d.label}>
-              <Link className="text-kit-blue-11" to="/operation?tab=staff-duties" data-testid={`delivery-settings-duty-${d.key}`}>
+              <Link className="text-kit-blue-11" to={`/operation/settings/staff-duties?duty=${d.key}`} data-testid={`delivery-settings-duty-${d.key}`}>
                 {DS.openStaffDuties}
               </Link>
             </Row>
