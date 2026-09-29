@@ -59,8 +59,8 @@
  * rather than left on screen as a lie.
  */
 import { useEffect, useMemo, useState } from "react";
-import { chartTree, ledgerKindWord, LEDGER_ACCOUNT_CODE_MESSAGE, type LedgerAccount } from "@carres/shared/finance-ledger";
-import { ledgerAccountCodeInput } from "@carres/shared/schemas/finance";
+import { chartTree, ledgerKindWord, LEDGER_ACCOUNT_CODE_MESSAGE, LEDGER_KIND_WORDS, type LedgerAccount } from "@carres/shared/finance-ledger";
+import { ledgerAccountCodeInput, type LedgerAccountAddInput } from "@carres/shared/schemas/finance";
 import Button from "@/components/kit/Button";
 import Input from "@/components/kit/Input";
 import Modal from "@/components/kit/Modal";
@@ -365,62 +365,69 @@ function AccountModal({ account, onClose }: { account: Row; onClose: () => void 
   );
 }
 
+/** Under's value for a heading with no heading above it. Account numbers are
+ *  digits, so it never collides with one. */
+const TOP = "top";
+
 /** The Receiving button law (COPY-STANDARD): a disabled Save names the FIRST
  *  missing field, top to bottom. null = nothing missing, Save is live. */
 export function addAccountSaveGap(f: {
   parent: string | undefined;
+  kind?: string | undefined;
   code: string;
   name: string;
   isHeading: boolean;
-  firstCode: string;
-  firstName: string;
 }): string | null {
   if (!f.parent) return "Save: pick Under";
-  if (!f.code.trim()) return "Save: type the number";
-  if (!f.name.trim()) return "Save: type the name";
-  if (f.isHeading && !f.firstCode.trim()) return "Save: type the first account number";
-  if (f.isHeading && !f.firstName.trim()) return "Save: type the first account name";
+  if (f.parent === TOP && !f.kind) return "Save: pick the kind";
+  if (!f.code.trim()) return f.isHeading ? "Save: type the heading number" : "Save: type the number";
+  if (!f.name.trim()) return f.isHeading ? "Save: type the heading name" : "Save: type the name";
   return null;
 }
 
 /**
- * Add an account under a heading, or a heading with its first account (0577).
- * The kind follows the heading, so it is not asked. A heading is an account
- * with an account under it, so "It is a heading" asks for that first account
- * too and both are added in one go. The refusals are gl_account_update's
- * sentences, shown as the database wrote them.
+ * Add an account under a heading, or a heading (0577). The kind follows the
+ * heading, so it is not asked. A heading is a stored flag since 0580, so
+ * "It is a heading" adds it empty (0608): Number and Name are the heading's,
+ * and its accounts are added under it afterwards. Only a heading may go at the
+ * top of the chart (Under: "Top of the chart", 0608); there is no heading to
+ * take the kind from, so Kind is asked then. The refusals are
+ * gl_account_update's sentences, shown as the database wrote them.
  */
 function AddAccountModal({ headings, ruleHeadings, onClose }: { headings: Row[]; ruleHeadings: Set<string>; onClose: () => void }) {
   const add = useAddAccount();
   const [parent, setParent] = useState<string | undefined>(undefined);
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
+  const [kind, setKind] = useState<string | undefined>(undefined);
   const [isHeading, setIsHeading] = useState(false);
-  const [firstCode, setFirstCode] = useState("");
-  const [firstName, setFirstName] = useState("");
   const [refusal, setRefusal] = useState<string | null>(null);
-  const gap = addAccountSaveGap({ parent, code, name, isHeading, firstCode, firstName });
-  const under = isHeading ? headings.filter((h) => !ruleHeadings.has(h.code)) : headings;
-  /* Ticking "It is a heading" drops a rule heading from Under, so a pick of
-     one is cleared and Save says "Save: pick Under" again. */
+  const top = parent === TOP;
+  const gap = addAccountSaveGap({ parent, kind, code, name, isHeading });
+  const under = isHeading
+    ? [{ value: TOP, label: "Top of the chart" }, ...headings.filter((h) => !ruleHeadings.has(h.code)).map((h) => ({ value: h.code, label: `${h.code} ${h.name}` }))]
+    : headings.map((h) => ({ value: h.code, label: `${h.code} ${h.name}` }));
+  /* Ticking "It is a heading" drops a rule heading from Under, and unticking
+     it drops the top of the chart, so a pick of either is cleared and Save
+     says "Save: pick Under" again. */
   const tickHeading = (on: boolean) => {
     setIsHeading(on);
-    if (on && parent && ruleHeadings.has(parent)) setParent(undefined);
+    if (on ? parent !== undefined && ruleHeadings.has(parent) : top) setParent(undefined);
   };
   const submit = () => {
     setRefusal(null);
     const shaped = ledgerAccountCodeInput.safeParse(code);
-    const firstShaped = ledgerAccountCodeInput.safeParse(firstCode);
-    if (!parent || !shaped.success || (isHeading && !firstShaped.success)) {
+    if (!parent || !shaped.success) {
       setRefusal(LEDGER_ACCOUNT_CODE_MESSAGE);
       return;
     }
     add.mutate(
       {
-        parentCode: parent,
+        parentCode: top ? null : parent,
         code: shaped.data,
         name: name.trim(),
-        ...(isHeading && firstShaped.success ? { first: { code: firstShaped.data, name: firstName.trim() } } : {}),
+        ...(isHeading ? { isHeading: true } : {}),
+        ...(top ? { kind: kind as LedgerAccountAddInput["kind"] } : {}),
       },
       { onSuccess: onClose, onError: (e) => setRefusal(e.message) },
     );
@@ -445,23 +452,27 @@ function AddAccountModal({ headings, ruleHeadings, onClose }: { headings: Row[];
       }
     >
       <div className="flex flex-col gap-3" data-testid="account-add-form">
+        <Checkbox id="account-add-heading" label="It is a heading" checked={isHeading} onCheckedChange={tickHeading} />
         <Select
           id="account-add-under"
           label="Under"
           required
           value={parent ?? ""}
           onValueChange={setParent}
-          options={under.map((h) => ({ value: h.code, label: `${h.code} ${h.name}` }))}
+          options={under}
         />
-        <Input id="account-add-code" label="Number" required maxLength={8} value={code} onChange={(e) => setCode(e.target.value)} />
-        <Input id="account-add-name" label="Name" required maxLength={60} value={name} onChange={(e) => setName(e.target.value)} />
-        <Checkbox id="account-add-heading" label="It is a heading" checked={isHeading} onCheckedChange={tickHeading} />
-        {isHeading && (
-          <>
-            <Input id="account-add-first-code" label="First account number" required maxLength={8} value={firstCode} onChange={(e) => setFirstCode(e.target.value)} />
-            <Input id="account-add-first-name" label="First account name" required maxLength={60} value={firstName} onChange={(e) => setFirstName(e.target.value)} />
-          </>
+        {top && (
+          <Select
+            id="account-add-kind"
+            label="Kind"
+            required
+            value={kind ?? ""}
+            onValueChange={setKind}
+            options={Object.entries(LEDGER_KIND_WORDS).map(([value, label]) => ({ value, label }))}
+          />
         )}
+        <Input id="account-add-code" label={isHeading ? "Heading number" : "Number"} required maxLength={8} value={code} onChange={(e) => setCode(e.target.value)} />
+        <Input id="account-add-name" label={isHeading ? "Heading name" : "Name"} required maxLength={60} value={name} onChange={(e) => setName(e.target.value)} />
         {refusal && <FieldError>{refusal}</FieldError>}
       </div>
     </Modal>

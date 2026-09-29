@@ -720,6 +720,7 @@ describe("Chart of accounts: Add account offers only the headings gl_account_add
     expect(within(dialog).getByRole("button", { name: "Save: pick Under" })).toBeDisabled();
     expect(within(dialog).getByRole("combobox", { name: /Under/ })).toHaveTextContent("Select");
     expect(await underOptions(dialog)).toEqual([
+      "Top of the chart",
       "300-0000 Assets",
       "320-0000 Receivables",
       "400-0000 Liabilities",

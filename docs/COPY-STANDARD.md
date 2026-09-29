@@ -4753,9 +4753,9 @@ is the proposal. No new sentence is added.
 
 Screen words (Finance Settings):
 - Button: `Add account`. Modal title: `Add account`.
-- Fields: `Under`, `Number`, `Name`, checkbox `It is a heading`, `First account number`, `First account name`.
+- Fields: checkbox `It is a heading`, `Under`, `Number`, `Name`. With `It is a heading` ticked, `Number` and `Name` read `Heading number` and `Heading name` (0608: a heading is added on its own; its accounts are added under it afterwards), and `Under` also offers `Top of the chart` (only a heading goes there). With `Top of the chart` picked, one more field, `Kind`, with the chart's kind words `Asset` · `Liability` · `Equity` · `Income` · `Expense`.
 - Money account add, field `Number`, hint `Leave blank to use the next free number.`
-- The disabled `Save` NAMES its gap (the Receiving button law; first gap wins, top to bottom). Add account: `Save: pick Under` · `Save: type the number` · `Save: type the name` · `Save: type the first account number` · `Save: type the first account name`. The Account (rename) modal reuses `Save: type the name` · `Save: type the number`.
+- The disabled `Save` NAMES its gap (the Receiving button law; first gap wins, top to bottom). Add account: `Save: pick Under` · `Save: pick the kind` (only with `Top of the chart`) · `Save: type the number` · `Save: type the name`; with `It is a heading` ticked, `Save: type the heading number` · `Save: type the heading name`. The Account (rename) modal reuses `Save: type the name` · `Save: type the number`.
 
 Database sentences (shown as written):
 - `<code> <name> is not a heading. Add the account under a heading.`
@@ -4764,6 +4764,8 @@ Database sentences (shown as written):
 - `Type a number for the new account. <code> <name> does not end in 00 or -0000, so no number is picked for you.`
 - `<code> <name> holds the bank and cash accounts. Add a bank or cash account in Money accounts.`
 - `<code> <name> decides how money may be recorded. A heading cannot go under it.`
+- `Only a heading goes at the top of the chart. Pick the heading this account goes under.` (0608)
+- `Choose the kind of the new heading.` (0608)
 
 
 ### Sales Order existing-reference revisions and delivery Activity
