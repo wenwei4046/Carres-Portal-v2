@@ -540,6 +540,9 @@ describe("Last PO time for one supplier", () => {
     render(wrap(<OperationPurchasingSettings />));
     expect(screen.getByTestId(`last-po-time-${NICE}`)).toHaveTextContent("10:00 AM");
     expect(screen.getByTestId(`last-po-time-${OHANA}`)).toHaveTextContent("Uses the PO windows");
+    /* No time yet: a door, never an empty `--:-- --` box. */
+    expect(document.getElementById(`last-po-time-${OHANA}-input`)).toBeNull();
+    fireEvent.click(screen.getByTestId(`last-po-time-${OHANA}-open`));
     fireEvent.change(document.getElementById(`last-po-time-${OHANA}-input`)!, { target: { value: "09:30" } });
     fireEvent.click(screen.getByTestId(`last-po-time-${OHANA}-save`));
     await waitFor(() => expect(setCutoff).toHaveBeenCalledWith({ supplierId: OHANA, cutoff: "09:30" }));
@@ -559,8 +562,7 @@ describe("Last PO time for one supplier", () => {
     fireEvent.change(input, { target: { value: "16:30" } });
     expect(screen.getByText("Must be earlier than the last PO window.")).toBeTruthy();
     expect(screen.getByTestId(`last-po-time-${NICE}-save`)).toBeDisabled();
-    fireEvent.change(input, { target: { value: "" } });
-    fireEvent.click(screen.getByTestId(`last-po-time-${NICE}-save`));
+    fireEvent.click(screen.getByTestId(`last-po-time-${NICE}-clear`));
     await waitFor(() => expect(setCutoff).toHaveBeenCalledWith({ supplierId: NICE, cutoff: null }));
   });
 

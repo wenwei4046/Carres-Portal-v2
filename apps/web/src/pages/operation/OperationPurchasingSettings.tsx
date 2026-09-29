@@ -1278,12 +1278,24 @@ function SupplierLastPoTimes({
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const w = settings.poWindows;
   const last = w ? (w.secondEnabled && w.second ? w.second : w.first) : null;
+  const save = (supplierId: string, cutoff: string | null) =>
+    setCutoff
+      .mutateAsync({ supplierId, cutoff })
+      .then(() => {
+        setDrafts((d) => {
+          const next = { ...d };
+          delete next[supplierId];
+          return next;
+        });
+        toast.success("Saved");
+      })
+      .catch(onFail);
   if (settings.suppliers.length === 0) return null;
   return (
     <div className="mt-4 border-t border-base-100 pt-3" data-testid="supplier-last-po-times">
       <div className="text-body text-base-900">Last PO time for one supplier</div>
       <div className="text-meta text-base-500 mt-0.5">
-        Only for a supplier that needs POs earlier. Leave empty to use the PO windows.
+        Only for a supplier that needs POs earlier. The rest use the PO windows.
       </div>
       <div className="mt-2">
         {settings.suppliers.map((s) => {
@@ -1302,36 +1314,54 @@ function SupplierLastPoTimes({
                   <ChangeLine settings={settings} settingKey="supplier_po_cutoff" supplierId={s.id} />
                 </div>
                 <div className="flex items-start gap-2">
-                  <Input
-                    id={`last-po-time-${s.id}-input`}
-                    type="time"
-                    aria-label={`Last PO time for ${s.name}`}
-                    value={value}
-                    disabled={!canEdit}
-                    error={late ? "Must be earlier than the last PO window." : undefined}
-                    onChange={(e) => setDrafts((d) => ({ ...d, [s.id]: e.target.value }))}
-                  />
-                  {canEdit && (
-                    <Button
-                      size="sm"
-                      disabled={!dirty || late || setCutoff.isPending}
-                      onClick={() =>
-                        setCutoff
-                          .mutateAsync({ supplierId: s.id, cutoff: value === "" ? null : value })
-                          .then(() => {
-                            setDrafts((d) => {
-                              const next = { ...d };
-                              delete next[s.id];
-                              return next;
-                            });
-                            toast.success("Saved");
-                          })
-                          .catch(onFail)
-                      }
-                      data-testid={`last-po-time-${s.id}-save`}
-                    >
-                      Save
-                    </Button>
+                  {/* An empty time input draws the browser's own `--:-- --`,
+                      a dash on screen (owner 2026-09-28). A supplier with no
+                      time shows a door instead; opening it starts at the
+                      first PO window, which the person then moves. */}
+                  {value === "" && !(s.id in drafts) ? (
+                    canEdit ? (
+                      <Button
+                        variant="neutral"
+                        size="sm"
+                        onClick={() => setDrafts((d) => ({ ...d, [s.id]: w?.first ?? "" }))}
+                        data-testid={`last-po-time-${s.id}-open`}
+                      >
+                        Set a time
+                      </Button>
+                    ) : null
+                  ) : (
+                    <>
+                      <Input
+                        id={`last-po-time-${s.id}-input`}
+                        type="time"
+                        aria-label={`Last PO time for ${s.name}`}
+                        value={value}
+                        disabled={!canEdit}
+                        error={late ? "Must be earlier than the last PO window." : undefined}
+                        onChange={(e) => setDrafts((d) => ({ ...d, [s.id]: e.target.value }))}
+                      />
+                      {canEdit && (
+                        <Button
+                          size="sm"
+                          disabled={!dirty || value === "" || late || setCutoff.isPending}
+                          onClick={() => save(s.id, value)}
+                          data-testid={`last-po-time-${s.id}-save`}
+                        >
+                          Save
+                        </Button>
+                      )}
+                      {canEdit && saved !== "" && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          disabled={setCutoff.isPending}
+                          onClick={() => save(s.id, null)}
+                          data-testid={`last-po-time-${s.id}-clear`}
+                        >
+                          Use the PO windows
+                        </Button>
+                      )}
+                    </>
                   )}
                 </div>
               </div>
