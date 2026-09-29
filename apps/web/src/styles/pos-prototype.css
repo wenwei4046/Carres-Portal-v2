@@ -320,6 +320,13 @@ button.pos-wordmark { background: none; border: 0; padding: 0; cursor: pointer; 
 .cat-search input::placeholder { color: var(--fg-muted); }
 .cat-search svg { flex: 0 0 16px; width: 16px; height: 16px; color: var(--fg-muted); }
 .cat-select {
+  /* July 2026 placeholder: ProductModelDto/CatalogResponse expose no
+     product-series field yet. Keep the JSX dormant until the catalog
+     contract, real options, and series filtering exist; then remove
+     this declaration to re-enable it. */
+  display: none;
+}
+.cat-select {
   height: 40px; padding: 0 16px;
   border-radius: 999px;
   background: var(--pos-rail);
@@ -4722,7 +4729,6 @@ button.step-pill:disabled { cursor: default; color: inherit; }
     min-height: 44px;
     flex: 0 0 auto;
     align-items: center;
-    gap: 6px;
     border: 1px solid var(--line-strong);
     border-radius: 999px;
     background: var(--pos-panel);
@@ -4734,6 +4740,12 @@ button.step-pill:disabled { cursor: default; color: inherit; }
     line-height: 1;
     white-space: nowrap;
     touch-action: manipulation;
+  }
+
+  .pos-mobile-category-chip__inner {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 6px;
   }
 
   .pos-mobile-category-chip.is-active:not(:disabled) {
@@ -5102,7 +5114,7 @@ button.step-pill:disabled { cursor: default; color: inherit; }
   }
 
   .cat-grid {
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 16px;
   }
 }
@@ -5111,5 +5123,16 @@ button.step-pill:disabled { cursor: default; color: inherit; }
 @media (min-width: 1024px) and (max-width: 1279px) {
   .cat-grid-wrap {
     padding: 20px 20px 24px;
+  }
+
+  .cat-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* Week 1 desktop baseline: the catalog wall is four columns from 1280px. */
+@media (min-width: 1280px) {
+  .cat-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
