@@ -89,15 +89,29 @@ against a real session.
   PO and perform ordinary Operation work in their joining month; no execution waiting period.
   No separate manager competency confirmation or training sign-off is required (Workspace §4).
 - **Checklists are a shared constant, not a config table.**
-- **Departure visibility — owner correction 2026-09-28 / APPROVED TARGET / NOT BUILT:** after
-  departure is effective, omit the person from default active staff views and current/future Duty
-  choices/routing; retain historical evidence. The authorised People/account owner records the
-  departure/access change once. Workspace does not add an independent employment switch.
-  **Owner-confirmed 2026-09-29 / NOT BUILT:** the default staff list contains current employees
-  only. Former staff profiles remain available only through deliberate historical lookup, not
-  mixed into the daily list or current selectable staff. Do not delete the person or erase their
-  name from existing PO, GRN or other immutable actual-actor evidence. This approval is for default
-  visibility and record retention, not a destructive delete action or a new staff-management page.
+- **ONE DEPARTURE FLOW — OWNER-APPROVED 2026-09-29 / APPROVED TARGET / NOT BUILT:** the
+  authorised People/account manager selects the employee, records the last working day, reviews
+  the effects and confirms once. The workflow records departure and arranges the corresponding
+  access disablement together; it must not require a second, unrelated disable-account action.
+  When departure takes effect, disable access, remove the person from default active staff lists,
+  current choices and routine Duty allocation, and re-resolve affected current/future routing.
+  Employment and Access remain distinct source facts, coordinated by this one workflow, not copied
+  into Workspace. A future departure confirmation schedules its effects; it does not claim access
+  has already been disabled or hide a still-current employee early. Preserve entered facts on
+  failure, identify any unfinished effect and never announce full completion on partial success.
+  Completion means the due departure/access effects are recorded and reflected by their owning
+  sources. Retain actor/time and history; the existing HQ-login and store-PIN distinction remains.
+- **FORMER STAFF VISIBILITY / ACCESS — OWNER-APPROVED 2026-09-29 / TARGET / NOT BUILT:**
+  departure automatically removes the account from Settings and other default active staff lists;
+  no second remove/delete action is needed. Ordinary staff cannot browse or open former employee
+  account/profile details. Only users with the existing personnel-management permission may
+  deliberately look up those retained records; those users also default to the current-staff list.
+  Enforce this on reads and direct detail access, not just by hiding a row. Existing separate
+  sensitive-field controls still apply. Preserve historical PO/GRN and other actual-actor names
+  for users already entitled to those source documents; seeing a historical name does not grant
+  access to the person's account/profile. Do not delete the identity or rewrite past evidence.
+  This approves a unified departure workflow and its access boundary, not a second employee store
+  or an unreviewed redesign of the whole HR module.
 - **Monthly order — owner-approved 2026-09-29 / NOT BUILT:** Workspace maintains a stable
   PO/GRN cycle; admitted newcomers join its tail, effective departures leave it, and existing
   people keep their relative order. People supplies eligibility without maintaining a second rota.
