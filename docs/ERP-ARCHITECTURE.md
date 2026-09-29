@@ -155,7 +155,7 @@ never creates a second assignment truth.
 
 ### Law F.1 · One Shared Duty Resolver
 
-**PLACEMENT — OWNER-APPROVED 2026-09-28 / NOT BUILT (Workspace MASTER §4).** Staff & Duties is
+**STAFF & DUTIES FINAL BLUEPRINT — OWNER-APPROVED 2026-09-29 / NOT BUILT (Workspace MASTER §4).** Staff & Duties is
 presented in global Settings, with no persistent main-menu row. Work retains exact-Duty correction
 links and return context. This changes navigation only: Workspace owns the one assignment/cover
 registry and resolver; People owns identity/eligibility; modules own their business completion.

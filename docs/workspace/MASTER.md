@@ -133,6 +133,15 @@ evidence to this target; existing restrictive code is measured implementation, n
 
 ## 4 · Staff & Duties
 
+**FINAL BLUEPRINT — OWNER-APPROVED / LOCKED 2026-09-29 · APPROVED TARGET / NOT BUILT.**
+The owner approved the assembled end-to-end Blueprint: Settings destination, plain current-person
+catalogue/detail, `Manage staff`, `Next`, collapsed `History`, monthly rotation, newcomer allocation
+versus execution, automatic recorded-leave cover, bounded manual exceptions and People-owned
+single-confirmation departure with restricted former-profile lookup. §§3–4 and HR MASTER §3 hold
+this one current truth. The UI alternatives and earlier cross-chat proposals are not parallel law.
+PLAN design review is complete for this surface; application work requires a BUILD/DELIVERY takeover.
+No application, migration, deployment or production verification is claimed by document approval.
+
 **ENTRY PLACEMENT — OWNER-APPROVED 2026-09-28 / APPROVED TARGET / NOT BUILT.**
 Jess approved this segment: move the one Staff & Duties destination to global Settings, remove its
 persistent main-menu row, and retain Work's direct door to the exact unresolved Duty. The page is
@@ -143,21 +152,15 @@ assignment controls remain intact. Module links lead to this same page; no secon
 Workspace still owns assignment/cover and the Shared Duty Resolver. Settings owns only placement;
 People/HR retains employee identity and eligibility, and modules retain actual work/completion.
 
-**Measured implementation boundary:** at review, the shipped page still occupied the main menu and
-Settings had no Staff & Duties section. Moving the destination is not yet BUILT or DEPLOYED. This
-placement approval and the separately approved §4.2 structure do not approve new cover actions or a
-complete Blueprint; continue the section-by-section PLAN review before application work. Existing
-approved capability contracts below remain in force. The relocation must preserve access, exact-Duty
-links and return context; it must fit the Settings shell without forcing three simultaneous columns
-on a narrow screen. No new token is approved or required by this placement ruling.
+**Measured implementation boundary:** the reviewed shipped page occupied the main menu and
+Settings had no Staff & Duties section. Relocation and the final Blueprint remain target work,
+not BUILT or DEPLOYED. Preserve access, exact-Duty deep links and return context; the Settings shell
+must not force three simultaneous columns on narrow screens. No token delta is required.
 
-**OWNER CORRECTION — 2026-09-28 / APPROVED TARGET / NOT BUILT.** Routine operational Duty
-assignment follows the governed automatic rotation and active/eligible People pool; Jess must not
-maintain each routine assignment manually. Staff & Duties shows the resulting responsibility and
-exceptions. The previously reviewed `Assign holder` form is a conditional manual action surface,
-not approval to make manual assignment the normal operating journey. Its final availability must
-follow the automatic-assignment/exception review. Do not treat the prior form approval as a complete
-Blueprint or permission to Build.
+Routine operational allocation follows the governed automatic rotation and eligible active People
+pool. Jess does not enter each monthly assignment. Staff & Duties displays the results and governed
+exceptions. The manual form is reached through `⋯` for applicable exceptions under §4.3, never a
+required step for normal monthly rotation or recorded PO/GRN leave.
 
 **JOINER / LEAVER TIMING — OWNER-APPROVED 2026-09-28 / APPROVED TARGET / NOT BUILT.**
 A new employee joins routine monthly Duty rotation on the first day of the month following the
@@ -167,7 +170,7 @@ The current month's allocation is not reshuffled merely because a new eligible p
 Departure removes a person immediately when departure becomes effective; do not wait for the next
 month. Re-resolve the affected current/future routine allocation through the one shared Duty model,
 preserving historical actual-actor evidence. This timing ruling does not auto-grant approval rights,
-change source-owned task completion or decide the remaining cover details.
+change source-owned task completion; §4.4 governs cover.
 
 **NEWCOMER PO TIMING — OWNER-APPROVED 2026-09-28 / APPROVED TARGET / NOT BUILT.**
 A new employee does not take PO Duty during their calendar month of joining. From the first day of
@@ -208,8 +211,8 @@ permission permits deliberate historical profile lookup; managers also default t
 People/account read gates enforce this beyond the visible list. Historical PO, GRN and other
 source evidence retains actual names for authorised document readers, without exposing private
 employee/account details through those names. This is not deletion, a second employment switch,
-or permission for ordinary staff to disable accounts. Entry presentation into the owning People
-surface remains under review; the approved workflow must retain return context when linked.
+or permission for ordinary staff to disable accounts. The approved `Manage staff` entry opens the existing People management surface and preserves
+return context; it creates no second staff editor.
 
 `Settings → Staff & Duties` is the only Duty assignment/cover surface and shows immutable history.
 Automatic operational allocation does not grant approval capability or randomly rotate Principal/
@@ -300,15 +303,17 @@ combines those truths. A manager never assigns individual routine Work here.
 
 ### 4.2 · Page composition
 
-**OWNER-APPROVED 2026-09-28 / APPROVED TARGET / NOT BUILT.** Jess approved the page-structure
-segment and the new `Next assignment` heading. Keep one Duty catalogue and one selected-Duty detail.
+**FINAL COMPOSITION — OWNER-APPROVED 2026-09-29 / APPROVED TARGET / NOT BUILT.**
+Keep one Duty catalogue and one selected-Duty detail. Use the final plain headings `Next` and
+`History`. An authorised personnel manager reaches the existing People surface through the header
+`Manage staff` action; staff who lack that permission do not receive that management entry.
 The detail reads in this order: current resolved person and plain dates → relevant future cover
 when applicable → next effective primary assignment → collapsed
-`Assignment & cover history`. Future appointments are not presented as if their terms already ran.
+`History`. Future appointments are not presented as if their terms already ran.
 All authorised assignment/cover records remain reachable; collapsing history never deletes evidence.
 
 ```text
-Staff & Duties
+Staff & Duties                         [Manage staff]
 
 Search duties       │ PO Duty                          ⋯
 State: All duties   │ Yu Jun
@@ -316,10 +321,10 @@ State: All duties   │ Yu Jun
 PO Duty             │
 GRN Duty            │
 Purchasing Approver │
-…                   │ Next assignment
+…                   │ Next
                     │ Shasha · Thu, 1 Oct to Sat, 31 Oct
                     │
-                    │ ▸ Assignment & cover history
+                    │ ▸ History
 ```
 
 Names/dates above illustrate the reading order, never hard-coded facts. The next assignment is the
@@ -335,7 +340,7 @@ follows the shared Duty catalogue order and answers who is responsible today. Ea
 Duty label and today's resolved person (effective cover when present, otherwise normal holder),
 or `Not assigned`. Future appointments never replace today's answer early. `Starts {date}`
 and `Ends {date}` do not appear in catalogue rows; effective periods and future arrangements belong
-in the selected detail's assignment/cover facts and `Next assignment`.
+in the selected detail's assignment/cover facts and `Next`.
 
 The catalogue never shows workload, performance, a recommended person or a copied module roster.
 Search matches Duty label and authorised current/historical person names; `State` may narrow to
@@ -372,7 +377,7 @@ full-width selected detail with `Back to duties`. Settings navigation is availab
 must not force a third simultaneous narrow-screen column. §4.5 owns the retained loading, no-match,
 read-failure, unassigned and read-only states; no task-level Waiting/Completed/Missed state is added.
 Reuse the governed kit and token values. These are acceptance targets, not new measured screenshots
-or production completion; the remaining action/exception details continue in PLAN review.
+or production completion. This composition is approved; delivery must validate it in real use.
 
 **MANUAL ACTION ENTRY — OWNER-APPROVED 2026-09-29 / APPROVED TARGET / NOT BUILT.**
 Place existing authorised manual adjustments in the selected Duty header's visible `⋯` menu,
@@ -405,7 +410,7 @@ be distinguishable from a successfully loaded list with no eligible choice; neve
 failed read proves nobody is eligible. Missing fields use §4.4.1's exact repair sentences. Preserve
 input on refusal/failure, prevent duplicate confirmation while saving, and only announce completion
 after the authoritative assignment write succeeds. A successful future assignment appears under
-`Next assignment` without changing today's owner early. No Work is marked complete by this act.
+`Next` without changing today's owner early. No Work is marked complete by this act.
 
 Use the shared focused dialog at 1440/1180px and a single-column form at 820/743/390px. Names wrap,
 content scrolls vertically, and controls remain reachable above the on-screen keyboard. Closing
@@ -529,33 +534,42 @@ single-column and dates/names never truncate. Keyboard order is
 search/filter → Duty list → selected facts → authorised actions → history. Focus returns to the
 originating Duty after a modal closes.
 
-### 4.6 · Current → proposed gap audit — 2026-09-15
+### 4.6 · Resolution, reference lessons and measured delivery gaps
 
-**CROSS-CHAT RECONCILIATION — MEASURED 2026-09-29 / REVIEW INPUT, NOT NEW APPROVAL.**
-The owner supplied the MC/operational-actor ruling from PR #1705. That PR is OPEN, not merged,
-at inspected head `dd78b8383ea7bfa71e490362576a9528f80c2963`. Its Workspace §3 records the
-operational owner/actual-actor distinction and Team Work assistance during unrecorded sudden
-absence; its COPY proposal includes `Who can act`. Its manual-cover-for-lasting-absence wording
-must converge with this chat's later approved automatic PO/GRN cover from recorded leave (§4.4).
-Do not copy its older page composition over this chat's separately approved `Next assignment` and
-catalogue/detail rules or claim its broad operational-permission target is deployed.
+**Resolution pass — final review 2026-09-29.** Shared Duty ownership, People eligibility, module
+completion and approval gates are RESOLVED FROM AUTHORITY. The owner-approved Settings/plain-name
+UI, automation, operational execution and departure flows are APPROVED TARGET / NOT BUILT.
+Catalogue/detail, search, state filter, current assignment/cover reads and guarded manual assign/
+cover forms are BUILT in the inspected source; this is not verification of the newly approved target.
+No additional owner policy is required for the bounded final Blueprint. Missing implementation
+is not a reason to re-interview the owner or expand the agreed surface.
 
-**RESOLVED — OWNER RULING 2026-09-29.** Joining-month newcomers may actually place PO and perform
-ordinary operational work. The first-month restriction governs Duty allocation only (§3); no
-additional PO competency sign-off or execution waiting period is authorised.
-`Who can act`/`End cover` presentation in the pasted third-segment proposal is not approved merely
-because the owner supplied it for reconciliation. Existing module approval, amendment, void and
-commercial gates must be checked against the exact operational-action scope.
+| Measured evidence and severity | Operator consequence | Required convergence |
+|---|---|---|
+| StaffDuties.tsx, DutyCatalogue.tsx and DutyDetail.tsx already implement selected detail, search and state filter | Rebuilding from the old stacked-page audit would discard useful capabilities | KEEP those capabilities; apply §4.2's plain-name Settings composition, manager menu and approved widths |
+| DutyDetail prints normal/acting labels and permanent manual buttons; current production navigation was inspected in the main menu — yellow | Looks restrictive and manually maintained | Settings entry, one current person, plain dates, `Next`, collapsed `History`, manager-only `⋯` |
+| Migration 0437 prefilled named two-person monthly assignments through September 2027 — red target gap | This does not establish general joiner/leaver automation | The approved cyclic allocation and next-month admission rule must produce the single authoritative assignment source |
+| Existing assign writer accepts overlapping rows; current cover writer validates a whole normal-holder period — red target gap | Manual exceptions and automatic leave could otherwise give inconsistent answers | Dated §4.3 exceptions with impact preview and preserved baseline; §4.4 one effective cover answer and eligibility checks |
+| Duty API GET reads assignments/covers with global limits of 200, without history pagination — yellow | Complete retained evidence cannot be promised by rendering the returned subset alone | All authorised records must remain reachable; current/next resolution must not depend on a truncated history slice |
+| StaffDuties.tsx replaces the page on refresh error — yellow | Previously known facts disappear | Retain last good facts with failure/retry, never present them as newly verified |
+| HrPersonDrawer ExitBlock explicitly separates exit recording and access disablement — red target gap | Manager can finish one step and miss the other | HR §3 one confirmation, honest scheduled/partial effects, default current-only lists and personnel-only former-profile access |
+| Existing ordinary-action Duty-only permission doors differ from §3's broadened operational target — red target gap | A colleague or newcomer can be blocked from helping | Owning-module permission convergence with immutable actual-actor evidence; approval/amendment/void gates stay separately governed |
 
-| Current branch evidence | Required Blueprint state |
-|---|---|
-| One shared catalogue/resolver, guarded assign/cover doors and append-only histories exist | Retain as the only authority; production-verify every catalogue consumer, not GRN alone |
-| Current page stacks Assign Holder, Add Cover and History under every Duty in a 720px document | Replace with one compact catalogue and one selected-duty detail/action surface |
-| Server `can_assign` correctly hides write forms from non-managers | Retain; separate readable facts from authorised actions |
-| Current staff picker reads Operation staff but the Blueprint roster is Yu Jun and Shasha | Enforce active/eligible source facts at read and write; never revive Khor Yee or admit external Warehouse accounts |
-| Cover overlap and whole-period holder are refused by the writer (0532); ending/replacing a cover has no governed act yet | Build the append-only end/replace-cover act with reason/actor/time (§4.4) |
-| Current page has loading/read-error and immutable history evidence | Retain; add no-match, catalogue-failure, scheduled-cover and write-success/refusal contracts |
-| Current layout has no search/filter, selected Duty or narrow-screen contract | Build the §4.2/§4.5 composition and verify at 1440, 1024 and 390px |
+Reference lessons used during review, never authorities over Carres business rules:
+
+| Reference capability | Carres owner / decision | Fit and boundary |
+|---|---|---|
+| [Linear members and roles](https://linear.app/docs/members-roles): managed suspension with retained activity | People / ADAPT | Central employee/access truth; remove leavers from routine lists while preserving evidence; Carres personnel-only former-profile rule applies |
+| [Shopify roles](https://help.shopify.com/en/manual/your-account/users/roles): central role administration | People and module capabilities / KEEP separation | A displayed work person is not a new permission editor or automatic approval grant |
+| [Shopify order details](https://help.shopify.com/en/manual/fulfillment/managing-orders/managing-order-details): More actions | Workspace / ADAPT | Visible `⋯` for applicable manager exceptions, not repeated permanent buttons |
+| [Linear Inbox](https://linear.app/docs/inbox): contextual actions | Workspace / ADAPT, REJECT right-click-only entry | Preserve focused action context, but make entry visible and touch/keyboard operable |
+| [Oracle effective-dated updates](https://docs.oracle.com/en/cloud/saas/human-resources/fahdl/options-for-updating-date-effective-objects-with-future-dated.html): explicit future-record effects | Workspace / ADAPT | Show affected arrangements; a temporary exception preserves the rotation baseline. Do not copy external overwrite modes or historical deletion semantics |
+
+**Scope boundary.** This Blueprint does not add a Work claim button, workload-based allocation,
+permission lecture, independent employee store, attendance monitor or destructive employee deletion.
+No new generic historical-correction UI, permanent rota editor or separate reporting/export surface
+is introduced. Existing governed source records and audit remain reachable; HR-owned sensitive
+records keep their existing gates. Build owns routine delivery mechanics, not new business policy.
 
 ### 4.7 · Staff & Duties acceptance contract
 
@@ -576,6 +590,15 @@ The page is ready for owner acceptance only when all are demonstrable:
   recorded event time is never substituted for the effective period;
 - changing the current holder/cover updates open/future Work routing without rewriting completed
   actor evidence.
+- newcomers can perform ordinary PO work in their joining month while PO allocation starts next
+  month; automatic admission/rotation never grants commercial approval;
+- active-person eligibility, recorded leave and month boundaries give one consistent current name;
+  temporary exceptions expire back to the correct system arrangement without resetting the rota;
+- `Manage staff` opens the owning People flow for authorised personnel managers; ordinary staff
+  cannot access former profiles by lists or direct links, while source-document actor names remain;
+- departure confirmation coordinates due access/list/routing effects and exposes partial failures;
+- `Next` and collapsed `History` use the final copy; full authorised evidence remains reachable even
+  when the dataset exceeds the old API limit.
 
 ## 5 · My Work and Team Work
 

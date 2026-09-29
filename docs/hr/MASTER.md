@@ -89,6 +89,9 @@ against a real session.
   PO and perform ordinary Operation work in their joining month; no execution waiting period.
   No separate manager competency confirmation or training sign-off is required (Workspace §4).
 - **Checklists are a shared constant, not a config table.**
+- **PEOPLE ENTRY — FINAL BLUEPRINT OWNER-APPROVED 2026-09-29 / NOT BUILT:** Staff & Duties
+  provides `Manage staff` to authorised personnel managers, opening the existing People surface
+  with return context. It creates no second employee record or parallel management permission.
 - **ONE DEPARTURE FLOW — OWNER-APPROVED 2026-09-29 / APPROVED TARGET / NOT BUILT:** the
   authorised People/account manager selects the employee, records the last working day, reviews
   the effects and confirms once. The workflow records departure and arranges the corresponding
