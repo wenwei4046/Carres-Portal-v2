@@ -296,6 +296,7 @@ import {
   type PoArrival,
   type AllocatedUnit,
   type SupplierClaimMove,
+  type SupplierClaimUnit,
   type WarehouseIncomingResponse,
   type WarehouseReceiptLine,
   type WarehouseReceiptRow,
@@ -3884,6 +3885,16 @@ export interface SupplierClaimListRow {
    *  register, and resolved units are gone from the count. */
   held_units: number;
   hold_reason: string | null;
+  /** §9.5 PO No line two — EVERY Unit the claim names; null = the read failed
+   *  (`Units could not be loaded`), never "no Units". */
+  units?: SupplierClaimUnit[] | null;
+  /** A confirmed `Claim sent to supplier` exists; null = could not tell. */
+  sent?: boolean | null;
+  /** 0607 — the reply timing snapshotted when the ask was recorded. */
+  reply_waiting_days?: number | null;
+  escalation_extra_days?: number | null;
+  /** The current formal reply's scope and the supplier's own date (0607). */
+  response_reply?: { scope: "claim" | "units"; unit_ids: string[]; supplier_date: string | null } | null;
 }
 
 export interface SupplierClaimsResponse {
@@ -3997,6 +4008,55 @@ export function useOperationSupplierClaims(
       ),
     staleTime: 30_000,
     ...options,
+  });
+}
+
+/** The claim record's Supplier / Result / Documents / History facts (§9.5). */
+export interface SupplierClaimReplyRow {
+  id: string;
+  response: string;
+  scope: "claim" | "units";
+  unit_ids: string[];
+  supplier_date: string | null;
+  note: string | null;
+  spoke_with: string | null;
+  spoken_at: string | null;
+  recorded_at: string;
+  recorded_by_name: string | null;
+  formal_at: string | null;
+  current: boolean;
+  evidence: Array<{ path: string; kind: "photo" | "video" | "pdf"; url: string | null }>;
+}
+export interface SupplierClaimRecord {
+  replies: SupplierClaimReplyRow[];
+  sends: Array<{ id: string; version: number; recipient: string; channel: string; note: string | null; sent_at: string; sent_by_name: string | null }>;
+  units: Array<{ id: string; unit_code: string | null; identity_scope: string; qty: number | null; status: string | null }>;
+  requested_by_name: string | null;
+  repair_orders: Array<{ id: string; ro_no: string }> | null;
+  purchase_returns: Array<{ id: string; pr_no: string }> | null;
+  authorised_outcome: string | null;
+  plan_repair: { allowed: boolean; missing: string | null };
+  po_duty_name: string | null;
+  approver_name: string | null;
+}
+export function useSupplierClaimRecord(claimId: string | null) {
+  return useQuery({
+    queryKey: ["operation", "supplier-claims", "record", claimId] as const,
+    enabled: Boolean(claimId),
+    queryFn: () => apiFetch<SupplierClaimRecord>(`/api/operation/supplier-claims/${encodeURIComponent(claimId ?? "")}/record`),
+  });
+}
+/** One claim door (`request` · `response` · `send`), refreshing the register
+ *  and the record on success. A refusal is the door's own words. */
+export function useSupplierClaimDoor(claimId: string, door: "request" | "response" | "send") {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (body: object) =>
+      apiFetch(`/api/operation/supplier-claims/${encodeURIComponent(claimId)}/${door}`, { method: "POST", body: JSON.stringify(body) }),
+    onSettled: () => {
+      void client.invalidateQueries({ queryKey: ["operation", "supplier-claims"] });
+      void client.invalidateQueries({ queryKey: qk.operation.supplierClaims("all") });
+    },
   });
 }
 

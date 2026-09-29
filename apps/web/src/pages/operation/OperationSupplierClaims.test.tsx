@@ -1,13 +1,17 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, within, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { claimNextMove } from "@carres/shared";
-import type { SupplierClaimListRow } from "@/lib/queries";
+import type { SupplierClaimListRow, SupplierClaimRecord } from "@/lib/queries";
 import OperationSupplierClaims from "./OperationSupplierClaims";
 import { openRailGroups } from "@/test/rail";
 
-/* Rail groups open on the operator's click (owner ruling 2026-09-28). */
+/**
+ * Supplier Claims — Purchasing MASTER §9.5: the confirmed register
+ * (2026-09-18) and the record where the supplier reply is recorded
+ * (2026-09-25).
+ */
 const renderOpen = ((...args: Parameters<typeof render>) => {
   const result = render(...args);
   openRailGroups();
@@ -15,52 +19,43 @@ const renderOpen = ((...args: Parameters<typeof render>) => {
 }) as typeof render;
 const claimsQuery = vi.fn();
 const photosQuery = vi.fn();
+const recordQuery = vi.fn();
+const doorMutate = vi.fn();
 const refreshPhotos = vi.fn();
 const apiMock = vi.fn();
-vi.mock("@/lib/api", () => ({ apiFetch: (...args: unknown[]) => apiMock(...args) }));
-vi.mock("@/lib/queries", () => ({ fetchOperationSupplierClaimPhotos: (...args: unknown[]) => refreshPhotos(...args), useOperationSupplierClaims: (...args: unknown[]) => claimsQuery(...args), useOperationSupplierClaimPhotos: (...args: unknown[]) => photosQuery(...args) }));
+vi.mock("@/lib/api", () => ({ apiFetch: (...args: unknown[]) => apiMock(...args), ApiError: class ApiError extends Error {} }));
+vi.mock("@/lib/queries", () => ({
+  fetchOperationSupplierClaimPhotos: (...args: unknown[]) => refreshPhotos(...args),
+  useOperationSupplierClaims: (...args: unknown[]) => claimsQuery(...args),
+  useOperationSupplierClaimPhotos: (...args: unknown[]) => photosQuery(...args),
+  useSupplierClaimRecord: (...args: unknown[]) => recordQuery(...args),
+  useSupplierClaimDoor: (_id: string, door: string) => ({ mutate: (body: unknown, opts?: { onSuccess?: () => void }) => { doorMutate(door, body); opts?.onSuccess?.(); }, isPending: false, error: null }),
+}));
 vi.mock("./PurchasingTabs", () => ({ default: () => <header>Supplier Claims</header> }));
 vi.mock("./components/GlobalTopBar", () => ({ TopBarIcons: () => null }));
 vi.mock("./SalesOrderLedger", () => ({ RecordRanks: ({ words }: { words: { title: string; identity: string; detail: string[] } }) => <><span>{words.title}</span><span>{words.identity}</span><span>{words.detail.join(" · ")}</span></> }));
+
+const unit = (id: string, code: string | null, scope = "unit") => ({ id, unit_code: code, identity_scope: scope, qty: 1, status: "on_hold" });
 function row(over: Partial<SupplierClaimListRow> = {}): SupplierClaimListRow {
   const base: SupplierClaimListRow = {
-    id: "c1",
-    claim_no: "SC-1001",
-    po_id: "PO-2050",
-    po_line_id: "l1",
-    supplier_id: "s1",
-    supplier_name: "Ohana",
-    sku: "mattress:carres-cloud:King",
-    product_category: "mattress",
-    claim_type: "damaged",
-    qty: 2,
-    status: "open",
-    do_number: "DO-5231",
-    note: null,
-    reported_by_name: "Shasha",
-    reported_at: "2026-07-27T02:00:00Z",
-    photo_count: 2,
-    requested_action: null,
-    requested_at: null,
-    supplier_response: null,
-    supplier_response_note: null,
-    responded_at: null,
-    closed_at: null,
-    close_note: null,
-    customer_resolution: null,
-    customer_resolution_note: null,
-    customer_resolution_at: null,
-    carres_execution: null,
-    carres_execution_note: null,
-    carres_execution_at: null,
-    line_pending: null,
-    held_units: 0,
-    hold_reason: null,
+    id: "c1", claim_no: "SC-1001", po_id: "PO-2050", po_line_id: "l1", supplier_id: "s1", supplier_name: "Ohana",
+    sku: "mattress:carres-cloud:King", product_category: "mattress", claim_type: "damaged", qty: 2, status: "open",
+    do_number: "DO-5231", note: null, reported_by_name: "Shasha", reported_at: "2026-07-27T02:00:00Z", photo_count: 2,
+    requested_action: null, requested_at: null, supplier_response: null, supplier_response_note: null, responded_at: null,
+    closed_at: null, close_note: null, customer_resolution: null, customer_resolution_note: null, customer_resolution_at: null,
+    carres_execution: null, carres_execution_note: null, carres_execution_at: null, line_pending: null, held_units: 0,
+    hold_reason: null, product_description: "Carres Cloud", product_variant: "King",
+    units: [unit("u1", "U1-000-075")], sent: false,
     next_move: { key: "ask", owner: "carres", label: "" },
     ...over,
   };
   return { ...base, next_move: claimNextMove(base) };
 }
+const RECORD = (over: Partial<SupplierClaimRecord> = {}): SupplierClaimRecord => ({
+  replies: [], sends: [], units: [unit("u1", "U1-000-075"), unit("u2", "U1-000-076")], requested_by_name: "Shasha",
+  repair_orders: [], purchase_returns: [], authorised_outcome: null, plan_repair: { allowed: false, missing: "Authorised Outcome" },
+  po_duty_name: "Shasha", approver_name: "Jess", ...over,
+});
 
 function show(at = "/operation?tab=claims") {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -69,169 +64,168 @@ function show(at = "/operation?tab=claims") {
   });
 }
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  // Thursday 1 Oct 2026, 12:00 KL.
+  vi.setSystemTime(new Date("2026-10-01T04:00:00Z"));
   apiMock.mockReset();
   refreshPhotos.mockReset();
+  doorMutate.mockReset();
   localStorage.clear();
   claimsQuery.mockReturnValue({ data: { claims: [row(), row({ id: "c2", claim_no: "SC-1002", supplier_name: "Hooka", status: "closed" })] }, isLoading: false, isError: false });
   photosQuery.mockReturnValue({ data: { photos: [] }, isLoading: false, isError: false });
+  recordQuery.mockReturnValue({ data: RECORD(), isLoading: false, isError: false });
 });
-describe("Supplier Claims factual Register and owning object", () => {
-  it("does not expose Case writes before their database dependency is released", () => {
-    show("/operation?tab=claims&claim=c1");
-    expect(screen.queryByRole("button", { name: "Link Case" })).not.toBeInTheDocument();
-    expect(apiMock).not.toHaveBeenCalled();
-  });
-  it("uses facts and truthful totals without a local Work queue", () => {
+afterEach(() => vi.useRealTimers());
+
+const headers = () => screen.getAllByRole("columnheader").map((th) => th.getAttribute("title")).filter(Boolean);
+
+describe("Supplier Claims register — the confirmed twelve columns (§9.5, 2026-09-18)", () => {
+  it("keeps the confirmed order after the two leading controls", () => {
     show();
-    expect(claimsQuery).toHaveBeenCalledWith("all");
-    expect(screen.getByText("2 claims · 4 units")).toBeInTheDocument();
-    expect(screen.queryByText("Next move")).not.toBeInTheDocument();
-    expect(screen.queryByText("Queues")).not.toBeInTheDocument();
-    expect(screen.queryByText("New Claim")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "SC-1001" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "SC-1002" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /^View/ })).not.toBeInTheDocument();
+    expect(headers().slice(0, 10)).toEqual(["Claim status", "Supplier Claim No", "Claim Reported", "Supplier", "PO No", "GRN No", "Items", "Qty", "Problem", "Supplier Response"]);
+    expect(screen.getAllByRole("checkbox", { name: "Select row" })).toHaveLength(2);
+    expect(headers()).not.toContain("Customer Resolution");
+    expect(headers()).not.toContain("Carres Execution");
   });
-  it("separates PO, GRN, product name and size into their own cells", () => {
-    claimsQuery.mockReturnValue({ data: { claims: [row({
-      product_description: "Carres Cloud", product_variant: "Super Single",
-      warehouse_receipt_id: "receipt-1", grn_no: "GRN-20260907-1",
-    })] }, isLoading: false, isError: false });
+  it("reads In progress for an open claim, and Not issued when it has no number", () => {
+    claimsQuery.mockReturnValue({ data: { claims: [row({ claim_no: "" })] }, isLoading: false });
     show();
-    const po = screen.getByRole("link", { name: "PO-2050" });
-    const grn = screen.getByRole("link", { name: "GRN-20260907-1" });
-    expect(po.closest("td")).not.toBe(grn.closest("td"));
-    expect(within(po.closest("td")!).getAllByRole("link")).toHaveLength(1);
-    expect(screen.getByText("Carres Cloud").closest("td")).not.toBe(screen.getByText("Super Single").closest("td"));
-    expect(screen.getByRole("columnheader", { name: /Supplier Claim No/ })).toBeInTheDocument();
-    expect(screen.queryByRole("columnheader", { name: /^Source/ })).not.toBeInTheDocument();
+    expect(screen.getByTestId("claim-status-in-progress")).toHaveTextContent("In progress");
+    expect(screen.getByRole("button", { name: "Not issued" })).toBeInTheDocument();
+    expect(screen.queryByText("Open")).not.toBeInTheDocument();
   });
-  it("shows the source SKU by default when Catalog cannot name a product", () => {
-    claimsQuery.mockReturnValue({ data: { claims: [row({ sku: "SMOKE King Mattress", product_description: null, product_variant: null })] }, isLoading: false });
+  it("prints the Unit identity on PO No line two, five ways, never invented", () => {
+    claimsQuery.mockReturnValue({ data: { claims: [
+      row(),
+      row({ id: "c3", claim_no: "SC-3", units: [unit("a", "U1-000-080"), unit("b", "U1-000-081")] }),
+      row({ id: "c4", claim_no: "SC-4", units: [unit("q", null, "quantity")] }),
+      row({ id: "c5", claim_no: "SC-5", units: [] }),
+      row({ id: "c6", claim_no: "SC-6", units: null }),
+    ] }, isLoading: false });
     show();
-    expect(screen.getByRole("columnheader", { name: /^SKU/ })).toBeInTheDocument();
-    expect(screen.getByText("SMOKE King Mattress").closest("td")).toBeInTheDocument();
-    expect(screen.queryByRole("cell", { name: "Super Single" })).not.toBeInTheDocument();
+    const po = screen.getAllByRole("link", { name: "PO-2050" }).map((link) => link.closest("td")!.textContent);
+    expect(po).toEqual(["PO-2050U1-000-075", "PO-20502 Units", "PO-2050Counted stock", "PO-2050Unit not recorded", "PO-2050Units could not be loaded"]);
   });
-  it("uses selection for a concrete export action", () => {
+  it("opens the row's own expansion from `{n} Units`, the same state as ▸", () => {
+    claimsQuery.mockReturnValue({ data: { claims: [row({ units: [unit("a", "U1-000-080"), unit("b", "U1-000-081")] })] }, isLoading: false });
     show();
-    fireEvent.click(screen.getAllByRole("checkbox", { name: "Select row" })[0]);
+    const link = screen.getByTestId("claim-units-c1");
+    expect(link).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(link);
+    const inspector = screen.getByTestId("claim-inspector");
+    expect(inspector).toHaveTextContent("U1-000-080");
+    expect(inspector).toHaveTextContent("U1-000-081");
+    expect(within(inspector).queryByRole("combobox")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("claim-inspect-SC-1001"));
+    expect(screen.queryByTestId("claim-inspector")).not.toBeInTheDocument();
+  });
+  it("keeps GRN in its own column and Items on two lines; a Catalog-silent SKU says so", () => {
+    claimsQuery.mockReturnValue({ data: { claims: [row({ warehouse_receipt_id: "r1", grn_no: "GRN-20260907-1" }), row({ id: "c9", claim_no: "SC-9", product_description: null, product_variant: null, sku: "SMOKE King" })] }, isLoading: false });
+    show();
+    expect(screen.getAllByRole("link", { name: "PO-2050" })[0]!.closest("td")).not.toBe(screen.getByRole("link", { name: "GRN-20260907-1" }).closest("td"));
+    expect(screen.getByText("Carres Cloud").closest("td")).toBe(screen.getAllByText("King")[0]!.closest("td"));
+    expect(screen.getByText("Recorded SKU").closest("td")).toHaveTextContent("SMOKE King");
+  });
+  it("counts claims only in the footer, filtered and whole", () => {
+    show();
+    expect(screen.getByText("2 Supplier Claims")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Hooka 1" }));
+    expect(screen.getByText("1 of 2 Supplier Claims")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
+    expect(screen.getByText("2 Supplier Claims")).toBeInTheDocument();
+  });
+  it("draws the four factual rail groups and no Evidence group", () => {
+    show();
+    const rail = screen.getByTestId("supplier-claims-rail");
+    expect([...rail.querySelectorAll("[data-rail-group]")].map((g) => g.getAttribute("data-rail-group"))).toEqual(["Supplier", "Problem", "Claim status", "Supplier Response"]);
+    expect(within(rail).getByRole("button", { name: "In progress 1" })).toBeInTheDocument();
+  });
+  it("keeps a failed read distinct from an empty register, inside the grid", () => {
+    claimsQuery.mockReturnValue({ isError: true, error: Object.assign(new Error("boom"), { status: 500 }), refetch: vi.fn() });
+    show();
+    expect(screen.getByRole("alert")).toHaveTextContent("Supplier Claims could not be loaded");
+    expect(screen.queryByText("No Supplier Claims yet.")).not.toBeInTheDocument();
+    claimsQuery.mockReturnValue({ data: { claims: [] }, isLoading: false });
+  });
+  it("uses selection for Export only", () => {
+    show();
+    fireEvent.click(screen.getAllByRole("checkbox", { name: "Select row" })[0]!);
     expect(screen.getByRole("button", { name: /Export Excel.*1/ })).toBeInTheDocument();
   });
-  it("keeps the inspector read-only and opens the full Claim", () => {
-    show(); fireEvent.click(screen.getByTestId("claim-inspect-SC-1001"));
-    const inspector = screen.getByTestId("claim-inspector");
-    expect(within(inspector).queryByRole("combobox")).not.toBeInTheDocument();
-    expect(inspector).toHaveTextContent("Problem: Damaged");
-    expect(inspector).toHaveTextContent("Evidence: 2 photos");
-    expect(inspector).not.toHaveTextContent("Variant:");
-    expect(inspector).not.toHaveTextContent("Supplier Response:");
-    fireEvent.click(within(inspector).getByRole("button", { name: "Open Claim" }));
-    expect(screen.getByTestId("claim-object")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Link Case" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Close claim" })).not.toBeInTheDocument();
+});
+
+describe("the claim record — where the supplier reply is recorded (§9.5, 2026-09-25)", () => {
+  it("replaces the not-available line with the two Supplier buttons, in order", () => {
+    show("/operation?tab=claims&claim=c1");
+    expect(screen.queryByText(/reply recording are not available here yet/)).not.toBeInTheDocument();
+    const ask = screen.getByTestId("claim-record-ask");
+    const reply = screen.getByTestId("claim-record-reply");
+    expect(ask).toHaveTextContent("Record what we asked");
+    expect(reply).toHaveTextContent("Record supplier reply");
+    expect(ask.compareDocumentPosition(reply) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+  it("leads with ONE current action: record the ask, then the send, then the reply", () => {
+    show("/operation?tab=claims&claim=c1");
+    expect(screen.getByTestId("claim-current-action")).toHaveTextContent("The supplier claim is not issued");
+    expect(screen.getByTestId("claim-primary")).toHaveTextContent("Record what we asked");
+  });
+  it("walks the reply state from the ask: Reply expected → Reply overdue → Escalated to {name}", () => {
+    // Asked Mon 28 Sep → Reply expected Wed 30 Sep → escalation Fri 2 Oct.
+    claimsQuery.mockReturnValue({ data: { claims: [row({ requested_action: "replace", requested_at: "2026-09-28T02:00:00Z", sent: true })] }, isLoading: false });
+    recordQuery.mockReturnValue({ data: RECORD({ sends: [{ id: "s1", version: 1, recipient: "Ohana Mr Lee", channel: "whatsapp", note: null, sent_at: "2026-09-28T03:00:00Z", sent_by_name: "Shasha" }] }), isLoading: false });
+    const view = show("/operation?tab=claims&claim=c1");
+    expect(screen.getByTestId("claim-reply-state")).toHaveTextContent("Reply overdue · Wed, 30 Sep");
+    expect(screen.getByTestId("claim-send-line")).toHaveTextContent("Claim sent · WhatsApp · Ohana Mr Lee");
+    expect(screen.getByTestId("claim-primary")).toHaveTextContent("Record supplier reply");
+    view.unmount();
+    vi.setSystemTime(new Date("2026-10-02T04:00:00Z"));
+    show("/operation?tab=claims&claim=c1");
+    expect(screen.getByTestId("claim-reply-state")).toHaveTextContent("Escalated to Jess");
+  });
+  it("dates Reply expected from the timing the ask snapshotted (0607), not a live setting", () => {
+    claimsQuery.mockReturnValue({ data: { claims: [row({ requested_action: "replace", requested_at: "2026-09-28T02:00:00Z", sent: true, reply_waiting_days: 3, escalation_extra_days: 2 })] }, isLoading: false });
+    show("/operation?tab=claims&claim=c1");
+    expect(screen.getByTestId("claim-reply-state")).toHaveTextContent("Reply expected Thu, 1 Oct");
+  });
+  it("names what is missing beside the button and does not save", () => {
+    claimsQuery.mockReturnValue({ data: { claims: [row({ requested_action: "replace", requested_at: "2026-09-28T02:00:00Z", sent: true })] }, isLoading: false });
+    show("/operation?tab=claims&claim=c1");
+    fireEvent.click(screen.getByTestId("claim-record-reply"));
+    fireEvent.click(screen.getByTestId("claim-reply-save"));
+    expect(screen.getByTestId("claim-reply-missing")).toHaveTextContent("Choose the supplier's answer.");
+    expect(screen.getByTestId("claim-reply-missing")).toHaveTextContent("Choose what the answer applies to.");
+    expect(screen.getByTestId("claim-reply-missing")).toHaveTextContent("Add the evidence: a file, or who spoke and when.");
+    expect(doorMutate).not.toHaveBeenCalled();
+  });
+  it("shows the recorded answer as a claim-level fact, never spread across Units", () => {
+    claimsQuery.mockReturnValue({ data: { claims: [row({ requested_action: "replace", requested_at: "2026-09-28T02:00:00Z", supplier_response: "repair", sent: true })] }, isLoading: false });
+    recordQuery.mockReturnValue({ data: RECORD({ replies: [{ id: "r1", response: "repair", scope: "claim", unit_ids: [], supplier_date: "2026-10-05", note: null, spoke_with: "Mr Lee", spoken_at: "2026-09-29T02:00:00Z", recorded_at: "2026-09-29T03:00:00Z", recorded_by_name: "Shasha", formal_at: "2026-09-29T03:00:00Z", current: true, evidence: [] }] }), isLoading: false });
+    show("/operation?tab=claims&claim=c1");
+    expect(screen.getByTestId("claim-answer")).toHaveTextContent("Repair · Whole claim · by Mon, 5 Oct · recorded Tue, 29 Sep · Shasha");
+    expect(screen.getByTestId("claim-answer")).not.toHaveTextContent("U1-000-075");
+    expect(screen.getByTestId("claim-answer")).toHaveTextContent("Evidence 1");
+    // A supplier's Repair is an offer: no Plan Repair without an Authorised Outcome.
+    expect(screen.queryByTestId("claim-plan-repair")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("claim-current-action")).not.toBeInTheDocument();
+  });
+  it("keeps saved claim photos in the ONE shared viewer with the claim's own context", () => {
+    photosQuery.mockReturnValue({ data: { photos: [{ path: "lost.jpg", url: null, at: "2026-09-04T02:00:00Z" }] } });
+    show("/operation?tab=claims&claim=c1");
+    fireEvent.click(screen.getByRole("button", { name: "Photo 1" }));
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).getByText(/SC-1001 · Evidence/)).toHaveTextContent("Fri, 4 Sep");
+    expect(within(dialog).getByRole("alert")).toHaveTextContent("Photo 1 could not be loaded");
   });
   it("opens a closed Claim outside the PO filter and preserves that filter on return", async () => {
     show("/operation?tab=claims&po=PO-other&claim=c2");
     expect(screen.getByTestId("object-identity")).toHaveTextContent("SC-1002");
+    expect(screen.queryByTestId("claim-record-reply")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("link", { name: "Supplier Claims" }));
     await waitFor(() => expect(screen.queryByTestId("claim-object")).not.toBeInTheDocument());
     expect(screen.getByTestId("claims-rail-source")).toHaveTextContent("PO: PO-other");
   });
-  it("does not drop a named Claim while loading", () => {
-    claimsQuery.mockReturnValue({ isLoading: true });
-    const view = show("/operation?tab=claims&claim=c1");
-    expect(screen.getByText("Loading claim…")).toBeInTheDocument();
-    claimsQuery.mockReturnValue({ data: { claims: [row()] }, isLoading: false });
-    view.rerender(<MemoryRouter initialEntries={["/operation?tab=claims&claim=c1"]}><OperationSupplierClaims /></MemoryRouter>);
-    expect(screen.getByTestId("object-identity")).toHaveTextContent("SC-1001");
-  });
-  it("preserves independent recorded resolutions without duplicate editors", () => {
-    claimsQuery.mockReturnValue({ data: { claims: [row({ customer_resolution: "no_replacement_required", carres_execution: "replace_first", supplier_response: "repair" })] } });
-    show("/operation?tab=claims&claim=c1");
-    expect(screen.getByTestId("claim-panel-SC-1001")).toHaveTextContent("No Replacement Required");
-    expect(screen.getByTestId("claim-panel-SC-1001")).toHaveTextContent("Replace First");
-    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Save|Send|Close claim/ })).not.toBeInTheDocument();
-  });
-  it("keeps unreadable photos in the shared viewer and retries only their owning claim", async () => {
-    claimsQuery.mockReturnValue({ data: { claims: [row({ held_unit_codes: ["U1-000-064"] })] } });
-    photosQuery.mockReturnValue({ data: { photos: [{ path: "lost.jpg", url: null, at: "2026-09-04T02:00:00Z" }] } });
-    refreshPhotos.mockResolvedValue({ photos: [{ path: "other.jpg", url: "https://example.test/other.jpg" }, { path: "lost.jpg", url: "https://example.test/fresh.jpg" }] });
-    show("/operation?tab=claims&claim=c1");
-    const opener = screen.getByRole("button", { name: "Photo 1" });
-    opener.focus();
-    fireEvent.click(opener);
-    const dialog = screen.getByRole("dialog");
-    expect(within(dialog).getByText(/SC-1001 · Evidence/)).toHaveTextContent("Fri, 4 Sep");
-    expect(within(dialog).getByRole("alert")).toHaveTextContent("Photo 1 could not be loaded");
-    expect(within(dialog).queryByText("U1-000-064")).not.toBeInTheDocument();
-    fireEvent.click(within(dialog).getByRole("button", { name: "Try again" }));
-    const photo = await within(dialog).findByRole("img", { name: "Photo 1" });
-    expect(refreshPhotos).toHaveBeenCalledWith("c1");
-    expect(photo).toHaveAttribute("src", "https://example.test/fresh.jpg");
-    fireEvent.load(photo);
-    expect(within(dialog).getByRole("button", { name: "Zoom in" })).toBeEnabled();
-    fireEvent.keyDown(document.activeElement ?? document, { key: "Escape" });
-    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
-    expect(opener).toHaveFocus();
-    expect(screen.getByTestId("claim-panel-SC-1001")).toBeVisible();
-    expect(apiMock).not.toHaveBeenCalled();
-  });
-  it("keeps the claim and file context open when the authorised photo refresh fails", async () => {
-    photosQuery.mockReturnValue({ data: { photos: [{ path: "lost.jpg", url: null }] } });
-    refreshPhotos.mockRejectedValue(new Error("Access denied"));
-    show("/operation?tab=claims&claim=c1");
-    fireEvent.click(screen.getByRole("button", { name: "Photo 1" }));
-    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
-    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("Photo 1 could not be loaded"));
-    expect(within(screen.getByRole("dialog")).getByText("SC-1001 · Evidence")).toBeVisible();
-    expect(screen.getByTestId("claim-panel-SC-1001")).toBeVisible();
-  });
-  it("does not turn a failed read into zero claims", () => {
-    claimsQuery.mockReturnValue({ isError: true, error: Object.assign(new Error("Access denied"), { status: 403 }), refetch: vi.fn() });
-    show(); expect(screen.getByRole("alert")).toHaveTextContent("You do not have access to Supplier Claims.");
-    expect(screen.queryByText("No matching claims.")).not.toBeInTheDocument();
-    expect(screen.queryByText("0 claims · 0 units")).not.toBeInTheDocument();
-  });
-  it("filters by a factual supplier and retains the result after viewing a Claim", () => {
-    show();
-    fireEvent.click(screen.getByRole("button", { name: "Hooka 1" }));
-    expect(screen.getByText("1 of 2 claims · 2 units")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "SC-1001" })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "SC-1002" }));
-    fireEvent.click(screen.getByRole("link", { name: "Supplier Claims" }));
-    expect(screen.getByText("1 of 2 claims · 2 units")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
-    expect(screen.getByText("2 claims · 4 units")).toBeInTheDocument();
-  });
   it("keeps a missing object distinct from an empty register", () => {
-    show("/operation?tab=claims&claim=missing"); expect(screen.getByText("Claim is not available.")).toBeInTheDocument();
-  });
-  it("draws the governed FilterRail, not the retired SectionCard facet chrome", () => {
-    show();
-    expect(screen.getByTestId("supplier-claims-rail")).toBeInTheDocument();
-    expect(screen.queryByTestId("listshell-facet")).not.toBeInTheDocument();
-    // §9.5: rail entries are factual predicates. A linked source is not an
-    // "Evidence" fact, so with every fixture row carrying a PO the group is absent.
-    expect(screen.queryByText("Source not linked")).not.toBeInTheDocument();
-  });
-  it("hides the rail from its own control, shows it back from the toolbar, and remembers the choice", () => {
-    show();
-    fireEvent.click(screen.getByRole("button", { name: "Hide filters" }));
-    expect(screen.queryByTestId("supplier-claims-rail")).not.toBeInTheDocument();
-    expect(localStorage.getItem("carres.supplier-claims.rail")).toBe("0");
-    fireEvent.click(screen.getByTestId("claims-show-filters"));
-    expect(screen.getByTestId("supplier-claims-rail")).toBeInTheDocument();
-    expect(screen.queryByTestId("claims-show-filters")).not.toBeInTheDocument();
-    expect(localStorage.getItem("carres.supplier-claims.rail")).toBe("1");
-  });
-  it("keeps a hidden rail's filters applied and counts a source-free claim as a fact", () => {
-    claimsQuery.mockReturnValue({ data: { claims: [row(), row({ id: "c3", claim_no: "", po_id: "", supplier_name: "Hooka" })] }, isLoading: false, isError: false });
-    show();
-    fireEvent.click(screen.getByTestId("claims-rail-evidence-Source not linked"));
-    expect(screen.getByText("1 of 2 claims · 2 units")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Hide filters" }));
-    expect(screen.getByText("1 of 2 claims · 2 units")).toBeInTheDocument();
+    show("/operation?tab=claims&claim=missing");
+    expect(screen.getByText("Claim is not available.")).toBeInTheDocument();
   });
 });

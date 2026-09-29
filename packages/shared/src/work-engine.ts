@@ -506,6 +506,38 @@ export const MODULE_WORK_RULES: readonly WorkRuleDefinition[] = [
     dueRule: "no governed date — the follow-up stays until consent is given",
     completionFact: "a given owner consent recorded for every such Unit (repair_order_owner_consents, 0602); a refusal keeps it open",
   },
+  /* ⭐ SUPPLIER CLAIMS (Purchasing §9.5, owner approval 2026-09-25). The
+   * claim's own facts; `projectSupplierClaimWork` is the one projector. */
+  {
+    key: "claims.issue_claim",
+    module: "purchasing",
+    trigger: "an open claim has a recorded ask and no confirmed `Claim sent to supplier`",
+    owner: "the effective PO Duty holder from Workspace; Buddy cover may act without replacing normal ownership",
+    ownerRule: "po_duty",
+    action: "Share the claim with {Supplier} and record the actual message sent",
+    dueRule: "the next OFFICE working day after the ask was recorded",
+    completionFact: "a confirmed send of the claim (document_sends supplier_claim, 0607)",
+  },
+  {
+    key: "claims.obtain_reply",
+    module: "purchasing",
+    trigger: "an open claim was asked and sent and the supplier's reply is not recorded",
+    owner: "the effective PO Duty holder from Workspace; any active Operation person may record the reply",
+    ownerRule: "po_duty",
+    action: "Ask {Supplier} to reply to the supplier claim",
+    dueRule: "the ask + Reply waiting days (Settings; starting value 2) on the OFFICE calendar",
+    completionFact: "supplier_response stored with scope, date and evidence (supplier_claim_replies, 0607)",
+  },
+  {
+    key: "claims.no_reply_decision",
+    module: "purchasing",
+    trigger: "Extra days before escalation passed after Reply expected with no supplier reply",
+    owner: "the Purchasing Approver duty holder; PO Duty keeps the chase",
+    ownerRule: "purchasing_approver",
+    action: "Decide how Carres will resolve the item problem",
+    dueRule: "Reply expected + Extra days before escalation (Settings; starting value 2) on the OFFICE calendar",
+    completionFact: "supplier_response stored with scope, date and evidence (supplier_claim_replies, 0607)",
+  },
   {
     key: "claims.confirm_what_happens_next",
     module: "claims",
@@ -551,6 +583,9 @@ const WORK_COMPLETION_STATEMENTS: Readonly<Record<string, string>> = {
   "repair_order.confirm_receipt": "Supplier receipt of the repair order is recorded",
   "repair_order.return_date_passed": "The Units are received back",
   "repair_order.owner_consent": "The owner's consent is recorded",
+  "claims.issue_claim": "The actual message sent to the supplier is recorded",
+  "claims.obtain_reply": "The supplier's reply is recorded with its scope, date and evidence",
+  "claims.no_reply_decision": "The supplier's reply is recorded with its scope, date and evidence",
 };
 
 export const WORK_RULES: readonly WorkRule[] = [

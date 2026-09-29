@@ -3742,11 +3742,18 @@ Warehouse submits count                (or Operation enters goods directly)
 
 ### 9.5 Supplier Claims — approved complete Blueprint
 
-**Release scope — 2026-09-07, restated 2026-09-18:** the current delivery is the governed factual
-Register, full-width read-only SC object and paginated source/catalog/Unit reads. Stock-claim
-intake from a Stock Unit, the claim write controls below, **the shared saved-evidence viewer** and
-**the Supplier Response recording surface** are all **APPROVED TARGET / NOT BUILT**. Local
-implementation evidence below is not production proof.
+**Build state — slice C1 BUILT ON BRANCH `build/supplier-claims-reply`, 2026-09-29; migration
+0607 NOT APPLIED; not merged, not deployed.** C1 delivers the confirmed 12-column Register (engine
+`pinnedPrefix`, 51px two-line rows, four closed rail groups), the full-width record in the approved
+order, `Record what we asked` · `Record supplier reply` (answer · Applies to · Supplier's date ·
+Evidence · Note) · `Claim sent to supplier` (`document_sends` kind `supplier_claim`), and the three
+Claim Work rules (Workspace §6.1). Still **APPROVED TARGET / NOT BUILT:** Stock-Unit intake, the
+per-Unit read-only row expansion (C1 keeps the claim-level inspector plus the Unit list), the
+Authorised Outcome writer (so `Plan Repair` never shows yet), Split/Cancel/Reopen, the claim pack
+PDF and the two Settings rows (0606, Settings lane). **0607 snapshots `claim_reply_waiting_days` /
+`claim_escalation_extra_days` onto the claim when the ask is recorded** (read by name, 2 and 2 when
+the columns are absent); `Reply expected` and escalation read that snapshot, so a later Settings
+change never moves an asked claim's dates. An ask recorded before 0607 reads 2 and 2.
 
 **OWNER-APPROVED / LOCKED — 2026-09-06; claim boundary owner-approved 2026-09-14.** This is the
 single complete Supplier Claims operating model. Existing built facts and unbuilt target rules are
@@ -4196,7 +4203,7 @@ No New Claim, module Work page, dashboard, second sidebar or duplicate editors. 
 contract; reuse existing kit components rather than freezing page-local dimensions.
 
 **APPROVED — register defaults; owner-confirmed column order, two-line identity and status words,
-2026-09-18, NOT BUILT.** Opening Supplier Claims shows every permitted claim — new, historical,
+2026-09-18 · BUILT ON BRANCH 2026-09-29 (slice C1).** Opening Supplier Claims shows every permitted claim — new, historical,
 closed and cancelled — newest report first, in ONE ungrouped list. There are no group bands, no
 View selector and no setup step before records appear. Purchase Orders' four groups are that
 page's ruling and are not copied here. Search and factual filters are optional, start clear on
@@ -4269,8 +4276,8 @@ owner-approved page orders outrank the general heuristic. Therefore: **canvas �
 leading controls plus `Claim status` and `Supplier Claim No`; below 768px only `Supplier Claim
 No.` pins**, and `Claim status` scrolls with the rest. `Claim Reported` is never pinned here.
 Consequence for build: the shipped `DataGrid leadingColumns` capability forces `date · identity`
-to lead and cannot express this order — Supplier Claims must NOT adopt it as built; the engine
-needs a pinned-prefix that takes the page's own leading columns. No column is hidden by width; the
+to lead and cannot express this order — Supplier Claims does NOT adopt it; the engine
+takes the page's own leading columns through `pinnedPrefix` (BUILT ON BRANCH 2026-09-29, slice C1). No column is hidden by width; the
 approved defaults or the person's saved layout always show and overflow scrolls inside the grid.
 Horizontal scrolling uses the shared pinned offsets, so a pinned cell never covers adjacent
 content.
@@ -4283,10 +4290,10 @@ body cells; a pinned cell paints above unpinned ones; a pinned header cell paint
 transparent sticky cell, no page-specific z-index ladder, no page-specific row or header height.
 
 **ROW HEIGHT.** This register carries two-line identity (`PO No` + Unit ID) and two-line goods
-(`Items`), so every row uses the **shared 54px two-line listing row** with vertically centred
+(`Items`), so every row uses the **shared 51px two-line listing row (UI §6.8, owner ruling 2026-09-26, which overwrote 54px)** with vertically centred
 checkbox, disclosure and quantity (§6.8). The engine's 38px single-line default stays correct for
-single-line registers; 54px is the goods-row geometry, not a portal-wide replacement. Short
-content fits inside 54px; long content and accessibility needs may grow the row — a required
+single-line registers; 51px is the goods-row geometry, not a portal-wide replacement. Short
+content fits inside 51px; long content and accessibility needs may grow the row — a required
 party, number, document or date is never ellipsised to protect the height.
 
 Wider detail/reference fields remain optional Columns: Requested Result, Authorised Outcome, Item
@@ -4350,7 +4357,7 @@ description sit small icon + text controls reading exactly **`Photos {n}`** and 
 (singular `Photo 1` · `Video 1`). Icon plus text only: **no large buttons, no pills, no borders,
 no permanent filled background.** They take the shared control ink and the 12px helper size, show
 a hover/focus tint only while hovered or focused, and carry a visible focus ring. Short content
-fits the shared 54px row; long problem text and accessibility needs may grow it.
+fits the shared 51px row; long problem text and accessibility needs may grow it.
 
 - **Clicking expands that Unit's evidence directly beneath that Unit. Clicking again collapses
   it.** `aria-expanded` states it. Each Unit owns its own evidence disclosure; opening one never
@@ -4451,9 +4458,9 @@ Orders):*
 
 | Region | Approved rule |
 |---|---|
-| Pinned columns | The two leading controls plus `Claim status` and `Supplier Claim No` pin at canvas ≥768px; below 768px only `Supplier Claim No` pins. `Claim Reported` is never pinned. The shipped `leadingColumns` capability cannot express this order and is not adopted here. No column is hidden by width; the approved defaults or the person's saved layout always show, and overflow scrolls inside the grid |
+| Pinned columns | The two leading controls plus `Claim status` and `Supplier Claim No` pin at canvas ≥768px; below 768px only `Supplier Claim No` pins. `Claim Reported` is never pinned. The shipped `leadingColumns` capability cannot express this order and is not adopted here; the engine `pinnedPrefix` is. No column is hidden by width; the approved defaults or the person's saved layout always show, and overflow scrolls inside the grid |
 | Widths | Content-measured `width` + `minWidth` like SO Batch/Manual Purchase, with the minimum set by the complete two-line header plus its controls. Candidates from production Inter 13px text: `SC-20260916-0007` 122.8px text (column ≈147px); widest date `Wed, 08 May` 81.1px text (column ≈97px); `In progress` needs ≈96px; `PO-20260904-4665` and `U1-000-075` share one cell, so its width is the wider of the two lines. Final values come from the build's DOM measurement |
-| Row height | Shared 54px two-line listing row (§6.8), vertically centred controls. Growth for long content and accessibility is allowed; ellipsising a required fact to protect 54px is not |
+| Row height | Shared 51px two-line listing row (§6.8), vertically centred controls. Growth for long content and accessibility is allowed; ellipsising a required fact to protect 51px is not |
 | Type and colour | Main text 13px · second line 11px slate-11 · form/button helper 12px · error 13px with icon. Shared slate palette (`palette="slate"`); no Claim-specific styles |
 | Buttons | Kit Button, `md` = 32px. Evidence controls are NOT Buttons — icon + text only. Touch targets expand only by the shared rule; no page-level 40px buttons |
 | Search and footer | Shared responsive search, condition bar and one `Clear filters` (grid `activeConditions`). Footer `{N} Supplier Claims` · `1 Supplier Claim` · filtered `{n} of {N} Supplier Claims`. No quantity total: `qty` is the reported quantity and held Units can be fewer or zero (`supplier-claims.ts` read), so it is not an independent Unit count |
@@ -4472,28 +4479,23 @@ editor, no second reply form, no inline reply in the register.** Case, Stock, Re
 ownership boundaries are unchanged: the record reads their facts and links to them, and never
 writes them.
 
-**Implementation state of reply recording — measured on this branch, 2026-09-18, source evidence
-only (no production walk):**
-
-| Layer | Measured | Classification |
-|---|---|---|
-| Server door | `apps/api/src/routes/operation/supplier-claims.ts:413` defines `POST /:id/response` | **BUILT — source measured** |
-| Web caller | **None.** No call to that route exists anywhere in `apps/web/src` | **NOT BUILT** |
-| Record surface | `SupplierClaimPanel.tsx:83` prints `Supplier Response` read-only; its own header comment states the old inline mutations cannot stand in for the approved doors | **Read-only today** |
-| Governed reply recording as designed above (answer + affected scope + date + evidence, under the approved permission gate) | Not present | **APPROVED TARGET / NOT BUILT** |
-
-Do not describe reply recording as available. A committed route is not a delivered capability, and
-neither is an approved design.
+**Implementation state of reply recording — BUILT ON BRANCH 2026-09-29 (slice C1), 0607 NOT
+APPLIED.** `POST /:id/response` now calls `supplier_claim_record_reply` (0607: append-only
+`supplier_claim_replies` with scope, Units, supplier's date, evidence and recorder; a reply before
+the ask is contact evidence that the ask promotes). The scope-less 0291 door is revoked from
+signed-in callers. The record page calls it through the reply form. Production proof (record,
+History, register column) is owed after 0607 is applied and the PR deployed.
 
 **TWO APPROVED TARGETS; NEITHER MAY BE DELIVERED HALF-WAY.**
 
 | Target | State | The build's obligation |
 |---|---|---|
 | The ONE shared read-only saved-evidence viewer (UI MASTER §6.8) | **DEPLOYED KIT + CLAIM-RECORD PHOTOS; authenticated readback recorded** | Registered in the kit with Receiving as the first consumer. Supplier Claims, Stock and Service Case reuse the same implementation — never a page-local copy |
-| The Supplier Response recording surface on the full-width claim record | **APPROVED TARGET / NOT BUILT** | The build **must** ship a working reply-recording journey, not a read-only page plus a promise |
+| The Supplier Response recording surface on the full-width claim record | **BUILT ON BRANCH 2026-09-29 (C1); 0607 not applied; production proof owed** | The build **must** ship a working reply-recording journey, not a read-only page plus a promise |
 
-**SUPPLIER REPLY RECORDING — OWNER-APPROVED (Jess, 2026-09-25) · NOT BUILT.** Measured on
-production the same day: 71 claims (70 `open`, 1 `closed`), 70 with `requested_action`, **1** with
+**SUPPLIER REPLY RECORDING — OWNER-APPROVED (Jess, 2026-09-25) · BUILT ON BRANCH 2026-09-29
+(slice C1, 0607 not applied).** The measurement below is the pre-build baseline. Measured on
+production 2026-09-25: 71 claims (70 `open`, 1 `closed`), 70 with `requested_action`, **1** with
 `supplier_response`; the three SQL doors exist (`supplier_claim_record_request` ·
 `supplier_claim_record_response` · `supplier_claim_close`, 0291) and **no web caller** exists for
 any of them — the record prints `Supplier instruction and reply recording are not available here

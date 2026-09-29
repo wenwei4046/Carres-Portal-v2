@@ -9,9 +9,12 @@ import {
   SUPPLIER_CLAIM_LATE,
   SUPPLIER_CLAIM_REQUEST_KEYS,
   SUPPLIER_CLAIM_RESPONSE_KEYS,
+  SUPPLIER_CLAIM_WORK_RULE,
   claimNextMove,
   holdOutcomeNeedsNote,
 } from "@carres/shared";
+import { supplierClaimWorkCompletion } from "../../lib/supplier-claim-work";
+import { readClaimFacts, registerSupplierClaimRecordRoutes } from "./supplier-claim-record";
 import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
 import { chunk } from "../../lib/purchase-demand-read";
 import { adminClient, userClient } from "../../lib/supabase";
@@ -105,7 +108,7 @@ supplierClaimsRouter.get("/", async (c) => {
     let q = sb
       .from("supplier_claims")
       .select(
-        "id, claim_no, po_id, po_line_id, warehouse_receipt_id, supplier_id, sku, product_category, claim_type, qty, status, do_number, photos, note, reported_by, reported_at, requested_action, requested_at, supplier_response, supplier_response_note, responded_at, closed_at, close_note, customer_resolution, customer_resolution_note, customer_resolution_at, carres_execution, carres_execution_note, carres_execution_at",
+        "id, claim_no, po_id, po_line_id, warehouse_receipt_id, supplier_id, sku, product_category, claim_type, qty, status, do_number, photos, note, reported_by, reported_at, requested_action, requested_at, supplier_response, supplier_response_note, responded_at, closed_at, close_note, customer_resolution, customer_resolution_note, customer_resolution_at, carres_execution, carres_execution_note, carres_execution_at, requested_by, responded_by, supplier_response_reply_id, reply_waiting_days, escalation_extra_days",
       )
       .order("reported_at", { ascending: false })
       .order("id", { ascending: false });
@@ -283,6 +286,11 @@ supplierClaimsRouter.get("/", async (c) => {
     }
   }
 
+  // §9.5 PO No line two — EVERY Unit this claim names (a released hold keeps
+  // its claim link), read on its own so a failure reads `Units could not be
+  // loaded` on the row instead of failing the register.
+  const facts = await readClaimFacts(sb, claims);
+
   return c.json({
     claims: claims.map((r) => {
       const supplier_name = supplierNames.get(r.supplier_id as string) ?? null;
@@ -305,6 +313,11 @@ supplierClaimsRouter.get("/", async (c) => {
         held_units: held?.units ?? 0,
         hold_reason: held?.reason ?? null,
         held_unit_codes: held?.codes ?? [],
+        units: facts.units ? (facts.units.get(r.id as string) ?? []) : null,
+        sent: facts.sent ? facts.sent.has(r.id as string) : null,
+        response_reply: r.supplier_response_reply_id
+          ? (facts.replies?.get(r.supplier_response_reply_id as string) ?? null)
+          : null,
         // Computed here so the row, the button and any future digest all read
         // the same sentence — one rule, in the shared module.
         next_move: claimNextMove({
@@ -382,8 +395,23 @@ const requestSchema = z.object({
   note: noteSchema,
 });
 
+/** §9.5 reply form (owner approval 2026-09-25): answer · Applies to ·
+ *  Supplier's date · Evidence (files and/or the phone answer) · Note. The
+ *  database (0607) is the rule; zod refuses obvious junk before a round-trip. */
 const responseSchema = z.object({
   supplier_response: z.enum(SUPPLIER_CLAIM_RESPONSE_KEYS),
+  scope: z.enum(["claim", "units"]),
+  unit_ids: z.array(z.string().uuid()).max(200).default([]),
+  supplier_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+  note: noteSchema,
+  evidence: z.array(z.object({ path: z.string().min(1).max(300), kind: z.enum(["photo", "video", "pdf"]) })).max(12).default([]),
+  spoke_with: z.string().trim().max(120).nullable().optional(),
+  spoken_at: z.string().datetime({ offset: true }).nullable().optional(),
+});
+
+const sendSchema = z.object({
+  channel: z.enum(["whatsapp", "email", "print"]),
+  recipient: z.string().trim().min(1).max(160),
   note: noteSchema,
 });
 
@@ -408,24 +436,53 @@ supplierClaimsRouter.post("/:id/request", async (c) => {
   return c.json(data ?? {});
 });
 
-/** POST /:id/response — what the SUPPLIER answered. Does NOT close the claim:
- *  an answer is a promise, and the goods usually arrive days later. */
-supplierClaimsRouter.post("/:id/response", async (c) => {
+/** POST /:id/response — what the SUPPLIER answered, with its scope, date and
+ *  evidence (0607). Does NOT close the claim: an answer is a promise, and the
+ *  goods usually arrive days later. A reply before any ask is kept as contact
+ *  evidence and becomes the formal reply when the ask is recorded. */
+supplierClaimsRouter.post("/:id/response", supplierClaimWorkCompletion([SUPPLIER_CLAIM_WORK_RULE.obtainReply, SUPPLIER_CLAIM_WORK_RULE.noReplyDecision]), async (c) => {
   gate(c);
   const parsed = await parseJsonBody(c, responseSchema);
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
 
   const sb = userClient(c.env, c.var.auth.jwt);
-  const { data, error } = await sb.rpc("supplier_claim_record_response", {
+  const d = parsed.data;
+  const { data, error } = await sb.rpc("supplier_claim_record_reply", {
     p_claim_id: c.req.param("id"),
-    p_response: parsed.data.supplier_response,
-    p_note: parsed.data.note ?? null,
+    p_response: d.supplier_response,
+    p_scope: d.scope,
+    p_unit_ids: d.unit_ids,
+    p_supplier_date: d.supplier_date ?? null,
+    p_note: d.note ?? null,
+    p_evidence: d.evidence,
+    p_spoke_with: d.spoke_with || null,
+    p_spoken_at: d.spoken_at ?? null,
   });
   if (error) {
     const m = mapPgError(error);
     return c.json(m.body, m.status);
   }
   return c.json(data ?? {});
+});
+
+/** POST /:id/send — `Claim sent to supplier`: the actual message staff sent,
+ *  confirmed. Opening WhatsApp or copying never reaches this door (§9.5). */
+supplierClaimsRouter.post("/:id/send", supplierClaimWorkCompletion([SUPPLIER_CLAIM_WORK_RULE.issueClaim]), async (c) => {
+  gate(c);
+  const parsed = await parseJsonBody(c, sendSchema);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("supplier_claim_record_send", {
+    p_claim_id: c.req.param("id"),
+    p_channel: parsed.data.channel,
+    p_recipient: parsed.data.recipient,
+    p_note: parsed.data.note ?? null,
+  });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json({ id: data ?? null });
 });
 
 /** POST /:id/close — settle it. The RPC refuses unless BOTH sides are on file
@@ -575,5 +632,7 @@ supplierClaimsRouter.post("/:id/carres-execution", async (c) => {
   }
   return c.json(data ?? {});
 });
+
+registerSupplierClaimRecordRoutes(supplierClaimsRouter, gate);
 
 export default supplierClaimsRouter;

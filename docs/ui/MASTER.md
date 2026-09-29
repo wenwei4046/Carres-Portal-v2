@@ -1804,9 +1804,11 @@ facts, permissions, complete-record populations or task ownership.
    second and the date is third. It pins the two leading controls plus `Claim status` and
    `Supplier Claim No` at a ≥768px canvas, and `Supplier Claim No` alone below it; its date is
    never pinned. The shipped `leadingColumns` capability forces `date · identity` to lead and
-   therefore cannot express this page — Supplier Claims does not adopt it as built, and the engine
-   needs a pinned-prefix that takes a page's own leading columns (Purchasing §9.5). Do not
-   "restore" the date-first pair there.
+   therefore cannot express this page — Supplier Claims does not adopt it. **Engine
+   `DataGrid pinnedPrefix={{ columns, narrow }}` — BUILT ON BRANCH 2026-09-29 (Purchasing §9.5
+   slice C1):** the page's own leading columns lead, cannot be hidden or dragged, pin at ≥768px,
+   and only `narrow` pins below it; an in-cell disclosure toggles the SAME row expansion through
+   `DataGridRowExpansionContext` (§6.9). Do not "restore" the date-first pair there.
    Other listings use their governed record date and identity, without inventing date facts.
    PO Date is the PO issue/document date represented in its number, not the sent-mark date.
    GRN Date is record creation; physical `Goods Received Date` is its own Receiving column (owner
