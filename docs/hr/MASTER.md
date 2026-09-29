@@ -91,6 +91,9 @@ against a real session.
   departure is effective, omit the person from default active staff views and current/future Duty
   choices/routing; retain historical evidence. The authorised People/account owner records the
   departure/access change once. Workspace does not add an independent employment switch.
+- **Monthly order — owner-approved 2026-09-29 / NOT BUILT:** Workspace maintains a stable
+  PO/GRN cycle; admitted newcomers join its tail, effective departures leave it, and existing
+  people keep their relative order. People supplies eligibility without maintaining a second rota.
 - **People owns Duty eligibility, not Duty assignment** (owner ruling 2026-09-01): employee name,
   personal account, active/disabled, last working date and membership of the eligible Carres staff
   rotation pool. A last-working-date change removes the person from future resolution; People does

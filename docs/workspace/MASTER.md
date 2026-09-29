@@ -149,7 +149,7 @@ The current month's allocation is not reshuffled merely because a new eligible p
 Departure removes a person immediately when departure becomes effective; do not wait for the next
 month. Re-resolve the affected current/future routine allocation through the one shared Duty model,
 preserving historical actual-actor evidence. This timing ruling does not auto-grant approval rights,
-change source-owned task completion or decide the remaining multi-person rotation/cover details.
+change source-owned task completion or decide the remaining cover details.
 
 **NEWCOMER PO TIMING — OWNER-APPROVED 2026-09-28 / APPROVED TARGET / NOT BUILT.**
 A new employee does not take PO Duty during their calendar month of joining. From the first day of
@@ -159,7 +159,23 @@ or fixed probation period is required for that transition. Joining in a month me
 month, not a rolling 30-day wait; the company calendar/timezone governs the boundary. Automatic
 admission makes the person available for the governed rotation; it does not mean every newcomer
 must be the PO holder on that first day. Existing approval capability and receiving-posting rules
-remain separate. The exact multi-person rotation order remains under review.
+remain separate.
+
+**MONTHLY ROTATION ORDER — OWNER-APPROVED 2026-09-29 / APPROVED TARGET / NOT BUILT.**
+Maintain a stable cyclic order of eligible routine Operation staff. Each month one person owns PO
+Duty and the next person in that order owns GRN Duty; advance the PO position by one each month.
+For three eligible people A/B/C, the cycle is PO A / GRN B → PO B / GRN C → PO C / GRN A.
+These letters illustrate the rule, not stored people or a live assignment. A newcomer joins the
+end of the existing rotation order at the approved admission boundary; preserve the existing
+people's relative order rather than restarting the schedule. Entry into the pool is not a promise
+of the next PO slot. Remove a departed person when departure is effective and continue the remaining
+order, re-resolving affected current/future allocation without rewriting historical actual actors.
+
+This determines responsibility and Work routing, not exclusive receiving-posting rights: other
+active Operation staff may still post Receiving under Purchasing's approved posting law. It does
+not rotate commercial approvers or change source-owned task completion. Existing one-person/
+no-eligible-person boundaries remain separate from the illustrated multi-person cycle. Temporary
+absence and cover behaviour remain under review against §4.4; do not treat absence as departure.
 
 When a person resigns, the authorised People/account owner records the last working date and
 access change once. When departure is effective, omit that person from default active staff views,

@@ -361,7 +361,14 @@ capability or rewrite completed Purchasing/Receiving evidence.
 in their calendar month of joining. From the first day of the following month, active staff with
 the existing role/access eligibility automatically join PO rotation without a separate manager
 competency confirmation or training sign-off. Admission is not a guarantee of holding the next PO
-slot. Workspace §4 owns the timing; the exact multi-person rotation order remains under review.
+slot. Workspace §4 owns the timing.
+
+**MONTHLY ORDER — OWNER-APPROVED 2026-09-29 / NOT BUILT:** use a stable cyclic order of eligible
+staff. The month's PO holder is followed by the GRN holder in that order; advance one position each
+month. At admission, append newcomers to the existing order without rearranging existing people.
+Remove effective departures and continue the remaining order. Workspace §4 owns the one shared
+rule. This responsibility allocation does not restrict the approved right of other active Operation
+staff to post Receiving or change historical actual-actor evidence.
 
 ### 5.4 Deliver To
 
