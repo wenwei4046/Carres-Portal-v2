@@ -155,7 +155,7 @@ never creates a second assignment truth.
 
 ### Law F.1 · One Shared Duty Resolver
 
-**PLACEMENT — OWNER-APPROVED 2026-09-28 / NOT BUILT (Workspace MASTER §4).** Staff & Duties is
+**STAFF & DUTIES FINAL BLUEPRINT — OWNER-APPROVED 2026-09-29 / NOT BUILT (Workspace MASTER §4).** Staff & Duties is
 presented in global Settings, with no persistent main-menu row. Work retains exact-Duty correction
 links and return context. This changes navigation only: Workspace owns the one assignment/cover
 registry and resolver; People owns identity/eligibility; modules own their business completion.
@@ -235,6 +235,10 @@ coordinates departure and access disablement. Effective departure removes the ac
 staff lists and Duty eligibility; only personnel managers may look up retained former profiles.
 Historical document readers retain real actor names without gaining employee/profile access.
 Workspace consumes the source facts and owns no second employee record or disable switch.
+
+Owner-approved temporary operational adjustments (2026-09-29 / NOT BUILT, Workspace §4.3) require
+start/end dates and reason, preview affected arrangements and return to the system arrangement
+after expiry. They do not reset monthly rotation, rewrite history or grant approval powers.
 
 An action owner and an action capability are separate facts. A governed Operations Superuser may
 perform the operational action without replacing the resolved owner. The event records both the

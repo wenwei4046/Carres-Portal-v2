@@ -1222,7 +1222,13 @@ lookup/opening of retained former profiles; ordinary staff cannot access them. A
 to current staff. Historical document readers retain actual-actor names without thereby receiving
 profile/account access. Preserve source identities and existing sensitive-field controls. Scheduled
 effects are not completed effects; partial failure must show the unfinished work honestly. Reuse
-existing governed components/tokens; the precise People-entry placement is still under review.
+existing governed components/tokens; the approved `Manage staff` header entry opens existing People management for authorised personnel
+managers and preserves return context.
+
+**TEMPORARY DUTY ADJUSTMENT — OWNER-APPROVED 2026-09-29 / NOT BUILT.** The manager menu’s
+PO/GRN adjustment shows the affected arrangements before confirmation and requires person, start,
+end and reason. Expiry returns to the system arrangement, not a changed monthly rota. Workspace
+§4.3 owns the business boundary; reuse the governed focused form and plain-name/date presentation.
 
 **STAFF & DUTIES PLAIN PERSON DISPLAY — OWNER CORRECTION 2026-09-29 / NOT BUILT.**
 Workspace §4.2 shows one current resolved person name and plain dates. Remove `Normal owner`,
@@ -1242,13 +1248,13 @@ BUILT: authorised manual actions live in the selected Duty header’s visible `�
 not permanent buttons. Only authorised managers see applicable actions; no right-click dependency. Catalogue/detail at 1440/1180px; list then full-width detail at 820/743/390px.
 Settings navigation opens on demand; never force a third narrow-screen column. The separately approved
 2026-09-28 catalogue shows today's holder/active cover/unassigned answer; future dates belong in
-detail (Workspace §4.2), with no token change. Remaining interaction
-review is still open. Workspace §4.3 also carries the owner-approved 2026-09-28 / NOT BUILT
+detail (Workspace §4.2), with no token change. Final Blueprint approved 2026-09-29 / NOT BUILT:
+plain `Next` and collapsed `History`, plus `Manage staff` to the existing People surface. Workspace §4.3 also carries the owner-approved 2026-09-28 / NOT BUILT
 assignment form: current read-only facts above the focused inputs, one confirmation, preserved
 input on failure, and single-column narrow-screen layout. Owner correction later on 2026-09-28 makes routine assignment automatic; this form is only
 conditional manual presentation, not the default journey. Effective departures disappear from
-active staff views/choices; historical evidence remains. Workspace §4 owns the target. Date-conflict
-policy and final manual-action availability are not approved by that presentation ruling. This ruling changes no
+active staff views/choices; historical evidence remains. Workspace §4 owns the final approved target and bounded manual-exception law; the full assembled
+Blueprint received owner approval 2026-09-29. This ruling changes no
 colour, spacing, typography, icon or other token value.
 
 **THE SETTINGS WORKSPACE RAIL — APPROVED / LOCKED, owner correction 2026-09-09. BUILT.** The

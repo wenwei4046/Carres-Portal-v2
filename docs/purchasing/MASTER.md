@@ -387,6 +387,12 @@ cannot cover PO in their joining month. Monthly normal ownership and future orde
 leave ending restores the normal holder applicable that day. No eligible cover stays visible for
 management; approvals retain their own capability rules and Receiving posting rights remain intact.
 
+**TEMPORARY MANUAL PO/GRN ADJUSTMENT — OWNER-APPROVED 2026-09-29 / NOT BUILT:** require the
+selected person, start/end dates and reason; preview affected arrangements before confirmation.
+Apply only within those dates, then resume the system arrangement due on that date. Do not change
+the monthly cyclic order or historical actual-actor evidence. Workspace §4.3 owns this exception;
+ordinary operational execution and approval capabilities remain distinct.
+
 ### 5.4 Deliver To
 
 The destination comes from the source PO/CO `Supplier Deliver To`. When a new buy needs a default, use the
