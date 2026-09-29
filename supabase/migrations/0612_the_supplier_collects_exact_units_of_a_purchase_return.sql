@@ -184,7 +184,8 @@ begin
      where purchase_return_id = v_pr.id and stock_item_id = v_id
      for update;
     if not found then
-      raise exception 'Unit % is not on %', v_id, v_pr.pr_no
+      raise exception 'Unit % is not on %',
+        coalesce((select unit_code from ops_stock_items where id = v_id), v_id::text), v_pr.pr_no
         using errcode = 'P0001', detail = 'not_on_this_return';
     end if;
     if v_line.actual_pickup_date is not null then

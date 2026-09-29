@@ -2,6 +2,7 @@ export const SHARED_VERSION = "0.0.0" as const;
 
 export * from "./issue-tracker";
 export * from "./unit-problem";
+export * from "./supplier-return-pickup";
 export * from "./repair-order";
 export * from "./repair-order-work";
 export * from "./supplier-claim-record";
