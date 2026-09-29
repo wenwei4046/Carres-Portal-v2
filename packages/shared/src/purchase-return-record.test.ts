@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  PURCHASE_RETURN_TO_FROM_WORD,
+  purchaseReturnResolvedReturnTo,
   SUPPLIER_CLAIM_DECISIONS,
   supplierClaimDecision,
   supplierClaimLegacyWords,
@@ -75,15 +77,21 @@ describe("the Purchase Return record states", () => {
 
 describe("the Issue Purchase Return form", () => {
   const source: PurchaseReturnIssueSource = {
-    claim_id: "c1", claim_no: "SC-1", supplier_name: "Hooka", return_address: null, grn_no: null,
+    claim_id: "c1", claim_no: "SC-1", supplier_name: "Hooka", return_to: null, return_to_from: null, grn_no: null,
     units: [{ stock_item_id: "a", unit_code: "U1-000-001", po_no: "PO-1", category: null, item: null, item_spec: null, pickup_location: "Carres Klang", seen: "t", refusal: null }],
   };
-  it("names the missing return address in the approved words", () => {
-    expect(purchaseReturnIssueMissing(source, ["a"])).toEqual(["Add the return address of Hooka"]);
+  it("names the missing address in the approved words only when both addresses are blank (owner ruling 2026-09-29)", () => {
+    expect(purchaseReturnIssueMissing(source, ["a"])).toEqual(["Add the address of Hooka"]);
+  });
+  it("resolves Return To to the return address, else the address, and says which", () => {
+    expect(purchaseReturnResolvedReturnTo({ return_address: " Lot 9 ", address: "No 5" })).toEqual({ return_to: "Lot 9", return_to_from: "return_address" });
+    expect(purchaseReturnResolvedReturnTo({ return_address: "  ", address: " No 5 " })).toEqual({ return_to: "No 5", return_to_from: "address" });
+    expect(purchaseReturnResolvedReturnTo({ return_address: null, address: "" })).toEqual({ return_to: null, return_to_from: null });
+    expect(PURCHASE_RETURN_TO_FROM_WORD).toEqual({ return_address: "From Return address", address: "From Address" });
   });
   it("asks for at least one Unit", () => {
-    expect(purchaseReturnIssueMissing({ ...source, return_address: "Lot 9" }, [])).toEqual(["Tick the Units to return."]);
-    expect(purchaseReturnIssueMissing({ ...source, return_address: "Lot 9" }, ["a"])).toEqual([]);
+    expect(purchaseReturnIssueMissing({ ...source, return_to: "Lot 9", return_to_from: "return_address" }, [])).toEqual(["Tick the Units to return."]);
+    expect(purchaseReturnIssueMissing({ ...source, return_to: "Lot 9", return_to_from: "return_address" }, ["a"])).toEqual([]);
   });
 });
 
@@ -135,5 +143,29 @@ describe("Purchase Return Work (PO Duty, Office calendar)", () => {
       expect(item.owner.rule).toBe("po_duty");
       expect(item.destination).toBe("/operation?tab=purchase-returns&pr=pr-1");
     }
+  });
+});
+
+// ── §9.6 `Record supplier receipt` ──────────────────────────────────────────
+import { purchaseReturnReceiptUnits, purchaseReturnReceiptMissing, RECORD_SUPPLIER_RECEIPT } from "./purchase-return-record";
+
+describe("purchaseReturnReceiptUnits — only Units Stock picked up, each received once", () => {
+  const unit = (unit_id: string, actual_pickup_date: string | null, supplier_received_date: string | null = null) =>
+    ({ unit_id, stock_item_id: `s-${unit_id}`, po_id: null, category: null, item: null, item_spec: null, pickup_location: null, return_to: null, collected_by: null, actual_pickup_date, supplier_received_date, evidence: [] });
+  it("offers a picked-up Unit, names the rest in the governed words, and never implies receipt from pickup", () => {
+    const rows = purchaseReturnReceiptUnits({ units: [unit("U1", "2026-09-05T02:00:00Z"), unit("U2", null), unit("U3", "2026-09-05T02:00:00Z", "2026-09-07")] });
+    expect(rows).toEqual([
+      { stock_item_id: "s-U1", unit_id: "U1", refusal: null, pickedUpOn: "2026-09-05" },
+      { stock_item_id: "s-U2", unit_id: "U2", refusal: "Not picked up", pickedUpOn: null },
+      { stock_item_id: "s-U3", unit_id: "U3", refusal: "Already received 7 Sep 2026", pickedUpOn: "2026-09-05" },
+    ]);
+    expect(RECORD_SUPPLIER_RECEIPT).toBe("Record supplier receipt");
+  });
+  it("names what is missing before the door is asked", () => {
+    expect(purchaseReturnReceiptMissing({ date: null, unitIds: [], files: 0, confirmedBy: "", confirmedAt: null })).toEqual([
+      "Choose the Supplier Received Date.", "Tick the Units the supplier received.", "Add the evidence: a file, or who confirmed and when.",
+    ]);
+    expect(purchaseReturnReceiptMissing({ date: "2026-09-07", unitIds: ["s"], files: 0, confirmedBy: "Mr Tan", confirmedAt: null })).toEqual(["A confirmation needs who confirmed and when."]);
+    expect(purchaseReturnReceiptMissing({ date: "2026-09-07", unitIds: ["s"], files: 1, confirmedBy: "", confirmedAt: null })).toEqual([]);
   });
 });

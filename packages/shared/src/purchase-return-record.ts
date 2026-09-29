@@ -21,6 +21,7 @@
  * up` never implies `Supplier Received Date`.
  */
 import { carresExecutionLabel, customerResolutionLabel } from "./supplier-claim";
+import { klDateOfIso } from "./supplier-claim-record";
 import type { PurchaseReturnListRow } from "./purchase-return";
 import { purchaseReturnCollectedQty, purchaseReturnQty } from "./purchase-return";
 import { PURCHASING_OFFICE_OFF_DAYS } from "./purchasing-supplier-calls";
@@ -104,6 +105,19 @@ export interface PurchaseReturnDetail extends PurchaseReturnListRow {
   supplier_claim_id: string | null;
   sends: PurchaseReturnSend[];
   confirmations: PurchaseReturnPickupConfirmation[];
+  /** 0614 — the supplier's own receipts of returned Units, oldest first. */
+  receipts?: PurchaseReturnSupplierReceipt[];
+}
+
+/** One `Record supplier receipt` (0614, append-only). */
+export interface PurchaseReturnSupplierReceipt {
+  received_on: IsoDate;
+  unit_ids: string[];
+  files: number;
+  confirmed_by: string | null;
+  confirmed_at: string | null;
+  recorded_at: string;
+  recorded_by_name: string | null;
 }
 
 export const PURCHASE_RETURN_CHANNEL_WORD: Record<string, string> = { whatsapp: "WhatsApp", email: "Email", print: "Print" };
@@ -148,17 +162,40 @@ export interface PurchaseReturnIssueSource {
   claim_id: string;
   claim_no: string | null;
   supplier_name: string | null;
-  /** Supplier Master's recorded return address; null = not recorded. */
-  return_address: string | null;
+  /** Return To as the door resolves it (owner ruling 2026-09-29): the
+   *  recorded return address, else the recorded address; null = neither. */
+  return_to: string | null;
+  /** Which Supplier Master field it came from, shown under it. */
+  return_to_from: PurchaseReturnToFrom | null;
   grn_no: string | null;
   units: PurchaseReturnIssueUnit[];
+}
+
+export type PurchaseReturnToFrom = "return_address" | "address";
+
+/** Second line under Return To: which Settings field (`Return address` /
+ *  `Address`, Settings → Purchasing → Supplier addresses) it came from. */
+export const PURCHASE_RETURN_TO_FROM_WORD: Record<PurchaseReturnToFrom, string> = {
+  return_address: "From Return address",
+  address: "From Address",
+};
+
+/** OWNER RULING (Jess, 2026-09-29): Return To = the supplier's return
+ *  address when filled, otherwise its address. The door (0614) computes the
+ *  same `coalesce(nullif(btrim(return_address),''), nullif(btrim(address),''))`. */
+export function purchaseReturnResolvedReturnTo(s: { return_address?: string | null; address?: string | null }): { return_to: string | null; return_to_from: PurchaseReturnToFrom | null } {
+  const ret = s.return_address?.trim();
+  if (ret) return { return_to: ret, return_to_from: "return_address" };
+  const addr = s.address?.trim();
+  if (addr) return { return_to: addr, return_to_from: "address" };
+  return { return_to: null, return_to_from: null };
 }
 
 /** What stops the issue, named, in the form's order. Empty = issuable. */
 export function purchaseReturnIssueMissing(source: PurchaseReturnIssueSource, picked: readonly string[]): string[] {
   const out: string[] = [];
-  if (!source.return_address || !source.return_address.trim()) {
-    out.push(`Add the return address of ${source.supplier_name ?? "the supplier"}`);
+  if (!source.return_to || !source.return_to.trim()) {
+    out.push(`Add the address of ${source.supplier_name ?? "the supplier"}`);
   }
   const eligible = new Set(source.units.filter((u) => !u.refusal).map((u) => u.stock_item_id));
   if (!picked.some((id) => eligible.has(id))) out.push("Tick the Units to return.");
@@ -354,4 +391,49 @@ export function projectPurchaseReturnWork(input: {
       })),
   );
   return [...issues, ...returns];
+}
+
+// ── `Record supplier receipt` (§9.6, 0614) ─────────────────────────────────
+//
+// §9.6: "`Supplier Received Date` is recorded from supplier evidence; fully
+// picked up never implies it." Only a Unit Stock has picked up may be
+// received, and each Unit is received once. The door (0614) refuses in the same
+// words; this is the form's reading of the same facts.
+
+export const RECORD_SUPPLIER_RECEIPT = "Record supplier receipt";
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+/** `7 Sep 2026` — the door's own `FMDD Mon YYYY`. */
+export function purchaseReturnReceiptDateWords(iso: IsoDate): string {
+  const [y, m, d] = iso.slice(0, 10).split("-");
+  return `${Number(d)} ${MONTHS[Number(m) - 1]} ${y}`;
+}
+
+export interface PurchaseReturnReceiptUnit {
+  stock_item_id: string;
+  unit_id: string;
+  /** Why this Unit cannot be ticked: `Not picked up` · `Already received {date}`. */
+  refusal: string | null;
+  /** The Malaysia date Stock recorded the pickup; the received date may not be earlier. */
+  pickedUpOn: IsoDate | null;
+}
+
+export function purchaseReturnReceiptUnits(pr: Pick<PurchaseReturnListRow, "units">): PurchaseReturnReceiptUnit[] {
+  return pr.units.filter((u) => u.stock_item_id).map((u) => {
+    const pickedUpOn = u.actual_pickup_date ? klDateOfIso(u.actual_pickup_date) : null;
+    const refusal = !pickedUpOn ? "Not picked up"
+      : u.supplier_received_date ? `Already received ${purchaseReturnReceiptDateWords(u.supplier_received_date)}`
+      : null;
+    return { stock_item_id: u.stock_item_id!, unit_id: u.unit_id, refusal, pickedUpOn };
+  });
+}
+
+export function purchaseReturnReceiptMissing(d: { date: string | null; unitIds: readonly string[]; files: number; confirmedBy: string; confirmedAt: string | null }): string[] {
+  const out: string[] = [];
+  if (!d.date) out.push("Choose the Supplier Received Date.");
+  if (d.unitIds.length === 0) out.push("Tick the Units the supplier received.");
+  const by = d.confirmedBy.trim().length > 0;
+  if (by !== Boolean(d.confirmedAt)) out.push("A confirmation needs who confirmed and when.");
+  else if (d.files === 0 && !by) out.push("Add the evidence: a file, or who confirmed and when.");
+  return out;
 }

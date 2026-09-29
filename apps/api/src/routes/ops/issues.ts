@@ -82,10 +82,11 @@ router.post("/evidence/upload-url", requireOperationOrPrincipal, async (c) => {
   const raw = await c.req.json<{ mimeType?: string; scope?: { kind?: string; id?: string } }>().catch(() => ({} as { mimeType?: string; scope?: { kind?: string; id?: string } }));
   const mime = raw.mimeType ?? "";
   const kind = /^[a-z_]+$/.test(raw.scope?.kind ?? "") ? raw.scope!.kind! : "issue";
-  /* A PDF is admitted for TWO purposes only: a supplier's Repair Quotation
-     (Purchasing MASTER §9.7) and a supplier's claim reply (§9.5, owner
-     approval 2026-09-25: photo, video, PDF). Every other proof stays photo or video. */
-  const pdf = mime === "application/pdf" && (kind === "repair_quotation" || kind === "supplier_claim_reply");
+  /* A PDF is admitted for THREE purposes only: a supplier's Repair Quotation
+     (Purchasing MASTER §9.7), a supplier's claim reply (§9.5, owner approval
+     2026-09-25: photo, video, PDF) and a supplier's receipt of returned goods
+     (§9.6 `Record supplier receipt`, 0614). Every other proof stays photo or video. */
+  const pdf = mime === "application/pdf" && (kind === "repair_quotation" || kind === "supplier_claim_reply" || kind === "purchase_return_receipt");
   const ext = mime === "image/png" ? "png" : mime === "image/webp" ? "webp" : mime === "video/mp4" ? "mp4" : mime === "video/quicktime" ? "mov" : mime === "image/jpeg" ? "jpg" : pdf ? "pdf" : null;
   if (!ext) return c.json({ error: "invalid_param", code: "invalid_param", message: "Only JPEG, PNG, WebP, MP4 or MOV evidence is accepted" }, 422);
   const id = /^[0-9a-f-]{36}$/i.test(raw.scope?.id ?? "") ? raw.scope!.id! : "unscoped";

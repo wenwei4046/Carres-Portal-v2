@@ -327,7 +327,7 @@ import {
   type RepairOrderEligibleUnit,
   type RepairOrderListRow,
 } from "@carres/shared";
-import { operationWorkResponseSchema, type LogisticsCardFacts, type RouteGoodsFacts } from "@carres/shared";
+import { operationWorkResponseSchema, type LogisticsCardFacts, type RouteGoodsFacts, type SupplierClaimInspection } from "@carres/shared";
 import {
   soBatchOrderLineOutstandingQty,
   soBatchPurchaseResponseSchema,
@@ -3989,6 +3989,24 @@ export function usePurchaseReturn(id: string | null) {
   });
 }
 
+export interface PurchaseReturnEvidenceFile { purpose: "pickup" | "receipt"; path: string; kind: "photo" | "video"; url: string | null }
+export interface PurchaseReturnEvidenceResponse { units: Array<{ unit_id: string; files: PurchaseReturnEvidenceFile[] }> }
+
+/** §9.6 Pickup proof and Supplier receipt proof, signed, read only when a
+ *  `Photos {n}` / `Video {n}` action is opened (URLs are short-lived). */
+export function fetchPurchaseReturnEvidence(id: string) {
+  return apiFetch<PurchaseReturnEvidenceResponse>(`/api/operation/purchase-returns/${encodeURIComponent(id)}/evidence`);
+}
+
+export function usePurchaseReturnEvidence(id: string | null) {
+  return useQuery({
+    queryKey: ["operation", "purchase-returns", "evidence", id] as const,
+    enabled: Boolean(id),
+    queryFn: () => fetchPurchaseReturnEvidence(id!),
+    staleTime: 10 * 60_000,
+  });
+}
+
 /** The `Issue Purchase Return` form's facts, read fresh each time it opens:
  *  the `seen` token the door compares is only as good as its read. */
 export function usePurchaseReturnIssueSource(claimId: string | null) {
@@ -4127,6 +4145,24 @@ export function fetchOperationSupplierClaimPhotos(claimId: string) {
   return apiFetch<{ photos: SupplierClaimPhoto[] }>(
     `/api/operation/supplier-claims/${claimId}/photos`,
   );
+}
+
+/** §9.5 Row expansion — every file with its kind and (0614) its Unit, and each
+ *  held Unit's own recorded problem. Read only when a row is expanded; the
+ *  shared `supplierClaimInspectionRows` decides where each fact belongs. */
+export function fetchSupplierClaimInspection(claimId: string) {
+  return apiFetch<SupplierClaimInspection>(
+    `/api/operation/supplier-claims/${claimId}/inspection`,
+  );
+}
+
+export function useSupplierClaimInspection(claimId: string | null) {
+  return useQuery({
+    queryKey: ["operation", "supplier-claims", "inspection", claimId ?? "none"],
+    queryFn: () => fetchSupplierClaimInspection(claimId!),
+    enabled: !!claimId,
+    staleTime: 10 * 60_000,
+  });
 }
 
 export function useOperationSupplierClaimPhotos(

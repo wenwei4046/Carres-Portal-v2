@@ -380,6 +380,62 @@ supplierClaimsRouter.get("/:id/photos", async (c) => {
   return c.json({ photos });
 });
 
+// ----- GET /:id/inspection -----
+//
+// §9.5 "Row expansion — the per-Unit evidence inspector" (read-only). Every
+// stored file with its kind and — only when it was filed with one (0614) — the
+// Unit it shows; and each held Unit's OWN recorded problem note from receiving
+// (`receiving_unit_results`, outcome `received_with_issue`). The shared
+// `supplierClaimInspectionRows` decides which row each fact belongs to; this
+// route attributes nothing. Read through the caller's JWT first, then signed.
+supplierClaimsRouter.get("/:id/inspection", async (c) => {
+  gate(c);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const id = c.req.param("id");
+  const { data, error } = await sb.from("supplier_claims").select("id, photos").eq("id", id).maybeSingle();
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  if (!data) throw new HTTPException(404, { message: "claim not found" });
+
+  const units = await sb.from("ops_stock_items").select("id").eq("hold_claim_id", id);
+  if (units.error) {
+    const m = mapPgError(units.error);
+    return c.json(m.body, m.status);
+  }
+  const unitIds = ((units.data ?? []) as Array<{ id: string }>).map((u) => u.id);
+  const problems = new Map<string, string | null>();
+  if (unitIds.length) {
+    const results = await readEveryClaimRelation<Record<string, unknown>>(unitIds, (ids) =>
+      sb.from("receiving_unit_results").select("stock_item_id, note, outcome, created_at")
+        .in("stock_item_id", ids).eq("outcome", "received_with_issue").order("created_at", { ascending: true }));
+    if (results.error) {
+      const m = mapPgError(results.error);
+      return c.json(m.body, m.status);
+    }
+    // The latest recorded result for the Unit is its problem as it stands.
+    for (const r of results.data) problems.set(String(r.stock_item_id), (r.note as string | null)?.trim() || null);
+  }
+
+  const entries = (Array.isArray(data.photos) ? data.photos : []) as Array<ClaimPhoto & { unit_code?: string | null }>;
+  const admin = adminClient(c.env);
+  const files = await Promise.all(entries.map(async (e) => {
+    const { data: signed } = await admin.storage.from("delivery-orders").createSignedUrl(e.path, SIGNED_URL_TTL_SECONDS);
+    return {
+      path: e.path,
+      at: e.at ?? null,
+      kind: /\.(mp4|mov|m4v|webm)$/i.test(e.path) ? "video" as const : "photo" as const,
+      unit_code: typeof e.unit_code === "string" && e.unit_code ? e.unit_code : null,
+      url: signed?.signedUrl ?? null,
+    };
+  }));
+  return c.json({
+    files,
+    problems: [...problems].map(([stock_item_id, note]) => ({ stock_item_id, note })),
+  });
+});
+
 // ----- R3 · the three moves -------------------------------------------------
 //
 // Each one is a thin door onto an RPC in 0291. The rules — which ask is legal

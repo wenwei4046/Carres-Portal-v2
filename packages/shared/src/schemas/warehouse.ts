@@ -17,7 +17,13 @@ import { z } from "zod";
 
 /** Same cap as R2's receive payload — a malformed client must not be able to
  *  write an unbounded jsonb array of photo paths. */
-const CLAIM_PHOTO_PATHS = z.array(z.string().min(1).max(400)).max(12);
+/** 0614 (§9.5): a plain storage key files a claim-level photo; `{path,
+ *  unitCode}` also names the Unit the photo shows, so the per-Unit inspector
+ *  can attribute it. `claimPhotoWire` reshapes it for the receive engine. */
+const CLAIM_PHOTO_PATHS = z.array(z.union([
+  z.string().min(1).max(400),
+  z.object({ path: z.string().min(1).max(400), unitCode: z.string().min(1).max(64) }),
+])).max(12);
 
 export const warehouseSubmitReceiptInput = z
   .object({

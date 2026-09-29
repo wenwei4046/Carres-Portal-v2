@@ -3776,9 +3776,11 @@ supplier reply` (answer · Applies to · Supplier's date · Evidence · Note) ·
 on the record's Result section, the ONE supplier-side decision and Authorised Outcome (owner ruling
 2026-09-29 below) through the existing `POST /:id/carres-execution`, and the server-confirmed `Plan
 Repair` / `Plan Supplier replacement` / `Issue Purchase Return` doors; the missing fact names itself
-(`Authorised Outcome` · `Units` · `PO Duty`). **Still APPROVED TARGET / NOT BUILT:** Stock-Unit
-intake, the per-Unit read-only row expansion, Split/Cancel/Reopen, the claim pack PDF and the two
-Settings rows (0606, Settings lane). **0607 snapshots `claim_reply_waiting_days` /
+(`Authorised Outcome` · `Units` · `PO Duty`). **Slice C3 — the per-Unit read-only row expansion —
+BUILT ON BRANCH `build/claim-unit-evidence-received-date`, 2026-09-29, migration 0614 NOT APPLIED;
+not merged, not deployed** (see "Row expansion" below for what it does and its one limit).
+**Still APPROVED TARGET / NOT BUILT:** Stock-Unit intake, Split/Cancel/Reopen, the claim pack PDF and
+the two Settings rows (0606, Settings lane). **0607 snapshots `claim_reply_waiting_days` /
 `claim_escalation_extra_days` onto the claim when the ask is recorded** (read by name, 2 and 2 when
 the columns are absent); `Reply expected` and escalation read that snapshot, so a later Settings
 change never moves an asked claim's dates. An ask recorded before 0607 reads 2 and 2.
@@ -4388,7 +4390,19 @@ loaded page; collapsed groups do not filter.
 
 #### Row expansion — the per-Unit evidence inspector
 
-**OWNER-CONFIRMED 2026-09-18 · APPROVED / NOT BUILT.** The expansion has exactly one job: read the
+**Build (2026-09-29, 0614, BUILT ON BRANCH, NOT APPLIED).** `SupplierClaimUnitsTable` draws the
+five columns below from `GET /api/operation/supplier-claims/:id/inspection` (read when the row is
+expanded) through the ONE shared arithmetic `supplierClaimInspectionRows`: one row per held tracked
+Unit (`Qty 1`) with its own receiving problem note (`receiving_unit_results`), counted stock on one
+row (`Counted stock`), and the SavedEvidenceViewer per kind. **Linkage:** before 0614 no stored claim
+photo named a Unit, so none is attributed; every such file sits on one `Whole claim` row, never spread
+across Units. 0614 lets the ONE photo writer (`supplier_claim_photo_entries`, called by every
+receiving door) keep `{path, unit_code}`, and both receiving APIs accept `{path, unitCode}`; a file
+is attributed only when its `unit_code` is one of that claim's Units. **Limit, named:** the
+Receiving form still uploads line-level photos, so until Receiving sends per-Unit photos (a §9.4 UI
+change needing its own approval) new evidence also lands on `Whole claim`.
+
+**OWNER-CONFIRMED 2026-09-18 · APPROVED; BUILT ON BRANCH 2026-09-29 (above).** The expansion has exactly one job: read the
 problem and its evidence for each affected Unit. **It is read-only. It contains no editor, no
 uploader, no delete control and no status change.** It replaces the earlier "photo thumbnails"
 inspector completely.
@@ -4939,12 +4953,31 @@ column `document_sent_at` is kept and no longer written); `Confirmed Pickup` (ap
 **Dependencies still NOT BUILT, named so nobody assumes them:** (1) ~~`suppliers.return_address`
 editor~~ BUILT 2026-09-29 (0611): Settings → Purchasing → `Supplier addresses` records each
 supplier's `Address` (PO / Repair Order PDF) and `Return address` (this `Return To`) one field at a
-time through `purchasing_set_supplier_address`; blank saves nothing recorded, so Issue still refuses
-`Add the return address of {Supplier}` until it is filled, and one address is never copied into the
-other; (2) Stock's Outbound `Return to
-supplier` handover (Stock §12.8) has no writer, so every return reads `Not picked up` until Stock
-records collector, time, Units and proof onto the return's Units; (3) `Supplier Received Date` has no
-writer; (4) the evidence viewer for pickup/receipt proof is still not wired. The approved
+time through `purchasing_set_supplier_address`; blank saves nothing recorded, and one address is
+never copied into the other. **OWNER RULING (Jess, 2026-09-29, relayed by the Settings lane) —
+BUILT ON BRANCH `build/claim-unit-evidence-received-date`, migration 0614 NOT APPLIED:** `Return To`
+= the supplier's `Return address` when filled, otherwise its `Address`; Issue refuses only when BOTH
+are blank, `Add the address of {Supplier}` (detail `address_missing`). 0614 re-issues
+`purchasing_issue_purchase_return` from the 0609 body applied in production with only that change;
+the resolved value is still snapshotted onto `purchase_return_units.return_to`, and the Issue form
+shows it with `From Return address` / `From Address` under it; (2) Stock's Outbound `Return to supplier` handover (Stock §12.8): Stock writer LIVE (0612,
+`stock_record_supplier_return_pickup`); Outbound screen pending owner design approval. Pickup proof
+files live in the private `issue-evidence` bucket under `purchase_return/<id>/…`; (3) `Supplier
+Received Date` — `Record supplier receipt` BUILT ON BRANCH `build/claim-unit-evidence-received-date`
+2026-09-29, migration 0614 NOT APPLIED: on the PR record's Pickup block, date (not future, not before
+that Unit's Actual Pickup Date), exact Units (partial allowed, each once), supplier evidence (photo /
+video / PDF under `purchase_return_receipt/<id>/…`, or `Who confirmed` + `When they confirmed` +
+`Time`), recorder. Append-only `purchase_return_supplier_receipts` + `…_receipt_units` through
+`purchase_return_record_supplier_receipt`; it writes no pickup, no custody and not the 0548 column
+`supplier_received_date`, which is no longer read — the register and record read the ledger. A Unit
+Stock has not picked up is refused `{Unit ID}: Not picked up`. No Work item: §9.6 names none; (4) the
+evidence viewer for Pickup proof and Supplier receipt proof — BUILT ON BRANCH (same PR): the Units
+table's `Photo 1` / `Photos {n}` / `Video {n}` open the shared SavedEvidenceViewer through `GET
+/:id/evidence`; a PDF receipt is counted in History (`Evidence {n}`), never as a photo.
+**Build decisions that read like business rules — PROPOSAL / NOT LAW (2026-09-29):** (h) a Unit is
+received once; a wrong receipt has no correction door (none is approved), falsified by one owner
+sentence; (i) `Record supplier receipt` is open to any active Operation person (the 0548/0609 gate),
+like send and pickup confirmation. The approved
 chain lives on the ONE claim record, both ways to the same facts:
 
 ```text
@@ -4964,8 +4997,8 @@ Chain:        Supplier reply (§9.5) → `Record what Carres does next` → `Iss
   through a new API route (no second SQL writer). The form: `Units to return` (only this claim's
   held tracked Units; counted goods are claimed, never returned by document) · `Pickup Location`
   (defaults from each Unit's current Stock Location; editing moves nothing) · `Return To` (the
-  supplier's recorded return address from Supplier Master; absent → `Add the return address of
-  {Supplier}`, never the registered address by assumption) · `Confirmed Pickup` (optional at
+  supplier's recorded `Return address`, otherwise its recorded `Address` — owner ruling 2026-09-29;
+  both blank → `Add the address of {Supplier}`; never typed by the caller) · `Confirmed Pickup` (optional at
   issue). Issue writes the PRTN row and its Units and moves no stock. A Unit changed under the
   form is refused by name; `No return was issued.`
 - **Sending** uses the shared document send area (`Return document sent to supplier`; the

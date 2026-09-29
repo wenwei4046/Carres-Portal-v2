@@ -115,22 +115,6 @@ function useWide(min = 1180): boolean {
   return wide;
 }
 
-/** Short inspector: facts and one door, never a mounted editor (§9.5 row
- *  expansion is read-only). Its Unit list is where `{n} Units` lands. */
-export function SupplierClaimInspector({ claim, onOpen }: { claim: SupplierClaimListRow; onOpen: () => void }) {
-  const units = claim.units ?? null;
-  return <div className="space-y-2 p-4 text-body" data-testid="claim-inspector">
-    <p>Problem: {supplierClaimTypeLabel(claim.claim_type)}</p>
-    {claim.note && <p className="whitespace-pre-wrap">{claim.note}</p>}
-    {claim.photo_count > 0 && <p>{claim.photo_count === 1 ? "Photo 1" : `Photos ${claim.photo_count}`}</p>}
-    <div tabIndex={-1} data-claim-units={claim.id} className="focus-visible:outline focus-visible:outline-2 focus-visible:outline-kit-blue-9">
-      {units == null ? <p className="text-kit-slate-11">Units could not be loaded</p>
-        : units.filter((u) => u.unit_code).map((u) => <p key={u.id} className="tabular-nums">{u.unit_code}</p>)}
-    </div>
-    <Button variant="neutral" onClick={onOpen}>Open Claim</Button>
-  </div>;
-}
-
 type Dialog = null | "ask" | "reply" | "send" | "next";
 
 export default function SupplierClaimPanel({ claim }: { claim: SupplierClaimListRow }) {

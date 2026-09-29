@@ -280,7 +280,13 @@ export type AttachDoInput = z.infer<typeof attachDoInput>;
  * ANY door that raises the counters without a covering claim. Photo paths are
  * capped so a malformed client cannot write an unbounded jsonb array.
  */
-const CLAIM_PHOTO_PATHS = z.array(z.string().min(1).max(400)).max(12);
+/** 0614 (§9.5): a plain storage key files a claim-level photo; `{path,
+ *  unitCode}` also names the Unit the photo shows, so the per-Unit inspector
+ *  can attribute it. `claimPhotoWire` reshapes it for the receive engine. */
+const CLAIM_PHOTO_PATHS = z.array(z.union([
+  z.string().min(1).max(400),
+  z.object({ path: z.string().min(1).max(400), unitCode: z.string().min(1).max(64) }),
+])).max(12);
 
 export const receivePoWithDoInput = z.object({
   doNumber: z.string().min(3),

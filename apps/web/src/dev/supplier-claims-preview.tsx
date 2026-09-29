@@ -21,6 +21,17 @@ window.fetch = async (input, init) => {
   if (url.includes("/api/")) {
     if (init?.method && init.method !== "GET") return new Response(JSON.stringify({ message: "Local preview does not save records." }), { status: 405, headers: { "Content-Type": "application/json" } });
     if (url.includes("/api/ops/service-cases")) return new Response(JSON.stringify({ items: [{ id: "22222222-2222-4222-8222-222222222222", caseNo: "SC2609-01",  customerName: "", issueType: "damaged", productCategory: "sofa", productSku: "LYYAR-1A(LHF)", whatHappened: "Left arm fabric torn on arrival." }] }), { headers: { "Content-Type": "application/json" } });
+    // 0614 — the per-Unit inspector: two files filed with U1-000-142, one
+    // video, and one earlier photo that names no Unit (stays `Whole claim`).
+    if (url.includes("/inspection")) return new Response(JSON.stringify({
+      files: [
+        { path: "claim-1/a.jpg", at: "2026-09-04T02:00:00Z", kind: "photo", unit_code: "U1-000-142", url: null },
+        { path: "claim-1/b.jpg", at: "2026-09-04T02:00:00Z", kind: "photo", unit_code: "U1-000-142", url: null },
+        { path: "claim-1/c.mp4", at: "2026-09-04T02:00:00Z", kind: "video", unit_code: "U1-000-142", url: null },
+        { path: "claim-1/old.jpg", at: "2026-09-04T02:00:00Z", kind: "photo", unit_code: null, url: null },
+      ],
+      problems: [{ stock_item_id: "u-142", note: "{Unit problem note}" }],
+    }), { headers: { "Content-Type": "application/json" } });
     const recordId = url.match(/supplier-claims\/([^/]+)\/record/)?.[1];
     if (recordId) return new Response(JSON.stringify(RECORD(recordId)), { headers: { "Content-Type": "application/json" } });
     const payload = url.includes("/photos") ? { photos: [{ path: "unavailable.jpg", url: null }] } : url.includes("/supplier-claims") ? { claims: rows, counts: { open: 2, closed: 1, all: 3 } } : {};
