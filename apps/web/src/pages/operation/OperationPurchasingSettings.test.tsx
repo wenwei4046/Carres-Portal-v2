@@ -640,6 +640,8 @@ describe("Supplier addresses (0611, Purchasing §9.6 Return To)", () => {
     expect(within(row).getByLabelText("Address")).toHaveValue("Ohana HQ, Klang");
     /* A blank Return address stays blank: the Address is never offered in its place. */
     expect(within(row).getByLabelText("Return address")).toHaveValue("");
+    /* Owner ruling 2026-09-29: one address; a blank Return address means the Address. */
+    expect(within(row).getByLabelText("Return address")).toHaveAttribute("placeholder", "Same as Address");
     expect(screen.getByTestId(`supplier-returnAddress-save-${OHANA}`)).toBeDisabled();
     fireEvent.change(within(row).getByLabelText("Return address"), { target: { value: "Ohana returns bay, Klang" } });
     fireEvent.click(screen.getByTestId(`supplier-returnAddress-save-${OHANA}`));

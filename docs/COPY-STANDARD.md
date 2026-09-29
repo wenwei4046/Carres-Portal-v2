@@ -4233,15 +4233,16 @@ Order detail, Finance → Supplier bill form.
 
 ### Supplier addresses (migration 0611) — BUILT 2026-09-29
 
-Settings → Purchasing. Each supplier has two separate addresses; one is never copied into the other
-and a blank saves nothing recorded (Purchasing MASTER §9.6).
+Settings → Purchasing. One address per supplier (owner ruling 2026-09-29): the `Address` prints on the
+PO and is also where Purchase Returns go. A `Return address` is filled only when the supplier wants
+returns somewhere else (Purchasing MASTER §9.6).
 
 | Where | Word | Meaning |
 |---|---|---|
 | Settings section | **`Supplier addresses`** | Heading for the per-supplier addresses. |
-| | **`The Address prints on the PO. Purchase Returns go to the Return address.`** | What each address is for. |
+| | **`The Address prints on the PO. Purchase Returns go there too. Fill Return address only if returns go somewhere else.`** | What each address is for. |
 | Supplier row | **`Address`** | The supplier's full address, printed on the PO and Repair Order PDFs. |
-| Supplier row | **`Return address`** | Where a Purchase Return goes (`Return To`). Blank = Issue Purchase Return refuses `Add the return address of {Supplier}`. |
+| Supplier row | **`Return address`** | Only when returns go somewhere else. Blank reads **`Same as Address`**. Both blank = Issue Purchase Return refuses `Add the address of {Supplier}`. |
 | Each field | **`Save`** | Saves that one address. |
 
 ## Header rules (see UI-KIT for the shell)

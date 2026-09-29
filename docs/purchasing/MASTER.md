@@ -4938,10 +4938,11 @@ column `document_sent_at` is kept and no longer written); `Confirmed Pickup` (ap
 (`purchase-return-template.tsx`); and four Work rules through their own loader (Workspace §6.1).
 **Dependencies still NOT BUILT, named so nobody assumes them:** (1) ~~`suppliers.return_address`
 editor~~ BUILT 2026-09-29 (0611): Settings → Purchasing → `Supplier addresses` records each
-supplier's `Address` (PO / Repair Order PDF) and `Return address` (this `Return To`) one field at a
-time through `purchasing_set_supplier_address`; blank saves nothing recorded, so Issue still refuses
-`Add the return address of {Supplier}` until it is filled, and one address is never copied into the
-other; (2) Stock's Outbound `Return to
+supplier's `Address` (PO / Repair Order PDF, and by default the `Return To`) and an optional `Return
+address` (only when returns go elsewhere; blank reads `Same as Address`) through
+`purchasing_set_supplier_address`. **APPROVED TARGET / NOT BUILT:** the Issue door resolves `Return
+To` = Return address, else Address, and refuses only when both are blank (`Add the address of
+{Supplier}`) — Purchase Returns lane; (2) Stock's Outbound `Return to
 supplier` handover (Stock §12.8) has no writer, so every return reads `Not picked up` until Stock
 records collector, time, Units and proof onto the return's Units; (3) `Supplier Received Date` has no
 writer; (4) the evidence viewer for pickup/receipt proof is still not wired. The approved
@@ -4964,8 +4965,10 @@ Chain:        Supplier reply (§9.5) → `Record what Carres does next` → `Iss
   through a new API route (no second SQL writer). The form: `Units to return` (only this claim's
   held tracked Units; counted goods are claimed, never returned by document) · `Pickup Location`
   (defaults from each Unit's current Stock Location; editing moves nothing) · `Return To` (the
-  supplier's recorded return address from Supplier Master; absent → `Add the return address of
-  {Supplier}`, never the registered address by assumption) · `Confirmed Pickup` (optional at
+  supplier's `Return address` when one is recorded, otherwise the supplier's `Address` — **owner
+  ruling 2026-09-29 (Jess: "of course return to the supplier")**: one address per supplier, a
+  separate Return address only when the supplier wants returns elsewhere; both blank → `Add the
+  address of {Supplier}`) · `Confirmed Pickup` (optional at
   issue). Issue writes the PRTN row and its Units and moves no stock. A Unit changed under the
   form is refused by name; `No return was issued.`
 - **Sending** uses the shared document send area (`Return document sent to supplier`; the

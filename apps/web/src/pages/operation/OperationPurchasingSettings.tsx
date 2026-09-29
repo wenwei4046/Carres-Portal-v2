@@ -928,12 +928,13 @@ export default function OperationPurchasingSettings({
         </div>
 
         {/* ── Supplier addresses (0611) ─────────────────────────────────────
-            `Address` prints on the PO and Repair Order PDFs; `Return address`
-            is a Purchase Return's `Return To` (Purchasing §9.6). Two separate
-            facts, saved one at a time: one is never copied into the other,
-            and a blank saves nothing recorded. */}
+            ONE address per supplier (owner ruling 2026-09-29, Jess: "of course
+            return to the supplier"). `Address` prints on the PO and Repair
+            Order PDFs and is also where Purchase Returns go. `Return address`
+            is filled ONLY when the supplier wants returns somewhere else; blank
+            reads `Same as Address`. Each is saved on its own. */}
         <div className="mb-8 max-w-[860px]" data-testid="supplier-address-settings">
-          <Block title="Supplier addresses" subtitle="The Address prints on the PO. Purchase Returns go to the Return address.">
+          <Block title="Supplier addresses" subtitle="The Address prints on the PO. Purchase Returns go there too. Fill Return address only if returns go somewhere else.">
           <div className="bg-white">
             {data.suppliers.map((s) => (
               <div
@@ -958,7 +959,7 @@ export default function OperationPurchasingSettings({
                           maxLength={SUPPLIER_ADDRESS_MAX}
                           value={draft}
                           disabled={!canEdit}
-                          placeholder={canEdit ? undefined : GOODS_ABSENCE_WORDS.notRecorded}
+                          placeholder={kind === "returnAddress" ? "Same as Address" : canEdit ? undefined : GOODS_ABSENCE_WORDS.notRecorded}
                           onChange={(e) => setAddressDraft((d) => ({ ...d, [key]: e.target.value }))}
                         />
                         {canEdit && (
