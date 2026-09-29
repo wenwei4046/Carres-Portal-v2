@@ -538,6 +538,48 @@ export const MODULE_WORK_RULES: readonly WorkRuleDefinition[] = [
     dueRule: "Reply expected + Extra days before escalation (Settings; starting value 2) on the OFFICE calendar",
     completionFact: "supplier_response stored with scope, date and evidence (supplier_claim_replies, 0607)",
   },
+  /* ⭐ PURCHASE RETURNS (Purchasing §9.6 creation door, owner approval
+   * 2026-09-25). `projectPurchaseReturnWork` is the one projector. */
+  {
+    key: "purchase_return.issue",
+    module: "purchasing",
+    trigger: "an open claim records `Return to supplier` and no Purchase Return is issued for it",
+    owner: "the effective PO Duty holder from Workspace; Buddy cover may act without replacing normal ownership",
+    ownerRule: "po_duty",
+    action: "Issue the purchase return to {Supplier}",
+    dueRule: "the next OFFICE working day after `Return to supplier` was recorded",
+    completionFact: "a Purchase Return issued for the claim (purchase_returns, 0548/0609)",
+  },
+  {
+    key: "purchase_return.send",
+    module: "purchasing",
+    trigger: "a Purchase Return has no confirmed `Return document sent to supplier`",
+    owner: "the effective PO Duty holder from Workspace; any active Operation person may record the send",
+    ownerRule: "po_duty",
+    action: "Send the return document to {Supplier}",
+    dueRule: "the next OFFICE working day after the PR Doc Date",
+    completionFact: "a confirmed send of the return document (document_sends purchase_return, 0609)",
+  },
+  {
+    key: "purchase_return.confirm_tomorrows_pickup",
+    module: "purchasing",
+    trigger: "the Confirmed Pickup Date is the next OFFICE working day and nothing is fully picked up",
+    owner: "the effective PO Duty holder from Workspace; any active Operation person may record the supplier's confirmation",
+    ownerRule: "po_duty",
+    action: "Confirm tomorrow's pickup",
+    dueRule: "one OFFICE working day before the Confirmed Pickup Date (the PO day-before rule)",
+    completionFact: "an evidenced pickup confirmation for that date recorded on or after the day before (purchase_return_pickup_confirmations, 0609)",
+  },
+  {
+    key: "purchase_return.pickup_missed",
+    module: "purchasing",
+    trigger: "the Confirmed Pickup Date has passed and Stock's Outbound handover recorded no Unit collected",
+    owner: "the effective PO Duty holder from Workspace; Buddy cover may act without replacing normal ownership",
+    ownerRule: "po_duty",
+    action: "Follow up supplier",
+    dueRule: "the Confirmed Pickup Date",
+    completionFact: "a Unit collected (Stock Outbound actual pickup) or a new confirmed pickup date not yet passed",
+  },
   {
     key: "claims.confirm_what_happens_next",
     module: "claims",
@@ -586,6 +628,10 @@ const WORK_COMPLETION_STATEMENTS: Readonly<Record<string, string>> = {
   "claims.issue_claim": "The actual message sent to the supplier is recorded",
   "claims.obtain_reply": "The supplier's reply is recorded with its scope, date and evidence",
   "claims.no_reply_decision": "The supplier's reply is recorded with its scope, date and evidence",
+  "purchase_return.issue": "The purchase return is issued",
+  "purchase_return.send": "The return document is recorded as sent to the supplier",
+  "purchase_return.confirm_tomorrows_pickup": "The supplier's confirmation of the pickup date is recorded",
+  "purchase_return.pickup_missed": "The goods are picked up, or a new pickup date is confirmed",
 };
 
 export const WORK_RULES: readonly WorkRule[] = [

@@ -19,6 +19,7 @@ import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
 import { chunk } from "../../lib/purchase-demand-read";
 import { adminClient, userClient } from "../../lib/supabase";
 import { resolveActorNames } from "../../lib/actor-names";
+import { purchasingActorMayIssue } from "../../lib/purchasing-po-authority";
 import type { AppEnv } from "../../types";
 
 /**
@@ -618,6 +619,17 @@ supplierClaimsRouter.post("/:id/carres-execution", async (c) => {
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
 
   const sb = userClient(c.env, c.var.auth.jwt);
+  /* §9.6 (owner approval 2026-09-25): `Record what Carres does next` is a
+     Carres commitment — PO Duty, its dated cover or an Operations Superuser.
+     The database (0609) asks the same capability again. */
+  const authority = await purchasingActorMayIssue(sb, c.var.auth.id);
+  if (authority.error) {
+    const m = mapPgError(authority.error);
+    return c.json(m.body, m.status);
+  }
+  if (!authority.mayIssue) {
+    return c.json({ error: "forbidden", code: "not_po_duty", message: "Only PO Duty records what Carres does next" }, 403);
+  }
   const { data, error } = await sb.rpc(
     "supplier_claim_record_carres_execution",
     {
@@ -627,6 +639,9 @@ supplierClaimsRouter.post("/:id/carres-execution", async (c) => {
     },
   );
   if (error) {
+    if (error.code === "23514") {
+      return c.json({ error: "refused", code: (error as { details?: string }).details ?? "refused", message: error.message }, 409);
+    }
     const m = mapPgError(error);
     return c.json(m.body, m.status);
   }

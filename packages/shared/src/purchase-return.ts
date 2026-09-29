@@ -264,7 +264,7 @@ export interface PurchaseReturnListRow {
   claim_no: string | null;
   grn_no: string | null;
   /** Whether the return document has been sent to the supplier. */
-  document_sent_at: string | null;
+  sent_at: string | null;
   confirmed_pickup_date: string | null;
   units: PurchaseReturnUnitRow[];
 }
@@ -435,7 +435,7 @@ export type PurchaseReturnRailSection =
 
 /** The exact condition words. §9.6 lists them; COPY-STANDARD locks them. */
 export const PURCHASE_RETURN_CONDITIONS = {
-  documentNotSent: "Return document not sent",
+  sendingNotConfirmed: "Sending not confirmed",
   pickupNotConfirmed: "Pickup date not confirmed",
   notPickedUp: "Not picked up",
   partlyPickedUp: "Partly picked up",
@@ -470,8 +470,8 @@ export function purchaseReturnConditions(
   const qty = purchaseReturnQty(row);
   const collected = purchaseReturnCollectedQty(row);
 
-  if (row.document_sent_at == null) {
-    out.push(PURCHASE_RETURN_CONDITIONS.documentNotSent);
+  if (row.sent_at == null) {
+    out.push(PURCHASE_RETURN_CONDITIONS.sendingNotConfirmed);
   }
   if (row.confirmed_pickup_date == null) {
     out.push(PURCHASE_RETURN_CONDITIONS.pickupNotConfirmed);
@@ -516,7 +516,7 @@ export const PURCHASE_RETURN_CONDITION_SECTION: Record<
   PurchaseReturnCondition,
   Exclude<PurchaseReturnRailSection, "supplier">
 > = {
-  [PURCHASE_RETURN_CONDITIONS.documentNotSent]: "document",
+  [PURCHASE_RETURN_CONDITIONS.sendingNotConfirmed]: "document",
   [PURCHASE_RETURN_CONDITIONS.pickupNotConfirmed]: "pickup",
   [PURCHASE_RETURN_CONDITIONS.notPickedUp]: "pickup",
   [PURCHASE_RETURN_CONDITIONS.partlyPickedUp]: "pickup",
@@ -527,7 +527,7 @@ export const PURCHASE_RETURN_CONDITION_SECTION: Record<
 /** The order conditions are drawn within their section — §9.6's own order, so
  *  a rail cannot re-sort itself alphabetically into a different reading. */
 export const PURCHASE_RETURN_CONDITION_ORDER: PurchaseReturnCondition[] = [
-  PURCHASE_RETURN_CONDITIONS.documentNotSent,
+  PURCHASE_RETURN_CONDITIONS.sendingNotConfirmed,
   PURCHASE_RETURN_CONDITIONS.pickupNotConfirmed,
   PURCHASE_RETURN_CONDITIONS.notPickedUp,
   PURCHASE_RETURN_CONDITIONS.partlyPickedUp,

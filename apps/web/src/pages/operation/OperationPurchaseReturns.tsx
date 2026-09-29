@@ -77,6 +77,7 @@ import {
   ShowFiltersButton,
 } from "./components/workspace-rail";
 import PurchaseReturnUnitsTable from "./components/PurchaseReturnUnitsTable";
+import PurchaseReturnRecord from "./PurchaseReturnRecord";
 import SecondLine from "./components/register-cell";
 
 /** `Absence` is a FACT, not an apology — `docs/COPY-STANDARD.md`. */
@@ -229,12 +230,16 @@ export function PurchaseReturnsRegister({
         key: "pr_no",
         label: PURCHASE_RETURN_COLUMN_LABEL.pr_no,
         width: 190,
-        /* Identity opens the object (§6.7 rule 2). The object is the document
-           slice's, so until it exists the number prints as the plain fact it
-           is rather than as a link to nowhere — a dead link teaches an
-           operator that links here do not work. */
+        /* Identity opens the object (§6.7 rule 2): the full-width PR record
+           (§9.6 creation door, built 2026-09-29). */
         accessor: (row) => (
-          <span className="font-semibold">{purchaseReturnNo(row.pr_no)}</span>
+          <Link
+            className="font-semibold text-kit-blue-11 hover:underline"
+            to={`/operation?tab=purchase-returns&pr=${encodeURIComponent(row.id)}`}
+            data-testid={`purchase-return-open-${row.id}`}
+          >
+            {purchaseReturnNo(row.pr_no)}
+          </Link>
         ),
         searchValue: (row) => purchaseReturnNo(row.pr_no),
         exportValue: (row) => purchaseReturnNo(row.pr_no),
@@ -573,10 +578,25 @@ export function PurchaseReturnsRegister({
  * searching for them.
  */
 export default function OperationPurchaseReturns() {
-  const [params] = useSearchParams();
+  const [params, setParams] = useSearchParams();
   const claim = params.get("claim");
+  const pr = params.get("pr");
   const query = useOperationPurchaseReturns(claim);
   const status = (query.error as { status?: number } | null)?.status;
+
+  /* `?pr=` opens the full-width record (§9.6: full width after issue); the
+     register's own link and every Work card land here. */
+  if (pr) {
+    return (
+      <div className="relative h-full min-h-0">
+        <PurchaseReturnRecord id={pr} onBack={() => setParams((previous) => {
+          const next = new URLSearchParams(previous);
+          next.delete("pr");
+          return next;
+        })} />
+      </div>
+    );
+  }
 
   return (
     <PurchaseReturnsRegister

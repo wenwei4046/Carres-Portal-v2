@@ -1066,9 +1066,19 @@ describe("GET / carries the customer resolution", () => {
 // is what these pin: the right RPC with the right arguments, an invented option
 // refused before a round-trip, the role gate, and the RPC's refusal intact.
 
+/** 0609: the route first asks the one PO issue capability (PO Duty, dated
+ *  cover or Operations Superuser); this caller holds it. */
+function executionClient(result: { data?: unknown; error?: unknown }) {
+  const rpc = vi.fn(async (name: string) =>
+    name === "purchasing_actor_may_issue"
+      ? { data: true, error: null }
+      : { data: result.data ?? null, error: result.error ?? null });
+  return { rpc };
+}
+
 describe("POST /:id/carres-execution — the order the goods move in", () => {
   it("records the execution through the RPC", async () => {
-    const sb = rpcClient({
+    const sb = executionClient({
       data: { claim_no: "SC-1001", carres_execution: "replace_first" },
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1086,7 +1096,7 @@ describe("POST /:id/carres-execution — the order the goods move in", () => {
   });
 
   it("carries the note when there is one", async () => {
-    const sb = rpcClient({ data: { carres_execution: "exchange_on_collection" } });
+    const sb = executionClient({ data: { carres_execution: "exchange_on_collection" } });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(userClient).mockReturnValue(sb as any);
     const res = await post("c1/carres-execution", {
@@ -1112,7 +1122,7 @@ describe("POST /:id/carres-execution — the order the goods move in", () => {
       "collect_first",
       "exchange_on_collection",
     ]) {
-      const sb = rpcClient({ data: { carres_execution: e } });
+      const sb = executionClient({ data: { carres_execution: e } });
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       vi.mocked(userClient).mockReturnValue(sb as any);
       const res = await post("c1/carres-execution", { carres_execution: e });

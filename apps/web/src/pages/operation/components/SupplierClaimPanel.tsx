@@ -10,7 +10,9 @@
  * Problem         type · note · evidence (the ONE shared viewer) · reported date and reporter
  * Supplier        what we asked · sending evidence · the reply state · the recorded answers
  *                 `Record what we asked` then `Record supplier reply`
- * Result          Authorised Outcome · Item Outcome · RO / PRTN doors (read-only)
+ * Result          What Carres does (`Record what Carres does next`, PO Duty) ·
+ *                 `Issue Purchase Return` · each PR's send and pickup state ·
+ *                 Authorised Outcome · Item Outcome · RO door (`Plan Repair`)
  * Related         Service Case (hidden when none)
  * Documents       Claim sent to supplier · channel · recipient · actor · time
  * History         three-rank records
@@ -21,8 +23,16 @@
  * is the claim's own door; the page never prints a refusal it did not receive.
  */
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
+  CARRES_NEXT_CHOICES,
+  ISSUE_PURCHASE_RETURN,
+  RECORD_WHAT_CARRES_DOES_NEXT,
+  carresNextWord,
+  purchaseReturnNo,
+  purchaseReturnPickupState,
+  purchaseReturnSendLine,
+  purchaseReturnSupplierReceivedDate,
   SUPPLIER_CLAIM_ABSENT,
   SUPPLIER_CLAIM_REPLY_SCOPE_WORD,
   SUPPLIER_CLAIM_RESPONSES,
@@ -39,7 +49,9 @@ import {
 } from "@carres/shared";
 import {
   fetchOperationSupplierClaimPhotos,
+  useOperationPurchaseReturns,
   useOperationSupplierClaimPhotos,
+  usePurchaseReturnWrite,
   useSupplierClaimDoor,
   useSupplierClaimRecord,
   type SupplierClaimListRow,
@@ -60,6 +72,7 @@ import SavedEvidenceViewer from "@/components/kit/SavedEvidenceViewer";
 import EvidenceUploadField from "@/components/EvidenceUploadField";
 import { Fact } from "../SalesOrderWorkspace";
 import { RecordRanks } from "../SalesOrderLedger";
+import PurchaseReturnIssue from "./PurchaseReturnIssue";
 
 const absent = SUPPLIER_CLAIM_ABSENT;
 const IMAGE_MIMES = ["image/jpeg", "image/png", "image/webp"] as const;
@@ -115,11 +128,13 @@ export function SupplierClaimInspector({ claim, onOpen }: { claim: SupplierClaim
   </div>;
 }
 
-type Dialog = null | "ask" | "reply" | "send";
+type Dialog = null | "ask" | "reply" | "send" | "next";
 
 export default function SupplierClaimPanel({ claim }: { claim: SupplierClaimListRow }) {
   const record = useSupplierClaimRecord(claim.id);
   const [dialog, setDialog] = useState<Dialog>(null);
+  const [issuing, setIssuing] = useState(false);
+  const navigate = useNavigate();
   const wide = useWide();
   const today = appTodayIso();
   const facts = {
@@ -128,10 +143,25 @@ export default function SupplierClaimPanel({ claim }: { claim: SupplierClaimList
     sent: Boolean(record.data?.sends.length ?? claim.sent),
     reply_waiting_days: claim.reply_waiting_days ?? null, escalation_extra_days: claim.escalation_extra_days ?? null,
   };
-  const action = supplierClaimCurrentAction(facts);
   const open = claim.status === "open";
-  const openDoor = (button: string | null) =>
+  const execution = record.data?.carres_execution ?? claim.carres_execution ?? null;
+  // §9.6: `Return to supplier` recorded and no Purchase Return yet — the same
+  // fact Work projects as `Issue the purchase return to {Supplier}`.
+  const pendingReturn = open && execution === "return_to_supplier" && record.data != null && (record.data.purchase_returns ?? []).length === 0;
+  const action = supplierClaimCurrentAction(facts) ?? (pendingReturn
+    ? { rule: null, fact: "Not issued", instruction: `Issue the purchase return to ${claim.supplier_name ?? "the supplier"}`, date: null, button: ISSUE_PURCHASE_RETURN }
+    : null);
+  const openDoor = (button: string | null) => {
+    if (button === ISSUE_PURCHASE_RETURN) return setIssuing(true);
     setDialog(button === "Record what we asked" ? "ask" : button === "Claim sent to supplier" ? "send" : button === "Record supplier reply" ? "reply" : null);
+  };
+
+  /* Issue is the ONE moment the paper stands beside the form: the governed
+     50/50 (§9.6); the record is full width again after it. */
+  if (issuing) {
+    return <PurchaseReturnIssue claimId={claim.id} onClose={() => setIssuing(false)}
+      onIssued={(id) => navigate(`/operation?tab=purchase-returns&pr=${encodeURIComponent(id)}`)} />;
+  }
 
   const replyForm = dialog === "reply"
     ? <ReplyForm claim={claim} record={record.data ?? null} wide={wide} onClose={() => setDialog(null)} />
@@ -155,13 +185,15 @@ export default function SupplierClaimPanel({ claim }: { claim: SupplierClaimList
       <SupplierSection claim={claim} record={record} today={today}
         onAsk={() => setDialog("ask")} onReply={() => setDialog("reply")} open={open}
         inlineForm={!wide ? replyForm : null} />
-      <ResultSection claim={claim} record={record.data ?? null} />
+      <ResultSection claim={claim} record={record.data ?? null} open={open} onNext={() => setDialog("next")}
+        onIssue={action?.button === ISSUE_PURCHASE_RETURN ? null : () => setIssuing(true)} />
       <DocumentsSection record={record} open={open} onSend={() => setDialog("send")} />
       <HistorySection claim={claim} record={record.data ?? null} />
     </div>
     {wide && replyForm && <aside className="sticky top-0 w-[560px] shrink-0" data-testid="claim-reply-panel">{replyForm}</aside>}
     <AskDialog claim={claim} open={dialog === "ask"} onClose={() => setDialog(null)} />
     <SendDialog claim={claim} open={dialog === "send"} onClose={() => setDialog(null)} />
+    <NextDialog claim={claim} current={execution} open={dialog === "next"} onClose={() => setDialog(null)} />
   </div>;
 }
 
@@ -290,23 +322,74 @@ function EvidenceLine({ reply, claimNo }: { reply: SupplierClaimReplyRow; claimN
   </div>;
 }
 
-function ResultSection({ claim, record }: { claim: SupplierClaimListRow; record: SupplierClaimRecord | null }) {
+function ResultSection({ claim, record, open, onNext, onIssue }: {
+  claim: SupplierClaimListRow; record: SupplierClaimRecord | null; open: boolean; onNext: () => void;
+  /** null when the record's Current action already leads with the door: one obvious button. */
+  onIssue: (() => void) | null;
+}) {
   const ros = record?.repair_orders ?? [];
-  const prs = record?.purchase_returns ?? [];
-  const units = record?.units ?? claim.units ?? [];
-  if (!units.length && !ros.length && !prs.length) return null;
-  return <Block title="Result">
-    <Facts>
-      <Fact idPrefix="claim-fact" own={false} framed label="Authorised Outcome" value={record?.authorised_outcome ?? absent} />
-      <Fact idPrefix="claim-fact" own={false} framed label="Item Outcome" value={heldUnitsLine(claim.held_units, claim.hold_reason)} />
-      {ros.length > 0 && <Fact idPrefix="claim-fact" own={false} framed label="RO No" value={<span className="flex flex-wrap gap-2">{ros.map((ro) => <Link key={ro.id} className="text-kit-blue-11 hover:underline" to={`/operation?tab=repair-orders&ro=${encodeURIComponent(ro.id)}`}>{ro.ro_no}</Link>)}</span>} />}
-      {prs.length > 0 && <Fact idPrefix="claim-fact" own={false} framed label="PR No" value={<span className="flex flex-wrap gap-2">{prs.map((pr) => <Link key={pr.id} className="text-kit-blue-11 hover:underline" to={`/operation?tab=purchase-returns&pr=${encodeURIComponent(pr.id)}`}>{pr.pr_no}</Link>)}</span>} />}
-    </Facts>
-    {/* A supplier's `Repair` is an offer: `Plan Repair` shows only when the
-        server confirms Authorised Outcome = Repair, the exact Units and the
-        actor's permission. Otherwise the missing fact above names itself. */}
-    {record?.plan_repair.allowed && <Link className="mt-3 inline-block text-kit-blue-11 underline" to={`/operation?tab=repair-orders&create=1&claim=${encodeURIComponent(claim.id)}`} data-testid="claim-plan-repair">Plan Repair</Link>}
+  const prRefs = record?.purchase_returns ?? [];
+  // Each PR's state is read from the register's own shape (the ledger-derived
+  // send, Stock's pickup facts) — never a second arithmetic here.
+  const returns = useOperationPurchaseReturns(prRefs.length ? claim.id : null, { enabled: prRefs.length > 0 });
+  const prs = returns.data?.returns ?? [];
+  const execution = record?.carres_execution ?? claim.carres_execution ?? null;
+  const executionBy = record?.carres_execution_by_name ?? null;
+  const executionAt = record?.carres_execution_at ?? claim.carres_execution_at ?? null;
+  const mayRecord = open && Boolean(record?.may_record_next);
+  const canIssue = open && execution === "return_to_supplier" && record != null && prRefs.length === 0;
+  return <Block title="Result" headerSlot={mayRecord ? <Button variant="neutral" onClick={onNext} data-testid="claim-record-next">{RECORD_WHAT_CARRES_DOES_NEXT}</Button> : undefined}>
+    <div className="space-y-3" data-testid="claim-result">
+      <p className="text-body text-kit-slate-12" data-testid="claim-what-carres-does">
+        {execution ? `What Carres does · ${carresNextWord(execution)}` : carresNextWord(null)}
+        {execution && executionAt ? <span className="text-kit-slate-11">{` · ${fmtDate(executionAt)} · ${executionBy ?? "Staff identity not recorded"}`}</span> : null}
+      </p>
+      {canIssue && onIssue && <div className="flex flex-wrap items-center gap-3">
+        <Button variant="neutral" onClick={onIssue} data-testid="claim-issue-return">{ISSUE_PURCHASE_RETURN}</Button>
+      </div>}
+      {prRefs.length > 0 && <div className="grid gap-2" data-testid="claim-purchase-returns">
+        {returns.isError ? <div role="alert"><p>Some information could not be refreshed.</p><Button variant="neutral" onClick={() => void returns.refetch()}>Try again</Button></div>
+          : prRefs.map((ref) => {
+            const pr = prs.find((p) => p.id === ref.id);
+            const send = pr ? purchaseReturnSendLine({ sends: pr.sends ?? [] }) : null;
+            const received = pr ? purchaseReturnSupplierReceivedDate(pr) : null;
+            return <div key={ref.id} className="rounded-control border border-kit-slate-5 px-3 py-2 text-body text-kit-slate-12">
+              <Link className="font-semibold text-kit-blue-11 hover:underline" to={`/operation?tab=purchase-returns&pr=${encodeURIComponent(ref.id)}`}>{purchaseReturnNo(ref.pr_no)}</Link>
+              {pr ? <>
+                <p>{send?.sent ? `${send.text} · ${fmtDate(send.date)}` : "Sending not confirmed"}</p>
+                <p>{pr.confirmed_pickup_date ? `Confirmed Pickup Date ${fmtDate(pr.confirmed_pickup_date)}` : "Pickup date not confirmed"}{` · ${purchaseReturnPickupState(pr)}`}</p>
+                <p className="text-kit-slate-11">{`Supplier Received Date ${received ? fmtDate(received) : absent}`}</p>
+              </> : <p className="text-kit-slate-11">Loading…</p>}
+            </div>;
+          })}
+      </div>}
+      <Facts>
+        <Fact idPrefix="claim-fact" own={false} framed label="Authorised Outcome" value={record?.authorised_outcome ?? absent} />
+        <Fact idPrefix="claim-fact" own={false} framed label="Item Outcome" value={heldUnitsLine(claim.held_units, claim.hold_reason)} />
+        {ros.length > 0 && <Fact idPrefix="claim-fact" own={false} framed label="RO No" value={<span className="flex flex-wrap gap-2">{ros.map((ro) => <Link key={ro.id} className="text-kit-blue-11 hover:underline" to={`/operation?tab=repair-orders&ro=${encodeURIComponent(ro.id)}`}>{ro.ro_no}</Link>)}</span>} />}
+      </Facts>
+      {/* A supplier's `Repair` is an offer: `Plan Repair` shows only when the
+          server confirms Authorised Outcome = Repair, the exact Units and the
+          actor's permission. Otherwise the missing fact above names itself. */}
+      {record?.plan_repair.allowed && <Link className="inline-block text-kit-blue-11 underline" to={`/operation?tab=repair-orders&create=1&claim=${encodeURIComponent(claim.id)}`} data-testid="claim-plan-repair">Plan Repair</Link>}
+    </div>
   </Block>;
+}
+
+/** `Record what Carres does next` — the five stored values in their approved
+ *  words. A Carres commitment: PO Duty, dated cover or Operations Superuser
+ *  (the server refuses anyone else). */
+function NextDialog({ claim, current, open, onClose }: { claim: SupplierClaimListRow; current: string | null; open: boolean; onClose: () => void }) {
+  const door = usePurchaseReturnWrite(`/api/operation/supplier-claims/${encodeURIComponent(claim.id)}/carres-execution`);
+  const [choice, setChoice] = useState<string | undefined>(current ?? undefined);
+  const [note, setNote] = useState("");
+  return <DoorDialog open={open} onClose={onClose} title={RECORD_WHAT_CARRES_DOES_NEXT} pending={door.isPending} error={door.error}
+    canSave={Boolean(choice)} saveWord={RECORD_WHAT_CARRES_DOES_NEXT}
+    onSave={() => door.mutate({ carres_execution: choice, ...(note.trim() ? { note: note.trim() } : {}) }, { onSuccess: onClose })}>
+    <Select id="claim-next" label="What Carres does" value={choice} onValueChange={setChoice}
+      options={CARRES_NEXT_CHOICES.map((c) => ({ value: c.key, label: c.label }))} />
+    <Textarea id="claim-next-note" label="Note" rows={2} value={note} onChange={(e) => setNote(e.target.value)} />
+  </DoorDialog>;
 }
 
 function DocumentsSection({ record, open, onSend }: { record: ReturnType<typeof useSupplierClaimRecord>; open: boolean; onSend: () => void }) {
