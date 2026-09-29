@@ -1629,19 +1629,19 @@ appears in any line. The row's status word carries the fact.
 
 | Trigger | Line 1 | Line 2 | Owner rule | Completion fact |
 |---|---|---|---|---|
-| no partner on the scope | `Assign logistics` | `Choose the company that carries this delivery` | Sales Order PIC; Buddy cover acts; Delivery Duty fallback only when no PIC | partner recorded |
-| partner set, no day agreed, partner contacts the customer | `Call NETS` | `Get the scheduled delivery date` | Sales Order PIC; Buddy cover acts; Delivery Duty fallback only when no PIC | day and window recorded |
-| partner set, no day agreed, Carres contacts the customer | `Call the customer` | `Get the scheduled delivery date` | Sales Order PIC; Buddy cover acts; Delivery Duty fallback only when no PIC | day and window recorded |
-| new date later than the requested date, no reply proof | `Call the customer` | `Record the reply and upload the WhatsApp proof` | Sales Order PIC; Buddy cover acts; Delivery Duty fallback only when no PIC | contact record with proof |
-| collected, no ETA | `Ask NETS` | `Record the delivery ETA` | Sales Order PIC; Buddy cover acts; Delivery Duty fallback only when no PIC | ETA recorded |
-| confirmed day is today, no result | `Deliver on Thu, 22 Oct` | `Record the delivery result` | Sales Order PIC; Buddy cover acts; Delivery Duty fallback only when no PIC | attempt recorded |
-| confirmed day passed, no result | `Ask NETS` | `Record the delivery result` | Sales Order PIC; Buddy cover acts; Delivery Duty fallback only when no PIC | attempt recorded |
-| delivered, photo missing | `Upload the delivery photo` | `Attach the photo from NETS` | Sales Order PIC; Buddy cover acts; Delivery Duty fallback only when no PIC | photo on the ledger |
-| delivered, signed DO missing | `Upload the signed DO` | `Attach the paper the customer signed` | Sales Order PIC; Buddy cover acts; Delivery Duty fallback only when no PIC | signed file on record |
-| delivered, proof not reviewed | `Check the delivery proof` | `Accept it, ask for more, or reject it` | Sales Order PIC; Buddy cover acts; Delivery Duty fallback only when no PIC | review recorded |
-| Failed Delivery recorded | the §7 next action, for example `Call the customer` | `Confirm a new delivery date` | Sales Order PIC; Buddy cover acts; Delivery Duty fallback only when no PIC | the named next fact |
-| Cannot Deliver reported by the partner | `Decide the next step for this delivery` | `Keep NETS with a new date, correct the details, or change logistics` | Sales Order PIC; Buddy cover acts; Delivery Duty fallback only when no PIC | arrangement event recorded |
-| loan out, delivery day | `Collect the loan item` | `Bring back U1-000-045 on the delivery day` | Sales Order PIC; Buddy cover acts; Delivery Duty fallback only when no PIC | loan row reads returned |
+| no partner on the scope | `Assign logistics` | `Choose the company that carries this delivery` | Current Work assignment, initially Sales Order PIC; Delivery Duty fallback only when no PIC | partner recorded |
+| partner set, no day agreed, partner contacts the customer | `Call NETS` | `Get the scheduled delivery date` | Current Work assignment, initially Sales Order PIC; Delivery Duty fallback only when no PIC | day and window recorded |
+| partner set, no day agreed, Carres contacts the customer | `Call the customer` | `Get the scheduled delivery date` | Current Work assignment, initially Sales Order PIC; Delivery Duty fallback only when no PIC | day and window recorded |
+| new date later than the requested date, no reply proof | `Call the customer` | `Record the reply and upload the WhatsApp proof` | Current Work assignment, initially Sales Order PIC; Delivery Duty fallback only when no PIC | contact record with proof |
+| collected, no ETA | `Ask NETS` | `Record the delivery ETA` | Current Work assignment, initially Sales Order PIC; Delivery Duty fallback only when no PIC | ETA recorded |
+| confirmed day is today, no result | `Deliver on Thu, 22 Oct` | `Record the delivery result` | Current Work assignment, initially Sales Order PIC; Delivery Duty fallback only when no PIC | attempt recorded |
+| confirmed day passed, no result | `Ask NETS` | `Record the delivery result` | Current Work assignment, initially Sales Order PIC; Delivery Duty fallback only when no PIC | attempt recorded |
+| delivered, photo missing | `Upload the delivery photo` | `Attach the photo from NETS` | Current Work assignment, initially Sales Order PIC; Delivery Duty fallback only when no PIC | photo on the ledger |
+| delivered, signed DO missing | `Upload the signed DO` | `Attach the paper the customer signed` | Current Work assignment, initially Sales Order PIC; Delivery Duty fallback only when no PIC | signed file on record |
+| delivered, proof not reviewed | `Check the delivery proof` | `Accept it, ask for more, or reject it` | Current Work assignment, initially Sales Order PIC; Delivery Duty fallback only when no PIC | review recorded |
+| Failed Delivery recorded | the §7 next action, for example `Call the customer` | `Confirm a new delivery date` | Current Work assignment, initially Sales Order PIC; Delivery Duty fallback only when no PIC | the named next fact |
+| Cannot Deliver reported by the partner | `Decide the next step for this delivery` | `Keep NETS with a new date, correct the details, or change logistics` | Current Work assignment, initially Sales Order PIC; Delivery Duty fallback only when no PIC | arrangement event recorded |
+| loan out, delivery day | `Collect the loan item` | `Bring back U1-000-045 on the delivery day` | Current Work assignment, initially Sales Order PIC; Delivery Duty fallback only when no PIC | loan row reads returned |
 | handover counts disagree | `Check the handover` | `Find the Unit the driver did not confirm` | `grn_duty` | mismatch resolved |
 
 The partner name always comes from the data. Delivery stores an action's owner rule, never a
@@ -1651,8 +1651,8 @@ calculate a duty holder.
 
 - **My Work Quick Rail** previews the person's owned Delivery actions and deep-links to the row or
   the DO; it is not another work store.
-- **Team Quick Rail** groups Delivery actions by the Sales Order's normal PIC and shows today's
-  Buddy cover only when that person differs. Orders without a PIC remain under `Delivery Duty`.
+- **Team Quick Rail** groups unfinished Delivery actions by current `Assigned to`. Assignment
+  movements remain in history. Orders without a PIC retain the governed `Delivery Duty` fallback.
 - **Calendar Quick Rail** shows confirmed deliveries, contact deadlines, handover deadlines,
   Failed Delivery follow-up and return due dates on actual dates.
 - **Activity Quick Rail** shows append-only assignment, arrangement, contact, handover, result,
@@ -1732,15 +1732,23 @@ assignment, customer/partner booking, delivery result, proof, Failed Delivery re
 collection and ordinary money follow-up. Delivery owns and writes the Delivery facts; the PIC owns
 the human action. There is no second Delivery-local assignment or owner list.
 
-Absence is Buddy cover, not reassignment. Today's governed cover acts in My Work while the Sales
-Order PIC remains the normal owner in Team Work and history. A shared or manager account may record
-authorised evidence but never becomes the order owner; managers are never dealt orders. A formal
-handover changes the Sales Order PIC and its append-only responsibility evidence together.
+**STAFF HELP AND ASSIGNMENT — OWNER RULING 2026-09-29 / APPROVED TARGET / NOT BUILT.**
+The shared Work Engine determines `Assigned to`, initially from the Sales Order PIC. Its recorded
+assignment movements, including the two Settings checkpoints (Workspace §§3–4.4), change current
+responsibility for unfinished work without rewriting the Sales Order PIC. Staff UI shows the
+current assignment and actual `Updated by` / `Completed by`; it has no normal/acting/cover labels.
+Any active authorised Operation person can record replies, update permitted Delivery facts, upload
+evidence and resolve urgent ordinary work without reassigning it first. The displayed person is
+not a write-access gate. Record the opening assignment, subsequent assignment changes, actual
+updater/completer, date/time and whether the result came from Workspace or Delivery Monitor.
+Both doors use the same source writer and completion fact, so the action completes once everywhere.
+Failed saves do not complete Work. Helping never silently changes assignment or another person's
+past evidence. Approval, amendment/void, Warehouse and external-partner boundaries remain separate.
 
 For customer-order work, Delivery Duty is not the routine owner. It is used when the Sales Order has no PIC so
 the action is not lost: the row stays visible under `Delivery Duty` and prints `Nobody holds
 Delivery Duty.` with `Set the holder in Settings → Staff & Duties`. Once a PIC exists, every open
-and future routine Delivery action resolves to that PIC and cover. Governed delivery-charge
+and future routine Delivery action resolves through that PIC and the recorded Work assignment movements. Governed delivery-charge
 exceptions continue to route to `delivery_charge_approver`. Corrections of saved facts,
 exceptional proof and refusal closure without an approved action definition enter no engine and
 remain named in §15.1.
@@ -1764,7 +1772,7 @@ presentation still need their governing contracts before implementation.
 Permissions separate view, record, record-on-behalf, review, correct, approve, configure and
 export.
 
-- The Sales Order PIC or today's Buddy cover may arrange, proxy-record, upload replies, assign after
+- Any active Operation person authorised for the action may arrange, proxy-record, upload replies, assign after
   `Cannot Deliver`, record results and proof on behalf of a partner, review proof and manage
   problems. Nobody issues the DO by hand and nobody may impersonate Warehouse or rewrite results.
 - Warehouse roles see and record only preparation, handover and returns for their Warehouse.
