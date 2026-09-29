@@ -930,7 +930,7 @@ Current implementation differences from the above target are build gaps, not a c
 - **A PAGE NEVER RESOLVES DUTY — owner ruling 2026-09-01.** Every action-bearing surface renders
   the resolved owner/avatar from the one Work Engine Action contract governed by
   `../ERP-ARCHITECTURE.md` Law F.1. Only `Settings → Staff & Duties` edits Duty assignments and
-  Buddy cover; People supplies
+  recorded assignment changes; People supplies
   active/access and last-working-date facts. Dashboard, module Registers, object details, My Work,
   Team Work and Quick Rail may change display density, but they may not query the rota, calculate
   an offset, store local assignment or invent a fallback identity.
@@ -1236,12 +1236,23 @@ PO/GRN adjustment shows the affected arrangements before confirmation and requir
 end and reason. Expiry returns to the system arrangement, not a changed monthly rota. Workspace
 §4.3 owns the business boundary; reuse the governed focused form and plain-name/date presentation.
 
-**STAFF & DUTIES PLAIN PERSON DISPLAY — OWNER CORRECTION 2026-09-29 / NOT BUILT.**
-Workspace §4.2 shows one current resolved person name and plain dates. Remove `Normal owner`,
-`Acting today`, `Who can act`, `Effective` labels and routine permission lectures from that surface.
-An effective cover supplies the displayed name; history preserves the separate source identities.
-The name does not restrict ordinary operational execution to that person. Existing page structure,
-shared components and token values remain; this is not a new component or a permission change.
+**ASSIGNMENT / ACTUAL WORK — OWNER RULING 2026-09-29 / APPROVED TARGET / NOT BUILT.**
+Staff UI uses `Assigned to` for current responsibility and `Completed by` for the actual performer;
+`Updated by` records an update. `Assigned by system` and timestamped assignment movements belong in
+history. Remove Normal owner, Acting owner, Buddy cover, Covering a person, Temporary owner and
+similar labels from routine pages, tooltips, accessibility names, filters and rendered history.
+A completed job retains the assignment effective at completion and its actual performer/time.
+Assignment never restricts another authorised Operation person from helping. Source permissions and
+approval gates remain; one owning-module business fact completes Work in every surface. Workspace
+§3 owns the complete evidence contract, including Workspace/Delivery Monitor origin.
+
+**TWO ASSIGNMENT CHECK TIMES — OWNER RULING 2026-09-29 / APPROVED TARGET / NOT BUILT.**
+Settings → Staff & Duties exposes two manager-editable times: `Morning check time` (10:30 AM) and
+`Afternoon check time` (3:00 PM), in company time. Reuse governed time inputs, form/save states and
+manager permissions. One shared persisted setting drives all consumers; a successful UI save cannot
+claim an active automation until the source and resolver actually consume it. Each check needs fresh
+activity evidence for its own work period; morning use cannot satisfy afternoon. Workspace §4.4 owns
+the routing/evidence contract and measured implementation gap. No third roster or MC editor is added.
 
 **STAFF & DUTIES PLACEMENT — PRODUCTION VERIFIED 2026-09-29, PR #1791 (owner-approved 2026-09-28).** The header gear →
 `All System Settings` → `Staff & Duties` is the one maintained destination. Remove its persistent

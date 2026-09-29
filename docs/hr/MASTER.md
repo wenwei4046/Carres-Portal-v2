@@ -54,8 +54,8 @@ against a real session.
 - **A residual is accepted and documented:** a token issued BEFORE the disable lives out its
   hour.
 - **Settings → Staff & Duties is the ONE company-wide Duty assignment door** (owner rulings
-  2026-09-01 / 2026-09-03; Settings placement approved 2026-09-28, NOT BUILT, Workspace §4). It keeps the Duty catalogue, each Duty's one Primary holder, optional
-  Buddy cover and effective dates. `Team` may show staff and workload, but it is not a second Duty
+  2026-09-01 / 2026-09-03; Settings placement production verified 2026-09-29, PR #1791, Workspace §4). It keeps the Duty catalogue, each Duty's one Primary holder, optional
+  assignment changes and effective dates. `Team` may show staff and workload, but it is not a second Duty
   editor. No module Settings surface keeps another approver list or rota. The Shared Duty Resolver
   defined by ERP Architecture Law F.1 is the only reader exposed to pages and Work.
 
@@ -78,7 +78,7 @@ against a real session.
   avatar, receipt, handover, approval and cover evidence remain unchanged. HR/People does not store
   a second PO Duty, GRN Duty or Warehouse rota; that one duty model remains in
   `../purchasing/MASTER.md` §5.3 and its one edit door is Settings → Staff & Duties
-  (approved placement / NOT BUILT; Workspace §4).
+  (placement production verified, PR #1791; Workspace §4).
 - **Rotation entry timing — owner-approved 2026-09-28 / APPROVED TARGET / NOT BUILT:** a newcomer
   enters routine monthly Duty rotation on the first day of the next month after acquiring the
   required People-owned eligibility. Account creation alone does not enrol them. Departure exclusion
@@ -172,8 +172,8 @@ against a real session.
 
 | What | Why it is not built |
 |---|---|
-| **Duty-cover leave fact** | **APPROVED 2026-09-03.** This is the effective-dated unavailable fact the Shared Duty Resolver needs to route today's Duty work to the governed Buddy. Owner-approved 2026-09-29 / NOT BUILT: recorded leave triggers automatic PO/GRN cover selection by Workspace’s governed cyclic order over available eligible people; no live-presence inference. HR owns leave, not a second cover roster. It is not a shift roster, attendance clock or presence monitor. |
-| **Shift roster / attendance / live presence** | **DROPPED by Loo at the design stage.** Missing heartbeat never activates a Cover; only a recorded leave fact does. |
+| **Leave fact for work assignment** | **APPROVED TARGET / NOT BUILT.** People owns dated leave and eligibility. Workspace §4.4 consumes them for recorded assignment changes and owns the two daily work-activity checks (10:30 AM / 3:00 PM defaults, manager-editable). Neither mechanism creates a second HR rota. |
+| **Work activity versus HR attendance** | **OWNER RULING 2026-09-29 / APPROVED TARGET / NOT BUILT.** Two period-specific activity checks may change unfinished Work assignment without a manager recording MC. An activity gap does not establish MC, attendance, employment status or access; no automated HR finding is created. Morning activity cannot satisfy the afternoon check, and background heartbeat is not fresh work-period evidence. |
 | **BD revenue on the cost screen** | Cost shows; revenue reads *not enrolled* — 0 dealers have a BD owner. Wiring it needs a dealer-channel revenue read, **not a widening of the showroom-only source.** |
 | **Effective dating on the other four config tables** | Approved. Today only rates carry it, so editing model rates, tiers, milestones or the scheme method rewrites live figures. Harmless for CLOSED months **because the run freezes the lines** — which is exactly why closed months must be read, never recomputed. |
 | **Pro-rating salary by join date** | Approved; blocked because `join_date` is filled for 0 of 9. |
