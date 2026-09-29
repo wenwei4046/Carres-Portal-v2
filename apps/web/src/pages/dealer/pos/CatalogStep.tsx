@@ -697,8 +697,10 @@ export default function CatalogStep({
                 onClick={() => setActiveRail(entry.key)}
                 data-testid={`pos-mobile-chip-${entry.key}`}
               >
-                <span>{entry.label}</span>
-                <span className="pos-mobile-category-chip__count">{entry.count}</span>
+                <span className="pos-mobile-category-chip__inner">
+                  <span>{entry.label}</span>
+                  <span className="pos-mobile-category-chip__count">{entry.count}</span>
+                </span>
               </button>
             ))}
         </nav>
