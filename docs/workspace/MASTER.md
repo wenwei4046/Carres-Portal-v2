@@ -136,7 +136,12 @@ rights. Ordinary authorised operations are not restricted to the displayed perso
 capabilities, required evidence and business gates still apply. Approval decisions retain their
 specific permissions, while their staff UI uses the same plain assignment/actual-actor vocabulary.
 
-**IMPLEMENTATION STATUS — 2026-09-29, current-assignment display built on branch; not production-verified.**
+**IMPLEMENTATION STATUS — 2026-09-29, current-assignment display PRODUCTION VERIFIED, PR #1800.**
+Deployment [36566892580](https://github.com/wenwei4046/Carres-Portal-v2/actions/runs/36566892580)
+succeeded for `4ec8022fd081a711527d2f7cf90a8b1a44fd95e5`; its proof step confirms all five
+production surfaces converged to that SHA (independently checked by this lane). The implementing
+Workspace task reports an authenticated Jess walk showing `Assigned to Shasha` and opening the
+existing Delivery date form without reassignment or saving a business record.
 Workspace action cards and owner/source disclosure, Payment Monitor, Collection owner details and
 PO send evidence use the plain assignment vocabulary. Missing current assignment never falls back
 to the original person. Source forms and actual send/history actors are preserved. This UI change
