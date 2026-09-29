@@ -889,7 +889,7 @@ Current implementation differences from the above target are build gaps, not a c
   deliberately selected and visible; removing it restores the prior permitted scope.
 - **A PAGE NEVER RESOLVES DUTY — owner ruling 2026-09-01.** Every action-bearing surface renders
   the resolved owner/avatar from the one Work Engine Action contract governed by
-  `../ERP-ARCHITECTURE.md` Law F.1. Only `Workspace → Staff & Duties` edits Duty assignments and
+  `../ERP-ARCHITECTURE.md` Law F.1. Only `Settings → Staff & Duties` edits Duty assignments and
   Buddy cover; People supplies
   active/access and last-working-date facts. Dashboard, module Registers, object details, My Work,
   Team Work and Quick Rail may change display density, but they may not query the rota, calculate
@@ -1179,6 +1179,25 @@ relevant section. Business values, permissions and workflow options are edited o
 auditable Workspace, never inside the launcher. Module tabs, portal navigation, Work Toolbars and
 `…` must not repeat a Settings destination. Current-view presentation such as Columns, personal
 Saved Views and governed Register layout remains on the owning Register and is not System Settings.
+
+**STAFF & DUTIES PLACEMENT — OWNER-APPROVED 2026-09-28 / NOT BUILT.** The header gear →
+`All System Settings` → `Staff & Duties` is the one maintained destination. Remove its persistent
+main-menu row. Work's unresolved-Duty link opens the exact Duty in this same Settings destination
+and preserves return context; contextual links are not duplicate editors. Preserve existing
+read-only visibility and manager-only writes. Workspace MASTER §4 owns the capability and this
+placement's acceptance boundary. Its §4.2 structure is separately owner-approved 2026-09-28 / NOT
+BUILT: current facts → next assignment → collapsed history, with existing authorised actions near
+the current facts. Catalogue/detail at 1440/1180px; list then full-width detail at 820/743/390px.
+Settings navigation opens on demand; never force a third narrow-screen column. The separately approved
+2026-09-28 catalogue shows today's holder/active cover/unassigned answer; future dates belong in
+detail (Workspace §4.2), with no token change. Remaining interaction
+review is still open. Workspace §4.3 also carries the owner-approved 2026-09-28 / NOT BUILT
+assignment form: current read-only facts above the focused inputs, one confirmation, preserved
+input on failure, and single-column narrow-screen layout. Owner correction later on 2026-09-28 makes routine assignment automatic; this form is only
+conditional manual presentation, not the default journey. Effective departures disappear from
+active staff views/choices; historical evidence remains. Workspace §4 owns the target. Date-conflict
+policy and final manual-action availability are not approved by that presentation ruling. This ruling changes no
+colour, spacing, typography, icon or other token value.
 
 **THE SETTINGS WORKSPACE RAIL — APPROVED / LOCKED, owner correction 2026-09-09. BUILT.** The
 Workspace's section rail is the governed Carres rail, not a fifth visual language. It drew a 280px

@@ -24,20 +24,23 @@ Dashboard
 
 WORKSPACE
   Work
-  Staff & Duties
   Issue Tracker
+
+HEADER SETTINGS
+  All System Settings
+    Staff & Duties
 ```
 
 `Workspace` is the left-bar section label for coordination destinations, not a landing page and not
 another Dashboard. Selecting `Work` opens My Work by default for staff and managers. Dashboard may
 drill into filtered Work, while Work never becomes a Dashboard tab.
 
-### 1.1 · Three-destination relationship
+### 1.1 · Cross-destination relationship
 
 | From | To | Exact reason and preserved context |
 |---|---|---|
 | Work item | Owning module object | Perform or record the required result; Work scope/filter remains in the URL |
-| Work `Not assigned` | Staff & Duties | Open the exact unresolved Duty; returning restores the same Work result |
+| Work `Not assigned` | Settings → Staff & Duties | Open the exact unresolved Duty; returning restores the same Work result |
 | Staff & Duties Duty | Team Work | Read-only `Open Team Work` with exact normal-owner/Duty filter; Staff & Duties never composes rows |
 | Issue Tracker Current Action | Work or same Issue result section | Shared action identity; no copied task and no second completion |
 | Work Issue item | Issue workspace | Open exact Issue and Current Action; My/Team scope remains recoverable |
@@ -48,7 +51,7 @@ drill into filtered Work, while Work never becomes a Dashboard tab.
 Browser Back returns to the same scope, saved view, search, filters, selected owner/Duty and scroll
 position where technically safe. A cross-page door never changes business state merely by opening.
 
-`Workspace → Staff & Duties` answers who holds each ERP Duty today, who covers an absence and who
+`Settings → Staff & Duties` answers who holds each ERP Duty today, who covers an absence and who
 actually acted. Workspace does not own module records or their completion facts.
 
 Carres has one cross-module Work coordination surface. Module Registers, queues and action views
@@ -107,14 +110,103 @@ future routing everywhere but never rewrites history.
 - `jess@carres.com` is Jess's **personal management identity**, role `principal`, person, `CR002`.
 - **Nobody assigns a Duty to themself or names themself as cover** — every role, the principal
   included (`self_assignment_refused`). This is the daily control.
-- Absence is expressed as a dated Buddy cover. With no eligible cover, the action **waits** for its
-  normal holder; it is never downgraded to another role, a position rung or an email list.
+- Absence is expressed as a dated Buddy cover. With no eligible cover, an approval **waits** for
+  its authorised holder; it is never downgraded to another role, position rung or email list.
+  Ordinary operational work follows the owner/actor rule below and is not blocked merely because
+  the normal holder or cover is absent.
+
+**OPERATIONAL EXECUTION ≠ DUTY ALLOCATION — OWNER-APPROVED 2026-09-29 / TARGET / NOT BUILT.**
+Every active authorised Operation staff person, including a newcomer in their joining month, may
+perform ordinary operational work, including placing/issuing PO and posting GRN, without being the
+Duty holder or cover. The first-month PO restriction applies to allocation of normal PO Duty, not
+to executing a PO action. The separately approved joining-month exclusion from automatic PO cover
+selection is also a routing rule, never a reason to refuse that person's ordinary PO execution.
+Record normal owner, dated cover and actual actor separately; helping does not take ownership,
+change the monthly rota or mark unrelated Work complete. Unrecorded sudden MC may be handled by
+colleagues through Team Work; recorded leave uses §4.4's automatic operational cover. Do not block
+ordinary work merely because nobody is available as assigned cover. Do not add a claim button.
+
+This ruling does not grant commercial approval, allow self-approval, bypass source-document facts,
+or automatically widen separately governed amendment/void powers. Approver Duties retain their
+own gates. Owning modules must converge their ordinary-action permission doors and actual-actor
+evidence to this target; existing restrictive code is measured implementation, not the final law.
 
 ## 4 · Staff & Duties
 
-`Workspace → Staff & Duties` is the only assignment surface. An authorised manager assigns one
-Primary holder and optional effective-dated Buddy cover to each named Duty and can see immutable
-assignment history.
+**ENTRY PLACEMENT — OWNER-APPROVED 2026-09-28 / APPROVED TARGET / NOT BUILT.**
+Jess approved this segment: move the one Staff & Duties destination to global Settings, remove its
+persistent main-menu row, and retain Work's direct door to the exact unresolved Duty. The page is
+reached through the header gear → `All System Settings` → `Staff & Duties`; a contextual Duty
+correction link opens that same destination without making the operator browse the Settings index.
+Return restores the originating Work context. Existing authorised read-only access and manager-only
+assignment controls remain intact. Module links lead to this same page; no second editor is created.
+Workspace still owns assignment/cover and the Shared Duty Resolver. Settings owns only placement;
+People/HR retains employee identity and eligibility, and modules retain actual work/completion.
+
+**Measured implementation boundary:** at review, the shipped page still occupied the main menu and
+Settings had no Staff & Duties section. Moving the destination is not yet BUILT or DEPLOYED. This
+placement approval and the separately approved §4.2 structure do not approve new cover actions or a
+complete Blueprint; continue the section-by-section PLAN review before application work. Existing
+approved capability contracts below remain in force. The relocation must preserve access, exact-Duty
+links and return context; it must fit the Settings shell without forcing three simultaneous columns
+on a narrow screen. No new token is approved or required by this placement ruling.
+
+**OWNER CORRECTION — 2026-09-28 / APPROVED TARGET / NOT BUILT.** Routine operational Duty
+assignment follows the governed automatic rotation and active/eligible People pool; Jess must not
+maintain each routine assignment manually. Staff & Duties shows the resulting responsibility and
+exceptions. The previously reviewed `Assign holder` form is a conditional manual action surface,
+not approval to make manual assignment the normal operating journey. Its final availability must
+follow the automatic-assignment/exception review. Do not treat the prior form approval as a complete
+Blueprint or permission to Build.
+
+**JOINER / LEAVER TIMING — OWNER-APPROVED 2026-09-28 / APPROVED TARGET / NOT BUILT.**
+A new employee joins routine monthly Duty rotation on the first day of the month following the
+month in which they acquire the required People-owned rotation eligibility, using the company
+calendar/timezone. Creating an account or starting employment alone is not rotation eligibility.
+The current month's allocation is not reshuffled merely because a new eligible person joins.
+Departure removes a person immediately when departure becomes effective; do not wait for the next
+month. Re-resolve the affected current/future routine allocation through the one shared Duty model,
+preserving historical actual-actor evidence. This timing ruling does not auto-grant approval rights,
+change source-owned task completion or decide the remaining cover details.
+
+**NEWCOMER PO TIMING — OWNER-APPROVED 2026-09-28 / APPROVED TARGET / NOT BUILT.**
+A new employee does not take PO Duty during their calendar month of joining. From the first day of
+the following month they automatically join the PO rotation, provided they remain active and meet
+the existing role/access eligibility. No separate manager competency confirmation, training sign-off
+or fixed probation period is required for that transition. Joining in a month means that calendar
+month, not a rolling 30-day wait; the company calendar/timezone governs the boundary. Automatic
+admission makes the person available for the governed rotation; it does not mean every newcomer
+must be the PO holder on that first day. Existing approval capability and receiving-posting rules
+remain separate.
+
+**MONTHLY ROTATION ORDER — OWNER-APPROVED 2026-09-29 / APPROVED TARGET / NOT BUILT.**
+Maintain a stable cyclic order of eligible routine Operation staff. Each month one person owns PO
+Duty and the next person in that order owns GRN Duty; advance the PO position by one each month.
+For three eligible people A/B/C, the cycle is PO A / GRN B → PO B / GRN C → PO C / GRN A.
+These letters illustrate the rule, not stored people or a live assignment. A newcomer joins the
+end of the existing rotation order at the approved admission boundary; preserve the existing
+people's relative order rather than restarting the schedule. Entry into the pool is not a promise
+of the next PO slot. Remove a departed person when departure is effective and continue the remaining
+order, re-resolving affected current/future allocation without rewriting historical actual actors.
+
+This determines responsibility and Work routing, not exclusive receiving-posting rights: other
+active Operation staff may still post Receiving under Purchasing's approved posting law. It does
+not rotate commercial approvers or change source-owned task completion. Existing one-person/
+no-eligible-person boundaries remain separate from the illustrated multi-person cycle. Temporary
+absence follows §4.4; do not treat absence as departure.
+
+When a person resigns, the authorised People/account owner records the last working date and
+access change once. When departure is effective, omit that person from default active staff views,
+current/future eligible pickers and Duty routing; preserve historical names, acts and records.
+This is not deletion, a second employment switch in Workspace, or permission for ordinary staff to
+disable other accounts. Settings may link to the owning People/account action. The exact entry
+presentation remains under review.
+
+`Settings → Staff & Duties` is the only Duty assignment/cover surface and shows immutable history.
+Automatic operational allocation does not grant approval capability or randomly rotate Principal/
+Finance approval duties. Existing approval qualifications, object PIC ownership and dated-cover
+rules remain in force. How automation represents its authoritative assignments, handles a changed
+eligible pool and exposes genuine exceptions remains a measured target gap, not a claim of delivery.
 
 Modules store only `rule → required Duty`. They never store another staff list, local approver,
 hard-coded Jess/Manager identity or page-level cover calculation. People/HR supplies active,
@@ -136,7 +228,7 @@ order, customer, delivery and ordinary collection work. The Work Engine routes t
 that PIC's governed Buddy cover when the PIC is absent without changing the normal owner. Delivery
 Duty is not the routine customer-order owner. For customer-order work it is the explicit fallback
 when a Sales Order has no PIC; that exception stays visible under `Delivery Duty` and prints `Nobody holds Delivery Duty.`
-and `Set the holder in Workspace → Staff & Duties`. Delivery Settings never holds a roster or a
+and `Set the holder in Settings → Staff & Duties`. Delivery Settings never holds a roster or a
 second owner list (`../delivery/MASTER.md` §13.1).
 
 **SHOWROOM ASSIGNMENTS — APPROVED TARGET / NOT BUILT; Jess, 2026-09-28.** For display
@@ -162,7 +254,7 @@ rulings 2026-09-18, 0533). Its pickers list Principal people; the doors refuse e
 account — Shasha and Yu Jun included — as holder (`invalid_holder`) or cover (`invalid_cover`).
 Deciding a Manual Purchase admits only today's resolved actor — the holder, or their dated Principal
 cover — and never the principal role alone, the `ops_manager` position or an email list. Unheld
-answers `Nobody holds Purchasing Approver.` · `Set the holder in Workspace → Staff & Duties.` Nobody
+answers `Nobody holds Purchasing Approver.` · `Set the holder in Settings → Staff & Duties.` Nobody
 decides a Manual Purchase they raised (`own_request`), and the principal role no longer raises one.
 **Bootstrap:** no door can name the first holder (self-assignment is refused and the shared login
 may not assign), so 0533 assigned Jess once from 2026-09-18 with `assigned_by` NULL, note `Bootstrap
@@ -199,44 +291,91 @@ combines those truths. A manager never assigns individual routine Work here.
 
 ### 4.2 · Page composition
 
-Desktop uses one catalogue and one selected-duty detail. It does not repeat two large forms and a
-full history beneath every Duty.
+**OWNER-APPROVED 2026-09-28 / APPROVED TARGET / NOT BUILT.** Jess approved the page-structure
+segment and the new `Next assignment` heading. Keep one Duty catalogue and one selected-Duty detail.
+The detail reads in this order: current normal owner and effective period → current/scheduled cover
+when applicable → existing authorised actions → next effective primary assignment → collapsed
+`Assignment & cover history`. Future appointments are not presented as if their terms already ran.
+All authorised assignment/cover records remain reachable; collapsing history never deletes evidence.
 
 ```text
-┌ Staff & Duties ──────────────────────────────────────────────────────────────┐
-│ Who holds each company duty today and who covers an absence.   Search duties│
-├ DUTIES ──────────────────────────┬ SELECTED DUTY ────────────────────────────┤
-│ PO Duty                          │ PO Duty                                   │
-│ [YJ] Yu Jun                      │ Normal owner  [YJ] Yu Jun                 │
-│                                  │ Acting today [SH] Shasha                  │
-│ GRN Duty                         │ Cover         15–17 Sep · Annual leave    │
-│ [SH] Shasha                      │                                            │
-│                                  │ [Assign holder] [Add cover]               │
-│ Delivery Duty                    ├ ASSIGNMENT & COVER HISTORY ───────────────┤
-│ Not assigned                     │ 15 Sep · Shasha covering for Yu Jun       │
-│                                  │ 01 Sep · Yu Jun assigned by Jess          │
-│ …                                │                                            │
-└──────────────────────────────────┴────────────────────────────────────────────┘
+Staff & Duties
+
+Search duties       │ PO Duty
+State: All duties   │ Normal owner  Yu Jun
+                    │ Effective     Mon, 7 Sep to Wed, 30 Sep
+PO Duty             │
+GRN Duty            │ [Assign holder]  [Add cover]
+Purchasing Approver │
+…                   │ Next assignment
+                    │ Shasha · Thu, 1 Oct to Sat, 31 Oct
+                    │
+                    │ ▸ Assignment & cover history
 ```
 
-The left catalogue follows the shared Duty catalogue order and shows Duty label, current normal
-holder and exceptional state: `Covered today`, `Starts {date}`, `Ends {date}` or `Not assigned`.
-It never shows workload, performance, a recommended person or a copied module roster. Search matches
-Duty label and authorised current/historical person names; `State` may narrow to `All duties`,
-`Covered today`, `Cover scheduled` and `Not assigned`.
+Names/dates above illustrate the reading order, never hard-coded facts. The next assignment is the
+next effective primary assignment from the authoritative Duty source; it does not replace today's
+normal owner early. It names the person and effective dates and is omitted when no future primary
+assignment exists. Do not infer the next effective owner merely from the first history row. Full
+future arrangements remain reachable in the expanded records, with their future effective periods
+explicit. History distinguishes the recorded event time from the assignment/cover effective dates
+and retains the shared event → who/when → detail grammar. Opening history changes no business fact.
+
+**CATALOGUE — OWNER-APPROVED 2026-09-28 / APPROVED TARGET / NOT BUILT.** The left catalogue
+follows the shared Duty catalogue order and answers who is responsible today. Each row shows the
+Duty label and today's normal holder, `{acting person} covering for {normal owner}` when cover is
+active, or `Not assigned`. Future appointments never replace today's answer early. `Starts {date}`
+and `Ends {date}` do not appear in catalogue rows; effective periods and future arrangements belong
+in the selected detail's assignment/cover facts and `Next assignment`.
+
+The catalogue never shows workload, performance, a recommended person or a copied module roster.
+Search matches Duty label and authorised current/historical person names; `State` may narrow to
+`All duties`, `Covered today`, `Cover scheduled` and `Not assigned`. Filtering by scheduled cover
+does not make that cover today's actor. Selecting the whole row opens detail, changes no assignment
+and completes no Work. Long names wrap; rows support keyboard selection. Returning from narrow-screen
+detail restores the catalogue's search/filter and position. Existing read-only users can navigate
+and inspect the same authorised facts.
 
 The selected detail prints separate labelled facts: `Normal owner`, `Acting today`, `Effective`,
 `Cover` and `Reason`. The same person is not repeated as acting when no cover exists. Avatar initials
 carry a full-name accessible label and never replace the printed name. Selecting a Work
-configuration failure may deep-link directly to the required Duty while preserving this layout.
+configuration failure opens the required Duty in this same Settings page and preserves return context.
+Readers see the existing manager-only sentence; only authorised managers see the existing focused
+assignment/cover actions. This composition does not authorise new actions or change their gates.
+
+At 1440px and 1180px retain catalogue/detail. At 820px, 743px and 390px show the catalogue, then a
+full-width selected detail with `Back to duties`. Settings navigation is available on demand and
+must not force a third simultaneous narrow-screen column. §4.5 owns the retained loading, no-match,
+read-failure, unassigned and read-only states; no task-level Waiting/Completed/Missed state is added.
+Reuse the governed kit and token values. These are acceptance targets, not new measured screenshots
+or production completion; the remaining action/exception details continue in PLAN review.
 
 ### 4.3 · Change-holder contract
 
-`Assign holder` opens a focused action surface with `Duty`, `Holder`, `Effective from`, optional
-`Until` and optional factual `Note`. Eligible choices come from People's active authorised Carres
-staff only; a departed, disabled, external Warehouse or ineligible account is not offered and is
-refused again at the write door. The system shows the current holder and the resulting effective
-period before confirmation.
+**FORM PRESENTATION — OWNER-APPROVED 2026-09-28 / APPROVED TARGET / NOT BUILT.**
+`Assign holder` opens one focused action surface. Show read-only `Duty`, `Normal owner` and the
+current assignment's `Effective` period above the inputs, followed by required `Holder` and
+`Effective from`, optional `Until` and optional factual `Note`. Do not preselect a person or start
+date. The selected person and effective dates remain visible before the single primary
+`Assign holder` confirmation; `Cancel` closes without a write.
+
+Eligible choices come from People's active authorised Carres staff only; a departed, disabled,
+external Warehouse or ineligible account is not offered and is refused again at the write door.
+Existing person-only, manager and no-self-assignment gates remain. Personnel loading/failure must
+be distinguishable from a successfully loaded list with no eligible choice; never imply that a
+failed read proves nobody is eligible. Missing fields use §4.4.1's exact repair sentences. Preserve
+input on refusal/failure, prevent duplicate confirmation while saving, and only announce completion
+after the authoritative assignment write succeeds. A successful future assignment appears under
+`Next assignment` without changing today's owner early. No Work is marked complete by this act.
+
+Use the shared focused dialog at 1440/1180px and a single-column form at 820/743/390px. Names wrap,
+content scrolls vertically, and controls remain reachable above the on-screen keyboard. Closing
+returns focus to the originating action. Readers retain `Duty assignments are set by the manager.`
+and see no write imitation. This surface introduces no Waiting/Urgent/Missed task state.
+
+This approval covers form presentation only. The conflict between §4.4.1's primary-period refusal
+copy and the current newest-effective-assignment behaviour remains under PLAN review; this approval
+does not settle overlapping-date policy or authorise application Build.
 
 The act appends a new assignment; it never edits or deletes an old row. Overlap resolution is
 server-owned and must not leave two primaries effective on one day. A future assignment does not
@@ -248,6 +387,33 @@ It does not claim that historical Work changed. Failure prints the governed serv
 the entered facts for correction without optimistic owner changes.
 
 ### 4.4 · Buddy-cover contract
+
+**AUTOMATIC PO/GRN COVER — OWNER-APPROVED 2026-09-29 / APPROVED TARGET / NOT BUILT.**
+A recorded People-owned leave fact activates automatic cover for routine PO/GRN Duties. Starting
+after the day's normal holder in the governed cyclic order, choose the next active, available person
+eligible for that Duty on that business date. Skip the absent holder and anyone unavailable,
+departed, disabled or otherwise ineligible. A newcomer cannot cover PO in their joining calendar
+month; cover cannot bypass the newcomer PO rule. Use recorded leave and governed calendars,
+not login activity, heartbeat or inferred live presence.
+
+Keep the normal monthly holder and future cyclic order unchanged. After the recorded leave ends,
+resolve back to the normal holder applicable on that date. A leave spanning a month boundary reads
+each date's normal assignment; it never extends an old monthly holder's term. An authorised change
+or cancellation of the source leave re-resolves the affected open/future dates while preserving
+recorded actual actors and prior cover evidence. This is one Workspace cover truth consumed by
+Work and protected module doors, not independent per-page routing.
+
+When nobody qualifies for cover, expose the missing acting person to authorised management; do not
+silently route to an absent normal holder or grant a new capability. Existing source-owned rights
+such as Receiving posting by active Operation staff remain distinct from Duty responsibility.
+Commercial/Principal/Finance approver duties do not inherit this automatic operational selection.
+The page shows separate `Normal owner`, `Acting today` and `Cover` dates; future cover never becomes
+today's actor early. Automatic cover changes neither due dates nor source-owned completion.
+
+The existing authorised manual cover capability below is retained for governed exceptions and
+other Duties; it is not a required step for ordinary recorded PO/GRN leave. Manual self-assignment
+and eligibility gates remain; automatic selection is the owner-approved system rule, not a user
+self-assignment action. Do not create competing active cover answers.
 
 `Add cover` is available only when the Duty has a normal holder for the complete selected period.
 It asks for `Acting person`, `From`, `Until` and `Reason`. The acting person must be active, eligible,
@@ -300,17 +466,33 @@ authoritative. No message says `Invalid`, `Error` or `Something went wrong` with
 | Not assigned | `Not assigned` · `Nobody holds {Duty}.` · manager sees `Assign holder`; Work remains visible under Duty word |
 | Cover active | Normal and acting person shown separately with effective dates/reason |
 | Cover scheduled | Normal owner remains today's actor; future cover and start date are visible in detail |
-| Read failed | `Staff & Duties could not be opened` · `Try again`; never infer no holder |
+| Read failed | `Staff & Duties could not be opened` · `Try again`; never infer no holder. On refresh failure retain the last successful catalogue/detail alongside the failure and retry state; do not present cached resolution as freshly confirmed. Loading never flashes an empty/unassigned answer. |
 | Write refused/failed | Exact reason beside action; no local mutation of displayed resolution |
 | History empty | `No assignments yet` / `No covers yet` within a valid selected Duty |
 
-At 1440px and above use the catalogue/detail split. At 1024–1439px retain the split with a narrower
-catalogue. Below 1024px show the catalogue first and open the selected Duty as a full-width detail
-with an explicit Back door; forms are single-column and dates/names never truncate. Keyboard order is
+Use §4.2’s approved catalogue/detail composition and responsive targets. Below 1024px show the
+catalogue first and open the selected Duty as a full-width detail with `Back to duties`; forms are
+single-column and dates/names never truncate. Keyboard order is
 search/filter → Duty list → selected facts → authorised actions → history. Focus returns to the
 originating Duty after a modal closes.
 
 ### 4.6 · Current → proposed gap audit — 2026-09-15
+
+**CROSS-CHAT RECONCILIATION — MEASURED 2026-09-29 / REVIEW INPUT, NOT NEW APPROVAL.**
+The owner supplied the MC/operational-actor ruling from PR #1705. That PR is OPEN, not merged,
+at inspected head `dd78b8383ea7bfa71e490362576a9528f80c2963`. Its Workspace §3 records the
+operational owner/actual-actor distinction and Team Work assistance during unrecorded sudden
+absence; its COPY proposal includes `Who can act`. Its manual-cover-for-lasting-absence wording
+must converge with this chat's later approved automatic PO/GRN cover from recorded leave (§4.4).
+Do not copy its older page composition over this chat's separately approved `Next assignment` and
+catalogue/detail rules or claim its broad operational-permission target is deployed.
+
+**RESOLVED — OWNER RULING 2026-09-29.** Joining-month newcomers may actually place PO and perform
+ordinary operational work. The first-month restriction governs Duty allocation only (§3); no
+additional PO competency sign-off or execution waiting period is authorised.
+`Who can act`/`End cover` presentation in the pasted third-segment proposal is not approved merely
+because the owner supplied it for reconciliation. Existing module approval, amendment, void and
+commercial gates must be checked against the exact operational-action scope.
 
 | Current branch evidence | Required Blueprint state |
 |---|---|
@@ -336,7 +518,9 @@ The page is ready for owner acceptance only when all are demonstrable:
 - assignment and cover overlap/race attempts cannot yield two effective answers;
 - success, known refusal, uncertain response and retry preserve one append-only act and honest UI;
 - search/no-match/read-failure/history-empty states and deep links retain their required meaning;
-- names, dates, action controls and history remain readable and operable at 1440, 1024 and 390px;
+- names, dates, action controls and history remain readable and operable at 1440, 1180, 820, 743 and 390px;
+- the current owner, next effective assignment and collapsed history remain distinct under §4.2;
+  recorded event time is never substituted for the effective period;
 - changing the current holder/cover updates open/future Work routing without rewriting completed
   actor evidence.
 
@@ -709,9 +893,9 @@ the same group and item grammar; zero matches is not the same as zero work.
 | Public holiday | Day remains visible and names the holiday; only an authorised holiday operation may remain assigned there |
 | Calendar not configured | Name the affected Site/owner calendar and correction door; do not invent off-days or missed age |
 | Calendar read failed | Say working days could not be loaded, preserve safe dated facts and hide invented missed age; never treat failure as zero |
-| No eligible actor that day | Keep the action on its authoritative day · `Nobody works {date} for {Duty}.` · `Set cover in Workspace → Staff & Duties`; do not falsely say the Duty has no holder |
+| No eligible actor that day | Keep the action on its authoritative day · `Nobody works {date} for {Duty}.` · `Set cover in Settings → Staff & Duties`; do not falsely say the Duty has no holder |
 | Blocked | Stays in its own working-day group (no `Blocked` group) · `Blocked by {dependency}` plus the door that can resolve it; retain original working day and missed age; the `Blocked` filter narrows to these rows |
-| Not assigned | Group under the governed Duty word · `Nobody holds {Duty}` · `Set the holder in Workspace → Staff & Duties` |
+| Not assigned | Group under the governed Duty word · `Nobody holds {Duty}` · `Set the holder in Settings → Staff & Duties` |
 | Covered | Preserve normal owner and effective cover evidence; My Work routes to today's acting person |
 | Source delayed | Preserve last safe observation and say `Could not refresh {source}` with time |
 | Source failed | Isolate and name the source; never omit its possible work or convert failure to zero |
@@ -2137,7 +2321,7 @@ unreviewed annotation · `Upcoming` · `Take it` · `Release`.
 | Multiple client queries with independent loading states | Replace with one validated Dashboard composition carrying per-source health |
 | `See all orders`, `Manage POs`, `Open warehouse` generic doors | Replace with one exact filtered owning-module drill-down per measure |
 | Whole-page RPC error | Retain retry, add per-source health and last-safe observation; never turn failure into zero |
-| Dashboard currently grouped under the left-bar `Workspace` section | Move it to the one independent top-level Dashboard position; Workspace contains Work, Staff & Duties and Issue Tracker only |
+| Dashboard currently grouped under the left-bar `Workspace` section | Move it to the one independent top-level Dashboard position; Workspace contains Work and Issue Tracker; Staff & Duties is under global Settings (§4 placement target) |
 
 No Dashboard production rebuild begins until each admitted measure has the section 8.2 contract and
 its owning module is production-verified. This blocks invented totals, not the already-honest Work
@@ -2249,11 +2433,13 @@ honest Work for admitted modules.
   recorded provenance; the Sales Orders `verifiedUnitIds` reader is evidence for display, not a new
   Unit assignment or Work source.
 - Migration 0425's shared Duty registry/resolver, effective primary assignment, dated cover,
-  audit evidence, guarded API and the one `Workspace → Staff & Duties` UI are production-proven
+  audit evidence, guarded API and the one Staff & Duties UI are production-proven
   for GRN Duty. The same catalogue now exposes the other approved cross-module Duty names; their
   module consumers remain implementation evidence until each module is production-verified.
-- **Staff & Duties §4.2 composition — DEPLOYED to production 2026-09-16 (`56e52d0e`, PR #1388);
-  owner acceptance under §4.7 still open.** Deploy run 35075197322 passed its repeated
+- **Existing Staff & Duties catalogue/detail implementation — DEPLOYED 2026-09-16
+  (`56e52d0e`, PR #1388); owner acceptance under §4.7 still open.** This proves the shipped
+  catalogue and focused actions only; §4’s Settings relocation and §4.2’s 2026-09-28 structure
+  remain APPROVED TARGET / NOT BUILT. Deploy run 35075197322 passed its repeated
   authoritative checks and deployment proof; an independent `verify-production.mjs` run then read
   `56e52d0e` from carres-portal Pages, carres-pos Pages, erp.carresofficial.com,
   pos.carresofficial.com and the API Worker. The stacked 720px document is replaced by one catalogue
@@ -2480,22 +2666,23 @@ The page Blueprint is reviewable when every row points to current truth with no 
 pages are built only when their acceptance contracts pass against current implementation and real
 authorised accounts. The global Dashboard remains outside these three destinations and retains its
 separate §§8–8.6 contract. Notifications and the right-rail boundary retain the supporting §7–7.1 contract and
-never become a fourth Workspace destination.
+never become additional Workspace destinations.
 
-### 13.1 · Owner-review result — 2026-09-16
+### 13.1 · Owner-review result — composition 2026-09-16; Duty placement 2026-09-28
 
 The composition review covers the complete relationship, not isolated screens:
 
 ```text
 Dashboard ──management fact drill-down──▶ owning Register / Team Work
 Workspace ──Work──▶ exact owning action door
-          ├─Staff & Duties──▶ shared owner/cover resolution
           └─Issue Tracker──▶ Issue truth + shared Current Action
+Settings ──Staff & Duties──▶ shared owner/cover resolution
 Right rail ──(no Work count; UI MASTER §5)
 Notifications ──event receipt──▶ Work / owning object
 ```
 
-No new business decision remains in the page composition. Implementation remains gated by the
+Staff & Duties entry placement follows §4’s 2026-09-28 ruling; its current internal-page review
+is not complete. Implementation remains gated by the
 module admission and production-proof work in §§6, 10 and 11; `Blueprint ready` does not mean those
 sources, migrations or pages are deployed.
 

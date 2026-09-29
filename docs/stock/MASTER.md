@@ -1061,7 +1061,7 @@ shows source identity, fact and action without repeating the grouped person on e
 The shared Quick Rail remains `Team · Calendar · My Work · Activity`:
 
 - **Team** shows every active Carres staff member, including zero work, current PO/GRN Duty,
-  Buddy cover and counts from the same Work Engine. `Workspace → Staff & Duties` is the only Duty
+  Buddy cover and counts from the same Work Engine. `Settings → Staff & Duties` is the only Duty
   edit door; Team is a read-only workload/coverage view. External NETS
   people appear only inside their permitted Warehouse/partner scope; they do not gain the full
   Carres team view.
@@ -1301,7 +1301,7 @@ surface and are not deleted by the card above:
   allowed actions, evidence requirements and active dates. No rule hard-codes NETS, so another 3PL
   or a future Carres-operated warehouse uses the same Unit/Receiving/Inventory/Outbound model.
 
-**Workspace → Staff & Duties** is the one place to view or correct PO Duty, GRN Duty and
+**Settings → Staff & Duties** is the one place to view or correct PO Duty, GRN Duty and
 Buddy cover. The governed **People** record supplies identity, active status, access, leave and last
 working date. Warehouse Settings links to those homes and must not copy either Duty assignment or
 employment truth.
@@ -1882,7 +1882,7 @@ Resolved owner · Action · Completion fact · governed actual date · source ob
 Duty Resolver consumes Staff & Duties/People facts and automatically adapts open/future Work; completed actor
 history never changes. Routine work has no Mark done and no undated generic task.
 
-**RECOMMENDED CARRES BUSINESS FLOW →** `Workspace → Staff & Duties` maintains the one PO Duty/GRN
+**RECOMMENDED CARRES BUSINESS FLOW →** `Settings → Staff & Duties` maintains the one PO Duty/GRN
 Duty rotation and Buddy cover. With three active staff, approved rotation and cover apply; with two, duties split/rotate;
 with one, the same person holds both; only zero assignable staff may produce `No active Carres staff
 can take this work` for COO attention. People `Last working date` removes a leaver from the effective
@@ -1897,7 +1897,7 @@ Warehouse page reads the same resolved owner and completes only when its stated 
 exists.
 
 **UI / PAGE / OBJECT PLACEMENT →** Quick Rail is `Team · Calendar · My Work · Activity`. Team shows
-coverage but `Workspace → Staff & Duties` is the only PO/GRN Duty and Buddy-cover edit door; People owns active/access/last-working-date facts;
+coverage but `Settings → Staff & Duties` is the only PO/GRN Duty and Buddy-cover edit door; People owns active/access/last-working-date facts;
 Warehouse Settings links but copies neither. Warehouse pages render returned avatar/owner only and
 store no assignee. NETS uses individual email/name/avatar; shared `NW`/company identity and
 impersonation are invalid.

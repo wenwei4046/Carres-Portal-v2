@@ -146,7 +146,7 @@ collect customer balance          → Sales Order PIC, with Buddy cover
 ```
 
 The rule resolves automatically. Staff do not assign routine work order by order. **People** owns
-employment/account eligibility facts only; **Workspace → Staff & Duties** is the ONE company-wide
+employment/account eligibility facts only; **Settings → Staff & Duties** is the ONE company-wide
 Duty assignment door. An Owner Rule may reference a stable object owner such as the Sales Order PIC
 or a governed Duty key; modules never keep a second staff list. The shared resolver applies the
 governed Buddy cover so absence changes who sees today's work without changing the underlying
@@ -154,6 +154,12 @@ business record or rewriting its history. A manager may see or filter the resolv
 never creates a second assignment truth.
 
 ### Law F.1 · One Shared Duty Resolver
+
+**PLACEMENT — OWNER-APPROVED 2026-09-28 / NOT BUILT (Workspace MASTER §4).** Staff & Duties is
+presented in global Settings, with no persistent main-menu row. Work retains exact-Duty correction
+links and return context. This changes navigation only: Workspace owns the one assignment/cover
+registry and resolver; People owns identity/eligibility; modules own their business completion.
+Existing read-only and write permissions are preserved. Settings never becomes a second owner.
 
 **OWNER-APPROVED / LOCKED 2026-09-01; OVERWRITTEN 2026-09-17.** No page, module or API reads a
 rota table or calculates a Duty holder or object-owner cover for itself. The same owner-resolution,
@@ -163,7 +169,7 @@ complete resolution chain is:
 
 ```
 People — individual staff identity, active/access, last working date and leave facts
-→ owning object or Workspace → Staff & Duties — normal PIC or Duty Primary and optional Buddy cover
+→ owning object or Settings → Staff & Duties — normal PIC or Duty Primary and optional Buddy cover
 → Shared Owner Resolver — date + active staff + leave/cover rules
 → Work Engine — resolves the owner of each action from its Owner rule
 → every Register, object, Dashboard, My Work, Team Work and Quick Rail
@@ -194,16 +200,35 @@ Each Duty has exactly one active Primary holder and may have one governed Buddy 
 Order has one PIC and may resolve the same governed Buddy cover for absence. When the
 Primary holder is on recorded leave, the Work Engine routes today's open work to the active Cover;
 it does not rewrite the normal owner. Changing staff or approval ownership happens once in
-`Workspace → Staff & Duties`, and every module, My Work and Team Work resolves the change together.
+`Settings → Staff & Duties`, and every module, My Work and Team Work resolves the change together.
 No action sentence, module setting or permission check hard-codes `Jess`, `Manager` or another
 person's name.
 
-Automatic rotation may supply a recommended Primary/Cover for operational rotas such as PO Duty and
-GRN Duty, but the authoritative assignment is the effective-dated record in `Staff & Duties`. A
+Owner correction 2026-09-28 / APPROVED TARGET / NOT BUILT: routine operational Duties such as
+PO Duty and GRN Duty follow governed automatic allocation over eligible active staff; the owner
+does not manually enter each routine assignment. The authoritative assignment remains in the one
+Workspace Duty model, never independent page-level rotation. This does not auto-grant approver
+permissions or change object PIC ownership. Owner-approved joiner/leaver timing (2026-09-28 /
+NOT BUILT, Workspace §4): newly eligible staff enter monthly rotation on the first day of the next
+month; departure exclusion takes effect immediately on its effective date. The owner
+confirmed PO timing: no PO Duty in the calendar month of joining; automatic admission from the
+following month while active and otherwise eligible, without a separate competency sign-off
+(Workspace §4). Owner-approved monthly order (2026-09-29 / NOT BUILT): a stable eligible-staff
+cycle supplies PO and the next person supplies GRN, advancing one position monthly; admitted
+newcomers join the tail and effective departures leave without resetting the remaining order.
+Owner-approved automatic PO/GRN cover (2026-09-29 / NOT BUILT, Workspace §4.4) reads recorded
+People leave and selects the next available eligible person in that cycle without changing normal
+ownership or the monthly order; no eligible cover stays visible, never an invented assignment. A
 last-working-date change removes the person and re-resolves open and future Work. Only no eligible
 Primary or Cover produces `Not assigned`, with a direct door to People / Staff & Duties. Capability
 remains separate: an authorised actor may perform an act without becoming its resolved owner, and
 history records normal owner, cover and actual actor separately.
+
+Owner clarification 2026-09-29 / TARGET / NOT BUILT: all active authorised Operation staff people,
+including joining-month newcomers, may execute ordinary operational work such as issuing PO and
+posting GRN without becoming its Duty holder. The newcomer PO rule limits allocation, not execution.
+Normal owner, cover and actual actor remain separate. Approval and separately governed amendment/
+void gates remain intact (Workspace §3).
 
 An action owner and an action capability are separate facts. A governed Operations Superuser may
 perform the operational action without replacing the resolved owner. The event records both the

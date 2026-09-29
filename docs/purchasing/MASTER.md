@@ -316,13 +316,22 @@ retype it.
 
 ### 5.3 One PO issue authority
 
+**OPERATIONAL PERMISSION — OWNER-APPROVED 2026-09-29 / TARGET / NOT BUILT.** Every active
+Operation staff person, including a joining-month newcomer, may perform ordinary PO work and
+issue a PO without holding PO Duty or cover. The first-month restriction affects allocation to
+PO Duty, not permission to place/issue PO. Record normal Duty holder, cover and actual issuer
+separately. Existing approved-demand, document, quantity and commercial approval gates remain;
+no approval capability or self-approval exception is granted. This overrides the ordinary-Operation
+Duty-only issue gate described in the implementation evidence below; it is not proof of deployment.
+
 Current PO Duty, or the dated cover while one is in force, is the normal work owner and remains
 accountable for PO issuance. A governed Operations Superuser may also complete any operational PO
 action without becoming — or being displayed/audited as — the duty holder. Jess is an Operations
 Superuser through Principal authority as a principal **person** (`is_operations_superuser`, 0533);
 `operation@carres.com` is the explicitly governed shared Operations Superuser (its flag). The shared
-owner login `principal@carres.com` is not a person and executes no duty (owner ruling 2026-09-18). An ordinary Operations login that is neither duty, cover nor superuser is
-refused. Commercial approval remains separate and never follows from issue authority.
+owner login `principal@carres.com` is not a person and executes no duty (owner ruling 2026-09-18). The measured existing implementation refuses an ordinary Operations login that is neither duty,
+cover nor superuser; that restriction must converge to the 2026-09-29 approved target above.
+Commercial approval remains separate and never follows from issue authority.
 
 **HOW IT IS ENFORCED — migrations 0379 / 0380 plus 0403, and the dependent web/API code, are
 production-verified at `98ce4220d15cd81482aef05124dbec470c2ed87b` on 29 Aug 2026. A real
@@ -345,6 +354,38 @@ no browser write policy.
 monthly PO/GRN rotation. The two duties remain opposite in every month so the person who issues a PO
 does not receive it. September 2026 is PO Duty = Yu Jun and GRN Duty = Shasha; October reverses.
 Khor Yee retains only historical actor/assignment evidence and receives no current or future Work.
+
+**OWNER CORRECTION 2026-09-28 / APPROVED TARGET / NOT BUILT:** routine allocation follows the
+governed rotation automatically as People eligibility changes; the owner does not maintain monthly
+PO/GRN assignment rows. Workspace §4 owns the one authoritative assignment model. Existing monthly
+rows are not proof of a general joiner/leaver automation. Approval capability, source-owned
+completion and historical actual-actor evidence remain separate.
+
+**JOINER / LEAVER TIMING — OWNER-APPROVED 2026-09-28 / NOT BUILT:** new eligible staff join
+monthly PO/GRN rotation from the first day of the following month; eligibility does not reshuffle
+the current month. Departure excludes the person on its effective date and immediately re-resolves
+affected current/future allocation. Workspace §4 owns this shared rule; it does not grant approval
+capability or rewrite completed Purchasing/Receiving evidence.
+
+**NEWCOMER PO TIMING — OWNER-APPROVED 2026-09-28 / NOT BUILT:** newcomers do not take PO Duty
+in their calendar month of joining; this limits responsibility allocation only, not their right
+to actually place/issue PO (owner clarification 2026-09-29). From the first day of the following month, active staff with
+the existing role/access eligibility automatically join PO rotation without a separate manager
+competency confirmation or training sign-off. Admission is not a guarantee of holding the next PO
+slot. Workspace §4 owns the timing.
+
+**MONTHLY ORDER — OWNER-APPROVED 2026-09-29 / NOT BUILT:** use a stable cyclic order of eligible
+staff. The month's PO holder is followed by the GRN holder in that order; advance one position each
+month. At admission, append newcomers to the existing order without rearranging existing people.
+Remove effective departures and continue the remaining order. Workspace §4 owns the one shared
+rule. This responsibility allocation does not restrict the approved right of other active Operation
+staff to post Receiving or change historical actual-actor evidence.
+
+**AUTOMATIC COVER — OWNER-APPROVED 2026-09-29 / NOT BUILT:** recorded leave triggers PO/GRN
+cover by the next available eligible person in the shared cyclic order (Workspace §4.4). Newcomers
+cannot cover PO in their joining month. Monthly normal ownership and future order remain intact;
+leave ending restores the normal holder applicable that day. No eligible cover stays visible for
+management; approvals retain their own capability rules and Receiving posting rights remain intact.
 
 ### 5.4 Deliver To
 
@@ -2524,7 +2565,7 @@ configuration or issuance authority. **Nobody decides a Manual Purchase they rai
   position rung and no email list. The holder and cover must be active Principal people —
   Operation accounts, Shasha and Yu Jun included, are refused (`invalid_holder` /
   `invalid_cover`). Unheld refuses `no_purchase_approver` → `Nobody holds Purchasing Approver.` ·
-  `Set the holder in Workspace → Staff & Duties.` The holder away with no eligible cover means
+  `Set the holder in Settings → Staff & Duties.` The holder away with no eligible cover means
   the approval **waits**; it is never downgraded to Operation. The requester is refused
   (`own_request`). `canApprove` (the Approve/Refuse controls and the approver-only money) asks the
   same resolver and is false on the caller's own request; the approver name is read through
@@ -3467,8 +3508,8 @@ merged `f755dea8`, deployed, both canonical surfaces reporting that exact SHA; t
 carries every corrected word and zero retired words; committed production smoke on
 GRN-20260904-1064 proved the 0427 evidence amend (DO paper replaced with before/after preserved,
 evidence appended append-only, idempotent retry `already_saved`, and an out-of-authority caller
-refused `no_grn_duty_holder`). GRN Duty is honestly unassigned until the manager assigns it in
-`Workspace → Staff & Duties`. The SECOND 2026-09-06 owner correction — one Receiving
+refused `no_grn_duty_holder`). GRN Duty is honestly unassigned until the manager records its holder
+in the one Staff & Duties surface. The SECOND 2026-09-06 owner correction — one Receiving
 destination with the rail month Calendar, governed Supplier-Delivery-Date filtering and
 server-side pagination — is PRODUCTION-VERIFIED 2026-09-07: PR #1117 merged `00bf3ced`,
 both canonical surfaces on that exact SHA, served bundle carrying every new governed word and
@@ -3594,7 +3635,11 @@ Warehouse submits count                (or Operation enters goods directly)
   record, or an honest `not_assigned` answer — **a rota recommendation is never silently turned
   into an assignment (owner correction 2026-09-04)**. While nobody holds the duty, the pages say
   so plainly and the Work card is unassigned; posting is not refused. The manager assigns the
-  holder in `Workspace → Staff & Duties`.
+  holder in `Settings → Staff & Duties` only through a governed exception. Owner correction
+  2026-09-28 / APPROVED TARGET / NOT BUILT: routine PO/GRN assignments are maintained automatically
+  from the governed rotation and eligible active People pool (Workspace §4), not manually entered
+  month by month. Automation must establish the authoritative assignment; a page must still never
+  display a recommendation as a recorded holder.
 - **The GRN number is STORED at posting** — `warehouse_receipts.grn_no`, drawn from the daily
   formal-document pool (0381), `GRN-YYYYMMDD-RRRR`. Sessions posted before 0426 keep their
   derived display through `receivingDisplayNo`. `Jump to…` matches the stored number first.
@@ -3664,7 +3709,7 @@ Warehouse submits count                (or Operation enters goods directly)
   arrive — and reads the earliest expected arrival per line/batch; its card says `Supplier date
   passed · nothing received yet`, never `Goods arrived`, which stays the submitted count's fact. Owner = the resolved GRN Duty; completion = the posted
   session; lateness counts on the Warehouse calendar (Mon–Sat).
-- **`Workspace → Staff & Duties`** is the ONE assignment surface: the resolution today
+- **`Settings → Staff & Duties`** is the ONE assignment surface: the resolution today
   (holder / `{cover} covering for {holder}` / `Nobody holds GRN Duty.`), effective-dated
   assignment, dated cover, immutable history; the manager gate mirrors the SQL door and the page
   never offers a control the server would refuse. **`Reports → Receiving & Inbound`** is the
@@ -6297,7 +6342,7 @@ completion facts in the table above.
 Settings lives under the global header gear and requires authorised roles. It includes:
 
 - document number format/version and locked Unit ID family;
-- a read-only door to `Workspace → Staff & Duties` for PO Duty / GRN Duty and Buddy-cover settings; Purchasing Settings
+- a read-only door to `Settings → Staff & Duties` for PO Duty / GRN Duty and Buddy-cover settings; Purchasing Settings
   stores no roster and performs no Duty calculation;
 - The legacy `/api/operation/po-duty` response-shape adapter is retired. `PurchaseOrdersPage`,
   `SalesOrderWorkspace` and `OperationOrdersControl` consume the shared Workspace Duty resolver;
