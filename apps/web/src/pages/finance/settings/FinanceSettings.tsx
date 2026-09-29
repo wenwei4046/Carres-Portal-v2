@@ -16,7 +16,8 @@
  * method words Cash · Bank transfer · Online payment for the kinds). A row
  * click opens it; the only new phrases are the page word and the add button.
  *
- * A second tab, `?tab=chart`, holds the chart of accounts (ChartOfAccounts.tsx).
+ * Two more tabs sit beside it: `?tab=chart` holds the chart of accounts
+ * (ChartOfAccounts.tsx) and `?tab=card` the card payout banks (0541).
  *
  * An opened account's number changes here too (YH, 24 Sep 2026), through the
  * chart's own door: the same request the Chart of accounts form sends
@@ -36,6 +37,7 @@ import {
 import { ledgerAccountCodeInput } from "@carres/shared/schemas/finance";
 import Button from "@/components/kit/Button";
 import Checkbox from "@/components/kit/Checkbox";
+import Icon from "@/components/kit/Icon";
 import Input from "@/components/kit/Input";
 import Modal from "@/components/kit/Modal";
 import Select from "@/components/kit/Select";
@@ -51,6 +53,7 @@ import ChartOfAccounts from "./ChartOfAccounts";
 const TABS = [
   { value: "money", label: "Money accounts" },
   { value: "chart", label: "Chart of accounts" },
+  { value: "card", label: "Card payout banks" },
 ] as const;
 
 const KIND_OPTIONS = [
@@ -62,14 +65,18 @@ const statusWord = (r: MoneyAccountRow) => (r.is_active ? "Active" : "Not active
 
 export default function FinanceSettings() {
   const [params, setParams] = useSearchParams();
-  const tab = params.get("tab") === "chart" ? "chart" : "money";
+  /* An unknown `?tab=` lands on Money accounts, the page's first tab. */
+  const asked = params.get("tab") ?? "";
+  const tab = TABS.some((t) => t.value === asked) ? asked : "money";
   return (
     <div className="flex h-full min-h-0 flex-col">
       <ModuleHeader destinationHeader testId="finance-settings-destination-header" word="Finance Settings" docTitle="Finance Settings · Carres" />
       <div className="px-6">
-        <Tabs tabs={TABS} value={tab} label="Finance Settings" onValueChange={(v) => setParams(v === "chart" ? { tab: v } : {})} />
+        <Tabs tabs={TABS} value={tab} label="Finance Settings" onValueChange={(v) => setParams(v === "money" ? {} : { tab: v })} />
       </div>
-      <div className="min-h-0 flex-1">{tab === "chart" ? <ChartOfAccounts /> : <MoneyAccounts />}</div>
+      <div className="min-h-0 flex-1">
+        {tab === "chart" ? <ChartOfAccounts /> : tab === "card" ? <CardRoutes /> : <MoneyAccounts />}
+      </div>
     </div>
   );
 }
@@ -110,7 +117,6 @@ function MoneyAccounts() {
       {editing !== undefined && (
         <MoneyAccountModal key={editing?.code ?? "new"} account={editing} onClose={() => setEditing(undefined)} />
       )}
-      {query.isSuccess && <CardRoutes accounts={query.data} />}
     </ListPageShell>
   );
 }
@@ -259,37 +265,58 @@ function MoneyAccountModal({ account, onClose }: { account: MoneyAccountRow | nu
 const CHANNEL_OPTIONS = CARD_CHANNELS.map((v) => ({ value: v, label: CARD_CHANNEL_WORD[v] }));
 
 /**
- * 0541 — Card payout banks: which bank each card holding account pays out to,
- * for machines at a showroom and at a dealer. The card payout form on Money
- * moves defaults its bank from here; the database checks the accounts again.
+ * 0541 — Card payout banks, `?tab=card`: which bank each card holding account
+ * pays out to, for machines at a showroom and at a dealer. The card payout form
+ * on Money moves defaults its bank from here; the database checks the accounts
+ * again.
+ *
+ * There is NO catch-all route. `settlementBank` (money-accounts.ts) returns
+ * nothing when no row matches the card account and place, and the form then
+ * fills Paid into with nothing — so the page says that rather than leaving the
+ * reader to guess a fallback from the seeded rows.
  */
-function CardRoutes({ accounts }: { accounts: MoneyAccountRow[] }) {
+function CardRoutes() {
+  const accountQuery = useMoneyAccounts();
   const routes = useCardRoutes();
   /* `undefined` = closed; `null` = a new route; a row = that route. */
   const [editing, setEditing] = useState<CardRouteRow | null | undefined>(undefined);
+  const accounts = accountQuery.data ?? [];
   const name = (code: string) => {
     const a = accounts.find((x) => x.code === code);
     return a ? accountLabel(a) : code;
   };
+
+  if (accountQuery.isError) return <LoadFailed what="The accounts" onRetry={() => void accountQuery.refetch()} />;
   return (
-    <section className="border-t border-kit-slate-5 p-5" data-testid="card-routes">
-      <div className="flex items-center justify-between gap-3">
-        <h2 className="text-section">Card payout banks</h2>
+    <section className="h-full overflow-auto p-6" data-testid="card-routes">
+      <div className="flex items-start justify-between gap-4">
+        <p className="max-w-[560px] text-meta text-kit-slate-11">
+          A card account and machine that is not listed here fills in no bank. Whoever records the
+          card payout chooses it.
+        </p>
         <Button variant="neutral" size="sm" onClick={() => setEditing(null)}>
           Add a card payout bank
         </Button>
       </div>
       {routes.isError && <LoadFailed what="Card payout banks" onRetry={() => void routes.refetch()} />}
-      <div className="mt-3 space-y-2">
+      <div className="mt-4 max-w-[560px] border-t border-kit-slate-5">
         {(routes.data ?? []).map((r) => (
+          /* A clickable row wears the portal's row chrome at rest — a ruled row
+             with a forward chevron (GlobalActivity, HrPeopleTab) — because a
+             hover wash alone never says "open me" until the mouse arrives. */
           <button
             key={`${r.holding_code}:${r.channel}`}
             type="button"
-            className="block w-full text-left text-body"
+            className="flex w-full items-center gap-2 border-b border-kit-slate-5 px-2 py-2 text-left text-body hover:bg-kit-slate-3"
             data-testid={`card-route-${r.holding_code}-${r.channel}`}
             onClick={() => setEditing(r)}
           >
-            {name(r.holding_code)} · {CARD_CHANNEL_WORD[r.channel]} → {name(r.bank_code)}
+            <span className="min-w-0 flex-1 truncate">
+              {name(r.holding_code)} · {CARD_CHANNEL_WORD[r.channel]} → {name(r.bank_code)}
+            </span>
+            <span className="shrink-0 text-kit-slate-11">
+              <Icon name="forward" size={14} />
+            </span>
           </button>
         ))}
       </div>
