@@ -18,11 +18,10 @@ import type { ZodTypeAny, infer as ZodInfer } from "zod";
  * Surfaces as 409 Conflict so the FE can show "Refresh and try again"
  * distinctly from generic 422 validation failures.
  *
- * TODO (Pipeline v2 follow-up): v2 detail-passthrough is currently scoped to
- * `mapPipelineV2Error` in routes/operation/orders.ts (it forwards the RPC's
- * `detail` as `code` for 22023 too, plus a `hint` field). Hoist that 22023
- * detail handling here when other routes need it (attach_do, warehouse routes
- * flagged in C3.1 review). Out of scope for C3.1 — wider blast radius.
+ * 2026-09-22: the 22023 detail-passthrough that lived only in
+ * `mapPipelineV2Error` (routes/operation/orders.ts) is hoisted here, so every
+ * door gets it. That mapper still exists for its `hint` field and its
+ * `error: "rule_violation"` wording.
  */
 export type PgErrorish = { code?: string; message?: string; details?: string };
 
@@ -68,8 +67,19 @@ export function mapPgError(error: PgErrorish) {
      * keyer typed still names it first and only falls through to here. */
     case "23505":
       return { status: 409 as const, body: { error: "conflict", code: "already_exists", message: "That value is already used. Change it and save again." } };
+    /* 22023 carries its DETAIL tag as `code`, the way P0001 and 40001 already
+     * do (the TODO above, now done). The RPCs raise a tag next to the sentence
+     * — `payment_reference_required`, `payment_method_required`,
+     * `payment_account_unmapped` (0535/0551) and two dozen others — and it
+     * arrived on the client as PostgrestError.details and was thrown away here,
+     * so every one of them reached the browser as the same word,
+     * `invalid_param`. The sentence always came through as `message`; what the
+     * screen could not do was tell WHICH refusal it was (offer to fill in the
+     * approval code vs. send the operator to Settings → Payment). A 22023 with
+     * no tag still reads `invalid_param`, so nothing that keyed off that word
+     * for an untagged refusal changes. */
     case "22023":
-      return { status: 422 as const, body: { error: "invalid_param", code: "invalid_param", message: error.message ?? "invalid param" } };
+      return { status: 422 as const, body: { error: "invalid_param", code: error.details ?? "invalid_param", message: error.message ?? "invalid param" } };
     case "P0001":
       return { status: 422 as const, body: { error: "rule_violation", code: error.details ?? "invalid_param", message: error.message ?? "rule violation" } };
     case "40001":
