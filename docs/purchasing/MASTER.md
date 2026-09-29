@@ -5737,6 +5737,26 @@ snapshot, so these are separate observations. This audit is not responsive/visua
   exact Showroom UI/copy and Work rules. Existing generic controls resolve many mechanics but not
   all domain consequences below.
 
+#### Finance capability mapping — scoped source evidence, 2026-09-29
+
+**FACT / RESEARCH, not new accounting law.** Inspected repository snapshot
+`c7dbc8909d8f715df19265e6d7fcd8523eeb1f42`; no supplier bill was created or posted and no
+production behaviour was verified in this pass.
+
+| Required connection | Measured current capability | Readiness boundary |
+|---|---|---|
+| Record the supplier's actual invoice | `apps/web/src/pages/finance/payables/SupplierBills.tsx` provides typed or receipt-derived drafts, confirmation, cancellation, files and history | Reuse the existing Finance surface; no second Purchasing bill register |
+| Avoid entering the same supplier invoice twice | Migration 0554 checks supplier plus trimmed, case-insensitive invoice number across non-cancelled bills, excluding the edited bill | Existing invoice-number guard; does not prove one sold Unit cannot be allocated to two different invoice numbers |
+| Prevent ordinary receipt overbilling | Migration 0570 checks receipt/PO-line billable quantity against other non-cancelled bill allocations, including drafts | Existing receipt-specific protection; not proof of consignment sale allocation |
+| Keep initial consignment receipt free of payable | Migration 0570 rejects a linked consignment receipt with `grn_is_consignment` | Preserve this boundary; do not bypass it to bill displayed goods before sale |
+| Match a consignment sale to its supplier invoice | Inspected Bills line state and `apps/api/src/routes/finance/payables.ts` line mapping carry receipt/PO-line references, quantities and amounts; no exact Unit or Consignment Sale Notice reference was found in those inspected mappings | NOT READY: no verified Carres sale-level matching capability; inspected 2990 evidence does not establish a copyable implementation. This is a scoped evidence gap, not proof that no reference system supports it |
+
+**Consequence for the existing §9.13.6 proposal:** reuse Finance Bills and its controls; preserve
+its receipt guard. Matching sold Units, partial invoice coverage, duplicate sale allocations and
+linked corrections still need the owning Finance contract. A supplier invoice number check alone
+cannot close that gap. No new payable trigger, automatic ownership transfer, posting rule or build
+scope is approved by this research.
+
 #### Reference-to-Carres capability matrix
 
 | Reference capability and inspected evidence | Carres owner/current equivalent | Disposition and dependency |
