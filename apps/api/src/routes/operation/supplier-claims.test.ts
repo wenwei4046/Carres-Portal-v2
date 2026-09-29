@@ -143,8 +143,44 @@ describe("GET /api/operation/supplier-claims", () => {
     // R4 — the goods, read from the register rather than copied from qty.
     expect(body.claims[0].held_units).toBe(2);
     expect(body.claims[0].hold_reason).toBe("damaged");
+    // §9.5 PO No line two reads EVERY Unit the claim names; a send read that
+    // could not run is unknown (null), never "not sent".
+    expect(body.claims[0].units.map((u: { unit_code: string | null }) => u.unit_code)).toEqual(["U-1001", null]);
+    expect(body.claims[0].sent).toBeNull();
     // NEVER the admin client for a read the caller's own RLS can do.
     expect(adminClient).not.toHaveBeenCalled();
+  });
+
+  it("prints Units could not be loaded for ONE row's failed Unit read, not a failed register", async () => {
+    const eqCalls: Array<[string, unknown]> = [];
+    let stockReads = 0;
+    const sb = {
+      rpc: namesDoor(),
+      from: vi.fn((t: string) => {
+        if (t === "supplier_claims") return listBuilder([{ ...CLAIM, supplier_response_reply_id: "r1" }], eqCalls);
+        if (t === "suppliers") return listBuilder([{ id: "s1", name: "Ohana" }], eqCalls);
+        if (t === "document_sends") return listBuilder([{ document_id: "c1" }], eqCalls);
+        if (t === "supplier_claim_replies") return listBuilder([{ id: "r1", scope: "claim", unit_ids: [], supplier_date: "2026-10-05" }], eqCalls);
+        if (t === "ops_stock_items") {
+          stockReads += 1;
+          const b = listBuilder([], eqCalls);
+          // The held-count read succeeds; the all-Units read fails.
+          if (stockReads > 1) b.range = vi.fn().mockResolvedValue({ data: null, error: { message: "boom" } });
+          return b;
+        }
+        return listBuilder([], eqCalls);
+      }),
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(new Request("http://t/api/operation/supplier-claims?status=all", { headers: { Authorization: `Bearer ${jwt}` } }), env);
+    expect(res.status).toBe(200);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const row = ((await res.json()) as any).claims[0];
+    expect(row.units).toBeNull();
+    expect(row.sent).toBe(true);
+    expect(row.response_reply).toEqual({ scope: "claim", unit_ids: [], supplier_date: "2026-10-05" });
   });
 
   it("`all` asks for no status at all", async () => {
@@ -569,63 +605,105 @@ describe("POST /:id/request — what WE ask", () => {
   });
 });
 
-describe("POST /:id/response — what the SUPPLIER answered", () => {
-  it("passes the answer and its note through", async () => {
-    const sb = rpcClient({ data: { claim_no: "SC-1001", supplier_response: "reject" } });
+const REPLY = {
+  supplier_response: "repair",
+  scope: "claim",
+  supplier_date: "2026-10-05",
+  evidence: [{ path: "supplier_claim_reply/c1/a.jpg", kind: "photo" }],
+};
+
+describe("POST /:id/response — what the SUPPLIER answered, with scope, date and evidence (0607)", () => {
+  it("passes the answer, its scope, the supplier's date and the evidence to the ONE reply door", async () => {
+    const sb = rpcClient({ data: { claim_no: "SC-1001", supplier_response: "repair", formal: true } });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(userClient).mockReturnValue(sb as any);
-    const res = await post("c1/response", {
-      supplier_response: "reject",
-      note: "Out of warranty",
-    });
+    const res = await post("c1/response", REPLY);
     expect(res.status).toBe(200);
-    expect(sb.rpc).toHaveBeenCalledWith("supplier_claim_record_response", {
+    expect(sb.rpc).toHaveBeenCalledWith("supplier_claim_record_reply", {
       p_claim_id: "c1",
-      p_response: "reject",
-      p_note: "Out of warranty",
+      p_response: "repair",
+      p_scope: "claim",
+      p_unit_ids: [],
+      p_supplier_date: "2026-10-05",
+      p_note: null,
+      p_evidence: [{ path: "supplier_claim_reply/c1/a.jpg", kind: "photo" }],
+      p_spoke_with: null,
+      p_spoken_at: null,
     });
+    // The scope-less legacy door is never reached again.
+    expect(sb.rpc).not.toHaveBeenCalledWith("supplier_claim_record_response", expect.anything());
   });
 
-  it("does not narrow the supplier's answer to what we asked", async () => {
+  it("carries exact Units and a phone answer (who spoke, when)", async () => {
     const sb = rpcClient({ data: {} });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(userClient).mockReturnValue(sb as any);
-    for (const answer of [
-      "replacement",
-      "deliver_remaining",
-      "repair",
-      "return_and_replace",
-      "other_agreement",
-    ]) {
-      const res = await post("c1/response", { supplier_response: answer, note: "ok" });
-      expect(res.status).toBe(200);
-    }
-  });
-
-  it("lets the DATABASE be the one that demands a note for a refusal", async () => {
-    // The route does not second-guess it: one rule, one place. A missing note
-    // comes back as the RPC's own detail code.
-    const sb = rpcClient({
-      error: {
-        code: "P0001",
-        details: "response_note_required",
-        message: "a reject answer must say what was agreed or why",
-      },
+    const unit = "0b8a3b5e-7a0c-4d3e-9d44-5d6c1a2b3c4d";
+    const res = await post("c1/response", {
+      supplier_response: "other_agreement", scope: "units", unit_ids: [unit], note: "New cushion only",
+      evidence: [], spoke_with: "Mr Tan", spoken_at: "2026-09-29T10:00:00+08:00",
     });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue(sb as any);
-    const res = await post("c1/response", { supplier_response: "reject" });
-    expect(res.status).toBe(422);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    expect(((await res.json()) as any).code).toBe("response_note_required");
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("supplier_claim_record_reply", expect.objectContaining({
+      p_scope: "units", p_unit_ids: [unit], p_spoke_with: "Mr Tan", p_spoken_at: "2026-09-29T10:00:00+08:00", p_note: "New cushion only",
+    }));
   });
 
-  it("refuses an invented answer word", async () => {
+  it("refuses a reply without a scope before any round-trip", async () => {
     const sb = rpcClient({});
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(userClient).mockReturnValue(sb as any);
-    const res = await post("c1/response", { supplier_response: "maybe_later" });
+    const res = await post("c1/response", { supplier_response: "repair", evidence: REPLY.evidence });
     expect(res.status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
+
+  it("lets the DATABASE demand the evidence and the note — its detail comes back as the code", async () => {
+    for (const detail of ["evidence_required", "response_note_required", "unit_not_on_claim"]) {
+      const sb = rpcClient({ error: { code: "22023", details: detail, message: detail } });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      vi.mocked(userClient).mockReturnValue(sb as any);
+      const res = await post("c1/response", REPLY);
+      expect(res.status).toBe(422);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      expect(((await res.json()) as any).code).toBe(detail);
+    }
+  });
+
+  it("refuses an invented answer word and an evidence kind the form never offers", async () => {
+    const sb = rpcClient({});
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    expect((await post("c1/response", { ...REPLY, supplier_response: "maybe_later" })).status).toBe(422);
+    expect((await post("c1/response", { ...REPLY, evidence: [{ path: "x", kind: "zip" }] })).status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
+
+  it("refuses a supplier and a dealer", async () => {
+    for (const role of ["supplier", "dealer"]) {
+      expect((await post("c1/response", REPLY, role)).status).toBe(403);
+    }
+  });
+});
+
+describe("POST /:id/send — Claim sent to supplier (document_sends, 0607)", () => {
+  it("records the channel and recipient through the send door", async () => {
+    const sb = rpcClient({ data: "send-1" });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const res = await post("c1/send", { channel: "whatsapp", recipient: "Hooka Mr Tan" });
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("supplier_claim_record_send", {
+      p_claim_id: "c1", p_channel: "whatsapp", p_recipient: "Hooka Mr Tan", p_note: null,
+    });
+  });
+
+  it("refuses a send with no recipient or an invented channel", async () => {
+    const sb = rpcClient({});
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    expect((await post("c1/send", { channel: "whatsapp", recipient: "  " })).status).toBe(422);
+    expect((await post("c1/send", { channel: "fax", recipient: "Hooka" })).status).toBe(422);
     expect(sb.rpc).not.toHaveBeenCalled();
   });
 });
@@ -1190,5 +1268,39 @@ describe("GET / carries the Carres execution", () => {
     );
     // Both layers survive the same read — one is not shadowing the other.
     expect(body.claims[0].customer_resolution).toBe("replace");
+  });
+});
+
+describe("GET /:id/record — the claim record's Supplier facts (§9.5)", () => {
+  it("returns every reply with its scope, date and signed evidence; sends; and refuses Plan Repair without an Authorised Outcome", async () => {
+    const eqCalls: Array<[string, unknown]> = [];
+    const replies = [
+      { id: "r1", response: "replacement", scope: "claim", unit_ids: [], supplier_date: "2026-10-05", note: null, evidence: [{ path: "supplier_claim_reply/c1/a.jpg", kind: "photo" }], spoke_with: null, spoken_at: null, recorded_by: "u1", recorded_at: "2026-09-29T02:00:00Z", formal_at: "2026-09-29T02:00:00Z" },
+    ];
+    const sb = {
+      rpc: namesDoor(),
+      from: vi.fn((t: string) => {
+        if (t === "supplier_claims") return listBuilder([{ id: "c1", claim_no: "SC-1001", requested_by: "u1", requested_at: "2026-09-28T02:00:00Z", responded_by: "u1", supplier_response_reply_id: "r1" }], eqCalls);
+        if (t === "supplier_claim_replies") return listBuilder(replies, eqCalls);
+        if (t === "document_sends") return listBuilder([{ id: "s1", version: 1, recipient: "Hooka Mr Tan", channel: "whatsapp", note: null, sent_by: "u1", sent_at: "2026-09-28T03:00:00Z" }], eqCalls);
+        if (t === "ops_stock_items") return listBuilder([{ id: "u-1", unit_code: "U1-000-075", identity_scope: "unit", qty: 1, status: "on_hold" }], eqCalls);
+        return listBuilder([], eqCalls);
+      }),
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const createSignedUrl = vi.fn().mockResolvedValue({ data: { signedUrl: "https://signed/a.jpg" } });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(adminClient).mockReturnValue({ storage: { from: vi.fn(() => ({ createSignedUrl })) } } as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(new Request("http://t/api/operation/supplier-claims/c1/record", { headers: { Authorization: `Bearer ${jwt}` } }), env);
+    expect(res.status).toBe(200);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await res.json()) as any;
+    expect(body.replies[0]).toMatchObject({ response: "replacement", scope: "claim", supplier_date: "2026-10-05", current: true, recorded_by_name: "Shasha", evidence: [{ kind: "photo", url: "https://signed/a.jpg" }] });
+    expect(body.sends[0]).toMatchObject({ channel: "whatsapp", recipient: "Hooka Mr Tan", sent_by_name: "Shasha" });
+    expect(body.units).toHaveLength(1);
+    expect(body.plan_repair).toEqual({ allowed: false, missing: "Authorised Outcome" });
+    expect(createSignedUrl).toHaveBeenCalledWith("supplier_claim_reply/c1/a.jpg", 3600);
   });
 });

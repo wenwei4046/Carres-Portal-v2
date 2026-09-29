@@ -43,6 +43,7 @@ import {
   type ReactNode,
   type MouseEvent,
   Fragment,
+  createContext,
   memo,
   useCallback,
   useId,
@@ -67,6 +68,13 @@ import styles from "./DataGrid.module.css";
 import { ViewportExpansion } from "./ViewportExpansion";
 
 const ICON = { size: 14, strokeWidth: 1.75 } as const;
+
+/** The row expansion an in-cell disclosure reads and toggles (§6.9). */
+export interface DataGridRowExpansion {
+  isExpanded: (key: string) => boolean;
+  toggle: (key: string) => void;
+}
+export const DataGridRowExpansionContext = createContext<DataGridRowExpansion | null>(null);
 
 export type DataGridColumn<T> = {
   key: string;
@@ -408,6 +416,24 @@ export type DataGridProps<T> = {
    */
   leadingColumns?: { date: string; identity: string; before?: readonly string[] };
   /**
+   * ⭐ A PAGE'S OWN PINNED PREFIX (Purchasing §9.5 · UI MASTER §6.7 rule 2,
+   * the owner-approved exception, Jess 2026-09-18). OPTIONAL, default OFF.
+   *
+   * `leadingColumns` forces `date · identity` to lead and cannot express an
+   * owner-approved order that leads with something else. Supplier Claims'
+   * confirmed order is `☐ · ▸ · Claim status · Supplier Claim No · Claim
+   * Reported · …` and pins the two controls plus `Claim status` and
+   * `Supplier Claim No`, with `Supplier Claim No` alone below 768px.
+   *
+   *   · `columns` always lead, in that order, whatever a saved layout or a drag
+   *     says, and none can be hidden (Columns chooser, header menu, saved hidden);
+   *   · a canvas ≥768px pins `columns`; a narrower canvas pins `narrow` only,
+   *     and every other leading column scrolls under it like any other fact.
+   * When set it replaces `leadingColumns` and `stickyIdentity`. Omitted =
+   * every register byte-identical.
+   */
+  pinnedPrefix?: { columns: readonly string[]; narrow: readonly string[] };
+  /**
    * ⭐ PERSONAL SAVED LAYOUTS — ui MASTER §6.7 rule 4 (Jess 2026-09-17).
    * OPTIONAL, default OFF; Purchase Orders is the only pilot.
    *
@@ -426,8 +452,11 @@ export type DataGridProps<T> = {
    * page passes the governed number; the engine never invents a third.
    * 40 = the one-line listing row, adopted PAGE BY PAGE (ui MASTER §6.0 rule
    * 5, owner ruling 2026-09-21); the 38px default is not changed by it.
+   * 51 = the shared TWO-LINE listing row (ui MASTER §6.8, owner ruling
+   * 2026-09-26: 8 + 18 + 2 + 14 + 8 + 1px rule), for a register whose cells
+   * carry a document over its goods identity (Supplier Claims, §9.5).
    */
-  rowHeight?: 38 | 40 | 72;
+  rowHeight?: 38 | 40 | 51 | 72;
   /** show "Drag a column header here to group by that column" banner */
   groupBanner?: boolean;
   emptyMessage?: string;
@@ -705,6 +734,7 @@ function DataGridInner<T>({
   collapseAllNonce,
   stickyIdentity = false,
   leadingColumns,
+  pinnedPrefix,
   personalLayouts,
   rowHeight,
   groupBanner = true,
@@ -738,6 +768,13 @@ function DataGridInner<T>({
       return n;
     });
   }, []);
+  /* ⭐ ONE EXPANDED STATE PER ROW, A SECOND DOOR IS NOT A SECOND PANEL (ui
+     MASTER §6.9). An in-cell disclosure (Supplier Claims' `{n} Units`, §9.5)
+     opens and closes the SAME expansion the row-leading ▸ does. */
+  const rowExpansionApi = useMemo<DataGridRowExpansion>(
+    () => ({ isExpanded: (key) => expandedRows.has(key), toggle: toggleExpand }),
+    [expandedRows, toggleExpand],
+  );
   const [layout, setLayoutRaw] = useState<Layout>(() => {
     const saved = readLayout(storageKey);
     // `readLayout` hands back DEFAULT_LAYOUT itself only when nothing is saved.
@@ -1039,12 +1076,16 @@ function DataGridInner<T>({
    * named twice is kept once, in this order.
    */
   const leadingBefore = leadingColumns?.before;
+  const prefixKey = pinnedPrefix ? `${pinnedPrefix.columns.join("|")}::${pinnedPrefix.narrow.join("|")}` : "";
   const leadingKeys = useMemo(
     () =>
-      leadingColumns
-        ? [...new Set([...(leadingBefore ?? []), leadingColumns.date, leadingColumns.identity])]
-        : [],
-    [leadingBefore, leadingColumns?.date, leadingColumns?.identity],
+      pinnedPrefix
+        ? [...new Set(pinnedPrefix.columns)]
+        : leadingColumns
+          ? [...new Set([...(leadingBefore ?? []), leadingColumns.date, leadingColumns.identity])]
+          : [],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [prefixKey, leadingBefore, leadingColumns?.date, leadingColumns?.identity],
   );
   /** Of those, only the date and identity PIN — §6.7 rule 2 is about the pair. */
   const pinnedLeadingKeys = useMemo(
@@ -1159,9 +1200,11 @@ function DataGridInner<T>({
     const m = new Map<string, number>();
     /* Date-first listings: both lead and pin on a canvas ≥768px; below it the
        identity pins alone and the date scrolls under it like any other fact. */
-    const pinRule: DataGridProps<T>["stickyIdentity"] = leadingColumns
-      ? { columnKey: narrowCanvas ? [leadingColumns.identity] : pinnedLeadingKeys }
-      : stickyIdentity;
+    const pinRule: DataGridProps<T>["stickyIdentity"] = pinnedPrefix
+      ? { columnKey: narrowCanvas ? pinnedPrefix.narrow : pinnedPrefix.columns }
+      : leadingColumns
+        ? { columnKey: narrowCanvas ? [leadingColumns.identity] : pinnedLeadingKeys }
+        : stickyIdentity;
     if (!pinRule) return m;
     /* ⭐ ONE NAME OR A RUN OF THEM (Delivery Monitor, owner ruling
        2026-09-12). A sheet 1818px wide scrolled to its `Actions` column showed
@@ -1207,7 +1250,8 @@ function DataGridInner<T>({
       if (pinned > 0) break;
     }
     return m;
-  }, [stickyIdentity, leadingColumns, pinnedLeadingKeys, narrowCanvas, visibleColumns, layout.widths]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stickyIdentity, leadingColumns, pinnedLeadingKeys, prefixKey, narrowCanvas, visibleColumns, layout.widths]);
   /** The last pinned column carries the edge that says where the block ends. */
   const pinnedEdgeKey = useMemo(() => {
     const keys = [...pinnedLefts.keys()];
@@ -2654,6 +2698,7 @@ function DataGridInner<T>({
   };
 
   return (
+    <DataGridRowExpansionContext.Provider value={rowExpansionApi}>
     <div
       className={[
         styles.root,
@@ -3289,7 +3334,7 @@ function DataGridInner<T>({
             ))
           : null}
         <table
-          className={`${styles.table}${leadingColumns || (typeof stickyIdentity === "object" && Array.isArray(stickyIdentity.columnKey)) ? ` ${styles.tablePinnedBlock}` : ""}`}
+          className={`${styles.table}${pinnedPrefix || leadingColumns || (typeof stickyIdentity === "object" && Array.isArray(stickyIdentity.columnKey)) ? ` ${styles.tablePinnedBlock}` : ""}`}
           hidden={groupLocalHeaders && !isLoading && errorState == null && renderList.length > 0}
         >
           {/* A flat register keeps the one sticky header it has always had. */}
@@ -3749,6 +3794,7 @@ function DataGridInner<T>({
         </div>
       )}
     </div>
+    </DataGridRowExpansionContext.Provider>
   );
 }
 

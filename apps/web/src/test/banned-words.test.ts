@@ -100,7 +100,7 @@ describe("no banned word reaches the screen (C12 · portal-wide)", () => {
   describe("the claim panel", () => {
     itSaysNoBannedWord(
       join(PAGES, "operation", "components", "SupplierClaimPanel.tsx"),
-      { minStrings: 40, expectString: "Customer Resolution" },
+      { minStrings: 40, expectString: "Record supplier reply" },
     );
   });
 });
