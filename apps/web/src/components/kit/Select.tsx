@@ -18,6 +18,7 @@
  * **Its own words are none.** `placeholder` and every option label come from the
  * caller, which gets them from COPY-STANDARD. This file spells nothing.
  */
+import type { ReactNode } from "react";
 import * as RadixSelect from "@radix-ui/react-select";
 import FieldFrame from "./FieldFrame";
 import Icon, { type IconName } from "./Icon";
@@ -47,7 +48,7 @@ export default function Select({
 }: {
   id: string;
   label?: string;
-  hint?: string;
+  hint?: ReactNode;
   /** Present = the field is refused. The message replaces the hint. */
   error?: string;
   required?: boolean;
