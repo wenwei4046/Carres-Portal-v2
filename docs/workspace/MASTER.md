@@ -444,6 +444,23 @@ the entered facts for correction without optimistic owner changes.
 
 ### 4.4 · Automatic assignment changes and two daily checks
 
+**Build evidence 2026-09-29 — FOUNDATION ONLY / NOT WIRED / NOT DEPLOYED.**
+The `codex/staff-activity-checks` draft prepares validated time settings/company-period windows
+(`packages/shared/src/workspace-activity.ts`) and a disposable trusted-foreground-interaction
+collector (`apps/web/src/lib/work-activity.ts`). The collector sends no identity/client time,
+never sends from mount, focus or timers, and does not carry a lunch event into the afternoon.
+It is deliberately not connected to the existing heartbeat or automatic resolver: doing that
+alone would retain the old SQL 10:00/all-day policy and falsely suggest the two checks work.
+Measured additional source: `apps/api/src/routes/operation/staff.ts` also calls `touch_last_seen`
+from `/auto-assign`; that system call must not become human activity evidence. It remains
+unchanged until the shared persistence/assignment change can be verified together.
+The current task has no connected Supabase query/apply tool. ENGINEERING §5 requires tracker
+inspection and the governed exact-file probe/apply path before migration/dependent deployment.
+Outstanding: persisted audited settings and period events, authoritative server-time/personal
+identity gates, scheduler/calendar eligibility, recorded assignment movement/no late bounce-back,
+shared consumers, Settings controls, offline-work evidence handling and production verification.
+These foundations do not prove attendance or resolve the offline-work evidence gap.
+
 **OWNER RULING 2026-09-29 — APPROVED TARGET / NOT BUILT.** Settings → Staff & Duties contains
 TWO manager-editable time settings, `Morning check time` and `Afternoon check time`, initially
 **10:30 AM** and **3:00 PM**, in Malaysia/company time. One configuration governs both checks
