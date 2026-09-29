@@ -206,7 +206,7 @@ export function purchaseReturnEvidenceLabel(
  *  no large pills". A purpose with neither file prints neither action — an
  *  absent count is not a `0`, it is nothing to open. */
 export function purchaseReturnPhotoAction(count: number): string | null {
-  return count > 0 ? `Photos ${count}` : null;
+  return count > 1 ? `Photos ${count}` : count === 1 ? "Photo 1" : null;
 }
 
 export function purchaseReturnVideoAction(count: number): string | null {
@@ -225,6 +225,8 @@ export function purchaseReturnVideoAction(count: number): string | null {
  */
 export interface PurchaseReturnUnitRow {
   unit_id: string;
+  /** The Unit's key, for the `Record supplier receipt` door (0614). */
+  stock_item_id?: string | null;
   po_id: string | null;
   category: string | null;
   /** The model, printed on line one of `Items`. */

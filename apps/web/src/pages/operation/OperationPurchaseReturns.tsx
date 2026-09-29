@@ -544,7 +544,7 @@ export function PurchaseReturnsRegister({
                per-Unit truth and the evidence door; the parent row never
                combines two physical Units into one evidence row. */
             expandable={{
-              renderExpansion: (row) => <PurchaseReturnUnitsTable units={row.units} />,
+              renderExpansion: (row) => <PurchaseReturnUnitsTable units={row.units} returnId={row.id} />,
               testId: (row) => `purchase-return-units-${row.id}`,
             }}
             statusSummary={(visible) => {

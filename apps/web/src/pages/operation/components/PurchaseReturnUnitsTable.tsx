@@ -42,6 +42,9 @@ import {
   type PurchaseReturnUnitRow,
 } from "@carres/shared";
 import { fmtDate } from "@/lib/fmt-date";
+import { fetchPurchaseReturnEvidence, usePurchaseReturnEvidence } from "@/lib/queries";
+import Button from "@/components/kit/Button";
+import SavedEvidenceViewer from "@/components/kit/SavedEvidenceViewer";
 import SecondLine from "./register-cell";
 
 /** `Absence` is a FACT, not an apology — `docs/COPY-STANDARD.md`. */
@@ -90,11 +93,18 @@ const UNIT_COLUMNS = [
 
 const MIN_WIDTH = UNIT_COLUMNS.reduce((sum, c) => sum + (c.width ?? 220), 0);
 
+type Opened = { unitId: string; purpose: string; kind: "photos" | "videos" };
+
 export default function PurchaseReturnUnitsTable({
   units,
+  returnId,
 }: {
   units: readonly PurchaseReturnUnitRow[];
+  /** When given, `Pickup proof` and `Supplier receipt proof` open in the
+   *  shared read-only SavedEvidenceViewer (§9.6). */
+  returnId?: string;
 }) {
+  const [opened, setOpened] = useState<Opened | null>(null);
   if (units.length === 0) {
     /* A return document with no Units is a real state — the document exists
        and its goods have not been named yet. It says so rather than drawing an
@@ -169,15 +179,36 @@ export default function PurchaseReturnUnitsTable({
                   )}
                 </Cell>
                 <Cell>
-                  <UnitEvidence unitId={unit.unit_id} evidence={unit.evidence} />
+                  <UnitEvidence unitId={unit.unit_id} evidence={unit.evidence}
+                    onOpen={returnId ? (purpose, kind) => setOpened({ unitId: unit.unit_id, purpose, kind }) : undefined} />
                 </Cell>
               </tr>
             </Fragment>
           ))}
         </tbody>
       </table>
+      {returnId && opened ? <EvidenceHost returnId={returnId} opened={opened} onClose={() => setOpened(null)} /> : null}
     </div>
   );
+}
+
+const PURPOSE_WORD: Record<string, string> = { pickup: "Pickup proof", receipt: "Supplier receipt proof" };
+
+/** Mounted only once an action is opened, so the signed read happens then. */
+function EvidenceHost({ returnId, opened, onClose }: { returnId: string; opened: Opened; onClose: () => void }) {
+  const read = usePurchaseReturnEvidence(returnId);
+  const kind = opened.kind === "photos" ? "photo" : "video";
+  const files = (read.data?.units.find((u) => u.unit_id === opened.unitId)?.files ?? [])
+    .filter((f) => f.purpose === opened.purpose && f.kind === kind);
+  if (read.isError) {
+    return <div role="alert" className="mt-2 flex flex-wrap items-center gap-2 text-body text-kit-slate-12">
+      <span>Evidence could not be loaded</span>
+      <Button variant="neutral" onClick={() => void read.refetch()}>Try again</Button>
+    </div>;
+  }
+  return <SavedEvidenceViewer activeId={files[0]?.path ?? null} onClose={onClose}
+    files={files.map((f) => ({ id: f.path, kind: f.kind, url: f.url, context: `${opened.unitId} · ${PURPOSE_WORD[f.purpose] ?? f.purpose}`, unitCodes: [opened.unitId] }))}
+    onRetry={async (id) => (await fetchPurchaseReturnEvidence(returnId)).units.flatMap((u) => u.files).find((f) => f.path === id)?.url ?? null} />;
 }
 
 function Cell({
@@ -217,14 +248,13 @@ function Cell({
  * pickup step", and the first is the gap the rail's `Pickup proof missing`
  * counts.
  *
- * ── AND THE VIEWER IS NOT WIRED HERE ────────────────────────────────────────
+ * ── THE VIEWER (0614) ───────────────────────────────────────────────────────
  * §9.6: "Use the shared read-only viewer target for photo zoom/pan/reset/
- * navigation and video playback/fullscreen. Viewer and real evidence wiring
- * require build verification." The entries carry `onOpen`, which is the door
- * that viewer plugs into; until the document slice supplies real files there
- * is nothing to open, so the action is drawn `disabled` rather than wired to a
- * viewer that would open empty. A control that does nothing and says nothing
- * is worse than one that says why.
+ * navigation and video playback/fullscreen." When the table is given the
+ * return's id, `onOpen` opens that Unit's files of that purpose and kind in
+ * the shared SavedEvidenceViewer (`GET /:id/evidence`, signed on open).
+ * Without it the action stays `disabled` and says why — a control that does
+ * nothing and says nothing is worse than one that says why.
  */
 export function UnitEvidence({
   unitId,

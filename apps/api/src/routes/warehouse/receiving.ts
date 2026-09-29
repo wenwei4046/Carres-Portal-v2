@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { warehouseSubmitReceiptInput } from "@carres/shared";
+import { claimPhotoWire, warehouseSubmitReceiptInput } from "@carres/shared";
 import { requireWarehouse } from "../../lib/auth-guards";
 import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
@@ -91,11 +91,11 @@ warehouseReceivingRouter.post("/receipts", requireWarehouse, async (c) => {
       damaged_qty: l.damagedQty ?? 0,
       wrong_item_qty: l.wrongItemQty ?? 0,
       wrong_item_claim_type: l.wrongItemClaimType ?? null,
-      // Storage KEYS, as plain strings — `supplier_claim_photo_entries` (0288)
-      // reads string elements and silently drops anything else, so wrapping
-      // them in objects here would look tidier and file a photo-less claim.
-      damaged_photos: l.damagedPhotos ?? [],
-      wrong_item_photos: l.wrongItemPhotos ?? [],
+      // Storage KEYS: a plain string files a claim-level photo; since 0614
+      // `supplier_claim_photo_entries` also reads `{path, unit_code}` and keeps
+      // the Unit the photo shows. Any other shape is still dropped.
+      damaged_photos: (l.damagedPhotos ?? []).map(claimPhotoWire),
+      wrong_item_photos: (l.wrongItemPhotos ?? []).map(claimPhotoWire),
       // 0426 — one physical result per governed expected Unit.
       units: (l.units ?? []).map((u) => ({
         unit_code: u.unitCode,

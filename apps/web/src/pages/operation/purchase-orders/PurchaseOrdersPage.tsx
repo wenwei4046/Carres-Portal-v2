@@ -46,6 +46,7 @@ import { usePdfCanvases } from "@/lib/pdf/use-pdf-canvases";
    sister pages read as two apps (YH, 2026-09-04). */
 import Block from "@/components/kit/Block";
 import DropdownMenu from "@/components/kit/DropdownMenu";
+import Popover from "@/components/kit/Popover";
 import { Fact } from "../SalesOrderWorkspace";
 import { SO_HEAD_ROW, SO_ROW, SO_TABLE, SO_TD, SO_TH } from "../components/so-document-table";
 import TableScroller from "@/components/TableScroller";
@@ -704,15 +705,45 @@ export default function PurchaseOrdersPage() {
             </button>
           ) : <span className="font-mono">{only!.reference}</span>;
         }
+        /* ⭐ MANY SOURCES OPEN A LIST IN PLACE (owner 2026-09-29, "why jump
+           to order route???"): the cell used to open the PO on its Order
+           Route tab, which read as the page jumping away. It now shows the
+           references right here, each one a door to its own record; the row
+           itself still opens the PO's Document. React events cross the
+           portal, so the list stops them before they reach the row. */
         return (
-          <button
-            type="button"
-            className={link}
-            data-testid={`po-source-${row.id}`}
-            onClick={(event) => { event.stopPropagation(); openObject(row, "Order Route"); }}
-          >
-            {sourceSummary(row.sources)}
-          </button>
+          <span onClick={(event) => event.stopPropagation()} onDoubleClick={(event) => event.stopPropagation()}>
+            <Popover
+              label={`Sources of ${row.id}`}
+              trigger={
+                <button type="button" className={link} data-testid={`po-source-${row.id}`}>
+                  {sourceSummary(row.sources)}
+                </button>
+              }
+            >
+              <ul
+                className="flex max-h-72 min-w-[160px] flex-col gap-1 overflow-y-auto"
+                data-testid={`po-source-list-${row.id}`}
+                onClick={(event) => event.stopPropagation()}
+                onDoubleClick={(event) => event.stopPropagation()}
+              >
+                {row.sources.map((source) => {
+                  const href = sourceHref(source);
+                  return (
+                    <li key={`${source.kind}-${source.reference}`} className="text-body">
+                      {href ? (
+                        <button type="button" className={`${link} font-mono`} onClick={() => navigate(href)}>
+                          {source.reference}
+                        </button>
+                      ) : (
+                        <span className="font-mono">{source.reference}</span>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </Popover>
+          </span>
         );
       },
       /* Every governed reference and the legacy CR/TCF mirrors stay

@@ -1141,3 +1141,43 @@ describe("GET /:id/record — the claim record's Supplier facts (§9.5)", () => 
     expect(createSignedUrl).toHaveBeenCalledWith("supplier_claim_reply/c1/a.jpg", 3600);
   });
 });
+
+describe("GET /:id/inspection — the per-Unit evidence inspector's facts (§9.5 Row expansion)", () => {
+  it("returns every file with its kind and its Unit when it was filed with one, and each Unit's own recorded problem", async () => {
+    const eqCalls: Array<[string, unknown]> = [];
+    const sb = {
+      rpc: namesDoor(),
+      from: vi.fn((t: string) => {
+        if (t === "supplier_claims") return listBuilder([{ id: "c1", warehouse_receipt_id: "g1", photos: [{ path: "PO-1/a.jpg", at: "2026-09-04T02:00:00Z", by: "u1", unit_code: "U1-000-001" }, { path: "PO-1/b.mp4", at: "2026-09-04T02:00:00Z", by: "u1" }] }], eqCalls);
+        if (t === "ops_stock_items") return listBuilder([{ id: "u-1" }], eqCalls);
+        if (t === "receiving_unit_results") return listBuilder([{ stock_item_id: "u-1", note: "Scratch on left arm", outcome: "received_with_issue", created_at: "2026-09-04T02:00:00Z" }], eqCalls);
+        return listBuilder([], eqCalls);
+      }),
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const createSignedUrl = vi.fn(async (path: string) => ({ data: { signedUrl: `https://signed/${path}` } }));
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(adminClient).mockReturnValue({ storage: { from: vi.fn(() => ({ createSignedUrl })) } } as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(new Request("http://t/api/operation/supplier-claims/c1/inspection", { headers: { Authorization: `Bearer ${jwt}` } }), env);
+    expect(res.status).toBe(200);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await res.json()) as any;
+    expect(body.files).toEqual([
+      { path: "PO-1/a.jpg", at: "2026-09-04T02:00:00Z", kind: "photo", unit_code: "U1-000-001", url: "https://signed/PO-1/a.jpg" },
+      { path: "PO-1/b.mp4", at: "2026-09-04T02:00:00Z", kind: "video", unit_code: null, url: "https://signed/PO-1/b.mp4" },
+    ]);
+    expect(body.problems).toEqual([{ stock_item_id: "u-1", note: "Scratch on left arm" }]);
+  });
+
+  it("answers 404 for a claim the caller cannot read, and refuses a dealer", async () => {
+    const sb = { rpc: namesDoor(), from: vi.fn(() => listBuilder([], [])) };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const res = await app.fetch(new Request("http://t/api/operation/supplier-claims/c9/inspection", { headers: { Authorization: `Bearer ${await makeJwt("operation")}` } }), env);
+    expect(res.status).toBe(404);
+    const dealer = await app.fetch(new Request("http://t/api/operation/supplier-claims/c9/inspection", { headers: { Authorization: `Bearer ${await makeJwt("dealer")}` } }), env);
+    expect(dealer.status).toBe(403);
+  });
+});

@@ -100,6 +100,8 @@ function client(
     salespersons: [],
     document_sends: [],
     purchase_return_pickup_confirmations: [],
+    purchase_return_supplier_receipts: [],
+    purchase_return_supplier_receipt_units: [],
   };
   return {
     rpc: vi.fn(async (name: string) =>
@@ -155,7 +157,10 @@ describe("GET /api/operation/purchase-returns", () => {
     expect(row.grn_no).toBe("GRN-20260904-1064");
     // §9.6's `Unit ID` is the Unit's readable code, never the table key.
     expect(row.units[0].unit_id).toBe("U-20260904-0142");
-    expect(row.units[0]).not.toHaveProperty("stock_item_id");
+    // The key travels beside it only for the `Record supplier receipt` door
+    // (0614); it is never printed as the Unit ID.
+    expect(row.units[0].unit_id).not.toBe(row.units[0].stock_item_id);
+    expect(row.units[0].stock_item_id).toBe("si1");
   });
 
   it("adds nothing up — Qty is derived from the Units it returned", async () => {
