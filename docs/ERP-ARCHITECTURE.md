@@ -214,7 +214,10 @@ confirmed PO timing: no PO Duty in the calendar month of joining; automatic admi
 following month while active and otherwise eligible, without a separate competency sign-off
 (Workspace §4). Owner-approved monthly order (2026-09-29 / NOT BUILT): a stable eligible-staff
 cycle supplies PO and the next person supplies GRN, advancing one position monthly; admitted
-newcomers join the tail and effective departures leave without resetting the remaining order. A
+newcomers join the tail and effective departures leave without resetting the remaining order.
+Owner-approved automatic PO/GRN cover (2026-09-29 / NOT BUILT, Workspace §4.4) reads recorded
+People leave and selects the next available eligible person in that cycle without changing normal
+ownership or the monthly order; no eligible cover stays visible, never an invented assignment. A
 last-working-date change removes the person and re-resolves open and future Work. Only no eligible
 Primary or Cover produces `Not assigned`, with a direct door to People / Staff & Duties. Capability
 remains separate: an authorised actor may perform an act without becoming its resolved owner, and

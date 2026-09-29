@@ -175,7 +175,7 @@ This determines responsibility and Work routing, not exclusive receiving-posting
 active Operation staff may still post Receiving under Purchasing's approved posting law. It does
 not rotate commercial approvers or change source-owned task completion. Existing one-person/
 no-eligible-person boundaries remain separate from the illustrated multi-person cycle. Temporary
-absence and cover behaviour remain under review against §4.4; do not treat absence as departure.
+absence follows §4.4; do not treat absence as departure.
 
 When a person resigns, the authorised People/account owner records the last working date and
 access change once. When departure is effective, omit that person from default active staff views,
@@ -369,6 +369,33 @@ It does not claim that historical Work changed. Failure prints the governed serv
 the entered facts for correction without optimistic owner changes.
 
 ### 4.4 · Buddy-cover contract
+
+**AUTOMATIC PO/GRN COVER — OWNER-APPROVED 2026-09-29 / APPROVED TARGET / NOT BUILT.**
+A recorded People-owned leave fact activates automatic cover for routine PO/GRN Duties. Starting
+after the day's normal holder in the governed cyclic order, choose the next active, available person
+eligible for that Duty on that business date. Skip the absent holder and anyone unavailable,
+departed, disabled or otherwise ineligible. A newcomer cannot cover PO in their joining calendar
+month; cover cannot bypass the newcomer PO rule. Use recorded leave and governed calendars,
+not login activity, heartbeat or inferred live presence.
+
+Keep the normal monthly holder and future cyclic order unchanged. After the recorded leave ends,
+resolve back to the normal holder applicable on that date. A leave spanning a month boundary reads
+each date's normal assignment; it never extends an old monthly holder's term. An authorised change
+or cancellation of the source leave re-resolves the affected open/future dates while preserving
+recorded actual actors and prior cover evidence. This is one Workspace cover truth consumed by
+Work and protected module doors, not independent per-page routing.
+
+When nobody qualifies for cover, expose the missing acting person to authorised management; do not
+silently route to an absent normal holder or grant a new capability. Existing source-owned rights
+such as Receiving posting by active Operation staff remain distinct from Duty responsibility.
+Commercial/Principal/Finance approver duties do not inherit this automatic operational selection.
+The page shows separate `Normal owner`, `Acting today` and `Cover` dates; future cover never becomes
+today's actor early. Automatic cover changes neither due dates nor source-owned completion.
+
+The existing authorised manual cover capability below is retained for governed exceptions and
+other Duties; it is not a required step for ordinary recorded PO/GRN leave. Manual self-assignment
+and eligibility gates remain; automatic selection is the owner-approved system rule, not a user
+self-assignment action. Do not create competing active cover answers.
 
 `Add cover` is available only when the Duty has a normal holder for the complete selected period.
 It asks for `Acting person`, `From`, `Until` and `Reason`. The acting person must be active, eligible,

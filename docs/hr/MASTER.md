@@ -148,7 +148,7 @@ against a real session.
 
 | What | Why it is not built |
 |---|---|
-| **Duty-cover leave fact** | **APPROVED 2026-09-03.** This is the effective-dated unavailable fact the Shared Duty Resolver needs to route today's Duty work to the governed Buddy. It is not a shift roster, attendance clock or presence monitor. |
+| **Duty-cover leave fact** | **APPROVED 2026-09-03.** This is the effective-dated unavailable fact the Shared Duty Resolver needs to route today's Duty work to the governed Buddy. Owner-approved 2026-09-29 / NOT BUILT: recorded leave triggers automatic PO/GRN cover selection by Workspace’s governed cyclic order over available eligible people; no live-presence inference. HR owns leave, not a second cover roster. It is not a shift roster, attendance clock or presence monitor. |
 | **Shift roster / attendance / live presence** | **DROPPED by Loo at the design stage.** Missing heartbeat never activates a Cover; only a recorded leave fact does. |
 | **BD revenue on the cost screen** | Cost shows; revenue reads *not enrolled* — 0 dealers have a BD owner. Wiring it needs a dealer-channel revenue read, **not a widening of the showroom-only source.** |
 | **Effective dating on the other four config tables** | Approved. Today only rates carry it, so editing model rates, tiers, milestones or the scheme method rewrites live figures. Harmless for CLOSED months **because the run freezes the lines** — which is exactly why closed months must be read, never recomputed. |

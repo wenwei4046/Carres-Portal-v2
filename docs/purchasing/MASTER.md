@@ -370,6 +370,12 @@ Remove effective departures and continue the remaining order. Workspace §4 owns
 rule. This responsibility allocation does not restrict the approved right of other active Operation
 staff to post Receiving or change historical actual-actor evidence.
 
+**AUTOMATIC COVER — OWNER-APPROVED 2026-09-29 / NOT BUILT:** recorded leave triggers PO/GRN
+cover by the next available eligible person in the shared cyclic order (Workspace §4.4). Newcomers
+cannot cover PO in their joining month. Monthly normal ownership and future order remain intact;
+leave ending restores the normal holder applicable that day. No eligible cover stays visible for
+management; approvals retain their own capability rules and Receiving posting rights remain intact.
+
 ### 5.4 Deliver To
 
 The destination comes from the source PO/CO `Supplier Deliver To`. When a new buy needs a default, use the
