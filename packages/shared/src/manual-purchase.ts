@@ -207,7 +207,6 @@ export const MANUAL_PURCHASE_WORDS = {
    * request that reads `Need PO` while its approval is still `Need approval`
    * or `Sent back for changes` says so on Status line two.
    */
-  statusNeedApprovalFirst: "Need approval first",
   remainderNotChecked: "Remaining quantity not checked",
   remainderNotCheckedWhy:
     "The quantity still to buy could not be read, so it is not offered for buying. Reopen the page to check again.",

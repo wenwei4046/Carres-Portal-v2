@@ -65,6 +65,13 @@ import { SkeletonRows } from "./Skeleton";
 import { DateField } from "./DateField";
 import styles from "./DataGrid.module.css";
 
+/* The row-highlight stripe (see `rowHighlight`). Literal class strings so the
+   Tailwind build keeps them; tokens only (kit red-9 / blue-9). */
+const ROW_HIGHLIGHT_CLASS = {
+  critical: "[&>td:first-child]:shadow-[inset_3px_0_0_theme(colors.kit.red.9)]",
+  info: "[&>td:first-child]:shadow-[inset_3px_0_0_theme(colors.kit.blue.9)]",
+} as const;
+
 import { ViewportExpansion } from "./ViewportExpansion";
 
 const ICON = { size: 14, strokeWidth: 1.75 } as const;
@@ -560,6 +567,19 @@ export type DataGridProps<T> = {
   /** Per-row test id for the whole `<tr>`. */
   rowTestId?: (row: T) => string;
   /**
+   * ⭐ ROW HIGHLIGHT — a 3px stripe at the row's left edge (owner ruling
+   * 2026-09-29, the SAP Fiori table `highlight`): every row keeps ONE height
+   * and the cell keeps ONE word; the stripe says "this row has something to
+   * say" and the reason lives in the row's expansion. `critical` (red) = the
+   * row cannot take the act until something is fixed; `info` (blue) = the row
+   * has an offer. The whole row is never painted: that fights hover and
+   * selection and cannot be read by a colour-blind person. `label` is the
+   * reason in words — the row's hover title and its screen-reader text — so
+   * the colour is never the only signal. Omitted = no stripe, every existing
+   * caller unchanged.
+   */
+  rowHighlight?: (row: T) => { tone: "critical" | "info"; label: string } | null;
+  /**
    * STAGE 1 engine extension (Law 13, with `chooserGroup`): the order the
    * grouped Columns chooser lists its sections in. Groups not named here
    * append in first-appearance order; omitted entirely = first-appearance.
@@ -711,6 +731,7 @@ function DataGridInner<T>({
   rowStyle,
   onSelectionChange,
   rowTestId,
+  rowHighlight,
   onFilteredRowsChange,
   onSearchChange,
   initialSearch = "",
@@ -2317,6 +2338,7 @@ function DataGridInner<T>({
     const key = rowKey(row);
     const expandKey = expandable ? expansionId(row) : null;
     const isExpanded = expandKey != null && expandedRows.has(expandKey);
+    const highlight = rowHighlight?.(row) ?? null;
     return (
       <Fragment key={`f-${key}-${idx}`}>
         <tr
@@ -2348,7 +2370,10 @@ function DataGridInner<T>({
           }) : undefined}
           data-grid-expansion-key={expandKey ?? undefined}
           data-testid={rowTestId?.(row) ?? (isReference ? "grid-parent-row" : undefined)}
-          className={`${styles.tr} ${
+          data-row-highlight={highlight?.tone}
+          title={highlight?.label}
+          aria-description={highlight?.label}
+          className={`${highlight ? ROW_HIGHLIGHT_CLASS[highlight.tone] : ""} ${styles.tr} ${
             palette === "slate"
               ? selectable && (selectable.selectedKeys.has(key) || (selectable.isIndeterminate?.(row as never) ?? false)) ? styles.trTicked : ""
               : selectedKey === key ? styles.trSelected : ""

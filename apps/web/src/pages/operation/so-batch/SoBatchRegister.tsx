@@ -792,33 +792,21 @@ export default function SoBatchRegister({ data, isLoading, onIssue, initialSearc
          */
         key: "status",
         label: "Status",
-        /* The shared Purchasing field width (UI MASTER §6.8); line two wraps
-           — the inline second line is the one allowed exception. */
+        /* The shared Purchasing field width (UI MASTER §6.8). ONE word, one
+           line: every row keeps one height (owner ruling 2026-09-29). */
         width: REGISTER_FIELD_WIDTH.status, minWidth: 96,
-        wrap: true,
         sortable: true,
         chooserGroup: "Buying",
-        accessor: (o) => {
-          /* ⭐ THE TWO-LINE STATUS RULE (owner ruling 2026-09-28): line one
-             is unchanged; line two is the SAME refusal the disabled tick
-             carries, read from the same projection. */
-          const why = soBatchOrderStatusWhy(o, leafsByOrder.get(o.orderId) ?? [], stateWords);
-          return (
-            <span className="block" data-testid={`so-batch-status-${o.orderId}`}>
-              <span className="block">
-                {soBatchOrderStatusWord(orderByFacts.get(o.orderId)!.group)}
-              </span>
-              {why ? (
-                <StatusWhy
-                  why={why}
-                  testId={`so-batch-status-why-${o.orderId}`}
-                  orderId={o.orderId}
-                  onDoor={(door) => navigate(STATUS_DOOR_PATH[door])}
-                />
-              ) : null}
-            </span>
-          );
-        },
+        accessor: (o) => (
+          /* ⭐ ONE WORD, NO DESCRIPTION IN THE CELL (owner ruling 2026-09-29,
+             replacing the 2026-09-28 two-line Status). The reason and its
+             door (`Use this PO` · `Fix in Catalog`) live in the row's
+             expansion, on each item line; the row says it has one with the
+             grid's left-edge stripe (`rowHighlight` below). */
+          <span className="block" data-testid={`so-batch-status-${o.orderId}`}>
+            {soBatchOrderStatusWord(orderByFacts.get(o.orderId)!.group)}
+          </span>
+        ),
         filterValue: (o) => soBatchOrderStatusWord(orderByFacts.get(o.orderId)!.group),
         sortFn: (a, b) =>
           soBatchOrderStatusWord(orderByFacts.get(a.orderId)!.group).localeCompare(
@@ -1489,6 +1477,19 @@ export default function SoBatchRegister({ data, isLoading, onIssue, initialSearc
               chooserGroupOrder={["Order", "Documents", "Buying"]}
               onRowDoubleClick={openOrder}
               contextMenu={rowMenu}
+              /* ⭐ THE STRIPE (owner ruling 2026-09-29, SAP Fiori row
+                 highlight): red = this order cannot be bought until something
+                 is fixed; blue = it has something to offer or to say (a PO
+                 with free goods, goods reserved on a PO). The words are the
+                 same projection the expansion prints. */
+              rowHighlight={(o: SoBatchOrderRow) => {
+                const leaves = leafsByOrder.get(o.orderId) ?? [];
+                const why = soBatchOrderStatusWhy(o, leaves, stateWords);
+                if (!why) return null;
+                const blocked =
+                  why.door !== "use_po" && soBatchOrderUnselectableReason(o, leaves, stateWords) != null;
+                return { tone: blocked ? "critical" : "info", label: why.text };
+              }}
               expandable={{
                 flush: true,
                 renderExpansion,

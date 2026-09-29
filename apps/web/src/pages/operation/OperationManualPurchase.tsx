@@ -1045,10 +1045,9 @@ export default function OperationManualPurchase() {
         key: "status",
         label: MW.colStatus,
         /* The shared Purchasing field width (UI MASTER §6.8) — SO Batch reads
-           the same one. Line two wraps (the inline second line exception). */
+           the same one. One word, one line. */
         width: REGISTER_FIELD_WIDTH.status,
         minWidth: 92,
-        wrap: true,
         sortable: true,
         chooserGroup: "Buying",
         accessor: (r) => {
@@ -1058,24 +1057,14 @@ export default function OperationManualPurchase() {
               <Absent title={MW.remainderNotCheckedWhy}>{MW.remainderNotChecked}</Absent>
             );
           }
-          /* ⭐ THE TWO-LINE STATUS RULE (owner ruling 2026-09-28): plain text
-             exactly like SO Batch, never a coloured pill (ONE KIT LAW). A
-             `Need PO` request still waiting on its decision says so on line
-             two, so the reason is not only in the neighbouring column. */
-          const waitsForApproval =
-            need === "need_po" &&
-            (r.approval.kind === "need_approval" || r.approval.kind === "sent_back");
+          /* ⭐ ONE WORD, ONE LINE (owner ruling 2026-09-29, replacing the
+             2026-09-28 two-line Status; same rule as SO Batch). A request
+             waiting on its decision already says `Need approval` in the
+             neighbouring `Approval Status` column, so the cell repeats
+             nothing and every row keeps one height. */
           return (
             <span className="block" data-testid={`mp-status-${r.id}`}>
-              <span className="block">{MANUAL_PURCHASE_NEED_STATUS_WORDS[need]}</span>
-              {waitsForApproval ? (
-                <span
-                  className="block text-meta text-kit-slate-11"
-                  data-testid={`mp-status-why-${r.id}`}
-                >
-                  {MW.statusNeedApprovalFirst}
-                </span>
-              ) : null}
+              {MANUAL_PURCHASE_NEED_STATUS_WORDS[need]}
             </span>
           );
         },
