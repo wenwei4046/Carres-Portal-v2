@@ -289,3 +289,55 @@ describe("GET /api/operation/repair-orders/eligible-units", () => {
     expect(units[0]).toMatchObject({ unit_id: "U1-000-009", refusal: "Reserved for SO2609-4827", item: "Sofa Lyra · 3 seater · Grey" });
   });
 });
+
+describe("GET /api/operation/repair-orders/:id/print-data — the A4 REPAIR ORDER (DOCUMENT-KIT §3.11–12, §4)", () => {
+  const withPhotos = UNITS.map((u, i) => ({
+    ...u,
+    evidence: i === 0 ? [{ path: "unit/a.jpg", kind: "photo", source: "unit" }, { path: "unit/a.mp4", kind: "video", source: "unit" }] : [],
+  }));
+
+  it("carries the document's facts and the Units' own photographs, read through — and no money at all", async () => {
+    const sb = client({
+      repair_order_units: withPhotos,
+      suppliers: [{ id: "s1", name: "Hooka", address: "Lot 1, Jalan Industri", contact: "012-3456789" }],
+      warehouses: [{ id: "w1", name: "Carres Klang", address: "No 2, Jalan Klang" }],
+    });
+    const res = await call(sb, `/${RO_ID}/print-data`);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Record<string, unknown> & { units: Array<Record<string, unknown>> };
+    expect(body).toMatchObject({
+      ro_no: "RO-20260928-4827", version: 1, ro_doc_date: "2026-09-28", claim_no: null, issued_by: "Faizal",
+      supplier: { name: "Hooka", address: "Lot 1, Jalan Industri", contact: "012-3456789" },
+      pickup: { name: "Carres Klang", address: "No 2, Jalan Klang" },
+      return_to: { name: "Carres Klang", address: "No 2, Jalan Klang" },
+    });
+    expect(body.units[0]).toMatchObject({ unit_id: "U1-000-001", problem: "Damaged", problem_note: "Arm torn", repair_requirement: "Replace arm fabric", photos: ["https://signed"] });
+    // Video is not a photograph; a Unit without evidence carries none.
+    expect(body.units[1]!.photos).toEqual([]);
+    expect(body.units[1]!.problem).toBe("Missing component");
+    // MONEY-FREE BY SHAPE: no price, quotation or cost fact anywhere in the payload.
+    expect(JSON.stringify(body)).not.toMatch(/price|quotation|cost|RM ?\d/i);
+  });
+
+  it("names an absent RO as not found", async () => {
+    const res = await call(client({ repair_orders: [] }), `/${RO_ID}/print-data`);
+    expect(res.status).toBe(404);
+  });
+});
+
+describe("GET /api/operation/repair-orders/work-source — the Work feed's one RO read", () => {
+  it("returns the object shape, with the consignment owner's name for the consent follow-up", async () => {
+    const sb = client({
+      ops_stock_items: [
+        { id: "si1", status: "free", hold_reason: null, condition: "new", supplier: "Hooka" },
+        { id: "si2", status: "free", hold_reason: null, condition: "new", supplier: "Dorsettloft" },
+      ],
+    });
+    const res = await call(sb, "/work-source");
+    expect(res.status).toBe(200);
+    const { repairOrders } = (await res.json()) as { repairOrders: RepairOrderDetail[] };
+    expect(repairOrders).toHaveLength(1);
+    expect(repairOrders[0]!.units.map((u) => u.owner_name)).toEqual([null, "Dorsettloft"]);
+    expect(repairOrders[0]!.consents).toEqual([]);
+  });
+});

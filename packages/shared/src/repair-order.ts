@@ -133,6 +133,9 @@ export interface RepairOrderUnitRow {
   item: string | null;
   item_spec: string | null;
   ownership: string | null;
+  /** The recorded owner of a non-Carres-owned Unit (Stock's supplier on the
+   *  Unit), read for the owner-consent follow-up; absent on older reads. */
+  owner_name?: string | null;
   /** The Unit is Display goods at its site (second line under the location). */
   display: boolean;
   problem: string;
@@ -402,6 +405,11 @@ export function repairOrderRoute(row: RepairOrderListRow): { stop: RepairOrderRo
   }));
 }
 
+/** `1 Unit` · `{n} Units` — every RO sentence that counts Units. */
+export function repairOrderUnitCount(n: number): string {
+  return n === 1 ? "1 Unit" : `${n} Units`;
+}
+
 export type RepairOrderDoor = "issue" | "record_receipt" | "open_pickup" | "record_reply" | "open_receiving";
 
 export interface RepairOrderCurrentAction {
@@ -433,7 +441,7 @@ export function repairOrderCurrentAction(row: RepairOrderListRow, fmt: (iso: str
     case "waiting_pickup": {
       const left = n - repairOrderPickedUp(row);
       return {
-        lineOne: `Hand ${left} Units to ${supplier}`,
+        lineOne: `Hand ${repairOrderUnitCount(left)} to ${supplier}`,
         lineTwo: "Warehouse records who collected them.",
         door: "open_pickup",
         button: "Outbound",
@@ -442,7 +450,7 @@ export function repairOrderCurrentAction(row: RepairOrderListRow, fmt: (iso: str
     case "out_for_repair": {
       const left = n - repairOrderReturnedQty(row);
       return {
-        lineOne: `Waiting for ${supplier} to return ${left} Units`,
+        lineOne: `Waiting for ${supplier} to return ${repairOrderUnitCount(left)}`,
         lineTwo: row.return_target_date ? `Carres return target ${fmt(row.return_target_date)}` : REPAIR_ORDER_AWAITING_RECEIPT,
         door: "record_reply",
         button: "Record Supplier reply",
@@ -451,7 +459,7 @@ export function repairOrderCurrentAction(row: RepairOrderListRow, fmt: (iso: str
     case "returned_not_inspected": {
       const left = repairOrderReturnedQty(row) - repairOrderInspected(row);
       return {
-        lineOne: `Inspect ${left} returned Units`,
+        lineOne: `Inspect ${left} returned ${left === 1 ? "Unit" : "Units"}`,
         lineTwo: "Available again only after inspection.",
         door: "open_receiving",
         button: "Receiving",
@@ -567,4 +575,38 @@ export interface RepairOrderEligibleUnit {
   ownership: string | null;
   /** NULL = can be ticked; otherwise the reason printed on the row. */
   refusal: string | null;
+}
+
+// ── the A4 REPAIR ORDER (docs/pdf/DOCUMENT-KIT.md §3 rules 11–12, §4) ────────
+/**
+ * What the paper prints — and nothing else. MONEY-FREE BY SHAPE: there is no
+ * price, quotation or cost field here, so the template cannot print one
+ * (DOCUMENT-KIT §4: a printed repair price reads as Carres accepting the
+ * supplier's charge). `photos` are the Unit's and the Claim's own evidence,
+ * read through (signed URLs from the API; the browser turns them into images).
+ */
+export interface RepairOrderPrintData {
+  ro_no: string;
+  version: number;
+  ro_doc_date: string;
+  supplier: { name: string; address: string | null; contact: string | null };
+  /** Only when the RO came from a Supplier Claim. */
+  claim_no: string | null;
+  pickup: { name: string; address: string | null };
+  return_to: { name: string; address: string | null };
+  /** The RO's recording actor — the family footer's audit cell. */
+  issued_by: string | null;
+  units: Array<{
+    unit_id: string;
+    po_no: string | null;
+    category: string | null;
+    item: string | null;
+    item_spec: string | null;
+    /** The governed problem word (`Damaged` · `Missing component` · `Something else`). */
+    problem: string;
+    /** `What happened, in one sentence` — printed verbatim in the Reason box. */
+    problem_note: string;
+    repair_requirement: string;
+    photos: string[];
+  }>;
 }

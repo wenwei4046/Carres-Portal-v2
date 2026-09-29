@@ -4953,9 +4953,9 @@ view; 50/50 remains reserved for issuing/revising. No application build is claim
 
 ### 9.7 Repair Orders
 
-**Owner-confirmed business blueprint — 2026-09-18; price/approval and owner-consent rulings 2026-09-19. SLICE A BUILT ON BRANCH (see "Build state" below); the rest APPROVED TARGET / NOT BUILT.**
+**Owner-confirmed business blueprint — 2026-09-18; price/approval and owner-consent rulings 2026-09-19. SLICE A DEPLOYED (#1757, 0602 APPLIED); SLICE B (PDF + Work) BUILT ON BRANCH; the rest APPROVED TARGET / NOT BUILT.**
 
-#### Build state — slice A, 2026-09-28 (branch `build/repair-orders-foundation`; migration 0602 NOT APPLIED; not deployed)
+#### Build state — slice A merged #1757 (0602 APPLIED); slice B on branch `build/repair-orders-pdf-work`, 2026-09-29 (no migration)
 
 | Built on the branch | Where |
 |---|---|
@@ -4969,6 +4969,8 @@ view; 50/50 remains reserved for issuing/revising. No application build is claim
 | **Goods sent for repair cannot be promised (owner, 2026-09-28).** `repair_order_create` puts each Unit `In repair` through Stock's governed flag door `ops_stock_flag_repair` (`needs_repair`), which every sell path already honours (`unit_availability` → not available; pool draw, bind and Use this PO refuse it). No custody is written. The same door lifts it when the repair ends for that Unit: the RO is cancelled, the Unit is removed before Issue (`repair_order_remove_unit`; the last Unit cannot be removed, cancel instead), or its return inspection is recorded (Stock's `ops_stock_resolve_unit_hold`, observed by a trigger). A Unit already `In repair` outside an RO is refused by name | 0602 |
 | `Repair Quotation`: photo or PDF, recorded at create or once later on the object (`repair_order_record_quotation`); the upload slot admits PDF for the `repair_quotation` purpose only and the `issue-evidence` bucket admits `application/pdf` | 0602, `routes/ops/issues.ts` |
 | Pickup: the `Hand {n} Units` door opens Stock's arrival-source form with `?ro=`; the pickup itself is Stock's existing `arrival_source_handover` (the ONE custody writer) and the return is Receiving's `receiving_arrival_post` with a GRN — proven end to end on a replayed chain | `ArrivalSourceWorkspace.tsx`, integration test |
+| **Slice B · the A4 `REPAIR ORDER` — BUILT ON BRANCH.** PO chrome (full header every page, `RO…(n)` hero); Supplier · Supplier Pickup/Return Location · RO Details (`Supplier Claim No` only when present); `Reason` box = each Unit's recorded sentence verbatim; goods `Category · PO No / Unit ID · Items · Qty · Problem · Repair Requirement` + `TOTAL`; `DAMAGE PHOTOS · {Unit ID}` pages (4 per sheet) from the Unit/Claim evidence read through; no photo = one sentence. Payload `GET /:id/print-data` carries no figure; Cost Responsibility is omitted from the supplier paper (DOCUMENT-KIT §4 names goods, never value). Object header `Open PDF`; Issue is the 50/50 with the paper | `repair-order-template.tsx`, `repair-order-pdf.ts`, `RepairOrderObject.tsx`, `repair-orders.ts` |
+| **Slice B · Work — BUILT ON BRANCH.** `repairOrderWorkItems` projects four rules into the ONE feed (PO Duty, Office calendar, deep link = RO object): `repair_order.issue` (due next Office working day after RO Doc Date; closes on confirmed send) · `repair_order.confirm_receipt` (due next Office working day after the send; closes on evidenced receipt) · `repair_order.return_date_passed` (opens the day after the Carres target; closes only when every Unit is back on a posted GRN or the RO is cancelled; a Supplier reply never closes it) · `repair_order.owner_consent` (no date; closes on `given` for every non-Carres Unit, refusal keeps it open). The 0584 Completed writer wraps issue, supplier-receipt, owner-consent, cancel and Receiving's arrival post. Route: the `Returned` stop is grey while the Supplier holds the goods, `Missed` after the target | `repair-order-work.ts` (shared + api), `work.ts`, `warehouse-receipts.ts` |
 
 **Owner rulings on the slice A report (2026-09-28):** pickup only from Carres Sites (accepted); a
 Unit on an active RO is NOT sellable (decision 1 rejected, built as above); the held-for-inspection,
@@ -4979,8 +4981,7 @@ active Stock operating party (`stock_operating_parties`), and a repair Supplier 
 staff record the carrier who actually collects. When the Supplier collects in person, Stock must
 admit the Supplier (or a supplier-party kind) as a party; Purchasing does not write that list.
 
-**Remaining, in dependency order:** the RO PDF (`Reason` box + photo page, DOCUMENT-KIT §3 rules
-11–12) and the `Open PDF` / 50/50 Issue preview · Work cards for each stop (Workspace §6) · a
+**Remaining, in dependency order:** a
 Claim-held Unit's release when its Claim hold ends without `hold_released_at` · Dealer as a Site
 (Stock §12.9) · the Settings row for the 14-day period · PO/PRTN/CO onto `document_sends`.
 This replaces the restriction that every RO must originate in a Supplier Claim and the blanket

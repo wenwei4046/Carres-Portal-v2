@@ -9,6 +9,8 @@ import {
   repairOrderReceiptInputSchema,
   repairOrderReplyInputSchema,
   repairOrderReturnTarget,
+  repairProblemLabel,
+  REPAIR_ORDER_WORK_RULE,
   REPAIR_ORDER_DEFAULT_WORKING_DAYS,
   REPAIR_ORDER_TARGET_CALENDAR,
   type RepairCostResponsibility,
@@ -17,6 +19,7 @@ import {
   type RepairOrderEligibleUnit,
   type RepairOrderEvidenceFile,
   type RepairOrderListRow,
+  type RepairOrderPrintData,
   type RepairOrderReply,
   type RepairOrderSend,
   type RepairOrderUnitRow,
@@ -26,6 +29,7 @@ import { chunk } from "../../lib/purchase-demand-read";
 import { adminClient, userClient } from "../../lib/supabase";
 import { resolveActorNames } from "../../lib/actor-names";
 import type { AppEnv } from "../../types";
+import { repairOrderWorkCompletion } from "../../lib/repair-order-work";
 
 /**
  * ⭐ REPAIR ORDERS — `docs/purchasing/MASTER.md` §9.7, migration 0602.
@@ -114,7 +118,7 @@ async function assemble(c: Context<AppEnv>, documents: Row[]): Promise<{ rows: R
   const [events, receipts, stock, catalog, suppliers, claims, sites] = await Promise.all([
     readAllIn(sourceIds, (b, f, t) => sb.from("arrival_source_events").select("source_id, kind, unit_ids, person, evidence, occurred_at").in("source_id", b).in("kind", ["collected", "carrier_received"]).range(f, t)),
     readAllIn(sourceIds, (b, f, t) => sb.from("warehouse_receipts").select("id, arrival_source_id, grn_no, goods_received_at, do_file_path, status").in("arrival_source_id", b).eq("status", "posted").range(f, t)),
-    readAllIn(stockIds, (b, f, t) => sb.from("ops_stock_items").select("id, status, hold_reason, condition").in("id", b).range(f, t)),
+    readAllIn(stockIds, (b, f, t) => sb.from("ops_stock_items").select("id, status, hold_reason, condition, supplier").in("id", b).range(f, t)),
     readAllIn(skus, (b, f, t) => sb.from("product_skus").select("sku, variant, product_models(name, category)").in("sku", b).range(f, t)),
     readAllIn(documents.map((d) => d.supplier_id as string), (b, f, t) => sb.from("suppliers").select("id, name").in("id", b).range(f, t)),
     readAllIn(documents.map((d) => d.supplier_claim_id as string), (b, f, t) => sb.from("supplier_claims").select("id, claim_no").in("id", b).range(f, t)),
@@ -183,6 +187,7 @@ async function assemble(c: Context<AppEnv>, documents: Row[]): Promise<{ rows: R
       item: cat?.item ?? null,
       item_spec: cat?.spec ?? null,
       ownership: str(u.ownership),
+      owner_name: str(u.ownership) && u.ownership !== "carres_owned" ? str(st?.supplier) : null,
       display: st?.condition === "exhibition",
       problem: u.problem as string,
       problem_note: u.problem_note as string,
@@ -324,6 +329,77 @@ router.get("/eligible-units", async (c) => {
   return c.json({ units });
 });
 
+// ── GET /work-source — every open RO as the object page reads it ─────────────
+// The Work feed's one RO read (`lib/repair-order-work.ts`): cancelled ROs owe
+// nothing, so they are not read. Registered before `/:id`.
+router.get("/work-source", async (c) => {
+  gate(c);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const documents = await readAll((f, t) =>
+    sb.from("repair_orders").select(DOC_SELECT).is("cancelled_at", null).order("created_at").range(f, t));
+  if (documents.error) return failRo(c, documents.error as never);
+  const { rows, error } = await assemble(c, documents.rows);
+  if (error) return failRo(c, error as never);
+  return c.json({ repairOrders: rows });
+});
+
+// ── GET /:id/print-data — the A4 REPAIR ORDER (DOCUMENT-KIT §3 rules 11–12) ──
+// MONEY-FREE, structurally (DOCUMENT-KIT §4): this payload carries no price,
+// quotation or cost field, so the template cannot print one. The photographs
+// are the Unit's and the Claim's OWN evidence, read through and signed on open
+// — never a second upload against the document.
+router.get("/:id/print-data", async (c) => {
+  gate(c);
+  const id = c.req.param("id");
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const column = /^[0-9a-f-]{36}$/i.test(id) ? "id" : "ro_no";
+  const { data, error } = await sb.from("repair_orders").select(DOC_SELECT).eq(column, id).maybeSingle();
+  if (error) return failRo(c, error);
+  if (!data) return c.json({ error: "not_found", code: "not_found", message: "Repair Order not found" }, 404);
+  const { rows, error: readError } = await assemble(c, [data as Row]);
+  if (readError) return failRo(c, readError as never);
+  const ro = rows[0]!;
+  const [supplier, sites] = await Promise.all([
+    sb.from("suppliers").select("name, address, contact").eq("id", ro.supplier_id).maybeSingle(),
+    sb.from("warehouses").select("id, name, address").in("id", [...new Set([ro.pickup_site_id, ro.return_site_id])]),
+  ]);
+  if (supplier.error) return failRo(c, supplier.error);
+  if (sites.error) return failRo(c, sites.error);
+  const site = new Map((sites.data ?? []).map((w) => [w.id as string, { name: (w.name as string) ?? "", address: str(w.address) }]));
+  const admin = adminClient(c.env);
+  const units = await Promise.all(ro.units.map(async (u) => {
+    const photos = await Promise.all(u.evidence.filter((e) => e.kind === "photo").map(async (e) => {
+      const bucket = e.source === "claim" ? "delivery-orders" : "issue-evidence";
+      const { data: signed } = await admin.storage.from(bucket).createSignedUrl(e.path, SIGNED_URL_TTL_SECONDS);
+      return signed?.signedUrl ?? null;
+    }));
+    return {
+      unit_id: u.unit_id,
+      po_no: u.po_no,
+      category: u.category,
+      item: u.item,
+      item_spec: u.item_spec,
+      problem: repairProblemLabel(u.problem),
+      problem_note: u.problem_note,
+      repair_requirement: u.repair_requirement,
+      photos: photos.filter((p): p is string => Boolean(p)),
+    };
+  }));
+  const s = supplier.data as { name: string | null; address: string | null; contact: string | null } | null;
+  const payload: RepairOrderPrintData = {
+    ro_no: ro.ro_no,
+    version: ro.version,
+    ro_doc_date: ro.ro_doc_date,
+    supplier: { name: s?.name ?? ro.supplier_name ?? "", address: s?.address ?? null, contact: s?.contact ?? null },
+    claim_no: ro.claim_no,
+    pickup: site.get(ro.pickup_site_id) ?? { name: ro.pickup_site_name ?? "", address: null },
+    return_to: site.get(ro.return_site_id) ?? { name: ro.return_site_name ?? "", address: null },
+    issued_by: ro.created_by,
+    units,
+  };
+  return c.json(payload);
+});
+
 // ── GET /:id — the object ────────────────────────────────────────────────────
 router.get("/:id", async (c) => {
   gate(c);
@@ -378,7 +454,7 @@ router.post("/", async (c) => {
   return c.json(out, out.replayed ? 200 : 201);
 });
 
-router.post("/:id/issue", async (c) => {
+router.post("/:id/issue", repairOrderWorkCompletion([REPAIR_ORDER_WORK_RULE.issue]), async (c) => {
   gate(c);
   const p = await parseJsonBody(c, repairOrderIssueInputSchema);
   if (!p.ok) return c.json(p.body, p.status);
@@ -389,7 +465,7 @@ router.post("/:id/issue", async (c) => {
   return c.json({ sendId: data });
 });
 
-router.post("/:id/supplier-receipt", async (c) => {
+router.post("/:id/supplier-receipt", repairOrderWorkCompletion([REPAIR_ORDER_WORK_RULE.confirmReceipt]), async (c) => {
   gate(c);
   const p = await parseJsonBody(c, repairOrderReceiptInputSchema);
   if (!p.ok) return c.json(p.body, p.status);
@@ -414,7 +490,7 @@ router.post("/:id/supplier-reply", async (c) => {
   return c.json({ replyId: data }, 201);
 });
 
-router.post("/:id/owner-consent", async (c) => {
+router.post("/:id/owner-consent", repairOrderWorkCompletion([REPAIR_ORDER_WORK_RULE.ownerConsent]), async (c) => {
   gate(c);
   const p = await parseJsonBody(c, repairOrderConsentInputSchema);
   if (!p.ok) return c.json(p.body, p.status);
@@ -442,7 +518,9 @@ router.post("/:id/units/:unitId/remove", async (c) => {
   return c.json(data);
 });
 
-router.post("/:id/cancel", async (c) => {
+// Cancelling is the authorised outcome that ends the return follow-up; the
+// issue / receipt / consent follow-ups merely leave (not completed).
+router.post("/:id/cancel", repairOrderWorkCompletion([REPAIR_ORDER_WORK_RULE.returnDatePassed]), async (c) => {
   gate(c);
   const p = await parseJsonBody(c, repairOrderCancelInputSchema);
   if (!p.ok) return c.json(p.body, p.status);

@@ -19,7 +19,7 @@
  * return inspection) OPEN the owning Stock / Receiving surfaces — this page
  * never writes custody.
  */
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -36,6 +36,7 @@ import {
   repairOrderReturnedQty,
   repairOrderRoute,
   klDate,
+  poDocumentNumberOf,
   REPAIR_ORDER_SENDING_NOT_CONFIRMED,
   type RepairOrderDetail,
 } from "@carres/shared";
@@ -47,6 +48,9 @@ import { fmtDate } from "@/lib/fmt-date";
 import Block from "@/components/kit/Block";
 import Button from "@/components/kit/Button";
 import Checkbox from "@/components/kit/Checkbox";
+import Drawer from "@/components/kit/Drawer";
+import PdfPreview from "@/components/kit/PdfPreview";
+import { renderRepairOrderPdfFor } from "@/lib/pdf/repair-order-pdf";
 import DatePicker from "@/components/kit/DatePicker";
 import EmptyState from "@/components/kit/EmptyState";
 import Input from "@/components/kit/Input";
@@ -58,7 +62,7 @@ import { Fact } from "./SalesOrderWorkspace";
 import { RecordRanks, groupHistoryChronology } from "./SalesOrderLedger";
 import RepairOrderUnitsTable from "./components/RepairOrderUnitsTable";
 
-type Dialog = null | "issue" | "receipt" | "reply" | "consent" | "cancel";
+type Dialog = null | "issue" | "receipt" | "reply" | "consent" | "cancel" | "pdf";
 
 const CHANNELS = [
   { value: "whatsapp", label: "WhatsApp" },
@@ -68,6 +72,16 @@ const CHANNELS = [
 const QUOTE_IMAGE_MIMES = ["image/jpeg", "image/png", "image/webp"] as const;
 const QUOTE_PDF_MIMES = ["application/pdf"] as const;
 const RECEIPT_CHANNELS = [...CHANNELS, { value: "phone", label: "Phone" }] as const;
+
+/** A stop's tone. `Due` is Carres's own act; while the Supplier holds the goods
+ *  (Returned is current) Carres waits — grey — until the Carres return target
+ *  passes, when it is `Missed` (slice A review, 2026-09-29). */
+export function routeTone(stop: string, state: "done" | "current" | "ahead", overdue: boolean): "done" | "due" | "missed" | "none" {
+  if (state === "done") return "done";
+  if (state !== "current") return "none";
+  if (stop === "Returned") return overdue ? "missed" : "none";
+  return "due";
+}
 
 function refusal(error: unknown): string {
   if (error instanceof ApiError) return error.message || "Not saved · Try again";
@@ -167,6 +181,17 @@ export function RepairOrderView({ ro }: { ro: RepairOrderDetail }) {
     }
   };
 
+  /* Issue is the ONE moment the paper stands beside the form: the governed
+     50/50 (§9.7 "only Issue/revision uses the governed 50/50 preview"). */
+  if (dialog === "issue") {
+    return (
+      <div className="flex h-full min-h-0 flex-col" data-testid="repair-order-object">
+        <PurchasingTabs />
+        <IssueWorkspace ro={ro} onClose={() => setDialog(null)} onDone={refresh} />
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-full min-h-0 flex-col" data-testid="repair-order-object">
       <PurchasingTabs />
@@ -183,9 +208,12 @@ export function RepairOrderView({ ro }: { ro: RepairOrderDetail }) {
                 {repairOrderDocumentState(ro)} · {ro.supplier_name ?? REPAIR_ORDER_ABSENT}
               </p>
             </div>
-            {canCancel ? (
-              <Button variant="neutral" onClick={() => setDialog("cancel")} data-testid="repair-order-cancel">Cancel repair order</Button>
-            ) : null}
+            <div className="flex flex-wrap items-center gap-2">
+              <Button variant="neutral" onClick={() => setDialog("pdf")} data-testid="repair-order-open-pdf">Open PDF</Button>
+              {canCancel ? (
+                <Button variant="neutral" onClick={() => setDialog("cancel")} data-testid="repair-order-cancel">Cancel repair order</Button>
+              ) : null}
+            </div>
           </header>
 
           {/* ROUTE — five stops, derived from facts, drawn with the kit
@@ -197,7 +225,7 @@ export function RepairOrderView({ ro }: { ro: RepairOrderDetail }) {
                 <RouteStop
                   key={stop}
                   label={stop}
-                  tone={state === "done" ? "done" : state === "current" ? (overdue && stop === "Returned" ? "missed" : "due") : "none"}
+                  tone={routeTone(stop, state, overdue)}
                   last={i === route.length - 1}
                   data-testid={`repair-order-stop-${stop}`}
                 >
@@ -341,7 +369,7 @@ export function RepairOrderView({ ro }: { ro: RepairOrderDetail }) {
         </div>
       </div>
 
-      <IssueDialog ro={ro} open={dialog === "issue"} onClose={() => setDialog(null)} onDone={refresh} />
+      <RepairOrderPdfSheet ro={ro} open={dialog === "pdf"} onClose={() => setDialog(null)} />
       <ReceiptDialog ro={ro} open={dialog === "receipt"} onClose={() => setDialog(null)} onDone={refresh} />
       <ReplyDialog ro={ro} open={dialog === "reply"} onClose={() => setDialog(null)} onDone={refresh} />
       <ConsentDialog ro={ro} open={dialog === "consent"} onClose={() => setDialog(null)} onDone={refresh} />
@@ -421,19 +449,118 @@ function DialogShell({ open, onClose, title, description, pending, error, canSav
   );
 }
 
-function IssueDialog({ ro, open, onClose, onDone }: { ro: RepairOrderDetail; open: boolean; onClose: () => void; onDone: () => void }) {
+/** The paper, painted once per open (a blob URL the preview reads). */
+function useRepairOrderPdfUrl(ro: RepairOrderDetail, active: boolean) {
+  const [url, setUrl] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+  // The paper changes when a fact it prints changes (a send, a new version).
+  const key = active ? `${ro.id}:${ro.version}:${ro.sends.length}` : null;
+  useEffect(() => {
+    if (!key) return;
+    let cancelled = false;
+    let made: string | null = null;
+    setUrl(null);
+    setFailed(false);
+    (async () => {
+      try {
+        const blob = await renderRepairOrderPdfFor(ro.id);
+        made = URL.createObjectURL(blob);
+        if (!cancelled) setUrl(made);
+      } catch {
+        if (!cancelled) setFailed(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+      if (made) URL.revokeObjectURL(made);
+    };
+  }, [key, ro.id]);
+  return { url, failed };
+}
+
+const PDF_LOADING = "Loading…";
+const PDF_FAILED = "Some information could not be refreshed.";
+
+/** `Open PDF` — the A4 Repair Order over the page, with Print and Download
+ *  (the same sheet grammar Work uses for a PO or a Sales Order). */
+function RepairOrderPdfSheet({ ro, open, onClose }: { ro: RepairOrderDetail; open: boolean; onClose: () => void }) {
+  const { url, failed } = useRepairOrderPdfUrl(ro, open);
+  const number = poDocumentNumberOf(ro.ro_no, ro.version);
+  const print = () => {
+    if (!url) return;
+    const w = window.open(url, "_blank", "noopener");
+    w?.addEventListener("load", () => w.print());
+  };
+  const download = () => {
+    if (!url) return;
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${number}.pdf`;
+    a.click();
+  };
+  return (
+    <Drawer
+      open={open}
+      onOpenChange={(v) => (v ? null : onClose())}
+      title={number}
+      footer={
+        <div className="flex items-center gap-2">
+          <Button icon="print" disabled={!url} onClick={print}>Print</Button>
+          <Button icon="download" disabled={!url} onClick={download}>Download</Button>
+        </div>
+      }
+    >
+      {url ? (
+        <PdfPreview src={url} title={number} data-testid="repair-order-pdf" />
+      ) : (
+        <p className="text-body text-kit-slate-11" role="status">{failed ? PDF_FAILED : PDF_LOADING}</p>
+      )}
+    </Drawer>
+  );
+}
+
+/** Issue — the governed 50/50: what was sent on the left, the paper on the right. */
+function IssueWorkspace({ ro, onClose, onDone }: { ro: RepairOrderDetail; onClose: () => void; onDone: () => void }) {
   const [channel, setChannel] = useState("whatsapp");
   const [recipient, setRecipient] = useState("");
   const [note, setNote] = useState("");
   const door = useDoor(ro, "issue", onDone, onClose);
+  const { url, failed } = useRepairOrderPdfUrl(ro, true);
+  const supplier = ro.supplier_name ?? REPAIR_ORDER_ABSENT;
   return (
-    <DialogShell open={open} onClose={onClose} title={`Issue repair order to ${ro.supplier_name ?? REPAIR_ORDER_ABSENT}`} pending={door.isPending} error={door.error}
-      canSave={recipient.trim().length > 0} saveWord="Record what you sent"
-      onSave={() => door.mutate({ channel, recipient: recipient.trim(), note: note.trim() || null })}>
-      <Select id="ro-issue-channel" label="Channel" value={channel} onValueChange={setChannel} options={CHANNELS} />
-      <Input id="ro-issue-recipient" label="Recipient" value={recipient} onChange={(e) => setRecipient(e.target.value)} />
-      <Textarea id="ro-issue-note" label="Note" rows={2} value={note} onChange={(e) => setNote(e.target.value)} />
-    </DialogShell>
+    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto lg:flex-row lg:overflow-visible" data-testid="repair-order-issue">
+      <div className="flex min-w-0 shrink-0 flex-col gap-3 p-3 sm:p-4 lg:min-h-0 lg:w-1/2 lg:shrink lg:overflow-auto" data-testid="repair-order-issue-form">
+        <p className="text-meta text-kit-slate-11">{ro.ro_no}</p>
+        <h1 className="text-page text-kit-slate-12">{`Issue repair order to ${supplier}`}</h1>
+        <Block title="Repair order">
+          <div className="grid gap-3">
+            {door.error ? <p role="alert" className="rounded-control border border-kit-red-9 bg-kit-red-3 px-3 py-2 text-body text-kit-red-11">{refusal(door.error)}</p> : null}
+            <p className="text-body text-kit-slate-11">{`The 14 working days start when ${supplier} receives it.`}</p>
+            <Select id="ro-issue-channel" label="Channel" value={channel} onValueChange={setChannel} options={CHANNELS} />
+            <Input id="ro-issue-recipient" label="Recipient" value={recipient} onChange={(e) => setRecipient(e.target.value)} />
+            <Textarea id="ro-issue-note" label="Note" rows={2} value={note} onChange={(e) => setNote(e.target.value)} />
+            <div className="flex justify-end gap-2">
+              <Button variant="neutral" onClick={onClose} disabled={door.isPending}>Cancel</Button>
+              <Button
+                variant="primary"
+                disabled={recipient.trim().length === 0}
+                loading={door.isPending}
+                onClick={() => door.mutate({ channel, recipient: recipient.trim(), note: note.trim() || null })}
+              >
+                Record what you sent
+              </Button>
+            </div>
+          </div>
+        </Block>
+      </div>
+      <div className="flex min-w-0 shrink-0 flex-col p-3 sm:p-4 lg:min-h-0 lg:w-1/2 lg:shrink">
+        {url ? (
+          <PdfPreview src={url} title={poDocumentNumberOf(ro.ro_no, ro.version)} data-testid="repair-order-issue-preview" />
+        ) : (
+          <p className="text-body text-kit-slate-11" role="status">{failed ? PDF_FAILED : PDF_LOADING}</p>
+        )}
+      </div>
+    </div>
   );
 }
 

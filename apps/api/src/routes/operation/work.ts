@@ -79,6 +79,7 @@ import opsStaffRouter from "./staff";
 import financeInvoicesRouter from "../finance/invoices";
 import issuesRouter from "../ops/issues";
 import purchaseDemandsRouter from "./purchase-demands";
+import { loadRepairOrderWork } from "../../lib/repair-order-work";
 import {
   invoiceNeeded,
   invoicePaymentTiming,
@@ -1760,6 +1761,9 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
     today,
     observedAt,
   });
+  // Repair Orders (Purchasing §9.7 · §10): their own projection, read inside
+  // the Purchasing source so a failed read fails that source's health.
+  const repairOrderWork = () => loadRepairOrderWork(c, { poDuty, today, observedAt });
   const sourceResults = await Promise.all([
     loadWorkSource("orders", observedAt, async () =>
       orderItems.filter((item) =>
@@ -1781,6 +1785,7 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
         today,
         now: observedAt,
       }),
+      ...(await repairOrderWork()),
     ]),
     loadWorkSource("receiving", observedAt, async () => receivingItems),
     loadWorkSource("delivery", observedAt, async () =>

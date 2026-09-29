@@ -967,6 +967,24 @@ Route stop facts reuse `{n} of {m} done` and `Sending not confirmed`. Empty and 
 received RO` · `Supplier reply` · `Owner consent` · `Picked up` · `Returned` · `Cancelled`.
 `Repair Quotation` prints `Recorded` (opens the file) or offers the upload (photo or PDF); `Price` prints `RM {amount}` or `Not recorded`.
 
+**Repair Orders slice B words — added 2026-09-29 (Purchasing MASTER §9.7 "Build state").**
+Object header `Open PDF` (the A4 paper over the page, with `Print` · `Download`); Issue opens the
+50/50 with the paper on the right and `Record what you sent`. The paper (DOCUMENT-KIT §3 rules
+11–12): hero `REPAIR ORDER`; blocks `Supplier` · `Supplier Pickup Location` · `Supplier Return
+Location` · `RO Details` (`RO No` · `RO Doc Date` · `Supplier Claim No` only for a Claim-origin RO) ·
+`Reason` (each Unit's recorded one sentence, verbatim); goods heads `Category` · `PO No / Unit ID` ·
+`Items` · `Qty` · `Problem` · `Repair Requirement`, closing `TOTAL`; photo pages `DAMAGE PHOTOS ·
+{Unit ID}`; absence `No damage photos recorded.` · `No damage photos recorded for {Unit IDs}.`
+Work (Workspace §6, PO Duty), row line · fact: `Issue repair order to {supplier}` · `Sending not
+confirmed` — `Ask {Supplier} to confirm they received {RO No}` · `Awaiting Supplier receipt of RO` —
+`Ask {Supplier} when {Unit ID} will return` · `The repair return date has passed` — `Ask {owner} to
+agree to repair {Unit ID}` · `Owner consent not recorded` (`{owner}` is the Unit's recorded owner,
+else `the owner`). Several Units read `{first Unit ID} + {n} more`. Every RO sentence that counts Units reads `1 Unit` / `{n} Units`
+(`Hand 1 Unit to {Supplier}` · `Waiting for {Supplier} to return 1 Unit` · `Inspect 1 returned Unit`).
+The paper's footer prints `{RO No} · Issued by {name}`, or the RO No alone when the issuer is unknown. Required results: `The current
+repair order version is marked as sent` · `Supplier receipt of the repair order is recorded` · `The
+Units are received back` · `The owner's consent is recorded`.
+
 ### Repair Orders creation and locations — owner ruling 2026-09-18
 
 `Create Repair Order` selects existing inventory Units, including Display at Warehouse, Showroom
