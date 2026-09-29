@@ -537,21 +537,51 @@ For each exact delivered Unit, Delivery emits one idempotent success fact. If St
 was `Supplier Consignment`, Purchasing automatically creates the Consignment Sale Notice for that
 supplier × Delivery Visit. Failed or refused goods create no notice.
 
-`Partially Delivered` preserves delivered goods and requires failed quantity, reason, goods
-location, proof and next Work for every remainder. `Failed Delivery` requires reason, explanation,
-affected goods, the actual attempt date (exact time optional under the rule above), goods location,
-reporter, proof and an explicit next action. No bare `Failed Delivery` may be saved or closed.
+**RESULT SCOPE — CARRIED-FORWARD OWNER RULINGS, CONVERGED 2026-09-30 / TARGET; END-TO-END
+IMPLEMENTATION NOT VERIFIED.** Expected exact Units come from this DO's frozen goods scope; Operation
+never retypes Unit IDs or substitutes the order's current allocation for the document. A partial
+result selects the exact delivered Units and automatically derives the affected remainder. Only the
+delivered Units move to Customer. Counted goods retain their governed source-line quantities rather
+than invented Unit IDs. Record the reason, current holder/location and concrete next action for each
+affected group of Units, keeping different outcomes distinguishable.
+
+`Failed Delivery` requires a structured reason, affected goods, actual attempt date (exact time
+optional under the rule above), current goods location, reporter, applicable failure evidence and an
+explicit next action. Known reasons do not require redundant free-text explanation; `Other` requires
+a short explanation. A pre-trip customer postponement is an arrangement change; a customer change
+after arrival or an actual delivery attempt is Failed Delivery with the governed reason. No bare
+`Failed Delivery` may be saved or closed.
 
 ### 6.1 · Proof and its review
 
 Proof is bound to the exact event it proves: Logistics confirmation, customer confirmation,
 Warehouse handover, Delivered, Failed Delivery, return or correction. An uploaded file records
 what the driver sent; it is not proof accepted and not a successful delivery. Operation reviews
-delivery proof as **`Proof Accepted`**, **`More Proof Required`** or **`Proof Rejected`**, each
-with a reason. `Proof Accepted` is the fact that turns `Delivered` green everywhere and closes
+delivery proof as **`Proof Accepted`**, **`More Proof Required`** or **`Proof Rejected`**;
+More Proof Required and Proof Rejected require a reason, as governed by COPY-STANDARD. `Proof Accepted` is the fact that turns `Delivered` green everywhere and closes
 `Upload delivery proof`; `Proof Rejected` reopens it with the reason. Saved delivery facts are
 corrected through an append-only Correction containing old value, new value, reason, person, time
 and approval where governed.
+
+**CURRENT SUBMISSION AND REQUIRED EVIDENCE — CARRIED-FORWARD OWNER RULINGS, CONVERGED
+2026-09-30 / TARGET; END-TO-END IMPLEMENTATION NOT VERIFIED.** Drivers send signed DO and delivery
+or service photos into the logistics WhatsApp group; Operation uploads them to the matching DO and
+actual delivery event in ERP. WhatsApp is the submission channel; ERP is the permanent record.
+Preserve separately the delivering logistics company/driver, the evidence reporter/source, submission
+channel and timestamp when known, actual Operation uploader and system upload timestamp, and actual
+reviewer and system review timestamp. Unknown external submission time stays unknown. Neither
+assignment nor upload identifies the person who physically delivered the goods. The source surface
+(Workspace or Delivery Monitor) is separate from the external submission channel and follows §13.1.
+
+A successful customer delivery requires the signed DO and delivery photo. Ordered services such as
+disposal carry their own service evidence. For a partial delivery, success evidence applies to the
+Units delivered and services actually performed; the remainder keeps its own reason, location and
+next action. A failed trip owes no successful-delivery photo or signed success document; record the
+applicable evidence of its failure instead. Upload does not mean Proof Accepted. Missing required
+files remain work even after the actual result is recorded; acceptance checks the applicable required
+evidence. Settings may express the governed requirements by result/service, not switch off these
+owner-required success facts. Future driver mobile/QR submission uses this same evidence model;
+it is not the current submission channel or a claim of live lorry tracking.
 
 **BUILT 2026-09-13 (Card 13, migration 0489).** `delivery_attempt_evidence` binds every file to
 the Delivery Visit it proves (the photo/video uploader stamps and binds in one act; the signed
@@ -1293,7 +1323,7 @@ and is not restored. `Booked` stays banned.
 
 | Recorded facts | Line 1 | Colour | Line 2 |
 |---|---|---|---|
-| no partner on the scope | `Assign logistics` | orange | the contact deadline, as a glyph and a day (§8.3) |
+| no partner on the scope | `Assign logistics` | orange | the assignment deadline from §2.1, as a glyph and a day; absent when no deadline is known |
 | partner set, no contact record, the partner contacts the customer | `Get delivery date from {partner}` | orange | the contact deadline, as a glyph and a day (§8.3) |
 | partner set, no contact record, Carres contacts the customer | `Get delivery date from customer` | orange | the contact deadline, as a glyph and a day (§8.3) |
 | latest contact result is `Waiting for Customer Reply` | `Waiting for customer reply` | orange | `Asked {date}` |
