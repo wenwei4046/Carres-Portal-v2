@@ -5542,10 +5542,12 @@ recreate its Unit list.
 
 **Object/placement:** internal full-width object; no PDF preview. Reuse the shared kit and owning
 forms. Workspace may open those same forms in place; it creates no second request, inventory or
-business writer. The existing register column contract remains Request No., Outlet, Requested By,
-Current Unit/Model, Requested Model, Reason, Needed Date, Purchasing Decision, Source Order, Work.
-The former decision-first rail wording and exact handoff controls require this page's copy/design
-review before build; they must not imply that Operation negotiates Sales's supplier price.
+business writer. The current register content boundary is §9.13.3: arrangement identity/date,
+showroom, supplier scope, negotiating Sales, incoming/outgoing goods and concrete unresolved facts.
+Do not add a Purchasing Decision approval step or generic Work column. The already-agreed handoff
+needs no extra boss approval; existing purchase and other owning-module approvals remain intact.
+Exact column order and literal copy still require design closure against the shared kit and COPY;
+this semantic boundary is not a final rendered register or permission to invent new screen words.
 
 **Exceptions:** missing Catalog SKU, unclear ownership, unidentified old Unit, unavailable model,
 duplicate arrangement, incomplete negotiated terms, and partial incoming/outgoing fulfilment.
@@ -5562,7 +5564,7 @@ and register destinations. Do not rename them collectively Consignment Note or i
 a third manually created document. Staff still enter the Display Request once; intent and verified
 ownership derive the correct source-linked order and/or return, with existing facts prefilled.
 
-**Source / identity:** approved Display Request or authorised Supplier Claim replacement outcome;
+**Source / identity:** source-linked Display Request under §9.8 or authorised Supplier Claim replacement outcome;
 no blank order that bypasses its source. Manual arrangement entry follows §9.8. Official issue
 allocates new incoming exact Unit IDs under §6.2; existing outgoing Units keep their identities.
 Preserve numbering families, old titles/versions and source links. No historical document rewrite,
@@ -6074,7 +6076,7 @@ same meaning and next action, with no claimed visual validation until the govern
 - Loading, failure, empty and filtered-empty are distinct. A failed read is never zero stock or
   completion. Disallowed actions explain the specific missing source, permission or affected Unit.
 
-**5. Ownership, Settings and unresolved assignment recommendation**
+**5. Ownership, Settings and approved assignments**
 
 Approved assignments remain: Sales negotiates commercial terms, Operation records/executes permitted
 arrangements, PO Duty owns supplier-document/follow-up actions, GRN Duty/eligible receiving people
