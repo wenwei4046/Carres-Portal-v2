@@ -29,7 +29,7 @@ export function workDueWord(item: Pick<WorkRow, "timingBucket" | "dueIso">): { t
 export default function WorkListRow({
   item,
   action,
-  cover,
+  cover: _cover,
   selected,
   onSelect,
   onOpenRecord: _onOpenRecord,
@@ -70,7 +70,7 @@ export default function WorkListRow({
       <span className="flex min-w-0 items-baseline gap-2">
         {/* The whole row chooses the act; `Open order` lives in the middle (Jess, 2026-09-27). */}
         <span className="shrink-0 text-[12px] font-medium leading-4 text-kit-slate-11">{item.soRef}</span>
-        {cover ? <span className="min-w-0 truncate text-[12px] font-medium leading-4 text-kit-amber-11" data-testid="work-row-cover">For {cover}</span> : null}
+        <span className="min-w-0 truncate text-[12px] font-medium leading-4 text-kit-slate-11" data-testid="work-row-assigned">{item.ownerId ? `Assigned to ${item.ownerName ?? "Name not recorded"}` : "Not assigned"}</span>
         <span className={`ml-auto shrink-0 text-[12px] leading-4 ${due.missed ? "font-semibold text-danger" : due.today ? "font-semibold text-kit-amber-11" : "text-kit-slate-11"}`} data-testid="work-row-due">
           {due.text}
         </span>

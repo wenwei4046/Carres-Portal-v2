@@ -24,4 +24,21 @@ describe("WorkOwnerSource", () => {
     expect(text).not.toMatch(/2026-07-16|T01:15|\.207Z/);
     expect(screen.getByText("Owner, timing and source")).toBeInTheDocument();
   });
+  it.each([
+    [{ userId: "ali", name: "Ali" }, "Ali"],
+    [null, "Not assigned"],
+    [{ userId: "ali", name: null }, "Name not recorded"],
+  ])("uses the resolved assignment and never substitutes the original person", (acting, expected) => {
+    const item = {
+      module: "delivery", object: { label: "SO-1" },
+      owner: { normal: { userId: "jess", name: "Jess" }, acting },
+      timing: { actionOn: null, businessDueOn: null, noDateReason: "No date" },
+      observedAt: "2026-09-29T06:14:00Z",
+    } as unknown as OperationWorkItem;
+    const { container } = render(<WorkOwnerSource item={item} />);
+    expect(container).toHaveTextContent("Assigned to");
+    expect(container).toHaveTextContent(expected);
+    expect(container).not.toHaveTextContent(/Jess|Normal owner|Acting today|Completed by/);
+  });
+
 });

@@ -469,7 +469,7 @@ export default function SoBatchIssueWorkspace({
                   <Fact idPrefix="po-review-fact" own={false} framed label="Supplier" value={
                     <span className="flex flex-col">
                       <span>{current.supplierName ?? "Not recorded"}</span>
-                      <span className="whitespace-pre-wrap break-words text-meta text-kit-slate-11">{current.supplierAddress || <a className="text-kit-blue-11 underline" href="/operation?tab=suppliers">Address not recorded. Check Suppliers.</a>}</span>
+                      <span className="whitespace-pre-wrap break-words text-meta text-kit-slate-11">{current.supplierAddress || <a className="text-kit-blue-11 underline" href="/operation/settings/purchasing">Address not recorded. Check Purchasing Settings.</a>}</span>
                     </span>
                   } />
                   <Fact idPrefix="po-review-fact" own={false} framed label="Supplier Deliver To" value={

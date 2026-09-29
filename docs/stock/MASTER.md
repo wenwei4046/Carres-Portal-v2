@@ -1717,6 +1717,24 @@ opens Outbound, scans the exact Unit and identifies the actual supplier collecto
 records out handover; Portal keeps the repair partner as holder and creates a concrete follow-up if
 the dated return is not submitted; actual return is scanned through Inbound and checked again.
 
+**THE SUPPLIER COLLECTS A PURCHASE RETURN — owner approval 2026-09-29 (relayed by the Purchasing
+lane); the writer BUILT 2026-09-29, migration 0612; the Outbound screen APPROVED TARGET / NOT BUILT
+(its design goes to the owner first).** Stock owns the physical half of Purchasing §9.6: the one door
+`stock_record_supplier_return_pickup` records, for an issued Purchase Return, the exact Units the
+supplier's person took, that person's name as given, the actual time and at least one proof (photo,
+video or PDF), with an optional note such as the lorry number. Per Unit it refuses a Unit that is not
+on the return, one already picked up, and one no longer held under the return's own Supplier Claim;
+then custody leaves Carres (`on_hold` → `returned_to_supplier`, which the 0341 guard admits only for a
+claim hold) and the pickup facts Purchasing reads are written onto the return's Unit rows
+(`actual_pickup_date`, `collected_by_name`, pickup proof). Units not named stay open, so Purchasing
+reads `Partly picked up` until the last one goes. Each handover is one append-only
+`supplier_return_handovers` row carrying the Carres person who recorded it; one request records
+once. `collected_by` (a portal user) stays empty on purpose: the collector is the supplier's person.
+Proven on a replayed production schema 2026-09-29: five refusals, a partial pickup of two of three
+Units, a replay that wrote nothing, the final Unit, another claim's Unit untouched, three lineage
+events, append-only enforced, a disabled user refused. `Supplier Received Date` stays Purchasing's
+(from supplier evidence). The Repair Order pickup leg needs the same handover and is not in this slice.
+
 **UI / PAGE / OBJECT PLACEMENT →** no Warehouse Return top page exists. Inbound hosts `Customer
 Return · Return from repair · Supplier replacement · Failed Delivery return`; Outbound hosts
 `Return to supplier · Send for repair · Return to showroom/warehouse`. Unit Detail shows `Return/

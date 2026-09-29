@@ -347,7 +347,7 @@ describe("one cache key per read — both mounting orders, real QueryClient", ()
     state.work = workResponse([collectItem(JESS_HOLDS), MINE]);
     await act(async () => { await qc.invalidateQueries({ queryKey: qk.operation.work() }); });
 
-    await waitFor(() => expect(within(screen.getByTestId("monitor-timing-1302")).getByTestId("monitor-owner-avatar")).toHaveAttribute("aria-label", "Jess"));
+    await waitFor(() => expect(within(screen.getByTestId("monitor-timing-1302")).getByTestId("monitor-owner-avatar")).toHaveAttribute("aria-label", "Assigned to Jess"));
     expect(screen.queryByTestId("monitor-owner-unassigned")).not.toBeInTheDocument();
     expect(state.workCalls).toBe(2);
     expect(state.tasksCalls).toBe(1);

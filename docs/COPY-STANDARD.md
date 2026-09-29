@@ -1613,7 +1613,7 @@ rule from the Sales Order entrance.
 | Review batch action (approved 2026-09-24) | `Issue {n} PO` / `Issue {n} POs` — the whole atomic batch, including while viewing its first document. |
 | SO Batch selection | `{n} Sales Order(s) · {n} item(s) · {n} unit(s) · Issue {n} PO(s)` — counts name their objects; an empty selection has no summary. |
 | Actual PDF preview | `Zoom out` · `Zoom in` · `Fit width` · `Rendering preview…` · `Could not load the preview.` · `Try again`. |
-| Missing review facts | `Address not recorded. Check Suppliers.` · `Address not recorded. Check Purchasing Settings.` · `Not recorded. Check Suppliers.` · `Not available. Go back and reload.` · `Not available. Check production days in Purchasing Settings.` |
+| Missing review facts | `Address not recorded. Check Purchasing Settings.` (supplier and Deliver To alike; the supplier's is recorded in `Supplier addresses`, 0611) · `Not recorded. Check Suppliers.` · `Not available. Go back and reload.` · `Not available. Check production days in Purchasing Settings.` |
 | Provisional issue date | `PO Doc Date` · `Provisional. The date is recorded when issued.` |
 | ⭐ ONE SURFACE, TWO LANES (owner instruction 2026-09-23) | The same review checks an SO Batch document and a Manual Purchase document. Its `Source` column prints whichever source the line HAS: `SO-{n}` for a Sales Order line, the request's `MPR No` for a Manual Purchase line — one column, one meaning, never a second word for either. The requester's `Purchase requirement` prints under the item where one was recorded. `Back to buying` keeps its word on SO Batch; from Manual Purchase Request the way out reads `Manual Purchase Request`, the list it came from. |
 | Factory-pickup collection fact | `{partner} collects from {supplier} and delivers to {destination}.` |
@@ -4230,6 +4230,19 @@ Order detail, Finance → Supplier bill form.
 | Both fields, refused | **`0 to 365`** | The allowed range. |
 | Bill form, under Due date | **`Bill date + {n} days, from the PO's terms`** · **`Bill date + {n} days, from the supplier's terms`** | Where the filled-in due date came from. Gone once the user types a date. |
 | PO detail, refused | **`The terms could not be saved`** | The save failed. |
+
+### Supplier addresses (migration 0611) — BUILT 2026-09-29
+
+Settings → Purchasing. Each supplier has two separate addresses; one is never copied into the other
+and a blank saves nothing recorded (Purchasing MASTER §9.6).
+
+| Where | Word | Meaning |
+|---|---|---|
+| Settings section | **`Supplier addresses`** | Heading for the per-supplier addresses. |
+| | **`The Address prints on the PO. Purchase Returns go to the Return address.`** | What each address is for. |
+| Supplier row | **`Address`** | The supplier's full address, printed on the PO and Repair Order PDFs. |
+| Supplier row | **`Return address`** | Where a Purchase Return goes (`Return To`). Blank = Issue Purchase Return refuses `Add the return address of {Supplier}`. |
+| Each field | **`Save`** | Saves that one address. |
 
 ## Header rules (see UI-KIT for the shell)
 

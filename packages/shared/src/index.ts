@@ -2,6 +2,7 @@ export const SHARED_VERSION = "0.0.0" as const;
 
 export * from "./issue-tracker";
 export * from "./unit-problem";
+export * from "./supplier-return-pickup";
 export * from "./repair-order";
 export * from "./repair-order-work";
 export * from "./supplier-claim-record";
@@ -124,6 +125,8 @@ export {
   purchasingSetProductionDaysInput,
   purchasingSetTransitDaysInput,
   purchasingSetSupplierTermsDaysInput,
+  purchasingSetSupplierAddressInput,
+  SUPPLIER_ADDRESS_MAX,
   TRANSIT_DAYS_RANGE,
   purchasingSetWorkWeekInput,
   type PurchasingCategory,
@@ -146,6 +149,7 @@ export {
   type PurchasingSetProductionDaysInput,
   type PurchasingSetTransitDaysInput,
   type PurchasingSetSupplierTermsDaysInput,
+  type PurchasingSetSupplierAddressInput,
   type PurchasingSetWorkWeekInput,
 } from "./purchasing-settings";
 

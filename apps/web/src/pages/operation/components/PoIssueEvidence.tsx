@@ -143,18 +143,8 @@ export function confirmedSendFor(
 
 function sendActorContext(evidence: PoSendEvidence): string {
   const actor = evidence.sent_by_name ? ` by ${evidence.sent_by_name}` : "";
-  if (evidence.acting_name) {
-    if (evidence.acting_name === evidence.sent_by_name) {
-      return `${actor} (covering ${evidence.duty_name ?? "PO duty"})`;
-    }
-    return `${actor} · PO Duty cover ${evidence.acting_name}${
-      evidence.duty_name ? ` for ${evidence.duty_name}` : ""
-    }`;
-  }
-  if (evidence.duty_name && evidence.duty_name !== evidence.sent_by_name) {
-    return `${actor} · PO Duty ${evidence.duty_name}`;
-  }
-  return actor;
+  const assigned = evidence.acting_name ?? evidence.duty_name;
+  return assigned ? `${actor} · Assigned to ${assigned}` : actor;
 }
 
 /**

@@ -161,7 +161,7 @@ describe("persisted evidence survives a reload", () => {
 
     const panel = screen.getByTestId(`so-batch-evidence-${PO.id}`);
     expect(panel).toHaveTextContent("by Operation Superuser");
-    expect(panel).toHaveTextContent("PO Duty cover Shasha for Yu Jun");
+    expect(panel).toHaveTextContent("Assigned to Shasha");
     expect(panel).not.toHaveTextContent("Operation Superuser (covering Yu Jun)");
   });
 
@@ -176,7 +176,7 @@ describe("persisted evidence survives a reload", () => {
     ]);
 
     expect(screen.getByTestId(`so-batch-evidence-${PO.id}`)).toHaveTextContent(
-      "by Operation Superuser · PO Duty Yu Jun",
+      "by Operation Superuser · Assigned to Yu Jun",
     );
   });
 });
