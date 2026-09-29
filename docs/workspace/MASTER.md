@@ -488,6 +488,12 @@ The current assignment source remains dated assignments, not the target's genera
 Outstanding before release: period collector wiring, authoritative scheduler/calendar/eligible
 pool, immutable assignment movements/no late bounce-back and shared consumers, missing-period
 versus offline-work evidence handling, full release checks and production verification.
+The shared checkpoint evaluator now separates the two evidence windows, uses the existing Office
+week/holiday contract, waits for the persisted cutoff, and distinguishes unavailable/corrupt
+evidence from a healthy empty result. It uses actual server observation timestamps, not minute
+buckets, so an interaction after the cutoff cannot satisfy the check. Nine focused cases cover
+flexible starts, lunch, cutoff boundaries, weekends, holidays and unavailable evidence. This
+evaluator is not yet connected to a scheduler or assignment writer.
 These components do not prove attendance or claim that automatic reassignment is live.
 
 **OWNER RULING 2026-09-29 — APPROVED TARGET / NOT BUILT.** Settings → Staff & Duties contains

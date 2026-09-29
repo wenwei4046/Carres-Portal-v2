@@ -3344,3 +3344,5 @@ export {
   workspaceActivityWindow,
   type WorkspaceActivitySettings,
 } from "./workspace-activity";
+
+export { evaluateWorkspaceActivityCheck, type WorkspaceActivityEvidence, type WorkspaceActivityCheck } from "./workspace-activity-check";
