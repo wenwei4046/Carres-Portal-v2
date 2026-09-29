@@ -12,6 +12,7 @@
  * because it has six fields and no lines.
  */
 import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import type { UseMutationResult } from "@tanstack/react-query";
 import {
   MONEY_MOVE_KIND_WORD,
@@ -388,7 +389,8 @@ export function MoneyMoveForm({
             options={fromOptions}
             hint={
               cardSettlementOnly
-                ? "A card account is paid out on Card settlement."
+                ? <>A card account is paid out on{" "}
+                  <Link className="underline underline-offset-2" to="/finance/card-settlement">Card settlement</Link>.</>
                 : fixed && routes.isError
                   ? "The payout banks did not load. Close this and try again."
                   : fixed && routes.isSuccess && fromOptions.length === 0

@@ -115,7 +115,7 @@ describe("Money moves", () => {
     fireEvent.click(await screen.findByRole("option", { name: "Card payout" }));
     fireEvent.keyDown(within(form).getByRole("combobox", { name: /Paid from/ }), { key: "Enter" });
     const options = (await screen.findAllByRole("option")).map((o) => o.textContent);
-    return { options, hint: within(form).queryByText(HINT) !== null };
+    return { options, hint: form.querySelector("#move-from-msg")?.textContent === HINT };
   };
   const accounts = (...card: Array<[string, string, boolean]>) => [
     { code: "1123", name: "Hong Leong", money_kind: "BANK", is_active: true, is_card_account: false },
@@ -126,6 +126,15 @@ describe("Money moves", () => {
     net.routes["GET /api/finance/ledger/money-accounts"] = accounts(["1130", "Other card", false], ["1131", "GHL", true], ["1132", "Visa", true]);
     net.routes["GET /api/finance/ledger/money-accounts/card-routes"] = [{ holding_code: "1131", channel: "dealer", bank_code: "1123" }];
     expect(await cardPayoutFrom()).toEqual({ options: ["1130 · Other card"], hint: true });
+  });
+
+  it("the hint's Card settlement opens the Card settlement page", async () => {
+    net.routes["GET /api/finance/ledger/money-accounts"] = accounts(["1130", "Other card", false], ["1131", "GHL", true]);
+    net.routes["GET /api/finance/ledger/money-accounts/card-routes"] = [];
+    await cardPayoutFrom();
+    const link = screen.getByTestId("money-move-form").querySelector("#move-from-msg a");
+    expect(link).toHaveTextContent("Card settlement");
+    expect(link).toHaveAttribute("href", "/finance/card-settlement");
   });
 
   it("0576: a card account a card method maps to, with no payout bank anywhere, is not offered, and the hint still shows", async () => {

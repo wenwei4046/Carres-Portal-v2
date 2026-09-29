@@ -28,7 +28,7 @@ export default function FieldFrame({
   /** Omit for a control that is labelled by its surroundings (a search box in
    *  a toolbar). Then pass `aria-label` on the control itself. */
   label?: string;
-  hint?: string;
+  hint?: ReactNode;
   error?: string;
   required?: boolean;
   children: ReactNode;
