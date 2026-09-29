@@ -156,10 +156,11 @@ assignment controls remain intact. Module links lead to this same page; no secon
 Workspace still owns assignment/cover and the Shared Duty Resolver. Settings owns only placement;
 People/HR retains employee identity and eligibility, and modules retain actual work/completion.
 
-**Measured implementation boundary:** the reviewed shipped page occupied the main menu and
-Settings had no Staff & Duties section. Relocation and the final Blueprint remain target work,
-not BUILT or DEPLOYED. Preserve access, exact-Duty deep links and return context; the Settings shell
-must not force three simultaneous columns on narrow screens. No token delta is required.
+**Measured implementation boundary:** CARD 02 is production verified (PR #1791; §4.6 proof).
+Settings contains the existing page, the permanent main-menu row is removed, and legacy/contextual
+links preserve the exact Duty and safe return context. Settings navigation opens on demand, with
+one catalogue/detail pane on narrow screens. No token or business-permission change was made.
+The rest of the final Blueprint remains approved target work, not delivered by this relocation.
 
 Routine operational allocation follows the governed automatic rotation and eligible active People
 pool. Jess does not enter each monthly assignment. Staff & Duties displays the results and governed
