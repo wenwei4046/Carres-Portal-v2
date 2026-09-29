@@ -7,7 +7,9 @@ export type WorkspaceActivityEvidence =
   | { status: "healthy"; events: readonly { userId: string; observedAt: string }[] };
 
 export type WorkspaceActivityCheck =
-  | { status: "not_due" | "not_working_day" | "evidence_unavailable" }
+  | { status: "not_due" }
+  | { status: "not_working_day" }
+  | { status: "evidence_unavailable" }
   | { status: "ready"; start: string; cutoff: string; activeUserIds: readonly string[] };
 
 /** Evaluate one checkpoint from server-recorded observations. This is routing

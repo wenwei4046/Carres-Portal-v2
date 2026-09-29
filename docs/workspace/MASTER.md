@@ -497,9 +497,23 @@ evaluator is not yet connected to a scheduler or assignment writer. The ordinary
 helper preserves from/to and expected revision for a future atomic writer, respects authoritative
 candidate order, refuses completed/approval work, and consumes per-day/per-period receipts to
 prevent repeat movements. Eleven cases cover late-activity bounce-back, independent afternoon
-checks, no candidate, source outage and People eligibility. These are decision tests only; durable
-receipts, locking and assignment history are not yet implemented and no production movement is
+checks, no candidate, source outage and People eligibility. These are decision tests only; the
+source-aware scheduler/resolver integration is not yet implemented and no production movement is
 claimed.
+
+Migration `0615_a_work_checkpoint_keeps_an_immutable_assignment_receipt` adds a service-only
+checkpoint receipt primitive with per-scope/day locking, unique period receipts, prior-receipt
+comparison and settings-revision validation. It retains from/to, reason, cutoff and recording time;
+retrying a recorded period returns the committed result. Direct browser reads/writes and direct
+service-role inserts/updates/deletes are revoked. The source-aware caller must still prove calendar,
+complete evidence, allocation eligibility and source completion in the committing transaction;
+the primitive alone is not an allocation authority.
+
+The exact committed 0613 + 0615 files passed a single rolled-back production probe on 2026-09-29:
+duplicate retry, stale assignment, stale settings, approval-duty refusal, browser refusal and
+sealed direct grants. Follow-up reads confirmed both tables absent and no 0615/probe tracker row.
+0615 is **NOT APPLIED**; its number follows measured tracker 0612 and all-branch maximum 0614.
+No scheduler or existing resolver has been activated by this work.
 These components do not prove attendance or claim that automatic reassignment is live.
 
 **OWNER RULING 2026-09-29 — APPROVED TARGET / NOT BUILT.** Settings → Staff & Duties contains
