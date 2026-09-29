@@ -1090,6 +1090,48 @@ export default function OperationPurchasingSettings({
           </div>
           </Block>
         </div>
+
+        {/* ⭐ SUPPLIER CLAIMS (Purchasing MASTER §9.5, owner-approved / LOCKED
+            2026-09-06; storage 0606): the two reply-timing numbers, Office
+            working days. The Supplier Claims lane reads them for `Reply
+            expected`, `Reply overdue` and the escalation Work; a change never
+            moves an existing claim's dated obligation. */}
+        {data.claimReplyWaitingDays != null && data.claimEscalationExtraDays != null && (
+          <div className="mt-8 max-w-[860px]" data-testid="supplier-claims-settings">
+            <Block title="Supplier Claims">
+              <div className="bg-white">
+                <NumberRow
+                  label="Reply waiting days"
+                  hint="From the day we ask the supplier to the day a reply is expected."
+                  unit="Office working days"
+                  value={data.claimReplyWaitingDays}
+                  min={PURCHASING_NUMBER_RANGE.claim_reply_waiting_days.min}
+                  max={PURCHASING_NUMBER_RANGE.claim_reply_waiting_days.max}
+                  canEdit={canEdit}
+                  pending={setNumber.isPending}
+                  testId="claim-reply-waiting-days"
+                  onSave={(n) => saveNumber("claim_reply_waiting_days", n)}
+                >
+                  <ChangeLine settings={data} settingKey="claim_reply_waiting_days" />
+                </NumberRow>
+                <NumberRow
+                  label="Extra days before escalation"
+                  hint="After a missed reply, before the Purchasing Approver is asked to decide."
+                  unit="Office working days"
+                  value={data.claimEscalationExtraDays}
+                  min={PURCHASING_NUMBER_RANGE.claim_escalation_extra_days.min}
+                  max={PURCHASING_NUMBER_RANGE.claim_escalation_extra_days.max}
+                  canEdit={canEdit}
+                  pending={setNumber.isPending}
+                  testId="claim-escalation-extra-days"
+                  onSave={(n) => saveNumber("claim_escalation_extra_days", n)}
+                >
+                  <ChangeLine settings={data} settingKey="claim_escalation_extra_days" />
+                </NumberRow>
+              </div>
+            </Block>
+          </div>
+        )}
       </div>
     </div>
   );
