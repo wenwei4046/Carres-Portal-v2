@@ -3,10 +3,10 @@
 - **Module:** Workspace — Staff & Duties
 - **Sequence:** 02
 - **Lane:** BUILD / DELIVERY
-- **Status:** OPEN — relocation-first scope authorised; not merged or deployed
+- **Status:** CLOSED — relocation production verified, 2026-09-29
 - **Owner instruction:** Jess, 2026-09-29: “first open card to fix the staff & duties move to setting first”
 - **Authority:** `docs/workspace/MASTER.md` §4 entry placement; shared Settings entry in `docs/ui/MASTER.md`; Duty destination in `docs/COPY-STANDARD.md`.
-- **Existing work:** draft PR #1791, branch `codex/staff-duties-delivery`. The release diff is narrowed to this Card; the broader draft is preserved on `codex/staff-duties-full-draft-20260929`.
+- **Release:** merged PR #1791, branch `codex/staff-duties-delivery`. The release diff is narrowed to this Card; the broader draft is preserved on `codex/staff-duties-full-draft-20260929`.
 
 ## Outcome
 
@@ -55,20 +55,20 @@ to alter HR or owning-module business rules.
 
 ## Acceptance and release
 
-- [ ] Gear → All System Settings → Staff & Duties opens the existing authorised page.
-- [ ] No permanent Staff & Duties main-menu row remains; Workspace naming is preserved.
-- [ ] An old exact-Duty bookmark reaches the same Duty at the new address; browser Back and
+- [x] Gear → All System Settings → Staff & Duties opens the existing authorised page.
+- [x] No permanent Staff & Duties main-menu row remains; Workspace naming is preserved.
+- [x] An old exact-Duty bookmark reaches the same Duty at the new address; browser Back and
       originating Work context remain usable.
-- [ ] Reader/manager access and existing assignment/cover behaviour are unchanged; no permission
+- [x] Reader/manager access and existing assignment/cover behaviour are unchanged; no permission
       or employee record is modified as a consequence of opening the page.
-- [ ] One destination header, no false Dashboard selection, and usable Settings navigation.
-- [ ] Browser verification at **1440, 1180, 820, 743 and 390px**: no horizontal overflow, clipped
+- [x] One destination header, no false Dashboard selection, and usable Settings navigation.
+- [x] Browser verification at **1440, 1180, 820, 743 and 390px**: no horizontal overflow, clipped
       names/controls or page errors; keyboard operation, narrow back focus, and loading/failure
       behaviour checked. Mark fixture evidence separately from authenticated production evidence.
-- [ ] Focused navigation regressions, required repository checks and exact-head CI pass.
-- [ ] Self-review confirms the released diff contains this Card only; merge and normal main-owned
+- [x] Focused navigation regressions, required repository checks and exact-head CI pass.
+- [x] Self-review confirms the released diff contains this Card only; merge and normal main-owned
       deployment complete, with exact deployment SHA and authenticated production journey verified.
-- [ ] Update Workspace MASTER §4 with the relocation's measured delivered status. Keep the wider
+- [x] Update Workspace MASTER §4 with the relocation's measured delivered status. Keep the wider
       approved operating model explicitly unfinished; this Card does not close the whole Blueprint.
 
 ## Build handoff
@@ -79,11 +79,22 @@ legacy/contextual links, responsive shell, tests and production verification. Do
 allocation, leave, departure, HR access, business permissions or database contracts. Follow the
 current constitution and owning MASTER; keep the broader approved Blueprint for subsequent work.
 
-## Verification in progress — 2026-09-29
+## Release proof — 2026-09-29
 
-Local focused checks: StaffDuties 96, OperationApp 43, SettingsWorkspace 13, DeliverySettings 8,
-and PortalSidebar 111 tests passed (271 total). The actual application shell with synthetic API
-fixtures passed at 1440, 1180, 820, 743 and 390px: canonical exact-Duty navigation, on-demand
-Settings rail, one destination header, document overflow, narrow Back focus, reader controls,
-loading, initial failure and page-error checks. Screenshots and measurements in
-`docs/evidence/staff-duties/settings/` are fixture evidence only. Production is not yet verified.
+- PR #1791 merged as `5fa933a5a06bdf7177043d892141e8cdd81e2f26`.
+- CI [36538315010](https://github.com/wenwei4046/Carres-Portal-v2/actions/runs/36538315010):
+  shared 3,904 passed; API 3,799 passed / 219 skipped; web 5,804 passed / 3 skipped.
+  Migration law, governance lint, type checks, production build and secret-bundle guard passed.
+- Main-owned deploy [36539744277](https://github.com/wenwei4046/Carres-Portal-v2/actions/runs/36539744277)
+  succeeded; both Pages aliases, ERP, POS and API reported the exact merged SHA.
+- Authenticated Operation browser: gear → All System Settings → Staff & Duties; old exact GRN
+  bookmark redirects correctly; current GRN details and read-only controls remain; Back, Settings
+  navigation and the menu's Workspace entry work without a permanent Staff & Duties row.
+  No production data changed. Manager controls were verified with local fixtures and existing tests,
+  not by performing production writes or claiming a manager login.
+- Actual application shell with synthetic fixtures passed at 1440/1180/820/743/390px. Screenshots
+  were captured after the selected GRN heading rendered. Local type checks, lint and build passed.
+- `docs/evidence/staff-duties/settings/measurements.json` records fixture checks;
+  `production-proof.json` records deployment identity and downloaded-bundle comparison.
+
+CARD 02 closes the navigation-only slice. The wider approved Blueprint remains unfinished.

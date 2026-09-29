@@ -170,8 +170,7 @@ uses the governed maximum-four-step `What to do` block below.
 ## Workspace destination words
 
 These words govern Workspace and Issue Tracker under the left-bar `WORKSPACE` section, and the
-Workspace-owned Staff & Duties page under global Settings (placement approved 2026-09-28 /
-NOT BUILT; Workspace MASTER §4). The one global
+Workspace-owned Staff & Duties page under global Settings (placement production verified 2026-09-29, PR #1791; Workspace MASTER §4). The one global
 `Dashboard` remains an independent top-level destination and is never called `Workspace Dashboard`.
 
 | Meaning | Use exactly | Do NOT use |
@@ -232,7 +231,7 @@ NOT BUILT; Workspace MASTER §4). The one global
 | Rail Calendar day rows (owner-confirmed 2026-09-25, UI MASTER §5) | `{n} scheduled deliveries` · `{n} {company} contact deadline(s)` · `{n} arriving` · `{n} pickups` · `Pickup By {company}` · `{n} return pickup(s)` · `{n} promised payment(s)` · `{n} free storage ends` · `{n} service visit(s)`; zero prints nothing; a failed source says it could not be loaded | `supplier arrival` · `pickups by logistics` · `{n} jobs` · `0` for a failed source |
 | Right Rail healthy clear — **retires with the rail My Work slot (UI MASTER §5, owner 2026-09-24)** | `No work due now` · `Open My Work` | All done! · `0` while loading/failed |
 | Right Rail refresh failure — **retires with the rail My Work slot** | `My Work could not be refreshed` | No work due now · No open work |
-| Duty destination (owner-approved 2026-09-28; NOT BUILT) | `Settings → Staff & Duties` · page `Staff & Duties`, reached via `All System Settings`; contextual links open the exact Duty | Workspace main-menu Duty row · Duty roster |
+| Duty destination (production verified 2026-09-29, PR #1791) | `Settings → Staff & Duties` · page `Staff & Duties`, reached via `All System Settings`; contextual links open the exact Duty | Workspace main-menu Duty row · Duty roster |
 | Staff departure presentation (owner-approved 2026-09-29; NOT BUILT; HR §3) | `Last working day`; one review-and-confirm departure flow; default lists contain current staff only, former-profile lookup is personnel-manager-only | `Delete account` for departure · a second removal step · historical names removed · scheduled or partial effects described as complete |
 | Duty personnel-management entry (owner-approved 2026-09-29; NOT BUILT) | `Manage staff` — authorised personnel managers open existing People management with return context | a second employee editor · exposing former profiles to ordinary staff |
 | Duty page purpose | `Who holds each company duty today and who covers an absence.` | Manage staff · Duty roster |
@@ -2027,7 +2026,7 @@ dictionary with the approved Receiving build; each is registered here so no chat
 | `Find PO or CO` | the Start Receiving entrance | Receiving starts from the exact source. The search is CONTROLLED: an unknown delivery may record evidence but never invents a supplier, an order, a Session, a GRN or Inventory. |
 | `Only Operation staff may save a receiving.` | the refused act | The page states the same rule the SQL door holds (0601, owner ruling 2026-09-25): every active Operation staff member and the principal may post. `Only GRN duty may save a receiving.` and `Not your duty today` are RETIRED. Amend and Void keep the GRN Duty authority; their doors are simply not offered to anyone else. |
 | `Operation staff` | the posting label beside `Saved by` | A saver who is neither GRN Duty, its cover nor an Operations Superuser (0601). |
-| `Staff & Duties` | Global Settings destination + page (owner-approved 2026-09-28; NOT BUILT) | The ONE company-wide assignment surface (Law F.1). A module names the duty it needs; it never keeps a second assignment list. |
+| `Staff & Duties` | Global Settings destination + page (production verified 2026-09-29, PR #1791) | The ONE company-wide assignment surface (Law F.1). A module names the duty it needs; it never keeps a second assignment list. |
 | `GRN Duty` | duty label | The receiving duty's name everywhere — pages, history, work rows. |
 | `Nobody holds GRN Duty.` | Staff & Duties resolution · unassigned states | The honest unassigned answer (owner correction 2026-09-04): no rota recommendation is ever shown as if it were an assignment. Posting is never refused for it (owner ruling 2026-09-25). |
 | `{acting} covering for {holder}` | duty resolution while a cover runs | Both names, both facts — the cover never erases the normal holder. |

@@ -146,7 +146,7 @@ this one current truth. The UI alternatives and earlier cross-chat proposals are
 PLAN design review is complete for this surface; application work requires a BUILD/DELIVERY takeover.
 No application, migration, deployment or production verification is claimed by document approval.
 
-**ENTRY PLACEMENT — OWNER-APPROVED 2026-09-28 / APPROVED TARGET / NOT BUILT.**
+**ENTRY PLACEMENT — PRODUCTION VERIFIED 2026-09-29, PR #1791 (owner-approved 2026-09-28).**
 Jess approved this segment: move the one Staff & Duties destination to global Settings, remove its
 persistent main-menu row, and retain Work's direct door to the exact unresolved Duty. The page is
 reached through the header gear → `All System Settings` → `Staff & Duties`; a contextual Duty
@@ -156,10 +156,11 @@ assignment controls remain intact. Module links lead to this same page; no secon
 Workspace still owns assignment/cover and the Shared Duty Resolver. Settings owns only placement;
 People/HR retains employee identity and eligibility, and modules retain actual work/completion.
 
-**Measured implementation boundary:** the reviewed shipped page occupied the main menu and
-Settings had no Staff & Duties section. Relocation and the final Blueprint remain target work,
-not BUILT or DEPLOYED. Preserve access, exact-Duty deep links and return context; the Settings shell
-must not force three simultaneous columns on narrow screens. No token delta is required.
+**Measured implementation boundary:** CARD 02 is production verified (PR #1791; §4.6 proof).
+Settings contains the existing page, the permanent main-menu row is removed, and legacy/contextual
+links preserve the exact Duty and safe return context. Settings navigation opens on demand, with
+one catalogue/detail pane on narrow screens. No token or business-permission change was made.
+The rest of the final Blueprint remains approved target work, not delivered by this relocation.
 
 Routine operational allocation follows the governed automatic rotation and eligible active People
 pool. Jess does not enter each monthly assignment. Staff & Duties displays the results and governed
@@ -551,22 +552,32 @@ is not a reason to re-interview the owner or expand the agreed surface.
 **DELIVERY PRIORITY — OWNER RULING 2026-09-29.** Deliver the Settings relocation first as
 [【WORKSPACE】 — CARD 02 · Move Staff & Duties into Settings](../cards/CARD-2026-09-29-workspace-02-staff-duties-settings-entry.md).
 This slice owns the existing page's destination, menu entry, compatible links and responsive shell;
-it does not change Duty business rules, HR workflows or database contracts. The broader draft must
-be narrowed before this slice releases. Missing migration tooling is not a blocker for this Card;
+it does not change Duty business rules, HR workflows or database contracts. The release diff was narrowed to this slice. Missing migration tooling is not a blocker for this Card;
 the remaining approved automation, personnel and permission targets remain unfinished.
 
-**BUILD IN PROGRESS — 2026-09-29; NOT DEPLOYED.** CARD 02 relocates the existing page to
-Settings, redirects legacy links, preserves exact Duty and Work return context, and removes the
-permanent main-menu entry. Existing read contracts, forms, history and permissions are unchanged.
-The broader draft is preserved in Git at `codex/staff-duties-full-draft-20260929`; it is not released
-by this Card. Rotation, leave, departure/access coordination, permission convergence and the
-approved detail/history redesign remain unfinished. Release evidence will distinguish fixture
-browser checks from authenticated production verification.
+**CARD 02 — PRODUCTION VERIFIED, 2026-09-29.** PR #1791 delivered the Settings relocation at
+`5fa933a5a06bdf7177043d892141e8cdd81e2f26`. CI run `36538315010` passed (13,507 tests passed;
+222 existing skips), and main-owned deployment `36539744277` converged both Pages aliases, both
+canonical web domains and the API Worker to that exact SHA. Downloaded predecessor/new bundles
+prove the destination title changed from Workspace to Settings while the existing page-purpose
+control remained present.
+
+The authenticated Operation browser walk verified gear → All System Settings → Staff & Duties,
+legacy exact-GRN redirection, current GRN facts, the read-only manager sentence, narrow Back,
+on-demand Settings navigation, and the main menu's Workspace entry without a Staff & Duties row.
+No production record was written. Fixture checks at 1440/1180/820/743/390px verify shell geometry,
+no horizontal overflow, narrow return focus, loading/failure and unchanged reader/manager controls.
+`docs/evidence/staff-duties/settings/` distinguishes these fixtures from deployment proof.
+
+This closes the destination move only. Existing API contracts, forms, history and permissions are
+unchanged. The broader draft remains preserved at `codex/staff-duties-full-draft-20260929` and is
+not a release or competing authority. Rotation, leave, departure/access coordination, permission
+convergence and the approved plain-person/detail/history redesign remain unfinished.
 
 | Measured evidence and severity | Operator consequence | Required convergence |
 |---|---|---|
 | StaffDuties.tsx, DutyCatalogue.tsx and DutyDetail.tsx already implement selected detail, search and state filter | Rebuilding from the old stacked-page audit would discard useful capabilities | KEEP those capabilities; apply §4.2's plain-name Settings composition, manager menu and approved widths |
-| Settings relocation is implemented on the Build branch; production verification pending — yellow | The destination move is not yet released; the approved detail redesign remains unbuilt | Deliver CARD 02 first; separately converge plain-person details, `Next`, collapsed `History` and manager-only `⋯` |
+| Settings relocation is production verified at PR #1791 — delivered; detail redesign remains a target gap | Staff now open the existing page under Settings | Preserve CARD 02; separately converge plain-person details, `Next`, collapsed `History` and manager-only `⋯` |
 | Migration 0437 prefilled named two-person monthly assignments through September 2027 — red target gap | This does not establish general joiner/leaver automation | The approved cyclic allocation and next-month admission rule must produce the single authoritative assignment source |
 | Existing assign writer accepts overlapping rows; current cover writer validates a whole normal-holder period — red target gap | Manual exceptions and automatic leave could otherwise give inconsistent answers | Dated §4.3 exceptions with impact preview and preserved baseline; §4.4 one effective cover answer and eligibility checks |
 | Existing Duty API limits history reads to 200 records — target gap | Older authorised records may not be reachable | Complete bounded history pagination in a separate approved delivery scope |
