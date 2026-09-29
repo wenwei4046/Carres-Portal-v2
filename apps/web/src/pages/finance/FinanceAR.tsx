@@ -50,10 +50,25 @@ export default function FinanceAR() {
   const askedAge = params.get("age");
   const ageScope = isAgeScope(askedAge) ? askedAge : null;
   const today = appTodayIso();
-  const rows = useMemo(() => {
+  const { rows, owingCount } = useMemo(() => {
     const owing = customerOwingRows(invoiceRows ?? []);
-    return ageScope ? rowsInAgeScope(owing, ageScope, today) : owing;
+    return {
+      rows: ageScope ? rowsInAgeScope(owing, ageScope, today) : owing,
+      // What the department filter alone left, before the age condition — the
+      // empty state needs it to name which of the two emptied the list.
+      owingCount: owing.length,
+    };
   }, [invoiceRows, ageScope, today]);
+  /* Why the list is empty, in the reader's own words — one sentence per
+     reason, never one sentence for all of them. The age condition narrows
+     orders that DO owe, so rows still counted in `owingCount` means the age
+     emptied the list; with none left at all it was the department filter, or
+     nobody owes anything. A search or column filter is the fourth reason and
+     carries its own `noMatchMessage` with the Clear filters door. */
+  const emptyWord =
+    owingCount > 0 ? "No order owing money is this old."
+      : dept ? "No customer in this department owes money."
+        : "No customer owes money.";
   const clearAge = () => setParams((before) => {
     const next = new URLSearchParams(before);
     next.delete("age");
@@ -121,7 +136,8 @@ export default function FinanceAR() {
             isLoading={!query.isSuccess}
             searchPlaceholder="Search orders…"
             toolbarStart={<DepartmentFilter value={dept} onChange={setDept} />}
-            emptyMessage={ageScope ? "No order owing money is this old." : "No customer owes money."}
+            emptyMessage={emptyWord}
+            noMatchMessage="No order owing money matches these filters"
             activeConditions={ageScope
               ? [{ key: "age", label: ageScopeWord(ageScope), onClear: clearAge }]
               : undefined}

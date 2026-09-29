@@ -57,13 +57,14 @@ beforeEach(() => {
   api.routes = {
     [INV]: { rows: ROWS, total: ROWS.length },
     "/api/finance/payment-settings/methods": { methods: [], money_accounts: [] },
+    "/api/finance/ledger/departments": { rows: [] },
   };
   localStorage.clear();
 });
 
-function show() {
+function show(path = "/") {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(<QueryClientProvider client={qc}><MemoryRouter><FinanceAR /></MemoryRouter></QueryClientProvider>);
+  return render(<QueryClientProvider client={qc}><MemoryRouter initialEntries={[path]}><FinanceAR /></MemoryRouter></QueryClientProvider>);
 }
 
 describe("AR · Receivables", () => {
@@ -125,6 +126,44 @@ describe("AR · Receivables", () => {
     show();
     expect(await screen.findByText("Invoices could not be loaded. Try again.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument();
+    expect(screen.queryByText("No customer owes money.")).not.toBeInTheDocument();
+  });
+});
+
+/* An empty list has more than one cause, and one sentence for all of them told
+   the reader something untrue — a filtered-out list is not a settled ledger. */
+describe("the empty list says WHY it is empty", () => {
+  it("nothing owed, no filter on: nobody owes money", async () => {
+    api.routes[INV] = { rows: [], total: 0 };
+    show();
+    expect(await screen.findByText("No customer owes money.")).toBeInTheDocument();
+  });
+
+  it("a department with nothing owing says so, never that nobody owes", async () => {
+    api.routes[INV] = { rows: [], total: 0 };
+    show("/?dept=SHOWROOM");
+    expect(await screen.findByText("No customer in this department owes money.")).toBeInTheDocument();
+    expect(screen.queryByText("No customer owes money.")).not.toBeInTheDocument();
+  });
+
+  it("an age condition that matches nothing names the age, while orders still owe", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-09-20T04:00:00Z")); // noon, 20 Sep — the invoice is 14 days old
+    try {
+      show("/?age=over-30");
+      expect(await screen.findByText("No order owing money is this old.")).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("a search that matches nothing says so and offers Clear filters", async () => {
+    show();
+    await screen.findByText("Dahlia Suria");
+    fireEvent.click(screen.getByTestId("search-icon")); // the register opens its search from the toolbar icon
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search" }), { target: { value: "nobody-by-this-name" } });
+    expect(await screen.findByText("No order owing money matches these filters")).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Clear filters" })).toHaveLength(1);
     expect(screen.queryByText("No customer owes money.")).not.toBeInTheDocument();
   });
 });
