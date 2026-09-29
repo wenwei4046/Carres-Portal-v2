@@ -349,3 +349,31 @@ describe("Purchasing Settings — a supplier's Last PO time (0585)", () => {
     }
   });
 });
+
+describe("Purchasing Settings — Repair return target (0602 · 0603)", () => {
+  it("reads the target days, and a failed read never stops the page", async () => {
+    const from = vi.fn(() => ({
+      select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { repair_return_working_days: 14 }, error: null }) }) }),
+    }));
+    vi.mocked(userClient).mockReturnValue({ rpc: vi.fn(), from } as never);
+    const ok = (await (await testApp().request("/settings")).json()) as PurchasingSettingsResponse;
+    expect(ok.repairReturnWorkingDays).toBe(14);
+
+    vi.mocked(userClient).mockReturnValue({ rpc: vi.fn() } as never);
+    const res = await testApp().request("/settings");
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as PurchasingSettingsResponse).repairReturnWorkingDays).toBeUndefined();
+  });
+
+  it("saves through the one numbers door by its key (the 1 to 90 range is the SQL CHECK and the field's own min and max)", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: null, error: null });
+    vi.mocked(userClient).mockReturnValue({ rpc } as never);
+    const res = await testApp().request("/settings/number", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ key: "repair_return_working_days", value: 10 }),
+    });
+    expect(res.status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("purchasing_set_number", { p_key: "repair_return_working_days", p_value: 10 });
+  });
+});

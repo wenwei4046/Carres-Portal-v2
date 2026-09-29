@@ -41,15 +41,36 @@ import type { AppEnv } from "../../types";
  */
 const purchasingSettingsRouter = new Hono<AppEnv>();
 
+/** 0602 · the Repair return target. Read here only and fault-tolerant: a
+ *  Settings-only number never decides whether the page loads. */
+async function readRepairReturnDays(sb: ReturnType<typeof userClient>): Promise<number | null> {
+  try {
+    const { data, error } = await sb
+      .from("purchasing_settings")
+      .select("repair_return_working_days")
+      .eq("id", 1)
+      .maybeSingle();
+    const v = (data as { repair_return_working_days?: number | null } | null)?.repair_return_working_days;
+    return error || v == null ? null : Number(v);
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Every number PLUS the daily PO windows. The windows ride through the ONE
  * window reader (`loadPoWindows`, the same read Work and SO Batch use), so
  * Settings can never show a window the engine does not use.
  */
 async function loadSettingsWithWindows(sb: ReturnType<typeof userClient>) {
-  const [settings, windows] = await Promise.all([loadPurchasingSettings(sb), loadPoWindows(sb)]);
+  const [settings, windows, repair] = await Promise.all([
+    loadPurchasingSettings(sb),
+    loadPoWindows(sb),
+    readRepairReturnDays(sb),
+  ]);
   return {
     ...settings,
+    ...(repair == null ? {} : { repairReturnWorkingDays: repair }),
     poWindows: windows.settings,
     /* Each supplier's own earlier `Last PO time`, from the same reader. */
     suppliers: settings.suppliers.map((s) => ({ ...s, poCutoff: windows.cutoffBySupplier.get(s.id) ?? null })),

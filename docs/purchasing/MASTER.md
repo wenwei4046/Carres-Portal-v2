@@ -5007,7 +5007,9 @@ Do not add `Repair Location`: this register does not track where the supplier pe
 
 **APPROVED TARGET / NOT BUILT.** Carres sets a default of **14 working days from the
 Supplier receiving the Repair Order document**. This is not receipt of the goods, RO creation,
-Issue/send time, pickup time or a Service Case deadline. The governed setting supplies the period;
+Issue/send time, pickup time or a Service Case deadline. The governed setting supplies the period
+(`Settings → Purchasing → The other numbers → Repair return target`, `{n} working days`, 1 to 90; BUILT
+2026-09-29, migration 0603 opens its write door; each RO keeps the value that applied at its receipt);
 staff do not type the target on every order. Record evidenced Supplier receipt of the specific RO
 version, the received date/time, source and actual recording actor. Sending/downloading alone
 cannot prove receipt. Until receipt is recorded, show `Awaiting Supplier receipt of RO`; do not

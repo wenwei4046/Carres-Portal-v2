@@ -573,3 +573,22 @@ describe("Last PO time for one supplier", () => {
     expect(screen.queryByTestId(`last-po-time-${NICE}-save`)).toBeNull();
   });
 });
+
+describe("Repair return target (0602 · 0603, Purchasing §9.7)", () => {
+  it("edits the working days by its key", async () => {
+    settingsQuery.mockReturnValue({ data: settings({ repairReturnWorkingDays: 14 }), isLoading: false, error: null });
+    setNumber.mockReset().mockResolvedValue(undefined);
+    render(wrap(<OperationPurchasingSettings />));
+    expect(screen.getByText("Repair return target")).toBeTruthy();
+    expect(screen.getByText("Counted from when the Supplier receives the Repair Order.")).toBeTruthy();
+    fireEvent.change(screen.getByTestId("repair-return-working-days"), { target: { value: "10" } });
+    fireEvent.click(screen.getByTestId("repair-return-working-days-save"));
+    await waitFor(() => expect(setNumber).toHaveBeenCalledWith({ key: "repair_return_working_days", value: 10 }));
+  });
+
+  it("is not drawn when the Worker does not send it", () => {
+    settingsQuery.mockReturnValue({ data: settings(), isLoading: false, error: null });
+    render(wrap(<OperationPurchasingSettings />));
+    expect(screen.queryByText("Repair return target")).toBeNull();
+  });
+});
