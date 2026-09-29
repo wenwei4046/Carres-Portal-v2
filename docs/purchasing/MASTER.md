@@ -5390,6 +5390,17 @@ may not invent the answer or negotiate/set the price. Both paths create the same
 Display Request, not separate queues or duplicate supplier orders. This ruling permits proxy
 entry, not supplier-document issuance, commercial approval or changing Stock through that entry.
 
+**ALREADY-AGREED DISPLAY HANDOFF — APPROVED TARGET / NOT BUILT; Jess, 2026-09-29.**
+A Display Request records and hands off Sales's supplier-agreed display arrangement; its name does
+not introduce another boss-approval round. Operation may proxy-create the one request with the
+actual negotiating Sales person and supplied evidence, without requiring Sales to re-enter it.
+For the Dorsettloft case, it connects new sofas from 2990 to PJ, the exact old PJ sets back to
+Carres warehouse, and later supplier collection whose date remains unconfirmed. Source facts
+prefill the Consignment Order, Stock Transfer and Consignment Return; staff do not create three
+blank documents or manufacture completed movements. Creating the handoff alone does not issue
+all downstream documents. Existing purchase, Claim, financial and physical permission/approval
+rules still apply; this is no general approval bypass or authority for Operation to negotiate.
+
 **MANUAL ARRANGEMENT AND ACTUAL MOVEMENT ROUTE — APPROVED TARGET / NOT BUILT;
 Jess, 2026-09-28.** Staff may manually initiate the display arrangement from Sales instructions,
 enter supplied facts and select the actual pickup and destination locations. Reuse Catalog for
