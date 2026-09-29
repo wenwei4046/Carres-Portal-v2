@@ -1261,7 +1261,7 @@ Sales Order line
 → Stock reads available/reserved/incoming quantity
 → uncovered quantity becomes purchase_demand
 → Delivery-derived latest arrival date becomes Purchasing required date
-→ Settings resolve production + transit days; Order By walks both legs backwards
+→ Settings resolve production days; Order By walks them backwards
 → SO Batch Purchase groups ready lines by supplier
 → operator checks/splits Deliver To
 → an authorised issuer uses the one PO door; normal PO Duty remains the work owner
@@ -1280,7 +1280,7 @@ missing quantity. Sales Orders only displays the risk.
 ```text
 Staff selects purpose
 → enters goods, quantity and Deliver To
-→ Catalog resolves supplier/category and Settings resolves production + transit days
+→ Catalog resolves supplier/category and Settings resolves production days
 → server previews Proceed Date and defaults Delivery Date from the slowest selected line
 → Delivery Date minus those same lead days derives each line's Order By
 → Catalog/supplier/price authority checks
@@ -1792,29 +1792,20 @@ no working-day arithmetic, and Safety days are subtracted exactly once:
 
 ```text
 Requested Delivery Date − 14 Safety days                         = Goods Must Arrive
-Goods Must Arrive − Supplier transit working days                = Goods Must Be Ready
-Goods Must Be Ready − Supplier × Category production working days = Order By
+Goods Must Arrive − Supplier × Category production working days  = Order By
 ```
 
-**THE TRANSIT LEG — APPROVED / LOCKED, owner correction 2026-09-09. BUILT.** The backward walk
-subtracted production days only, while the forward arithmetic that stamps a PO's `eta_date`
-(`expectedArrivalOf`) has always been `production + transit`. One derived fact therefore had two
-arithmetics (Architecture Law D), and the gap was paid out of the Safety period: a PO issued
-exactly ON `Order By` arrived one working day AFTER `Goods Must Arrive`. Measured on live data
-(every configured supplier carries `transit_days = 1`): a Mon 2 Nov 2026 customer date gave
-`Goods Must Arrive` Tue 13 Oct and `Order By` Sat 26 Sep, and the PO born that day promised
-Wed 14 Oct — **13 of 14 safety days, not 14.**
-
-`Order By` is now Fri 25 Sep for the same order, and the two walks are exact inverses of each
-other. The rules that do not change: **Safety days are subtracted exactly once**, at
-`Goods Must Arrive`; each leg counts on its own named calendar (Law 2A) — the transit leg on the
-OFFICE week because Carres arranges the movement, the production leg on the factory's own week;
-`Goods Must Be Ready` is engine-internal and is **not** a screen word, a column or a stored date;
-and `Order By` remains a planned date, never an unlock date. `transit_days` is the SAME governed
-`purchasing_supplier_settings` number the PO already used — nothing was added, renamed or
-defaulted. A supplier with no number set keeps the pre-correction behaviour (the leg is omitted,
-never guessed); this is currently unreachable, because every supplier that has production days
-also has transit days.
+**NO TRANSIT LEG — owner ruling 2026-09-29 (Jess: "remove transit days in setting").** Goods
+arrival is the factory's production working days only, on the factory's own work week: the forward
+arithmetic (`expectedArrivalOf`, identical to the PO Delivery Date's `poDeliveryDateOf`) and the
+backward walk (`Order By`) are exact inverses with no second leg. A supplier's ready date is its
+arrival. **Safety days are subtracted exactly once**, at `Goods Must Arrive`; `Order By` remains a
+planned date, never an unlock date. Settings shows no Transit days; the stored
+`purchasing_supplier_settings.transit_days` column and its setter stay in the database unread.
+Consequences, accepted with the ruling: a supplier's recorded ready date becomes the expected
+arrival itself (`POST /pos/:id/ready-date` sends it unchanged), and a supplier whose own work week
+includes Saturday (Ohana) can have an arrival on a Saturday, exactly as its PO Delivery Date
+already could since 2026-09-22.
 
 **PO DAYS DO NOT MOVE `Order By`.** `po_days` (live: `Mon · Wed · Fri`) is a scheduling fact, not
 an input to this arithmetic — the SO Batch surface passes no review days to the planner at all, so
@@ -2552,7 +2543,6 @@ SUPPLIER
 SETUP TO FIX
   Supplier not set
   Production days not set
-  Transit days not set
 ```
 
 `SETUP TO FIX` appears only when an affected request exists. It filters affected requests;
@@ -2677,13 +2667,13 @@ shared implementation; do not introduce a separate Manual Purchase palette or gu
   not a customer promise or physical receipt time. With complete Catalog/Settings, the create form
   defaults it to the latest `expectedArrivalOf(Settings, Proceed Date)` across selected lines.
   Staff may move it; the engine never silently overwrites a chosen value.
-- `Order By` is derived for every line by walking Delivery Date backwards through supplier transit
-  days on the Office calendar and Supplier × Category production days on that supplier's calendar.
+- `Order By` is derived for every line by walking Delivery Date backwards through Supplier ×
+  Category production days on that supplier's calendar (no transit leg, owner ruling 2026-09-29).
   One request uses the earliest line result. It drives timing/work and the optional quiet
   `Order by {date}` second line but not a parent or goods `Order By` column. It is not a stored date;
   missing setup prints the governed missing-planning fact.
 - Manual Purchase does not subtract SO Safety days; Delivery Date is already goods arrival at
-  Carres. Missing production/transit Settings produce no default or Order By.
+  Carres. Missing production Settings produce no default or Order By.
 - `Approval Status` shows the approval badge (`Need approval`, `Approved`, `Refused`,
   `Withdrawn`, `Sent back for changes`). The register omits the redundant `{name} approves` and `Ordered.`
   second lines (owner correction, 2026-09-09); approval ownership, selection eligibility and
@@ -3017,7 +3007,7 @@ Object Header + Summary + Sections + History template. No tabs, no drawer, no sp
   PO door and restates no arithmetic (Law D). Until this ruling the rule was defined and its
   engine was read only by the Purchase Orders page, so the obligation reached nobody's Work
   list. **It is derived at READ time like every sibling projection — no cron is involved, and
-  a missing cron was never what was wrong.** `eta_date` is OUR production-plus-transit
+  a missing cron was never what was wrong.** `eta_date` is OUR production-days
   prediction (`expectedArrivalOf`), never a supplier-confirmed date and never a shipping date.
 
 **Journey:** `+ Manual Purchase Request` → choose plain-language purpose → name the purpose's
@@ -6557,12 +6547,9 @@ Settings lives under the global header gear and requires authorised roles. It in
 - default `Supplier Deliver To` (`Carres Klang`) and permitted destinations, including add, address,
   availability, default, receiving station/party, arrival calendar, linked Warehouse/no-Stock
   consequence, Unit-scan requirement and signed-DO evidence controls;
-- supplier channels, contacts, `Supplier work week`, Supplier × Product Category Production Days
-  and `Transit days` — the last of these reached a screen on 2026-09-09. Its column and its audited
-  write door (`purchasing_set_supplier_transit_days`) shipped with migration 0318 and nothing had
-  ever called them, while Manual Purchase told the operator to *"Add transit days for {supplier} in
-  Settings"*. Stored values are shown as they are; a supplier nobody has set reads `Set a number`,
-  and the door refuses a null so an unknown lorry leg stays unknown rather than becoming `0`;
+- supplier channels, contacts, `Supplier addresses`, `Supplier work week` and Supplier × Product
+  Category Production Days. `Transit days` was removed from Settings and from every date by owner
+  ruling 2026-09-29;
 - PO grouping rules and source-preservation law;
 - purchased vs supplier-consignment agreements and settlement terms;
 - supplier Unit-label capability (package, physical Unit, future machine-readable support);
