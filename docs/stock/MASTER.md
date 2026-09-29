@@ -1,11 +1,6 @@
 # STOCK / WAREHOUSE — MASTER
 
-**Field-operation UI — owner-approved direction, 2026-09-29; implementation and operator validation pending:**
-Follow [UI MASTER: Shared field-operation UI](../ui/MASTER.md#shared-field-operation-ui--owner-ruling-2026-09-29).
-Office staff manage through registers; Warehouse, Delivery and NETS share simple, guided physical
-work with system-filled facts, necessary confirmations, photos and submission. Preserve this
-module's completion evidence, permissions and write ownership; a photograph alone is not completion.
-
+**Shared field-operation UI:** follow [the canonical UI MASTER ruling](../ui/MASTER.md#shared-field-operation-ui--owner-ruling-2026-09-29) (approved direction; implementation and operator validation pending).
 
 **All listing appearance — APPROVED / NOT BUILT (Jess, 2026-09-17):** follow
 [UI MASTER §6.7 Portal-wide listing readability](../ui/MASTER.md#portal-wide-listing-readability--built-2026-09-17-slice-1--authenticated-walk-owed).
