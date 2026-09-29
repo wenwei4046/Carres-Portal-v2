@@ -569,8 +569,14 @@ facts, the one send area and the completion fact below.
   issued PO. **BUILT 2026-09-28:** one `PO windows` card at the top of Purchasing Settings holds
   `PO Days`, `First PO window` and `Second PO window` with its switch. It reads through the same
   window reader Work and SO Batch use (`loadPoWindows`) and writes through 0585's audited door
-  `purchasing_set_po_windows`; the history line reads the change in clock words. A supplier's own
-  earlier cut-off (`purchasing_set_supplier_po_cutoff`, 0585) still has no screen.
+  `purchasing_set_po_windows`; the history line reads the change in clock words. **BUILT
+  2026-09-29 (owner: "original setting? why you cant??"):** under the windows, `Last PO time for one
+  supplier` lists every supplier with its own earlier time or `Uses the PO windows`, saved through
+  0585's `purchasing_set_supplier_po_cutoff` (earlier than the last PO window only).
+  **Who may save:** the page offers Save only where the SQL gate (`purchasing_settings_gate`:
+  principal, or a position carrying `ops_manager`) accepts it. The shared `operation@` login passed the
+  page's legacy email fallback, was offered Save and had every save refused; since 2026-09-29 it reads
+  Settings with `Only a manager signed in with their own account can change these.`
 - **One occurrence per window.** Eligible demand admitted before a window belongs to it; a supplier
   with an earlier governed cut-off gets its own occurrence at its real time. Blocked lines (for
   example `Production days not set`) are named with their owning setup door and never counted as

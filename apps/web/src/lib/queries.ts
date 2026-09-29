@@ -229,6 +229,7 @@ import {
   type PurchasingSetNumberInput,
   type PurchasingSetPoDaysInput,
   type PurchasingSetPoWindowsInput,
+  type PurchasingSetSupplierPoCutoffInput,
   type PurchasingSetProductionDaysInput,
   type PurchasingSetTransitDaysInput,
   type PurchasingSetSupplierTermsDaysInput,
@@ -5466,6 +5467,10 @@ export function useSetPurchasingPoDays() {
 /** 0585 · `First PO window` · `Second PO window` + its switch (MASTER §5.6.1). */
 export function useSetPurchasingPoWindows() {
   return usePurchasingSettingsMutation<PurchasingSetPoWindowsInput>("/po-windows");
+}
+/** 0585 · one supplier's `Last PO time` (null = use the PO windows). */
+export function useSetSupplierPoCutoff() {
+  return usePurchasingSettingsMutation<PurchasingSetSupplierPoCutoffInput>("/po-cutoff");
 }
 export function useSetProductionDays() {
   return usePurchasingSettingsMutation<PurchasingSetProductionDaysInput>("/production-days");

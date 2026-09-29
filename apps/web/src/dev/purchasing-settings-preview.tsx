@@ -31,7 +31,16 @@ let SETTINGS: PurchasingSettingsResponse = {
   poDays: [1, 3, 5],
   poWindows: { first: "11:30", second: "16:00", secondEnabled: true },
   manualPurchaseMinDeliveryDays: 0,
-  suppliers: [],
+  /* Five production suppliers by their real ids; none has a Last PO time
+     today (measured 2026-09-29). Categories and work weeks are left out:
+     this preview is for the PO windows card. */
+  suppliers: [
+    { id: "838f325a-92e2-4db4-a11a-699c207b6742", name: "Armani", categories: [], offDays: null, transitDays: null, poCutoff: null },
+    { id: "fc99b9a9-b1b3-4455-882f-ffb6f9a91efa", name: "Dorsettloft", categories: [], offDays: null, transitDays: null, poCutoff: null },
+    { id: "ccdd06e4-700b-4476-87ff-1810bd41cae0", name: "Hookka Industries", categories: [], offDays: null, transitDays: null, poCutoff: null },
+    { id: "00000000-0000-0000-0000-0000000000e2", name: "Nice Future", categories: [], offDays: null, transitDays: null, poCutoff: null },
+    { id: "00000000-0000-0000-0000-0000000000e1", name: "Ohana", categories: [], offDays: null, transitDays: null, poCutoff: null },
+  ],
   productionDays: [],
   destinations: [],
   lastChanges: [],
@@ -50,6 +59,11 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   if (url.includes("/purchasing/settings/po-windows") && init?.method === "PUT") {
     const body = JSON.parse(String(init.body)) as { first: string; second: string | null; secondEnabled: boolean };
     SETTINGS = { ...SETTINGS, poWindows: body };
+    return json(SETTINGS);
+  }
+  if (url.includes("/purchasing/settings/po-cutoff") && init?.method === "PUT") {
+    const body = JSON.parse(String(init.body)) as { supplierId: string; cutoff: string | null };
+    SETTINGS = { ...SETTINGS, suppliers: SETTINGS.suppliers.map((s) => (s.id === body.supplierId ? { ...s, poCutoff: body.cutoff } : s)) };
     return json(SETTINGS);
   }
   if (url.includes("/purchasing/settings")) return json(SETTINGS);

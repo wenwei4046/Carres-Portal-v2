@@ -521,6 +521,9 @@ export const purchasingSettingsResponseSchema = z.object({
       offDays: z.array(z.number().int().min(0).max(6)).nullable(),
       transitDays: z.number().int().min(0).max(60).nullable(),
       termsDays: z.number().int().min(0).nullable().optional(),
+      /** 0585 · the supplier's own earlier last PO time (`HH:MM`); null =
+       *  the standard PO windows. Optional for an older Worker. */
+      poCutoff: z.string().nullable().optional(),
     }),
   ),
   productionDays: z.array(
@@ -639,6 +642,13 @@ export const purchasingSetPoWindowsInput = z
     path: ["second"],
   });
 export type PurchasingSetPoWindowsInput = z.infer<typeof purchasingSetPoWindowsInput>;
+
+/** 0585 · one supplier's `Last PO time` (null = use the PO windows). The SQL
+ *  door refuses a time that is not earlier than the last PO window. */
+export const purchasingSetSupplierPoCutoffInput = z
+  .object({ supplierId: z.string().uuid(), cutoff: clockTime.nullable() })
+  .strict();
+export type PurchasingSetSupplierPoCutoffInput = z.infer<typeof purchasingSetSupplierPoCutoffInput>;
 
 export const purchasingSetProductionDaysInput = z
   .object({
@@ -802,6 +812,7 @@ export function settingValueLabel(
   if (settingKey === "supplier_work_week") return workWeekLabel(parsePgIntArray(raw));
   if (settingKey === "po_days") return weekdayListLabel(parsePgIntArray(raw));
   if (settingKey === "po_windows") return poWindowsHistoryLabel(raw);
+  if (settingKey === "supplier_po_cutoff") return clockWordOf(raw) ?? raw;
   return raw;
 }
 
@@ -811,16 +822,18 @@ export function settingValueLabel(
  * — `11:30 AM and 4:00 PM` · `11:30 AM, second window off` — never the
  * database's spelling, never a dash.
  */
+/** `11:30` / `11:30:00` → `11:30 AM`; anything else → null. */
+export function clockWordOf(t: string | null | undefined): string | null {
+  const m = /^(\d{1,2}):(\d{2})/.exec(t ?? "");
+  if (!m) return null;
+  const h = Number(m[1]);
+  return `${h % 12 === 0 ? 12 : h % 12}:${m[2]} ${h < 12 ? "AM" : "PM"}`;
+}
+
 export function poWindowsHistoryLabel(raw: string): string {
   const [first, second, state] = raw.split("·").map((part) => part.trim());
-  const clock = (t: string | undefined) => {
-    const m = /^(\d{1,2}):(\d{2})/.exec(t ?? "");
-    if (!m) return null;
-    const h = Number(m[1]);
-    return `${h % 12 === 0 ? 12 : h % 12}:${m[2]} ${h < 12 ? "AM" : "PM"}`;
-  };
-  const one = clock(first);
+  const one = clockWordOf(first);
   if (!one) return raw;
-  const two = clock(second);
+  const two = clockWordOf(second);
   return state === "on" && two ? `${one} and ${two}` : `${one}, second window off`;
 }

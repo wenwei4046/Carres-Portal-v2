@@ -36,13 +36,13 @@ const response: Omit<PurchasingSettingsResponse, "canEdit"> = {
   lastChanges: [],
 };
 
-function testApp() {
+function testApp(who: { role: string; email: string } = { role: "principal", email: "jess@carres.com" }) {
   const app = new Hono<AppEnv>();
   app.use("*", async (c, next) => {
     c.set("auth", {
       id: "11111111-0000-0000-0000-000000000001",
-      role: "principal",
-      email: "jess@carres.com",
+      role: who.role as never,
+      email: who.email,
       dealerId: null,
       supplierId: null,
       partnerId: null,
@@ -298,5 +298,54 @@ describe("Purchasing Settings — Transit days (0318's write door, finally on a 
 
     expect(res.status).toBe(422);
     expect(rpc).not.toHaveBeenCalled();
+  });
+});
+
+describe("Purchasing Settings — who may save (owner report 2026-09-29)", () => {
+  it("the shared operation@ login reads Settings but is never offered Save, because the SQL gate refuses it", async () => {
+    vi.mocked(userClient).mockReturnValue({ rpc: vi.fn() } as never);
+    const res = await testApp({ role: "operation", email: "operation@carres.com" }).request("/settings");
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as PurchasingSettingsResponse).canEdit).toBe(false);
+  });
+
+  it("the principal is offered Save", async () => {
+    vi.mocked(userClient).mockReturnValue({ rpc: vi.fn() } as never);
+    const res = await testApp().request("/settings");
+    expect(((await res.json()) as PurchasingSettingsResponse).canEdit).toBe(true);
+  });
+});
+
+describe("Purchasing Settings — a supplier's Last PO time (0585)", () => {
+  it("carries each supplier's own time from the one window reader", async () => {
+    vi.mocked(loadPurchasingSettings).mockResolvedValue({
+      ...response,
+      suppliers: [{ id: SUPPLIER_ID, name: "Ohana", categories: [], offDays: null, transitDays: null }],
+    });
+    vi.mocked(loadPoWindows).mockResolvedValue({
+      settings: { first: "11:30", second: "16:00", secondEnabled: true },
+      poDays: [1, 3, 5],
+      cutoffBySupplier: new Map([[SUPPLIER_ID, "10:00"]]),
+    });
+    vi.mocked(userClient).mockReturnValue({ rpc: vi.fn() } as never);
+    const body = (await (await testApp().request("/settings")).json()) as PurchasingSettingsResponse;
+    expect(body.suppliers[0]!.poCutoff).toBe("10:00");
+  });
+
+  it("saves and clears through the audited door", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: null, error: null });
+    vi.mocked(userClient).mockReturnValue({ rpc } as never);
+    for (const cutoff of ["10:00", null]) {
+      const res = await testApp().request("/settings/po-cutoff", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ supplierId: SUPPLIER_ID, cutoff }),
+      });
+      expect(res.status).toBe(200);
+      expect(rpc).toHaveBeenLastCalledWith("purchasing_set_supplier_po_cutoff", {
+        p_supplier_id: SUPPLIER_ID,
+        p_cutoff: cutoff,
+      });
+    }
   });
 });

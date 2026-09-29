@@ -22,6 +22,7 @@ const createDestination = vi.fn();
 const updateDestination = vi.fn();
 const setSupplierCollection = vi.fn();
 const setPoWindows = vi.fn();
+const setCutoff = vi.fn();
 
 function mutation(mutateAsync: ReturnType<typeof vi.fn>) {
   return { mutateAsync, isPending: false, isError: false, error: null };
@@ -40,6 +41,7 @@ vi.mock("@/lib/queries", async () => {
     useUpdatePurchasingDestination: () => mutation(updateDestination),
     useSetPurchasingSupplierCollection: () => mutation(setSupplierCollection),
     useSetPurchasingPoWindows: () => mutation(setPoWindows),
+    useSetSupplierPoCutoff: () => mutation(setCutoff),
   };
 });
 
@@ -512,5 +514,62 @@ describe("PO windows in Settings", () => {
     render(wrap(<OperationPurchasingSettings />));
     const card = screen.getByTestId("po-windows");
     expect(card.textContent).toContain("was 11:30 AM and 4:00 PM");
+  });
+});
+
+/**
+ * ⭐ A SUPPLIER'S OWN LAST PO TIME (0585; owner 2026-09-29: "original
+ * setting? why you cant??"). It had no screen; it sits under the PO windows.
+ */
+describe("Last PO time for one supplier", () => {
+  beforeEach(() => {
+    setCutoff.mockReset().mockResolvedValue(undefined);
+  });
+
+  it("lists every supplier, says which use the PO windows, and saves one supplier's time", async () => {
+    settingsQuery.mockReturnValue({
+      data: settings({
+        suppliers: [
+          { id: NICE, name: "Nice Future", categories: ["mattress"], offDays: [0, 6], transitDays: 1, poCutoff: "10:00" },
+          { id: OHANA, name: "Ohana", categories: ["sofa"], offDays: [0], transitDays: 1, poCutoff: null },
+        ],
+      }),
+      isLoading: false,
+      error: null,
+    });
+    render(wrap(<OperationPurchasingSettings />));
+    expect(screen.getByTestId(`last-po-time-${NICE}`)).toHaveTextContent("10:00 AM");
+    expect(screen.getByTestId(`last-po-time-${OHANA}`)).toHaveTextContent("Uses the PO windows");
+    /* No time yet: a door, never an empty `--:-- --` box. */
+    expect(document.getElementById(`last-po-time-${OHANA}-input`)).toBeNull();
+    fireEvent.click(screen.getByTestId(`last-po-time-${OHANA}-open`));
+    fireEvent.change(document.getElementById(`last-po-time-${OHANA}-input`)!, { target: { value: "09:30" } });
+    fireEvent.click(screen.getByTestId(`last-po-time-${OHANA}-save`));
+    await waitFor(() => expect(setCutoff).toHaveBeenCalledWith({ supplierId: OHANA, cutoff: "09:30" }));
+  });
+
+  it("clears a time back to the PO windows, and refuses one that is not earlier than the last window", async () => {
+    settingsQuery.mockReturnValue({
+      data: settings({
+        suppliers: [{ id: NICE, name: "Nice Future", categories: ["mattress"], offDays: [0, 6], transitDays: 1, poCutoff: "10:00" }],
+      }),
+      isLoading: false,
+      error: null,
+    });
+    render(wrap(<OperationPurchasingSettings />));
+    const input = document.getElementById(`last-po-time-${NICE}-input`)!;
+    /* The last window is 4:00 PM (second window on). */
+    fireEvent.change(input, { target: { value: "16:30" } });
+    expect(screen.getByText("Must be earlier than the last PO window.")).toBeTruthy();
+    expect(screen.getByTestId(`last-po-time-${NICE}-save`)).toBeDisabled();
+    fireEvent.click(screen.getByTestId(`last-po-time-${NICE}-clear`));
+    await waitFor(() => expect(setCutoff).toHaveBeenCalledWith({ supplierId: NICE, cutoff: null }));
+  });
+
+  it("a read-only viewer is told who can change Settings, and gets no Save", () => {
+    settingsQuery.mockReturnValue({ data: settings({ canEdit: false }), isLoading: false, error: null });
+    render(wrap(<OperationPurchasingSettings />));
+    expect(screen.getByText(/Only a manager signed in with their own account can change these\./)).toBeTruthy();
+    expect(screen.queryByTestId(`last-po-time-${NICE}-save`)).toBeNull();
   });
 });
