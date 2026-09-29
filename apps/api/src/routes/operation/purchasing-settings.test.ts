@@ -377,3 +377,17 @@ describe("Purchasing Settings — Repair return target (0602 · 0603)", () => {
     expect(rpc).toHaveBeenCalledWith("purchasing_set_number", { p_key: "repair_return_working_days", p_value: 10 });
   });
 });
+
+describe("Purchasing Settings — Supplier Claims reply timing (0606)", () => {
+  it("reads both numbers by their own columns", async () => {
+    const values: Record<string, number> = { claim_reply_waiting_days: 2, claim_escalation_extra_days: 3 };
+    const from = vi.fn(() => ({
+      select: (column: string) => ({ eq: () => ({ maybeSingle: async () => ({ data: { [column]: values[column] ?? 14 }, error: null }) }) }),
+    }));
+    vi.mocked(userClient).mockReturnValue({ rpc: vi.fn(), from } as never);
+    const body = (await (await testApp().request("/settings")).json()) as PurchasingSettingsResponse;
+    expect(body.claimReplyWaitingDays).toBe(2);
+    expect(body.claimEscalationExtraDays).toBe(3);
+    expect(body.repairReturnWorkingDays).toBe(14);
+  });
+});

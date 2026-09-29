@@ -41,16 +41,13 @@ import type { AppEnv } from "../../types";
  */
 const purchasingSettingsRouter = new Hono<AppEnv>();
 
-/** 0602 · the Repair return target. Read here only and fault-tolerant: a
- *  Settings-only number never decides whether the page loads. */
-async function readRepairReturnDays(sb: ReturnType<typeof userClient>): Promise<number | null> {
+/** The Settings-only numbers (0602 Repair return target · 0606 claim reply
+ *  timing). Read here only, each fault-tolerant: a Settings-only number never
+ *  decides whether the page loads, and a column not yet applied is absent. */
+async function readSettingsOnlyNumber(sb: ReturnType<typeof userClient>, column: string): Promise<number | null> {
   try {
-    const { data, error } = await sb
-      .from("purchasing_settings")
-      .select("repair_return_working_days")
-      .eq("id", 1)
-      .maybeSingle();
-    const v = (data as { repair_return_working_days?: number | null } | null)?.repair_return_working_days;
+    const { data, error } = await sb.from("purchasing_settings").select(column).eq("id", 1).maybeSingle();
+    const v = (data as Record<string, number | null> | null)?.[column];
     return error || v == null ? null : Number(v);
   } catch {
     return null;
@@ -63,14 +60,18 @@ async function readRepairReturnDays(sb: ReturnType<typeof userClient>): Promise<
  * Settings can never show a window the engine does not use.
  */
 async function loadSettingsWithWindows(sb: ReturnType<typeof userClient>) {
-  const [settings, windows, repair] = await Promise.all([
+  const [settings, windows, repair, claimWait, claimExtra] = await Promise.all([
     loadPurchasingSettings(sb),
     loadPoWindows(sb),
-    readRepairReturnDays(sb),
+    readSettingsOnlyNumber(sb, "repair_return_working_days"),
+    readSettingsOnlyNumber(sb, "claim_reply_waiting_days"),
+    readSettingsOnlyNumber(sb, "claim_escalation_extra_days"),
   ]);
   return {
     ...settings,
     ...(repair == null ? {} : { repairReturnWorkingDays: repair }),
+    ...(claimWait == null ? {} : { claimReplyWaitingDays: claimWait }),
+    ...(claimExtra == null ? {} : { claimEscalationExtraDays: claimExtra }),
     poWindows: windows.settings,
     /* Each supplier's own earlier `Last PO time`, from the same reader. */
     suppliers: settings.suppliers.map((s) => ({ ...s, poCutoff: windows.cutoffBySupplier.get(s.id) ?? null })),

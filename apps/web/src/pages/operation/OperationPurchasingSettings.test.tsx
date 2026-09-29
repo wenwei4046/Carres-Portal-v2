@@ -592,3 +592,30 @@ describe("Repair return target (0602 · 0603, Purchasing §9.7)", () => {
     expect(screen.queryByText("Repair return target")).toBeNull();
   });
 });
+
+describe("Supplier Claims reply timing (0606, Purchasing §9.5 owner-approved 2026-09-06)", () => {
+  it("edits both Office working day numbers by their keys", async () => {
+    settingsQuery.mockReturnValue({
+      data: settings({ claimReplyWaitingDays: 2, claimEscalationExtraDays: 2 }),
+      isLoading: false,
+      error: null,
+    });
+    setNumber.mockReset().mockResolvedValue(undefined);
+    render(wrap(<OperationPurchasingSettings />));
+    const card = screen.getByTestId("supplier-claims-settings");
+    expect(within(card).getByText("Reply waiting days")).toBeTruthy();
+    expect(within(card).getByText("Extra days before escalation")).toBeTruthy();
+    fireEvent.change(screen.getByTestId("claim-reply-waiting-days"), { target: { value: "3" } });
+    fireEvent.click(screen.getByTestId("claim-reply-waiting-days-save"));
+    await waitFor(() => expect(setNumber).toHaveBeenCalledWith({ key: "claim_reply_waiting_days", value: 3 }));
+    fireEvent.change(screen.getByTestId("claim-escalation-extra-days"), { target: { value: "4" } });
+    fireEvent.click(screen.getByTestId("claim-escalation-extra-days-save"));
+    await waitFor(() => expect(setNumber).toHaveBeenCalledWith({ key: "claim_escalation_extra_days", value: 4 }));
+  });
+
+  it("is not drawn when the Worker does not send the numbers", () => {
+    settingsQuery.mockReturnValue({ data: settings(), isLoading: false, error: null });
+    render(wrap(<OperationPurchasingSettings />));
+    expect(screen.queryByTestId("supplier-claims-settings")).toBeNull();
+  });
+});

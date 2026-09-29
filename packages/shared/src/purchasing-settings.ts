@@ -55,6 +55,10 @@ export const PURCHASING_NUMBER_KEYS = [
   /** 0602 · 0603 — WORKING days from the Supplier's receipt of a Repair Order
    *  to its return target (§9.7). Each RO snapshots it at receipt. */
   "repair_return_working_days",
+  /** 0606 — Purchasing §9.5 `Reply waiting days` / `Extra days before
+   *  escalation`, Office working days (owner-approved 2026-09-06). */
+  "claim_reply_waiting_days",
+  "claim_escalation_extra_days",
 ] as const;
 export type PurchasingNumberKey = (typeof PURCHASING_NUMBER_KEYS)[number];
 
@@ -70,6 +74,8 @@ export const PURCHASING_NUMBER_RANGE: Record<PurchasingNumberKey, { min: number;
   logistics_call_working_days: { min: 0, max: 30 },
   manual_purchase_min_delivery_days: { min: 0, max: 365 },
   repair_return_working_days: { min: 1, max: 90 },
+  claim_reply_waiting_days: { min: 1, max: 30 },
+  claim_escalation_extra_days: { min: 1, max: 30 },
 };
 
 /** Production working days are bounded by the SQL CHECK too. */
@@ -519,6 +525,9 @@ export const purchasingSettingsResponseSchema = z.object({
   manualPurchaseMinDeliveryDays: z.number().int(),
   /** 0602 · `Repair return target`. Optional: read by the Settings route only. */
   repairReturnWorkingDays: z.number().int().optional(),
+  /** 0606 · Supplier Claims reply timing. Optional: read by the Settings route only. */
+  claimReplyWaitingDays: z.number().int().optional(),
+  claimEscalationExtraDays: z.number().int().optional(),
   suppliers: z.array(
     z.object({
       id: z.string(),

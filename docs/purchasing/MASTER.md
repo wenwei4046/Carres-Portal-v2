@@ -3836,7 +3836,11 @@ existing dated obligation or supplier promise. **Approved starting values: Reply
 Extra days before escalation = 2.** Chase when the reply date passes. Two further Office working
 days without a reply raises Purchasing Approver decision work while PO Duty keeps the supplier
 chase. An earlier evidenced claim limit or customer deadline takes precedence. These are internal
-follow-through dates, never a claimed supplier promise. **APPROVED TARGET / NOT BUILT.**
+follow-through dates, never a claimed supplier promise. **Settings BUILT 2026-09-29** (migration
+0606: `purchasing_settings.claim_reply_waiting_days` / `claim_escalation_extra_days`, default 2, 1 to
+30, written through `purchasing_set_number`; Settings → Purchasing → `Supplier Claims`). How a claim
+reads them and snapshots them stays the Supplier Claims lane's and is **NOT BUILT** until that lane
+ships.
 
 #### Evidence boundary and resolution pass
 

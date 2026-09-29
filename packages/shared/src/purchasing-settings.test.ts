@@ -218,7 +218,7 @@ describe("the wire refuses what the database would refuse", () => {
     ).toBe(false);
   });
 
-  it("only the five single numbers are settable by key (0603 adds the Repair return target)", () => {
+  it("only the seven single numbers are settable by key (0603 Repair return target · 0606 claim reply timing)", () => {
     /* The SAME closed list as `purchasing_set_number` in SQL (0603). */
     expect(PURCHASING_NUMBER_KEYS).toEqual([
       "order_by_buffer_days",
@@ -226,6 +226,8 @@ describe("the wire refuses what the database would refuse", () => {
       "logistics_call_working_days",
       "manual_purchase_min_delivery_days",
       "repair_return_working_days",
+      "claim_reply_waiting_days",
+      "claim_escalation_extra_days",
     ]);
     expect(isPurchasingNumberKey("production_days")).toBe(false);
     expect(purchasingSetNumberInput.safeParse({ key: "po_days", value: 3 }).success).toBe(false);
