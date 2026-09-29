@@ -4737,3 +4737,13 @@ Workspace message availability: `Message not available` replaces a placeholder d
 | PO view (a PO serving two or more orders) | `{PO No} · {Supplier}` over `PO Delivery Date {date} · Expected arrival {date} · Related orders · {n}` · a related order line `{SO No} · {customer} · Requested {date}` · on the order it opens: `Back to {PO No}` | copying the PO's act onto each order |
 | Communication | `Communication` · tabs `Supplier` · `Warehouse` · `Logistics` · `Customer` · `To` (recorded channels only: `{party} · WhatsApp group` · `{party} · Email`) · `Template` · `Message` · `Message not available` · `Copy message` · `History {n}` | a typed recipient · a message with a missing field · a dash |
 | Empty and failure | `Nothing assigned to you` + `See Team Work` · `Nothing due on {date}` + `Open {date}` / `Open Missed` · `No missed work` · `No open work. Every track is clear.` · `Could not refresh {source}` · `Last updated {time}` · `Work could not be loaded. Try again.` | `0` for a failed source |
+
+## PROPOSAL — PENDING APPROVAL (SO Maintenance: a reference the database always asks for)
+
+A payment method the database refuses without its reference (`requiredPaymentReference`: card, Credit / Debit and Installment need an approval code, Cheque a cheque number, bank transfer and DuitNow QR a reference number) shows its `Approval code required` switch as fixed in SO Maintenance. Cash and any method a manager adds stay editable.
+
+| Where | Words |
+|---|---|
+| The method row's value | `Approval code required: Always` (beside the existing `Yes` · `No`) |
+| Under the locked switch in the Edit payment method drawer | `{method} always needs its {approval code / cheque number / reference number}, so this cannot be turned off.` |
+| The same line for Credit / Debit, whose Bank question is also fixed | `It always asks which bank, too.` |

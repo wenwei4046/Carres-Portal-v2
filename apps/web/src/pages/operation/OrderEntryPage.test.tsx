@@ -151,6 +151,7 @@ describe("OrderEntryPage", () => {
             { key: "credit", label: "Credit / Debit", sublabel: "", active: true, approvalCodeRequired: false,
               followUps: [{ key: "bank", label: "Bank", options: ["Maybank"], required: false }] },
             { key: "installment", label: "Installment", sublabel: "", active: true, approvalCodeRequired: false, followUps: [] },
+            { key: "cheque", label: "Cheque", sublabel: "", active: true, approvalCodeRequired: false, followUps: [] },
             { key: "cash", label: "Cash", sublabel: "", active: true, approvalCodeRequired: false, followUps: [] },
           ],
           formFields: {},
@@ -162,8 +163,10 @@ describe("OrderEntryPage", () => {
     } as any);
     render(<OrderEntryPage />);
 
-    expect(screen.getByTestId("payment-method-credit")).toHaveTextContent("Approval code required: Yes");
-    expect(screen.getByTestId("payment-method-installment")).toHaveTextContent("Approval code required: Yes");
+    expect(screen.getByTestId("payment-method-credit")).toHaveTextContent("Approval code required: Always");
+    expect(screen.getByTestId("payment-method-installment")).toHaveTextContent("Approval code required: Always");
+    // Cheque is refused without its cheque number (0551), so it is fixed too.
+    expect(screen.getByTestId("payment-method-cheque")).toHaveTextContent("Approval code required: Always");
     // Cash is genuinely optional and stays editable.
     expect(screen.getByTestId("payment-method-cash")).toHaveTextContent("Approval code required: No");
 
@@ -174,6 +177,7 @@ describe("OrderEntryPage", () => {
     const bankRequired = screen.getByLabelText("credit required information bank required") as HTMLInputElement;
     expect(bankRequired.checked).toBe(true);
     expect(bankRequired.disabled).toBe(true);
+    expect(screen.getByText("Credit / Debit always needs its approval code, so this cannot be turned off. It always asks which bank, too.")).toBeInTheDocument();
 
     // …and the save writes what the till enforces, not the overruled "No".
     fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
