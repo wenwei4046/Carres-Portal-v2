@@ -146,7 +146,7 @@ this one current truth. The UI alternatives and earlier cross-chat proposals are
 PLAN design review is complete for this surface; application work requires a BUILD/DELIVERY takeover.
 No application, migration, deployment or production verification is claimed by document approval.
 
-**ENTRY PLACEMENT — OWNER-APPROVED 2026-09-28 / APPROVED TARGET / NOT BUILT.**
+**ENTRY PLACEMENT — PRODUCTION VERIFIED 2026-09-29, PR #1791 (owner-approved 2026-09-28).**
 Jess approved this segment: move the one Staff & Duties destination to global Settings, remove its
 persistent main-menu row, and retain Work's direct door to the exact unresolved Duty. The page is
 reached through the header gear → `All System Settings` → `Staff & Duties`; a contextual Duty
