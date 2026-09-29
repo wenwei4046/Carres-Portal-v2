@@ -5415,6 +5415,27 @@ the source for governed documents; this does not permit arbitrary standalone rec
 completed-handover records. Keep actual pickup location, supplier ownership and final destination
 as separate facts. An external pickup location is not automatically a Carres-controlled Site.
 
+**MULTIPLE MOVEMENT LEGS — APPROVED TARGET / NOT BUILT; Jess, 2026-09-29.**
+One Display Request can add further movement legs as the actual arrangement requires; the three
+Dorsettloft legs are an example, not a fixed limit or three mandatory slots. Adding a leg adds a
+planned arrangement only, not an issued document, stock movement or completed handover.
+Each leg identifies its goods, pickup and destination, contacts/transport party, planned dates and
+separate actual pickup/receipt or supplier-handover evidence. Select existing exact Units for held
+goods; new goods retain the governed Catalog-to-issue identity process.
+
+When the same goods pass through multiple locations, link successive legs and preserve the same
+physical identities; a planned destination is not evidence of the next leg's actual pickup holder.
+Different goods may follow independent routes and dates. Prevent contradictory simultaneous
+commitments for the same Unit; do not create duplicate Units to represent another leg. Partial
+results leave the specific remaining goods outstanding. Adding or changing a future leg preserves
+completed movement evidence and follows existing amendment/cancellation rules.
+
+The system derives the source-linked Stock Transfer, Receiving, consignment or logistics action
+from the verified locations, ownership and purpose; staff do not choose an unfamiliar document
+family for each card. An external address remains an external address unless it is a governed
+Carres Site. Existing permissions, supplier-specific documents and one combined same-supplier swap
+instruction remain unchanged. Multiple cards do not create a new transport or stock ledger.
+
 **OWNER-REPORTED OPERATING CASE:** Dorsettloft sent two new display sofas to the wrong location,
 2990. Sales asked Operation to collect them from 2990 for PJ Showroom and move two old display
 sets from PJ back to Carres warehouse. Dorsettloft may collect the old sets from that warehouse
@@ -6050,16 +6071,17 @@ result. Read view does not show a meaningless blank PDF pane. Errors preserve dr
 loading/failure/unknown are not zero quantities. Keyboard and mobile reflow must preserve the
 same meaning and next action, with no claimed visual validation until the governed render review.
 
-**Display Request composition review — PROPOSAL / NOT LAW, 2026-09-29.**
+**Display Request composition — APPROVED TARGET / NOT BUILT, Jess, 2026-09-29.**
 Applies the installed `design:design-critique` skill to the approved semantic journey, not to a
-rendered screen. This is a three-option owner review of remaining presentation; it changes no
-business rule, document purpose or section order. Source snapshot
+rendered screen. Owner selected the expanded movement-card direction with the clarification that
+more locations require additional cards, not a fixed three-card layout. Document purposes and the
+approved semantic section order remain unchanged. Research source snapshot
 `f1b2ed63c641dd05d3fa8c8c4ef24c43026855e9`; `portal-nav.ts:402–405` still marks the four Showroom
 pages `soon: true`. No screenshot, accessibility pass or numeric visual score is claimed.
 
 Whole-page review, including entry and downstream consequences:
 
-| Severity / evidence | Operator impact | Required resolution in every option |
+| Severity / evidence | Operator impact | Required resolution |
 |---|---|---|
 | Red design risk: §9.8 allows parallel legs, while no rendered Display Request exists | A sequential-looking page could hide old goods still awaiting collection | Show all leg identities and remaining scope; never gate new-in on old-out or mark the whole request done from one receipt |
 | Red integration gap: §9.8 and Stock §12.9 identify unverified opening ownership/identity | A model or count can select the wrong physical goods | Catalog for new goods, exact Stock Units for old goods; show identity/ownership gaps without fabricated IDs or receipts |
@@ -6072,76 +6094,46 @@ Whole-page review, including entry and downstream consequences:
 
 **Reference evidence and limits.** Official documentation was inspected on 2026-09-29:
 
-- [Shopify receiving transfers](https://help.shopify.com/en/manual/products/inventory/inventory-transfers/receiving-and-managing-transfers): individual receiving quantities and remaining progress inform option A. Carres keeps its own custody/inspection rules; Shopify availability and cancellation semantics are not imported.
-- [Linear parent and sub-issues](https://linear.app/docs/parent-and-sub-issues): related work remains under one parent and may be shared across teammates. This informs option B's compact related-leg overview, not a claim that Linear uses the proposed collapse layout. Reject inherited ownership and automatic parent closure for Carres physical facts.
-- [Trello boards and lists](https://support.atlassian.com/trello/docs/creating-a-new-board/): parallel lists/cards inform option C's side-by-side comparison. Carres columns represent fixed movement legs, not workflow stages; reject drag-to-complete and a new board engine.
+- [Shopify receiving transfers](https://help.shopify.com/en/manual/products/inventory/inventory-transfers/receiving-and-managing-transfers): individual receiving quantities and remaining progress inform the selected expanded movement sections. Carres keeps its own custody/inspection rules; Shopify availability and cancellation semantics are not imported.
+- [Linear parent and sub-issues](https://linear.app/docs/parent-and-sub-issues): related work remains under one parent and may be shared across teammates. KEEP linked child records as a reference principle, without adopting a collapsed default. Reject inherited ownership and automatic parent closure for Carres physical facts.
+- [Trello boards and lists](https://support.atlassian.com/trello/docs/creating-a-new-board/): parallel lists/cards were considered for comparison. The selected Carres presentation uses vertically ordered movement sections; reject drag-to-complete and a new board engine.
 - Local 2990 `docs/SUPPLY-CHAIN-DOCUMENTS.md` retains distinct supplier order/receive/return records and shared PDF generators. KEEP source/document linkage under all options, not document-first input or extra manually created records. This local code evidence is not a live 2990 UI inspection.
 - Odoo batch-transfer full-page retrieval failed in this pass; its search extract is not evidence for any proposed layout.
 
-All three options retain the approved page order and full-width, one-scroll internal object with
-no PDF split or new tabs. The following sketches are explanatory structure, NOT final screen copy.
-Unspecified models, IDs, dates and actual completion remain unknown in the Dorsettloft example.
+The page retains the approved section order and full-width, one-scroll internal object with no
+PDF split or new tabs. One existing shared `Block` represents each movement leg, expanded by
+default. The operator can add another leg within the same Display Request under §9.8. Do not
+hard-code the example's three routes, introduce a new component, or require three empty cards for
+a simple one-leg arrangement. New literal action/field wording still follows COPY governance.
 
-**A — Expanded movement sections (RECOMMENDED).** One shared `Block` per leg, open by default;
-within a wide block, related facts use the kit's multi-column arrangement rather than six stacked
-fields. Source-owned action opens its existing form, with one primary writer at a time.
+Within a wide block, related facts use the kit's multi-column arrangement rather than six stacked
+fields. Source-owned action opens its existing form, with one primary writer at a time. Mobile
+stacks each block's facts in logical order. Every leg retains its own goods, contacts, dates,
+actual results and remaining scope. Existing facts prefill a linked next leg where applicable;
+the operator reviews the real destination and scope rather than re-entering known Unit identity.
 
-```text
-Request identity / applicable action / incoming and outgoing goods
-[2990 → PJ]           [party/contact] [planned date]
- exact goods          pickup evidence / arrival evidence / remainder
-[PJ → warehouse]      [party/contact] [planned date]
- exact old Units      pickup evidence / arrival evidence / remainder
-[warehouse → supplier] [party/contact] [collection date]
- same old Units       actual handover / remainder
-Connected documents / commercial evidence / History
-```
-
-Best fit: new Operation staff and this three-leg swap. Trade-off: more vertical scrolling;
-all route facts can be read without opening another section. Mobile stacks each block's facts in
-the same logical order. Falsifier: operators repeatedly lose the pending supplier collection or
-must open other records merely to discover pickup/destination/remaining goods already known here.
-
-**B — Compact movement summaries, expand for detail.** Reuse `Block.summary`; keep every leg's
-route and meaningful unresolved scope visible when collapsed. The active or dirty/error block is
-open, and multiple blocks may stay open. A block without a truthful summary remains expanded.
+Explanatory structure only, not final screen copy or a real completion record:
 
 ```text
 Request identity / applicable action / incoming and outgoing goods
-> 2990 → PJ             actual result / remaining goods
-v PJ → warehouse        actual result / remaining goods
-  exact old Units / contacts / dates / pickup and arrival evidence
-> warehouse → supplier  actual result / remaining goods
+[Pickup → destination]  goods / party / planned dates
+                       actual pickup / arrival / remainder
+[Pickup → destination]  goods / party / planned dates
+                       actual pickup / arrival / remainder
+[Add another movement leg to this same arrangement]
 Connected documents / commercial evidence / History
 ```
 
-Best fit: experienced staff revisiting long arrangements. Trade-off: less scrolling but more
-expansion and a greater risk of missing detail. No completed-looking summary without evidence;
-no hidden unresolved exception. Kit evidence: existing `Block` supports `summary` and `forceOpen`.
+Trade-off: more vertical scrolling, but route facts can be read without opening each section.
+Falsifier: operators repeatedly lose the pending supplier collection or must open other records
+merely to discover pickup/destination/remaining goods already known here. The whole arrangement
+never becomes complete merely because its last visible card was added, a document was issued or
+one leg finished. No fixed wizard order applies to independent routes; linked movements of the
+same Unit still respect actual custody and evidence.
 
-**C — Movement sections side by side on a wide screen.** The same existing Blocks share one
-movement region, with no independent scrollers or drag interaction. At constrained widths they
-stack in the approved logical order; this is a composition, not a new board component.
-
-```text
-Request identity / applicable action / incoming and outgoing goods
-[2990 → PJ]       [PJ → warehouse]       [warehouse → supplier]
- goods            exact old Units        same old Units
- party / date     party / date           party / date
- actual / left    actual / left          actual / left
-Connected documents / commercial evidence / History
-```
-
-Best fit: desktop coordination comparing three legs together. Trade-off: less vertical travel,
-but narrow columns wrap long model/contact details and comparison disappears on a phone. Do not
-truncate identity or force sideways page scrolling to preserve the three-column appearance.
-
-**Recommendation / approval boundary:** select A for the Display Request movement region.
-Keep shared kit values, semantic section order, permission boundaries and source-owned completion.
-B and C are alternatives for this review only, not additional user-selectable page modes. Owner
-approval chooses the default composition; it does not approve application build, unresolved literal
-copy, Finance rules or unverified responsive behaviour. Once chosen, overwrite this comparison
-with the selected current rule; Git retains the research alternatives.
+This approval selects the expanded movement-card composition and add-leg capability only. It
+does not approve application build, unresolved literal copy, Finance rules or unverified
+responsive behaviour. Rendered review and the other §9.13.7 closure items remain outstanding.
 
 **4. Exceptions and record lifecycle**
 
