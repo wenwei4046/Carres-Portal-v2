@@ -258,7 +258,7 @@ describe("the claim record's Result — `Record what Carres does next` and `Issu
     expect(screen.getByTestId("claim-what-carres-does")).toHaveTextContent("What Carres does · Not recorded");
     expect(screen.queryByTestId("claim-record-next")).not.toBeInTheDocument();
   });
-  it("records one of the five approved words through the existing route", () => {
+  it("records one of the three supplier-side decisions through the existing route", () => {
     recordQuery.mockReturnValue({ data: RECORD({ may_record_next: true }), isLoading: false });
     show("/operation?tab=claims&claim=c1");
     fireEvent.click(screen.getByTestId("claim-record-next"));
