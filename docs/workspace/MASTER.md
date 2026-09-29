@@ -479,8 +479,8 @@ authoritative. No message says `Invalid`, `Error` or `Something went wrong` with
 | Empty catalogue | Configuration failure, because the governed catalogue is code-owned; never `No duties yet` |
 | No search match | `No duties match this search` · `Clear search`; catalogue truth remains healthy |
 | Not assigned | `Not assigned` · `Nobody holds {Duty}.` · manager sees `Assign holder`; Work remains visible under Duty word |
-| Cover active | Normal and acting person shown separately with effective dates/reason |
-| Cover scheduled | Normal owner remains today's actor; future cover and start date are visible in detail |
+| Cover active | Show the effective cover as the single current person with plain dates (§4.2); preserve separate normal/cover identities and reason in history |
+| Cover scheduled | Show today's resolved person; future cover and dates remain separate and never replace today's name early |
 | Read failed | `Staff & Duties could not be opened` · `Try again`; never infer no holder. On refresh failure retain the last successful catalogue/detail alongside the failure and retry state; do not present cached resolution as freshly confirmed. Loading never flashes an empty/unassigned answer. |
 | Write refused/failed | Exact reason beside action; no local mutation of displayed resolution |
 | History empty | `No assignments yet` / `No covers yet` within a valid selected Duty |
