@@ -55,6 +55,8 @@ function client(opts: { tables?: Record<string, unknown[]>; rpc?: Record<string,
     purchase_return_units: [],
     document_sends: [],
     purchase_return_pickup_confirmations: [],
+    purchase_return_supplier_receipts: [],
+    purchase_return_supplier_receipt_units: [],
     supplier_claim_replies: [],
     ops_stock_items: [],
     repair_orders: [],
@@ -67,6 +69,7 @@ function client(opts: { tables?: Record<string, unknown[]>; rpc?: Record<string,
     purchasing_issue_purchase_return: { data: PR },
     purchase_return_record_send: { data: "d1" },
     purchase_return_record_pickup_confirmation: { data: "p1" },
+    purchase_return_record_supplier_receipt: { data: "r1" },
     purchasing_po_duty_may_act: { data: true },
     supplier_claim_record_carres_execution: { data: { claim_no: "SC-1" } },
     workspace_resolve_duty: { data: null },
@@ -218,5 +221,49 @@ describe("Record what Carres does next and Plan Repair", () => {
     const res = await call(sb, `/operation/supplier-claims/${CLAIM}/carres-execution`, { method: "POST", body: { carres_execution: "collect_first" } });
     expect(res.status).toBe(422);
     expect(sb.rpc.mock.calls.some(([n]) => n === "supplier_claim_record_carres_execution")).toBe(false);
+  });
+});
+
+describe("Record supplier receipt (§9.6, 0614)", () => {
+  const RU = "55555555-5555-4555-8555-000000000001";
+  it("calls the ONE door with the exact Units, the supplier evidence and the confirmation", async () => {
+    const sb = client();
+    const res = await call(sb, `/operation/purchase-returns/${PR}/supplier-receipt`, { method: "POST", body: {
+      received_on: "2026-09-07", stock_item_ids: [UNIT], evidence: [{ path: `purchase_return_receipt/${PR}/a.pdf`, kind: "pdf" }], confirmed_by: "Mr Tan", confirmed_at: "2026-09-07T10:00:00+08:00", note: "Signed GRN" } });
+    expect(res.status).toBe(200);
+    expect(sb.rpc.mock.calls.find(([n]) => n === "purchase_return_record_supplier_receipt")?.[1]).toEqual({
+      p_return_id: PR, p_received_on: "2026-09-07", p_stock_item_ids: [UNIT], p_evidence: [{ path: `purchase_return_receipt/${PR}/a.pdf`, kind: "pdf" }],
+      p_confirmed_by: "Mr Tan", p_confirmed_at: "2026-09-07T10:00:00+08:00", p_note: "Signed GRN",
+    });
+  });
+
+  it("a Unit Stock has not picked up is refused in the door's own words", async () => {
+    const sb = client({ rpc: { purchase_return_record_supplier_receipt: { error: { code: "23514", message: "U1-000-001: Not picked up", details: "not_picked_up" } } } });
+    const res = await call(sb, `/operation/purchase-returns/${PR}/supplier-receipt`, { method: "POST", body: { received_on: "2026-09-07", stock_item_ids: [UNIT], confirmed_by: "Mr Tan", confirmed_at: "2026-09-07T10:00:00+08:00" } });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ code: "not_picked_up", message: "U1-000-001: Not picked up" });
+  });
+
+  it("is internal only", async () => {
+    const res = await call(client(), `/operation/purchase-returns/${PR}/supplier-receipt`, { method: "POST", role: "dealer", body: { received_on: "2026-09-07", stock_item_ids: [UNIT] } });
+    expect(res.status).toBe(403);
+  });
+
+  it("the record reads Supplier Received Date and receipt proof from the receipt ledger, never from pickup or the 0548 column", async () => {
+    const tables = {
+      purchase_returns: [{ id: PR, pr_no: "PR-20260929-1001", pr_doc_date: "2026-09-29T02:00:00Z", supplier_id: "s1", supplier_claim_id: CLAIM, warehouse_receipt_id: null, confirmed_pickup_date: null }],
+      purchase_return_units: [
+        { id: RU, purchase_return_id: PR, stock_item_id: UNIT, unit_code: "U1-000-001", actual_pickup_date: "2026-09-05T02:00:00Z", supplier_received_date: "2020-01-01T00:00:00Z", evidence: [] },
+        { id: "ru-2", purchase_return_id: PR, stock_item_id: "s-2", unit_code: "U1-000-002", actual_pickup_date: "2026-09-05T02:00:00Z", supplier_received_date: null, evidence: [] },
+      ],
+      purchase_return_supplier_receipts: [{ id: "r1", purchase_return_id: PR, received_on: "2026-09-07", evidence: [{ path: "purchase_return_receipt/x/a.jpg", kind: "photo" }, { path: "purchase_return_receipt/x/b.mp4", kind: "video" }], confirmed_by: null, confirmed_at: null, recorded_by: ME, recorded_at: "2026-09-07T04:00:00Z" }],
+      purchase_return_supplier_receipt_units: [{ receipt_id: "r1", purchase_return_unit_id: RU }],
+    };
+    const res = await call(client({ tables }), `/operation/purchase-returns/${PR}`);
+    const { purchaseReturn } = (await res.json()) as { purchaseReturn: { units: Array<Record<string, unknown>>; receipts: Array<Record<string, unknown>> } };
+    expect(purchaseReturn.units.map((u) => [u.unit_id, u.stock_item_id, u.supplier_received_date])).toEqual([["U1-000-001", UNIT, "2026-09-07"], ["U1-000-002", "s-2", null]]);
+    expect(purchaseReturn.units[0]!.evidence).toEqual([{ purpose: "receipt", photos: 1, videos: 1 }]);
+    expect(purchaseReturn.units[1]!.evidence).toEqual([]);
+    expect(purchaseReturn.receipts).toEqual([{ received_on: "2026-09-07", unit_ids: ["U1-000-001"], files: 2, confirmed_by: null, confirmed_at: null, recorded_at: "2026-09-07T04:00:00Z", recorded_by_name: "Mei" }]);
   });
 });

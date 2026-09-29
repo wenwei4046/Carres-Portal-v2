@@ -15,7 +15,7 @@
  * ```
  *
  * One ungrouped list, newest report first. `☐` is for Export only; `▸` opens
- * the row's read-only inspector. The engine's `pinnedPrefix` pins the two
+ * the row's read-only per-Unit evidence inspector (`SupplierClaimUnitsTable`). The engine's `pinnedPrefix` pins the two
  * controls plus `Claim status` and `Supplier Claim No` at a ≥768px canvas and
  * `Supplier Claim No` alone below it — never the date (§6.7 rule 2 exception).
  */
@@ -47,7 +47,8 @@ import PurchasingTabs from "./PurchasingTabs";
 import SalesOrderTabs from "./SalesOrderTabs";
 import { FilterRail, FilterRailGroup, FilterRailRow, ShowFiltersButton, useFilterRailOpen } from "./components/workspace-rail";
 import SecondLine from "./components/register-cell";
-import SupplierClaimPanel, { SupplierClaimInspector } from "./components/SupplierClaimPanel";
+import SupplierClaimPanel from "./components/SupplierClaimPanel";
+import SupplierClaimUnitsTable from "./components/SupplierClaimUnitsTable";
 
 type Facet = "supplier" | "problem" | "status" | "response";
 const FACETS: Facet[] = ["supplier", "problem", "status", "response"];
@@ -227,7 +228,7 @@ export default function OperationSupplierClaims() {
             searchPlaceholder="Search Supplier Claims"
             toolbarStart={<>{!railOpen ? <ShowFiltersButton onShow={() => setRailVisible(true)} testId="claims-show-filters" /> : null}</>}
             onFilteredRowsChange={setVisibleRows} onRowDoubleClick={open}
-            expandable={{ renderExpansion: (row) => <SupplierClaimInspector claim={row} onOpen={() => open(row)} />, testId: (row) => `claim-inspect-${row.claim_no}` }}
+            expandable={{ renderExpansion: (row) => <SupplierClaimUnitsTable claim={row} />, testId: (row) => `claim-inspect-${row.claim_no}` }}
             selectable={{ selectedKeys, onToggle: (key) => setSelectedKeys((previous) => { const next = new Set(previous); if (next.has(key)) next.delete(key); else next.add(key); return next; }), onToggleAll: (keys, all) => setSelectedKeys((previous) => { const next = new Set(previous); keys.forEach((key) => { if (all) next.delete(key); else next.add(key); }); return next; }) }}
             statusSummary={(visible) => <span>{supplierClaimFooter(visible.length, claims.length)}</span>}
           />

@@ -225,6 +225,8 @@ export function purchaseReturnVideoAction(count: number): string | null {
  */
 export interface PurchaseReturnUnitRow {
   unit_id: string;
+  /** The Unit's key, for the `Record supplier receipt` door (0614). */
+  stock_item_id?: string | null;
   po_id: string | null;
   category: string | null;
   /** The model, printed on line one of `Items`. */

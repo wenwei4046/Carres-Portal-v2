@@ -21,6 +21,7 @@
  * up` never implies `Supplier Received Date`.
  */
 import { carresExecutionLabel, customerResolutionLabel } from "./supplier-claim";
+import { klDateOfIso } from "./supplier-claim-record";
 import type { PurchaseReturnListRow } from "./purchase-return";
 import { purchaseReturnCollectedQty, purchaseReturnQty } from "./purchase-return";
 import { PURCHASING_OFFICE_OFF_DAYS } from "./purchasing-supplier-calls";
@@ -104,6 +105,19 @@ export interface PurchaseReturnDetail extends PurchaseReturnListRow {
   supplier_claim_id: string | null;
   sends: PurchaseReturnSend[];
   confirmations: PurchaseReturnPickupConfirmation[];
+  /** 0614 — the supplier's own receipts of returned Units, oldest first. */
+  receipts?: PurchaseReturnSupplierReceipt[];
+}
+
+/** One `Record supplier receipt` (0614, append-only). */
+export interface PurchaseReturnSupplierReceipt {
+  received_on: IsoDate;
+  unit_ids: string[];
+  files: number;
+  confirmed_by: string | null;
+  confirmed_at: string | null;
+  recorded_at: string;
+  recorded_by_name: string | null;
 }
 
 export const PURCHASE_RETURN_CHANNEL_WORD: Record<string, string> = { whatsapp: "WhatsApp", email: "Email", print: "Print" };
@@ -354,4 +368,49 @@ export function projectPurchaseReturnWork(input: {
       })),
   );
   return [...issues, ...returns];
+}
+
+// ── `Record supplier receipt` (§9.6, 0614) ─────────────────────────────────
+//
+// §9.6: "`Supplier Received Date` is recorded from supplier evidence; fully
+// picked up never implies it." Only a Unit Stock has picked up may be
+// received, and each Unit is received once. The door (0614) refuses in the same
+// words; this is the form's reading of the same facts.
+
+export const RECORD_SUPPLIER_RECEIPT = "Record supplier receipt";
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+/** `7 Sep 2026` — the door's own `FMDD Mon YYYY`. */
+export function purchaseReturnReceiptDateWords(iso: IsoDate): string {
+  const [y, m, d] = iso.slice(0, 10).split("-");
+  return `${Number(d)} ${MONTHS[Number(m) - 1]} ${y}`;
+}
+
+export interface PurchaseReturnReceiptUnit {
+  stock_item_id: string;
+  unit_id: string;
+  /** Why this Unit cannot be ticked: `Not picked up` · `Already received {date}`. */
+  refusal: string | null;
+  /** The Malaysia date Stock recorded the pickup; the received date may not be earlier. */
+  pickedUpOn: IsoDate | null;
+}
+
+export function purchaseReturnReceiptUnits(pr: Pick<PurchaseReturnListRow, "units">): PurchaseReturnReceiptUnit[] {
+  return pr.units.filter((u) => u.stock_item_id).map((u) => {
+    const pickedUpOn = u.actual_pickup_date ? klDateOfIso(u.actual_pickup_date) : null;
+    const refusal = !pickedUpOn ? "Not picked up"
+      : u.supplier_received_date ? `Already received ${purchaseReturnReceiptDateWords(u.supplier_received_date)}`
+      : null;
+    return { stock_item_id: u.stock_item_id!, unit_id: u.unit_id, refusal, pickedUpOn };
+  });
+}
+
+export function purchaseReturnReceiptMissing(d: { date: string | null; unitIds: readonly string[]; files: number; confirmedBy: string; confirmedAt: string | null }): string[] {
+  const out: string[] = [];
+  if (!d.date) out.push("Choose the Supplier Received Date.");
+  if (d.unitIds.length === 0) out.push("Tick the Units the supplier received.");
+  const by = d.confirmedBy.trim().length > 0;
+  if (by !== Boolean(d.confirmedAt)) out.push("A confirmation needs who confirmed and when.");
+  else if (d.files === 0 && !by) out.push("Add the evidence: a file, or who confirmed and when.");
+  return out;
 }

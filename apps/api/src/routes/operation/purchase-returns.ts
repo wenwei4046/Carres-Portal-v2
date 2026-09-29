@@ -30,6 +30,7 @@ import type { AppEnv } from "../../types";
  *   POST /                        `Issue Purchase Return` → the ONE 0548/0609 door
  *   POST /:id/send                `Return document sent to supplier`
  *   POST /:id/pickup-confirmation `Confirmed Pickup` (evidenced)
+ *   POST /:id/supplier-receipt    `Record supplier receipt` (0614)
  *
  * Every write is a thin door onto a SECURITY DEFINER function; there is no
  * table write here (ERP-ARCHITECTURE law C). Issuing moves no stock (§7.4):
@@ -114,7 +115,7 @@ async function assemble(c: Context<AppEnv>, documents: Row[]): Promise<{ rows: P
   const [units, sends, confirmations] = await Promise.all([
     readAllIn(ids, (batch, from, to) =>
       sb.from("purchase_return_units")
-        .select("purchase_return_id, stock_item_id, unit_code, po_id, category, item, item_spec, pickup_location, return_to, collected_by, collected_by_name, actual_pickup_date, supplier_received_date, evidence")
+        .select("id, purchase_return_id, stock_item_id, unit_code, po_id, category, item, item_spec, pickup_location, return_to, collected_by, collected_by_name, actual_pickup_date, evidence")
         .in("purchase_return_id", batch).order("unit_code", { ascending: true }).range(from, to)),
     readAllIn(ids, (batch, from, to) =>
       sb.from("document_sends").select("id, document_id, channel, recipient, sent_by, sent_at")
@@ -125,6 +126,18 @@ async function assemble(c: Context<AppEnv>, documents: Row[]): Promise<{ rows: P
   ]);
   for (const r of [units, sends, confirmations]) if (r.error) return { rows: [], error: r.error };
 
+  /* 0614 — `Supplier Received Date` and `Supplier receipt proof` are read
+     from the append-only receipt ledger, never from the pickup and never from
+     the 0548 column (which nothing writes). Before 0614 is applied the ledger
+     does not exist, and then no receipt can have been recorded: `Not recorded`
+     is the truth, not a guess. */
+  const receipts = await readAllIn(ids, (batch, from, to) =>
+    sb.from("purchase_return_supplier_receipts").select("id, purchase_return_id, received_on, evidence, confirmed_by, confirmed_at, recorded_by, recorded_at")
+      .in("purchase_return_id", batch).order("recorded_at", { ascending: true }).range(from, to));
+  const receiptUnits = receipts.error ? { rows: [] as Row[], error: null } : await readAllIn(receipts.rows.map((r) => r.id as string), (batch, from, to) =>
+    sb.from("purchase_return_supplier_receipt_units").select("receipt_id, purchase_return_unit_id").in("receipt_id", batch).range(from, to));
+  for (const r of [receipts, receiptUnits]) if (r.error && !ledgerAbsent(r.error)) return { rows: [], error: r.error };
+
   const admin = adminClient(c.env);
   const [supplierRes, claimRes, receiptRes, actorNames] = await Promise.all([
     readAllIn(documents.map((d) => d.supplier_id as string), (b, f, t) => sb.from("suppliers").select("id, name").in("id", b).range(f, t)),
@@ -134,6 +147,7 @@ async function assemble(c: Context<AppEnv>, documents: Row[]): Promise<{ rows: P
       ...units.rows.map((u) => u.collected_by as string | null),
       ...sends.rows.map((s) => s.sent_by as string | null),
       ...confirmations.rows.map((r) => r.recorded_by as string | null),
+      ...receipts.rows.map((r) => r.recorded_by as string | null),
     ]),
   ]);
   for (const r of [supplierRes, claimRes, receiptRes]) if (r.error) return { rows: [], error: r.error };
@@ -150,6 +164,10 @@ async function assemble(c: Context<AppEnv>, documents: Row[]): Promise<{ rows: P
   const unitsBy = group(units.rows, "purchase_return_id");
   const sendsBy = group(sends.rows, "document_id");
   const confirmationsBy = group(confirmations.rows, "purchase_return_id");
+  const receiptsBy = group(receipts.rows, "purchase_return_id");
+  const receiptById = new Map(receipts.rows.map((r) => [r.id as string, r]));
+  const receiptOfUnit = new Map(receiptUnits.rows.map((r) => [r.purchase_return_unit_id as string, receiptById.get(r.receipt_id as string)]));
+  const unitCodeById = new Map(units.rows.map((u) => [u.id as string, (u.unit_code as string) ?? ""]));
 
   const rows = documents.map((row): PurchaseReturnDetail => {
     const id = row.id as string;
@@ -179,9 +197,19 @@ async function assemble(c: Context<AppEnv>, documents: Row[]): Promise<{ rows: P
         recorded_at: r.recorded_at as string,
         recorded_by_name: actorNames.get(r.recorded_by as string) ?? null,
       })),
+      receipts: (receiptsBy.get(id) ?? []).map((r) => ({
+        received_on: r.received_on as string,
+        unit_ids: receiptUnits.rows.filter((ru) => ru.receipt_id === r.id).map((ru) => unitCodeById.get(ru.purchase_return_unit_id as string) ?? "").filter(Boolean),
+        files: Array.isArray(r.evidence) ? r.evidence.length : 0,
+        confirmed_by: str(r.confirmed_by),
+        confirmed_at: str(r.confirmed_at),
+        recorded_at: r.recorded_at as string,
+        recorded_by_name: actorNames.get(r.recorded_by as string) ?? null,
+      })),
       units: (unitsBy.get(id) ?? []).map((unit) => ({
         /* §9.6's `Unit ID` is the Unit's own code, not the table's key. */
         unit_id: (unit.unit_code as string) ?? "",
+        stock_item_id: str(unit.stock_item_id),
         po_id: str(unit.po_id),
         category: str(unit.category),
         item: str(unit.item),
@@ -193,8 +221,11 @@ async function assemble(c: Context<AppEnv>, documents: Row[]): Promise<{ rows: P
            collected the goods that day. */
         collected_by: str(unit.collected_by_name) || actorNames.get(unit.collected_by as string) || null,
         actual_pickup_date: str(unit.actual_pickup_date),
-        supplier_received_date: str(unit.supplier_received_date),
-        evidence: countEvidence(unit.evidence),
+        supplier_received_date: str(receiptOfUnit.get(unit.id as string)?.received_on),
+        evidence: countEvidence([
+          ...(Array.isArray(unit.evidence) ? unit.evidence : []),
+          ...receiptFiles(receiptOfUnit.get(unit.id as string)?.evidence),
+        ]),
       })),
     };
   });
@@ -454,6 +485,52 @@ purchaseReturnsRouter.post("/:id/pickup-confirmation", purchaseReturnWorkComplet
   return c.json({ id: data ?? null });
 });
 
+
+// ----- POST /:id/supplier-receipt — `Record supplier receipt` (0614) -----
+//
+// §9.6: the supplier's own receipt of returned Units, from supplier evidence.
+// The door refuses a Unit Stock has not picked up, a date before that pickup
+// or in the future, and a Unit already received; it writes no pickup fact.
+
+const receiptSchema = z.object({
+  received_on: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  stock_item_ids: z.array(z.string().uuid()).min(1).max(200),
+  evidence: z.array(z.object({ path: z.string().min(1).max(300), kind: z.enum(["photo", "video", "pdf"]) })).max(12).default([]),
+  confirmed_by: z.string().trim().max(120).nullable().optional(),
+  confirmed_at: z.string().datetime({ offset: true }).nullable().optional(),
+  note: z.string().trim().max(500).nullable().optional(),
+});
+
+purchaseReturnsRouter.post("/:id/supplier-receipt", async (c) => {
+  gate(c);
+  const parsed = await parseJsonBody(c, receiptSchema);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const d = parsed.data;
+  const { data, error } = await userClient(c.env, c.var.auth.jwt).rpc("purchase_return_record_supplier_receipt", {
+    p_return_id: c.req.param("id"),
+    p_received_on: d.received_on,
+    p_stock_item_ids: d.stock_item_ids,
+    p_evidence: d.evidence,
+    p_confirmed_by: d.confirmed_by || null,
+    p_confirmed_at: d.confirmed_at ?? null,
+    p_note: d.note || null,
+  });
+  if (error) return failDoor(c, error);
+  return c.json({ id: data ?? null });
+});
+
+/** The receipt ledger (0614) is not there yet: nothing can have been recorded. */
+function ledgerAbsent(error: unknown): boolean {
+  const code = (error as { code?: string } | null)?.code;
+  return code === "42P01" || code === "PGRST205";
+}
+
+/** A receipt's files, as `receipt` evidence for each Unit it names. */
+function receiptFiles(raw: unknown): Array<{ purpose: "receipt"; path: string }> {
+  if (!Array.isArray(raw)) return [];
+  return raw.filter((f) => f && typeof f === "object" && typeof (f as Row).path === "string")
+    .map((f) => ({ purpose: "receipt" as const, path: String((f as Row).path) }));
+}
 
 /**
  * Evidence counts, by purpose.

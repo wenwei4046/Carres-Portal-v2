@@ -138,3 +138,84 @@ describe("Supplier Claim Work (one engine, own projector)", () => {
     expect(run(claim({ status: "cancelled" }), "2026-10-09")).toEqual([]);
   });
 });
+
+// ── §9.5 Row expansion — the per-Unit evidence inspector ────────────────────
+import { supplierClaimInspectionRows, supplierClaimEvidenceControls } from "./supplier-claim-record";
+
+describe("supplierClaimInspectionRows — one row per held Unit, never distributed", () => {
+  const units = [
+    { id: "u1", unit_code: "U1-000-001", identity_scope: "unit", qty: 1 },
+    { id: "u2", unit_code: "U1-000-002", identity_scope: "unit", qty: 1 },
+    { id: "q1", unit_code: null, identity_scope: "quantity", qty: 3 },
+  ];
+  const claim = { claim_type: "damaged", note: "Leg broken on both", qty: 5, supplier_response: null, response_reply: null, units };
+  const file = (path: string, unit_code: string | null, kind: "photo" | "video" = "photo") => ({ path, at: "2026-09-04T02:00:00Z", kind, unit_code, url: null });
+
+  it("gives each tracked Unit its own row, Qty 1, its own problem note and only its own files", () => {
+    const rows = supplierClaimInspectionRows(claim, {
+      problems: [{ stock_item_id: "u1", note: "Scratch on left arm" }],
+      files: [file("a.jpg", "U1-000-001"), file("b.mp4", "U1-000-001", "video"), file("c.jpg", "U1-000-002")],
+    });
+    expect(rows.map((r) => [r.key, r.unitLine, r.qty])).toEqual([["u1", "U1-000-001", 1], ["u2", "U1-000-002", 1], ["q1", "Counted stock", 3]]);
+    expect(rows[0]).toMatchObject({ problem: "Damaged", note: "Scratch on left arm" });
+    expect(rows[0]!.files.map((f) => f.path)).toEqual(["a.jpg", "b.mp4"]);
+    expect(rows[1]).toMatchObject({ note: null });
+    expect(rows[1]!.files.map((f) => f.path)).toEqual(["c.jpg"]);
+    expect(rows[2]!.files).toEqual([]);
+  });
+
+  it("keeps a file that names no Unit of THIS claim on one honest `Whole claim` row", () => {
+    const rows = supplierClaimInspectionRows(claim, { problems: [], files: [file("legacy.jpg", null), file("stray.jpg", "U9-999-999")] });
+    const whole = rows.find((r) => r.scope === "claim")!;
+    expect(whole).toMatchObject({ unitLine: "Whole claim", problem: "Damaged", note: "Leg broken on both", qty: 5 });
+    expect(whole.files.map((f) => f.path)).toEqual(["legacy.jpg", "stray.jpg"]);
+    expect(rows.filter((r) => r.scope === "unit").every((r) => r.files.length === 0)).toBe(true);
+  });
+
+  it("prints a whole-claim answer as the claim-level answer it is, and a Units answer only on its Units", () => {
+    const whole = supplierClaimInspectionRows({ ...claim, supplier_response: "repair", response_reply: { scope: "claim", unit_ids: [] } }, { problems: [], files: [] });
+    expect(whole.map((r) => [r.response, r.responseLine])).toEqual([["Repair", "Whole claim"], ["Repair", "Whole claim"], ["Repair", "Whole claim"]]);
+    const some = supplierClaimInspectionRows({ ...claim, supplier_response: "replacement", response_reply: { scope: "units", unit_ids: ["u2"] } }, { problems: [], files: [] });
+    expect(some.map((r) => [r.key, r.response, r.responseLine])).toEqual([["u1", "Not recorded", null], ["u2", "Replacement", null], ["q1", "Not recorded", null]]);
+    const legacy = supplierClaimInspectionRows({ ...claim, supplier_response: "reject", response_reply: null }, { problems: [], files: [] });
+    expect(legacy[0]).toMatchObject({ response: "Reject", responseLine: "Whole claim" });
+  });
+
+  it("draws nothing for a claim with no Unit and no file, and a `Whole claim` row when it has files", () => {
+    expect(supplierClaimInspectionRows({ ...claim, units: [] }, { problems: [], files: [] })).toEqual([]);
+    const rows = supplierClaimInspectionRows({ ...claim, units: [] }, { problems: [], files: [file("x.jpg", null)] });
+    expect(rows.map((r) => r.unitLine)).toEqual(["Whole claim"]);
+  });
+});
+
+describe("supplierClaimEvidenceControls — `Photos {n}` / `Video {n}`, a zero kind prints nothing", () => {
+  it("counts by kind in the governed words", () => {
+    const f = (kind: "photo" | "video") => ({ path: kind, at: null, kind, unit_code: null, url: null });
+    expect(supplierClaimEvidenceControls([f("photo"), f("photo"), f("video")])).toEqual([{ kind: "photo", label: "Photos 2" }, { kind: "video", label: "Video 1" }]);
+    expect(supplierClaimEvidenceControls([f("photo")])).toEqual([{ kind: "photo", label: "Photo 1" }]);
+    expect(supplierClaimEvidenceControls([f("video"), f("video")])).toEqual([{ kind: "video", label: "Video 2" }]);
+    expect(supplierClaimEvidenceControls([])).toEqual([]);
+  });
+});
+
+import { claimPhotoWire } from "./supplier-claim-record";
+import { officeReceiveInput } from "./schemas/operation";
+import { warehouseSubmitReceiptInput } from "./schemas/warehouse";
+
+describe("claimPhotoWire — a receiving photo may name its Unit (0614)", () => {
+  it("keeps a plain key claim-level and carries the Unit on an object", () => {
+    expect(claimPhotoWire("PO-1/a.jpg")).toBe("PO-1/a.jpg");
+    expect(claimPhotoWire({ path: "PO-1/b.jpg", unitCode: "U1-000-001" })).toEqual({ path: "PO-1/b.jpg", unit_code: "U1-000-001" });
+  });
+  it("both receiving doors accept either shape and refuse an object without its Unit", () => {
+    const line = { id: "11111111-1111-4111-8111-111111111111", receivedNow: 1, damagedQty: 1 };
+    const ok = [{ ...line, damagedPhotos: ["a.jpg", { path: "b.jpg", unitCode: "U1-000-001" }] }];
+    const bad = [{ ...line, damagedPhotos: [{ path: "b.jpg" }] }];
+    const office = { doNumber: "DO-123", doFilePath: "x.pdf" };
+    expect(officeReceiveInput.safeParse({ ...office, lines: ok }).success).toBe(true);
+    expect(officeReceiveInput.safeParse({ ...office, lines: bad }).success).toBe(false);
+    const wh = { poId: "PO-1", doNumber: "DO-123", doFilePath: "x.pdf" };
+    expect(warehouseSubmitReceiptInput.safeParse({ ...wh, lines: ok }).success).toBe(true);
+    expect(warehouseSubmitReceiptInput.safeParse({ ...wh, lines: bad }).success).toBe(false);
+  });
+});

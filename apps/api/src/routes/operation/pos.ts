@@ -27,6 +27,7 @@ import {
   type PoReportLine,
   type PoReportResponse,
   type WarehouseReceiptLine,
+  claimPhotoWire,
 } from "@carres/shared";
 // renderPoPdf moved to apps/web/src/lib/pdf/render.ts (Workers WASM ban).
 import { requireOperation } from "../../lib/auth-guards";
@@ -1821,9 +1822,9 @@ operationPosRouter.post("/:id/office-receive", requireOperation, async (c) => {
       received_now: l.receivedNow,
       damaged_qty: l.damagedQty ?? 0,
       wrong_item_qty: l.wrongItemQty ?? 0,
-      damaged_photos: l.damagedPhotos ?? [],
+      damaged_photos: (l.damagedPhotos ?? []).map(claimPhotoWire),
       wrong_item_claim_type: l.wrongItemClaimType ?? null,
-      wrong_item_photos: l.wrongItemPhotos ?? [],
+      wrong_item_photos: (l.wrongItemPhotos ?? []).map(claimPhotoWire),
       // 0426 — per-Unit outcomes (ERP-ARCHITECTURE §3.4); absent = the
       // quantity line the validator already governs.
       units: (l.units ?? []).map((u) => ({

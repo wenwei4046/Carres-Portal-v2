@@ -25,11 +25,15 @@ const refreshPhotos = vi.fn();
 const apiMock = vi.fn();
 const returnsQuery = vi.fn();
 const writeMutate = vi.fn();
+const inspectionQuery = vi.fn();
+const refreshInspection = vi.fn();
 vi.mock("@/lib/api", () => ({ apiFetch: (...args: unknown[]) => apiMock(...args), ApiError: class ApiError extends Error {} }));
 vi.mock("@/lib/queries", () => ({
   fetchOperationSupplierClaimPhotos: (...args: unknown[]) => refreshPhotos(...args),
   useOperationSupplierClaims: (...args: unknown[]) => claimsQuery(...args),
   useOperationSupplierClaimPhotos: (...args: unknown[]) => photosQuery(...args),
+  useSupplierClaimInspection: (...args: unknown[]) => inspectionQuery(...args),
+  fetchSupplierClaimInspection: (...args: unknown[]) => refreshInspection(...args),
   useSupplierClaimRecord: (...args: unknown[]) => recordQuery(...args),
   useSupplierClaimDoor: (_id: string, door: string) => ({ mutate: (body: unknown, opts?: { onSuccess?: () => void }) => { doorMutate(door, body); opts?.onSuccess?.(); }, isPending: false, error: null }),
   useOperationPurchaseReturns: (...args: unknown[]) => returnsQuery(...args),
@@ -81,6 +85,8 @@ beforeEach(() => {
   recordQuery.mockReturnValue({ data: RECORD(), isLoading: false, isError: false });
   returnsQuery.mockReturnValue({ data: { returns: [] }, isLoading: false, isError: false });
   writeMutate.mockReset();
+  inspectionQuery.mockReturnValue({ data: { files: [], problems: [] }, isLoading: false, isError: false });
+  refreshInspection.mockReset();
 });
 afterEach(() => vi.useRealTimers());
 
@@ -309,5 +315,81 @@ describe("the claim record's Result — `Record what Carres does next` and `Issu
     recordQuery.mockReturnValue({ data: RECORD({ decision: "repair", authorised_outcome: "Repair", plan_repair: { allowed: true, missing: null } }), isLoading: false });
     show("/operation?tab=claims&claim=c1");
     expect(screen.getByTestId("claim-plan-repair")).toHaveAttribute("href", "/operation?tab=repair-orders&create=1&claim=c1");
+  });
+});
+
+describe("Row expansion — the per-Unit evidence inspector (§9.5, owner-confirmed 2026-09-18)", () => {
+  const file = (path: string, unit_code: string | null, kind: "photo" | "video" = "photo") => ({ path, at: "2026-09-04T02:00:00Z", kind, unit_code, url: `https://signed/${path}` });
+  const twoUnits = () => claimsQuery.mockReturnValue({ data: { claims: [row({ note: "Both legs cracked", supplier_response: "repair", response_reply: { scope: "units", unit_ids: ["a"], supplier_date: null }, units: [unit("a", "U1-000-080"), unit("b", "U1-000-081")] })] }, isLoading: false });
+
+  it("draws one row per held Unit, Qty 1, in the confirmed five columns, with no editor, uploader or delete", () => {
+    twoUnits();
+    inspectionQuery.mockReturnValue({ data: { files: [file("a1.jpg", "U1-000-080"), file("a2.jpg", "U1-000-080"), file("a3.mp4", "U1-000-080", "video"), file("old.jpg", null)], problems: [{ stock_item_id: "a", note: "Left leg cracked" }] }, isLoading: false, isError: false });
+    show();
+    fireEvent.click(screen.getByTestId("claim-inspect-SC-1001"));
+    const inspector = screen.getByTestId("claim-inspector");
+    expect(within(inspector).getAllByRole("columnheader").map((h) => h.textContent)).toEqual(["PO No", "Items", "Qty", "Problem & Evidence", "Supplier Response"]);
+    const rows = within(inspector).getAllByTestId(/^claim-unit-row-/);
+    expect(rows.map((r) => r.getAttribute("data-testid"))).toEqual(["claim-unit-row-a", "claim-unit-row-b", "claim-unit-row-claim"]);
+    expect(rows[0]).toHaveTextContent("U1-000-080");
+    expect(rows[0]).toHaveTextContent("Left leg cracked");
+    expect(within(rows[0]!).getByRole("button", { name: "Photos 2" })).toHaveAttribute("aria-expanded", "false");
+    expect(within(rows[0]!).getByRole("button", { name: "Video 1" })).toBeInTheDocument();
+    expect(rows[0]).toHaveTextContent("Repair");
+    // B has no file: no dead control, and the Units answer is not spread to it.
+    expect(within(rows[1]!).queryByRole("button", { name: /Photo|Video/ })).not.toBeInTheDocument();
+    expect(rows[1]).toHaveTextContent("Not recorded");
+    // The pre-0614 photo names no Unit: it stays on the honest claim-level row.
+    expect(rows[2]).toHaveTextContent("Whole claim");
+    expect(rows[2]).toHaveTextContent("Both legs cracked");
+    expect(within(rows[2]!).getByRole("button", { name: "Photo 1" })).toBeInTheDocument();
+    for (const u of within(inspector).getAllByTestId(/^claim-unit-row-/)) expect(u.querySelectorAll("td")[2]!.textContent).toMatch(/^[12]$/);
+    expect(within(inspector).queryByRole("textbox")).not.toBeInTheDocument();
+    expect(within(inspector).queryByText(/Upload|Delete|Add evidence/)).not.toBeInTheDocument();
+  });
+
+  it("expands that Unit's evidence beneath it, independently, and opens the shared viewer naming the Unit", () => {
+    twoUnits();
+    inspectionQuery.mockReturnValue({ data: { files: [file("a1.jpg", "U1-000-080"), file("b1.jpg", "U1-000-081")], problems: [] }, isLoading: false, isError: false });
+    show();
+    fireEvent.click(screen.getByTestId("claim-inspect-SC-1001"));
+    const a = screen.getByTestId("claim-unit-row-a");
+    const b = screen.getByTestId("claim-unit-row-b");
+    fireEvent.click(within(a).getByRole("button", { name: "Photo 1" }));
+    fireEvent.click(within(b).getByRole("button", { name: "Photo 1" }));
+    expect(within(a).getByRole("button", { name: "Photo 1" })).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByTestId("claim-unit-evidence-a")).toBeInTheDocument();
+    expect(screen.getByTestId("claim-unit-evidence-b")).toBeInTheDocument();
+    fireEvent.click(within(screen.getByTestId("claim-unit-evidence-a")).getByRole("button", { name: /Photo 1/ }));
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).toHaveTextContent("SC-1001 · U1-000-080 · Problem evidence");
+    fireEvent.keyDown(dialog, { key: "Escape" });
+    fireEvent.click(within(a).getByRole("button", { name: "Photo 1" }));
+    expect(screen.queryByTestId("claim-unit-evidence-a")).not.toBeInTheDocument();
+    expect(screen.getByTestId("claim-unit-evidence-b")).toBeInTheDocument();
+  });
+
+  it("never prints a count it does not know: a failed read says so with Try again", () => {
+    twoUnits();
+    const refetch = vi.fn();
+    inspectionQuery.mockReturnValue({ data: undefined, isLoading: false, isError: true, refetch });
+    show();
+    fireEvent.click(screen.getByTestId("claim-inspect-SC-1001"));
+    const inspector = screen.getByTestId("claim-inspector");
+    expect(inspector).toHaveTextContent("Evidence could not be loaded");
+    expect(inspector).not.toHaveTextContent(/Photos 0|Photo 0/);
+    fireEvent.click(within(inspector).getByRole("button", { name: "Try again" }));
+    expect(refetch).toHaveBeenCalled();
+    // The Units still show; only their evidence is unknown.
+    expect(inspector).toHaveTextContent("U1-000-080");
+  });
+
+  it("keeps counted stock on one row with its genuine quantity", () => {
+    claimsQuery.mockReturnValue({ data: { claims: [row({ units: [{ ...unit("q", null, "quantity"), qty: 3 }] })] }, isLoading: false });
+    show();
+    fireEvent.click(screen.getByTestId("claim-inspect-SC-1001"));
+    const r = screen.getByTestId("claim-unit-row-q");
+    expect(r).toHaveTextContent("Counted stock");
+    expect(r.querySelectorAll("td")[2]!.textContent).toBe("3");
   });
 });

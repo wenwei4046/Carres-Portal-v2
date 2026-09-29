@@ -137,3 +137,27 @@ describe("Purchase Return Work (PO Duty, Office calendar)", () => {
     }
   });
 });
+
+// ── §9.6 `Record supplier receipt` ──────────────────────────────────────────
+import { purchaseReturnReceiptUnits, purchaseReturnReceiptMissing, RECORD_SUPPLIER_RECEIPT } from "./purchase-return-record";
+
+describe("purchaseReturnReceiptUnits — only Units Stock picked up, each received once", () => {
+  const unit = (unit_id: string, actual_pickup_date: string | null, supplier_received_date: string | null = null) =>
+    ({ unit_id, stock_item_id: `s-${unit_id}`, po_id: null, category: null, item: null, item_spec: null, pickup_location: null, return_to: null, collected_by: null, actual_pickup_date, supplier_received_date, evidence: [] });
+  it("offers a picked-up Unit, names the rest in the governed words, and never implies receipt from pickup", () => {
+    const rows = purchaseReturnReceiptUnits({ units: [unit("U1", "2026-09-05T02:00:00Z"), unit("U2", null), unit("U3", "2026-09-05T02:00:00Z", "2026-09-07")] });
+    expect(rows).toEqual([
+      { stock_item_id: "s-U1", unit_id: "U1", refusal: null, pickedUpOn: "2026-09-05" },
+      { stock_item_id: "s-U2", unit_id: "U2", refusal: "Not picked up", pickedUpOn: null },
+      { stock_item_id: "s-U3", unit_id: "U3", refusal: "Already received 7 Sep 2026", pickedUpOn: "2026-09-05" },
+    ]);
+    expect(RECORD_SUPPLIER_RECEIPT).toBe("Record supplier receipt");
+  });
+  it("names what is missing before the door is asked", () => {
+    expect(purchaseReturnReceiptMissing({ date: null, unitIds: [], files: 0, confirmedBy: "", confirmedAt: null })).toEqual([
+      "Choose the Supplier Received Date.", "Tick the Units the supplier received.", "Add the evidence: a file, or who confirmed and when.",
+    ]);
+    expect(purchaseReturnReceiptMissing({ date: "2026-09-07", unitIds: ["s"], files: 0, confirmedBy: "Mr Tan", confirmedAt: null })).toEqual(["A confirmation needs who confirmed and when."]);
+    expect(purchaseReturnReceiptMissing({ date: "2026-09-07", unitIds: ["s"], files: 1, confirmedBy: "", confirmedAt: null })).toEqual([]);
+  });
+});

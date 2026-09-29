@@ -112,3 +112,45 @@ describe("the Purchase Return record", () => {
     expect(screen.getByTestId("purchase-return-current-action")).toHaveTextContent("Follow up supplier");
   });
 });
+
+describe("Record supplier receipt (§9.6, 0614)", () => {
+  const picked = (unit_id: string, stock_item_id: string, actual_pickup_date: string | null, supplier_received_date: string | null = null) =>
+    ({ unit_id, stock_item_id, po_id: "PO-1", category: "Mattress", item: "Carres Cloud", item_spec: "King", pickup_location: "Carres Klang", return_to: "Lot 9", collected_by: actual_pickup_date ? "Ah Seng" : null, actual_pickup_date, supplier_received_date, evidence: [] });
+  const sent = { sends: [{ id: "d", channel: "whatsapp", recipient: "Ah Seng", sent_at: "2026-09-29T03:00:00Z", sent_by_name: "Mei" }] };
+
+  it("offers only the Units Stock picked up; the rest say why; saves the exact Units with who confirmed and when", () => {
+    const pr = PR({ ...sent, units: [picked("U1-000-075", "s-a", "2026-09-30T02:00:00Z"), picked("U1-000-076", "s-b", null), picked("U1-000-077", "s-c", "2026-09-30T02:00:00Z", "2026-10-01")] });
+    render(<MemoryRouter><PurchaseReturnPanel pr={pr} today="2026-10-02" /></MemoryRouter>);
+    fireEvent.click(screen.getByTestId("purchase-return-supplier-receipt"));
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).getByRole("checkbox", { name: "U1-000-075" })).not.toBeDisabled();
+    expect(within(dialog).getByRole("checkbox", { name: /U1-000-076/ })).toBeDisabled();
+    expect(dialog).toHaveTextContent("Not picked up");
+    expect(dialog).toHaveTextContent("Already received 1 Oct 2026");
+    const save = within(dialog).getByRole("button", { name: "Record supplier receipt" });
+    fireEvent.click(save);
+    expect(mutate).not.toHaveBeenCalled();
+    expect(dialog).toHaveTextContent("Tick the Units the supplier received.");
+    fireEvent.click(within(dialog).getByRole("checkbox", { name: "U1-000-075" }));
+    fireEvent.change(within(dialog).getByLabelText("Who confirmed"), { target: { value: "Mr Tan" } });
+    fireEvent.change(within(dialog).getByLabelText("Time"), { target: { value: "10:30" } });
+    fireEvent.click(save);
+    expect(mutate).toHaveBeenCalledWith("/api/operation/purchase-returns/pr1/supplier-receipt", {
+      received_on: "2026-10-02", stock_item_ids: ["s-a"], evidence: [], confirmed_by: "Mr Tan", confirmed_at: "2026-10-02T10:30:00+08:00", note: null,
+    });
+  });
+
+  it("reads Supplier Received Date from the receipt, never from a full pickup", () => {
+    const all = PR({ ...sent, units: [picked("U1-000-075", "s-a", "2026-09-30T02:00:00Z")] });
+    const { unmount } = render(<MemoryRouter><PurchaseReturnPanel pr={all} today="2026-10-02" /></MemoryRouter>);
+    expect(screen.getByTestId("purchase-return-pickup-state")).toHaveTextContent("Fully picked up");
+    expect(screen.getByTestId("purchase-return-pickup-state")).toHaveTextContent("Supplier Received DateNot recorded");
+    unmount();
+    const received = PR({ ...sent, units: [picked("U1-000-075", "s-a", "2026-09-30T02:00:00Z", "2026-10-01")],
+      receipts: [{ received_on: "2026-10-01", unit_ids: ["U1-000-075"], files: 1, confirmed_by: null, confirmed_at: null, recorded_at: "2026-10-01T04:00:00Z", recorded_by_name: "Mei" }] });
+    render(<MemoryRouter><PurchaseReturnPanel pr={received} today="2026-10-02" /></MemoryRouter>);
+    expect(screen.getByTestId("purchase-return-pickup-state")).toHaveTextContent("Supplier Received DateThu, 1 Oct");
+    expect(screen.queryByTestId("purchase-return-supplier-receipt")).not.toBeInTheDocument();
+    expect(screen.getAllByText("Supplier receipt recorded").length).toBeGreaterThan(0);
+  });
+});

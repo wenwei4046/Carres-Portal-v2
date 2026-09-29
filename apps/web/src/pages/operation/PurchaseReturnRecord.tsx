@@ -23,20 +23,24 @@ import { useMemo, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import {
   PURCHASE_RETURN_CHANNEL_WORD,
+  RECORD_SUPPLIER_RECEIPT,
   RETURN_DOCUMENT_SENT,
   purchaseReturnNo,
   purchaseReturnPickupState,
+  purchaseReturnReceiptMissing,
+  purchaseReturnReceiptUnits,
   purchaseReturnSendLine,
   purchaseReturnSupplierReceivedDate,
   purchaseReturnWorkItems,
   type PurchaseReturnDetail,
 } from "@carres/shared";
-import { ApiError } from "@/lib/api";
+import { ApiError, apiFetch } from "@/lib/api";
 import { usePurchaseReturn, usePurchaseReturnWrite } from "@/lib/queries";
 import { purchaseReturnPrintData, usePurchaseReturnPdfUrl } from "@/lib/pdf/purchase-return-pdf";
 import { appTodayIso, fmtDate } from "@/lib/fmt-date";
 import Block from "@/components/kit/Block";
 import Button from "@/components/kit/Button";
+import Checkbox from "@/components/kit/Checkbox";
 import DatePicker from "@/components/kit/DatePicker";
 import Drawer from "@/components/kit/Drawer";
 import EmptyState from "@/components/kit/EmptyState";
@@ -45,6 +49,7 @@ import Modal from "@/components/kit/Modal";
 import PdfPreview from "@/components/kit/PdfPreview";
 import Select from "@/components/kit/Select";
 import Textarea from "@/components/kit/Textarea";
+import EvidenceUploadField from "@/components/EvidenceUploadField";
 import SalesOrderTabs from "./SalesOrderTabs";
 import { Fact } from "./SalesOrderWorkspace";
 import { RecordRanks } from "./SalesOrderLedger";
@@ -57,7 +62,7 @@ const CHANNELS = [
   { value: "print", label: "Print" },
 ];
 
-type Dialog = null | "send" | "pickup" | "pdf";
+type Dialog = null | "send" | "pickup" | "pdf" | "receipt";
 
 function refusal(error: unknown): string {
   if (error instanceof ApiError) return error.message || "Not saved · Try again";
@@ -91,6 +96,9 @@ export function PurchaseReturnPanel({ pr, today = appTodayIso() }: { pr: Purchas
     : current.item.ruleKey === "purchase_return.send" ? { word: RETURN_DOCUMENT_SENT, open: "send" as const }
     : { word: "Confirmed Pickup", open: "pickup" as const };
   const done = pickup === "Fully picked up";
+  // §9.6: `Record supplier receipt` stays offered while any Unit has no
+  // supplier receipt; the door (0614) refuses a Unit Stock has not picked up.
+  const receivable = pr.units.some((u) => u.stock_item_id && !u.supplier_received_date);
 
   return <div className="flex min-w-0 flex-col gap-4" data-testid={`purchase-return-panel-${pr.pr_no}`}>
     {current && <Block title="Current action">
@@ -124,7 +132,10 @@ export function PurchaseReturnPanel({ pr, today = appTodayIso() }: { pr: Purchas
       </div>
     </Block>
 
-    <Block title="Pickup" headerSlot={!done ? <Button variant="neutral" onClick={() => setDialog("pickup")} data-testid="purchase-return-pickup">Confirmed Pickup</Button> : undefined}>
+    <Block title="Pickup" headerSlot={!done || receivable ? <div className="flex flex-wrap gap-2">
+      {!done && <Button variant="neutral" onClick={() => setDialog("pickup")} data-testid="purchase-return-pickup">Confirmed Pickup</Button>}
+      {receivable && <Button variant="neutral" onClick={() => setDialog("receipt")} data-testid="purchase-return-supplier-receipt">{RECORD_SUPPLIER_RECEIPT}</Button>}
+    </div> : undefined}>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3" data-testid="purchase-return-pickup-state">
         <Fact idPrefix="pr-fact" own={false} framed label="Confirmed Pickup Date" value={pr.confirmed_pickup_date ? fmtDate(pr.confirmed_pickup_date) : "Pickup date not confirmed"} />
         <Fact idPrefix="pr-fact" own={false} framed label="Pickup" value={pickup} />
@@ -140,6 +151,7 @@ export function PurchaseReturnPanel({ pr, today = appTodayIso() }: { pr: Purchas
 
     <SendDialog pr={pr} open={dialog === "send"} onClose={() => setDialog(null)} />
     <PickupDialog pr={pr} open={dialog === "pickup"} onClose={() => setDialog(null)} />
+    {dialog === "receipt" && <ReceiptDialog pr={pr} today={today} onClose={() => setDialog(null)} />}
     <PdfSheet pr={pr} open={dialog === "pdf"} onClose={() => setDialog(null)} />
   </div>;
 }
@@ -149,6 +161,8 @@ function HistorySection({ pr }: { pr: PurchaseReturnDetail }) {
     { title: `Purchase return issued to ${pr.supplier_name ?? ABSENT}`, date: pr.pr_doc_date, actor: null as string | null, detail: pr.claim_no },
     ...pr.sends.map((s) => ({ title: RETURN_DOCUMENT_SENT, date: s.sent_at, actor: s.sent_by_name, detail: `${PURCHASE_RETURN_CHANNEL_WORD[s.channel] ?? s.channel} · ${s.recipient}` })),
     ...pr.confirmations.map((c) => ({ title: "Confirmed Pickup", date: c.recorded_at, actor: c.recorded_by_name, detail: `${fmtDate(c.confirmed_pickup_date)} · ${c.evidence}` })),
+    ...(pr.receipts ?? []).map((r) => ({ title: "Supplier receipt recorded", date: r.recorded_at, actor: r.recorded_by_name,
+      detail: [fmtDate(r.received_on), ...r.unit_ids, r.files ? `Evidence ${r.files}` : null, r.confirmed_by && r.confirmed_at ? `${r.confirmed_by} · ${fmtDate(r.confirmed_at, { time: true })}` : null].filter(Boolean).join(" · ") })),
   ].filter((e) => e.date).sort((a, b) => a.date!.localeCompare(b.date!)), [pr]);
   return <Block title="History">
     {events.map((event, index) => <div key={`${event.title}-${event.date}-${index}`} className="flex flex-col gap-1 py-2">
@@ -200,6 +214,82 @@ function PickupDialog({ pr, open, onClose }: { pr: PurchaseReturnDetail; open: b
     <DatePicker id="pr-pickup-date" label="Confirmed Pickup" value={date} onChange={setDate} minDate={appTodayIso()} />
     <Input id="pr-pickup-evidence" label="Who confirmed" value={evidence} onChange={(e) => setEvidence(e.target.value)} />
   </DoorDialog>;
+}
+
+const RECEIPT_IMAGE_MIMES = ["image/jpeg", "image/png", "image/webp"] as const;
+const RECEIPT_VIDEO_MIMES = ["video/mp4", "video/quicktime"] as const;
+const RECEIPT_PDF_MIMES = ["application/pdf"] as const;
+
+/** `Record supplier receipt` (§9.6, 0614): the date the supplier received the
+ *  exact Units, from supplier evidence — a file (photo, video, PDF) or who
+ *  confirmed and when. Only Units Stock picked up can be ticked; the rest say
+ *  why. It records no pickup and moves nothing. */
+function ReceiptDialog({ pr, today, onClose }: { pr: PurchaseReturnDetail; today: string; onClose: () => void }) {
+  const door = usePurchaseReturnWrite(`/api/operation/purchase-returns/${encodeURIComponent(pr.id)}/supplier-receipt`);
+  const units = purchaseReturnReceiptUnits(pr);
+  const [date, setDate] = useState<string | null>(today);
+  const [picked, setPicked] = useState<string[]>([]);
+  const [files, setFiles] = useState<Array<{ path: string; kind: string }>>([]);
+  const [who, setWho] = useState("");
+  const [whenDate, setWhenDate] = useState<string | null>(today);
+  const [time, setTime] = useState("");
+  const [note, setNote] = useState("");
+  const [tried, setTried] = useState(false);
+  const confirmedAt = who.trim() && whenDate && time ? `${whenDate}T${time}:00+08:00` : null;
+  const missing = purchaseReturnReceiptMissing({ date, unitIds: picked, files: files.length, confirmedBy: who, confirmedAt });
+  const earliest = units.filter((u) => picked.includes(u.stock_item_id) && u.pickedUpOn).map((u) => u.pickedUpOn!).sort().pop();
+  const save = () => {
+    setTried(true);
+    if (missing.length) return;
+    door.mutate({ received_on: date, stock_item_ids: picked, evidence: files, confirmed_by: who.trim() || null, confirmed_at: confirmedAt, note: note.trim() || null }, { onSuccess: onClose });
+  };
+  return <Modal open onOpenChange={(v) => { if (!v) onClose(); }} title={RECORD_SUPPLIER_RECEIPT}
+    footer={<div className="flex justify-end gap-2 [&_button]:min-h-[40px] sm:[&_button]:min-h-0">
+      <Button variant="neutral" onClick={onClose} disabled={door.isPending}>Cancel</Button>
+      <Button variant="primary" loading={door.isPending} onClick={save} data-testid="purchase-return-receipt-save">{RECORD_SUPPLIER_RECEIPT}</Button>
+    </div>}>
+    <div className="grid gap-3" data-testid="purchase-return-receipt-form">
+      {door.error ? <p role="alert" className="rounded-control border border-kit-red-9 bg-kit-red-3 px-3 py-2 text-body text-kit-red-11">{refusal(door.error)}</p> : null}
+      <DatePicker id="pr-receipt-date" label="Supplier Received Date" value={date} onChange={setDate} {...(earliest ? { minDate: earliest } : {})} />
+      <div className="grid gap-1" role="group" aria-label="Units">
+        <h4 className="text-label text-kit-slate-11">Units</h4>
+        {units.map((u) => <div key={u.stock_item_id} className="flex min-h-[32px] flex-wrap items-center gap-x-2">
+          <Checkbox id={`pr-receipt-unit-${u.stock_item_id}`} label={u.unit_id} disabled={u.refusal != null} checked={picked.includes(u.stock_item_id)}
+            onCheckedChange={(on) => setPicked((prev) => (on === true ? [...prev, u.stock_item_id] : prev.filter((x) => x !== u.stock_item_id)))} />
+          {u.refusal && <span className="text-meta text-kit-slate-11">{u.refusal}</span>}
+        </div>)}
+      </div>
+      <div>
+        <h4 className="mb-2 text-label text-kit-slate-11">Evidence</h4>
+        <EvidenceUploadField<{ path: string; kind: string }>
+          entries={files}
+          onChange={setFiles}
+          sign={(file) => apiFetch<{ token: string; path: string }>("/api/ops/issues/evidence/upload-url", {
+            method: "POST", body: JSON.stringify({ mimeType: file.type, scope: { kind: "purchase_return_receipt", id: pr.id } }),
+          })}
+          bucket="issue-evidence"
+          imageMimes={RECEIPT_IMAGE_MIMES}
+          videoMimes={RECEIPT_VIDEO_MIMES}
+          pdfMimes={RECEIPT_PDF_MIMES}
+          imageMaxBytes={10 * 1024 * 1024}
+          videoMaxBytes={20 * 1024 * 1024}
+          pdfMaxBytes={20 * 1024 * 1024}
+          maxFiles={6}
+          ariaLabel="Evidence"
+          disabled={door.isPending}
+        />
+        <div className="mt-2 grid gap-3 sm:grid-cols-3">
+          <Input id="pr-receipt-who" label="Who confirmed" value={who} onChange={(e) => setWho(e.target.value)} />
+          <DatePicker id="pr-receipt-when" label="When they confirmed" value={whenDate} onChange={setWhenDate} />
+          <Input id="pr-receipt-time" type="time" label="Time" value={time} onChange={(e) => setTime(e.target.value)} />
+        </div>
+      </div>
+      <Textarea id="pr-receipt-note" label="Note" rows={2} value={note} onChange={(e) => setNote(e.target.value)} />
+      {tried && missing.length > 0 && <ul className="text-body text-kit-red-11" data-testid="purchase-return-receipt-missing">
+        {missing.map((m) => <li key={m}>{m}</li>)}
+      </ul>}
+    </div>
+  </Modal>;
 }
 
 function PdfSheet({ pr, open, onClose }: { pr: PurchaseReturnDetail; open: boolean; onClose: () => void }) {
