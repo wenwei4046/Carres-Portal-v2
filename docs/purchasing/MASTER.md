@@ -1530,14 +1530,18 @@ Need PO                                        No PO needed
   until a separate ruling.
 - Reference: NetSuite and SAP allow incoming PO supply to be committed/pegged to a sales order.
 
-**THE TWO-LINE STATUS RULE — same ruling, both SO Batch and Manual Purchase.** `Status` keeps its
-governed first line (`Need PO` · `No PO needed`, independent of `Approval Status`). Whenever that row
-or line cannot be ticked, a second line in plain words says WHY and, where a door exists, the next
-step: `Need approval first` · `SKU not found` with `[Fix in Catalog]` · `{PO No} has {n} {Item}
-available.` with `[Use this PO]`. The reason is no longer printed only in a neighbouring column or
-a tooltip. Manual Purchase's coloured status pill is retired to the SO Batch plain text (ONE KIT
-LAW). The legacy `/operation/purchasing` address redirects to SO Batch Purchase.
-BUILT on branch build/purchasing-so-batch-mp-closure (slice 1).
+**ONE-WORD STATUS, ONE ROW HEIGHT — owner ruling 2026-09-29 ("every row stay the same height, why
+got description in the cell, remove"), replacing the 2026-09-28 two-line Status. Both SO Batch and
+Manual Purchase.** The register `Status` cell prints one word (`Need PO` · `No PO needed`) and
+nothing under it, so every row keeps one height. SO Batch marks a row that has something to say
+with the shared grid's left-edge stripe (SAP Fiori row highlight, UI MASTER): **red** = the order
+cannot be bought until something is fixed (`SKU not found`, `Production days not set`, a missing
+customer date, `Already on a PO`); **blue** = an offer or a fact to read (`{PO No} has {n} {Item}
+available.`, goods reserved on a PO). The stripe's words are the row's hover title and screen-reader
+description; the reason and its door (`Fix in Catalog` · `Open Settings` · `Use this PO`) print on the
+item line inside the row's expansion. The whole row is never painted. Manual Purchase needs no
+stripe: its `Approval Status` column already says `Need approval`. Plain text, never a coloured pill
+(ONE KIT LAW). The legacy `/operation/purchasing` address redirects to SO Batch Purchase.
 
 **Correction recorded the same day:** the planner's first list proposed replacing `Need PO` with
 the blocker and unifying the two ORDER TIMING rail vocabularies; both contradicted standing

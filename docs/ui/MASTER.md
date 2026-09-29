@@ -2223,6 +2223,15 @@ page-drawn `Ready Stock` cell, a per-item `detailRow`, and the §6.9 connector.
 edit/save/cancel controls are the same; its business guards stay in Purchasing.
 Use the existing DataGrid, GoodsMiniTable, controls and connector kit; do not transplant mock HTML/CSS.
 
+**ROW HIGHLIGHT — owner ruling 2026-09-29 · BUILT.** `DataGrid rowHighlight` draws a 3px stripe at a
+row's left edge (the SAP Fiori table row `highlight`): `critical` = kit red-9 (the row cannot take the
+act until something is fixed), `info` = kit blue-9 (an offer or a fact to read). Every row keeps ONE
+height and a register cell keeps ONE word: the reason is never printed under the word in the cell. The
+stripe's `label` is the row's hover title and `aria-description`, so colour is never the only signal,
+and the owning page prints the reason with its door where the row's details live (SO Batch: the item
+line in the expansion). The whole row is never painted — it fights hover and selection, tires the eye
+and fails colour-blind readers. Opt-in; omitted callers are unchanged.
+
 **DEPLOYED + AUTHENTICATED READBACK 2026-09-24 (#1589):** DataGrid's optional
 `selectable.unselectableReason` adds an accessible description and the existing kit
 Tooltip to a refused checkbox. The label is keyboard-focusable and description IDs
