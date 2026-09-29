@@ -451,6 +451,16 @@ across modules; there is no parallel per-module threshold. Store/read one shared
 Validate ordered morning/afternoon times and apply them to the applicable working day/calendar.
 No offline browser timer or per-user browser preference is the business authority.
 
+**Owner clarification 2026-09-29 — operating hours and flexible starts.** Carres Operation's
+usual hours are **9:00 AM–6:00 PM**. Staff may arrive by **10:00 AM** and finish at
+**7:00 PM**, provided they work **eight hours**. A permitted 10:00 AM start is not an
+absence or late-start finding. The 10:30 AM and 3:00 PM settings are availability checkpoints
+for assigning work; they are not shift start/end times or proof of eight hours worked.
+Break duration, lunch timing and an attendance calculation are not inferred from these examples.
+Two observations cannot prove continuous availability: departure after the afternoon check is
+not automatically detected by that check. Lack of portal activity can also mean telephone,
+receiving or other offline work; the evidence contract must address this before activation.
+
 Each check evaluates its OWN work period. A morning activity stamp does not prove afternoon
 availability: morning attendance followed by afternoon MC must be detectable. Fresh, authenticated
 use by the real person is the intended signal; an overnight/background tab's periodic requests
