@@ -47,6 +47,11 @@ vi.mock("@/lib/api", () => ({
       }));
       return { code: to };
     }
+    // The chart's add door: like the database, the new row is in the next read.
+    if (key === "POST /api/finance/ledger/accounts") {
+      net.chart = [...net.chart, acc(body.code, body.name, body.parentCode, body.isHeading === true)];
+      return { code: body.code };
+    }
     return { code: "1125" };
   }),
 }));
@@ -355,13 +360,38 @@ describe("Finance Settings — the chart of accounts", () => {
     fireEvent.click(within(dialog).getByLabelText("It is a heading"));
     expect(within(dialog).getByRole("button", { name: "Save: pick Under" })).toBeDisabled();
 
-    const f = { parent: "2000", code: "2140", name: "Deposits held", isHeading: true, firstCode: "2141", firstName: "Hall deposits" };
-    expect(addAccountSaveGap({ ...f, code: " " })).toBe("Save: type the number");
-    expect(addAccountSaveGap({ ...f, name: "" })).toBe("Save: type the name");
-    expect(addAccountSaveGap({ ...f, firstCode: "" })).toBe("Save: type the first account number");
-    expect(addAccountSaveGap({ ...f, firstName: "" })).toBe("Save: type the first account name");
-    expect(addAccountSaveGap({ ...f, isHeading: false, firstCode: "" })).toBeNull();
+    const f = { parent: "2000", code: "2140", name: "Deposits held", isHeading: true };
+    expect(addAccountSaveGap({ ...f, code: " " })).toBe("Save: type the heading number");
+    expect(addAccountSaveGap({ ...f, name: "" })).toBe("Save: type the heading name");
+    expect(addAccountSaveGap({ ...f, isHeading: false, code: " " })).toBe("Save: type the number");
+    expect(addAccountSaveGap({ ...f, isHeading: false, name: "" })).toBe("Save: type the name");
     expect(addAccountSaveGap(f)).toBeNull();
+  });
+
+  it("Add account: a heading is added on its own, with no first account, and is offered under Under at once (0608)", async () => {
+    show("/finance/settings?tab=chart");
+    await screen.findByText("2130 Accrued expenses");
+    fireEvent.click(screen.getByRole("button", { name: "Add account" }));
+    let dialog = await screen.findByRole("dialog");
+    fireEvent.click(within(dialog).getByLabelText("It is a heading"));
+    expect(within(dialog).queryByLabelText(/First account/)).toBeNull();
+    fireEvent.keyDown(within(dialog).getByRole("combobox", { name: /Under/ }), { key: "Enter" });
+    fireEvent.click(await screen.findByRole("option", { name: "2000 Liabilities" }));
+    fireEvent.change(within(dialog).getByLabelText(/^Heading number/), { target: { value: "2800" } });
+    fireEvent.change(within(dialog).getByLabelText(/^Heading name/), { target: { value: "testhead" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(writes()).toHaveLength(1));
+    expect(writes()[0]).toEqual({
+      key: "POST /api/finance/ledger/accounts",
+      body: { parentCode: "2000", code: "2800", name: "testhead", isHeading: true },
+    });
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+
+    // The chart is read again, and the new empty heading is one to add under.
+    fireEvent.click(await screen.findByRole("button", { name: "Add account" }));
+    dialog = await screen.findByRole("dialog");
+    fireEvent.keyDown(within(dialog).getByRole("combobox", { name: /Under/ }), { key: "Enter" });
+    expect(await screen.findByRole("option", { name: "2800 testhead" })).toBeInTheDocument();
   });
 
   it("Add account: F3 or Ctrl+S saves, and does nothing while Save names a gap", async () => {

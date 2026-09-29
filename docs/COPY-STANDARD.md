@@ -4751,9 +4751,9 @@ is the proposal. No new sentence is added.
 
 Screen words (Finance Settings):
 - Button: `Add account`. Modal title: `Add account`.
-- Fields: `Under`, `Number`, `Name`, checkbox `It is a heading`, `First account number`, `First account name`.
+- Fields: checkbox `It is a heading`, `Under`, `Number`, `Name`. With `It is a heading` ticked, `Number` and `Name` read `Heading number` and `Heading name` (0608: a heading is added on its own; its accounts are added under it afterwards).
 - Money account add, field `Number`, hint `Leave blank to use the next free number.`
-- The disabled `Save` NAMES its gap (the Receiving button law; first gap wins, top to bottom). Add account: `Save: pick Under` · `Save: type the number` · `Save: type the name` · `Save: type the first account number` · `Save: type the first account name`. The Account (rename) modal reuses `Save: type the name` · `Save: type the number`.
+- The disabled `Save` NAMES its gap (the Receiving button law; first gap wins, top to bottom). Add account: `Save: pick Under` · `Save: type the number` · `Save: type the name`; with `It is a heading` ticked, `Save: type the heading number` · `Save: type the heading name`. The Account (rename) modal reuses `Save: type the name` · `Save: type the number`.
 
 Database sentences (shown as written):
 - `<code> <name> is not a heading. Add the account under a heading.`

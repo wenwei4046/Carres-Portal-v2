@@ -372,23 +372,19 @@ export function addAccountSaveGap(f: {
   code: string;
   name: string;
   isHeading: boolean;
-  firstCode: string;
-  firstName: string;
 }): string | null {
   if (!f.parent) return "Save: pick Under";
-  if (!f.code.trim()) return "Save: type the number";
-  if (!f.name.trim()) return "Save: type the name";
-  if (f.isHeading && !f.firstCode.trim()) return "Save: type the first account number";
-  if (f.isHeading && !f.firstName.trim()) return "Save: type the first account name";
+  if (!f.code.trim()) return f.isHeading ? "Save: type the heading number" : "Save: type the number";
+  if (!f.name.trim()) return f.isHeading ? "Save: type the heading name" : "Save: type the name";
   return null;
 }
 
 /**
- * Add an account under a heading, or a heading with its first account (0577).
- * The kind follows the heading, so it is not asked. A heading is an account
- * with an account under it, so "It is a heading" asks for that first account
- * too and both are added in one go. The refusals are gl_account_update's
- * sentences, shown as the database wrote them.
+ * Add an account under a heading, or a heading (0577). The kind follows the
+ * heading, so it is not asked. A heading is a stored flag since 0580, so
+ * "It is a heading" adds it empty (0608): Number and Name are the heading's,
+ * and its accounts are added under it afterwards. The refusals are
+ * gl_account_update's sentences, shown as the database wrote them.
  */
 function AddAccountModal({ headings, ruleHeadings, onClose }: { headings: Row[]; ruleHeadings: Set<string>; onClose: () => void }) {
   const add = useAddAccount();
@@ -396,10 +392,8 @@ function AddAccountModal({ headings, ruleHeadings, onClose }: { headings: Row[];
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
   const [isHeading, setIsHeading] = useState(false);
-  const [firstCode, setFirstCode] = useState("");
-  const [firstName, setFirstName] = useState("");
   const [refusal, setRefusal] = useState<string | null>(null);
-  const gap = addAccountSaveGap({ parent, code, name, isHeading, firstCode, firstName });
+  const gap = addAccountSaveGap({ parent, code, name, isHeading });
   const under = isHeading ? headings.filter((h) => !ruleHeadings.has(h.code)) : headings;
   /* Ticking "It is a heading" drops a rule heading from Under, so a pick of
      one is cleared and Save says "Save: pick Under" again. */
@@ -410,8 +404,7 @@ function AddAccountModal({ headings, ruleHeadings, onClose }: { headings: Row[];
   const submit = () => {
     setRefusal(null);
     const shaped = ledgerAccountCodeInput.safeParse(code);
-    const firstShaped = ledgerAccountCodeInput.safeParse(firstCode);
-    if (!parent || !shaped.success || (isHeading && !firstShaped.success)) {
+    if (!parent || !shaped.success) {
       setRefusal(LEDGER_ACCOUNT_CODE_MESSAGE);
       return;
     }
@@ -420,7 +413,7 @@ function AddAccountModal({ headings, ruleHeadings, onClose }: { headings: Row[];
         parentCode: parent,
         code: shaped.data,
         name: name.trim(),
-        ...(isHeading && firstShaped.success ? { first: { code: firstShaped.data, name: firstName.trim() } } : {}),
+        ...(isHeading ? { isHeading: true } : {}),
       },
       { onSuccess: onClose, onError: (e) => setRefusal(e.message) },
     );
@@ -445,6 +438,7 @@ function AddAccountModal({ headings, ruleHeadings, onClose }: { headings: Row[];
       }
     >
       <div className="flex flex-col gap-3" data-testid="account-add-form">
+        <Checkbox id="account-add-heading" label="It is a heading" checked={isHeading} onCheckedChange={tickHeading} />
         <Select
           id="account-add-under"
           label="Under"
@@ -453,15 +447,8 @@ function AddAccountModal({ headings, ruleHeadings, onClose }: { headings: Row[];
           onValueChange={setParent}
           options={under.map((h) => ({ value: h.code, label: `${h.code} ${h.name}` }))}
         />
-        <Input id="account-add-code" label="Number" required maxLength={8} value={code} onChange={(e) => setCode(e.target.value)} />
-        <Input id="account-add-name" label="Name" required maxLength={60} value={name} onChange={(e) => setName(e.target.value)} />
-        <Checkbox id="account-add-heading" label="It is a heading" checked={isHeading} onCheckedChange={tickHeading} />
-        {isHeading && (
-          <>
-            <Input id="account-add-first-code" label="First account number" required maxLength={8} value={firstCode} onChange={(e) => setFirstCode(e.target.value)} />
-            <Input id="account-add-first-name" label="First account name" required maxLength={60} value={firstName} onChange={(e) => setFirstName(e.target.value)} />
-          </>
-        )}
+        <Input id="account-add-code" label={isHeading ? "Heading number" : "Number"} required maxLength={8} value={code} onChange={(e) => setCode(e.target.value)} />
+        <Input id="account-add-name" label={isHeading ? "Heading name" : "Name"} required maxLength={60} value={name} onChange={(e) => setName(e.target.value)} />
         {refusal && <FieldError>{refusal}</FieldError>}
       </div>
     </Modal>

@@ -368,12 +368,14 @@ export const ledgerAccountUpdateInput = z.object({
 }).strict();
 
 /** Add an account under a heading on Finance Settings → Chart of accounts
- *  (0577). The kind follows the heading. A heading is added with its first
- *  account (`first`), because a heading is an account with an account under it. */
+ *  (0577). The kind follows the heading. `isHeading` adds a heading, empty
+ *  since 0608 (a heading is a stored flag since 0580); `first` still adds one
+ *  account under it in the same call. */
 export const ledgerAccountAddInput = z.object({
   parentCode: z.string().trim().regex(ledgerAccountCodeShape, 'That account is not in the chart.'),
   code: ledgerAccountCodeInput,
   name: z.string().trim().min(1, 'Type the account name.').max(60, 'Keep the name to 60 characters.'),
+  isHeading: z.boolean().optional(),
   first: z.object({
     code: ledgerAccountCodeInput,
     name: z.string().trim().min(1, 'Type the account name.').max(60, 'Keep the name to 60 characters.'),
