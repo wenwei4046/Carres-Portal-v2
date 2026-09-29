@@ -1180,6 +1180,13 @@ auditable Workspace, never inside the launcher. Module tabs, portal navigation, 
 `…` must not repeat a Settings destination. Current-view presentation such as Columns, personal
 Saved Views and governed Register layout remains on the owning Register and is not System Settings.
 
+**STAFF & DUTIES PLAIN PERSON DISPLAY — OWNER CORRECTION 2026-09-29 / NOT BUILT.**
+Workspace §4.2 shows one current resolved person name and plain dates. Remove `Normal owner`,
+`Acting today`, `Who can act`, `Effective` labels and routine permission lectures from that surface.
+An effective cover supplies the displayed name; history preserves the separate source identities.
+The name does not restrict ordinary operational execution to that person. Existing page structure,
+shared components and token values remain; this is not a new component or a permission change.
+
 **STAFF & DUTIES PLACEMENT — OWNER-APPROVED 2026-09-28 / NOT BUILT.** The header gear →
 `All System Settings` → `Staff & Duties` is the one maintained destination. Remove its persistent
 main-menu row. Work's unresolved-Duty link opens the exact Duty in this same Settings destination
