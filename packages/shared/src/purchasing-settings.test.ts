@@ -640,3 +640,14 @@ describe("PO windows in Settings (0585, MASTER §5.6.1)", () => {
     expect(purchasingSetPoWindowsInput.safeParse({ first: "25:00", second: null, secondEnabled: false }).success).toBe(false);
   });
 });
+
+describe("a supplier's Last PO time (0585)", () => {
+  it("reads the recorded time in clock words and checks the input", async () => {
+    const { settingValueLabel, purchasingSetSupplierPoCutoffInput } = await import("./purchasing-settings");
+    expect(settingValueLabel("supplier_po_cutoff", "10:00:00")).toBe("10:00 AM");
+    const id = "11111111-0000-0000-0000-000000000001";
+    expect(purchasingSetSupplierPoCutoffInput.safeParse({ supplierId: id, cutoff: "10:00" }).success).toBe(true);
+    expect(purchasingSetSupplierPoCutoffInput.safeParse({ supplierId: id, cutoff: null }).success).toBe(true);
+    expect(purchasingSetSupplierPoCutoffInput.safeParse({ supplierId: id, cutoff: "10am" }).success).toBe(false);
+  });
+});

@@ -12,6 +12,7 @@ import {
   TRANSIT_DAYS_RANGE,
   SUNDAY,
   WEEKDAYS,
+  clockWordOf,
   lastChangeFor,
   settingValueLabel,
   workWeekLabel,
@@ -29,6 +30,7 @@ import {
   useSetPurchasingNumber,
   useSetPurchasingPoDays,
   useSetPurchasingPoWindows,
+  useSetSupplierPoCutoff,
   useSetSupplierWorkWeek,
   useSetPurchasingSupplierCollection,
   useUpdatePurchasingDestination,
@@ -366,7 +368,10 @@ export default function OperationPurchasingSettings({
         <div className="text-body text-base-600 mb-[18px] max-w-[720px]">
           The settings the ordering engine reads. Change one here and SO Batch Purchase uses it
           the same day.
-          {!canEdit && " Manager only. Read-only for your role."}
+          {/* Owner report 2026-09-29: the shared login was offered Save and
+              every save failed. Settings are changed by a manager signed in
+              with their OWN account; the sentence says so. */}
+          {!canEdit && " Only a manager signed in with their own account can change these."}
         </div>
 
         {/* ⭐ PO WINDOWS (Purchasing MASTER §5.6.1, owner 2026-09-24/25): the
@@ -1245,9 +1250,95 @@ function PoWindowsSection({
                 ) : null}
               </div>
             )}
+            <SupplierLastPoTimes settings={settings} canEdit={canEdit} onFail={onFail} />
           </div>
         )}
       </div>
     </Block>
+  );
+}
+
+/**
+ * ⭐ A SUPPLIER'S OWN `Last PO time` (MASTER §5.6.1 "a supplier's governed
+ * earlier cut-off always wins"; door 0585 `purchasing_set_supplier_po_cutoff`).
+ * Owner 2026-09-29: it belongs in Settings beside the windows, never in the
+ * database by hand. Empty = the supplier uses the PO windows. The time must be
+ * earlier than the last PO window of the day; the door refuses anything else.
+ */
+function SupplierLastPoTimes({
+  settings,
+  canEdit,
+  onFail,
+}: {
+  settings: PurchasingSettingsResponse;
+  canEdit: boolean;
+  onFail: (e: unknown) => void;
+}) {
+  const setCutoff = useSetSupplierPoCutoff();
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const w = settings.poWindows;
+  const last = w ? (w.secondEnabled && w.second ? w.second : w.first) : null;
+  if (settings.suppliers.length === 0) return null;
+  return (
+    <div className="mt-4 border-t border-base-100 pt-3" data-testid="supplier-last-po-times">
+      <div className="text-body text-base-900">Last PO time for one supplier</div>
+      <div className="text-meta text-base-500 mt-0.5">
+        Only for a supplier that needs POs earlier. Leave empty to use the PO windows.
+      </div>
+      <div className="mt-2">
+        {settings.suppliers.map((s) => {
+          const saved = s.poCutoff ?? "";
+          const value = drafts[s.id] ?? saved;
+          const dirty = value !== saved;
+          const late = value !== "" && last != null && value >= last;
+          return (
+            <div key={s.id} className="py-2 border-b border-base-100 last:border-b-0" data-testid={`last-po-time-${s.id}`}>
+              <div className="flex items-start justify-between gap-4 flex-wrap">
+                <div className="min-w-[200px]">
+                  <div className="text-body text-base-900">{s.name}</div>
+                  <div className="text-meta text-base-500">
+                    {saved ? clockWordOf(saved) : "Uses the PO windows"}
+                  </div>
+                  <ChangeLine settings={settings} settingKey="supplier_po_cutoff" supplierId={s.id} />
+                </div>
+                <div className="flex items-start gap-2">
+                  <Input
+                    id={`last-po-time-${s.id}-input`}
+                    type="time"
+                    aria-label={`Last PO time for ${s.name}`}
+                    value={value}
+                    disabled={!canEdit}
+                    error={late ? "Must be earlier than the last PO window." : undefined}
+                    onChange={(e) => setDrafts((d) => ({ ...d, [s.id]: e.target.value }))}
+                  />
+                  {canEdit && (
+                    <Button
+                      size="sm"
+                      disabled={!dirty || late || setCutoff.isPending}
+                      onClick={() =>
+                        setCutoff
+                          .mutateAsync({ supplierId: s.id, cutoff: value === "" ? null : value })
+                          .then(() => {
+                            setDrafts((d) => {
+                              const next = { ...d };
+                              delete next[s.id];
+                              return next;
+                            });
+                            toast.success("Saved");
+                          })
+                          .catch(onFail)
+                      }
+                      data-testid={`last-po-time-${s.id}-save`}
+                    >
+                      Save
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }
