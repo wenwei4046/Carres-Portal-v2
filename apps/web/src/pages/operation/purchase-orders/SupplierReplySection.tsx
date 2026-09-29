@@ -277,7 +277,7 @@ export default function SupplierReplySection({
               floor the item name broke into one word per line). Below 560px
               the card's own scroller takes over, like the Goods lines table. */}
           <table className="w-full min-w-[560px] border-collapse text-meta" data-testid="po-supplier-reply-table">
-            <thead className="bg-kit-slate-3">
+            <thead className="border-b border-kit-slate-5">
               <tr>
                 <th className={`${readHead} min-w-[180px]`}>Item</th><th className={`${readHead} w-12 text-right`}>Qty</th><th className={`${readHead} w-16 text-right`}>To deliver</th>
                 <th className={`${readHead} w-[112px]`}>Supplier Confirmed Delivery Date</th><th className={`${readHead} w-[128px]`}>Last answer</th>
@@ -301,7 +301,11 @@ export default function SupplierReplySection({
         </TableScroller></div>
         <div className="mt-2 flex flex-wrap gap-x-4 text-meta text-kit-slate-11" data-testid="po-supplier-reply-foot">
           <span>Supplier DO · {supplierDo?.number ? <span className="font-medium text-kit-slate-12">{supplierDo.number}</span> : "Not recorded"}{supplierDo?.uploadedAt ? ` · ${fmtDate(supplierDo.uploadedAt)}` : ""}{supplierDo?.file ? <> · <button type="button" className="text-kit-blue-11 hover:underline" onClick={() => void openFile(supplierDo.file!)}>PDF</button></> : null}</span>
-          <span>Last answer · {lastAnswer ? `${fmtDate(lastAnswer.recordedAt)}${lastAnswer.recordedByName ? ` · recorded by ${lastAnswer.recordedByName}` : ""} · Evidence ${evidenceCount}` : "None recorded yet"}</span>
+          {/* The per-line `Last answer` column already says `None recorded yet`;
+              the footer adds only who recorded the latest answer and its evidence. */}
+          {lastAnswer ? (
+            <span>Last answer · {fmtDate(lastAnswer.recordedAt)}{lastAnswer.recordedByName ? ` · recorded by ${lastAnswer.recordedByName}` : ""} · Evidence {evidenceCount}</span>
+          ) : null}
         </div>
         {problem ? <div className="mt-2 text-meta text-kit-red-11">{problem}</div> : null}
       </div>
@@ -342,7 +346,7 @@ export default function SupplierReplySection({
       </div>
       <div className="mt-2 min-w-0 max-w-full overflow-x-auto">
         <table className="w-full min-w-[900px] border-collapse text-meta" data-testid="po-answer-table">
-          <thead className="bg-kit-slate-3">
+          <thead className="border-b border-kit-slate-5">
             <tr>
               <th className={`${head} w-8`}><span className="sr-only">Select</span></th>
               <th className={head}>Item</th><th className={`${head} text-right`}>To deliver</th>

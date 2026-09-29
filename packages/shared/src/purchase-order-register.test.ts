@@ -54,8 +54,9 @@ describe("Purchase Order Register authority", () => {
     expect(facts.filters).toContain("supplier_update_required");
     expect(facts.sentToSupplier).toBe("PO V1");
     expect(purchaseOrderWork({ ...base, version: 2, sends: base.sends }, facts)).toEqual({
-      problem: "PO V2 has not been sent",
-      action: "Issue PO V2 to Hooka",
+      problem: "PO-20260828-4827 V2 has not been sent",
+      /* Owner 2026-09-25 send line: the PO is issued; the act is to SEND it. */
+      action: "Send PO-20260828-4827 V2 to Hooka",
     });
   });
 

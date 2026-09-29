@@ -616,8 +616,9 @@ describe("Purchase Orders Register", () => {
   it("keeps the work copy in the PO detail, where actions live", () => {
     renderPage("/operation/procurement?po=PO-20260828-4827");
     const work = screen.getByTestId("po-object-work");
-    expect(work).toHaveTextContent("PO V2 has not been sent");
-    expect(work).toHaveTextContent("Issue PO V2 to Hooka");
+    expect(work).toHaveTextContent("PO-20260828-4827 V2 has not been sent");
+    /* Owner 2026-09-25 send line: issued is not sent, and the act says Send. */
+    expect(work).toHaveTextContent("Send PO-20260828-4827 V2 to Hooka");
     expect(work.querySelector('[data-owner-id="user-duty"]')).toHaveAttribute("data-owner-duty", "PO Duty");
   });
 
@@ -640,6 +641,13 @@ vi.mock("@/components/SupplierAnswerEvidenceUploadField", () => ({
   default: ({ onChange, ariaLabel }: { onChange: (entries: { path: string; kind: "photo" | "pdf" }[]) => void; ariaLabel: string }) =>
     <button onClick={() => onChange([{ path: ariaLabel === "DO file" ? "PO-20260828-4827/do.pdf" : "PO-20260828-4827/reply.png", kind: ariaLabel === "DO file" ? "pdf" : "photo" }])}>Upload {ariaLabel}</button>,
 }));
+
+/** `Edit ▾` → `Revise quantity or Deliver To` (MASTER §9.3). A Radix menu opens
+ *  on the keyboard in jsdom (no PointerEvent), like the kit's own tests. */
+function openRevise() {
+  fireEvent.keyDown(screen.getByTestId("po-object-edit"), { key: "Enter" });
+  fireEvent.click(screen.getByRole("menuitem", { name: "Revise quantity or Deliver To" }));
+}
 
 describe("the supplier answer per goods line (0587, Purchasing §5.7)", () => {
   function sent() { queryData.pos[0]!.sends[0]!.po_version = 2; }
@@ -855,20 +863,21 @@ describe("Purchase Order object", () => {
      what the supplier actually received meant scrolling the two apart. They are
      now two panes that each scroll on their own — the Sales Order's shape —
      and the document is paper, not a framed PDF viewer. */
-  it("shows the official document beside the facts as two self-scrolling panes", () => {
+  it("viewing never splits: one column, the official document full width and LAST (MASTER §9.3, owner 2026-09-25)", () => {
     renderPage("/operation/procurement?po=PO-20260828-4827");
+    const page = screen.getByTestId("po-document-panes");
+    expect(page.className).not.toContain("lg:flex-row");
     const column = screen.getByTestId("po-document-column");
     expect(within(column).getByLabelText("Official purchase order preview")).toBeInTheDocument();
-    expect(within(column).queryByTitle("Official purchase order preview")).toBeNull();
-    const panes = column.parentElement!;
-    expect(panes.className).toContain("lg:flex-row");
-    /* Each pane scrolls on its own, and the page does not. */
-    expect(panes.firstElementChild?.className).toContain("lg:overflow-auto");
-    expect(column.className).toContain("lg:overflow-auto");
-    /* The Goods lines table sets `min-w-[900px]`. Without `min-w-0` the flex
-       item sizes to it and the document pane collapses — the one failure this
-       layout has, and the reason the class is asserted rather than eyeballed. */
-    expect(panes.firstElementChild?.className).toContain("min-w-0");
+    const heads = within(page).getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
+    expect(heads[0]).toBe("Current action");
+    expect(heads.at(-1)).toBe("Document");
+    /* State lives in the header, once; the Status and PO Version facts are retired. */
+    expect(screen.getByTestId("po-object-state")).toBeInTheDocument();
+    const facts = screen.getByTestId("po-object-facts");
+    expect(within(facts).queryByText("Status")).toBeNull();
+    expect(within(facts).queryByText("PO Version")).toBeNull();
+    expect(within(facts).getByText("Sent")).toBeInTheDocument();
   });
 
   it("shows the print-data refusal and corrective action instead of a generic PDF error", async () => {
@@ -887,7 +896,7 @@ describe("Purchase Order object", () => {
 
   it("wears the Sales Order's card heading and keeps the long Unit ID list last (2026-09-04)", () => {
     renderPage("/operation/procurement?po=PO-20260828-4827");
-    const facts = screen.getByTestId("po-document-panes").firstElementChild!;
+    const facts = screen.getByTestId("po-document-panes");
     const heads = within(facts as HTMLElement).getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
     /* Same card as the Sales Order: the blue, sentence-case title over a rule
        (owner, 2026-09-26 — one card grammar for every Purchasing page). */
@@ -936,7 +945,7 @@ describe("Purchase Order object", () => {
 
   it("revises one goods line to another governed Deliver To", () => {
     renderPage("/operation/procurement?po=PO-20260828-4827");
-    fireEvent.click(screen.getByRole("button", { name: "Revise" }));
+    openRevise();
     expect(screen.getByLabelText("Qty for MAT-K-001")).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("Deliver To for MAT-K-001"), {
       target: { value: "destination-2" },
@@ -958,14 +967,14 @@ describe("Purchase Order object", () => {
     queryData.destinations.splice(1, 1);
     queryData.pos[0]!.purchase_order_lines[0]!.destination_id = "destination-2";
     renderPage("/operation/procurement?po=PO-20260828-4827");
-    fireEvent.click(screen.getByRole("button", { name: "Revise" }));
+    openRevise();
     expect(screen.getByRole("option", { name: "Carres Penang (closed)" })).toBeDisabled();
   });
 
   it("keeps a PO-level destination out of a quantity-only line revision", () => {
     queryData.pos[0]!.purchase_order_lines[0]!.destination_id = null;
     renderPage("/operation/procurement?po=PO-20260828-4827");
-    fireEvent.click(screen.getByRole("button", { name: "Revise" }));
+    openRevise();
     fireEvent.change(screen.getByLabelText("Qty for MAT-K-001"), { target: { value: "4" } });
     fireEvent.change(screen.getByLabelText("Why"), { target: { value: "Customer quantity changed" } });
     fireEvent.click(screen.getByRole("button", { name: "Save PO V3" }));

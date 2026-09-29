@@ -57,19 +57,10 @@
   border-color: #cbd5e1;
 }
 
-.po-detail-style :is(tr, .border-t, .border-b) {
-  border-color: #d0d7e0;
-}
-
-.po-detail-style thead,
-.po-detail-style thead tr {
-  background-color: #e8edf2;
-  color: #24364b;
-}
-
-.po-detail-style tbody tr {
-  background-color: #ffffff;
-}
+/* ONE KIT LAW (owner 2026-09-27): the PO page's tables are the kit's own —
+   the DocumentTable recipe draws plain label heads over a kit-slate-5
+   hairline. The page-scoped raw-hex band and line colours that overrode it
+   were removed 2026-09-29. */
 
 .po-detail-style tbody tr:is([aria-selected="true"], [data-state="selected"]) {
   background-color: #eaf4ff;
