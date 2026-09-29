@@ -45,7 +45,7 @@ const RETURN = {
   supplier_id: "s1",
   supplier_claim_id: "c1",
   warehouse_receipt_id: "w1",
-  document_sent_at: null,
+  sent_at: null,
   confirmed_pickup_date: null,
 };
 
@@ -98,6 +98,8 @@ function client(
     supplier_claims: [{ id: "c1", claim_no: "SC-1038" }],
     warehouse_receipts: [{ id: "w1", grn_no: "GRN-20260904-1064" }],
     salespersons: [],
+    document_sends: [],
+    purchase_return_pickup_confirmations: [],
   };
   return {
     rpc: vi.fn(async (name: string) =>
@@ -280,14 +282,13 @@ describe("GET /api/operation/purchase-returns", () => {
     expect(new Set(unitCalls.flat()).size).toBe(250);
   });
 
-  it("offers no door that writes a return", async () => {
-    // §7.4 gives creation to one SQL door behind an approved claim outcome.
-    // A POST/PATCH/DELETE here would be a second writer (ERP-ARCHITECTURE law
-    // C: a door, never a duplicate).
+  it("offers no door that edits or deletes a return", async () => {
+    // Creation is `POST /` onto the ONE SQL door (0548/0609); nothing edits or
+    // deletes a return (ERP-ARCHITECTURE law C: a door, never a duplicate).
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(userClient).mockReturnValue(client() as any);
     const jwt = await makeJwt("operation");
-    for (const method of ["POST", "PATCH", "DELETE", "PUT"]) {
+    for (const method of ["PATCH", "DELETE", "PUT"]) {
       const res = await app.fetch(
         new Request("http://t/api/operation/purchase-returns", {
           method,

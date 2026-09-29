@@ -50,7 +50,7 @@ const doc = (over: Partial<PurchaseReturnListRow> = {}): PurchaseReturnListRow =
   supplier_name: "Hookka",
   claim_no: "SC-1038",
   grn_no: "GRN-20260904-1064",
-  document_sent_at: null,
+  sent_at: null,
   confirmed_pickup_date: null,
   units: [unit()],
   ...over,
@@ -184,7 +184,7 @@ describe("dates are never invented", () => {
   it("does not let a fully collected return claim supplier receipt", () => {
     show([
       doc({
-        document_sent_at: "2026-09-14T06:00:00Z",
+        sent_at: "2026-09-14T06:00:00Z",
         confirmed_pickup_date: "2026-09-17T00:00:00Z",
         units: [
           unit({
@@ -275,7 +275,7 @@ describe("the left rail — the confirmed four sections", () => {
   it("lets the conditions overlap — one return counted under three", () => {
     show([doc()]);
     expect(
-      screen.getByTestId("purchase-returns-rail-condition-Return document not sent"),
+      screen.getByTestId("purchase-returns-rail-condition-Sending not confirmed"),
     ).toBeTruthy();
     expect(
       screen.getByTestId("purchase-returns-rail-condition-Pickup date not confirmed"),
@@ -285,11 +285,11 @@ describe("the left rail — the confirmed four sections", () => {
 
   it("supplier and condition combine", () => {
     show([
-      doc({ id: "a", supplier_name: "Hookka", document_sent_at: "2026-09-15T06:00:00Z" }),
+      doc({ id: "a", supplier_name: "Hookka", sent_at: "2026-09-15T06:00:00Z" }),
       doc({ id: "b", supplier_name: "Ohana", pr_no: "1039" }),
     ]);
     fireEvent.click(
-      screen.getByTestId("purchase-returns-rail-condition-Return document not sent"),
+      screen.getByTestId("purchase-returns-rail-condition-Sending not confirmed"),
     );
     expect(screen.getByText("PR-1039")).toBeTruthy();
     expect(screen.queryByText("PR-20260915-1042")).toBeNull();

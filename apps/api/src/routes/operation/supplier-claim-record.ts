@@ -18,6 +18,8 @@ import { mapPgError } from "../../lib/route-helpers";
 import { chunk } from "../../lib/purchase-demand-read";
 import { adminClient, userClient } from "../../lib/supabase";
 import { resolveActorNames } from "../../lib/actor-names";
+import { purchasingPoDutyMayAct } from "../../lib/purchasing-po-authority";
+import { carresNextWord, supplierClaimDecision, supplierClaimLegacyWords } from "@carres/shared";
 import type { AppEnv } from "../../types";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -157,7 +159,7 @@ export function registerSupplierClaimRecordRoutes(
     const id = c.req.param("id");
     const { data: claim, error } = await sb
       .from("supplier_claims")
-      .select("id, claim_no, requested_by, requested_at, responded_by, supplier_response_reply_id")
+      .select("id, claim_no, status, requested_by, requested_at, responded_by, supplier_response_reply_id, customer_resolution, customer_resolution_at, customer_resolution_by, carres_execution, carres_execution_at, carres_execution_by")
       .eq("id", id)
       .maybeSingle();
     if (error) {
@@ -182,7 +184,7 @@ export function registerSupplierClaimRecordRoutes(
     const replyRows = (replies.data ?? []) as Array<Record<string, unknown>>;
     const sendRows = (sends.data ?? []) as Array<Record<string, unknown>>;
     const actorIds = [
-      claim.requested_by, claim.responded_by,
+      claim.requested_by, claim.responded_by, claim.carres_execution_by, claim.customer_resolution_by,
       ...replyRows.map((r) => r.recorded_by), ...sendRows.map((s) => s.sent_by),
     ].filter(Boolean) as string[];
     const names = await resolveActorNames(sb, actorIds);
@@ -191,10 +193,27 @@ export function registerSupplierClaimRecordRoutes(
       const { data } = await admin.storage.from("issue-evidence").createSignedUrl(path, SIGNED_URL_TTL_SECONDS);
       return data?.signedUrl ?? null;
     };
-    const [poDutyName, approverName] = await Promise.all([
+    const [poDutyName, approverName, authority] = await Promise.all([
       dutyActorName(sb, "po_duty"),
       dutyActorName(sb, "purchasing_approver"),
+      purchasingPoDutyMayAct(sb, c.var.auth.id),
     ]);
+    const mayAct = authority.error == null && authority.mayAct;
+    const mayRecordNext = mayAct && claim.status === "open";
+    const decision = supplierClaimDecision(claim as { carres_execution: string | null; customer_resolution: string | null });
+    const decisionAt = decision === "return_to_supplier" ? claim.carres_execution_at : decision ? claim.customer_resolution_at : null;
+    const decisionBy = decision === "return_to_supplier" ? claim.carres_execution_by : decision ? claim.customer_resolution_by : null;
+    // `Plan Repair` — only when the server confirms all three (§9.5): the
+    // decision is Repair, the exact Units are held on the claim, and the actor may.
+    const exactUnits = ((units.data ?? []) as Array<{ unit_code: string | null; identity_scope: string | null; status: string | null }>)
+      .filter((u) => u.unit_code && (u.identity_scope ?? "unit") === "unit" && u.status === "on_hold");
+    const planRepair = decision !== "repair"
+      ? { allowed: false, missing: "Authorised Outcome" }
+      : exactUnits.length === 0
+        ? { allowed: false, missing: "Units" }
+        : !mayAct
+          ? { allowed: false, missing: "PO Duty" }
+          : { allowed: true, missing: null };
     return c.json({
       replies: await Promise.all(replyRows.map(async (r) => ({
         id: String(r.id),
@@ -216,10 +235,23 @@ export function registerSupplierClaimRecordRoutes(
       requested_by_name: claim.requested_by ? (names.get(String(claim.requested_by)) ?? null) : null,
       repair_orders: repairs.error ? null : (repairs.data ?? []),
       purchase_returns: returns.error ? null : (returns.data ?? []),
-      // No Authorised Outcome writer exists yet (§9.5): `Plan Repair` needs the
-      // server to confirm outcome Repair, exact Units and the actor's permission.
-      authorised_outcome: null,
-      plan_repair: { allowed: false, missing: "Authorised Outcome" },
+      // OWNER RULING 2026-09-29: ONE supplier-side decision, which IS the
+      // Authorised Outcome — read with the one arithmetic from the facts the
+      // downstream doors read (0609). Legacy values stay readable as history.
+      carres_execution: (claim.carres_execution as string | null) ?? null,
+      carres_execution_at: (claim.carres_execution_at as string | null) ?? null,
+      carres_execution_by_name: claim.carres_execution_by ? (names.get(String(claim.carres_execution_by)) ?? null) : null,
+      decision,
+      decision_at: decisionAt,
+      decision_by_name: decisionBy ? (names.get(String(decisionBy)) ?? null) : null,
+      legacy_words: supplierClaimLegacyWords(claim as { carres_execution: string | null; customer_resolution: string | null }),
+      // The server confirms the actor through the Shared Duty Resolver.
+      may_record_next: mayRecordNext,
+      authorised_outcome: decision ? carresNextWord(decision) : null,
+      plan_repair: planRepair,
+      // Replacement's owning door is the supplier-replacement arrival source
+      // (0490/0602); no new instruction is invented here.
+      plan_replacement: { allowed: decision === "replacement" && mayAct && claim.status === "open" },
       po_duty_name: poDutyName,
       approver_name: approverName,
     });
