@@ -1180,11 +1180,15 @@ auditable Workspace, never inside the launcher. Module tabs, portal navigation, 
 `…` must not repeat a Settings destination. Current-view presentation such as Columns, personal
 Saved Views and governed Register layout remains on the owning Register and is not System Settings.
 
-**FORMER STAFF VISIBILITY — OWNER-CONFIRMED 2026-09-29 / NOT BUILT.** Default staff lists and
-current selection surfaces show current employees only. Former profiles are reached through
-intentional historical lookup; past source documents retain their real actor names. HR MASTER §3
-owns the employee fact, Workspace §4 consumes it. This is neither a delete action nor approval of
-the still-proposed staff-management entry design; no new screen copy or token is introduced.
+**DEPARTURE FLOW AND FORMER STAFF — OWNER-APPROVED 2026-09-29 / NOT BUILT.** HR MASTER §3
+owns a single review-and-confirm departure flow coordinating last working day and access disablement.
+Effective departure automatically removes the account from Settings/default active staff lists;
+no separate delete/remove step. Only existing personnel-management permission allows intentional
+lookup/opening of retained former profiles; ordinary staff cannot access them. All users default
+to current staff. Historical document readers retain actual-actor names without thereby receiving
+profile/account access. Preserve source identities and existing sensitive-field controls. Scheduled
+effects are not completed effects; partial failure must show the unfinished work honestly. Reuse
+existing governed components/tokens; the precise People-entry placement is still under review.
 
 **STAFF & DUTIES PLAIN PERSON DISPLAY — OWNER CORRECTION 2026-09-29 / NOT BUILT.**
 Workspace §4.2 shows one current resolved person name and plain dates. Remove `Normal owner`,
