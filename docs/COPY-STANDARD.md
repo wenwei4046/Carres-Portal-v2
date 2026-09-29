@@ -250,7 +250,7 @@ Workspace-owned Staff & Duties page under global Settings (placement production 
 | Duty unassigned | `Not assigned` · `Nobody holds {Duty}.` | Unowned · Available · — |
 | Assignment movement (owner ruling 2026-09-29; NOT BUILT) | `Assigned to {name}` · `Assigned by system` · `Assigned to {name} by system`; timestamped previous/new assignment in `History` | Covered by · Covered for · a second current person |
 | Duty write success (owner ruling 2026-09-29; NOT BUILT) | `{Duty} assigned to {name} from {date}` · `{Duty} assigned to {name}, {from} to {until}` | Saved · Updated successfully · person covers another person |
-| Duty validation (owner ruling 2026-09-29; NOT BUILT) | `Choose a person.` · `Choose when this assignment starts.` · `Choose valid assignment dates.` | Required · Invalid date · Error · cover terminology |
+| Duty validation (owner ruling 2026-09-29; NOT BUILT) | `Choose a person.` · `Choose when this assignment starts.` · `Choose valid assignment dates.` · `Until must be on or after From.` | Required · Invalid date · Error · cover terminology |
 | Duty conflict (owner ruling 2026-09-29; NOT BUILT) | `{Duty} already has an assignment for these dates. Choose different dates.` | Conflict · Overlap found |
 | Duty refusal (owner ruling 2026-09-29; NOT BUILT) | `{name} cannot be assigned to {Duty}. Choose an eligible active staff member.` · `Choose another person for {Duty}.` · `{Duty} has no assignment for all these dates. Assign it first.` · `{Duty} could not be updated. Try again.` (existing write-door codes retained; Workspace §4.4.1) | the database's own sentence · normal/acting/cover wording · Invalid · Error |
 | Issue Register purpose | `Every issue stays for facts, money and learning.` | Issue dashboard · Problem inbox |

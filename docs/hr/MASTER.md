@@ -121,7 +121,7 @@ against a real session.
 - **People owns Duty eligibility, not Duty assignment** (owner ruling 2026-09-01): employee name,
   personal account, active/disabled, last working date and membership of the eligible Carres staff
   rotation pool. A last-working-date change removes the person from future resolution; People does
-  not store any Duty assignment or Buddy cover.
+  not store any Duty assignment or reassignment.
 
 # §4 · Commission
 

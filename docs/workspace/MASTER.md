@@ -395,9 +395,9 @@ and failures; no new token or component is introduced.
 
 **FORM PRESENTATION — OWNER-APPROVED 2026-09-28 / APPROVED TARGET / NOT BUILT.**
 `Assign` opens one focused action surface. Show read-only `Duty`, the current person's name and applicable
-plain dates above the inputs, followed by required `Holder` and
-`Effective from`, `Until` and a factual `Note`. For a PO/GRN temporary adjustment, both dates
-and the reason in `Note` are required under the ruling below. Other Duties retain their governed
+plain dates above the inputs, followed by required `Assigned to` and
+`From`, `Until` and a factual `Reason`. For a PO/GRN temporary adjustment, both dates
+and `Reason` are required under the ruling below. Other Duties retain their governed
 optional end/note rules. Do not preselect a person or start date. The selected person and effective dates remain visible before the single primary
 `Assign` confirmation; `Cancel` closes without a write.
 
@@ -473,7 +473,7 @@ Completed work, actual performers, source business facts, Sales Order PIC and th
 cycle are not rewritten. Both morning and afternoon checks are distinct: afternoon can change an
 assignment made that morning if its current assignee is unavailable. Late activity does not silently
 bounce an already-moved assignment back; subsequent changes are recorded under the shared policy.
-The next working period resolves its normal allocation and eligibility again. No candidate or
+The next working day resolves its normal allocation and eligibility again. No candidate or
 unreliable evidence produces a visible management exception, not an invented assignee or silent
 permission expansion. Approver Duties do not inherit automatic ordinary-work reassignment rights.
 
@@ -822,8 +822,8 @@ Blocked by {dependency} · exceptional state (only when true) wraps below
 
 - Object identity belongs in the item header and is not repeated in the action.
 - Owner belongs in the Team group/avatar or exceptional cover/handover metadata, never the sentence.
-- My Work omits the signed-in person's avatar. It shows `Covered for {normal owner}` when routed by
-  active cover. Team Work keeps the normal owner's group and shows `Covered by {acting person}`.
+- My Work and Team Work show current `Assigned to` and use that assignment for their person scope.
+  Changes remain in history; completed work separately shows `Completed by`. No cover labels remain.
 - A future Site queue is an owner state, not a person. It may render only after a governed queue
   identity, permission and atomic acceptance path are built and admitted; until then unresolved
   site work is `Not assigned`.
@@ -1739,7 +1739,7 @@ checklist. Revisions 2 to 5 carry her corrections of the same day, made on the d
   - *The act:* a separate occurrence, dated that check day, with Delivery's governed words for the
     Carres-contacts row — line 1 `Call the customer`, line 2 `Get the scheduled delivery date` (no
     new words; the partner-chase row `Call {logistics}` stays its own occurrence).
-  - *Owner:* the Sales Order PIC; Buddy cover acts; the Delivery Duty only when there is no PIC
+  - *Owner:* the current recorded Work assignment, initially Sales Order PIC; Delivery Duty only when there is no PIC
     (Delivery §9, every Delivery act's owner rule).
   - *What closes it:* a Scheduled delivery date recorded, OR a customer contact record written by
     Carres (not on behalf of the partner) with a structured result. Opening or copying WhatsApp
@@ -2405,7 +2405,7 @@ using an attractive default.
 
 Use: `Management attention` · `Commitment health` · `Material exposure` · `Work health` ·
 `Recent material change` · `Broken` · `Due today` · `Due later` · `Blocked` · `Not assigned` ·
-`Covered by` · `Last available` · `Could not load` · `Open Team Work` · `Open {module}`.
+`Assigned to` · `Last available` · `Could not load` · `Open Team Work` · `Open {module}`.
 
 Do not use: `At Risk` · `SLA` · `Open POs` as an alert · `Active pipeline` as management health ·
 `to action` · `All on track` without source evidence · `No alerts ✓` · `Escalations` for an
@@ -2563,7 +2563,7 @@ honest Work for admitted modules.
   read today's actor from `resolution` alone and take the company date from `appTodayIso()`.
   Built behaviour: catalogue rows equal `WORKSPACE_DUTIES.length` (12, including Finance Approver);
   an unknown `duty` key is corrected with history-replace; readers receive `Duty assignments are set
-  by the manager.` and zero write controls; `Assign` and `Add cover` are focused kit `Modal`
+  by the manager.` and zero write controls; the measured pre-convergence `Assign holder` and `Add cover` are focused kit `Modal`
   acts with §4.4.1 sentences, no optimistic owner change, and
   `Add cover` absent while nobody holds the Duty; an empty catalogue renders the read-failure
   sentence; history uses event / who-when / note ranks with no controls.

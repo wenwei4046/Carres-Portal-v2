@@ -176,9 +176,10 @@ People — individual staff identity, active/access, last working date and leave
 ```
 
 An action stores its `Owner rule`, trigger, completion fact, governed date and source object. Its
-audit evidence preserves three distinct identities: the normal PIC or Duty owner, today's resolved
-Cover (when one acts), and the actual person who completed/approved the work. Historical evidence
-never changes when a Duty holder changes later. The displayed owner/avatar is the resolver result,
+audit evidence preserves the original assignment, all subsequent assignment movements, assignment
+effective at each update/completion, actual updater/completer, dates/times and originating surface.
+Source PIC and existing technical identities remain available without competing staff-facing labels.
+Historical evidence never changes when an assignment changes later. The displayed assignment is the resolver result,
 not a second stored `assigned_to`. A page may not read `ops_po_duty`, `ops_po_duty_cover`, a GRN
 rota or any equivalent table directly. It may not implement its own rotation arithmetic. Any action
 or owner avatar that did not come from the shared Work Engine's resolved owner is an architecture
