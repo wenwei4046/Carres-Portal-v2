@@ -5975,6 +5975,37 @@ actions. One arrangement pre-fills the correct documents; one combined swap PDF 
 instructions while receipt and handover remain independently evidenced. Detailed shared-kit
 composition still needs design closure; naming approval is not rendered-screen acceptance.
 
+**DISPLAY REQUEST OBJECT — REVIEW PROPOSAL / NOT LAW; 2026-09-29.** This is semantic page
+composition for the approved journey, not a rendered mockup, final new English copy or permission
+to build. Reuse the shared Object Detail and Block grammar; Workspace embeds the same owning forms.
+
+| Reading order | What the operator sees / does | Guard against repeated or misleading work |
+|---|---|---|
+| Arrangement identity | Request number, showroom, purpose, supplier scope, negotiating Sales and actual recorder, source message/quotation | Known facts come from source; no fabricated customer Sales Order or universal arrangement owner |
+| Current applicable action | The permitted owning action for the signed-in actor, opened directly when arriving from My Work; other concurrent obligations stay visible | Missing model, contact or appointment opens its exact resolution; missing price stays Sales follow-up and does not block physical arrangement |
+| Goods | Requested new Catalog goods with configuration/quantity; outgoing existing Stock Units with model/current location/ownership | Distinguish sofas, sets and physical Units. Unknown models/identities remain unresolved rather than sample data being saved as fact |
+| Each movement leg | Actual pickup/destination, party/contact, planned date, actual result and remaining goods together; open the owning arrange/receive/handover form | Independent dates and partial outcomes; no automatic receiving from PDF issuance, no supplier return inferred from warehouse arrival |
+| Connected documents and supplier evidence | Source-linked Consignment Order, Stock Transfer, Consignment Return, issued version/send evidence and actual proof | Review derived documents without retyping; swap links its return but sends one supplier instruction. Creating the request alone does not issue every downstream document |
+| Commercial evidence and History | Quotation versions, attributable Sales confirmation or outstanding confirmation, actual actors and changes; permission-scoped Finance links | Operation records evidence without accepting terms; completed transport does not erase commercial/Finance work |
+
+**Walkthrough data is illustrative:** the owner supplied two new sofas at 2990 and two old PJ sets
+returning via Carres warehouse, but no exact models/Unit IDs, transport company or dates. Therefore
+show those known quantities and route facts and leave the missing facts explicit. Do not display
+fictional document numbers, a named Sales person, a completion tick or a scheduled supplier visit
+as a real record. First completion is to establish exact goods and actionable transport facts;
+subsequent action depends on the actor's permission and the actual saved source state.
+
+The example's three legs read: 2990 → PJ new goods; PJ → Carres warehouse old goods; Carres
+warehouse → Dorsettloft those same old goods. If evidence later confirms the first two legs,
+only the supplier collection remains physically open. Commercial work, if any, stays separately
+visible. Pure placement omits outgoing goods; standalone removal omits incoming goods. Never force
+staff to fill empty sections simply because the swap example has both.
+
+Source-linked document review retains the request context and returns to it after the owning
+result. Read view does not show a meaningless blank PDF pane. Errors preserve draft input;
+loading/failure/unknown are not zero quantities. Keyboard and mobile reflow must preserve the
+same meaning and next action, with no claimed visual validation until the governed render review.
+
 **4. Exceptions and record lifecycle**
 
 - Draft editing preserves creator/history and consumes no official new Unit IDs. Repeated saves
