@@ -1243,7 +1243,7 @@ An effective cover supplies the displayed name; history preserves the separate s
 The name does not restrict ordinary operational execution to that person. Existing page structure,
 shared components and token values remain; this is not a new component or a permission change.
 
-**STAFF & DUTIES PLACEMENT — OWNER-APPROVED 2026-09-28 / NOT BUILT.** The header gear →
+**STAFF & DUTIES PLACEMENT — PRODUCTION VERIFIED 2026-09-29, PR #1791 (owner-approved 2026-09-28).** The header gear →
 `All System Settings` → `Staff & Duties` is the one maintained destination. Remove its persistent
 main-menu row. Work's unresolved-Duty link opens the exact Duty in this same Settings destination
 and preserves return context; contextual links are not duplicate editors. Preserve existing
