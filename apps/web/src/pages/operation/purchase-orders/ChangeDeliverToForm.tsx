@@ -1,6 +1,6 @@
 /**
  * `Change Deliver To` — Purchasing MASTER §5.4 (Jess, 2026-09-22 · build
- * boundary confirmed 2026-09-25 · built 2026-09-29, migration 0609).
+ * boundary confirmed 2026-09-25 · built 2026-09-29, migration 0610).
  *
  * Part of a PO's goods go to another Deliver To. The SAME PO keeps its number
  * and gets its next version; the moved qty joins the line already going
@@ -50,7 +50,7 @@ export interface ChangeDeliverToRow {
 /**
  * The version the operator is about to save, for the moved goods only: every
  * line of the same item after the change. One arithmetic with the SQL door
- * (0609): the whole line changes its Deliver To; part of it lowers the line
+ * (0610): the whole line changes its Deliver To; part of it lowers the line
  * and joins the line already going to the new Deliver To, or becomes one.
  * `blocked` = the whole line would fold into a sibling, which the door refuses.
  */

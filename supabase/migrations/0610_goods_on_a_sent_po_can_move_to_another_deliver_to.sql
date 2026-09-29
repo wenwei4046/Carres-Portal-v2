@@ -1,5 +1,5 @@
 -- =============================================================================
--- 0609_goods_on_a_sent_po_can_move_to_another_deliver_to.sql
+-- 0610_goods_on_a_sent_po_can_move_to_another_deliver_to.sql
 -- Purchasing MASTER §5.4 `Change Deliver To` — APPROVED TARGET (Jess,
 -- 2026-09-22), build boundary owner-confirmed 2026-09-25, build "go"
 -- 2026-09-29.
@@ -61,7 +61,7 @@ create unique index if not exists po_lines_sku_attrs_destination_uniq
      (po_id, sku, (coalesce(attrs::text, '')), (coalesce(destination_id::text, '')));
 
 comment on index public.po_lines_sku_attrs_destination_uniq is
-  '0609 · Purchasing §5.4: the same (PO, SKU, attrs) may appear once per Deliver To, so part of a line can move to another destination on the SAME PO. Replaces 0076 po_lines_sku_attrs_uniq.';
+  '0610 · Purchasing §5.4: the same (PO, SKU, attrs) may appear once per Deliver To, so part of a line can move to another destination on the SAME PO. Replaces 0076 po_lines_sku_attrs_uniq.';
 
 drop index if exists public.po_lines_sku_attrs_uniq;
 
@@ -88,7 +88,7 @@ begin
   end if;
 
   -- 0442 · once a Unit knows its line it never changes its mind.
-  -- 0609 · except goods still at the supplier moving to another line of the
+  -- 0610 · except goods still at the supplier moving to another line of the
   -- SAME PO through `Change Deliver To` (the only writer of the flag).
   if old.po_line_id is not null and new.po_line_id is distinct from old.po_line_id then
     if not (
@@ -454,7 +454,7 @@ revoke all on function public.purchasing_change_po_deliver_to(text, uuid, intege
 grant execute on function public.purchasing_change_po_deliver_to(text, uuid, integer, uuid, text, text[]) to authenticated;
 
 comment on function public.purchasing_change_po_deliver_to(text, uuid, integer, uuid, text, text[]) is
-  '0609 · Purchasing §5.4 Change Deliver To: moves part or all of one line''s undelivered qty to another active Deliver To on the SAME PO, as the next version. Exact Units keep their IDs and rebind; po_line_sources follow; total qty unchanged; prior version snapshotted.';
+  '0610 · Purchasing §5.4 Change Deliver To: moves part or all of one line''s undelivered qty to another active Deliver To on the SAME PO, as the next version. Exact Units keep their IDs and rebind; po_line_sources follow; total qty unchanged; prior version snapshotted.';
 
 -- ── §4 · the old split door is retired ──────────────────────────────────────
 -- 0311 `purchasing_split_line_destination` split a line without moving its
@@ -470,23 +470,23 @@ do $sanity$
 declare v_n int;
 begin
   if to_regclass('public.po_lines_sku_attrs_destination_uniq') is null then
-    raise exception '0609 sanity: po_lines_sku_attrs_destination_uniq missing';
+    raise exception '0610 sanity: po_lines_sku_attrs_destination_uniq missing';
   end if;
   if to_regclass('public.po_lines_sku_attrs_uniq') is not null then
-    raise exception '0609 sanity: po_lines_sku_attrs_uniq still present';
+    raise exception '0610 sanity: po_lines_sku_attrs_uniq still present';
   end if;
   select count(*) into v_n from pg_proc p join pg_namespace n on n.oid = p.pronamespace
    where n.nspname = 'public' and p.proname = 'purchasing_change_po_deliver_to';
   if v_n <> 1 then
-    raise exception '0609 sanity: purchasing_change_po_deliver_to must have one overload, found %', v_n;
+    raise exception '0610 sanity: purchasing_change_po_deliver_to must have one overload, found %', v_n;
   end if;
   if has_function_privilege('authenticated',
        'public.purchasing_split_line_destination(uuid, integer, uuid)', 'execute') then
-    raise exception '0609 sanity: the retired split door is still callable';
+    raise exception '0610 sanity: the retired split door is still callable';
   end if;
   if not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
                   where n.nspname = 'public' and p.proname = 'trg_stock_unit_identity_permanence'
                     and p.prosrc like '%carres.po_line_move%') then
-    raise exception '0609 sanity: the Unit permanence trigger does not know the line move';
+    raise exception '0610 sanity: the Unit permanence trigger does not know the line move';
   end if;
 end $sanity$;

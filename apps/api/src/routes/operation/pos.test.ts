@@ -3068,7 +3068,7 @@ describe("GET /api/operation/pos/for-order/:orderId — the Work Supplier card's
   });
 });
 
-describe("POST /api/operation/pos/:id/change-deliver-to (0609 · Purchasing §5.4)", () => {
+describe("POST /api/operation/pos/:id/change-deliver-to (0610 · Purchasing §5.4)", () => {
   const LINE = "570cc230-d0f3-45ef-a525-f3f061bf7d85";
   const AL = "818b420c-27f9-4707-a516-b91a6e03f343";
   const post = async (body: unknown) =>

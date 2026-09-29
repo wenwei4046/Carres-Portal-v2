@@ -443,7 +443,7 @@ export function purchasingRefusal(
         todo: "Wait for the PDF, then record it as sent.",
       };
 
-    // ── CHANGE DELIVER TO (0609 · Purchasing §5.4) ───────────────────────
+    // ── CHANGE DELIVER TO (0610 · Purchasing §5.4) ───────────────────────
     case "po_not_open":
       return {
         wrong: `${po} is not open.`,

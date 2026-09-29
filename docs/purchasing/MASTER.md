@@ -20,7 +20,7 @@ page 3 Supplier Claim record · page 4 Purchase Return document + send · page 5
 Purchasing · page 6 Work right-panel Purchasing cards (Workspace template) · page 7 Stock Unit
 Detail `Report a problem` (Stock lane). Cards are authored only after the owner agrees every
 page; recommended Card order A Settings · B shared send ledger · C PO window Work + SO Batch ·
-D per-item answer + day-before Work · E Change Deliver To (BUILT 2026-09-29, 0609) · F Claim reply → decision → PRTN.
+D per-item answer + day-before Work · E Change Deliver To (BUILT 2026-09-29, 0610) · F Claim reply → decision → PRTN.
 Restart prompt: `Purchasing — PLAN / DESIGN, page-by-page UI review. Read CLAUDE.md, this
 RESUME block, UI MASTER §4.1/§6.7–6.10, tokens; continue at the next unapproved page; persist
 each owner-approved page to this MASTER + COPY + Workspace before moving on.`
@@ -442,7 +442,7 @@ receiving/logistics.
 
 #### `Change Deliver To` — send part of a sent PO to another destination
 
-**APPROVED (Jess, 2026-09-22) · BUILT 2026-09-29 (migration 0609 `purchasing_change_po_deliver_to`).**
+**APPROVED (Jess, 2026-09-22) · BUILT 2026-09-29 (migration 0610 `purchasing_change_po_deliver_to`).**
 The staff member picks, inside the PO, the goods to send elsewhere; the system writes the next
 revision of the SAME PO. Nothing is typed twice and no second PO exists.
 
@@ -490,7 +490,7 @@ demand is covered once, never twice.
 - The PDF of a PO with several Deliver To prints each destination from a new page
   (`docs/pdf/PO-PDF-STANDARD.md` §2).
 
-**How it is built (2026-09-29, 0609).** One SQL door, `purchasing_change_po_deliver_to(po, line,
+**How it is built (2026-09-29, 0610).** One SQL door, `purchasing_change_po_deliver_to(po, line,
 qty, deliver_to, reason, unit_codes)`, one transaction on the SAME PO:
 - **Checks first:** reason given · PO open · line on this PO · new Deliver To open and different from
   where the goods go now · `1 ≤ Qty to move ≤ Qty you can move` (ordered − received). A fully

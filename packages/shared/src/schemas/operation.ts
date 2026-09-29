@@ -177,7 +177,7 @@ export type SetLineDestinationInput = z.infer<typeof setLineDestinationInput>;
 
 /**
  * `Change Deliver To` (Purchasing MASTER §5.4, Jess 2026-09-22 · build
- * 2026-09-29, 0609) — POST /api/operation/pos/:id/change-deliver-to →
+ * 2026-09-29, 0610) — POST /api/operation/pos/:id/change-deliver-to →
  * `purchasing_change_po_deliver_to`. Part or all of ONE line's undelivered
  * qty moves to another open Deliver To on the SAME PO as its next version.
  * Exact-unit goods name the Unit IDs that move; omitted, the server takes the

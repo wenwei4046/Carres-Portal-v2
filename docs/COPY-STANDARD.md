@@ -1682,7 +1682,7 @@ Settings owns the expandable list; these are its exact management words:
 `Not available for new POs`. A future destination is added here and then appears in every governed
 Purchasing picker. No SO Batch Purchase page keeps its own destination list.
 
-**`Change Deliver To` — the words (Jess, 2026-09-22 · BUILT 2026-09-29, 0609).** Moving part of
+**`Change Deliver To` — the words (Jess, 2026-09-22 · BUILT 2026-09-29, 0610).** Moving part of
 a sent PO to another Deliver To keeps the SAME PO number and mints its next revision (purchasing
 MASTER §5.4). There is never a second PO, so there is no `Moved from` / `Split from` word.
 

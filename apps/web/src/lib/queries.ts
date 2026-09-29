@@ -5509,7 +5509,7 @@ export function useRevisePo(poId: string | null) {
   });
 }
 
-/** POST /:id/change-deliver-to — `Change Deliver To` (0609, Purchasing §5.4).
+/** POST /:id/change-deliver-to — `Change Deliver To` (0610, Purchasing §5.4).
  *  Part or all of one line's undelivered qty moves to another Deliver To on
  *  the SAME PO as its next version; exact Units keep their IDs. */
 export function useChangePoDeliverTo(poId: string | null) {

@@ -19,7 +19,7 @@ const line = (over: Partial<Line>): Line => ({
   model_name: "Fenrir", size: "Queen", destination_id: null, ...over,
 } as Line);
 
-describe("changeDeliverToPreview · one arithmetic with 0609", () => {
+describe("changeDeliverToPreview · one arithmetic with 0610", () => {
   it("part of a line: the line lowers and a new line goes to the new Deliver To; total unchanged", () => {
     const r = changeDeliverToPreview([line({})], KLANG, "line-1", 2, AL);
     expect(r.rows.map((x) => [x.destinationId, x.qty])).toEqual([[KLANG, 4], [AL, 2]]);

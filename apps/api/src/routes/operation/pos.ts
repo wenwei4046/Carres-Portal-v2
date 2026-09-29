@@ -2199,7 +2199,7 @@ const SUPPLIER_CALL_422: Record<string, string> = {
   reason_required: "reason_required",
   nothing_changed: "nothing_changed",
   sent_po_needs_revision: "sent_po_needs_revision",
-  // 0609 · Change Deliver To's own refusals.
+  // 0610 · Change Deliver To's own refusals.
   deliver_to_closed: "deliver_to_closed",
   same_destination: "same_destination",
   all_received: "all_received",
@@ -2522,7 +2522,7 @@ operationPosRouter.post("/:id/revise", requireOperation, async (c) => {
 });
 
 // ----- POST /:id/change-deliver-to -----
-// Purchasing MASTER §5.4 `Change Deliver To` (0609). One transaction on the
+// Purchasing MASTER §5.4 `Change Deliver To` (0610). One transaction on the
 // SAME PO: the moved qty joins the line already going to the new Deliver To
 // or becomes a new line; exact Units keep their IDs and follow; Sales Order
 // lineage follows once; the prior version is snapshotted and the next
@@ -2573,7 +2573,7 @@ operationPosRouter.put("/message-template", requireOperation, async (c) => {
 // ----- POST /lines/:lineId/destination · /ops-remark -----
 // Where each LINE goes (Jess, 2026-08-02 — 0311). Purchasing's only per-line
 // job: ten to Klang, one to AL. A whole line moves here; a PART of a line
-// moves through /:id/change-deliver-to (0609), which carries its Units and
+// moves through /:id/change-deliver-to (0610), which carries its Units and
 // Sales Order lineage and mints the next version. The ops
 // remark is internal and, by 0311's own sanity check, can never print.
 operationPosRouter.post("/lines/:lineId/destination", requireOperation, async (c) => {
