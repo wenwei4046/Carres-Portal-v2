@@ -752,14 +752,11 @@ toOrderRouter.post("/issue-batch", requireOperation, async (c) => {
       supplier_id: group.proposal.supplierId,
       warehouse_id: warehouse.id,
       destination_id: group.destinationId,
-      /* ⭐ THE PO's OWN DELIVERY DATE — `PO Date + n Settings working days`,
-         NO transit added (owner correction 2026-09-22, converged across both
-         buying doors on 2026-09-23). `expectedArrivalOf` answers a DIFFERENT
-         question — when the goods reach Carres, production PLUS the transit
-         leg — and it stays the arrival-planning arithmetic behind `Order By`
-         and the register's timing facts. Printing the arrival under a
-         `PO {n}-Day` label was how a 13-day Settings number came to promise
-         14 days on a supplier's paper.
+      /* ⭐ THE PO's OWN DELIVERY DATE — `PO Date + n Settings working days`
+         (owner correction 2026-09-22, converged across both buying doors on
+         2026-09-23). Since the supplier transit leg was removed (owner ruling
+         2026-09-29) `expectedArrivalOf` gives the same date for the same
+         inputs.
  
          ⛔ WHAT THIS DOES NOT TOUCH: the customer arrival projection
          (`purchasing_project_line_etas`, which reads supplier dates and not

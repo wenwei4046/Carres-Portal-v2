@@ -293,7 +293,6 @@ interface RequestRegisterRow {
   lineOrderBys: (string | null)[];
   supplierGap: boolean;
   productionDaysMissing: boolean;
-  transitDaysMissing: boolean;
   /** The document-partition facts behind `Issue {n} PO{s}` — and, since the
    *  2026-09-22 review surface, the facts each DRAFT purchase order prints.
    *  One list, so the count the toolbar shows and the documents the operator
@@ -501,7 +500,6 @@ function buildRows(data: ManualPurchaseRegisterPayload): RequestRegisterRow[] {
       lineOrderBys: live.map((l) => l.order_by ?? null),
       supplierGap: live.some((l) => l.supplier_id == null),
       productionDaysMissing: live.some((l) => l.production_days_missing === true),
-      transitDaysMissing: live.some((l) => l.transit_days_missing === true),
       issueWalls: live.map((l) => ({
         demandId: l.id,
         requestNo: r.req_no,
@@ -761,7 +759,6 @@ export default function OperationManualPurchase() {
           lineOrderBys: r.lineOrderBys,
           supplierGap: r.supplierGap,
           productionDaysMissing: r.productionDaysMissing,
-          transitDaysMissing: r.transitDaysMissing,
         })),
         /* The SERVER's Malaysia date — never the browser clock. */
         q.data?.todayIso ?? null,
@@ -778,8 +775,7 @@ export default function OperationManualPurchase() {
     if (railFilter.setup == null) return;
     if (rail.setupCounts[railFilter.setup] > 0) return;
     if (railFacts.some((f) => railFilter.setup === "supplier_not_set" ? f.supplierGap
-      : railFilter.setup === "production_days_not_set" ? f.productionDaysMissing
-        : f.transitDaysMissing)) return;
+      : f.productionDaysMissing)) return;
     setRailFilter((prev) => ({ ...prev, setup: null }));
   }, [rail.setupCounts, railFacts, railFilter.setup]);
 
@@ -2540,13 +2536,6 @@ function CreateRequestWorkspace({
           kind: "production",
           supplierName: p.supplierName,
           categoryLabel: categoryLabel(p.category),
-        });
-        gaps.push({ sku, ...facts });
-      }
-      if (p.transitDays == null) {
-        const facts = manualPurchaseLeadDayFacts({
-          kind: "transit",
-          supplierName: p.supplierName,
         });
         gaps.push({ sku, ...facts });
       }
@@ -4312,14 +4301,6 @@ function ManualPurchaseObject({
                               categoryLabel: l.category
                                 ? categoryLabel(l.category)
                                 : null,
-                            })}
-                          />
-                        ) : null}
-                        {l.transit_days_missing ? (
-                          <LeadGapLine
-                            facts={manualPurchaseLeadDayFacts({
-                              kind: "transit",
-                              supplierName: supName.get(l.supplier_id) ?? null,
                             })}
                           />
                         ) : null}

@@ -411,7 +411,7 @@ interface PurchaseOrderWorkSource {
   supplier_id: string;
   status: "open" | "received" | "cancelled";
   version?: number | null;
-  /** OUR predicted arrival (production + transit) — the advance check's one
+  /** OUR predicted arrival (production days) — the advance check's one
    *  anchor. Already selected by the internal `/pos` read. */
   eta_date?: string | null;
   expected_ready_date?: string | null;

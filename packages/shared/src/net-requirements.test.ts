@@ -22,7 +22,6 @@ const line = (over: Partial<DemandLine> = {}): DemandLine => ({
   placedAt: over.placedAt ?? "2026-01-01",
   committed: over.committed ?? true,
   offDays: over.offDays,
-  transitDays: "transitDays" in over ? over.transitDays : undefined,
 });
 
 const opts = (over: Partial<NetRequirementsOptions> = {}): NetRequirementsOptions => ({
@@ -314,20 +313,20 @@ describe("computeNetRequirements — arrival buffer + per-supplier work week", (
 });
 
 /* ────────────────────────────────────────────────────────────────────────────
- * THE TRANSIT LEG (owner correction, 2026-09-09)
+ * PRODUCTION LEG ONLY (owner ruling, 2026-09-29)
  *
- * `raiseBy` used to walk back through the production leg only, while the
- * forward arithmetic that stamps a PO's `eta_date` (`expectedArrivalOf`) walks
- * `production + transit`. A PO issued exactly ON raise-by therefore arrived a
- * working day AFTER the goods were due, eating a day of the Safety period.
+ * The supplier transit leg was removed: `raiseBy` walks back through the
+ * production leg only, and the forward arithmetic that stamps a PO's
+ * `eta_date` (`expectedArrivalOf`) is production only, so the two stay exact
+ * inverses.
  *
  * Calendar facts used below, all verified against `working-days.ts`:
  *   Office week  = Mon–Fri            (offDays [0,6])
- *   Ohana        = Mon–Sat            (offDays [0])      production 14, transit 1
- *   Nice Future  = Mon–Fri            (offDays [0,6])    production  7, transit 1
+ *   Ohana        = Mon–Sat            (offDays [0])      production 14
+ *   Nice Future  = Mon–Fri            (offDays [0,6])    production  7
  *   2026-08-31 Mon = National Day · 2026-09-16 Wed = Malaysia Day
  * ──────────────────────────────────────────────────────────────────────────── */
-describe("computeNetRequirements — the transit leg", () => {
+describe("computeNetRequirements — production leg only (transit removed, owner 2026-09-29)", () => {
   const OFFICE = [0, 6];
   const OHANA = [0];
   const HOLIDAYS = new Set(["2026-08-31", "2026-09-16"]);
@@ -352,64 +351,38 @@ describe("computeNetRequirements — the transit leg", () => {
       ...over,
     });
 
-  it("subtracts BOTH legs: Order By is one working day earlier than production alone", () => {
-    const withTransit = computeNetRequirements(
-      [ohanaSofa({ transitDays: 1 })],
-      {},
-      planOpts(),
-    ).bundles[0];
-    const productionOnly = computeNetRequirements(
-      [ohanaSofa({ transitDays: 0 })],
-      {},
-      planOpts(),
-    ).bundles[0];
-
-    // Goods Must Arrive is untouched — Safety days are still subtracted once.
-    expect(withTransit.arriveBy).toBe("2026-10-13"); // Tue
-    expect(productionOnly.arriveBy).toBe("2026-10-13");
-
-    expect(productionOnly.raiseBy).toBe("2026-09-26"); // Sat — the old answer
-    expect(withTransit.raiseBy).toBe("2026-09-25"); // Fri — one office day earlier
+  it("Order By = Goods Must Arrive − production days on the factory week, nothing more", () => {
+    const b = computeNetRequirements([ohanaSofa()], {}, planOpts()).bundles[0];
+    // Goods Must Arrive — Safety days are subtracted once.
+    expect(b.arriveBy).toBe("2026-10-13"); // Tue
+    // − 14 Ohana working days (Mon to Sat) = Sat 26 Sep. With the old 1-day
+    // transit leg this was Fri 25 Sep; it is now one working day later.
+    expect(b.raiseBy).toBe("2026-09-26");
   });
 
-  it("a PO issued exactly ON Order By now lands ON Goods Must Arrive, not after it", () => {
+  it("a PO issued exactly ON Order By lands ON Goods Must Arrive", () => {
     const b = computeNetRequirements(
-      [ohanaSofa({ transitDays: 1 })],
+      [ohanaSofa()],
       {},
-      planOpts({ today: "2026-09-25" }), // today === Order By
+      planOpts({ today: "2026-09-26" }), // today === Order By
     ).bundles[0];
 
-    // promiseIfOrderedToday is now the ARRIVAL (production then transit), so it
-    // meets Goods Must Arrive exactly. Before the fix it read 2026-10-13 as a
-    // READY date and the goods actually turned up on the 14th.
-    expect(b.raiseBy).toBe("2026-09-25");
+    // promiseIfOrderedToday is today + production on the factory week, the
+    // same arithmetic as `expectedArrivalOf`, so it meets Goods Must Arrive.
+    expect(b.raiseBy).toBe("2026-09-26");
     expect(b.promiseIfOrderedToday).toBe(b.arriveBy);
     expect(b.promiseIfOrderedToday).toBe("2026-10-13");
   });
 
-  it("counts transit ONCE — a second identical run never compounds it", () => {
-    const once = computeNetRequirements([ohanaSofa({ transitDays: 1 })], {}, planOpts())
-      .bundles[0];
-    const again = computeNetRequirements([ohanaSofa({ transitDays: 1 })], {}, planOpts())
-      .bundles[0];
+  it("a second identical run gives the same Order By", () => {
+    const once = computeNetRequirements([ohanaSofa()], {}, planOpts()).bundles[0];
+    const again = computeNetRequirements([ohanaSofa()], {}, planOpts()).bundles[0];
     expect(again.raiseBy).toBe(once.raiseBy);
-
-    // And the whole walk is exactly transit + production working days back from
-    // arriveBy — never transit twice, and never applied to the Safety leg.
-    const twoTransit = computeNetRequirements(
-      [ohanaSofa({ transitDays: 2 })],
-      {},
-      planOpts(),
-    ).bundles[0];
-    // Wed 23 Sep, not Thu 24: the two legs walk DIFFERENT weeks. readyBy moves
-    // back two OFFICE days to Fri 9 Oct, and the 14-day production leg then
-    // walks Ohana's Mon–Sat week from there.
-    expect(twoTransit.raiseBy).toBe("2026-09-23");
   });
 
-  it("walks the transit leg on the OFFICE week, so it steps over a weekend", () => {
+  it("a Mon to Fri factory walks its production leg over the weekend", () => {
     // Nice Future mattress, 7 production days, deadline Mon 2026-11-02.
-    // arriveBy Tue 13 Oct → readyBy Mon 12 Oct → raiseBy Thu 1 Oct.
+    // arriveBy Tue 13 Oct → − 7 Mon–Fri days → Fri 2 Oct.
     const b = computeNetRequirements(
       [
         line({
@@ -418,50 +391,34 @@ describe("computeNetRequirements — the transit leg", () => {
           deadline: "2026-11-02",
           leadDays: 7,
           offDays: OFFICE,
-          transitDays: 1,
         }),
       ],
       {},
       planOpts(),
     ).bundles[0];
     expect(b.arriveBy).toBe("2026-10-13");
-    expect(b.raiseBy).toBe("2026-10-01"); // Thu
+    expect(b.raiseBy).toBe("2026-10-02"); // Fri
   });
 
-  it("steps over a PUBLIC HOLIDAY on the transit leg (Malaysia Day, Wed 16 Sep)", () => {
-    // arriveBy Thu 17 Sep. The lorry day walks back over Wed 16 Sep (holiday)
-    // and lands on Tue 15 Sep; without the holiday set it would be the 16th.
+  it("steps over a PUBLIC HOLIDAY on the production leg (Malaysia Day, Wed 16 Sep)", () => {
+    // arriveBy Thu 17 Sep. One production day walks back over Wed 16 Sep
+    // (holiday) and lands on Tue 15 Sep; without the holiday set it is the 16th.
+    const nf = line({
+      supplierId: "SUP-NF",
+      category: "mattress",
+      deadline: "2026-10-07", // 14 office working days after 17 Sep
+      leadDays: 1,
+      offDays: OFFICE,
+    });
     const withHoliday = computeNetRequirements(
-      [
-        line({
-          supplierId: "SUP-NF",
-          category: "mattress",
-          deadline: "2026-10-07", // 14 office working days after 17 Sep
-          leadDays: 0,
-          offDays: OFFICE,
-          transitDays: 1,
-        }),
-      ],
+      [nf],
       {},
       planOpts({ holidays: HOLIDAYS }),
     ).bundles[0];
     expect(withHoliday.arriveBy).toBe("2026-09-17");
     expect(withHoliday.raiseBy).toBe("2026-09-15"); // Tue — 16th skipped
 
-    const noHoliday = computeNetRequirements(
-      [
-        line({
-          supplierId: "SUP-NF",
-          category: "mattress",
-          deadline: "2026-10-07",
-          leadDays: 0,
-          offDays: OFFICE,
-          transitDays: 1,
-        }),
-      ],
-      {},
-      planOpts(),
-    ).bundles[0];
+    const noHoliday = computeNetRequirements([nf], {}, planOpts()).bundles[0];
     expect(noHoliday.raiseBy).toBe("2026-09-16");
   });
 
@@ -475,7 +432,6 @@ describe("computeNetRequirements — the transit leg", () => {
           deadline: "2026-11-02",
           leadDays: 7,
           offDays: OFFICE,
-          transitDays: 1,
         }),
         line({
           lineId: "L-BED",
@@ -484,34 +440,14 @@ describe("computeNetRequirements — the transit leg", () => {
           deadline: "2026-11-02",
           leadDays: 14,
           offDays: OHANA,
-          transitDays: 1,
         }),
       ],
       {},
       planOpts({ bundleGroupOf: () => "bedset" }),
     );
     expect(r.bundles).toHaveLength(1);
-    // Ohana's 14-day leg gates: Fri 25 Sep, earlier than Nice Future's 1 Oct.
-    expect(r.bundles[0].raiseBy).toBe("2026-09-25");
-  });
-
-  it("NO transit number supplied → the leg is omitted, never guessed", () => {
-    // The pre-2026-09-09 behaviour, byte for byte: every caller that does not
-    // pass `transitDays` keeps the dates it always got.
-    const omitted = computeNetRequirements([ohanaSofa()], {}, planOpts()).bundles[0];
-    const zero = computeNetRequirements(
-      [ohanaSofa({ transitDays: 0 })],
-      {},
-      planOpts(),
-    ).bundles[0];
-    const explicitNull = computeNetRequirements(
-      [ohanaSofa({ transitDays: null })],
-      {},
-      planOpts(),
-    ).bundles[0];
-    expect(omitted.raiseBy).toBe("2026-09-26");
-    expect(zero.raiseBy).toBe("2026-09-26");
-    expect(explicitNull.raiseBy).toBe("2026-09-26");
+    // Ohana's 14-day leg gates: Sat 26 Sep, earlier than Nice Future's Fri 2 Oct.
+    expect(r.bundles[0].raiseBy).toBe("2026-09-26");
   });
 
   it("PO days never move Order By — it is calendar arithmetic, not an unlock date", () => {
@@ -520,12 +456,12 @@ describe("computeNetRequirements — the transit leg", () => {
     // changes only the urgency BUCKET; raiseBy is identical either way, and it
     // may legitimately land on a day POs are not sent (here: Saturday).
     const noReviewDays = computeNetRequirements(
-      [ohanaSofa({ transitDays: 0 })],
+      [ohanaSofa()],
       {},
       planOpts(),
     ).bundles[0];
     const withPoDays = computeNetRequirements(
-      [ohanaSofa({ transitDays: 0 })],
+      [ohanaSofa()],
       {},
       planOpts({ reviewDaysBySupplier: { "SUP-OHANA": [1, 3, 5] } }),
     ).bundles[0];

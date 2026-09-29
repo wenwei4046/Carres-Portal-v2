@@ -16,7 +16,6 @@ import {
   purchasingSuppliersOnly,
   railItemLabel,
   stockMatchKey,
-  transitDaysFor,
   manualPurchaseIntentSchema,
   manualPurchaseLineStockRemaining,
   manualPurchaseStockBlockOf,
@@ -104,14 +103,14 @@ function plusCalendarDays(iso: string, n: number): string {
  *   delivery_date            the line's stored `required_by`, falling back to
  *                            the request header's — when supplier goods must
  *                            reach Deliver To. Never invented.
- *   order_by                 Delivery Date − transit (Office week) −
- *                            Supplier × Category production (factory week),
- *                            via the ONE inverse planner. Null is a real
- *                            answer: missing Settings, missing Catalog
+ *   order_by                 Delivery Date − Supplier × Category production
+ *                            (factory week), via the ONE inverse planner
+ *                            (transit leg removed, owner ruling 2026-09-29).
+ *                            Null is a real answer: missing Settings, missing Catalog
  *                            relationship or a historical `Not recorded`
  *                            date produce NO Order By, never a guessed one.
  *   production_days_missing  a live line whose Supplier × Category pair has
- *   transit_days_missing     no configured number — the exact Settings fact
+ *                            no configured number — the exact Settings fact
  *                            the rail's setup lens and Work rows name.
  *
  * `settings == null` (the loader failed) stamps nulls and no gap flags —
@@ -138,7 +137,6 @@ function withDatePlan(
       settings != null
         ? productionWorkingDaysFor(settings, supplierId, category)
         : null;
-    const transit = settings != null ? transitDaysFor(settings, supplierId) : null;
     return {
       ...l,
       delivery_date: deliveryDate,
@@ -153,8 +151,6 @@ function withDatePlan(
       production_days_missing:
         settings != null && live && supplierId != null && category != null &&
         production == null,
-      transit_days_missing:
-        settings != null && live && supplierId != null && transit == null,
       /* ⭐ THE PO DELIVERY DATE THIS LINE WOULD BE ISSUED WITH (owner
          instruction 2026-09-23): `PO Date + n Settings working days`, from the
          ONE arithmetic the issue door itself uses, so the draft paper on
@@ -2197,7 +2193,7 @@ const planBody = z
  *   proceedDate           the read-only preview the form shows before Send;
  *                         after Send the stored `created_at` is authoritative.
  *   lines[]               per asked SKU: the Catalog supplier × category and
- *                         the configured production/transit numbers (null
+ *                         the configured production number (null
  *                         where nobody set one — the form names the exact
  *                         Settings fact and blocks Send), plus the proposed
  *                         arrival from the ONE forward planner.
@@ -2267,14 +2263,12 @@ manualPurchaseRouter.post("/plan", requireOperation, async (c) => {
     const category = cat?.category ?? null;
     const productionDays =
       settings != null ? productionWorkingDaysFor(settings, supplierId, category) : null;
-    const transitDays = settings != null ? transitDaysFor(settings, supplierId) : null;
     return {
       sku,
       supplierId,
       supplierName: supplierId ? (supplierName.get(supplierId) ?? null) : null,
       category,
       productionDays,
-      transitDays,
       /* The ONE forward arithmetic (`expectedArrivalOf`) from the preview
          Proceed Date — null is a real answer, never a guessed arrival. */
       arrival:
@@ -2612,8 +2606,7 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
          (Jess, 2026-09-22), replacing Card 06 §7's "the approved Manual
          Delivery Date becomes the official PO delivery date".
  
-         `PO Date + n Settings working days`, with NO transit days added and
-         `n` exactly the recorded Supplier × Category number — the one
+         `PO Date + n Settings working days`, with `n` exactly the recorded Supplier × Category number — the one
          arithmetic in `poDeliveryDateOf`, so the date and the paper's
          `PO {n}-Day Delivery Date` label can never disagree.
  

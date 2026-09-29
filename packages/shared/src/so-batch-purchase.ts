@@ -83,7 +83,7 @@ export const SO_BATCH_PURCHASE_WORDS = {
    * Purchasing dictionary's `PO Safety Days`.
    *
    * The working-day margin that would REMAIN if the outstanding demand were
-   * ordered today, after supplier production and transit, against the
+   * ordered today, after supplier production, against the
    * applicable required date. It is NOT the Order By date, NOT always 14 and
    * NOT days since creation: the one server planning engine counts it
    * (`purchaseDemandSafetyDaysLeft`, the same expression the timing states are

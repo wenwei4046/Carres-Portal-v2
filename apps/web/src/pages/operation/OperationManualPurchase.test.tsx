@@ -183,7 +183,6 @@ const REGISTER = {
       delivery_date: "2026-09-12",
       order_by: "2026-09-01",
       production_days_missing: false,
-      transit_days_missing: false,
     },
     {
       id: "l2",
@@ -206,12 +205,11 @@ const REGISTER = {
       item_label: "MATTRESS-LOOK-9",
       po_ids: [],
       destination_id: KLANG,
-      // Card 06 — no Delivery Date and no transit number: no Order By, and
-      // the exact Settings fact is named for the setup lens.
+      // Card 06 — no Delivery Date: no Order By. (No setup gap: the supplier
+      // transit fact was removed by owner ruling 2026-09-29.)
       delivery_date: null,
       order_by: null,
       production_days_missing: false,
-      transit_days_missing: true,
       /* The date the issue door WOULD stamp — `PO Date + n Settings working
          days`, projected by the server (owner instruction 2026-09-23). */
       po_delivery_date: "2026-10-02",
@@ -240,7 +238,6 @@ const REGISTER = {
       delivery_date: null,
       order_by: null,
       production_days_missing: false,
-      transit_days_missing: false,
     },
   ],
   // Card 04 — id → the ACTUAL po_no; the column prints numbers, never UUIDs.
@@ -334,11 +331,11 @@ const PICK = {
 const PLAN_LINES: Record<string, Record<string, unknown>> = {
   "5539-2NA": {
     sku: "5539-2NA", supplierId: "s1", supplierName: "Ohana", category: "sofa",
-    productionDays: 14, transitDays: 1, arrival: "2026-09-12",
+    productionDays: 14, arrival: "2026-09-12",
   },
   "5539-CNR": {
     sku: "5539-CNR", supplierId: "s1", supplierName: "Ohana", category: "sofa",
-    productionDays: 14, transitDays: 1, arrival: "2026-09-14",
+    productionDays: 14, arrival: "2026-09-14",
   },
 };
 
@@ -350,7 +347,7 @@ function planFor(init?: RequestInit): unknown {
     (sku) =>
       PLAN_LINES[sku] ?? {
         sku, supplierId: null, supplierName: null, category: null,
-        productionDays: null, transitDays: null, arrival: null,
+        productionDays: null, arrival: null,
       },
   );
   const complete = lines.length > 0 && lines.every((l) => l.arrival != null);
@@ -629,9 +626,6 @@ describe("Card 03 · the left filter rail", () => {
       "Hooka",
       "Office Co",
       "Ohana",
-      // Only the setup row with an affected request (REQ-0002's transit gap).
-      "Setup to fix",
-      "Transit days not set",
     ];
     let cursor = -1;
     for (const word of expected) {
@@ -640,7 +634,9 @@ describe("Card 03 · the left filter rail", () => {
       cursor = at;
     }
     // R2 — retired from this page.
-    for (const retired of ["WORK TO DO", "TO ORDER", "All not ordered", "Approve purchase", "Production days not set"]) {
+    // `Setup to fix` draws only while an affected request exists — none here —
+    // and the supplier transit row was removed by owner ruling 2026-09-29.
+    for (const retired of ["WORK TO DO", "TO ORDER", "All not ordered", "Approve purchase", "Production days not set", "Setup to fix", "Transit days not set"]) {
       expect(text.toLowerCase(), retired).not.toContain(retired.toLowerCase());
     }
   });
@@ -691,7 +687,7 @@ describe("Card 03 · the left filter rail", () => {
     expect(optionText("mp-product-select", "mattress")).toContain("0");
     expect(optionText("mp-product-select", "sofa")).toContain("1");
     expect(optionText("mp-product-select", "bedframe")).toContain("1");
-    expect(screen.getByTestId("mp-setup-transit_days_not_set").textContent).toContain("1");
+    expect(screen.queryByTestId("mp-setup-transit_days_not_set")).toBeNull();
     expect(screen.queryByTestId("mp-setup-production_days_not_set")).toBeNull();
   });
 

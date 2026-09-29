@@ -6,8 +6,9 @@ import { countWorkingDays, type IsoDate, type WorkingDayOptions } from "./workin
  *
  * `docs/COPY-STANDARD.md` → Purchasing UI dictionary (owner ruling
  * 2026-09-18): *the working-day margin remaining if the outstanding demand
- * were ordered today, after supplier production and transit, relative to the
- * applicable required date.*
+ * were ordered today, after supplier production, relative to the applicable
+ * required date.* (The supplier transit leg was removed by owner ruling
+ * 2026-09-29.)
  *
  * ⛔ FOUR THINGS IT IS NOT, and the dictionary names every one of them because
  * each has been shipped somewhere as though it were this number:
@@ -18,13 +19,13 @@ import { countWorkingDays, type IsoDate, type WorkingDayOptions } from "./workin
  *     planning reserve; Manual Purchase measures against its own required
  *     arrival date and adds no reserve at all.
  *   · NOT days since the request was created.
- *   · NOT ZERO WHEN IT IS UNKNOWN. Missing production days, missing transit
- *     days, no required date, or coverage nobody could read all mean the
- *     margin CANNOT BE COMPUTED — and `0` means *order today or you are late*,
+ *   · NOT ZERO WHEN IT IS UNKNOWN. Missing production days, no required
+ *     date, or coverage nobody could read all mean the margin CANNOT BE
+ *     COMPUTED — and `0` means *order today or you are late*,
  *     which is a specific and alarming claim to make on no evidence.
  *
  * The margin is derived from the Order By the planning engine already walked
- * back through supplier production and transit. Recomputing the walk here
+ * back through supplier production. Recomputing the walk here
  * would be the second arithmetic Law D forbids; this counts working days
  * between today and that date and nothing else.
  *
@@ -52,7 +53,7 @@ export const PO_SAFETY_DAYS_NONE: PoSafetyDays = { days: null, passed: false };
  * The margin for ONE line.
  *
  * `orderBy` null means the engine could not plan the line (missing Supplier ×
- * Category production days, missing transit days, or no required date). That
+ * Category production days, or no required date). That
  * is UNKNOWN and it stays unknown all the way to the cell.
  */
 export function poSafetyDaysOf(
