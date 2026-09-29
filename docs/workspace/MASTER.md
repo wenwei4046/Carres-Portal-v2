@@ -548,6 +548,13 @@ cover forms are BUILT in the inspected source; this is not verification of the n
 No additional owner policy is required for the bounded final Blueprint. Missing implementation
 is not a reason to re-interview the owner or expand the agreed surface.
 
+**DELIVERY PRIORITY — OWNER RULING 2026-09-29.** Deliver the Settings relocation first as
+[【WORKSPACE】 — CARD 02 · Move Staff & Duties into Settings](../cards/CARD-2026-09-29-workspace-02-staff-duties-settings-entry.md).
+This slice owns the existing page's destination, menu entry, compatible links and responsive shell;
+it does not change Duty business rules, HR workflows or database contracts. The broader draft must
+be narrowed before this slice releases. Missing migration tooling is not a blocker for this Card;
+the remaining approved automation, personnel and permission targets remain unfinished.
+
 **BUILD IN PROGRESS — 2026-09-29; NOT DEPLOYED.** The Settings/plain-person presentation and
 read-path changes are implemented on `codex/staff-duties-delivery`: canonical Settings entry and
 legacy redirect, manager overflow actions, permission-gated People entry with return context,
