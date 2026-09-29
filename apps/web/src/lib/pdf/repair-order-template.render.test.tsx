@@ -117,3 +117,11 @@ it("the template source can never print money (source scan)", () => {
   const src = fs.readFileSync(new URL("./repair-order-template.tsx", import.meta.url), "utf8");
   expect(src).not.toMatch(/\bprice\b|quotation|cost_responsibility|\bRM\b/i);
 });
+
+it("an unknown issuer prints the RO No alone in the footer — never a placeholder", async () => {
+  const pages = await render({ ...sample(false), issued_by: null }, "ro-no-issuer");
+  expect(pages[0]).not.toMatch(/Issued by/);
+  expect(pages[0]).toMatch(/RO260928-4827\(1\) Computer-generated document/);
+  const named = await render(sample(false), "ro-named-issuer");
+  expect(named[0]).toContain("RO260928-4827(1) · Issued by Recorded actor");
+});

@@ -378,7 +378,8 @@ export function RepairOrderTemplate(data: RepairOrderPrintData) {
         {pages}
 
         <View style={styles.footer} fixed>
-          <Text style={styles.footerCell}>{`${roId} · Issued by ${data.issued_by ?? NOT_RECORDED}`}</Text>
+          {/* An unknown issuer prints the number alone — never a placeholder. */}
+          <Text style={styles.footerCell}>{data.issued_by ? `${roId} · Issued by ${data.issued_by}` : roId}</Text>
           <Text style={styles.footerCenter}>Computer-generated document · No signature required.</Text>
           <Text style={styles.footerPage} render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`} />
         </View>

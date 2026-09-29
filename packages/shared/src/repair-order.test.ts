@@ -7,6 +7,7 @@ import {
   REPAIR_PROBLEM_CHOICES,
   klDate,
   repairOrderCategory,
+  repairOrderCurrentAction,
   repairOrderConditions,
   repairOrderFooter,
   repairOrderGrnCell,
@@ -94,5 +95,24 @@ describe("derived facts", () => {
     expect(repairOrderFooter(1, 1)).toBe("1 Repair Order");
     expect(repairOrderFooter(3, 3)).toBe("3 Repair Orders");
     expect(repairOrderFooter(2, 5)).toBe("2 of 5 Repair Orders");
+  });
+});
+
+describe("a count of Units reads 1 Unit / {n} Units (coordinator review 2026-09-29)", () => {
+  const two = [unit(), unit({ stock_item_id: "si2", unit_id: "U1-000-002" })];
+  const received = { issued: true, supplier_received_at: "2026-09-28T03:00:00Z", return_target_date: "2026-10-16" };
+  it("pickup", () => {
+    expect(repairOrderCurrentAction(row(received))!.lineOne).toBe("Hand 1 Unit to Hooka");
+    expect(repairOrderCurrentAction(row({ ...received, units: two }))!.lineOne).toBe("Hand 2 Units to Hooka");
+  });
+  it("out for repair", () => {
+    const out = unit({ actual_pickup_date: "2026-09-29T02:00:00Z" });
+    expect(repairOrderCurrentAction(row({ ...received, units: [out] }))!.lineOne).toBe("Waiting for Hooka to return 1 Unit");
+    expect(repairOrderCurrentAction(row({ ...received, units: [out, { ...out, stock_item_id: "si2" }] }))!.lineOne).toBe("Waiting for Hooka to return 2 Units");
+  });
+  it("inspection", () => {
+    const back = unit({ actual_pickup_date: "2026-09-29T02:00:00Z", goods_received_date: "2026-10-10", grn_no: "G" });
+    expect(repairOrderCurrentAction(row({ ...received, units: [back] }))!.lineOne).toBe("Inspect 1 returned Unit");
+    expect(repairOrderCurrentAction(row({ ...received, units: [back, { ...back, stock_item_id: "si2" }] }))!.lineOne).toBe("Inspect 2 returned Units");
   });
 });

@@ -405,6 +405,11 @@ export function repairOrderRoute(row: RepairOrderListRow): { stop: RepairOrderRo
   }));
 }
 
+/** `1 Unit` · `{n} Units` — every RO sentence that counts Units. */
+export function repairOrderUnitCount(n: number): string {
+  return n === 1 ? "1 Unit" : `${n} Units`;
+}
+
 export type RepairOrderDoor = "issue" | "record_receipt" | "open_pickup" | "record_reply" | "open_receiving";
 
 export interface RepairOrderCurrentAction {
@@ -436,7 +441,7 @@ export function repairOrderCurrentAction(row: RepairOrderListRow, fmt: (iso: str
     case "waiting_pickup": {
       const left = n - repairOrderPickedUp(row);
       return {
-        lineOne: `Hand ${left} Units to ${supplier}`,
+        lineOne: `Hand ${repairOrderUnitCount(left)} to ${supplier}`,
         lineTwo: "Warehouse records who collected them.",
         door: "open_pickup",
         button: "Outbound",
@@ -445,7 +450,7 @@ export function repairOrderCurrentAction(row: RepairOrderListRow, fmt: (iso: str
     case "out_for_repair": {
       const left = n - repairOrderReturnedQty(row);
       return {
-        lineOne: `Waiting for ${supplier} to return ${left} Units`,
+        lineOne: `Waiting for ${supplier} to return ${repairOrderUnitCount(left)}`,
         lineTwo: row.return_target_date ? `Carres return target ${fmt(row.return_target_date)}` : REPAIR_ORDER_AWAITING_RECEIPT,
         door: "record_reply",
         button: "Record Supplier reply",
@@ -454,7 +459,7 @@ export function repairOrderCurrentAction(row: RepairOrderListRow, fmt: (iso: str
     case "returned_not_inspected": {
       const left = repairOrderReturnedQty(row) - repairOrderInspected(row);
       return {
-        lineOne: `Inspect ${left} returned Units`,
+        lineOne: `Inspect ${left} returned ${left === 1 ? "Unit" : "Units"}`,
         lineTwo: "Available again only after inspection.",
         door: "open_receiving",
         button: "Receiving",

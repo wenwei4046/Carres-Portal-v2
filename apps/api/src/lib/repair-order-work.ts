@@ -27,6 +27,7 @@ import {
   repairOrderConsentOutstanding,
   type OperationWorkItem,
   type RepairOrderDetail,
+  type WorkspaceDutyResolution,
 } from "@carres/shared";
 import type { AppEnv } from "../types";
 import { userClient } from "./supabase";
@@ -37,8 +38,21 @@ import { workCompletion, workCompletionDeps, type WorkCompletionDeps, type WorkC
  *  dev preview run the same function). */
 export { projectRepairOrderWork, repairOrderDestination } from "@carres/shared";
 
-/** The RO object read, as the caller (RLS), through the RO router itself. */
-export async function readRepairOrderDetail(c: Context<AppEnv>, roId: string): Promise<RepairOrderDetail | null> {
+/** The Work feed's Repair Order entry: every open RO (`GET /work-source`,
+ *  the object page's own shape) projected for PO Duty. Its own function so the
+ *  PO projections in `work.ts` stay untouched; a failed read fails the
+ *  Purchasing source honestly rather than showing an empty repair desk. */
+export async function loadRepairOrderWork(
+  c: Context<AppEnv>,
+  input: { poDuty: WorkspaceDutyResolution | null; today: string; observedAt: string },
+): Promise<OperationWorkItem[]> {
+  const res = await (await repairOrderReader(c)).request("http://workspace.internal/repair-orders/work-source", {}, c.env);
+  if (!res.ok) throw new Error(`Repair Order work source failed (${res.status})`);
+  const { repairOrders } = (await res.json()) as { repairOrders: RepairOrderDetail[] };
+  return projectRepairOrderWork({ repairOrders, ...input });
+}
+
+async function repairOrderReader(c: Context<AppEnv>): Promise<Hono<AppEnv>> {
   const { default: router } = await import("../routes/operation/repair-orders");
   const internal = new Hono<AppEnv>();
   internal.use("*", async (child, next) => {
@@ -46,7 +60,12 @@ export async function readRepairOrderDetail(c: Context<AppEnv>, roId: string): P
     await next();
   });
   internal.route("/repair-orders", router);
-  const res = await internal.request(`http://workspace.internal/repair-orders/${encodeURIComponent(roId)}`, {}, c.env);
+  return internal;
+}
+
+/** The RO object read, as the caller (RLS), through the RO router itself. */
+export async function readRepairOrderDetail(c: Context<AppEnv>, roId: string): Promise<RepairOrderDetail | null> {
+  const res = await (await repairOrderReader(c)).request(`http://workspace.internal/repair-orders/${encodeURIComponent(roId)}`, {}, c.env);
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(`Repair Order read failed (${res.status})`);
   return ((await res.json()) as { repairOrder: RepairOrderDetail }).repairOrder;

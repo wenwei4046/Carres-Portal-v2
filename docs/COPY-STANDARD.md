@@ -971,7 +971,9 @@ Work (Workspace §6, PO Duty), row line · fact: `Issue repair order to {supplie
 confirmed` — `Ask {Supplier} to confirm they received {RO No}` · `Awaiting Supplier receipt of RO` —
 `Ask {Supplier} when {Unit ID} will return` · `The repair return date has passed` — `Ask {owner} to
 agree to repair {Unit ID}` · `Owner consent not recorded` (`{owner}` is the Unit's recorded owner,
-else `the owner`). Several Units read `{first Unit ID} + {n} more`. Required results: `The current
+else `the owner`). Several Units read `{first Unit ID} + {n} more`. Every RO sentence that counts Units reads `1 Unit` / `{n} Units`
+(`Hand 1 Unit to {Supplier}` · `Waiting for {Supplier} to return 1 Unit` · `Inspect 1 returned Unit`).
+The paper's footer prints `{RO No} · Issued by {name}`, or the RO No alone when the issuer is unknown. Required results: `The current
 repair order version is marked as sent` · `Supplier receipt of the repair order is recorded` · `The
 Units are received back` · `The owner's consent is recorded`.
 
