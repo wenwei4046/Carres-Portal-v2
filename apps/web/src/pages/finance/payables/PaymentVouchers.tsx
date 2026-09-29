@@ -104,7 +104,7 @@ function VoucherRegister() {
     { key: "status", label: "Status", width: 120, accessor: (r) => word(VOUCHER_STATUS_WORD, r.status),
       filterValue: (r) => word(VOUCHER_STATUS_WORD, r.status), filterType: "enum" },
     { key: "advance", label: "Advance", width: 190, accessor: (r) => advanceCell(r),
-      exportValue: (r) => num(r.advance_amount) ?? "" },
+      numberValue: advanceAmount, exportValue: (r) => num(r.advance_amount) ?? "" },
     { key: "amount", label: "Amount", width: 140, align: "right", accessor: (r) => money(r.amount),
       numberValue: (r) => num(r.amount), filterType: "number", exportValue: (r) => num(r.amount) ?? "" },
     { key: "prepared", label: "Prepared By", width: 150, accessor: (r) => r.prepared_by_name ?? "Not prepared yet",
@@ -169,10 +169,16 @@ function VoucherRegister() {
   );
 }
 
+/** The advance the cell shows first; null for "No advance", which sorts last. */
+function advanceAmount(r: PaymentVoucherRegisterRow): number | null {
+  const amount = num(r.advance_amount) ?? 0;
+  return amount > 0 ? amount : null;
+}
+
 /** "No advance", or the advance and — once approved — what is left of it. */
 function advanceCell(r: PaymentVoucherRegisterRow): string {
-  const amount = num(r.advance_amount) ?? 0;
-  if (amount <= 0) return "No advance";
+  const amount = advanceAmount(r);
+  if (amount === null) return "No advance";
   return r.advance_open === null ? money(amount) : `${money(amount)} · ${money(r.advance_open)} left`;
 }
 
