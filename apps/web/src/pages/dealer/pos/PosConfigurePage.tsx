@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ArrowLeft, Check, LayoutTemplate, Minus, Plus, Ticket, X } from "lucide-react";
+import { ArrowLeft, Check, LayoutTemplate, Menu, Minus, Plus, Ticket, X } from "lucide-react";
 import type {
   CatalogFabricDto,
   CatalogOptionPoolDto,
@@ -66,6 +66,8 @@ import {
  *  SO PDF / Create-PO / receive modals show the choice is still pending
  *  (the team's KIV vocabulary, same as the fabric/leg dropdowns). */
 export const GAP_KIV = "KIV";
+
+const PHONE_WIZARD_STEPS = ["Cart", "Customer", "Confirmed"] as const;
 
 /** The size table, the plan view and the container hook moved to
  *  `./MattressPlan` on 2026-08-06, when the Rent-to-Own configure surface
@@ -678,7 +680,7 @@ export default function PosConfigurePage({
 
   return createPortal(
     <div
-      className={`pos-proto cfg-root${wizardTopbar ? " has-wizardbar" : ""}`}
+      className={`pos-proto cfg-root cfg-root--mattress-bed${wizardTopbar ? " has-wizardbar" : ""}`}
       style={{ position: "fixed", inset: 0, zIndex: 50 }}
       role="dialog"
       aria-modal="true"
@@ -690,6 +692,56 @@ export default function PosConfigurePage({
       {wizardTopbar && (
         <div className="cfg-wizardbar">
           <ConfigureTopbarBrand ctx={wizardTopbar} onBack={onClose} />
+          <div className="cfg-wizardbar__mobile-main pos-mobile-topbar__main hidden">
+            <button
+              type="button"
+              className="pos-mobile-topbar__icon"
+              aria-label="Categories unavailable while configuring"
+              disabled
+            >
+              <Menu size={18} strokeWidth={1.75} aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              className="pos-wordmark pos-mobile-topbar__wordmark"
+              onClick={onClose}
+              aria-label="Back to catalog"
+            >
+              CARRES
+            </button>
+            <span className="pos-topbar__crumb pos-mobile-topbar__context">
+              POS · {wizardTopbar.contextLabel}
+            </span>
+            <button
+              type="button"
+              className="pos-mobile-topbar__avatar"
+              aria-label="Staff profile unavailable while configuring"
+              disabled
+            >
+              <span className="pos-staff-chip__avatar" aria-hidden="true">
+                PR
+              </span>
+            </button>
+          </div>
+          <nav
+            className="cfg-wizardbar__mobile-steps pos-mobile-topbar__steps hidden"
+            aria-label="Order steps"
+          >
+            {PHONE_WIZARD_STEPS.map((label, index) => (
+              <button
+                key={label}
+                type="button"
+                className={`pos-mobile-topbar__step ${index === 0 ? "is-active" : ""}`}
+                aria-current={index === 0 ? "step" : undefined}
+                disabled={index !== 0}
+              >
+                <span className="pos-mobile-topbar__step-pill">
+                  <span className="pos-mobile-topbar__step-number">{index + 1}</span>
+                  {label}
+                </span>
+              </button>
+            ))}
+          </nav>
         </div>
       )}
       {/* Header — back arrow (non-wizard) · live summary · live total

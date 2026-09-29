@@ -4525,6 +4525,109 @@ button.step-pill:disabled { cursor: default; color: inherit; }
 }
 .os-stripe__void:hover { color: var(--c-orange); }
 
+/* ========= Responsive mattress / bed-frame configurator: phone ========= */
+@media (max-width: 767.98px) {
+  /* Mattress / bed-frame configurator header: preserve the existing controls,
+     but give the wizard identity and step rail their own phone rows. */
+  .cfg-root--mattress-bed.cfg-root {
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .cfg-root--mattress-bed.cfg-root.has-wizardbar {
+    grid-template-rows: auto auto minmax(0, 1fr);
+  }
+
+  .cfg-root--mattress-bed .cfg-wizardbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: 48px 44px;
+    height: auto;
+    padding: 0;
+  }
+
+  .cfg-root--mattress-bed .cfg-wizardbar > [data-testid="cfg-topbar-brand"] {
+    display: none !important;
+  }
+
+  .cfg-root--mattress-bed .cfg-wizardbar__mobile-main {
+    grid-column: 1;
+    grid-row: 1;
+    display: grid;
+  }
+
+  .cfg-root--mattress-bed .cfg-wizardbar__mobile-steps {
+    grid-column: 1;
+    grid-row: 2;
+    display: grid;
+  }
+
+  /* One phone scroll root: the preview and controls remain consecutive
+     siblings, but neither child owns a nested vertical scrollbar. */
+  .cfg-root--mattress-bed .cfg-body {
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .cfg-root--mattress-bed .cfg-grid,
+  .cfg-root--mattress-bed .cfg-grid:not(.cfg-grid--full) {
+    height: auto;
+    min-height: 100%;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto;
+    overflow: visible;
+  }
+
+  .cfg-root--mattress-bed .cfg-canvas {
+    overflow: visible;
+    border-right: none;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .cfg-root--mattress-bed .cfg-controls {
+    max-height: none;
+    overflow: visible;
+  }
+
+  /* Phone touch targets. Desktop and tablet retain their existing sizing. */
+  .cfg-root--mattress-bed .cfg-header {
+    gap: 8px;
+    padding: 6px 8px;
+  }
+
+  .cfg-root--mattress-bed .cfg-header__back {
+    width: 44px;
+    height: 44px;
+  }
+
+  .cfg-root--mattress-bed .cfg-header__live {
+    width: 100%;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .cfg-root--mattress-bed .cfg-header__total {
+    padding-right: 8px;
+  }
+
+  .cfg-root--mattress-bed .cfg-header__cta {
+    gap: 8px;
+  }
+
+  .cfg-root--mattress-bed .cfg-header__cta .btn,
+  .cfg-root--mattress-bed .cfg-opt,
+  .cfg-root--mattress-bed .cfg-stepperBtn,
+  .cfg-root--mattress-bed [data-testid="cfg-pwp-input"],
+  .cfg-root--mattress-bed [data-testid="cfg-pwp-section"] .btn {
+    min-height: 44px;
+  }
+
+  .cfg-root--mattress-bed .cfg-stepperBtn {
+    min-width: 44px;
+  }
+}
+
 /* ========= Responsive catalog shell: phone ========= */
 @media (max-width: 767px) {
   /* Day 4 — the desktop top bar stays byte-for-byte in the DOM and is only

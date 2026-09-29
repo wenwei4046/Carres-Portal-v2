@@ -44,7 +44,7 @@ vi.mock("./ledger/ledger-queries", () => {
   return {
     JOURNAL_PAGE_SIZE: 1000, JOURNAL_MAX_PAGES: 10,
     useLedgerEntries: () => waiting, useLedgerEntry: () => waiting, useLedgerChart: () => waiting,
-    useTrialBalance: () => waiting, useLedgerSelfCheck: () => waiting,
+    useTrialBalance: () => waiting, useLedgerSelfCheck: () => waiting, useAccountBalances: () => waiting,
     // The Dashboard's cash, Activity and month-end pack reads (2026-09-14).
     useLatestLedgerEntries: () => waiting,
     ledgerKeys: { all: () => ["finance", "ledger"] },

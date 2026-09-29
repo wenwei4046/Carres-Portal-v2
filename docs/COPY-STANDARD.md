@@ -201,7 +201,7 @@ Workspace-owned Staff & Duties page under global Settings (placement production 
 | Work action sentences (owner ruling 2026-09-17; supplier correction 2026-09-24) | fact `Overdue delivery` · `Call {logistics}` over `Arrange a new delivery date` · `Ask {logistics}` over `Record the delivery result` · `Confirm tomorrow's supplier delivery` only one Office working day before the effective arrival · button `Record supplier answer` only on an admitted date-specific or exception action | `Date passed` · `Reschedule` · generic `Follow up supplier` · an immediate `Supplier has not confirmed the PO date` action after sending |
 | Purchasing arrival and delay words (owner ruling 2026-09-24) | `PO Delivery Date` for the immutable planned/default date · `Waiting for goods from supplier` after confirmed send · `Supplier DO` for the supplier's dispatch document · `Confirm tomorrow's supplier delivery` · `Confirmed for {date}` only with evidence · `Delayed · New expected date {date}` | `Supplier confirmed` for the calculated default date · `Delivery Order` when Supplier DO is meant · treating a WhatsApp screenshot or Supplier DO as Goods Received |
 | Purchasing supplier answer words (owner ruling 2026-09-25; Purchasing MASTER §5.7) | button `Record supplier answer` · top option `Supplier DO received` · per item `What changed?` with `No change` · `Confirmed` · `New date` (auto `Earlier` / `Delayed`) · `Split delivery` · `+ Add another date` · `Total {n} of {m}` · batch `{n} pcs · {date}` · `Evidence` · `Add a WhatsApp screenshot` · `Affects {SO No} · customer date {date}` · reasons `Production delay` · `Material unavailable` · `Capacity / scheduling delay` · `Quality issue / remake` · `Transport delay` · `Supplier closed / holiday` · `Partial quantity ready` · `Other` · day-before action `Click WhatsApp, ask {Supplier} for the Supplier DO for {PO No}` | `Part now, rest later` · `Waiting Customer Confirmation` · `Material Shortage` · `Factory Closed` · editing `PO {n}-Day Delivery Date` |
-| Purchasing Change Deliver To words (owner confirmed 2026-09-25; Purchasing MASTER §5.4) | per-line door `Change Deliver To` · `Current Deliver To` · `Qty on this PO` · `Still to deliver` · `Qty to move` · `New Deliver To` · `Units moving` · `Reason` · `Review changes` · `Total — unchanged` · `Version ({n}) must be sent to {Supplier} again` · `Save version ({n})` · refusals `Only {n} still to deliver` · `All received · use a transfer instead` · `Add the address of {destination} in Settings` · permission `Only PO Duty can change a PO` | a second PO for the moved goods · a new PO number · `Move` · `Transfer` for a not-yet-received quantity · marking version ({n}) sent on save |
+| Purchasing Change Deliver To words (owner confirmed 2026-09-25; Purchasing MASTER §5.4) | per-line door `Change Deliver To` · `Current Deliver To` · `Qty on this PO` · `Still to deliver` · `Qty to move` · `New Deliver To` · `Units moving` · `Reason` · `Review changes` · `Total unchanged` · `Version ({n}) must be sent to {Supplier} again` · `Save version ({n})` · refusals `Only {n} still to deliver` · `All received · use a transfer instead` · `Add the address of {destination} in Settings` · permission `Only PO Duty can change a PO` | a second PO for the moved goods · a new PO number · `Move` · `Transfer` for a not-yet-received quantity · marking version ({n}) sent on save |
 | Purchasing PO object page words (owner approval 2026-09-25; Purchasing MASTER §9.3) | `CURRENT ACTION` block: the Work fact/action lines · `Nothing to do until {date}` · `Ask {Supplier} when the goods will arrive` · `Ask {Supplier} for the balance delivery date` · `Edit ▾` items `Revise quantity or Deliver To` · `Change Deliver To` · `Cancel purchase order` · narrow `Open PDF` | a `Status` fact in the grid · `PO Version` as a fact · a second primary button · a viewing-mode split |
 | Purchasing Supplier Claim reply words (owner approval 2026-09-25; Purchasing MASTER §9.5) | buttons `Record what we asked` · `Record supplier reply` · form `Supplier's answer` · `Applies to` · `Whole claim` · `These Units` · `Supplier's date` · `Evidence` · `Note` · states `Reply expected {date}` · `Reply overdue · {date}` · `Escalated to {name}` · `Claim sent · {channel} · {recipient}` · Work `Ask {Supplier} to reply to the supplier claim` · Settings `Reply waiting days` · `Extra days before escalation` (the 2026-09-06 approved names) | `Only PO Duty can record the supplier's reply` (recording is open to any Operation person) · `Refund` as a supplier answer · `Supplier did not answer` as an accepted remedy · `Close as unanswered` |
 | Purchasing Supplier Claim record words (BUILT on branch 2026-09-29, 0607; completes the row above) | Items fallback line two `Recorded SKU` · `Applies to` opens on `Whole claim` · phone evidence behind the `Phone call` link under `Evidence`: `Who spoke` · `When they spoke` · `Time` · send dialog `Channel` · `Recipient` · `Note` with `Claim sent to supplier` · validation `Choose the supplier's answer.` · `Choose what the answer applies to.` · `Tick the Units this answer applies to.` · `Add the evidence: a file, or who spoke and when.` · `Write the note: why the supplier refused, or what was agreed.` · answer line `{answer} · {scope} · by {date} · recorded {date} · {recorder}` with `Evidence {n}` · a reply recorded before the ask `{answer line} · Received before the ask` · sending line `Claim sent · {channel} · {recipient} · {time} · {actor}` · Work `The supplier claim is not issued` / `Share the claim with {Supplier} and record the actual message sent` · `{Supplier} has not replied` / `Ask {Supplier} to reply to the supplier claim` · escalation `{Supplier} has not replied` / `Decide how Carres will resolve the item problem` (Purchasing Approver) · Result `Authorised Outcome` · `Item Outcome` · `RO No` · `PR No` · `PDF {n}` | a SKU printed as if it were a product name · a whole-claim answer printed against each Unit · `Plan Repair` from a supplier's `Repair` offer alone · `Sent` for an opened WhatsApp |
@@ -1679,16 +1679,18 @@ Settings owns the expandable list; these are its exact management words:
 `Not available for new POs`. A future destination is added here and then appears in every governed
 Purchasing picker. No SO Batch Purchase page keeps its own destination list.
 
-**`Change Deliver To` — the words (Jess, 2026-09-22 · APPROVED TARGET / NOT BUILT).** Moving part of
+**`Change Deliver To` — the words (Jess, 2026-09-22 · BUILT 2026-09-29, 0610).** Moving part of
 a sent PO to another Deliver To keeps the SAME PO number and mints its next revision (purchasing
 MASTER §5.4). There is never a second PO, so there is no `Moved from` / `Split from` word.
 
 | What | The word |
 |---|---|
 | The edit and its screen title | **`Change Deliver To`** |
-| Screen fields, in order | **`Item`** · **`Current Deliver To`** · **`Qty on this PO`** · **`Qty you can move`** · **`Qty to move`** · **`New Deliver To`** · **`Reason`** |
+| Screen fields, in order | **`Item`** · **`Current Deliver To`** · **`Qty on this PO`** · **`Qty you can move`** · **`Qty to move`** · **`New Deliver To`** · **`Units moving`** (exact-unit goods) · **`Reason`** |
 | The check before saving | **`Review changes`** |
-| The review's closing row | **`Total — unchanged`** |
+| The review's closing row | **`Total unchanged`** |
+| The save button and its note | **`Save version ({n})`** · **`Version ({n}) must be sent to {Supplier} again`** |
+| Refusals (two lines each, `purchasing-refusals.ts`) | `{PO} is not open.` · `{Deliver To} is closed.` · `These goods already go to {Deliver To}.` · `All {Item} on {PO} is received.` / `Use a transfer instead.` · `Qty to move is more than the qty you can move.` / `Enter a whole number from 1 to {n}.` · `A Unit ID is chosen twice.` · `A chosen Unit ID is no longer on this line.` · `The Unit IDs chosen do not match Qty to move.` · `{Item} already has a line going to {Deliver To}.` / `Move one less, or use Revise quantity or Deliver To on that line.` |
 | PDF section-2 heading on every Deliver To's first page | plain **`DELIVER TO`** + that location's full name and address — never `(1 of 2)`; the page count is the footer's `Page n of m` |
 | PDF closing quantity: one location's table · the whole PO (last page, only when a PO has several Deliver To) | **`TOTAL`** · **`PO TOTAL`** — nothing printed beside `PO TOTAL` (`PO TOTAL · 2 Deliver To` refused as confusing, 2026-09-22) |
 
@@ -3887,6 +3889,9 @@ cannot say what it means or does. A stored key never reaches the screen.
 | | **`Trial Balance`** | Every account's balance on one day, debits beside credits. |
 | | **`Self-check`** | The books test themselves and name what is wrong. |
 | Journal columns | **`Entry No`** · **`Date`** · **`Source`** · **`Document`** · **`Narration`** · **`Amount`** · **`Reversal`** | The entry's number, day, what made it, its document, its note, its total, its reversed pair. |
+| Journal column, one account picked | **`Running balance`** | The picked account's balance after the entry, counted by the ledger from everything posted before the first day read. Shows only while one account is picked and no column sort is on (the rows then run by date and entry number, newest first). |
+| | **`{money} Debit`** · **`{money} Credit`** · **`RM 0.00`** | The side the balance sits on. An asset or expense account on its usual side reads Debit, the other kinds Credit; a balance that turned reads the other side, never a negative figure. |
+| | **`The running balances could not be loaded. Try again.`** · **`Try again`** | The balance read failed; the column is not shown, never a blank or a zero. |
 | Sources | **`Sales invoice`** · **`Customer payment`** · **`Supplier bill`** · **`Supplier payment`** · **`Payment voucher`** · **`Other debtor invoice`** · **`Other receipt`** · **`Rental payment`** · **`Manual journal`** | What made the entry. |
 | | **`{source} reversal`** | The entry that cancels one of those. |
 | | **`Other entry`** | A source this list does not name yet. Never the key. |
@@ -4754,9 +4759,9 @@ is the proposal. No new sentence is added.
 
 Screen words (Finance Settings):
 - Button: `Add account`. Modal title: `Add account`.
-- Fields: `Under`, `Number`, `Name`, checkbox `It is a heading`, `First account number`, `First account name`.
+- Fields: checkbox `It is a heading`, `Under`, `Number`, `Name`. With `It is a heading` ticked, `Number` and `Name` read `Heading number` and `Heading name` (0608: a heading is added on its own; its accounts are added under it afterwards), and `Under` also offers `Top of the chart` (only a heading goes there). With `Top of the chart` picked, one more field, `Kind`, with the chart's kind words `Asset` · `Liability` · `Equity` · `Income` · `Expense`.
 - Money account add, field `Number`, hint `Leave blank to use the next free number.`
-- The disabled `Save` NAMES its gap (the Receiving button law; first gap wins, top to bottom). Add account: `Save: pick Under` · `Save: type the number` · `Save: type the name` · `Save: type the first account number` · `Save: type the first account name`. The Account (rename) modal reuses `Save: type the name` · `Save: type the number`.
+- The disabled `Save` NAMES its gap (the Receiving button law; first gap wins, top to bottom). Add account: `Save: pick Under` · `Save: pick the kind` (only with `Top of the chart`) · `Save: type the number` · `Save: type the name`; with `It is a heading` ticked, `Save: type the heading number` · `Save: type the heading name`. The Account (rename) modal reuses `Save: type the name` · `Save: type the number`.
 
 Database sentences (shown as written):
 - `<code> <name> is not a heading. Add the account under a heading.`
@@ -4765,6 +4770,8 @@ Database sentences (shown as written):
 - `Type a number for the new account. <code> <name> does not end in 00 or -0000, so no number is picked for you.`
 - `<code> <name> holds the bank and cash accounts. Add a bank or cash account in Money accounts.`
 - `<code> <name> decides how money may be recorded. A heading cannot go under it.`
+- `Only a heading goes at the top of the chart. Pick the heading this account goes under.` (0608)
+- `Choose the kind of the new heading.` (0608)
 
 
 ### Sales Order existing-reference revisions and delivery Activity

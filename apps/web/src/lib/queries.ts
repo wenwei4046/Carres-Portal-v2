@@ -5561,6 +5561,29 @@ export function useRevisePo(poId: string | null) {
   });
 }
 
+/** POST /:id/change-deliver-to — `Change Deliver To` (0610, Purchasing §5.4).
+ *  Part or all of one line's undelivered qty moves to another Deliver To on
+ *  the SAME PO as its next version; exact Units keep their IDs. */
+export function useChangePoDeliverTo(poId: string | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: {
+      lineId: string;
+      qty: number;
+      destinationId: string;
+      reason: string;
+      unitCodes?: string[];
+    }) =>
+      apiFetch<{ ok: true; result: { version: number; to_line: string; unit_codes: string[] } }>(
+        `/api/operation/pos/${encodeURIComponent(poId ?? "")}/change-deliver-to`,
+        { method: "POST", body: JSON.stringify(input) },
+      ),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["operation", "pos"] });
+    },
+  });
+}
+
 function usePurchasingSettingsMutation<TInput>(path: string) {
   const qc = useQueryClient();
   return useMutation({

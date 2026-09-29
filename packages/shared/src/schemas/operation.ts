@@ -175,11 +175,24 @@ export const setLineDestinationInput = z.object({
 }).strict();
 export type SetLineDestinationInput = z.infer<typeof setLineDestinationInput>;
 
-export const splitLineDestinationInput = z.object({
-  moveQty: z.number().int().min(1),
+/**
+ * `Change Deliver To` (Purchasing MASTER §5.4, Jess 2026-09-22 · build
+ * 2026-09-29, 0610) — POST /api/operation/pos/:id/change-deliver-to →
+ * `purchasing_change_po_deliver_to`. Part or all of ONE line's undelivered
+ * qty moves to another open Deliver To on the SAME PO as its next version.
+ * Exact-unit goods name the Unit IDs that move; omitted, the server takes the
+ * line's last n. The reason is required in SQL; this mirror fails faster.
+ * It replaces 0311's `/lines/:id/split`, which moved neither Units nor
+ * Sales Order lineage and minted no version.
+ */
+export const changePoDeliverToInput = z.object({
+  lineId: z.string().uuid(),
+  qty: z.number().int().min(1),
   destinationId: z.string().uuid(),
+  reason: z.string().trim().min(1).max(300),
+  unitCodes: z.array(z.string().min(1)).max(500).optional(),
 }).strict();
-export type SplitLineDestinationInput = z.infer<typeof splitLineDestinationInput>;
+export type ChangePoDeliverToInput = z.infer<typeof changePoDeliverToInput>;
 
 export const setLineOpsRemarkInput = z.object({
   text: z.string().max(500),
