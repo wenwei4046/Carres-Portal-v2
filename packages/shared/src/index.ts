@@ -124,6 +124,8 @@ export {
   purchasingSetProductionDaysInput,
   purchasingSetTransitDaysInput,
   purchasingSetSupplierTermsDaysInput,
+  purchasingSetSupplierAddressInput,
+  SUPPLIER_ADDRESS_MAX,
   TRANSIT_DAYS_RANGE,
   purchasingSetWorkWeekInput,
   type PurchasingCategory,
@@ -146,6 +148,7 @@ export {
   type PurchasingSetProductionDaysInput,
   type PurchasingSetTransitDaysInput,
   type PurchasingSetSupplierTermsDaysInput,
+  type PurchasingSetSupplierAddressInput,
   type PurchasingSetWorkWeekInput,
 } from "./purchasing-settings";
 

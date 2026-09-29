@@ -391,3 +391,44 @@ describe("Purchasing Settings — Supplier Claims reply timing (0606)", () => {
     expect(body.repairReturnWorkingDays).toBe(14);
   });
 });
+
+describe("Purchasing Settings — Supplier addresses (0611)", () => {
+  it("saves one address per call through the one door, and blank goes through as blank", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: null, error: null });
+    vi.mocked(userClient).mockReturnValue({ rpc } as never);
+    for (const [kind, p_kind, text] of [
+      ["address", "address", "Lot 5, Jalan Ohana, Klang"],
+      ["returnAddress", "return_address", "Ohana returns bay, Klang"],
+      ["returnAddress", "return_address", ""],
+    ] as const) {
+      const res = await testApp().request("/settings/supplier-address", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ supplierId: SUPPLIER_ID, kind, text }),
+      });
+      expect(res.status).toBe(200);
+      expect(rpc).toHaveBeenLastCalledWith("purchasing_set_supplier_address", {
+        p_supplier_id: SUPPLIER_ID,
+        p_kind,
+        p_text: text,
+      });
+    }
+  });
+
+  it("refuses an unknown kind or an over-long address before any database call", async () => {
+    const rpc = vi.fn();
+    vi.mocked(userClient).mockReturnValue({ rpc } as never);
+    for (const body of [
+      { supplierId: SUPPLIER_ID, kind: "registered", text: "x" },
+      { supplierId: SUPPLIER_ID, kind: "address", text: "x".repeat(501) },
+    ]) {
+      const res = await testApp().request("/settings/supplier-address", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      expect(res.status).toBeGreaterThanOrEqual(400);
+    }
+    expect(rpc).not.toHaveBeenCalled();
+  });
+});

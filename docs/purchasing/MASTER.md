@@ -4936,9 +4936,12 @@ column `document_sent_at` is kept and no longer written); `Confirmed Pickup` (ap
 `purchase_return_pickup_confirmations`, evidenced with who confirmed); the full-width PR record at
 `/operation?tab=purchase-returns&pr={id}` with `Open PDF`; the money-free PR paper
 (`purchase-return-template.tsx`); and four Work rules through their own loader (Workspace §6.1).
-**Dependencies still NOT BUILT, named so nobody assumes them:** (1) `suppliers.return_address` is new
-schema with no editor — the Supplier Master / Purchasing Settings lane owns that screen; until it
-exists every issue is refused `Add the return address of {Supplier}`; (2) Stock's Outbound `Return to
+**Dependencies still NOT BUILT, named so nobody assumes them:** (1) ~~`suppliers.return_address`
+editor~~ BUILT 2026-09-29 (0611): Settings → Purchasing → `Supplier addresses` records each
+supplier's `Address` (PO / Repair Order PDF) and `Return address` (this `Return To`) one field at a
+time through `purchasing_set_supplier_address`; blank saves nothing recorded, so Issue still refuses
+`Add the return address of {Supplier}` until it is filled, and one address is never copied into the
+other; (2) Stock's Outbound `Return to
 supplier` handover (Stock §12.8) has no writer, so every return reads `Not picked up` until Stock
 records collector, time, Units and proof onto the return's Units; (3) `Supplier Received Date` has no
 writer; (4) the evidence viewer for pickup/receipt proof is still not wired. The approved
