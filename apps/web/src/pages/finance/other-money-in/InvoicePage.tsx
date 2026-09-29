@@ -52,6 +52,7 @@ import {
   type TypedLine,
 } from "./parts";
 import { DepartmentName, encodeDepartment } from "../department";
+import { useSaveKey } from "../save-key";
 import { FieldError } from "@/components/kit/FieldFrame";
 
 const TONE = { draft: "neutral", issued: "info", cancelled: "neutral" } as const;
@@ -196,6 +197,9 @@ function InvoiceForm({
       },
     );
   };
+
+  // The key is Save draft, never Issue invoice; it waits while a question is open.
+  useSaveKey(() => submit(false), !save.isPending && !confirming && !cancelling);
 
   if (parties.isError || accounts.isError) {
     return (

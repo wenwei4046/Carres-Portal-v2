@@ -169,6 +169,25 @@ describe("Other receipts — the form", () => {
     });
   });
 
+  it("Ctrl+S or F3 presses Record receipt: it still asks first, and records nothing on its own", async () => {
+    show("/finance/other-receipts?receipt=new");
+    await screen.findByTestId("other-receipt-form");
+    await waitFor(() => expect(sent("GET /accounts")).toHaveLength(1));
+    fireEvent.keyDown(window, { key: "s", ctrlKey: true });
+    expect(await screen.findByText("Choose where the money was received.")).toBeInTheDocument();
+    await choose(/Received into/, "1120 · Bank — current account");
+    await choose(/^Account/, "2360 · Loans received");
+    fireEvent.change(screen.getByLabelText("Amount (RM)"), { target: { value: "10,000" } });
+    await choose(/^Department/, "Office");
+    fireEvent.change(screen.getByLabelText(/Payer name/), { target: { value: "Example Lender Bhd" } });
+    fireEvent.keyDown(window, { key: "F3" });
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.keyDown(window, { key: "F3" });
+    expect(sent("POST /receipts")).toHaveLength(0);
+    fireEvent.click(within(dialog).getByRole("button", { name: "Record receipt" }));
+    await waitFor(() => expect(sent("POST /receipts")).toHaveLength(1));
+  });
+
   it("a refused press keeps its idempotency key, so a second press can only find the first receipt", async () => {
     net.failOnce.set("POST /receipts", "The receipt date is before the ledger go-live.");
     show(`/finance/other-receipts?receipt=new&party=${P1}&invoice=${I_OPEN}`);

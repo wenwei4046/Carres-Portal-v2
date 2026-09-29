@@ -45,6 +45,7 @@ import { useCardRoutes, useMoneyAccounts } from "../settings/api";
 import { useLedgerChart } from "../ledger/ledger-queries";
 import { accountLabel, CancelWithReason, LoadFailed } from "../other-money-in/parts";
 import { useApproveMoneyMove, useCancelMoneyMove, useMoneyMoves, useMoneyMovesMe, usePrepareMoneyMove } from "./api";
+import { useSaveKey } from "../save-key";
 
 const TONE = { prepared: "warning", approved: "success", reversed: "neutral", cancelled: "neutral" } as const;
 const from = (r: MoneyMoveRow) => accountLabel({ code: r.from_account_code, name: r.from_account_name });
@@ -341,6 +342,7 @@ export function MoneyMoveForm({
       onError: (e) => setRefusal(e.message),
     });
   };
+  useSaveKey(submit, !prepare.isPending);
 
   return (
     <Modal

@@ -66,6 +66,7 @@ import {
   type TypedLine,
 } from "./parts";
 import { DepartmentFilter, DepartmentName, useDepartmentParam } from "../department";
+import { useSaveKey } from "../save-key";
 import { FieldError } from "@/components/kit/FieldFrame";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -414,6 +415,10 @@ function ReceiptForm({
     });
   };
 
+  // The key presses Record receipt, which still asks first; it waits while that question is open.
+  const ask = () => (build() ? setConfirming(true) : undefined);
+  useSaveKey(ask, !confirming && !record.isPending);
+
   if (parties.isError || accounts.isError || moneyAccounts.isError || invoices.isError) {
     return (
       <LoadFailed
@@ -540,7 +545,7 @@ function ReceiptForm({
         )}
 
         <div className="flex flex-wrap items-center gap-2">
-          <Button variant="primary" onClick={() => (build() ? setConfirming(true) : undefined)}>
+          <Button variant="primary" onClick={ask}>
             Record receipt
           </Button>
           <Button variant="ghost" onClick={onBack}>

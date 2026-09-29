@@ -328,6 +328,67 @@ describe("Bill form — Convert GRN to bill", () => {
     expect(billSaveGap({ ...base, lines: [line] })).toBeNull();
   });
 
+  it("F3 or Ctrl+S saves the bill, and does nothing while Save names a gap", async () => {
+    show(`/finance/bills/new?supplier=${LANDLORD}`);
+    await waitFor(() => expect(screen.getByLabelText("Supplier")).toHaveValue(LANDLORD));
+    fireEvent.keyDown(window, { key: "s", ctrlKey: true });
+    fireEvent.keyDown(window, { key: "F3" });
+    expect(screen.getByRole("button", { name: "Save: type the supplier invoice No" })).toBeDisabled();
+    expect(writes()).toHaveLength(0);
+
+    fireEvent.change(screen.getByLabelText("Supplier invoice No"), { target: { value: "RENT-08" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add line" }));
+    fireEvent.change(screen.getByLabelText("Line 1 account"), { target: { value: "6500" } });
+    fireEvent.change(screen.getByLabelText("Line 1 amount"), { target: { value: "3000" } });
+    await pickDept("Line 1 department", "OFFICE");
+    fireEvent.keyDown(screen.getByLabelText("Line 1 amount"), { key: "F3" });
+    await waitFor(() => expect(writes()).toHaveLength(1));
+    expect(writes()[0]).toMatchObject({ url: `${B}/bills`, method: "POST" });
+  });
+
+  it("F3 or Ctrl+S never saves the bill behind an open dialog", async () => {
+    show(`/finance/bills/new?supplier=${LANDLORD}`);
+    await waitFor(() => expect(screen.getByLabelText("Supplier")).toHaveValue(LANDLORD));
+    fireEvent.change(screen.getByLabelText("Supplier invoice No"), { target: { value: "RENT-08" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add line" }));
+    fireEvent.change(screen.getByLabelText("Line 1 account"), { target: { value: "6500" } });
+    fireEvent.change(screen.getByLabelText("Line 1 amount"), { target: { value: "3000" } });
+    await pickDept("Line 1 department", "OFFICE");
+
+    fireEvent.click(screen.getByRole("button", { name: "Add other creditor" }));
+    await screen.findByRole("dialog");
+    fireEvent.keyDown(window, { key: "s", ctrlKey: true });
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+
+    fireEvent.click(screen.getByTestId("convert-grn"));
+    await screen.findByRole("dialog");
+    fireEvent.keyDown(window, { key: "F3" });
+    // A save goes out a tick later; wait for it before saying none went.
+    await new Promise((r) => setTimeout(r, 50));
+    expect(writes()).toHaveLength(0);
+  });
+
+  it("a line with no qty or unit price shows an empty cell, never a dash", async () => {
+    api.routes[`${B}/bills/${BILL1}`] = {
+      bill: { id: BILL1, bill_no: "BILL-4XK2", status: "draft", supplier_id: LANDLORD, supplier_name: "Bayview Properties",
+        supplier_kind: "other_creditor", supplier_invoice_no: "RENT-08", bill_date: "2026-09-10", due_date: null, po_id: null,
+        ap_account_code: "2110", ap_account_name: "Trade payables", total_amount: "3000.00", narration: null,
+        cancel_reason: null, created_at: "2026-09-10T01:00:00Z", created_by_name: "Aina", confirmed_at: null,
+        confirmed_by_name: null, cancelled_at: null, cancelled_by_name: null, entry_no: null, reversal_entry_no: null },
+      lines: [{ line_no: 1, warehouse_receipt_id: null, po_line_id: null, grn_no: null, grn_po_id: null, sku: null,
+        description: "August rent", account_code: "6500", account_name: "Bank charges", qty: null, unit_price: null,
+        amount: "3000.00", po_unit_cost: null, price_diff: null, department_type: "OFFICE", department_id: null }],
+      payments: [], files: [], events: [], paid_total: "0.00", allocated_total: "0.00", unpaid: null, left_to_pay: null,
+      advance_open: null, go_live_on: "2026-09-10",
+      can: { edit: true, confirm: false, cancel: false, add_file: false, apply_advance: false, take_advance_off: false },
+    };
+    show(`/finance/bills/${BILL1}`);
+    const row = within(await screen.findByTestId("bill-lines")).getAllByRole("row")[1]!;
+    expect(row).toHaveTextContent("August rent");
+    expect(row.textContent).not.toMatch(/[—–]/);
+  });
+
   it("leaves the due date empty when no terms are set (0530)", async () => {
     show("/finance/bills/new");
     await screen.findByRole("option", { name: "Lumen Sofa Works" });
@@ -410,6 +471,27 @@ describe("Payment voucher form", () => {
     expect(voucherSaveGap({ ...base, purpose: "DIRECT", picks: {}, payee: "Tenaga" })).toBe("Save: add a line");
     expect(voucherSaveGap({ ...base, total: 0 })).toBe("Save: the total must be above RM 0.00");
     expect(voucherSaveGap(base)).toBeNull();
+  });
+
+  it("Ctrl+S or F3 saves the voucher, and does nothing while Save names a gap", async () => {
+    show(`/finance/payment-vouchers/new?supplier=${SUP}`);
+    fireEvent.change(await screen.findByLabelText("Advance"), { target: { value: "500" } });
+    fireEvent.keyDown(window, { key: "F3" });
+    fireEvent.keyDown(window, { key: "s", ctrlKey: true });
+    expect(screen.getByRole("button", { name: "Save: pick Paid from" })).toBeDisabled();
+    expect(writes()).toHaveLength(0);
+
+    fireEvent.change(screen.getByLabelText("Paid from"), { target: { value: "1120" } });
+    fireEvent.keyDown(window, { key: "s", ctrlKey: true });
+    await waitFor(() => expect(writes()).toHaveLength(1));
+    expect(writes()[0]!.body).toMatchObject({ supplierId: SUP, advanceAmount: 500 });
+  });
+
+  it("a bill with no Price Check shows an empty cell, never a dash", async () => {
+    api.routes[`${B}/bills`] = { rows: [billRow({})] };
+    show(`/finance/payment-vouchers/new?supplier=${SUP}`);
+    expect(await screen.findByTestId(`price-check-${BILL1}`)).toHaveTextContent("1 line differs from PO");
+    expect(screen.getByTestId(`price-check-${BILL2}`)).toBeEmptyDOMElement();
   });
 
   it("Paid from offers cash and banks in use, never a holding account (0512)", async () => {

@@ -72,6 +72,7 @@ import { LoadFailed } from "../other-money-in/parts";
 import Checkbox from "@/components/kit/Checkbox";
 import Select from "@/components/kit/Select";
 import { useAddAccount, useMoveAccount, useReorderAccounts, useSaveAccount } from "./api";
+import { useSaveKey } from "../save-key";
 
 type Row = LedgerAccount & { depth: number };
 
@@ -414,6 +415,7 @@ function AddAccountModal({ headings, onClose }: { headings: Row[]; onClose: () =
       { onSuccess: onClose, onError: (e) => setRefusal(e.message) },
     );
   };
+  useSaveKey(submit, gap === null && !add.isPending);
   return (
     <Modal
       open
