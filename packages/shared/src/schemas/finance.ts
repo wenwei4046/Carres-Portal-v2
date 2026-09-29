@@ -64,7 +64,22 @@ export const financeRecordReceiptInput = z.object({
 }).strict();
 export type FinanceRecordReceiptInput = z.infer<typeof financeRecordReceiptInput>;
 
-/** Inclusive YYYY-MM-DD `from`/`to` filters plus the row cap, shared by the finance list queries. */
+/**
+ * `refundPayInput` — POST /api/finance/refunds/:id/pay.
+ * Maps to RPC `refund_pay(refund_id, method, reference)` (migration 0062).
+ * Marks an `approved` refund as `paid` AND inserts an outbound payments
+ * row tied to the refund. Caller MUST first decide the approval row via
+ * `approval_decide` (kind=refund) so the refund row reaches `approved`
+ * status — this RPC rejects pending / paid / rejected refunds with
+ * ERRCODE 22023.
+ */
+export const refundPayInput = z.object({
+  method:     paymentMethodEnum,
+  reference:  z.string().min(1).max(255).nullable().optional(),
+}).strict();
+export type RefundPayInput = z.infer<typeof refundPayInput>;
+
+/** Inclusive YYYY-MM-DD `from`/`to` filters plus the row cap, shared by the four finance list queries. */
 const dateWindow = {
   from:  z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   to:    z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
@@ -134,6 +149,44 @@ export const invoicesListQuery = z.object({
 export type InvoicesListQuery = z.infer<typeof invoicesListQuery>;
 
 /**
+ * `refundCreateInput` — POST /api/finance/refunds/create.
+ * Q5=A locked 2026-05-08: kind is `credit` (CN-{N}) or `refund` (RF-{N}).
+ *
+ * Behavior (matches proto finance-refunds.jsx:13-46):
+ *   - Always inserts a refunds row with reason + amount.
+ *   - For `kind=refund` AND amount > RM 1000, ALSO inserts an approvals
+ *     row with kind='refund', refers_to=`SO-{so}`, dealer_id, amount.
+ *     Refunds row stays at status='pending' until approval_decide
+ *     (existing 0016 RPC) flips it via the kind=refund side-effect.
+ *   - For `kind=refund` AND amount <= RM 1000, refunds row is created
+ *     directly at status='approved' (no approval gate per proto).
+ *   - For `kind=credit`, refunds row is created at status='issued' (the
+ *     credit-note path uses `status='issued'` semantics; `apply` later
+ *     deducts from a target order).
+ */
+export const refundCreateInput = z.object({
+  orderId:  z.string().uuid(),
+  amount:   z.number().positive().finite(),
+  reason:   z.string().min(1).max(500),
+  kind:     z.enum(['credit', 'refund']),
+}).strict();
+export type RefundCreateInput = z.infer<typeof refundCreateInput>;
+
+/**
+ * `refundsListQuery` — GET /api/finance/refunds?status&dealerId&from&to.
+ * Status filter accepts the actual `refund_status` enum values
+ * (pending/approved/rejected/paid) plus the credit-note pseudo-status
+ * `issued` (which maps to the `refunds.status='issued'` if we choose
+ * to extend the enum, OR a synthetic value for credit-note rows).
+ */
+export const refundsListQuery = z.object({
+  status:    z.enum(['all', 'pending', 'approved', 'rejected', 'paid', 'issued', 'applied']).optional(),
+  dealerId:  z.string().uuid().optional(),
+  ...dateWindow,
+}).strict();
+export type RefundsListQuery = z.infer<typeof refundsListQuery>;
+
+/**
  * `financePoPayInput` — POST /api/finance/payments/po-pay.
  *
  * Spec: §5.1. Inserts a payments row (direction='out', po_id=...,
@@ -177,6 +230,53 @@ export const financePoScheduleInput = z.object({
 export type FinancePoScheduleInput = z.infer<typeof financePoScheduleInput>;
 
 /**
+ * `bankStatementCreateInput` — POST /api/finance/bank-statements.
+ * Manual single-row insert. CSV bulk import (Q3=B Maybank2u) is deferred
+ * to Chunk C / Phase 9. Amount is signed: positive = inflow, negative =
+ * outflow (matches the bank_statements column convention from 0061).
+ */
+export const bankStatementCreateInput = z.object({
+  statementDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  description:   z.string().min(1).max(500),
+  amount:        z.number().finite(),
+  reference:     z.string().min(1).max(255).nullable().optional(),
+  currency:      z.string().min(3).max(3).default('MYR'),
+}).strict();
+export type BankStatementCreateInput = z.infer<typeof bankStatementCreateInput>;
+
+/**
+ * `bankStatementsListQuery` — GET /api/finance/bank-statements.
+ * Filters: from/to date range, matched=true|false (post-fetch derive via
+ * left join check on reconciliations).
+ */
+export const bankStatementsListQuery = z.object({
+  ...dateWindow,
+  matched: z.enum(['true', 'false']).optional(),
+}).strict();
+export type BankStatementsListQuery = z.infer<typeof bankStatementsListQuery>;
+
+/**
+ * `reconciliationCreateInput` — POST /api/finance/reconciliations.
+ * Links a bank_statements row to ONE OF: payment / invoice / refund /
+ * manual_ref. Server enforces the same check constraint as the table
+ * (at least one target). manual_ref is the escape hatch for lines that
+ * don't have a clean record match (proto: customer transferred without
+ * quoting SO).
+ */
+export const reconciliationCreateInput = z.object({
+  bankStatementId: z.string().uuid(),
+  paymentId:       z.string().uuid().nullable().optional(),
+  invoiceId:       z.string().uuid().nullable().optional(),
+  refundId:        z.string().uuid().nullable().optional(),
+  manualRef:       z.string().min(1).max(255).nullable().optional(),
+  note:            z.string().min(1).max(1000).nullable().optional(),
+}).strict().refine(
+  (v) => !!(v.paymentId || v.invoiceId || v.refundId || v.manualRef),
+  { message: 'At least one of paymentId / invoiceId / refundId / manualRef is required' },
+);
+export type ReconciliationCreateInput = z.infer<typeof reconciliationCreateInput>;
+
+/**
  * `cashflowSeriesQuery` — report params.
  * It clamps the period parameter to a sensible range before passing to
  * the SQL RPC (which also clamps server-side).
@@ -185,6 +285,20 @@ export const cashflowSeriesQuery = z.object({
   weeks: z.coerce.number().int().min(1).max(52).optional(),
 }).strict();
 export type CashflowSeriesQuery = z.infer<typeof cashflowSeriesQuery>;
+
+/**
+ * `refundApplyInput` — POST /api/finance/refunds/:id/apply.
+ *
+ * Spec: §5.3. Marks a credit-note refund row as applied against a future
+ * order. Wraps the `finance_apply_credit_note` RPC (migration 0065) which
+ * validates the refund is a credit note (credit_note_no IS NOT NULL) AND
+ * status='approved' (UI label "issued") + flips status='paid' (UI label
+ * "applied") + records applied_to_order_id + paid_at=now().
+ */
+export const refundApplyInput = z.object({
+  targetOrderId: z.string().uuid(),
+}).strict();
+export type RefundApplyInput = z.infer<typeof refundApplyInput>;
 
 // ── Finance Ledger reads — GET /api/finance/ledger/* ─────────────────────────
 /**

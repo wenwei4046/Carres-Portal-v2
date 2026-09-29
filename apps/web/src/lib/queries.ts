@@ -148,8 +148,11 @@ import {
   type CreateOrderInput,
   type RawCreateOrderInput,
   type DealerSelf,
+  type BankStatementCreateInput,
   type FinanceRecordReceiptInput,
   type FinanceTopupApproveInput,
+  type ReconciliationCreateInput,
+  type RefundApplyInput,
   type ListOperationOrdersQuery,
   type ListMovementsQuery,
   type ListPurchaseOrdersQuery,
@@ -161,6 +164,8 @@ import {
   type ReassignPoWarehouseInput,
   type ReceivePoWithDoInput,
   type OfficeReceiveInput,
+  type RefundCreateInput,
+  type RefundPayInput,
   type ReservedDrilldownResponse,
   type AddOrderLinesInput,
   type EditOrderAddonInput,
@@ -605,6 +610,10 @@ export const qk = {
   // and `operation` so mutations can blast `["finance"]` (e.g. a receipt
   // ripples to the invoice and payment registers) or a tighter sub-tree.
   finance: {
+    bankStatements:   (filters?: { from?: string; to?: string; matched?: "true" | "false" }) =>
+      ["finance", "bank-statements", filters ?? {}] as const,
+    reconSuggest:     (bankStmtId: string) =>
+      ["finance", "recon-suggest", bankStmtId] as const,
     payments:         (filters?: FinancePaymentsFilters) =>
       ["finance", "payments", filters ?? {}] as const,
     paymentRegister: () => ["finance", "payment-register"] as const,
@@ -619,6 +628,8 @@ export const qk = {
     collectionOwner: (orderId: string) => ["finance", "collection-owner", orderId] as const,
     invoices:         (filters?: FinanceInvoicesFilters) =>
       ["finance", "invoices", filters ?? {}] as const,
+    refunds:          (filters?: FinanceRefundsFilters) =>
+      ["finance", "refunds", filters ?? {}] as const,
   },
   // BD namespace (2026-07-19 — the BD POS reads dealer stats + audit activity;
   // the Phase-8 Inquiries key died with the ERP-style BD portal).
@@ -730,12 +741,76 @@ export interface FinanceInvoicesFilters {
   to?:       string;
   limit?:    number;
 }
+export interface FinanceRefundsFilters {
+  status?:   "all" | "pending" | "approved" | "rejected" | "paid" | "issued" | "applied";
+  dealerId?: string;
+  from?:     string;
+  to?:       string;
+  limit?:    number;
+}
 
 // ---------------------------------------------------------------------------
 // Phase 5 — Finance response shapes (inline types matching the SQL RPC
 // payloads; no need for a domain layer for these aggregates since they're
 // read-only dashboard data, never round-tripped through adapters).
 // ---------------------------------------------------------------------------
+// Bank statement row (from /api/finance/bank-statements list — augmented
+// with matched_ref derived from reconciliations join).
+export interface FinanceBankStatementRow {
+  id:             string;
+  statement_date: string;
+  description:    string;
+  amount:         number;
+  reference:      string | null;
+  currency:       string;
+  imported_from:  string;
+  created_at:     string;
+  matched_ref:    string | null;  // server-side derived
+}
+
+// Refund row (Chunk C) — credit_note_no IS NOT NULL discriminates a credit
+// note from a refund. UI label derivation:
+//   credit_note_no IS NULL  + status='pending'   -> "RF pending"
+//   credit_note_no IS NULL  + status='approved'  -> "RF approved"
+//   credit_note_no IS NULL  + status='paid'      -> "RF paid"
+//   credit_note_no NOT NULL + status='approved'  -> "CN issued"
+//   credit_note_no NOT NULL + status='paid'      -> "CN applied"
+export interface FinanceRefundRow {
+  id:                    string;
+  order_id:              string;
+  dealer_id:             string | null;
+  amount:                number;
+  reason:                string | null;
+  status:                "pending" | "approved" | "rejected" | "paid";
+  approval_id:           string | null;
+  approved_at:           string | null;
+  paid_at:               string | null;
+  credit_note_no:        string | null;
+  applied_to_order_id:   string | null;
+  created_at:            string;
+}
+
+// finance_recon_suggest_matches RPC payload.
+export interface FinanceReconCandidate {
+  so:            number;
+  customer_name: string;
+  dealer_name:   string | null;
+  total:         number;
+  paid:          number;
+  outstanding:   number;
+  invoice_no:    string;
+  distance:      number;
+}
+export interface FinanceReconSuggestResponse {
+  bank_statement: {
+    id:             string;
+    statement_date: string;
+    description:    string;
+    amount:         number;
+    reference:      string | null;
+  };
+  candidates: FinanceReconCandidate[];
+}
 export interface FinancePaymentRow {
   id:           string;
   direction:    "in" | "out";
@@ -8557,6 +8632,8 @@ export function useReassignPoWarehouseMutation(
 //   GET   /api/finance/payments/register          -> PaymentRegisterRow[] (paged, fail-closed)
 //   POST  /api/finance/payments/topup-approve     mutation -> payments row
 //   POST  /api/finance/payments/order-receipt     mutation -> payments row
+//   POST  /api/finance/refunds/create             mutation -> { refund, needsApproval }
+//   POST  /api/finance/refunds/:id/pay            mutation -> refunds row
 //
 // Money owed has ONE arithmetic: customer Outstanding comes from the invoice
 // register through `soRemaining`, supplier Unpaid from
@@ -8579,6 +8656,54 @@ function toFinanceInvoicesSearch(f?: FinanceInvoicesFilters): string {
   if (f.limit)    p.set("limit",    String(f.limit));
   const qs = p.toString();
   return qs ? `?${qs}` : "";
+}
+
+function toFinanceRefundsSearch(f?: FinanceRefundsFilters): string {
+  if (!f) return "";
+  const p = new URLSearchParams();
+  if (f.status)   p.set("status",   f.status);
+  if (f.dealerId) p.set("dealerId", f.dealerId);
+  if (f.from)     p.set("from",     f.from);
+  if (f.to)       p.set("to",       f.to);
+  if (f.limit)    p.set("limit",    String(f.limit));
+  const qs = p.toString();
+  return qs ? `?${qs}` : "";
+}
+
+export function useFinanceBankStatements(
+  filters?: { from?: string; to?: string; matched?: "true" | "false" },
+  opts?: Partial<UseQueryOptions<FinanceBankStatementRow[]>>,
+) {
+  const qs = new URLSearchParams();
+  if (filters?.from)    qs.set("from",    filters.from);
+  if (filters?.to)      qs.set("to",      filters.to);
+  if (filters?.matched) qs.set("matched", filters.matched);
+  const search = qs.toString();
+  return useQuery({
+    queryKey: qk.finance.bankStatements(filters),
+    queryFn: () =>
+      apiFetch<FinanceBankStatementRow[]>(
+        `/api/finance/bank-statements${search ? `?${search}` : ""}`,
+      ),
+    staleTime: 30_000,
+    ...opts,
+  });
+}
+
+export function useFinanceReconSuggest(
+  bankStmtId: string,
+  opts?: Partial<UseQueryOptions<FinanceReconSuggestResponse>>,
+) {
+  return useQuery({
+    queryKey: qk.finance.reconSuggest(bankStmtId),
+    queryFn: () =>
+      apiFetch<FinanceReconSuggestResponse>(
+        `/api/finance/reconciliations/suggest/${bankStmtId}`,
+      ),
+    enabled: !!bankStmtId,
+    staleTime: 30_000,
+    ...opts,
+  });
 }
 
 export function usePaymentRegister() {
@@ -8751,6 +8876,18 @@ export function useFinanceInvoices(
   });
 }
 
+export function useFinanceRefunds(
+  filters?: FinanceRefundsFilters,
+  opts?: Partial<UseQueryOptions<FinanceRefundRow[]>>,
+) {
+  return useQuery({
+    queryKey: qk.finance.refunds(filters),
+    queryFn: () => apiFetch<FinanceRefundRow[]>(`/api/finance/refunds${toFinanceRefundsSearch(filters)}`),
+    staleTime: 30_000,
+    ...opts,
+  });
+}
+
 export function useTopupApprove(
   opts?: Partial<UseMutationOptions<FinancePaymentRow, ApiError, FinanceTopupApproveInput>>,
 ) {
@@ -8798,9 +8935,130 @@ export function useRecordReceipt(
 // issued from the order (Generate invoice) or at dispatch, and corrected by
 // void and replace (/api/finance/invoices/:id/void-replace).
 
+export function useCreateRefund(
+  opts?: Partial<UseMutationOptions<{ refund: unknown; needsApproval: boolean }, ApiError, RefundCreateInput>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<{ refund: unknown; needsApproval: boolean }, ApiError, RefundCreateInput>({
+    mutationFn: (input) =>
+      apiFetch<{ refund: unknown; needsApproval: boolean }>("/api/finance/refunds/create", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: qk.finance.refunds() });
+      // amount > 1000 path also creates an approval row
+      await qc.invalidateQueries({ queryKey: ["principal", "approvals"] });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+export function useRefundPay(
+  refundId: string,
+  opts?: Partial<UseMutationOptions<unknown, ApiError, RefundPayInput>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<unknown, ApiError, RefundPayInput>({
+    mutationFn: (input) =>
+      apiFetch<unknown>(`/api/finance/refunds/${refundId}/pay`, {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    ...opts,
+    onSuccess: async (...args) => {
+      // refunds.status='paid' + paid_at + outbound payments row
+      await qc.invalidateQueries({ queryKey: qk.finance.refunds() });
+      await qc.invalidateQueries({ queryKey: qk.finance.payments() });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
 // usePoPay / usePoSchedule retired with 0477: the po-pay and po-schedule
 // routes answer 410 — a supplier is paid by a Payment Voucher
 // (lib/payables-queries.ts), the one door money leaves by.
+
+export function useCreateBankStatement(
+  opts?: Partial<UseMutationOptions<FinanceBankStatementRow, ApiError, BankStatementCreateInput>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<FinanceBankStatementRow, ApiError, BankStatementCreateInput>({
+    mutationFn: (input) =>
+      apiFetch<FinanceBankStatementRow>("/api/finance/bank-statements", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: qk.finance.bankStatements() });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+export function useCreateReconciliation(
+  opts?: Partial<UseMutationOptions<unknown, ApiError, ReconciliationCreateInput>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<unknown, ApiError, ReconciliationCreateInput>({
+    mutationFn: (input) =>
+      apiFetch<unknown>("/api/finance/reconciliations", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    ...opts,
+    onSuccess: async (...args) => {
+      // matched_ref derivation flips on the bank-statements list.
+      await qc.invalidateQueries({ queryKey: qk.finance.bankStatements() });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+export function useApplyCreditNote(
+  refundId: string,
+  opts?: Partial<UseMutationOptions<FinanceRefundRow, ApiError, RefundApplyInput>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<FinanceRefundRow, ApiError, RefundApplyInput>({
+    mutationFn: (input) =>
+      apiFetch<FinanceRefundRow>(`/api/finance/refunds/${refundId}/apply`, {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    ...opts,
+    onSuccess: async (...args) => {
+      // refund row flips status='paid' + applied_to_order_id set.
+      // The target order's outstanding balance is conceptually reduced
+      // but Phase 5 V1 doesn't auto-deduct on the order side — that
+      // happens on next checkout / dealer ack. Invalidate the refunds
+      // list + the invoice register (where Outstanding is read) so finance
+      // sees the CN move to "applied".
+      await qc.invalidateQueries({ queryKey: qk.finance.refunds() });
+      await qc.invalidateQueries({ queryKey: qk.finance.invoiceRegister() });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+export function useDeleteReconciliation(
+  opts?: Partial<UseMutationOptions<unknown, ApiError, string>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<unknown, ApiError, string>({
+    mutationFn: (recId) =>
+      apiFetch<unknown>(`/api/finance/reconciliations/${recId}`, {
+        method: "DELETE",
+      }),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: qk.finance.bankStatements() });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
 
 
 // ---------------------------------------------------------------------------

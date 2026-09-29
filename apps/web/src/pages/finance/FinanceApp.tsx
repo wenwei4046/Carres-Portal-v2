@@ -93,8 +93,7 @@ export default function FinanceApp() {
               carries `?invoice=` / `?order=` / the §17 Calendar params across;
               routine Refunds & Credits is a Payment MASTER §13 intentional
               reject (history stays on the payment object); the Bank Matching
-              workspace retired 2026-09-07. The DATA remains; the refunds and bank
-              matching API routes are gone (0593). */}
+              workspace retired 2026-09-07. The DATA and API routes remain. */}
           <Route path="invoices"  element={<LegacyPaymentRedirect to="/finance/monitor" />} />
           <Route path="refunds"   element={<Navigate to="/finance/payments" replace />} />
           <Route path="recon"     element={<Navigate to="/finance/payments" replace />} />
