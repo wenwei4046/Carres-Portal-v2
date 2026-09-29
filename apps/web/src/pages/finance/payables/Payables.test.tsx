@@ -243,6 +243,30 @@ describe("Payment vouchers register", () => {
     show("/finance/payment-vouchers");
     expect(await screen.findByRole("link", { name: "PV-9M3Q" })).toHaveClass("text-kit-blue-11");
   });
+
+  it("sorts Advance by the amount, with No advance last either way", async () => {
+    const pv = (id: string, voucher_no: string, advance_amount: string, advance_open: string | null) => ({
+      id, voucher_no, status: "approved", purpose: "SUPPLIER_BILLS", supplier_id: SUP, supplier_name: "Lumen Sofa Works",
+      payee_name: "Lumen Sofa Works", voucher_date: "2026-09-11", amount: "1225.00", pay_method: "BANK_TRANSFER",
+      pay_reference: null, pay_from_account_code: "1120", pay_from_name: "Bank", bill_nos: null, line_count: 0,
+      prepared_by_name: null, checked_by_name: null, approved_by_name: null, file_count: 0,
+      created_at: "2026-09-11T01:00:00Z", advance_amount, advance_open });
+    // As text these sort "No advance", "RM 500.00 · …", "RM 90.00".
+    api.routes[`${B}/vouchers`] = { rows: [
+      pv(`${PV.slice(0, -1)}1`, "PV-NONE", "0.00", null),
+      pv(`${PV.slice(0, -1)}2`, "PV-FIVE", "500.00", "200.00"),
+      pv(`${PV.slice(0, -1)}3`, "PV-NINE", "90.00", null),
+    ] };
+    show("/finance/payment-vouchers");
+    await screen.findByRole("link", { name: "PV-NINE" });
+    const order = () => screen.getAllByRole("link").map((l) => l.textContent).filter((t) => t?.startsWith("PV-"));
+    const sortAdvance = () => fireEvent.click(screen.getAllByRole("button", { name: /^Advance/ })[0]!);
+
+    sortAdvance();
+    expect(order()).toEqual(["PV-NINE", "PV-FIVE", "PV-NONE"]);
+    sortAdvance();
+    expect(order()).toEqual(["PV-FIVE", "PV-NINE", "PV-NONE"]);
+  });
 });
 
 describe("Bill form — Convert GRN to bill", () => {
