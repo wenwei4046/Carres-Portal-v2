@@ -82,13 +82,14 @@ identities and write no completion. Module filter rails do not copy those action
 
 ---
 
-**SHOWROOM DOCUMENT PRESENTATION — APPROVED TARGET / NOT BUILT, Jess 2026-09-28.**
-Purchasing exposes Display Requests, Consignment Notes and Consignment Sale Notices. One sourced
-Consignment Note presents supplier-owned placement/return/swap; internal incoming and return
-records retain distinct identities and physical obligations (Purchasing §§9.9–9.10). No extra
-manual note writer or separate staff Order/Return selection. Stock retains site-to-site Transfer
-and custody, Receiving retains receipt, and Finance retains supplier billing. Naming never changes
-stock, historical documents or existing number families. Current application navigation may lag.
+**SHOWROOM DOCUMENT PURPOSE — APPROVED TARGET / NOT BUILT, Jess 2026-09-29.**
+Purchasing exposes Display Requests, Consignment Orders, Consignment Returns and Consignment Sale
+Notices. Staff record one arrangement; the system pre-fills the order to obtain supplier-owned
+goods and/or return to hand goods back. Keep these names and roles distinct. Do not merge them
+into Consignment Note or add another manual acknowledgement document. A same-supplier swap sends
+one combined instruction while receipt and return retain separate actual evidence. Receiving owns
+showroom receipt, Stock/physical handlers own custody/handover, Finance owns supplier billing.
+Existing identities and historical documents remain unchanged (Purchasing §§9.9–9.10).
 
 # §1 · The five ownership laws
 
@@ -294,7 +295,8 @@ SUPPLY CHAIN
 │   │   └── Repair Orders
 │   └── SHOWROOM
 │       ├── Display Requests
-│       ├── Consignment Notes
+│       ├── Consignment Orders
+│       ├── Consignment Returns
 │       └── Consignment Sale Notices
 ├── Warehouse
 │   ├── Arrival Schedule
