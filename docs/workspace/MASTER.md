@@ -494,9 +494,9 @@ evidence from a healthy empty result. It uses actual server observation timestam
 buckets, so an interaction after the cutoff cannot satisfy the check. Nine focused cases cover
 flexible starts, lunch, cutoff boundaries, weekends, holidays and unavailable evidence. This
 evaluator is not yet connected to a scheduler or assignment writer. The ordinary-work decision
-helper preserves from/to and expected revision for a future atomic writer, respects authoritative
+helper preserves from/to and expected previous receipt for the atomic writer, respects authoritative
 candidate order, refuses completed/approval work, and consumes per-day/per-period receipts to
-prevent repeat movements. Eleven cases cover late-activity bounce-back, independent afternoon
+prevent repeat movements. Twelve cases cover first receipt, late-activity bounce-back, independent afternoon
 checks, no candidate, source outage and People eligibility. These are decision tests only; the
 source-aware scheduler/resolver integration is not yet implemented and no production movement is
 claimed.

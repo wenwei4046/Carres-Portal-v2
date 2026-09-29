@@ -7,7 +7,7 @@ export interface WorkspaceCheckpointIdentity {
 export type WorkspaceReassignmentDecision =
   | { kind: "unchanged"; reason: "completed" | "restricted_duty" | "already_checked" | "not_due" | "not_working_day" | "active" }
   | { kind: "exception"; reason: "evidence_unavailable" | "not_assigned" | "no_candidate" }
-  | { kind: "reassign"; fromUserId: string; toUserId: string; expectedRevision: number;
+  | { kind: "reassign"; fromUserId: string; toUserId: string; expectedPreviousReceiptId: number | null;
       checkpoint: WorkspaceCheckpointIdentity; reason: "missing_period_activity" | "no_longer_eligible"; effectiveAt: string };
 
 /** Candidate order/eligibility come from the governing Duty/object policy.
@@ -21,7 +21,7 @@ export function decideWorkspaceReassignment(input: {
   completed: boolean;
   ordinaryWork: boolean;
   assignedUserId: string | null;
-  assignmentRevision: number;
+  previousReceiptId: number | null;
   /** Current People/leave/role facts permit this allocation. */
   assignedPersonEligible: boolean;
   /** Durable receipts for THIS allocation scope, including no-op checks. */
@@ -43,9 +43,9 @@ export function decideWorkspaceReassignment(input: {
   if (input.assignedPersonEligible && active.has(input.assignedUserId)) return { kind: "unchanged", reason: "active" };
   const next = input.candidateUserIds.find((id) => id !== input.assignedUserId && active.has(id));
   if (!next) return { kind: "exception", reason: "no_candidate" };
-  if (!Number.isSafeInteger(input.assignmentRevision) || input.assignmentRevision < 1) throw new Error("Invalid assignment revision");
+  if (input.previousReceiptId !== null && (!Number.isSafeInteger(input.previousReceiptId) || input.previousReceiptId < 1)) throw new Error("Invalid previous receipt");
   return { kind: "reassign", fromUserId: input.assignedUserId, toUserId: next,
-    expectedRevision: input.assignmentRevision, checkpoint: { ...input.checkpoint },
+    expectedPreviousReceiptId: input.previousReceiptId, checkpoint: { ...input.checkpoint },
     reason: input.assignedPersonEligible ? "missing_period_activity" : "no_longer_eligible",
     effectiveAt: input.check.cutoff };
 }

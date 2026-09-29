@@ -5,13 +5,16 @@ const morning = { day: "2026-09-29", period: "morning" as const };
 const base = {
   checkpoint: morning,
   check: { status: "ready", start: "2026-09-29T01:00:00Z", cutoff: "2026-09-29T02:30:00Z", activeUserIds: ["b", "c"] } as WorkspaceActivityCheck,
-  completed: false, ordinaryWork: true, assignedUserId: "a", assignmentRevision: 4,
+  completed: false, ordinaryWork: true, assignedUserId: "a", previousReceiptId: 4,
   assignedPersonEligible: true, checked: [], candidateUserIds: ["c", "b"],
 };
 describe("ordinary work checkpoint reassignment", () => {
   it("uses policy order and preserves previous person/revision for atomic writes", () => {
-    expect(decide(base)).toEqual({ kind: "reassign", fromUserId: "a", toUserId: "c", expectedRevision: 4,
+    expect(decide(base)).toEqual({ kind: "reassign", fromUserId: "a", toUserId: "c", expectedPreviousReceiptId: 4,
       checkpoint: morning, reason: "missing_period_activity", effectiveAt: "2026-09-29T02:30:00Z" });
+  });
+  it("permits the first checkpoint without inventing a previous receipt", () => {
+    expect(decide({ ...base, previousReceiptId: null })).toMatchObject({ kind: "reassign", expectedPreviousReceiptId: null });
   });
   it("cannot rewrite completed jobs or auto-allocate approvals", () => {
     expect(decide({ ...base, completed: true })).toEqual({ kind: "unchanged", reason: "completed" });
