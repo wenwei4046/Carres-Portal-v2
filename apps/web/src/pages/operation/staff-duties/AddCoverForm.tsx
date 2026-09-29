@@ -1,4 +1,3 @@
-import Button from "@/components/kit/Button";
 import { useState } from "react";
 import DatePicker from "@/components/kit/DatePicker";
 import Input from "@/components/kit/Input";
@@ -33,18 +32,12 @@ type Duty = WorkspaceDutiesResponse["duties"][number];
 export default function AddCoverForm({
   duty,
   staff,
-  staffLoading = false,
-  staffError = false,
-  onRetryStaff,
   open,
   onClose,
   onDone,
 }: {
   duty: Duty;
   staff: OpsStaffMember[];
-  staffLoading?: boolean;
-  staffError?: boolean;
-  onRetryStaff?: () => void;
   open: boolean;
   onClose: () => void;
   onDone: (sentence: string) => void;
@@ -64,7 +57,6 @@ export default function AddCoverForm({
   );
 
   function submit() {
-    if (staffLoading || staffError) return;
     setRefusal(null);
     if (!duty.resolution.normal_user_id) {
       return setRefusal(
@@ -112,7 +104,7 @@ export default function AddCoverForm({
       dutyLabel={duty.label}
       submitLabel="Add cover"
       submitTestId="cover-submit"
-      pending={cover.isPending || staffLoading || staffError}
+      pending={cover.isPending}
       error={
         refusal ??
         (cover.error
@@ -127,11 +119,12 @@ export default function AddCoverForm({
       onSubmit={submit}
     >
       {/* Who is being covered FOR — a fact of this act, never a field. */}
-      {staffLoading ? <p role="status" className="text-meta text-kit-slate-11">Loading…</p> : null}
-      {staffError ? <div role="alert" className="text-meta text-kit-red-11">
-        <p>Staff &amp; Duties could not be opened</p><Button onClick={onRetryStaff}>Try again</Button>
-      </div> : null}
-      <p className="break-words text-body text-kit-slate-12">{(duty.resolution.is_cover ? duty.resolution.acting_user_name : duty.resolution.normal_user_name) ?? "Not assigned"}</p>
+      <div className="flex flex-wrap items-baseline gap-x-3">
+        <span className="w-28 shrink-0 text-label text-kit-slate-9">
+          Normal owner
+        </span>
+        <span className="text-body text-kit-slate-12">{normalOwner}</span>
+      </div>
       <Select
         id="cover-acting"
         label="Acting person"

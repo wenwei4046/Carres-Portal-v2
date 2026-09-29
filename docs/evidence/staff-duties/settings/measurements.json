@@ -1,111 +1,43 @@
 {
-  "scope": "Local Chromium, actual application shell with intercepted fixture API responses. Not production or authorization proof.",
-  "sourceCommit": "37f8597a9",
-  "checks": [
+  "evidence": "Local intercepted synthetic fixtures in the actual application shell; not production or database permission proof.",
+  "scope": "CARD 02 navigation only; existing duty page retained",
+  "date": "2026-09-29T07:42:08.476Z",
+  "viewports": [
     {
       "width": 1440,
-      "scroll": 1440,
-      "catalogue": {
-        "width": 320,
-        "height": 747
-      },
-      "detail": {
-        "width": 824,
-        "height": 747
-      },
-      "header": {
-        "width": 1144,
-        "height": 51
-      },
-      "clipped": [],
-      "keyboardMenu": true,
-      "backFocus": null,
-      "historyDisclosure": true,
-      "errors": []
+      "scrollWidth": 1440,
+      "headerCount": 1
     },
     {
       "width": 1180,
-      "scroll": 1180,
-      "catalogue": {
-        "width": 272,
-        "height": 747
-      },
-      "detail": {
-        "width": 784,
-        "height": 747
-      },
-      "header": {
-        "width": 1056,
-        "height": 51
-      },
-      "clipped": [],
-      "keyboardMenu": true,
-      "backFocus": null,
-      "historyDisclosure": true,
-      "errors": []
+      "scrollWidth": 1180,
+      "headerCount": 1
     },
     {
       "width": 820,
-      "scroll": 820,
-      "catalogue": {
-        "width": 0,
-        "height": 0
-      },
-      "detail": {
-        "width": 696,
-        "height": 455
-      },
-      "header": {
-        "width": 696,
-        "height": 51
-      },
-      "clipped": [],
-      "keyboardMenu": true,
-      "backFocus": true,
-      "historyDisclosure": true,
-      "errors": []
+      "scrollWidth": 820,
+      "headerCount": 1
     },
     {
       "width": 743,
-      "scroll": 743,
-      "catalogue": {
-        "width": 0,
-        "height": 0
-      },
-      "detail": {
-        "width": 743,
-        "height": 459
-      },
-      "header": {
-        "width": 743,
-        "height": 51
-      },
-      "clipped": [],
-      "keyboardMenu": true,
-      "backFocus": true,
-      "historyDisclosure": true,
-      "errors": []
+      "scrollWidth": 743,
+      "headerCount": 1
     },
     {
       "width": 390,
-      "scroll": 390,
-      "catalogue": {
-        "width": 0,
-        "height": 0
-      },
-      "detail": {
-        "width": 390,
-        "height": 459
-      },
-      "header": {
-        "width": 390,
-        "height": 51
-      },
-      "clipped": [],
-      "keyboardMenu": true,
-      "backFocus": true,
-      "historyDisclosure": true,
-      "errors": []
+      "scrollWidth": 390,
+      "headerCount": 1
     }
-  ]
+  ],
+  "checks": [
+    "Settings navigation opens and closes",
+    "canonical exact duty URL",
+    "single destination header",
+    "narrow Back restores catalogue focus",
+    "reader has no assign action",
+    "loading and initial failure",
+    "no horizontal document overflow",
+    "no page errors"
+  ],
+  "errors": []
 }

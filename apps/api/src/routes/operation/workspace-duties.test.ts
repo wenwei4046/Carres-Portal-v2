@@ -31,7 +31,7 @@ async function makeJwt(role: string) {
 }
 
 type Result = { data: unknown; error: unknown };
-type TableCfg = { list?: Result; pages?: Record<number, Result> };
+type TableCfg = { list?: Result };
 
 /** The scaffold's builder, with per-NAME rpc results — this router calls two
  *  different RPCs inside one GET, so a single shared result would lie. */
@@ -40,28 +40,20 @@ function makeSb(
   rpcResults: Record<string, { data?: unknown; error?: unknown }> = {},
 ) {
   const sb = {
-    rpc: vi.fn((fn: string, _args?: Record<string, unknown>) => {
+    rpc: vi.fn((fn: string) => {
       const r = rpcResults[fn] ?? {};
       return Promise.resolve({ data: r.data ?? null, error: r.error ?? null });
     }),
     from(table: string) {
       const cfg = tables[table] ?? {};
       const builder: Record<string, unknown> = {};
-      let offset = 0;
-      let end: number | undefined;
       const chain = () => builder;
       for (const m of ["select", "eq", "in", "order", "limit"])
         builder[m] = vi.fn(chain);
-      builder.range = vi.fn((from: number, to: number) => { offset = from; end = to; return builder; });
       builder.then = (
         resolve: (r: Result) => unknown,
         reject?: (e: unknown) => unknown,
-      ) => {
-        const result = cfg.pages?.[offset] ?? cfg.list ?? { data: [], error: null };
-        const data = Array.isArray(result.data) && !cfg.pages && end !== undefined
-          ? result.data.slice(offset, end + 1) : result.data;
-        return Promise.resolve({ ...result, data }).then(resolve, reject);
-      };
+      ) => Promise.resolve(cfg.list ?? { data: [], error: null }).then(resolve, reject);
       return builder;
     },
   };
@@ -568,79 +560,5 @@ describe("S2-A · the scheduled cover is the one the resolver will use", () => {
     const grn = body.duties.find((d) => d.key === "grn_duty")!;
     expect(grn.scheduled_cover_id).toBe("soon");
     expect(body.duties.find((d) => d.key === "po_duty")!.scheduled_cover_id).toBeNull();
-  });
-});
-
-
-describe("complete duty evidence", () => {
-  it("reads beyond the database page cap instead of truncating history", async () => {
-    const tables = dutyTables();
-    const row = tables.workspace_duty_assignments.list.data[0]!;
-    tables.workspace_duty_assignments.list.data = Array.from({ length: 1003 }, (_, i) => ({ ...row, id: `a${i}` }));
-    const sb = makeSb(tables, {
-      workspace_can_assign_duties: { data: false },
-      workspace_resolve_duty: { data: { ...RESOLVED, on_date: "2026-09-29" } },
-    });
-    vi.mocked(userClient).mockReturnValue(sb as unknown as ReturnType<typeof userClient>);
-    const response = await req("/api/operation/workspace-duties", "GET", await makeJwt("operation"));
-    const body = await response.json() as { duties: { key: string; assignments: unknown[] }[] };
-    expect(response.status).toBe(200);
-    expect(body.duties.find(d => d.key === "grn_duty")?.assignments).toHaveLength(1003);
-  });
-
-  it("fails the entire read when a later history page fails", async () => {
-    const row = dutyTables().workspace_duty_assignments.list.data[0]!;
-    const sb = makeSb({ workspace_duty_assignments: { pages: {
-      0: { data: Array.from({ length: 1000 }, () => row), error: null },
-      1000: { data: null, error: { code: "XX000", message: "read failed" } },
-    } } }, { workspace_can_assign_duties: { data: false } });
-    vi.mocked(userClient).mockReturnValue(sb as unknown as ReturnType<typeof userClient>);
-    const response = await req("/api/operation/workspace-duties", "GET", await makeJwt("operation"));
-    expect(response.status).toBe(500);
-    expect(await response.json()).not.toHaveProperty("duties");
-  });
-
-  it("does not confuse assignment permission with People management permission", async () => {
-    const sb = makeSb(dutyTables(), {
-      workspace_can_assign_duties: { data: true }, workspace_resolve_duty: { data: RESOLVED },
-    });
-    vi.mocked(userClient).mockReturnValue(sb as unknown as ReturnType<typeof userClient>);
-    for (const role of ["operation", "principal"]) {
-      const response = await req("/api/operation/workspace-duties", "GET", await makeJwt(role));
-      expect(await response.json()).toMatchObject({ can_assign: true, can_manage_staff: role === "principal" });
-    }
-  });
-});
-
-
-it("uses the shared resolver to skip invalid future holders and covers", async () => {
-  const tables = dutyTables();
-  const assignment = tables.workspace_duty_assignments.list.data[0]!;
-  tables.workspace_duty_assignments.list.data = [
-    { ...assignment, id: "future-invalid", holder_id: MANAGER, effective_from: "2026-10-01" },
-    { ...assignment, id: "future-valid", holder_id: COVER, effective_from: "2026-11-01" },
-  ];
-  const cover = tables.workspace_duty_covers.list.data[0]!;
-  tables.workspace_duty_covers.list.data = [
-    { ...cover, id: "cover-invalid", starts_on: "2026-10-02", ends_on: "2026-10-03" },
-    { ...cover, id: "cover-valid", starts_on: "2026-10-04", ends_on: "2026-10-05" },
-  ];
-  const sb = makeSb(tables);
-  sb.rpc.mockImplementation((fn, args) => {
-    if (fn === "workspace_can_assign_duties") return Promise.resolve({ data: false, error: null });
-    if (fn !== "workspace_resolve_duty") return Promise.resolve({ data: [], error: null });
-    const date = args?.p_on ?? "2026-09-29";
-    return Promise.resolve({ data: {
-      ...RESOLVED, on_date: date,
-      normal_user_id: date === "2026-11-01" ? COVER : HOLDER,
-      cover_id: date === "2026-10-04" ? "cover-valid" : null,
-    }, error: null });
-  });
-  vi.mocked(userClient).mockReturnValue(sb as unknown as ReturnType<typeof userClient>);
-  const response = await req("/api/operation/workspace-duties", "GET", await makeJwt("operation"));
-  const body = await response.json() as { duties: { key: string }[] };
-  expect(response.status).toBe(200);
-  expect(body.duties.find(d => d.key === "grn_duty")).toMatchObject({
-    next_assignment_id: "future-valid", scheduled_cover_id: "cover-valid", current_assignment_id: null,
   });
 });

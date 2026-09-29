@@ -55,7 +55,6 @@ import OperationPurchaseOrders from "./purchase-orders/PurchaseOrdersPage";
 import OperationReceiving from "./OperationReceiving";
 import OperationReceivingReport from "./OperationReceivingReport";
 import OperationDeliveryReport from "./OperationDeliveryReport";
-
 // R2 (0288) — the supplier-claim queue, fourth tab of the Purchasing module.
 import OperationSupplierClaims from "./OperationSupplierClaims";
 import OperationPurchaseReturns from "./OperationPurchaseReturns";
@@ -597,8 +596,7 @@ export default function OperationApp() {
             {/* Central Reports → Delivery (Delivery MASTER §12, CARD 17) —
                 reachable by direct URL, like the Receiving report. */}
             {tab === "delivery-report" && <OperationDeliveryReport />}
-            {/* Workspace → Staff & Duties — the ONE duty assignment door
-                (workspace/MASTER.md, LOCKED 2026-09-03). */}
+            {/* Preserve legacy bookmarks at the one Settings destination. */}
             {tab === "staff-duties" && <Navigate replace state={location.state} to={`/operation/settings/staff-duties?${new URLSearchParams([...searchParams].filter(([key]) => key !== "tab"))}`} />}
             {/* R2 — the supplier-claim queue: what receiving found wrong, and
                 what an unkept ETA turned into. Fourth Purchasing tab, no new

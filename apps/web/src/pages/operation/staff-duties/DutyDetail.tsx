@@ -1,10 +1,8 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import Button from "@/components/kit/Button";
-import DropdownMenu from "@/components/kit/DropdownMenu";
-import SectionHeader from "@/components/kit/SectionHeader";
 import AddCoverForm from "./AddCoverForm";
 import AssignHolderForm from "./AssignHolderForm";
-import { shownCoverOf } from "./staff-duties-model";
+import { dutyDisplayState, shownCoverOf } from "./staff-duties-model";
 import { apiFetch } from "@/lib/api";
 import { fmtDate } from "@/lib/fmt-date";
 import { personInitials } from "@/lib/staff-avatar";
@@ -15,8 +13,10 @@ import type { OpsStaffListResponse } from "@carres/shared";
 /**
  * The selected duty (workspace/MASTER.md §4.2, §4.5).
  *
- * One resolved person and plain dates precede future arrangements.
- * Management actions belong to the overflow menu; history starts collapsed.
+ * Separate LABELLED facts, never one packed sentence: `Normal owner`,
+ * `Acting today`, `Effective`, `Cover`, `Reason`. The acting line appears
+ * only when somebody is actually covering — printing the holder twice would
+ * invent an absence that nobody recorded.
  *
  * Avatar initials carry the full name for a reader and never replace the
  * printed name.
@@ -26,23 +26,33 @@ type Duty = WorkspaceDutiesResponse["duties"][number];
 
 function Person({ name, testId }: { name: string; testId: string }) {
   return (
-    <span className="inline-flex max-w-full items-start gap-2">
+    <span className="inline-flex items-center gap-2">
       <span
         role="img"
         aria-label={name}
         data-testid={testId}
-        className="inline-flex shrink-0 h-6 w-6 items-center justify-center rounded-full bg-kit-slate-3 text-label font-medium text-kit-slate-11"
+        className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-kit-slate-3 text-label font-medium text-kit-slate-11"
       >
         {personInitials(name, "")}
       </span>
-      <span className="min-w-0 break-words text-body text-kit-slate-12">{name}</span>
+      <span className="text-body text-kit-slate-12">{name}</span>
     </span>
+  );
+}
+
+function Fact({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 py-1">
+      <span className="w-28 shrink-0 text-label text-kit-slate-9">{label}</span>
+      <span className="min-w-0 break-words">{children}</span>
+    </div>
   );
 }
 
 export default function DutyDetail({
   duty,
   canAssign,
+  today,
   onBack,
 }: {
   duty: Duty;
@@ -77,15 +87,17 @@ export default function DutyDetail({
   });
   const staff = staffQ.data?.staff ?? [];
   const r = duty.resolution;
+  const note = dutyDisplayState(duty, today);
   /** The cover the detail describes — the resolver's own row by id, today's
    *  or the next scheduled one. Never the first row whose dates match. */
   const shownCover = shownCoverOf(duty);
   /** The assignment that is in force — the newest one that has begun. */
-  const activeAssignment = duty.assignments.find(a => a.id === duty.current_assignment_id);
-  const nextAssignment = duty.assignments.find(a => a.id === duty.next_assignment_id);
-  const currentName = (r.is_cover ? r.acting_user_name : r.normal_user_name) ?? "Not assigned";
-  const period = (from: string, until: string | null) => until ? `${fmtDate(from)} to ${fmtDate(until)}` : `from ${fmtDate(from)}`;
-  const openAct = (act: "assign" | "cover") => { setActingSeq(n => n + 1); setActing(act); };
+  const activeAssignment =
+    duty.assignments.find(
+      (a) =>
+        a.effective_from <= today &&
+        (!a.effective_until || a.effective_until >= today),
+    ) ?? null;
 
   return (
     <>
@@ -100,35 +112,92 @@ export default function DutyDetail({
       ) : null}
 
       <section data-testid={`selected-duty-${duty.key}`}>
-        <div className="flex items-start justify-between gap-3">
-          <h2 className="text-strong text-kit-slate-12">{duty.label}</h2>
-          {canAssign ? <DropdownMenu
-            label="More actions"
-            trigger={<Button variant="ghost" size="touch" icon="overflow" aria-label="More actions" />}
-            items={[
-              { key: "assign", label: "Assign holder", onSelect: () => openAct("assign") },
-              ...(r.normal_user_id ? [{ key: "cover", label: "Add cover", onSelect: () => openAct("cover") }] : []),
-            ]}
-          /> : null}
-        </div>
-        <div className="mt-2 break-words">
-          <Person name={currentName} testId={r.is_cover ? "duty-avatar-acting" : "duty-avatar-normal"} />
-          {!r.normal_user_id ? <p className="mt-1 text-meta text-kit-slate-11">Nobody holds {duty.label}.</p> : null}
-          {r.is_cover && shownCover ? <p className="mt-1 text-body text-kit-slate-11">{period(shownCover.starts_on, shownCover.ends_on)}</p>
-            : activeAssignment ? <p className="mt-1 text-body text-kit-slate-11">{period(activeAssignment.effective_from, activeAssignment.effective_until)}</p> : null}
-        </div>
-        {!r.is_cover && shownCover ? <div className="mt-4 break-words">
-          <h3 className="text-strong text-kit-slate-12">Cover scheduled</h3>
-          <p className="mt-1 text-body text-kit-slate-12">{shownCover.acting_user_name ?? "Not recorded"}</p>
-          <p className="text-body text-kit-slate-11">{period(shownCover.starts_on, shownCover.ends_on)}</p>
-        </div> : null}
-        {nextAssignment ? <div className="mt-4 break-words" data-testid="duty-next">
-          <h3 className="text-strong text-kit-slate-12">Next</h3>
-          <p className="mt-1 text-body text-kit-slate-12">{nextAssignment.holder_name ?? "Not recorded"}</p>
-          <p className="text-body text-kit-slate-11">{period(nextAssignment.effective_from, nextAssignment.effective_until)}</p>
-        </div> : null}
+        <h2 className="text-title text-kit-slate-12">{duty.label}</h2>
+
+        {!r.normal_user_id ? (
+          /* A missing holder is an explicit configuration exception — never a
+             silent fallback person (§3, §4.5). */
+          <div className="mt-2">
+            <p className="text-body font-medium text-kit-slate-12">
+              Not assigned
+            </p>
+            <p className="mt-0.5 text-meta text-kit-slate-11">
+              Nobody holds {duty.label}.
+            </p>
+          </div>
+        ) : (
+          <div className="mt-2">
+            <Fact label="Normal owner">
+              <Person name={r.normal_user_name ?? r.normal_user_id} testId="duty-avatar-normal" />
+            </Fact>
+            {r.is_cover && r.acting_user_id ? (
+              <Fact label="Acting today">
+                <Person
+                  name={r.acting_user_name ?? r.acting_user_id}
+                  testId="duty-avatar-acting"
+                />
+              </Fact>
+            ) : null}
+            {activeAssignment ? (
+              <Fact label="Effective">
+                <span className="text-body text-kit-slate-12">
+                  {activeAssignment.effective_until
+                    ? `${fmtDate(activeAssignment.effective_from)} to ${fmtDate(activeAssignment.effective_until)}`
+                    : `from ${fmtDate(activeAssignment.effective_from)}`}
+                </span>
+              </Fact>
+            ) : null}
+            {shownCover ? (
+              <>
+                <Fact label="Cover">
+                  <span className="block text-body text-kit-slate-12">
+                    {`${shownCover.acting_user_name ?? shownCover.acting_user_id} covering for ${shownCover.normal_user_name ?? shownCover.normal_user_id}`}
+                  </span>
+                  <span className="text-body text-kit-slate-12">
+                    {`${fmtDate(shownCover.starts_on)} to ${fmtDate(shownCover.ends_on)}`}
+                  </span>
+                  {note.kind === "cover_scheduled" ? (
+                    <span className="ml-2 text-label text-kit-slate-9">
+                      {note.word}
+                    </span>
+                  ) : null}
+                </Fact>
+                {shownCover.reason ? (
+                  <Fact label="Reason">
+                    <span className="text-body text-kit-slate-12">
+                      {shownCover.reason}
+                    </span>
+                  </Fact>
+                ) : null}
+              </>
+            ) : null}
+          </div>
+        )}
+
         {canAssign ? (
           <>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Button
+                onClick={() => {
+                  setActingSeq((n) => n + 1);
+                  setActing("assign");
+                }}
+              >
+                Assign holder
+              </Button>
+              {/* §4.4: cover exists only when there is somebody to cover FOR.
+                  An offer the write door would refuse is not an offer. */}
+              {r.normal_user_id ? (
+                <Button
+                  onClick={() => {
+                    setActingSeq((n) => n + 1);
+                    setActing("cover");
+                  }}
+                >
+                  Add cover
+                </Button>
+              ) : null}
+            </div>
             {notice ? (
               <p
                 role="status"
@@ -142,9 +211,6 @@ export default function DutyDetail({
               key={`assign-${duty.key}-${actingSeq}`}
               duty={duty}
               staff={staff}
-              staffLoading={staffQ.isLoading}
-              staffError={staffQ.isError}
-              onRetryStaff={() => void staffQ.refetch()}
               open={acting === "assign"}
               onClose={() => setActing(null)}
               onDone={setNotice}
@@ -153,15 +219,18 @@ export default function DutyDetail({
               key={`cover-${duty.key}-${actingSeq}`}
               duty={duty}
               staff={staff}
-              staffLoading={staffQ.isLoading}
-              staffError={staffQ.isError}
-              onRetryStaff={() => void staffQ.refetch()}
               open={acting === "cover"}
               onClose={() => setActing(null)}
               onDone={setNotice}
             />
           </>
-        ) : null}
+        ) : (
+          /* §4.5: a reader gets the sentence, never a disabled control — an
+             imitation of a capability is worse than its absence. */
+          <p className="mt-3 text-meta text-kit-slate-9">
+            Duty assignments are set by the manager.
+          </p>
+        )}
       </section>
     </>
   );
@@ -182,17 +251,15 @@ function Record({
   event,
   actor,
   note,
-  period,
 }: {
   testId: string;
   event: string;
   actor: string[];
-  period: string;
   note: string | null;
 }) {
   return (
-    <li data-testid={testId} className="break-words py-2">
-      <p data-testid="record-event" className="text-body font-semibold text-kit-slate-12">
+    <li data-testid={testId} className="py-1">
+      <p data-testid="record-event" className="text-body text-kit-slate-12">
         {event}
       </p>
       <p
@@ -203,7 +270,6 @@ function Record({
           <span key={part}>{part}</span>
         ))}
       </p>
-      <p data-testid="record-period" className="text-meta text-kit-slate-11">{period}</p>
       {note ? (
         <p data-testid="record-note" className="text-meta text-kit-slate-9">
           {note}
@@ -214,14 +280,14 @@ function Record({
 }
 
 export function DutyHistory({ duty }: { duty: Duty }) {
-  const [open, setOpen] = useState(false);
   return (
     <section
       data-testid={`duty-history-${duty.key}`}
       className="mt-4 border-t border-kit-slate-5 pt-3"
     >
-      <SectionHeader title="History" collapsible open={open} onToggle={() => setOpen(v => !v)} />
-      {open ? <>
+      <h3 className="text-label uppercase tracking-wide text-kit-slate-9">
+        Assignment &amp; cover history
+      </h3>
       {duty.assignments.length === 0 ? (
         <p className="mt-1 text-meta text-kit-slate-9">No assignments yet</p>
       ) : (
@@ -230,12 +296,11 @@ export function DutyHistory({ duty }: { duty: Duty }) {
             <Record
               key={a.id}
               testId={`assignment-${a.id}`}
-              event={`${a.holder_name ?? "Not recorded"} holds ${duty.label}`}
-              period={a.effective_until
-                ? `${fmtDate(a.effective_from)} to ${fmtDate(a.effective_until)}`
-                : `from ${fmtDate(a.effective_from)}`}
+              event={`${a.holder_name ?? a.holder_id} holds ${duty.label}`}
               actor={[
-                fmtDate(a.created_at, { time: true }),
+                a.effective_until
+                  ? `${fmtDate(a.effective_from)} to ${fmtDate(a.effective_until)}`
+                  : `from ${fmtDate(a.effective_from)}`,
                 ...(a.assigned_by_name
                   ? [`Assigned by ${a.assigned_by_name}`]
                   : []),
@@ -253,10 +318,9 @@ export function DutyHistory({ duty }: { duty: Duty }) {
             <Record
               key={v.id}
               testId={`cover-${v.id}`}
-              event={`${v.acting_user_name ?? "Not recorded"} covering for ${v.normal_user_name ?? "Not recorded"}`}
-              period={`${fmtDate(v.starts_on)} to ${fmtDate(v.ends_on)}`}
+              event={`${v.acting_user_name ?? v.acting_user_id} covering for ${v.normal_user_name ?? v.normal_user_id}`}
               actor={[
-                fmtDate(v.created_at, { time: true }),
+                `${fmtDate(v.starts_on)} to ${fmtDate(v.ends_on)}`,
                 ...(v.assigned_by_name ? [`Added by ${v.assigned_by_name}`] : []),
               ]}
               note={v.reason}
@@ -264,7 +328,6 @@ export function DutyHistory({ duty }: { duty: Duty }) {
           ))}
         </ul>
       )}
-      </> : null}
     </section>
   );
 }

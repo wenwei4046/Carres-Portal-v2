@@ -5,9 +5,8 @@ import DutyCatalogue from "./staff-duties/DutyCatalogue";
 import DutyDetail, { DutyHistory } from "./staff-duties/DutyDetail";
 import type { DutyStateFilter } from "./staff-duties/staff-duties-model";
 import Button from "@/components/kit/Button";
-import { WORKSPACE_DUTIES } from "@carres/shared";
-import Loading from "@/components/kit/Loading";
 import { readReturnTo } from "@/lib/return-to";
+import Loading from "@/components/kit/Loading";
 import { appTodayIso } from "@/lib/fmt-date";
 import { useWorkspaceDuties } from "@/lib/queries";
 
@@ -28,20 +27,18 @@ import { useWorkspaceDuties } from "@/lib/queries";
  *
  * Every rule stays in the SQL doors. The page renders the server's
  * `can_assign` fact and never offers a control the server would refuse: a
- * reader sees the same facts without management controls.
+ * reader gets the quiet sentence, not a disabled form.
  */
 export default function StaffDuties({ settingsNavigation }: { settingsNavigation?: ReactNode } = {}) {
   const dutiesQ = useWorkspaceDuties();
   const navigate = useNavigate();
   const location = useLocation();
-  const lastSelected = useRef<string | null>(null);
   const focusOnReturn = useRef<string | null>(null);
-  const [params, setParams] = useSearchParams();
-  const view = location.state as { dutySearch?: unknown; dutyFilter?: unknown } | null;
-  const [search, setSearch] = useState(typeof view?.dutySearch === "string" ? view.dutySearch : "");
-  const [stateFilter, setStateFilter] = useState<DutyStateFilter>(["all", "not_assigned", "covered_today", "cover_scheduled"].includes(String(view?.dutyFilter)) ? view!.dutyFilter as DutyStateFilter : "all");
   const origin = readReturnTo(location.state);
   const workOrigin = origin?.split("?")[0] === "/operation" && new URLSearchParams(origin.split("?")[1]).get("tab") === "work" ? origin : null;
+  const [params, setParams] = useSearchParams();
+  const [search, setSearch] = useState("");
+  const [stateFilter, setStateFilter] = useState<DutyStateFilter>("all");
   /* The COMPANY date, read once per render from the governed clock — never a
      `new Date()` inside a comparison (§4.4). */
   const today = appTodayIso();
@@ -64,14 +61,13 @@ export default function StaffDuties({ settingsNavigation }: { settingsNavigation
   }, [requested, known, duties, params, setParams, location.state]);
 
   function select(key: string) {
-    lastSelected.current = key;
     const next = new URLSearchParams(params);
     next.set("duty", key);
     setParams(next, { state: location.state });
   }
 
   function back() {
-    focusOnReturn.current = lastSelected.current ?? selectedKey;
+    focusOnReturn.current = selectedKey;
     const next = new URLSearchParams(params);
     next.delete("duty");
     setParams(next, { state: location.state });
@@ -93,12 +89,7 @@ export default function StaffDuties({ settingsNavigation }: { settingsNavigation
      A healthy response with zero duties is therefore a CONFIGURATION failure,
      not an empty list — `No duties yet` would tell the reader that Carres has
      no duties, which is never true (§4.5). */
-  const complete = duties.length === WORKSPACE_DUTIES.length && WORKSPACE_DUTIES.every(d => duties.filter(row => row.key === d.key).length === 1);
-  const broken = !dutiesQ.isLoading && !complete;
-  const failure = <div role="alert" className="flex flex-wrap items-center gap-3 px-6 py-3">
-    <p className="text-body text-kit-slate-12">Staff &amp; Duties could not be opened</p>
-    <Button onClick={() => void dutiesQ.refetch()}>Try again</Button>
-  </div>;
+  const broken = dutiesQ.isError || (!dutiesQ.isLoading && duties.length === 0);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -109,9 +100,9 @@ export default function StaffDuties({ settingsNavigation }: { settingsNavigation
         destinationHeader
       />
       <div className="min-h-0 flex-1 bg-white" data-testid="staff-duties">
-        {(settingsNavigation || workOrigin || dutiesQ.data?.can_manage_staff) ? <div className="flex flex-wrap items-center justify-between gap-3 px-6 pt-3">
-          <div className="flex items-center gap-3">{settingsNavigation}{workOrigin ? <Button onClick={() => navigate(workOrigin)}>Back to work</Button> : null}</div>
-          {dutiesQ.data?.can_manage_staff ? <Button onClick={() => navigate("/hr?tab=people", { state: { from: `${location.pathname}${location.search}`, returnState: { ...location.state, dutySearch: search, dutyFilter: stateFilter } } })}>Manage staff</Button> : null}
+        {(settingsNavigation || workOrigin) ? <div className="flex flex-wrap items-center gap-3 px-6 pt-3">
+          {settingsNavigation}
+          {workOrigin ? <Button onClick={() => navigate(workOrigin)}>Back to work</Button> : null}
         </div> : null}
         {dutiesQ.isLoading ? (
           /* Skeletons keep the page's geometry, so nothing jumps when the read
@@ -140,11 +131,25 @@ export default function StaffDuties({ settingsNavigation }: { settingsNavigation
             </div>
           </div>
         ) : broken ? (
-          failure
+          /* A failure sentence is never the empty sentence — what broke, then
+             the act that fixes it. It never infers that nobody holds a duty. */
+          <div className="flex flex-col items-center gap-3 py-8">
+            <p className="text-body text-kit-slate-12">
+              Staff &amp; Duties could not be opened
+            </p>
+            <button
+              type="button"
+              className="rounded-control border border-kit-slate-5 bg-white px-3 py-1.5 text-meta font-medium text-kit-slate-11 hover:text-kit-slate-12"
+              onClick={() => void dutiesQ.refetch()}
+            >
+              Try again
+            </button>
+          </div>
         ) : (
           <div className="flex min-h-0 flex-1 flex-col">
-            {dutiesQ.isError ? failure : null}
-
+            <p className="px-6 pt-3 text-meta text-kit-slate-11">
+              Who holds each company duty today and who covers an absence.
+            </p>
             <div
               data-testid="staff-duties-split"
               className="mt-2 grid min-h-0 flex-1 lg:grid-cols-[minmax(240px,272px)_minmax(0,1fr)] min-[1440px]:grid-cols-[minmax(240px,320px)_minmax(0,1fr)]"
@@ -169,13 +174,12 @@ export default function StaffDuties({ settingsNavigation }: { settingsNavigation
                 {selected ? (
                   <>
                     <DutyDetail
-                      key={`detail-${selected.key}`}
                       duty={selected}
                       canAssign={canAssign}
                       today={today}
                       onBack={explicit ? back : undefined}
                     />
-                    <DutyHistory key={`history-${selected.key}`} duty={selected} />
+                    <DutyHistory duty={selected} />
                   </>
                 ) : null}
               </div>

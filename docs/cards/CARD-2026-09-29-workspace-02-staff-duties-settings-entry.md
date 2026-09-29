@@ -6,7 +6,7 @@
 - **Status:** OPEN — relocation-first scope authorised; not merged or deployed
 - **Owner instruction:** Jess, 2026-09-29: “first open card to fix the staff & duties move to setting first”
 - **Authority:** `docs/workspace/MASTER.md` §4 entry placement; shared Settings entry in `docs/ui/MASTER.md`; Duty destination in `docs/COPY-STANDARD.md`.
-- **Existing work:** draft PR #1791, branch `codex/staff-duties-delivery`. Its current diff is broader than this Card and must be narrowed before release.
+- **Existing work:** draft PR #1791, branch `codex/staff-duties-delivery`. The release diff is narrowed to this Card; the broader draft is preserved on `codex/staff-duties-full-draft-20260929`.
 
 ## Outcome
 
@@ -44,12 +44,10 @@ block this navigation-only Card: no schema, migration, RLS or production-data mu
 
 ## Existing draft reconciliation
 
-The current draft already contains useful relocation work, plus broader page/API/People-entry
-changes. Before requesting release checks, isolate this Card's route, navigation, shell and
-return-context changes with their regression tests. Preserve the other work in Git; do not merge
-unrelated changes merely because they already exist in the draft. Reuse PR #1791 if practical,
-and rewrite its title/body around the final relocation-only diff.
-
+The release diff now contains only route, navigation, shell and return-context changes with their
+regression tests. The broader API, HR, resolver and form/detail work is restored to current main
+for this release and preserved on `codex/staff-duties-full-draft-20260929`. PR #1791 is reused for
+this relocation-only change.
 Primary implementation surfaces are `OperationApp.tsx`, `SettingsWorkspace.tsx`, `portal-nav.ts`,
 `PortalSidebar.tsx`, existing module links such as `DeliverySettings.tsx`, and only the page-level
 navigation plumbing needed by `StaffDuties.tsx`. Tests follow those surfaces. This is not authority
@@ -80,3 +78,12 @@ above from current main, using the existing Settings shell and Duty page. Own ro
 legacy/contextual links, responsive shell, tests and production verification. Do not change duty
 allocation, leave, departure, HR access, business permissions or database contracts. Follow the
 current constitution and owning MASTER; keep the broader approved Blueprint for subsequent work.
+
+## Verification in progress — 2026-09-29
+
+Local focused checks: StaffDuties 96, OperationApp 43, SettingsWorkspace 13, DeliverySettings 8,
+and PortalSidebar 111 tests passed (271 total). The actual application shell with synthetic API
+fixtures passed at 1440, 1180, 820, 743 and 390px: canonical exact-Duty navigation, on-demand
+Settings rail, one destination header, document overflow, narrow Back focus, reader controls,
+loading, initial failure and page-error checks. Screenshots and measurements in
+`docs/evidence/staff-duties/settings/` are fixture evidence only. Production is not yet verified.
