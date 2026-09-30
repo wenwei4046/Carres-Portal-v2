@@ -159,14 +159,15 @@ changes are explicit recorded movements, not a hidden alternative person behind 
 
 ## 4 · Staff & Duties
 
-**FINAL BLUEPRINT — OWNER-APPROVED / LOCKED 2026-09-29 · APPROVED TARGET / NOT BUILT.**
+**FINAL BLUEPRINT — OWNER-APPROVED / LOCKED 2026-09-29 · PARTIALLY DELIVERED.**
 The owner approved the assembled end-to-end Blueprint: Settings destination, plain current-person
 catalogue/detail, `Manage staff`, `Next`, collapsed `History`, monthly rotation, newcomer allocation
 versus execution, automatic recorded-leave cover, bounded manual exceptions and People-owned
 single-confirmation departure with restricted former-profile lookup. §§3–4 and HR MASTER §3 hold
 this one current truth. The UI alternatives and earlier cross-chat proposals are not parallel law.
-PLAN design review is complete for this surface; application work requires a BUILD/DELIVERY takeover.
-No application, migration, deployment or production verification is claimed by document approval.
+PLAN design review is complete and BUILD/DELIVERY was authorised by Jess. Settings relocation,
+current-person presentation and the two-period engine are delivered in #1791/#1798; §4.4 records
+production evidence and the remaining approved target. Approval alone never claims delivery.
 
 **ENTRY PLACEMENT — PRODUCTION VERIFIED 2026-09-29, PR #1791 (owner-approved 2026-09-28).**
 Jess approved this segment: move the one Staff & Duties destination to global Settings, remove its
@@ -330,7 +331,7 @@ combines those truths. A manager never assigns individual routine Work here.
 
 ### 4.2 · Page composition
 
-**FINAL COMPOSITION — OWNER-APPROVED 2026-09-29 / APPROVED TARGET / NOT BUILT.**
+**FINAL COMPOSITION — OWNER-APPROVED 2026-09-29 / DELIVERED 2026-09-30 (#1798).**
 Keep one Duty catalogue and one selected-Duty detail. Use the final plain headings `Next` and
 `History`. An authorised personnel manager reaches the existing People surface through the header
 `Manage staff` action; staff who lack that permission do not receive that management entry.
@@ -361,7 +362,7 @@ future arrangements remain reachable in the expanded records, with their future 
 explicit. History distinguishes the recorded event time from the assignment/cover effective dates
 and retains the shared event → who/when → detail grammar. Opening history changes no business fact.
 
-**CATALOGUE — OWNER-APPROVED 2026-09-28 / APPROVED TARGET / NOT BUILT.** The left catalogue
+**CATALOGUE — OWNER-APPROVED 2026-09-28 / PRODUCTION VERIFIED 2026-09-30 (#1798).** The left catalogue
 follows the shared Duty catalogue order and answers who is responsible today. Each row shows the
 Duty label and today's resolved person (effective cover when present, otherwise normal holder),
 or `Not assigned`. Future appointments never replace today's answer early. `Starts {date}`
@@ -392,10 +393,10 @@ At 1440px and 1180px retain catalogue/detail. At 820px, 743px and 390px show the
 full-width selected detail with `Back to duties`. Settings navigation is available on demand and
 must not force a third simultaneous narrow-screen column. §4.5 owns the retained loading, no-match,
 read-failure, unassigned and read-only states; no task-level Waiting/Completed/Missed state is added.
-Reuse the governed kit and token values. These are acceptance targets, not new measured screenshots
-or production completion. This composition is approved; delivery must validate it in real use.
+Reuse the governed kit and token values. The five widths were verified with real components and on production in #1798; screenshots and
+read/write verification boundaries are recorded in §4.4.
 
-**MANUAL ACTION ENTRY — OWNER-APPROVED 2026-09-29 / APPROVED TARGET / NOT BUILT.**
+**MANUAL ACTION ENTRY — OWNER-APPROVED 2026-09-29 / DELIVERED 2026-09-30 (#1798).**
 Place existing authorised manual adjustments in the selected Duty header's visible `⋯` menu,
 accessible name `More actions`. Do not keep manual assignment actions as permanent buttons
 beside the current person. Only authorised managers see this menu, and only applicable governed
@@ -411,7 +412,7 @@ and failures; no new token or component is introduced.
 
 ### 4.3 · Change-holder contract
 
-**FORM PRESENTATION — OWNER-APPROVED 2026-09-28 / APPROVED TARGET / NOT BUILT.**
+**FORM PRESENTATION — OWNER-APPROVED 2026-09-28 / DELIVERED 2026-09-30 (#1798); full cross-month exception semantics remain below.**
 `Assign` opens one focused action surface. Show read-only `Duty`, the current person's name and applicable
 plain dates above the inputs, followed by required `Assigned to` and
 `From`, `Until` and a factual `Reason`. For a PO/GRN temporary adjustment, both dates
@@ -462,8 +463,8 @@ the entered facts for correction without optimistic owner changes.
 
 ### 4.4 · Automatic assignment changes and two daily checks
 
-**Build evidence 2026-09-30 — PR #1798 / BUILT ON BRANCH, NOT DEPLOYED.**
-The branch wires trusted foreground interaction collection into OperationApp and removes its
+**Release evidence 2026-09-30 — PR #1798 / DEPLOYED.**
+The release wires trusted foreground interaction collection into OperationApp and removes its
 mount/timer heartbeat as assignment evidence. Shared validated settings feed independent Office
 morning and afternoon windows; lunch, background tabs and post-cutoff interactions cannot satisfy
 an earlier check. A failed settings/evidence read aborts the check rather than proving absence.
@@ -473,11 +474,14 @@ idempotent checkpoint receipt. An append-only movement ledger also handles expli
 unavailability between checkpoints. Stable Sales Order PIC and completed source facts are untouched.
 Late activity does not undo a movement; the following day starts from its dated source allocation.
 
-Migrations 0613, 0615–0621 and 0624 are committed and **NOT APPLIED**. Exact-file rollback probes passed
+Migrations 0613, 0615–0621 and 0624 are **APPLIED**, with all nine tracker file hashes and all
+19 final function hashes reconciled to the committed files. Exact-file rollback probes passed
 settings validation/audit, manager and browser refusals, lunch/overnight exclusion, receipt retries,
 stale source/settings refusal, independent morning/afternoon movement, no late bounce-back, newer
 manual assignment precedence, recorded unavailability, restricted history and unchanged GRN
-amendment authority. Follow-up reads confirmed no probe tables or tracker rows persisted.
+amendment authority. Additional probes passed collection-context departure/null-actor preservation,
+and morning movement → intervening movement → afternoon current-actor acceptance with stale-actor
+refusal. Follow-up reads confirmed no probe fixtures or tracker rows persisted.
 The current live GRN posting gate was already opened to active personal Operation/Principal by
 0601; 0619 preserves the separate original-holder/manual-assignment/Superuser amendment gate when
 automatic responsibility moves. Automatic assignment never grants amendment or approval rights.
@@ -486,7 +490,10 @@ Settings has the two persisted manager-editable times, revision conflict handlin
 states. Duty catalogue/detail use one current person, future assignments, collapsed history and
 the existing kit menu/form. System movements have paginated authenticated history; no private
 People profile is exposed through a historic name. Work and Staff & Duties refresh their shared
-current-person projections. UI remains subject to final browser verification and release checks.
+current-person projections. Authenticated production reads verified saved times, current/next
+people, collapsed/expanded history, read-only manager gates and zero horizontal overflow at all
+five approved widths. Personal-manager writes were verified by rollback SQL and the real-component
+manager fixture, not by changing live settings through the shared Principal test account.
 
 **Measured data boundary:** Shasha and Yu Jun have no People joining date or employment event.
 No date is invented and execution is unrestricted by tenure. Existing recorded PO assignment
@@ -499,10 +506,16 @@ monthly roster/admission engine; current baseline assignment remains the dated s
 and restricted former-profile lookup, complete bounded manual-exception convergence across a
 changing monthly baseline, full legacy-history pagination, and original/update/completion Work
 assignment snapshots with originating-surface audit. The two-period movement ledger must not be
-reported as those capabilities. Real browser and production proof, exact-file application and
-release closure remain owed before this branch is described as deployed.
+reported as those capabilities.
 
-**OWNER RULING 2026-09-29 — APPROVED TARGET / NOT BUILT.** Settings → Staff & Duties contains
+Release: merge `0f80cff62a73d17ade68fce0c07b87a73732cf59`, deployment run
+[36677653387](https://github.com/wenwei4046/Carres-Portal-v2/actions/runs/36677653387).
+Both Pages projects, both canonical web domains and the API Worker reported this SHA. The deployed
+SHA passed shared 3,974, API 3,865 and web 5,815 tests (259 existing skips), lint, typecheck, build
+and the browser-secret scan. Production screenshots and bundle comparison are in
+`docs/evidence/staff-duties-2026-09-30/`. Scheduled execution verification is still being observed.
+
+**OWNER RULING 2026-09-29 — DELIVERED 2026-09-30 (#1798).** Settings → Staff & Duties contains
 TWO manager-editable time settings, `Morning check time` and `Afternoon check time`, initially
 **10:30 AM** and **3:00 PM**, in Malaysia/company time. One configuration governs both checks
 across modules; there is no parallel per-module threshold. Store/read one shared configuration with changer, change time and previous values.
@@ -645,20 +658,20 @@ no horizontal overflow, narrow return focus, loading/failure and unchanged reade
 `docs/evidence/staff-duties/settings/` distinguishes these fixtures from deployment proof.
 
 This closes the destination move only. Existing API contracts, forms, history and permissions are
-unchanged. The broader draft remains preserved at `codex/staff-duties-full-draft-20260929` and is
-not a release or competing authority. Rotation, leave, departure/access coordination, permission
-convergence and the approved plain-person/detail/history redesign remain unfinished.
+unchanged. The subsequent #1798 release delivers the current-person/detail/history composition and
+two-period/recorded-unavailability engine (§4.4). General rotation, People departure/access,
+bounded manual-exception convergence and full Work actor/origin audit remain approved target work.
 
 | Measured evidence and severity | Operator consequence | Required convergence |
 |---|---|---|
 | StaffDuties.tsx, DutyCatalogue.tsx and DutyDetail.tsx already implement selected detail, search and state filter | Rebuilding from the old stacked-page audit would discard useful capabilities | KEEP those capabilities; apply §4.2's plain-name Settings composition, manager menu and approved widths |
-| Settings relocation is production verified at PR #1791 — delivered; detail redesign remains a target gap | Staff now open the existing page under Settings | Preserve CARD 02; separately converge plain-person details, `Next`, collapsed `History` and manager-only `⋯` |
+| Settings relocation and current-person/Next/history composition are production verified (#1791/#1798) | Staff now open the existing page under Settings | Preserve the shipped destination and composition; remaining policy/history gaps are separate below |
 | Migration 0437 prefilled named two-person monthly assignments through September 2027 — red target gap | This does not establish general joiner/leaver automation | The approved cyclic allocation and next-month admission rule must produce the single authoritative assignment source |
 | Existing assign writer accepts overlapping rows; current cover writer validates a whole normal-holder period — red target gap | Manual exceptions and automatic leave could otherwise give inconsistent answers | Dated §4.3 exceptions with impact preview and preserved baseline; §4.4 one effective cover answer and eligibility checks |
-| PR #1798 replaces the OperationApp heartbeat and the 0504 presence fallback with period interaction evidence and recorded movements — branch only | Morning use does not satisfy the afternoon check; no late bounce-back | Exact migration application, release and production verification remain required (§4.4) |
+| PR #1798 replaces the OperationApp heartbeat and the 0504 presence fallback with period interaction evidence and recorded movements — deployed | Morning use does not satisfy the afternoon check; no late bounce-back | Applied files/functions reconcile; release and production evidence are in §4.4 |
 | `operationWorkCompletedSchema` exposes completed actor/time but no assignment snapshots or Workspace/Delivery Monitor origin — measured contract gap | The full newly approved history cannot be claimed from that DTO alone | Preserve existing completion evidence and converge the assignment/update/origin audit across owning-module writers and Work reads |
 | Existing Duty API limits history reads to 200 records — target gap | Older authorised records may not be reachable | Complete bounded history pagination in a separate approved delivery scope |
-| PR #1798 retains the last successful Duty response on refresh failure — branch only | Staff keep the known facts and can retry | Verify the deployed failure state |
+| PR #1798 retains the last successful Duty response on refresh failure — deployed | Staff keep the known facts and can retry | Failure/retained-data behavior is covered by focused tests and the real-component browser fixture |
 | HrPersonDrawer ExitBlock explicitly separates exit recording and access disablement — red target gap | Manager can finish one step and miss the other | HR §3 one confirmation, honest scheduled/partial effects, default current-only lists and personnel-only former-profile access |
 | GRN posting already admits active personal Operation/Principal under 0601; automatic assignment must not expand amendment permission | Helping remains possible regardless of the displayed assignee | 0619 preserves the original/manual GRN amendment authority separately from automatic responsibility; other source-owned permissions remain unchanged |
 
