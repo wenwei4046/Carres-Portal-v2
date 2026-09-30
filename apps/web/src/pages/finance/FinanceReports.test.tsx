@@ -7,6 +7,9 @@ import { dirname, join } from "node:path";
 import { itSaysNoBannedWord } from "@/test/banned-words";
 import { appTodayIso, fmtDate, fmtMonth } from "@/lib/fmt-date";
 import FinanceReports from "./FinanceReports";
+import { rm } from "@/lib/format-currency";
+import { statementExport } from "./month-end-pack";
+import { parseBalanceSheet, parseProfitAndLoss } from "./reports/report-queries";
 import { paidBeforeInvoiceNote } from "./reports/StatementTable";
 
 const api = vi.hoisted(() => ({ fetch: vi.fn() }));
@@ -522,6 +525,37 @@ describe("Reports — when there is nothing, or no answer", () => {
     expect(await screen.findByTestId("balance-sheet-failed"))
       .toHaveTextContent("The balance sheet could not be loaded. Try again.");
     expect(screen.queryByText("RM 6,850.00")).not.toBeInTheDocument();
+  });
+});
+
+describe("Reports — Export writes the statement on screen", () => {
+  /** A sheet's body (under the blank row and the Account | Amount header) spelled as the table prints it. */
+  const asPrinted = (rows: (string | number)[][]) => rows.slice(rows.findIndex((r) => r.length === 0) + 2)
+    .map((r) => [String(r[0]).trim(), typeof r[1] === "number" ? rm(r[1]) : ""].join(" | ").trim());
+
+  it("Profit and Loss for a department: the same headings, accounts, subtotals and net result as the table", async () => {
+    show(`/finance/reports?dept=SHOWROOM&from=${FROM}&to=${TO}`);
+    const table = screen.getByTestId("profit-and-loss");
+    await within(table).findByRole("link", { name: "4100 Furniture sales" });
+    const { sheet, stem } = statementExport(parseProfitAndLoss(pl(FROM, TO, PL_BODY), FROM, TO), "Showroom");
+    expect(asPrinted(sheet.rows)).toEqual(lines(table));
+    expect(sheet.rows[1]).toEqual(["Department", "Showroom"]);
+    expect(stem).toBe(`Profit and Loss ${fmtMonth(YM)} Showroom`);
+    expect(within(screen.getByTestId("profit-and-loss-export")).getByRole("button", { name: "Export Excel" })).toBeEnabled();
+  });
+
+  it("Balance Sheet: the same bands, headings, accounts and unclosed result as the table", async () => {
+    show(`/finance/reports?asOf=${TODAY}`);
+    const table = screen.getByTestId("balance-sheet");
+    await within(table).findByRole("link", { name: "1120 Bank — current account" });
+    const { sheet, stem } = statementExport(parseBalanceSheet(bs(TODAY, bsBody(0)), TODAY), null);
+    expect(asPrinted(sheet.rows)).toEqual(lines(table));
+    expect(stem).toBe(`Balance Sheet as of ${fmtDate(TODAY, { year: "always" })}`);
+  });
+
+  it("keeps the characters a file name cannot hold out of a department's name", () => {
+    const { stem } = statementExport(parseBalanceSheet(bs(TODAY, bsBody(0)), TODAY), 'KL\\North/2: "A"');
+    expect(stem).toBe(`Balance Sheet as of ${fmtDate(TODAY, { year: "always" })} KL-North-2- -A-`);
   });
 });
 

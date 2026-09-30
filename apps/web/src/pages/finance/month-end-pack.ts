@@ -15,6 +15,7 @@ import type { QueryClient } from "@tanstack/react-query";
 import type { TrialBalanceReport } from "@carres/shared/finance-ledger";
 import { ledgerKindWord } from "@carres/shared/finance-ledger";
 import { fmtDate, fmtMonth } from "@/lib/fmt-date";
+import { rm } from "@/lib/format-currency";
 import { trialBalanceQuery } from "./ledger/ledger-queries";
 import { trialBalanceLabel, trialBalanceLines } from "./ledger/LedgerTrialBalance";
 import { nothingInPeriod, nothingOnDay, paidBeforeInvoiceNote, statementRows } from "./reports/StatementTable";
@@ -177,4 +178,52 @@ export async function exportMonthEndPack(qc: QueryClient, ym: string, today: str
   for (const s of sheets) XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(s.rows), s.name);
   XLSX.writeFile(wb, packFileName(ym));
   return sheets;
+}
+
+/**
+ * Reports → Export Excel / Export PDF: the one statement on screen, as the
+ * same rows its sheet in the pack has, plus the department picked (null: All).
+ * `stem` is the file name without its extension:
+ * `Profit and Loss Sep 2026 Showroom` · `Balance Sheet as of 30 Sep 2026`.
+ */
+export function statementExport(report: ProfitAndLoss | BalanceSheet, department: string | null): { sheet: PackSheet; stem: string } {
+  const sheet = "asOf" in report ? balanceSheetSheet(report) : profitAndLossSheet(report);
+  if (department) sheet.rows.splice(1, 0, ["Department", department]);
+  const ym = "asOf" in report ? null : report.from.slice(0, 7);
+  const when = "asOf" in report ? `as of ${day(report.asOf)}`
+    : report.from === `${ym}-01` && report.to === monthEnd(ym!) ? fmtMonth(ym) : `${day(report.from)} to ${day(report.to)}`;
+  // A department name is typed by a person; keep the characters a file name cannot hold out of it.
+  const stem = [sheet.name, when, department].filter(Boolean).join(" ").replace(/[\\/:*?"<>|]/g, "-");
+  return { sheet, stem };
+}
+
+export async function writeStatementExcel({ sheet, stem }: ReturnType<typeof statementExport>): Promise<void> {
+  const XLSX = await import("xlsx");
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(sheet.rows), sheet.name);
+  XLSX.writeFile(wb, `${stem}.xlsx`);
+}
+
+/** The same rows through the PDF every list's Export → PDF prints: the lines
+ *  above the first blank row are the title and the note under the table. */
+export async function writeStatementPdf({ sheet, stem }: ReturnType<typeof statementExport>): Promise<void> {
+  const blank = sheet.rows.findIndex((r) => r.length === 0);
+  const head = sheet.rows.slice(0, blank);
+  const [headers, ...body] = sheet.rows.slice(blank + 1);
+  const text = (c: Cell | undefined) =>
+    typeof c === "number" ? rm(c) : (c ?? "").replace(/^ +/, (s) => " ".repeat(s.length * 2));
+  const { renderRegisterListPdf } = await import("@/lib/pdf/render");
+  const blob = await renderRegisterListPdf({
+    title: head[0]!.join(" · "),
+    summary: head.slice(1).map((r) => r.join(" ")).join(" · "),
+    headers: headers!.map(String),
+    rows: body.map((r) => [text(r[0]), text(r[1])]),
+    printedAt: new Date().toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" }),
+  });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${stem}.pdf`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
