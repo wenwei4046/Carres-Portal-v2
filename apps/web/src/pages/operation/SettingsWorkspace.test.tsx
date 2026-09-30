@@ -199,7 +199,7 @@ describe("SettingsWorkspace — the Delivery group", () => {
     renderAt("/operation/settings/delivery/partners");
     expect(screen.getByText("Delivery", { selector: "[data-settings-group]" })).toBeInTheDocument();
     for (const [label, slug] of [
-      ["Logistics Partners", "partners"],
+      ["Logistics", "partners"],
       ["Delivery Rules", "rules"],
       ["Message Templates", "templates"],
       ["Access", "access"],
@@ -212,7 +212,7 @@ describe("SettingsWorkspace — the Delivery group", () => {
     expect(screen.getByText("Delivery settings")).toBeInTheDocument();
   });
 
-  it("lands `/delivery` on Logistics Partners, and a partner object route mounts the page", () => {
+  it("lands `/delivery` on Logistics, and a partner object route mounts the page", () => {
     renderAt("/operation/settings/delivery");
     expect(screen.getByText("Delivery settings")).toBeInTheDocument();
     renderAt("/operation/settings/delivery/partners/p-nets/schedule");

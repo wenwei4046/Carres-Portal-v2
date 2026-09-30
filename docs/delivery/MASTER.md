@@ -2143,7 +2143,7 @@ BUILD/DELIVERY lane. This audit does not declare this restarted planning mission
 
 ### 15.2 · Complete Delivery Blueprint — current owner review
 
-**2026-09-30 restarted PLAN mission: consolidated review, not a build authorisation.** Sections
+**2026-09-30 consolidated owner-reviewed Blueprint; bounded BUILD takeover below.** Sections
 1–15 retain their explicitly approved operating rules, including the owner's assignment-timing,
 actual-date/time and customer-period rulings. The review below synthesises them; it does not
 reopen those decisions. The prior Blueprint approval does not prove the later convergence work is
