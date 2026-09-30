@@ -1807,8 +1807,9 @@ agreed window. An empty period is not an explicit any-time agreement. No precise
 invented. These business concepts do not admit unreviewed new screen labels into COPY-STANDARD.
 
 **MEASURED SOURCE / NOT PRODUCTION VERIFICATION — 2026-09-30.**
-`DeliverySettings.tsx` still contains the routine Operation/Logistics contact choice, old company
-headings, independently typed handover points and four proof switches. The shared
+`DeliverySettings.tsx` now renders fixed Logistics contact and success-proof policy, with the
+approved company headings; independently typed handover points still await Sites convergence.
+The failure-photo requirement remains configurable. The shared
 `DELIVERY_TIME_SLOTS` list hardcodes morning 09:00–12:00, afternoon 12:00–15:00, late afternoon,
 evening and anytime. This source is implementation evidence, not approval of those clock ranges.
 
@@ -2256,8 +2257,19 @@ Focused checks cover Settings/API policy, bulk rejection, ETA input and failure-
 Seeded Settings preview verified at 390px and the normal desktop viewport: fixed success proof
 is readable policy, only failure-photo evidence remains configurable, and fields stack without
 horizontal overflow on phone. This is component-preview evidence, not production acceptance.
-Full release validation remains owed before production closure. Configurable period persistence, assignment timing, exact DO result scope, fleet binding, actual-date storage and
+Full release validation remains owed before production closure. Configurable period persistence, assignment timing, exact DO result scope, actual-date storage and
 complete evidence/audit convergence remain open; this increment is not the whole approved UI scope.
+
+
+**2026-09-30 fleet-template selection — implementation in progress, NOT DEPLOYED.** Logistics
+Details reads active driver and vehicle templates for the chosen company through the existing
+Settings query. The recorded name/plate remains readable if a template was renamed or retired;
+changing company clears the former company's crew. Optional crew can be cleared. A failed template
+read disables selection and preserves the existing recorded facts. The existing arrangement writer
+stores the chosen name/plate snapshot; this does not add template IDs, driver-phone storage or live
+tracking. Four focused tests cover company filtering, saved ETA/agreed-time separation, historical
+values, company changes and read failure. The seeded real component's driver selection was walked;
+full release and authenticated production acceptance remain owed.
 
 
 **2026-09-14 · Final convergence — the three 🟡 notes of 2026-09-13 are closed, and a Sales Order opens by its
