@@ -411,7 +411,7 @@ interface PurchaseOrderWorkSource {
   supplier_id: string;
   status: "open" | "received" | "cancelled";
   version?: number | null;
-  /** OUR predicted arrival (production + transit) — the advance check's one
+  /** OUR predicted arrival (production days) — the advance check's one
    *  anchor. Already selected by the internal `/pos` read. */
   eta_date?: string | null;
   expected_ready_date?: string | null;
@@ -1341,9 +1341,9 @@ function dutyResolution(
     };
   };
   const normalOwner = person("normal_user_id", "normal_user_name");
-  const acting = person("actor_user_id", "acting_user_name") ??
-    person("acting_user_id", "acting_user_name") ??
-    normalOwner;
+  const acting = (raw.source === "system_assignment" || raw.source === "not_assigned")
+    ? person("actor_user_id", "acting_user_name")
+    : person("actor_user_id", "acting_user_name") ?? person("acting_user_id", "acting_user_name") ?? normalOwner;
   const activeCover = raw.is_cover === true
     ? person("acting_user_id", "acting_user_name")
     : null;
@@ -1354,7 +1354,7 @@ function dutyResolution(
     buddy: activeCover,
     activeCover,
     actingPerson: acting,
-    state: normalOwner ? (activeCover ? "covered" : "primary") : "not_assigned",
+    state: acting ? (activeCover ? "covered" : "primary") : "not_assigned",
     assignmentId: null,
   };
 }

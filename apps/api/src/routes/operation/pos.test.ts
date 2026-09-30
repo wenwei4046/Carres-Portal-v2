@@ -2573,10 +2573,9 @@ describe("POST /api/operation/pos/:id/ready-date", () => {
       p_po_id: PO_ID,
       p_new_date: "2026-09-10",
       p_reason: null,
-      // Slice 1 (0325): the computed `ready + transit` arrival rides along;
-      // null here because the mock supplies no transit number — P1: no
-      // number, no guessed arrival, and the RPC then keeps the old date.
-      p_new_eta: null,
+      // Slice 1 (0325): the computed arrival rides along. With the supplier
+      // transit leg removed (owner ruling 2026-09-29) it IS the ready date.
+      p_new_eta: "2026-09-10",
     });
     // The RPC's signature is (text, date, text, date): a missing or extra key
     // is PGRST202 in production and a green test without this assertion.

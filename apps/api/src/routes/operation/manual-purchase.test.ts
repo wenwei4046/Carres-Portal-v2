@@ -1244,7 +1244,7 @@ const CARD06_SETTINGS = {
   poDays: [1, 3, 5],
   manualPurchaseMinDeliveryDays: 0,
   suppliers: [
-    { id: SUP, name: "Hooka", categories: ["sofa"], offDays: [0], transitDays: 1 },
+    { id: SUP, name: "Hooka", categories: ["sofa"], offDays: [0] },
   ],
   productionDays: [{ supplierId: SUP, category: "sofa", workingDays: 5 }],
   destinations: [],
@@ -1322,7 +1322,7 @@ describe("Card 06 · GET /purchasing/requests — the server date projection", (
     const body = (await res.json()) as {
       lines: Array<{
         delivery_date: string | null; order_by: string | null;
-        production_days_missing: boolean; transit_days_missing: boolean;
+        production_days_missing: boolean;
       }>;
       todayIso: string;
       planUnavailable: boolean;
@@ -1338,16 +1338,18 @@ describe("Card 06 · GET /purchasing/requests — the server date projection", (
         deliveryDateIso: "2026-10-16",
       }),
     );
-    expect(body.lines[0].order_by).not.toBeNull();
+    // Fri 16 Oct − 5 Hooka working days (Mon to Sat) = Sat 10 Oct: production
+    // only, no transit leg (owner ruling 2026-09-29).
+    expect(body.lines[0].order_by).toBe("2026-10-10");
     expect(body.lines[0].production_days_missing).toBe(false);
-    expect(body.lines[0].transit_days_missing).toBe(false);
+    expect(body.lines[0]).not.toHaveProperty("transit_days_missing");
   });
 
   it("missing Settings produce NO guessed date — the exact gap is named instead", async () => {
     vi.mocked(loadPurchasingSettings).mockResolvedValueOnce({
       ...CARD06_SETTINGS,
       suppliers: [
-        { id: SUP, name: "Hooka", categories: ["sofa"], offDays: [0], transitDays: null },
+        { id: SUP, name: "Hooka", categories: ["sofa"], offDays: [0] },
       ],
       productionDays: [],
     } as Awaited<ReturnType<typeof loadPurchasingSettings>>);
@@ -1355,12 +1357,13 @@ describe("Card 06 · GET /purchasing/requests — the server date projection", (
     const body = (await (await readRegister()).json()) as {
       lines: Array<{
         order_by: string | null;
-        production_days_missing: boolean; transit_days_missing: boolean;
+        production_days_missing: boolean;
       }>;
     };
     expect(body.lines[0].order_by).toBeNull();
     expect(body.lines[0].production_days_missing).toBe(true);
-    expect(body.lines[0].transit_days_missing).toBe(true);
+    // The transit gap no longer exists (owner ruling 2026-09-29).
+    expect(body.lines[0]).not.toHaveProperty("transit_days_missing");
   });
 
   it("a numbered PO is not `sent` — only the CURRENT version's confirmed-sent evidence", async () => {
@@ -1437,7 +1440,7 @@ describe("Card 06 · POST /purchasing/requests/plan — the create form's date p
       proceedDate: string;
       lines: Array<{
         sku: string; supplierName: string | null; category: string | null;
-        productionDays: number | null; transitDays: number | null; arrival: string | null;
+        productionDays: number | null; arrival: string | null;
       }>;
       deliveryDateDefault: string | null;
     };
@@ -1446,8 +1449,8 @@ describe("Card 06 · POST /purchasing/requests/plan — the create form's date p
       supplierName: "Hooka",
       category: "sofa",
       productionDays: 5,
-      transitDays: 1,
     });
+    expect(body.lines[0]).not.toHaveProperty("transitDays");
     // Agreement with the shared arithmetic from the same Proceed Date.
     expect(body.lines[0].arrival).toBe(
       expectedArrivalOf(CARD06_SETTINGS, {

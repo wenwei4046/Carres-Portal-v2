@@ -591,8 +591,7 @@ export interface PoDateHistory {
   /**
    * `Supplier Ready Date` — when the factory says it has FINISHED making it
    * (Q5). Its own list, never merged into `entries`: the two are different
-   * FACTS (§12.2's date dictionary), every supplier here carries transit days,
-   * and one numbered run mixing them would count `2nd` across two questions
+   * FACTS (§12.2's date dictionary), and one numbered run mixing them would count `2nd` across two questions
    * and measure a slip between a ready date and an arrival date.
    *
    * Before Q5 this ledger kind was FILTERED OUT, so the first ready date an

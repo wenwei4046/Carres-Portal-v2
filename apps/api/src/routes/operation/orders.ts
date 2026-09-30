@@ -477,7 +477,7 @@ operationOrdersRouter.get("/", requireOperation, async (c) => {
   const poNumbersBySo = new Map<number, Set<string>>();
   /* DELIVERY MONITOR (2026-09-11) — one entry per purchase order serving this
      sales order, carrying only RECORDED dates. `plannedIso` is our own
-     production-plus-transit prediction, `originalIso` the immutable date the
+     production-days prediction, `originalIso` the immutable date the
      supplier was given, `reply` the latest recorded supplier answer. The
      browser decides what that means; this route never says "delayed". */
   const poArrivalsBySo = new Map<number, OrderPoArrival[]>();
@@ -488,7 +488,7 @@ operationOrdersRouter.get("/", requireOperation, async (c) => {
       .from("purchase_orders")
       // DELIVERY MONITOR (2026-09-11) — the ARRIVAL facts the delivery work
       // list needs, and no derived word: the PO's own status, OUR
-      // production-plus-transit prediction (`eta_date` — `expectedArrivalOf`'s
+      // production-days prediction (`eta_date` — `expectedArrivalOf`'s
       // persisted result) and the immutable original the supplier was actually
       // given (`official_delivery_date`, 0428). The latest supplier REPLY is
       // read below. Nothing is CLASSIFIED here: the states and their words

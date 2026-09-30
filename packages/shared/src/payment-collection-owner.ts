@@ -1,21 +1,6 @@
-/**
- * ONE SALES ORDER, ONE COLLECTION OWNER (owner ruling 2026-09-13 —
- * `docs/payment/MASTER.md` §3 · §10 · §12; migrations 0489 · 0504).
- *
- * The owner of ordinary customer-balance collection is the RESPONSIBLE
- * DELIVERY OPERATION — not a daily duty, and since 0504 not a duty holder
- * either: it is the INDIVIDUAL the Sales Order was dealt to when it entered
- * Operations (`ops_order_control.assigned_staff`). That person carries the
- * customer follow-up and stays the owner until the balance is fully paid. A
- * changed date, a duty rotation, a filter or a page reload never rotates it;
- * only governed buddy cover (the acting person for today, the owner preserved)
- * or a formal handover (full evidence, append-only) changes who acts.
- *
- * This module is the ONE translation of the database's context row
- * (`payment_collection_owner_context`) into the shared Work owner shape every
- * surface reads — the Work feed, My Work, Team Work, the Quick Rail and the
- * Payment Monitor's owner cell all print the same three facts: normal owner ·
- * today's cover · acting person.
+/** One translation of the current assignment for Orders, Work and Payment.
+ * Original allocation remains evidence; only the resolver's actual current
+ * person answers Assigned to. A departed original never hides a replacement.
  */
 
 import type { WorkspaceDutyPerson, WorkspaceDutyResolution } from "./workspace-duty";
@@ -60,17 +45,17 @@ export interface CollectionOwnerHistoryRow {
 /** One order's row from `payment_collection_owner_context`. */
 export interface CollectionOwnerContextRow {
   order_id: string;
-  normal_user_id: string;
+  normal_user_id: string | null;
   normal_user_name: string | null;
   cover_user_id: string | null;
   cover_user_name: string | null;
-  acting_user_id: string;
+  acting_user_id: string | null;
   acting_user_name: string | null;
   is_cover: boolean;
   cover_ends_on: string | null;
   /** 0504 — `assigned` is the order's own Operation assignment, which needs no
    *  ledger row to be true; `established`/`handover` are ledger rows. */
-  source: "established" | "handover" | "assigned";
+  source: "established" | "handover" | "assigned" | "not_assigned" | "system_assignment";
   effective_from: string | null;
   established_on: string | null;
   history: CollectionOwnerHistoryRow[];
@@ -91,23 +76,24 @@ export function collectionOwnerResolution(
   today: string,
 ): WorkspaceDutyResolution {
   const normal = row ? person(row.normal_user_id, row.normal_user_name) : null;
-  if (!row || !normal) {
+  if (!row) {
     return {
       dutyKey: COLLECTION_OWNER_DUTY_KEY, onDate: today,
       normalOwner: null, buddy: null, activeCover: null, actingPerson: null,
       state: "not_assigned", assignmentId: null,
     };
   }
-  const cover = row.is_cover ? person(row.cover_user_id, row.cover_user_name) : null;
-  const covered = !!cover && cover.userId !== normal.userId;
+  const acting = person(row.acting_user_id, row.acting_user_name);
+  const cover = row.is_cover && acting && acting.userId !== normal?.userId ? acting : null;
+  const covered = !!cover;
   return {
     dutyKey: COLLECTION_OWNER_DUTY_KEY,
     onDate: today,
     normalOwner: normal,
     buddy: covered ? cover : null,
     activeCover: covered ? cover : null,
-    actingPerson: covered ? cover : normal,
-    state: covered ? "covered" : "primary",
+    actingPerson: acting,
+    state: !acting ? "not_assigned" : covered ? "covered" : "primary",
     assignmentId: null,
   };
 }

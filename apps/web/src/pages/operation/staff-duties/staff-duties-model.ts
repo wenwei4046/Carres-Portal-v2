@@ -18,6 +18,14 @@ import type { WorkspaceDutiesResponse } from "@/lib/queries";
 
 type Duty = WorkspaceDutiesResponse["duties"][number];
 
+/** The server's resolved person, never an original-person fallback after a system change. */
+export function currentDutyPerson(duty: Duty) {
+  const r = duty.resolution;
+  const id = r.actor_user_id ?? ((r.source === "system_assignment" || r.source === "not_assigned") ? null : r.acting_user_id ?? r.normal_user_id);
+  if (!id) return null;
+  return { id, name: (id === r.normal_user_id ? r.normal_user_name : r.acting_user_name) ?? "Name not recorded" };
+}
+
 /** The `State` narrowing offered beside search — COPY-STANDARD's four words. */
 export type DutyStateFilter =
   | "all"
@@ -108,7 +116,7 @@ function assignmentEnd(duty: Duty, today: string) {
  * ends. Anything else is an ordinary held duty and says nothing.
  */
 export function dutyDisplayState(duty: Duty, today: string): DutyDisplayState {
-  if (!duty.resolution.normal_user_id) {
+  if (!currentDutyPerson(duty)) {
     return { kind: "not_assigned", word: "Not assigned" };
   }
   if (duty.resolution.is_cover) {
@@ -180,22 +188,22 @@ export function dutyRefusalSentence(
   const { duty, name } = facts;
   switch (refusalCodeOf(error)) {
     case "no_duty_holder":
-      return `${duty} has no normal holder for all these dates. Assign the holder first.`;
+      return `${duty} has no assignment for all these dates. Assign it first.`;
     case "cover_overlap":
-      return `${duty} already has cover for these dates. Choose different dates.`;
+      return `${duty} already has an assignment for these dates. Choose different dates.`;
     case "cover_is_holder":
-      return `Choose another person to cover ${duty}.`;
+      return `Choose another person for ${duty}.`;
     case "invalid_cover":
-      return `${name} can no longer cover ${duty}. Choose another eligible staff member.`;
+      return `${name} cannot be assigned to ${duty}. Choose an eligible active staff member.`;
     case "self_assignment_refused":
       // 0533: nobody names themself — as holder or as cover.
       return act === "cover"
-        ? `${name} can no longer cover ${duty}. Choose another eligible staff member.`
-        : `${name} cannot hold ${duty}. Choose an eligible active staff member.`;
+        ? `${name} cannot be assigned to ${duty}. Choose an eligible active staff member.`
+        : `${name} cannot be assigned to ${duty}. Choose an eligible active staff member.`;
     case "invalid_holder":
-      return `${name} cannot hold ${duty}. Choose an eligible active staff member.`;
+      return `${name} cannot be assigned to ${duty}. Choose an eligible active staff member.`;
     case "invalid_dates":
-      return act === "assign" ? "Choose when this holder starts." : "Choose valid cover dates.";
+      return act === "assign" ? "Choose when this assignment starts." : "Choose valid assignment dates.";
     case "not_duty_manager":
       return "Duty assignments are set by the manager.";
     default:

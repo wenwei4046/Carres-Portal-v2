@@ -102,7 +102,6 @@ export {
   isPurchasingCategory,
   isPurchasingNumberKey,
   productionWorkingDaysFor,
-  transitDaysFor,
   workWeekOffDaysFor,
   purchasingUrgentWindowDays,
   unratedPairs,
@@ -123,11 +122,9 @@ export {
   clockWordOf,
   poWindowsHistoryLabel,
   purchasingSetProductionDaysInput,
-  purchasingSetTransitDaysInput,
   purchasingSetSupplierTermsDaysInput,
   purchasingSetSupplierAddressInput,
   SUPPLIER_ADDRESS_MAX,
-  TRANSIT_DAYS_RANGE,
   purchasingSetWorkWeekInput,
   type PurchasingCategory,
   type PurchasingNumberKey,
@@ -147,7 +144,6 @@ export {
   type PurchasingSetPoWindowsInput,
   type PurchasingSetSupplierPoCutoffInput,
   type PurchasingSetProductionDaysInput,
-  type PurchasingSetTransitDaysInput,
   type PurchasingSetSupplierTermsDaysInput,
   type PurchasingSetSupplierAddressInput,
   type PurchasingSetWorkWeekInput,
@@ -3335,3 +3331,17 @@ export * from "./supplier-card";
 export * from "./mission-route";
 
 export * from "./sales-order-register-filters";
+
+export {
+  workspaceActivitySettingsSchema,
+  workspaceActivitySettingsInput,
+  workspaceActivitySettingsResponseSchema,
+  type WorkspaceActivitySettingsResponse,
+  INITIAL_WORKSPACE_ACTIVITY_SETTINGS,
+  workspaceActivityWindow,
+  type WorkspaceActivitySettings,
+} from "./workspace-activity";
+
+export { evaluateWorkspaceActivityCheck, type WorkspaceActivityEvidence, type WorkspaceActivityCheck } from "./workspace-activity-check";
+
+export { decideWorkspaceReassignment, type WorkspaceCheckpointIdentity, type WorkspaceReassignmentDecision } from "./workspace-reassignment";

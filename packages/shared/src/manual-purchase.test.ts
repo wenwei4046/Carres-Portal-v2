@@ -41,7 +41,6 @@ const facts = (
   timing: null,
   supplierGap: false,
   productionDaysMissing: false,
-  transitDaysMissing: false,
   ...over,
 });
 
@@ -86,11 +85,10 @@ describe("Round 2 · the rail words and order", () => {
     expect(MANUAL_PURCHASE_RAIL.product).toBe(SO_BATCH_RAIL.product);
   });
 
-  it("SETUP TO FIX names the three exact configuration facts", () => {
+  it("SETUP TO FIX names the two exact configuration facts — no transit row (owner 2026-09-29)", () => {
     expect(MANUAL_PURCHASE_RAIL.setup.rows.map((r) => r.word)).toEqual([
       "Supplier not set",
       "Production days not set",
-      "Transit days not set",
     ]);
   });
 
@@ -235,12 +233,6 @@ describe("Card 06 §3.4 · the missing-Settings facts", () => {
       wrong: "Production days are not set",
       todo: "Add production days for Hooka · Sofa in Settings",
     });
-    expect(
-      manualPurchaseLeadDayFacts({ kind: "transit", supplierName: "Ohana" }),
-    ).toEqual({
-      wrong: "Transit days are not set",
-      todo: "Add transit days for Ohana in Settings",
-    });
   });
 
   it("the quiet timing line spells `Order by {date}` once", () => {
@@ -260,7 +252,6 @@ describe("Round 2 · the facts projection", () => {
     lineOrderBys: ["2026-09-10", "2026-09-03", null],
     supplierGap: true,
     productionDaysMissing: false,
-    transitDaysMissing: true,
     ...over,
   });
 
@@ -345,7 +336,6 @@ describe("Round 2 · the rail model", () => {
     expect(m.setupCounts).toEqual({
       supplier_not_set: 0,
       production_days_not_set: 1,
-      transit_days_not_set: 0,
     });
   });
 
@@ -458,6 +448,18 @@ describe("Card 06 §7 · the two Work actions", () => {
       ownerUserId: "u-yj",
       dueIso: "2026-09-03",
     });
+  });
+
+  it("does not resurrect the legacy PO person when the authoritative actor is null", () => {
+    const items = manualPurchaseWorkItems(input({}), {
+      approver, poDuty,
+      poDutyResolution: {
+        dutyKey: "po_duty", onDate: "2026-09-01", normalOwner: poDuty,
+        buddy: null, activeCover: null, actingPerson: null,
+        state: "not_assigned", assignmentId: null,
+      },
+    }, "2026-09-01");
+    expect(items[0]).toMatchObject({ ownerUserId: null, actingPerson: null, ownerState: "not_assigned" });
   });
 
   it("an ISSUED PO is a commitment — a missing send confirmation raises no work", () => {

@@ -51,12 +51,10 @@ async function makeJwt(role: string) {
  * placed a known number of working days from the expected ARRIVAL, and the
  * test asserts the state that distance must produce.
  *
- * THE ANCHOR IS ARRIVAL, NOT COMPLETION (owner correction, 2026-09-09). The
- * Safety period is the gap between the goods being HERE and the customer's
- * date, so it is measured from `READY + transit`, not from the day the factory
- * puts the goods down. These dates hung off `READY` until the transit leg was
- * added to the planner; the distances below are unchanged, only what they are
- * measured from.
+ * THE ANCHOR IS ARRIVAL. The Safety period is the gap between the goods being
+ * HERE and the customer's date. Since the supplier transit leg was removed
+ * (owner ruling 2026-09-29) arrival is the production completion day itself;
+ * the distances below are unchanged, only the anchor moved one day earlier.
  */
 const TODAY = "2026-09-02";
 const HOLIDAYS = myHolidaySet();
@@ -66,8 +64,8 @@ const NICE_WEEK = { offDays: [0] as number[], holidays: HOLIDAYS };
 const OFFICE = { offDays: [0, 6] as number[], holidays: HOLIDAYS };
 /** Expected production completion of a Nice Future mattress ordered today. */
 const READY = addWorkingDays(TODAY, 7, NICE_WEEK);
-/** …and when it reaches Carres: the fixture's Nice Future carries 1 transit day. */
-const ARRIVAL = addWorkingDays(READY, 1, OFFICE);
+/** …which is also when it reaches Carres — no transit leg (owner 2026-09-29). */
+const ARRIVAL = READY;
 const DELIVERY_EARLY = addWorkingDays(ARRIVAL, 40, OFFICE);
 const DELIVERY_FULL = addWorkingDays(ARRIVAL, 14, OFFICE);
 const DELIVERY_LOW = addWorkingDays(ARRIVAL, 5, OFFICE);
@@ -119,7 +117,7 @@ const TABLES = () => ({
     error: null,
   },
   purchasing_supplier_settings: {
-    data: [{ supplier_id: NICE, off_days: [0], transit_days: 1 }],
+    data: [{ supplier_id: NICE, off_days: [0] }],
     error: null,
   },
   purchasing_setting_changes: { data: [], error: null },
@@ -791,7 +789,6 @@ describe("the buying facts SO Batch Purchase needs", () => {
       data: [{
         supplier_id: NICE,
         off_days: [0],
-        transit_days: 1,
         fixed_destination_id: KLANG_DEST,
         collected_by_partner_id: "p-nets",
       }],
@@ -829,7 +826,6 @@ describe("the buying facts SO Batch Purchase needs", () => {
       data: [{
         supplier_id: NICE,
         off_days: [0],
-        transit_days: 1,
         fixed_destination_id: KLANG_DEST,
         collected_by_partner_id: "p-nets",
       }],
@@ -1468,7 +1464,7 @@ describe("the daily PO window of every demand line (Purchasing §5.6.1, owner ru
       error: null,
     };
     t.purchasing_supplier_settings = {
-      data: [{ supplier_id: NICE, off_days: [0], transit_days: 1, po_cutoff: cutoff }],
+      data: [{ supplier_id: NICE, off_days: [0], po_cutoff: cutoff }],
       error: null,
     };
     const proceeded: Record<string, string> = {

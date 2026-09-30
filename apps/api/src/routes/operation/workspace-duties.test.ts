@@ -562,3 +562,24 @@ describe("S2-A · the scheduled cover is the one the resolver will use", () => {
     expect(body.duties.find((d) => d.key === "po_duty")!.scheduled_cover_id).toBeNull();
   });
 });
+
+
+describe("scoped assignment history", () => {
+  it("forwards an older-page cursor through the authenticated source", async () => {
+    const sb = makeSb({}, { workspace_assignment_history: { data: [{ id: 5, to_name: "Shasha" }] } });
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const res = await req("/api/operation/workspace-duties/grn_duty/history?before=9", "GET", await makeJwt("operation"));
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("workspace_assignment_history", { p_duty_key: "grn_duty", p_before: 9, p_limit: 50 });
+    expect(await res.json()).toEqual({ records: [{ id: 5, to_name: "Shasha" }] });
+  });
+  it.each(["0", "-1", "NaN", "9007199254740992"])("refuses malformed cursor %s", async (cursor) => {
+    const res = await req(`/api/operation/workspace-duties/grn_duty/history?before=${cursor}`, "GET", await makeJwt("operation"));
+    expect(res.status).toBe(400); expect(userClient).not.toHaveBeenCalled();
+  });
+  it("refuses a dealer and an unauthenticated caller", async () => {
+    expect((await req("/api/operation/workspace-duties/grn_duty/history", "GET", await makeJwt("dealer"))).status).toBe(403);
+    expect((await req("/api/operation/workspace-duties/grn_duty/history", "GET", null)).status).toBe(401);
+    expect(userClient).not.toHaveBeenCalled();
+  });
+});

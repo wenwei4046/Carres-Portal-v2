@@ -19,21 +19,23 @@
  * before go-live), through the same query the statement uses, so the month on
  * screen is not read twice.
  */
+import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useQueries } from "@tanstack/react-query";
 import { ledgerAccountHref } from "@carres/shared/finance-ledger";
 import Button from "@/components/kit/Button";
 import Loading from "@/components/kit/Loading";
 import DatePicker from "@/components/kit/DatePicker";
+import { FieldError } from "@/components/kit/FieldFrame";
 import Panel from "@/components/kit/Panel";
 import Select from "@/components/kit/Select";
 import { appTodayIso, fmtDate, fmtMonth } from "@/lib/fmt-date";
 import { rm } from "@/lib/format-currency";
 import ModuleHeader from "@/pages/operation/components/ModuleHeader";
 import StatementTable, { nothingInPeriod, nothingOnDay, paidBeforeInvoiceNote } from "./reports/StatementTable";
-import { packMonths } from "./month-end-pack";
-import { profitAndLossQuery, useBalanceSheet, useProfitAndLoss, type ProfitAndLoss } from "./reports/report-queries";
-import { DepartmentFilter, useDepartmentParam } from "./department";
+import { packMonths, statementExport, writeStatementExcel, writeStatementPdf } from "./month-end-pack";
+import { profitAndLossQuery, useBalanceSheet, useProfitAndLoss, type BalanceSheet, type ProfitAndLoss } from "./reports/report-queries";
+import { DepartmentFilter, departmentWord, useDepartmentParam, useDepartments } from "./department";
 
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -101,6 +103,41 @@ function ReadFailed({ testId, sentence, retrying, onRetry }: {
   </div>;
 }
 
+/** Export Excel · Export PDF: the statement on screen, the same rows as its sheet in the month-end pack.
+ *  Off until the statement has figures to write. */
+function ExportStatement({ testId, word, report, department }: {
+  testId: string;
+  word: string;
+  report: ProfitAndLoss | BalanceSheet | undefined;
+  department: string | null;
+}) {
+  const [busy, setBusy] = useState<"excel" | "pdf" | null>(null);
+  const [failed, setFailed] = useState(false);
+  const ready = report?.status === "ok";
+  const run = async (as: "excel" | "pdf") => {
+    if (report?.status !== "ok") return;
+    setBusy(as);
+    setFailed(false);
+    try {
+      const out = statementExport(report, department);
+      await (as === "excel" ? writeStatementExcel(out) : writeStatementPdf(out));
+    } catch {
+      setFailed(true);
+    } finally {
+      setBusy(null);
+    }
+  };
+  return <div className="ml-auto flex flex-wrap items-end gap-3" data-testid={testId}>
+    {failed && <FieldError>The {word} could not be exported. Try again.</FieldError>}
+    <Button icon="download" loading={busy === "excel"} disabled={!ready || busy !== null} onClick={() => void run("excel")}>
+      Export Excel
+    </Button>
+    <Button icon="download" loading={busy === "pdf"} disabled={!ready || busy !== null} onClick={() => void run("pdf")}>
+      Export PDF
+    </Button>
+  </div>;
+}
+
 const TREND_MONTHS = 12;
 
 /** A section's served total; a section with no accounts in the chart is 0. */
@@ -156,6 +193,8 @@ export default function FinanceReports() {
   const asOf = readDay(params.get("asOf")) ?? today;
 
   const [dept, setDept] = useDepartmentParam();
+  const { data: departments = [] } = useDepartments();
+  const deptWord = departmentWord(dept, departments);
   const pl = useProfitAndLoss(from, to, dept);
   const bs = useBalanceSheet(asOf, dept);
   const notStarted = notStartedError(pl.error) || notStartedError(bs.error);
@@ -246,6 +285,7 @@ export default function FinanceReports() {
                   <div className="w-40">
                     <DatePicker id="reports-pl-to" label="Up to" value={to} minDate={from} onChange={pickTo} />
                   </div>
+                  <ExportStatement testId="profit-and-loss-export" word="profit and loss" report={plReport} department={deptWord} />
                 </div>
                 {pl.isError ? <ReadFailed testId="profit-and-loss-failed"
                   sentence="The profit and loss could not be loaded. Try again."
@@ -266,6 +306,7 @@ export default function FinanceReports() {
                   <div className="w-40">
                     <DatePicker id="reports-bs-as-of" label="As of" value={asOf} onChange={pickAsOf} />
                   </div>
+                  <ExportStatement testId="balance-sheet-export" word="balance sheet" report={bsReport} department={deptWord} />
                 </div>
                 {bsReport?.status === "ok" && !bsReport.balances && <div role="status" data-testid="balance-sheet-differs"
                   className="flex flex-wrap items-center gap-2 rounded-control bg-kit-amber-3 px-4 py-2 text-body text-kit-amber-11">

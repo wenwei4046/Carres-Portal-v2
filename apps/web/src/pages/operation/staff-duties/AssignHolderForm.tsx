@@ -1,11 +1,14 @@
-import { useState } from "react";
+import { useState, type RefObject } from "react";
+import Button from "@/components/kit/Button";
+import Loading from "@/components/kit/Loading";
+import { currentDutyPerson } from "./staff-duties-model";
 import DatePicker from "@/components/kit/DatePicker";
 import Input from "@/components/kit/Input";
 import Select from "@/components/kit/Select";
 import DutyActionDialog from "./DutyActionDialog";
 import { dutyRefusalSentence } from "./staff-duties-model";
 import { fmtDate } from "@/lib/fmt-date";
-import { useWorkspaceAssignDutyMutation } from "@/lib/queries";
+import { useWorkspaceAssignDutyMutation, useWorkspaceCoverDutyMutation } from "@/lib/queries";
 import type { WorkspaceDutiesResponse } from "@/lib/queries";
 import type { OpsStaffMember } from "@carres/shared";
 
@@ -24,7 +27,7 @@ import type { OpsStaffMember } from "@carres/shared";
  *
  * `Effective from` starts EMPTY on purpose. Defaulting a recorded business
  * date to today is a decision nobody made, and it would make
- * `Choose when this holder starts.` unreachable.
+ * `Choose when this assignment starts.` unreachable.
  */
 
 type Duty = WorkspaceDutiesResponse["duties"][number];
@@ -35,9 +38,17 @@ export default function AssignHolderForm({
   open,
   onClose,
   onDone,
+  staffLoading = false,
+  staffError = false,
+  retryStaff,
+  returnFocusRef,
 }: {
   duty: Duty;
   staff: OpsStaffMember[];
+  returnFocusRef?: RefObject<HTMLElement>;
+  staffLoading?: boolean;
+  staffError?: boolean;
+  retryStaff?: () => void;
   open: boolean;
   onClose: () => void;
   /** The governed success sentence, handed up to be announced. */
@@ -49,54 +60,54 @@ export default function AssignHolderForm({
   const [note, setNote] = useState("");
   const [refusal, setRefusal] = useState<string | null>(null);
   const assign = useWorkspaceAssignDutyMutation();
+  const dated = useWorkspaceCoverDutyMutation();
+  const bounded = duty.key === "po_duty" || duty.key === "grn_duty";
+
+  const current = currentDutyPerson(duty);
 
   function submit() {
+    if (assign.isPending || dated.isPending || staffLoading || staffError) return;
     setRefusal(null);
-    if (!holderId) return setRefusal("Choose a holder.");
-    if (!effectiveFrom) return setRefusal("Choose when this holder starts.");
+    if (!holderId) return setRefusal("Choose a person.");
+    if (!effectiveFrom) return setRefusal("Choose when this assignment starts.");
     if (effectiveUntil && effectiveUntil < effectiveFrom) {
-      return setRefusal("Until must be on or after Effective from.");
+      return setRefusal("Until must be on or after From.");
     }
-    assign.mutate(
-      {
-        dutyKey: duty.key,
-        holderId,
-        effectiveFrom,
-        ...(effectiveUntil ? { effectiveUntil } : {}),
-        ...(note.trim() ? { note: note.trim() } : {}),
-      },
-      {
-        /* react-query runs this only after the hook's own onSuccess has
-           awaited invalidation — so the page closes onto a REFRESHED read,
-           never onto a stale one it would have to correct a moment later. */
-        onSuccess: (written) => {
-          const name =
-            ((written ?? {}) as { holder_name?: string | null }).holder_name ??
-            staff.find((s) => s.user_id === holderId)?.name ??
-            holderId;
-          onDone(`${name} holds ${duty.label} from ${fmtDate(effectiveFrom)}`);
-          onClose();
-        },
-      },
-    );
+    if (bounded && !effectiveUntil) return setRefusal("Choose valid assignment dates.");
+    if (bounded && !note.trim()) return setRefusal("Write the reason.");
+    const done = () => {
+      const name = staff.find(person => person.user_id === holderId)?.name ?? "Name not recorded";
+      onDone(effectiveUntil ? `${duty.label} assigned to ${name}, ${fmtDate(effectiveFrom)} to ${fmtDate(effectiveUntil)}`
+        : `${duty.label} assigned to ${name} from ${fmtDate(effectiveFrom)}`);
+      onClose();
+    };
+    if (effectiveUntil && duty.resolution.normal_user_id && holderId !== duty.resolution.normal_user_id) {
+      dated.mutate({ dutyKey: duty.key, actingUserId: holderId, startsOn: effectiveFrom, endsOn: effectiveUntil,
+        ...(note.trim() ? { reason: note.trim() } : {}) }, { onSuccess: done });
+    } else {
+      assign.mutate({ dutyKey: duty.key, holderId, effectiveFrom,
+        ...(effectiveUntil ? { effectiveUntil } : {}), ...(note.trim() ? { note: note.trim() } : {}) }, { onSuccess: done });
+    }
+
   }
 
   return (
     <DutyActionDialog
       open={open}
+      returnFocusRef={returnFocusRef}
       onOpenChange={(next) => {
         if (!next) onClose();
       }}
-      title="Assign holder"
+      title="Assign"
       dutyLabel={duty.label}
-      submitLabel="Assign holder"
+      submitLabel="Assign"
       submitTestId="assign-submit"
-      pending={assign.isPending}
+      pending={assign.isPending || dated.isPending || staffLoading || staffError}
       /* The browser's guiding sentence, else the server's own refusal. */
       error={
         refusal ??
-        (assign.error
-          ? dutyRefusalSentence("assign", assign.error, {
+        ((assign.error ?? dated.error)
+          ? dutyRefusalSentence(dated.error ? "cover" : "assign", assign.error ?? dated.error, {
               duty: duty.label,
               name: staff.find((s) => s.user_id === holderId)?.name ?? "This person",
             })
@@ -104,13 +115,18 @@ export default function AssignHolderForm({
       }
       onSubmit={submit}
     >
+      <p className="text-body">{current ? `Assigned to ${current.name}` : "Not assigned"}</p>
+      {staffLoading ? <Loading variant="skeleton" lines={2} label="Loading" /> : staffError ? <div role="alert">
+        <p className="text-body">Staff &amp; Duties could not be opened</p>
+        <Button onClick={retryStaff}>Try again</Button>
+      </div> : <>
       <Select
         id="assign-holder"
-        label="Holder"
+        label="Assigned to"
         required
         value={holderId}
         onValueChange={setHolderId}
-        placeholder="Choose a holder"
+        placeholder="Choose a person."
         options={staff.map((s) => ({
           value: s.user_id,
           label: s.name ?? s.email,
@@ -118,7 +134,7 @@ export default function AssignHolderForm({
       />
       <DatePicker
         id="assign-effective-from"
-        label="Effective from"
+        label="From"
         required
         value={effectiveFrom}
         onChange={setEffectiveFrom}
@@ -126,15 +142,18 @@ export default function AssignHolderForm({
       <DatePicker
         id="assign-effective-until"
         label="Until"
+        required={bounded}
         value={effectiveUntil}
         onChange={setEffectiveUntil}
       />
       <Input
         id="assign-note"
-        label="Note"
+        label="Reason"
+        required={bounded}
         value={note}
         onChange={(e) => setNote(e.target.value)}
       />
+      </>}
     </DutyActionDialog>
   );
 }
