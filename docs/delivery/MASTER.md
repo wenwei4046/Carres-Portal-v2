@@ -232,7 +232,8 @@ path produces the row. **A Journey leg's document is BUILT (Card 14, migration 0
 issuing discipline (`attemptLegDocumentIssue` → `delivery_leg_document_mint`) the moment the
 leg's arrangement carries its partner and its agreed day and the order's money and Finance
 gate holds, numbered on the order and the leg; the customer leg's number mirrors onto the
-order for the legacy readers. A split-trip DO remains approved target (§15.1).
+order for the legacy readers. A split-trip mint path exists in source (`delivery_trip_document_mint`, 0542); independent
+trip arrangement and end-to-end scope convergence remain incomplete (§15.1).
 
 - **Delivery document number — OWNER RULING 2026-09-23 (Jess) · APPROVED / LOCKED · BUILT
   (migration `0575`, PR #1550).** Outright trips issue **`DO2609-4827`** (four random digits, 10,000 a month), Subscription trips
@@ -1025,7 +1026,13 @@ Delivery` are retired as columns; the row's acts live in the panels (§8.6).
 changing a filter clears the selection; the selection toolbar replaces the normal toolbar at the
 same height and reads `{N} selected · Clear · Assign logistics`. Bulk assignment is offered only
 while every selected row is unassigned; a row that already carries a partner turns the act into
-`Change logistics`, one row at a time, through the same governed door. Footer: `{n} deliveries`
+`Change logistics`, one row at a time, through the same governed door. A multi-row selection
+containing an assigned delivery cannot submit a bulk company change, even with a reason. Recheck
+the current assignment when saving so another person's intervening assignment is not overwritten.
+Changing Logistics records the governed reason, previous/new company, actual actor and time; it
+revokes the previous company's answer link (§5.5) but never rewrites custody or past handovers.
+One checkbox identifies the delivery scope, not each goods line or every trip under the same SO.
+Footer: `{n} deliveries`
 or `{n} of {m} deliveries`; empty states `No deliveries` and `No matching deliveries.`.
 **Loading, failed and refused reads are three different pictures (owner ruling 2026-09-25):** 72px
 skeleton rows and `Loading…` in the footer until the read SUCCEEDS — a paused or unfinished read
@@ -2095,7 +2102,7 @@ emoji, ticks, checkmarks, warning marks or progress icons inside a status fact; 
 label; a checklist column; a Delivery-local roster; an Operations Superuser fallback owner; a fake
 tab strip on the DO object; a separate Edit Delivery page.
 
-### 15.1 · Implementation gaps deferred to READY FOR CARD
+### 15.1 · Approved-target gaps and measured implementation limits
 
 The approved model is persisted here; the runtime lags it. These are named so that no build reads
 their absence as a design blind spot:
@@ -2106,8 +2113,8 @@ their absence as a design blind spot:
 | the append-only Correction of saved delivery facts (§6.1) | a new migration under the governed apply path |
 | Payment's §6 written request filed from a later-date save (the storage-terms acknowledgement is not among the ruled edit-state fields) | `docs/payment/MASTER.md` §6, `payment_delivery_date_requests` |
 | fleet-template binding on the arrangement (the brief still types the driver and vehicle; the saved templates exist in Delivery Settings) | `ops_delivery_arrangements`, `partner_drivers`, `partner_fleet` |
-| the split-trip DO's own issuing door (a leg DO is built; a split-trip scope still has no door) | `apps/api/src/lib/delivery-order-issue.ts` |
-| central Delivery reports | the Reports destination |
+| Independent split-trip arrangement, earlier-leg arrival enforcement and one scheduled-date writer remain incomplete | Orders §0.0 A2 records these gaps. Split-trip mint already exists in `delivery-order-issue.ts` through `delivery_trip_document_mint`; do not invent a second issuing engine or claim the whole capability is absent |
+| Delivery reports exist; convergence with newly approved timing, agreement and proof rules still needs validation | `OperationDeliveryReport.tsx` and §12; this pass is source inspection, not a new production verification |
 | `Hold delivery` on the Payment, Warehouse and Logistics surfaces, and the Operation words `RM {amount} unpaid` · `Finance hold · {reason}` (§3, owner ruling 2026-09-25) | `delivery-work-status.ts`, `logistics-card.ts`, `delivery-warehouse-schedule.ts`, `PaymentMonitor.tsx`, the partner arrange page and `DeliveryLinkPage.tsx` |
 | the `ETA` field in the Logistics Details edit state (§8.6) — the Operation save already accepts `expectedArrival`; the brief has no input for it | `apps/web/src/pages/operation/components/DeliveryBrief.tsx` |
 | `View Sales Order` in panel 1 of the brief, replacing `Open Sales Order to change` (§8.5) | `DeliveryBrief.tsx`, the governed SO renderer |
@@ -2115,6 +2122,24 @@ their absence as a design blind spot:
 | the Delivery Orders register's date-first pair `DO Date · DO No` (§8.7, UI §6.7) | `DeliveryOrdersRegister.tsx` (`stickyIdentity` → `leadingColumns`) |
 | the Delivery Order brief inside the register row and the two-column DO object (§8.7, §9, owner ruling 2026-09-26) | `DeliveryOrdersRegister.tsx` (`DoExpansion`), `DeliveryOrderPage.tsx`; the acts reuse `DeliveryResultAction`, `WarehouseHandoverBlock`, `DeliveryEvidencePanel` |
 | the POS required-facts gate for address, state, building type, floor, lift and access | **BUILT 2026-09-13 (Delivery Card 18)** — `createOrderInputSchema`, `rawCreateOrderInputSchema`, the POS wizard and the office create door refuse the facts with one wording; `Order details incomplete` now names legacy rows only |
+
+**2026-09-30 convergence audit — measured source, not production verification or build sequencing.**
+The current approved business rules above resolve these points; missing code does not reopen them
+as owner decisions. Additional material implementation limits are:
+
+| Approved boundary | Evidence and remaining limit |
+|---|---|
+| Bulk assignment only for unassigned deliveries; change Logistics one delivery at a time | `/assign` in `delivery-arrangements.ts` accepts multiple scopes with a change reason. It writes each arrangement/event sequentially; its all-or-nothing comment is not proof of atomic completion. Concurrent changes and failed saves must preserve readable, accurate outcomes |
+| Result selection uses the DO's frozen goods scope | `DeliveryResultAction.tsx` currently builds its Unit list from `useOrderAllocation`; current order allocation is not the issued document's scope |
+| Shared Work assignment and actual actor/source remain distinct | `operationWorkCompletedSchema` carries actual completer/time but not the full assignment snapshots or Workspace/Monitor origin; this DTO alone cannot prove §13.1's complete audit |
+| Optional configured periods, honest actual time, immutable proof minimum | §§5–6 and 11 govern the target. Settings' hardcoded periods/proof switches and current result inputs require convergence; this planning pass changes no runtime behaviour |
+| Fleet and ETA reuse existing capabilities | Driver/vehicle templates and ETA save support already exist. Binding the templates and exposing the governed ETA input are integration gaps, not new fleet/tracking engines |
+
+The remaining richer company-cost reference in §11.2 has no approved structured rate model. It is
+not needed to record actual service/cost under Payment §9 and must not be silently promoted into
+pricing law. No new owner decision is needed to correct the implementation limits above. Detailed
+Cards, implementation order and production verification belong to a separately commissioned
+BUILD/DELIVERY lane. This audit does not declare this restarted planning mission complete.
 
 ### 15.2 · Whole-domain closure
 
