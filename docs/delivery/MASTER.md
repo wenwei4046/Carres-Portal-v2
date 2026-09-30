@@ -1747,7 +1747,7 @@ effective date on every change. It contains no roster, no owner list and no duty
 | Section | Rows |
 |---|---|
 | `Logistics` (the Settings rail row reads `Logistics`, never `Logistics Partners` — `Partner` is a banned UI word) | one row per company opening its object: `Company details` (owner ruling 2026-09-26; `Partner details` retired) (name, `Active` · `Inactive`, customer-facing number, office contact, address, WhatsApp group) · `Coverage` (states, cities and postcodes covered; excluded locations; the `Klang Valley default` flag and its fallback rule) · `Schedule` (pickup weekdays, delivery weekdays per region, transit days, cut-off time, capacity per day, closed dates) · `Transit points` (the Logistics company's own points — `AL Sungai Buloh`, `HOUZS Balakong`, `HOUZS Penang` — registered once in Warehouse Settings → Sites as kind `Logistics transit point`; never a Carres warehouse; owner correction 2026-09-25, Stock §5) and the two-leg handover locations · `Drivers` and `Vehicles` (templates: driver name and phone; plate, vehicle type, capacity) · `Services & charges` (stair carry, dismantling, disposal, surcharge areas, partner charges) · `Portal access` (Warehouse role, Logistics role, data visibility, API scope) |
-| `Delivery Rules` | `Logistics contacts the customer` is fixed (owner ruling 2026-09-25; Carres contacts the customer only for the four Workspace §5.10 exceptions — no per-company choice any more; `customer_contact_by` survives only as read-only history) · the configurable logistics assignment lead and deadline in §2.1 · the record-on-behalf policy · the contact lead days (reads the shared `chase` setting, one home) · the payment-clearance read rule and DO availability, both read-only mirrors of Payment's clock and the DO gate · proof required by result and goods type · the supported delivery services |
+| `Delivery Rules` | `Logistics contacts the customer` is fixed (owner ruling 2026-09-25; Carres contacts the customer only for the four Workspace §5.10 exceptions — no per-company choice any more; `customer_contact_by` survives only as read-only history) · the configurable logistics assignment lead and deadline in §2.1 · the record-on-behalf policy · the contact lead days (reads the shared `chase` setting, one home) · the payment-clearance read rule and DO availability, both read-only mirrors of Payment's clock and the DO gate · result/goods/service proof requirements governed by §6.1 (required successful-delivery evidence is policy, never a disable switch) · the optional customer-agreed delivery periods in §5 · the supported delivery services |
 | `Message Templates` | WhatsApp, email and copy-message templates per purpose, versioned, one Default per purpose, the Payment template-library grammar |
 | `Access` | which People hold Delivery capabilities; a link to `Settings → Staff & Duties`, never a copy |
 
@@ -1768,6 +1768,47 @@ Delivery Settings stores only the `delivery_charge_approver` Duty key used by it
 Routine customer Delivery ownership reads the Sales Order PIC; `delivery_duty` serves the
 explicit no-PIC fallback and no-Sales-Order display transport coordination (§13.1), through
 `Settings → Staff & Duties`.
+
+### 11.1 · Settings convergence and customer-period review
+
+**RESOLVED FROM AUTHORITY / APPROVED TARGET, NOT VERIFIED BUILT — 2026-09-30.** Keep the
+four Settings sections above. Sites owns transit-point identity; Staff & Duties owns staff
+assignment; Payment owns its clock and money rule. Delivery consumes those facts. Logistics
+customer contact is fixed under §5.2. Required proof cannot be disabled (§6.1). Driver and vehicle
+templates supply known trip facts, not live lorry tracking. Company schedules feed §5.3's backward
+calculation; assignment timing follows §2.1, separately from contact and booking deadlines.
+The carried-forward owner ruling permits an optional morning, afternoon, any-time or specifically
+agreed window. An empty period is not an explicit any-time agreement. No precise appointment is
+invented. These business concepts do not admit unreviewed new screen labels into COPY-STANDARD.
+
+**MEASURED SOURCE / NOT PRODUCTION VERIFICATION — 2026-09-30.**
+`DeliverySettings.tsx` still contains the routine Operation/Logistics contact choice, old company
+headings, independently typed handover points and four proof switches. The shared
+`DELIVERY_TIME_SLOTS` list hardcodes morning 09:00–12:00, afternoon 12:00–15:00, late afternoon,
+evening and anytime. This source is implementation evidence, not approval of those clock ranges.
+
+**PROPOSAL / NOT LAW — customer-period meaning; owner review pending.**
+Authority searched: Delivery §§5, 5.2, 11; Workspace §5.9 and §6.1; COPY-STANDARD's Delivery Dates
+and Delivery Rules entries; carried-forward customer-period ruling. They resolve optionality and
+ownership but do not establish morning/afternoon boundaries or how changed definitions affect
+existing agreements. The whole-domain audit and reference-to-Carres matrix are already research
+input; this is a remaining Settings business choice, not a request to approve the completed audit.
+
+Recommendation: maintain effective-dated standard morning/afternoon ranges in Delivery Rules.
+Record the range actually agreed for each delivery; a customer's specific window takes precedence
+for that delivery. Changing a definition does not rewrite existing agreements. Until a range has
+been configured and actually agreed, do not convert a period name into clock times. A date-only
+booking remains valid. Explicit any-time agreement still respects site access and working hours.
+ETA remains separate; an evidenced breach of the agreed range follows §5.2's customer exception.
+No initial clock boundary is proposed from the hardcoded examples.
+
+Operating alternative: keep morning/afternoon as broad descriptions and record explicit clock
+ranges individually only when the customer agrees one. This reduces central setup but provides no
+clock-based breach assessment for a broad period. The recommended shared definitions add setup
+work but make customer messages and exception handling consistent. Falsifier: observed logistics
+or regional agreements use materially different definitions; then a universal range would misstate
+the promise and the scope must be reviewed. Neither choice authorises implementation or new UI
+wording before owner review.
 
 ## 12 · Reports
 
