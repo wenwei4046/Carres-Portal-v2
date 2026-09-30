@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { addWorkingDays } from "./working-days";
 import { poDeliveryDateOf,
+  arrivalFromReadyDate,
   poDeliveryWorkingDays,
   PURCHASING_NUMBER_KEYS,
   expectedArrivalOf,
@@ -36,9 +36,9 @@ const SETTINGS: PurchasingSettings = {
   manualPurchaseMinDeliveryDays: 0,
   poDays: [1, 3, 5],
   suppliers: [
-    { id: NICE, name: "Nice Future", categories: ["mattress"], offDays: [0, 6], transitDays: 1 },
-    { id: OHANA, name: "Ohana", categories: ["bedframe", "sofa"], offDays: [0], transitDays: 1 },
-    { id: NOBODY, name: "No SKUs", categories: [], offDays: null, transitDays: null },
+    { id: NICE, name: "Nice Future", categories: ["mattress"], offDays: [0, 6] },
+    { id: OHANA, name: "Ohana", categories: ["bedframe", "sofa"], offDays: [0] },
+    { id: NOBODY, name: "No SKUs", categories: [], offDays: null },
   ],
   productionDays: [
     { supplierId: NICE, category: "mattress", workingDays: 7 },
@@ -265,8 +265,8 @@ describe("the wire refuses what the database would refuse", () => {
 
 /**
  * `expectedArrivalOf` — ONE arithmetic for the expected arrival (Loo,
- * 2026-08-05, §4 Approved Evolution). It replaced two copies that disagreed:
- * the issue path added the transit leg, the register did not.
+ * 2026-08-05, §4 Approved Evolution). Since the owner removed the supplier
+ * transit leg (Jess, 2026-09-29) it is production working days only.
  *
  * Holidays are injected EMPTY here on purpose. The 2026 Selangor list is data
  * that will be corrected, and a test that moves when a gazette date is fixed
@@ -277,16 +277,12 @@ const NO_HOLIDAYS: ReadonlySet<string> = new Set();
 /**
  * ⭐ `poDeliveryDateOf` — THE PO's OWN DELIVERY DATE (owner ruling Jess,
  * 2026-09-22). `PO Date + n Settings working days`, and `n` is exactly the
- * recorded production number: NO transit day is added. It is deliberately a
- * DIFFERENT answer from `expectedArrivalOf`, which is when the goods reach
- * Carres — the pair below is the whole point of having two functions.
+ * recorded production number.
  */
 describe("poDeliveryDateOf — the Settings date the supplier's paper prints", () => {
-  it("counts the recorded production days on the FACTORY's week and adds no transit", () => {
+  it("counts the recorded production days on the FACTORY's week", () => {
     // Ohana works Saturday (offDays [0]) on a 7-day bedframe lead: Mon 3 Aug
-    // + 7 working days is Tue 11 Aug. `expectedArrivalOf` then adds Ohana's
-    // transit day and answers Wed 12 Aug — one day later, for a different
-    // question. The PAPER prints the factory's own promise.
+    // + 7 working days is Tue 11 Aug.
     expect(
       poDeliveryDateOf(SETTINGS, {
         supplierId: OHANA,
@@ -295,14 +291,6 @@ describe("poDeliveryDateOf — the Settings date the supplier's paper prints", (
         holidays: NO_HOLIDAYS,
       }),
     ).toBe("2026-08-11");
-    expect(
-      expectedArrivalOf(SETTINGS, {
-        supplierId: OHANA,
-        category: "bedframe",
-        fromIso: "2026-08-03",
-        holidays: NO_HOLIDAYS,
-      }),
-    ).toBe("2026-08-12");
   });
 
   it("the label's `n` counts back to the same number it was computed from", () => {
@@ -348,10 +336,9 @@ describe("poDeliveryDateOf — the Settings date the supplier's paper prints", (
 });
 
 describe("expectedArrivalOf — the ONE expected-arrival arithmetic", () => {
-  it("production on the FACTORY's week, then transit on the OFFICE week", () => {
+  it("production working days on the FACTORY's week, and no transit leg (owner 2026-09-29)", () => {
     // Ohana works Saturday (offDays [0]). Mon 3 Aug + 7 working days lands on
-    // Tue 11 Aug because Sat 8 counts and Sun 9 does not; + 1 transit day on
-    // the office week is Wed 12 Aug.
+    // Tue 11 Aug because Sat 8 counts and Sun 9 does not. Arrival is that day.
     expect(
       expectedArrivalOf(SETTINGS, {
         supplierId: OHANA,
@@ -359,13 +346,13 @@ describe("expectedArrivalOf — the ONE expected-arrival arithmetic", () => {
         fromIso: "2026-08-03",
         holidays: NO_HOLIDAYS,
       }),
-    ).toBe("2026-08-12");
+    ).toBe("2026-08-11");
   });
 
   it("a factory that does NOT work Saturday lands a day later on the same lead", () => {
     // Nice Future is Mon to Fri (offDays [0,6]) on the same 7-day mattress lead:
-    // ready Wed 12 Aug, arriving Thu 13 Aug. Same number, different week — the
-    // reason production may never be counted on a portal-wide calendar.
+    // arriving Wed 12 Aug. Same number, different week — the reason production
+    // may never be counted on a portal-wide calendar.
     expect(
       expectedArrivalOf(SETTINGS, {
         supplierId: NICE,
@@ -373,34 +360,59 @@ describe("expectedArrivalOf — the ONE expected-arrival arithmetic", () => {
         fromIso: "2026-08-03",
         holidays: NO_HOLIDAYS,
       }),
-    ).toBe("2026-08-13");
+    ).toBe("2026-08-12");
   });
 
-  /**
-   * THE DEFECT THIS FUNCTION EXISTS FOR. The register computed
-   * `placed_at + production` and stopped, so it printed the day the factory
-   * FINISHES as the day the goods REACH us. Both live suppliers carry
-   * `transitDays = 1`, and on the 16 dateless POs that missing day moved three
-   * rows: one silent that should read `same day`, and two amber `same day` that
-   * are truly `1d late`.
-   */
-  it("THE TRANSIT LEG IS NOT OPTIONAL — production alone is the day the factory finishes", () => {
-    const production = addWorkingDays("2026-08-03", 7, { offDays: [0], holidays: NO_HOLIDAYS });
-    expect(production).toBe("2026-08-11");
+  it("is EXACTLY `poDeliveryDateOf` for the same inputs — one arithmetic, two names", () => {
+    const cases: Array<{ supplierId: string; category: string; from: string }> = [
+      { supplierId: OHANA, category: "bedframe", from: "2026-08-03" },
+      { supplierId: OHANA, category: "sofa", from: "2026-07-30" },
+      { supplierId: NICE, category: "mattress", from: "2026-08-03" },
+      { supplierId: NICE, category: "mattress", from: "2026-09-25" },
+      { supplierId: OHANA, category: "mattress", from: "2026-08-03" }, // null both
+    ];
+    for (const holidays of [NO_HOLIDAYS, new Set(["2026-08-05", "2026-10-01"])]) {
+      for (const c of cases) {
+        expect(
+          expectedArrivalOf(SETTINGS, {
+            supplierId: c.supplierId,
+            category: c.category,
+            fromIso: c.from,
+            holidays,
+          }),
+        ).toBe(
+          poDeliveryDateOf(SETTINGS, {
+            supplierId: c.supplierId,
+            category: c.category,
+            poDateIso: c.from,
+            holidays,
+          }),
+        );
+      }
+    }
+  });
+
+  it("a supplier row with no transit field at all still gets an arrival", () => {
+    // The row shape has no transit number any more. A supplier that has a
+    // production number and nothing else is fully planned.
+    const bare: Pick<PurchasingSettings, "productionDays" | "suppliers"> = {
+      suppliers: [{ id: NOBODY, name: "Bare", categories: ["sofa"], offDays: null }],
+      productionDays: [{ supplierId: NOBODY, category: "sofa", workingDays: 3 }],
+    };
+    // Default week (Sunday off): Mon 3 Aug + 3 = Thu 6 Aug.
     expect(
-      expectedArrivalOf(SETTINGS, {
-        supplierId: OHANA,
-        category: "bedframe",
+      expectedArrivalOf(bare, {
+        supplierId: NOBODY,
+        category: "sofa",
         fromIso: "2026-08-03",
         holidays: NO_HOLIDAYS,
       }),
-    ).not.toBe(production);
+    ).toBe("2026-08-06");
   });
 
-  it("transit skips the WEEKEND even for a factory that works Saturday", () => {
-    // Ohana bedframe from Thu 30 Jul is ready Fri 7 Aug. Moving the goods is
-    // arranged by US (Law 2A's office week), so the arrival is Mon 10 Aug —
-    // never Sat 8, which counting transit on Ohana's own week would give.
+  it("counts only the factory's own week — a Saturday-working factory can land on a Saturday", () => {
+    // Ohana bedframe from Thu 30 Jul: Fri 31, Sat 1, Mon 3 … Fri 7 Aug. With no
+    // transit leg the arrival is the day the factory finishes.
     expect(
       expectedArrivalOf(SETTINGS, {
         supplierId: OHANA,
@@ -408,10 +420,19 @@ describe("expectedArrivalOf — the ONE expected-arrival arithmetic", () => {
         fromIso: "2026-07-30",
         holidays: NO_HOLIDAYS,
       }),
-    ).toBe("2026-08-10");
+    ).toBe("2026-08-07");
+    // Ohana bedframe from Fri 31 Jul: Sat 1, Mon 3 … Sat 8 Aug.
+    expect(
+      expectedArrivalOf(SETTINGS, {
+        supplierId: OHANA,
+        category: "bedframe",
+        fromIso: "2026-07-31",
+        holidays: NO_HOLIDAYS,
+      }),
+    ).toBe("2026-08-08");
   });
 
-  it("NULL IS A REAL ANSWER — no production number, no transit number, no start", () => {
+  it("NULL IS A REAL ANSWER — no production number, no start", () => {
     // P1's law: a missing number never becomes a 7, and never becomes a date.
     expect(
       expectedArrivalOf(SETTINGS, {
@@ -423,7 +444,7 @@ describe("expectedArrivalOf — the ONE expected-arrival arithmetic", () => {
     ).toBeNull();
     expect(
       expectedArrivalOf(SETTINGS, {
-        supplierId: NOBODY, // transitDays null
+        supplierId: NOBODY, // no production number for any category
         category: "sofa",
         fromIso: "2026-08-03",
         holidays: NO_HOLIDAYS,
@@ -447,19 +468,37 @@ describe("expectedArrivalOf — the ONE expected-arrival arithmetic", () => {
         fromIso: "2026-08-03T09:15:00.000Z",
         holidays: NO_HOLIDAYS,
       }),
+    ).toBe("2026-08-11");
+  });
+});
+
+describe("arrivalFromReadyDate — the ready date IS the arrival (owner 2026-09-29)", () => {
+  it("returns the ready date itself, sliced to a day", () => {
+    expect(
+      arrivalFromReadyDate(SETTINGS, { supplierId: OHANA, readyDateIso: "2026-08-12" }),
     ).toBe("2026-08-12");
+    expect(
+      arrivalFromReadyDate(SETTINGS, {
+        supplierId: NOBODY,
+        readyDateIso: "2026-08-14T03:00:00.000Z",
+      }),
+    ).toBe("2026-08-14");
+  });
+
+  it("a missing or malformed ready date is still no arrival", () => {
+    expect(arrivalFromReadyDate(SETTINGS, { supplierId: OHANA, readyDateIso: null })).toBeNull();
+    expect(arrivalFromReadyDate(SETTINGS, { supplierId: OHANA, readyDateIso: "2026-08" })).toBeNull();
   });
 });
 
 /**
  * `orderByFromDeliveryDate` — the ONE inverse of `expectedArrivalOf`
- * (Purchasing Card 06). Delivery Date − transit on the OFFICE week −
- * production on the FACTORY's own week = Order By; null is a real answer.
+ * (Purchasing Card 06). Delivery Date − production on the FACTORY's own week
+ * = Order By; null is a real answer. No transit leg (owner 2026-09-29).
  */
 describe("orderByFromDeliveryDate — the ONE Order By arithmetic (Card 06)", () => {
-  it("walks both legs backwards on their OWN calendars — Ohana works Saturday", () => {
-    // 30 Sep 2026 (Wed) − 1 office transit day = Tue 29 Sep; − 14 Ohana
-    // working days (Mon to Sat) = Sat 12 Sep.
+  it("walks the production leg backwards on the factory's OWN week — Ohana works Saturday", () => {
+    // 30 Sep 2026 (Wed) − 14 Ohana working days (Mon to Sat) = Mon 14 Sep.
     expect(
       orderByFromDeliveryDate(SETTINGS, {
         supplierId: OHANA,
@@ -467,9 +506,9 @@ describe("orderByFromDeliveryDate — the ONE Order By arithmetic (Card 06)", ()
         deliveryDateIso: "2026-09-30",
         holidays: NO_HOLIDAYS,
       }),
-    ).toBe("2026-09-12");
+    ).toBe("2026-09-14");
     // Nice Future does not work Saturday: the same delivery date and a
-    // 7-day production lands Fri 18 Sep, not the Saturday arithmetic.
+    // 7-day production lands Mon 21 Sep.
     expect(
       orderByFromDeliveryDate(SETTINGS, {
         supplierId: NICE,
@@ -477,7 +516,7 @@ describe("orderByFromDeliveryDate — the ONE Order By arithmetic (Card 06)", ()
         deliveryDateIso: "2026-09-30",
         holidays: NO_HOLIDAYS,
       }),
-    ).toBe("2026-09-18");
+    ).toBe("2026-09-21");
   });
 
   it("is the exact inverse of the forward planner on its own answer", () => {
@@ -497,7 +536,9 @@ describe("orderByFromDeliveryDate — the ONE Order By arithmetic (Card 06)", ()
     ).toBe("2026-09-30");
   });
 
-  it("skips an injected public holiday on the office transit leg", () => {
+  it("skips an injected public holiday on the production leg", () => {
+    // 30 Sep − 7 Nice Future days with Tue 29 Sep a holiday: 28, 25, 24, 23,
+    // 22, 21, 18 → Fri 18 Sep.
     expect(
       orderByFromDeliveryDate(SETTINGS, {
         supplierId: NICE,
@@ -505,10 +546,10 @@ describe("orderByFromDeliveryDate — the ONE Order By arithmetic (Card 06)", ()
         deliveryDateIso: "2026-09-30",
         holidays: new Set(["2026-09-29"]),
       }),
-    ).toBe("2026-09-17");
+    ).toBe("2026-09-18");
   });
 
-  it("NULL is a real answer — no production, no transit or no date means no Order By", () => {
+  it("NULL is a real answer — no production or no date means no Order By", () => {
     expect(
       orderByFromDeliveryDate(SETTINGS, {
         supplierId: NOBODY,
@@ -601,8 +642,8 @@ describe("P20.4 · an audited setting value reads as business, never as SQL", ()
 describe("poDeliveryWorkingDays — the n of `PO {n}-Day Delivery Date` (owner 2026-09-22)", () => {
   const settings = {
     suppliers: [
-      { id: "nf", name: "Nice Future", categories: [], offDays: [0, 6], transitDays: 1 },
-      { id: "ohana", name: "Ohana", categories: [], offDays: [0], transitDays: 1 },
+      { id: "nf", name: "Nice Future", categories: [], offDays: [0, 6] },
+      { id: "ohana", name: "Ohana", categories: [], offDays: [0] },
     ],
   } as unknown as Pick<import("./purchasing-settings").PurchasingSettings, "suppliers">;
 

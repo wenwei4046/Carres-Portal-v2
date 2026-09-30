@@ -231,7 +231,6 @@ import {
   type PurchasingSetPoWindowsInput,
   type PurchasingSetSupplierPoCutoffInput,
   type PurchasingSetProductionDaysInput,
-  type PurchasingSetTransitDaysInput,
   type PurchasingSetSupplierTermsDaysInput,
   type PurchasingSetSupplierAddressInput,
   type PurchasingSetWorkWeekInput,
@@ -2790,7 +2789,7 @@ export interface operationOrderListRow {
   /**
    * DELIVERY MONITOR (2026-09-11) — the ARRIVAL facts, one entry per purchase
    * order serving this order: its status, the SKUs it still owes, OUR
-   * production-plus-transit prediction (`eta_date`), the immutable
+   * production-days prediction (`eta_date`), the immutable
    * supplier-facing original (`official_delivery_date`) and the latest recorded
    * supplier reply. RECORDED DATES ONLY — the state and every word come from
    * the ONE shared reader (`deliveryArrivalStateOf`).
@@ -5085,7 +5084,6 @@ export interface PurchaseRequestLineRow {
   delivery_date?: string | null;
   order_by?: string | null;
   production_days_missing?: boolean;
-  transit_days_missing?: boolean;
 }
 
 export interface ManualPurchaseRegisterPayload {
@@ -5224,7 +5222,6 @@ export interface ManualPurchasePlanLine {
   supplierName: string | null;
   category: string | null;
   productionDays: number | null;
-  transitDays: number | null;
   /** `expectedArrivalOf` from the preview Proceed Date — null is a real
    *  answer (missing Catalog relationship or Settings), never a guess. */
   arrival: string | null;
@@ -5657,11 +5654,6 @@ export function useSetProductionDays() {
 export function useSetSupplierWorkWeek() {
   return usePurchasingSettingsMutation<PurchasingSetWorkWeekInput>("/work-week");
 }
-/** The lorry leg — 0318's write door, finally given a screen (2026-09-09). */
-export function useSetSupplierTransitDays() {
-  return usePurchasingSettingsMutation<PurchasingSetTransitDaysInput>("/transit-days");
-}
-
 /** 0530 — a supplier's payment terms in days (null clears). */
 export function useSetSupplierTermsDays() {
   return usePurchasingSettingsMutation<PurchasingSetSupplierTermsDaysInput>("/terms-days");

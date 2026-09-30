@@ -1667,7 +1667,7 @@ async function poPaperFacts(
   ]);
   const offDays = ((week.data as { off_days: number[] | null } | null)?.off_days ?? []).map(Number);
   const days = poDeliveryWorkingDays(
-    { suppliers: [{ id: supplierId, name: "", categories: [], offDays: offDays.length > 0 ? offDays : null, transitDays: null }] },
+    { suppliers: [{ id: supplierId, name: "", categories: [], offDays: offDays.length > 0 ? offDays : null }] },
     { supplierId, poDateIso: doc.issue_date, deliveryDateIso: doc.eta_date },
   );
   const kind = (supplier.data as { kind: string | null } | null)?.kind ?? null;
@@ -2322,42 +2322,14 @@ operationPosRouter.post("/:id/ready-date", requireOperation, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
 
   // Slice 1 (Loo, 2026-08-06): a ready date the factory gives MOVES the
-  // expected arrival — new arrival = ready date + transit working days on the
-  // OFFICE week, computed with `arrivalFromReadyDate`, the ONE spelling of
-  // that leg (the same function `expectedArrivalOf` calls — Law D; a plpgsql
-  // copy is exactly the second spelling the register bug came from). No
-  // transit number → null → the RPC keeps the old arrival rather than
-  // guessing one (P1). Both lookups fail-SOFT to null: the ready date must
-  // still record even when the settings read hiccups.
+  // expected arrival, through `arrivalFromReadyDate` — the ONE spelling (Law D).
+  // The supplier transit leg was removed by owner ruling 2026-09-29, so the new
+  // arrival is the ready date itself.
   const poId = c.req.param("id");
-  let newEta: string | null = null;
-  try {
-    const [poRow, transitRow] = await Promise.all([
-      sb.from("purchase_orders").select("supplier_id").eq("id", poId).maybeSingle(),
-      sb
-        .from("purchasing_supplier_settings")
-        .select("supplier_id, transit_days"),
-    ]);
-    const supplierId = (poRow?.data as { supplier_id?: string } | null)?.supplier_id;
-    if (supplierId) {
-      const suppliers = ((transitRow?.data ?? []) as Array<{
-        supplier_id: string;
-        transit_days: number | null;
-      }>).map((r) => ({
-        id: r.supplier_id,
-        name: "",
-        categories: [] as const,
-        offDays: null,
-        transitDays: r.transit_days ?? null,
-      }));
-      newEta = arrivalFromReadyDate(
-        { suppliers },
-        { supplierId, readyDateIso: parsed.data.newDate },
-      );
-    }
-  } catch {
-    newEta = null;
-  }
+  const newEta = arrivalFromReadyDate(
+    { suppliers: [] },
+    { supplierId: null, readyDateIso: parsed.data.newDate },
+  );
 
   const { data, error } = await sb.rpc("purchasing_record_ready_date", {
     p_po_id: poId,

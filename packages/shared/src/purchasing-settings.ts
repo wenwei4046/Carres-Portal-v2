@@ -28,7 +28,6 @@
  */
 
 import { myHolidaySet } from "./my-holidays";
-import { PURCHASING_OFFICE_OFF_DAYS } from "./purchasing-supplier-calls";
 import { z } from "zod";
 import { addWorkingDays, countWorkingDays, DEFAULT_OFF_DAYS, subtractWorkingDays } from "./working-days";
 
@@ -96,18 +95,6 @@ export interface PurchasingSupplierRow {
   categories: readonly PurchasingCategory[];
   /** Non-working weekdays, or null when nobody has set this factory's week. */
   offDays: readonly number[] | null;
-  /**
-   * WORKING days between the factory finishing and the goods reaching the
-   * destination — the eighth purchasing number (Loo, 2026-08-03). Seeded 1
-   * for every supplier: both factories are local, Nice Future is collected by
-   * NETS and Ohana delivers.
-   *
-   * It exists so `purchase_orders.eta_date` can be stamped when a PO is
-   * issued. Until it did, every PO born on To Order carried a NULL arrival,
-   * and `purchasing_record_tomorrow_delivery` (0306, shipped) refuses to open
-   * without one — a built, deployed supplier call that could never fire.
-   */
-  transitDays: number | null;
   /** 0530 — payment terms in days after the bill date. Null = not set. */
   termsDays?: number | null;
   /** 0383/0611 — the supplier's full address, printed on the PO and Repair
@@ -217,56 +204,24 @@ export function workWeekOffDaysFor(
 }
 
 /**
- * Transit working days for this factory — or `null` when nobody has set one.
- *
- * NEVER DEFAULTED. A null means the caller must say so rather than invent an
- * arrival date: P1's whole lesson is that a fallback is how a setting silently
- * stops mattering, and an `eta_date` nobody chose is a date the Receiving
- * queue would then treat as a measurement.
- */
-export function transitDaysFor(
-  settings: Pick<PurchasingSettings, "suppliers">,
-  supplierId: string | null | undefined,
-): number | null {
-  if (!supplierId) return null;
-  const row = settings.suppliers.find((s) => s.id === supplierId);
-  return row?.transitDays ?? null;
-}
-
-/**
  * WHEN THE GOODS REACH US — **the ONE arithmetic, and there may never be a
  * second** (Loo's §4 Approved Evolution, 2026-08-05).
  *
- * It was written twice and the two copies disagreed:
+ * ```
+ * arrival = fromIso + Supplier × Category production working days
+ *           (on THIS factory's own work week — Ohana works Saturday,
+ *            Nice Future does not)
+ * ```
  *
- *   `to-order.ts`                  today + production (FACTORY week)
- *                                        + transit    (OFFICE week)   ← Law 2A
- *   `OperationPurchaseOrders.tsx`  placed_at + production (FACTORY week)
- *                                                                     ← no transit
+ * The supplier transit leg was removed by owner ruling (Jess, 2026-09-29):
+ * arrival is the factory's production days only, so this now returns exactly
+ * what `poDeliveryDateOf` returns for the same inputs.
  *
- * Both live suppliers carry `transitDays = 1`, so the register was short by
- * exactly the day it forgot. Recomputed over the 16 dateless POs on production
- * (2026-08-05; no Malaysian public holiday falls between 1 and 19 Aug 2026)
- * **the missing day bites three rows**: `PO-2036` was silent where it should
- * read `same day`, and `PO-2049` + `PO-2042` read amber `same day` where the
- * truth is red `1d late`. **A page that under-warns is worse than one that says
- * nothing**, because silence is honest and a wrong colour is not.
- *
- * **TWO CALENDARS, NAMED** (Law 2A). Production is counted on the FACTORY's own
- * week — Ohana works Saturday and Nice Future does not — and transit on the
- * OFFICE week, because moving the goods is arranged by us. A caller that lets
- * `working-days.ts` default is counting on `[0]`, the WAREHOUSE week, which
- * nobody chose for this.
- *
- * **NULL IS A REAL ANSWER.** No production number, no transit number, or no
- * start date → no arrival at all, never a guessed one. P1 deleted exactly that
- * habit, and an arrival nobody chose is a date the register would then paint as
- * a measurement.
+ * **NULL IS A REAL ANSWER.** No production number or no start date → no
+ * arrival at all, never a guessed one (P1).
  *
  * `fromIso` is the day the clock starts, and it is the CALLER's fact: `today`
- * for a purchase order being born, `placed_at` for one already issued. Passing
- * it in is what lets both callers share this function without either of them
- * reading a clock inside it.
+ * for a purchase order being born, `placed_at` for one already issued.
  */
 export function expectedArrivalOf(
   settings: Pick<PurchasingSettings, "productionDays" | "suppliers">,
@@ -281,17 +236,10 @@ export function expectedArrivalOf(
   const from = (args.fromIso ?? "").slice(0, 10);
   if (from.length !== 10) return null;
   const production = productionWorkingDaysFor(settings, args.supplierId, args.category);
-  const transit = transitDaysFor(settings, args.supplierId);
-  if (production == null || transit == null) return null;
-  const holidays = args.holidays ?? myHolidaySet();
-  const ready = addWorkingDays(from, production, {
+  if (production == null) return null;
+  return addWorkingDays(from, production, {
     offDays: workWeekOffDaysFor(settings, args.supplierId),
-    holidays,
-  });
-  return arrivalFromReadyDate(settings, {
-    supplierId: args.supplierId,
-    readyDateIso: ready,
-    holidays,
+    holidays: args.holidays ?? myHolidaySet(),
   });
 }
 
@@ -304,17 +252,12 @@ export function expectedArrivalOf(
  * ```
  *
  * `n` is EXACTLY the recorded Supplier × Category production number: Settings
- * 14 means 14, Settings 10 means 10. **No transit days are added** — that is
- * the correction this function exists for. Weekends and public holidays are
+ * 14 means 14, Settings 10 means 10. Weekends and public holidays are
  * skipped on THIS supplier's own work week, because the number is a promise
  * the factory makes about its own days.
  *
- * ⛔ IT IS NOT `expectedArrivalOf`. That one answers a different question —
- * when the goods reach Carres, production PLUS the transit leg — and it stays
- * the arrival-planning arithmetic behind `Order By` and the register's timing
- * facts. Two questions, two functions, neither one guessing the other's
- * answer: printing the arrival date under a `PO 14-Day` label was how a
- * 13-day Settings number came to print `14-Day` on a supplier's paper.
+ * Since the supplier transit leg was removed (owner ruling 2026-09-29),
+ * `expectedArrivalOf` returns the same date for the same inputs.
  *
  * NULL IS A REAL ANSWER: no production number for this supplier × category,
  * or no PO Date → no date at all. The paper then prints `PO Delivery Date :
@@ -346,9 +289,8 @@ export function poDeliveryDateOf(
  * The `{n}` in the PO's printed `PO {n}-Day Delivery Date` (owner ruling
  * 2026-09-22, PO-PDF-STANDARD §2): the supplier's working days from the PO Date
  * to the PO Delivery Date — counted on THIS supplier's work week and the
- * holiday set, by the same working-day functions that stamped the date. It is
- * never the raw Settings number: every supplier carries a transit day, so a
- * 13-day production setting prints `14-Day`, which is what the dates say.
+ * holiday set, by the same working-day functions that stamped the date — it
+ * counts what the dates say, never the raw Settings number.
  *
  * NULL IS A REAL ANSWER: no PO Date or no delivery date → no number, and the
  * paper prints the plain `PO Delivery Date` label instead of inventing one.
@@ -372,17 +314,13 @@ export function poDeliveryWorkingDays(
 }
 
 /**
- * THE TRANSIT LEG on its own — when the goods reach us, counted from a day the
- * factory says they are FINISHED (Slice 1, Loo 2026-08-06: *"a ready date the
- * factory gives MOVES the expected arrival — and never overwrites it"*).
+ * When the goods reach us, counted from a day the factory says they are
+ * FINISHED (Slice 1, Loo 2026-08-06: a ready date the factory gives MOVES the
+ * expected arrival — and never overwrites it).
  *
- * `expectedArrivalOf` calls this for its own second half, so the two share ONE
- * spelling of `ready + transit on the OFFICE week` (Law 2A / Law D) — the
- * register's earlier bug was exactly a second spelling that forgot this leg.
- *
- * NULL IS A REAL ANSWER: no transit number for this supplier → no arrival,
- * never a guessed one (P1). `PO-2052` is the worked example: ready 12 Aug +
- * Ohana's 1 transit day = 13 Aug, while the self-computed arrival said 14 Aug.
+ * The supplier transit leg was removed by owner ruling (Jess, 2026-09-29), so
+ * the arrival IS the ready date. The function stays so every caller keeps one
+ * spelling. NULL only for a missing or malformed ready date.
  */
 export function arrivalFromReadyDate(
   settings: Pick<PurchasingSettings, "suppliers">,
@@ -392,14 +330,10 @@ export function arrivalFromReadyDate(
     holidays?: ReadonlySet<string>;
   },
 ): string | null {
+  void settings;
   const ready = (args.readyDateIso ?? "").slice(0, 10);
   if (ready.length !== 10) return null;
-  const transit = transitDaysFor(settings, args.supplierId);
-  if (transit == null) return null;
-  return addWorkingDays(ready, transit, {
-    offDays: PURCHASING_OFFICE_OFF_DAYS,
-    holidays: args.holidays ?? myHolidaySet(),
-  });
+  return ready;
 }
 
 /**
@@ -407,19 +341,19 @@ export function arrivalFromReadyDate(
  * (Purchasing Card 06; Law D: a derived fact has ONE arithmetic).
  *
  * The Manual Purchase `Order By` walks the requested Delivery Date BACKWARDS
- * through the same two legs the forward planner walks forwards, each on its
- * own named calendar (Law 2A):
+ * through the same production leg the forward planner walks forwards:
  *
  *   Delivery Date
- *   − supplier transit working days            on the OFFICE week (Mon–Fri)
  *   − Supplier × Category production days      on that FACTORY's own week
  *   = Order By
+ *
+ * The supplier transit leg was removed by owner ruling (Jess, 2026-09-29).
  *
  * Sunday and Selangor public holidays are excluded by the same injected
  * holiday set. Manual Purchase never subtracts SO Safety days: its Delivery
  * Date is already goods arrival at Carres.
  *
- * NULL IS A REAL ANSWER. No production number, no transit number or no
+ * NULL IS A REAL ANSWER. No production number or no
  * Delivery Date → no Order By, never a guessed one — the screen names the
  * missing Settings fact instead (P1's rule, unchanged).
  */
@@ -436,16 +370,10 @@ export function orderByFromDeliveryDate(
   const delivery = (args.deliveryDateIso ?? "").slice(0, 10);
   if (delivery.length !== 10) return null;
   const production = productionWorkingDaysFor(settings, args.supplierId, args.category);
-  const transit = transitDaysFor(settings, args.supplierId);
-  if (production == null || transit == null) return null;
-  const holidays = args.holidays ?? myHolidaySet();
-  const ready = subtractWorkingDays(delivery, transit, {
-    offDays: PURCHASING_OFFICE_OFF_DAYS,
-    holidays,
-  });
-  return subtractWorkingDays(ready, production, {
+  if (production == null) return null;
+  return subtractWorkingDays(delivery, production, {
     offDays: workWeekOffDaysFor(settings, args.supplierId),
-    holidays,
+    holidays: args.holidays ?? myHolidaySet(),
   });
 }
 
@@ -540,7 +468,6 @@ export const purchasingSettingsResponseSchema = z.object({
       name: z.string(),
       categories: z.array(purchasingCategorySchema),
       offDays: z.array(z.number().int().min(0).max(6)).nullable(),
-      transitDays: z.number().int().min(0).max(60).nullable(),
       termsDays: z.number().int().min(0).nullable().optional(),
       /** 0611 · the two supplier addresses. Optional for an older Worker. */
       address: z.string().nullable().optional(),
@@ -688,34 +615,6 @@ export const purchasingSetProductionDaysInput = z
   })
   .strict();
 export type PurchasingSetProductionDaysInput = z.infer<typeof purchasingSetProductionDaysInput>;
-
-/**
- * The lorry leg's range, mirroring `purchasing_set_supplier_transit_days`'s own
- * `0..60` guard (migration 0318). The RPC is the boundary; this only stops a
- * pointless round trip.
- */
-export const TRANSIT_DAYS_RANGE = { min: 0, max: 60 } as const;
-
-/**
- * Set one supplier's transit days.
- *
- * The number and its audited write door have existed since 0318; until
- * 2026-09-09 NOTHING in the portal called them, while Manual Purchase told the
- * operator "Add transit days for {supplier} in Settings" and Settings had no
- * such field. `days` is NOT nullable — the RPC refuses null, and a supplier
- * whose lorry leg is unknown must stay unknown rather than be written as 0.
- */
-export const purchasingSetTransitDaysInput = z
-  .object({
-    supplierId: z.string().uuid(),
-    days: z
-      .number()
-      .int()
-      .min(TRANSIT_DAYS_RANGE.min)
-      .max(TRANSIT_DAYS_RANGE.max),
-  })
-  .strict();
-export type PurchasingSetTransitDaysInput = z.infer<typeof purchasingSetTransitDaysInput>;
 
 /** 0530 — one supplier's payment terms in days; null clears it. */
 export const purchasingSetSupplierTermsDaysInput = z

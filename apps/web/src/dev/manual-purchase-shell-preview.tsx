@@ -81,7 +81,7 @@ function add(kind: string, i: number) {
     required_by: r.required_by, remark: i % 5 ? null : "grey, not beige", po_id: null, cancelled_at: null,
     cancel_reason: null, received: false, category: item.category, item_label: item.label, po_ids: [], allocations: [],
     delivery_date: r.required_by, order_by: kind === "notplanned" || kind === "nosupplier" ? null : day(14 + (i % 14)),
-    production_days_missing: kind === "notplanned", transit_days_missing: false,
+    production_days_missing: kind === "notplanned",
   };
   if (["approved", "notplanned", "nosupplier", "partial", "ordered", "zero"].includes(kind)) {
     r.approved_at = `${day(2 + (i % 14))}T03:00:00Z`;
@@ -214,7 +214,7 @@ async function answer(url: string, init?: RequestInit): Promise<unknown | Respon
   if (path.includes("/purchasing/requests/detail/")) return detail(path.split("/detail/")[1]!.split("?")[0]!);
   if (path.includes("/purchasing/requests/plan")) {
     return { proceedDate: "2026-09-17", deliveryDateDefault: "2026-10-15", planUnavailable: false,
-      lines: ((body.skus ?? []) as string[]).map((sku) => ({ sku, supplierId: "s1", supplierName: "Hooka", category: "mattress", productionDays: 14, transitDays: 3, arrival: "2026-10-15" })) };
+      lines: ((body.skus ?? []) as string[]).map((sku) => ({ sku, supplierId: "s1", supplierName: "Hooka", category: "mattress", productionDays: 14, arrival: "2026-10-15" })) };
   }
   if (path.includes("/purchasing/requests/already-have")) return { sku: "B1201S-K", alreadyOnPo: 0, firstPo: null };
   if (path.includes("/purchasing/requests/issue") && method === "POST") {

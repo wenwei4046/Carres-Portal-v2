@@ -343,7 +343,7 @@ export function purchaseOrderArrivalCheckWorkItems(
     supplierId: string;
     supplierName: string;
     status: "open" | "received" | "cancelled";
-    /** OUR predicted arrival — `expectedArrivalOf`'s production + transit
+    /** OUR predicted arrival — `expectedArrivalOf`'s production-days
      *  result, as persisted on `purchase_orders.eta_date`. No anchor, no
      *  call: nothing is invented to stand in for it. */
     etaDateIso: string | null;

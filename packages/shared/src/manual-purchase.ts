@@ -399,27 +399,23 @@ export function manualPurchaseOrderByLine(dateLabel: string): string {
 /**
  * THE MISSING-SETTINGS FACTS (Card 06 §3.4) — the governed two lines, fact
  * then act, spelt once for the create form, the object and the rail's setup
- * lens. No production or transit number means no proposed Delivery Date and
- * no Order By; the engine never substitutes zero or a browser date.
+ * lens. No production number means no proposed Delivery Date and no Order
+ * By; the engine never substitutes zero or a browser date. (The supplier
+ * transit leg and its missing-number words were removed by owner ruling
+ * 2026-09-29.)
  */
 export function manualPurchaseLeadDayFacts(gap: {
-  kind: "production" | "transit";
+  kind: "production";
   supplierName: string | null;
   /** The Catalog category word, already capitalised by the caller's one
    *  label arithmetic (`categoryLabel`). Production only. */
   categoryLabel?: string | null;
 }): { wrong: string; todo: string } {
   const supplier = (gap.supplierName ?? "").trim() || "the supplier";
-  if (gap.kind === "production") {
-    const category = (gap.categoryLabel ?? "").trim() || "the category";
-    return {
-      wrong: "Production days are not set",
-      todo: `Add production days for ${supplier} · ${category} in Settings`,
-    };
-  }
+  const category = (gap.categoryLabel ?? "").trim() || "the category";
   return {
-    wrong: "Transit days are not set",
-    todo: `Add transit days for ${supplier} in Settings`,
+    wrong: "Production days are not set",
+    todo: `Add production days for ${supplier} · ${category} in Settings`,
   };
 }
 
@@ -737,9 +733,8 @@ export function stillNeededOf(qty: number, free: number, alreadyOnPo: number): n
  *   PURPOSE        the six governed purposes (compact dropdown).
  *   PRODUCT        the Catalog categories (compact dropdown).
  *   SUPPLIER       actual names, alphabetical (compact dropdown).
- *   SETUP TO FIX   `Supplier not set` · `Production days not set` ·
- *                  `Transit days not set` — only while an affected request
- *                  exists.
+ *   SETUP TO FIX   `Supplier not set` · `Production days not set` — only
+ *                  while an affected request exists.
  *
  * ⛔ `WORK TO DO` and `TO ORDER / All not ordered` are RETIRED from this page.
  * Central Work keeps its action identities; the Register's three groups say
@@ -764,7 +759,6 @@ export const MANUAL_PURCHASE_RAIL = {
     rows: [
       { key: "supplier_not_set", word: "Supplier not set" },
       { key: "production_days_not_set", word: "Production days not set" },
-      { key: "transit_days_not_set", word: "Transit days not set" },
     ],
   },
 } as const;
@@ -914,7 +908,6 @@ export interface ManualPurchaseRailFacts {
   timing: ManualPurchaseTimingState | null;
   supplierGap: boolean;
   productionDaysMissing: boolean;
-  transitDaysMissing: boolean;
 }
 
 export function manualPurchaseRailFacts(
@@ -929,7 +922,6 @@ export function manualPurchaseRailFacts(
     lineOrderBys: readonly (string | null | undefined)[];
     supplierGap: boolean;
     productionDaysMissing: boolean;
-    transitDaysMissing: boolean;
   }[],
   todayIso: string | null,
 ): ManualPurchaseRailFacts[] {
@@ -953,7 +945,6 @@ export function manualPurchaseRailFacts(
       timing: buying ? manualPurchaseTimingOf(orderBy, todayIso) : null,
       supplierGap: r.supplierGap,
       productionDaysMissing: r.productionDaysMissing,
-      transitDaysMissing: r.transitDaysMissing,
     };
   });
 }
@@ -966,8 +957,6 @@ function hasSetup(f: ManualPurchaseRailFacts, key: ManualPurchaseSetupKey): bool
       return f.supplierGap;
     case "production_days_not_set":
       return f.productionDaysMissing;
-    case "transit_days_not_set":
-      return f.transitDaysMissing;
   }
 }
 

@@ -70,8 +70,8 @@ function settings(over: Partial<PurchasingSettingsResponse> = {}): PurchasingSet
     poWindows: { first: "11:30", second: "16:00", secondEnabled: true },
     manualPurchaseMinDeliveryDays: 0,
     suppliers: [
-      { id: NICE, name: "Nice Future", categories: ["mattress"], offDays: [0, 6], transitDays: 1 },
-      { id: OHANA, name: "Ohana", categories: ["bedframe", "sofa"], offDays: [0], transitDays: 1 },
+      { id: NICE, name: "Nice Future", categories: ["mattress"], offDays: [0, 6] },
+      { id: OHANA, name: "Ohana", categories: ["bedframe", "sofa"], offDays: [0] },
     ],
     productionDays: [
       { supplierId: NICE, category: "mattress", workingDays: 7 },
@@ -533,8 +533,8 @@ describe("Last PO time for one supplier", () => {
     settingsQuery.mockReturnValue({
       data: settings({
         suppliers: [
-          { id: NICE, name: "Nice Future", categories: ["mattress"], offDays: [0, 6], transitDays: 1, poCutoff: "10:00" },
-          { id: OHANA, name: "Ohana", categories: ["sofa"], offDays: [0], transitDays: 1, poCutoff: null },
+          { id: NICE, name: "Nice Future", categories: ["mattress"], offDays: [0, 6], poCutoff: "10:00" },
+          { id: OHANA, name: "Ohana", categories: ["sofa"], offDays: [0], poCutoff: null },
         ],
       }),
       isLoading: false,
@@ -554,7 +554,7 @@ describe("Last PO time for one supplier", () => {
   it("clears a time back to the PO windows, and refuses one that is not earlier than the last window", async () => {
     settingsQuery.mockReturnValue({
       data: settings({
-        suppliers: [{ id: NICE, name: "Nice Future", categories: ["mattress"], offDays: [0, 6], transitDays: 1, poCutoff: "10:00" }],
+        suppliers: [{ id: NICE, name: "Nice Future", categories: ["mattress"], offDays: [0, 6], poCutoff: "10:00" }],
       }),
       isLoading: false,
       error: null,
@@ -629,7 +629,7 @@ describe("Supplier addresses (0611, Purchasing §9.6 Return To)", () => {
     settingsQuery.mockReturnValue({
       data: settings({
         suppliers: [
-          { id: OHANA, name: "Ohana", categories: ["bedframe"], offDays: [0], transitDays: 1, address: "Ohana HQ, Klang", returnAddress: null },
+          { id: OHANA, name: "Ohana", categories: ["bedframe"], offDays: [0], address: "Ohana HQ, Klang", returnAddress: null },
         ],
       }),
       isLoading: false,
@@ -640,6 +640,8 @@ describe("Supplier addresses (0611, Purchasing §9.6 Return To)", () => {
     expect(within(row).getByLabelText("Address")).toHaveValue("Ohana HQ, Klang");
     /* A blank Return address stays blank: the Address is never offered in its place. */
     expect(within(row).getByLabelText("Return address")).toHaveValue("");
+    /* Owner ruling 2026-09-29: one address; a blank Return address means the Address. */
+    expect(within(row).getByLabelText("Return address")).toHaveAttribute("placeholder", "Same as Address");
     expect(screen.getByTestId(`supplier-returnAddress-save-${OHANA}`)).toBeDisabled();
     fireEvent.change(within(row).getByLabelText("Return address"), { target: { value: "Ohana returns bay, Klang" } });
     fireEvent.click(screen.getByTestId(`supplier-returnAddress-save-${OHANA}`));
@@ -651,7 +653,7 @@ describe("Supplier addresses (0611, Purchasing §9.6 Return To)", () => {
     settingsQuery.mockReturnValue({
       data: settings({
         canEdit: false,
-        suppliers: [{ id: OHANA, name: "Ohana", categories: ["bedframe"], offDays: [0], transitDays: 1, address: null, returnAddress: "Returns bay" }],
+        suppliers: [{ id: OHANA, name: "Ohana", categories: ["bedframe"], offDays: [0], address: null, returnAddress: "Returns bay" }],
       }),
       isLoading: false,
       error: null,

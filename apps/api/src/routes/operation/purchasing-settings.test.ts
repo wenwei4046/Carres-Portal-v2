@@ -251,9 +251,9 @@ describe("Purchasing Settings — the earliest Delivery Date a Manual Purchase m
   });
 });
 
-describe("Purchasing Settings — Transit days (0318's write door, finally on a screen)", () => {
-  it("PUT /transit-days reaches purchasing_set_supplier_transit_days", async () => {
-    const rpc = vi.fn().mockResolvedValue({ data: null, error: null });
+describe("Purchasing Settings — supplier transit leg removed (owner ruling 2026-09-29)", () => {
+  it("PUT /transit-days no longer exists and never reaches the database", async () => {
+    const rpc = vi.fn();
     vi.mocked(userClient).mockReturnValue({ rpc } as never);
 
     const res = await testApp().request("/settings/transit-days", {
@@ -262,41 +262,7 @@ describe("Purchasing Settings — Transit days (0318's write door, finally on a 
       body: JSON.stringify({ supplierId: SUPPLIER_ID, days: 2 }),
     });
 
-    expect(res.status).toBe(200);
-    expect(rpc).toHaveBeenCalledWith("purchasing_set_supplier_transit_days", {
-      p_supplier_id: SUPPLIER_ID,
-      p_days: 2,
-    });
-    // The answer is the whole settings object, so the screen can never drift
-    // from the stored truth after a save.
-    expect(await res.json()).toMatchObject({ poDays: [1, 3, 5] });
-  });
-
-  it("refuses a number outside 0..60 before any database call", async () => {
-    const rpc = vi.fn();
-    vi.mocked(userClient).mockReturnValue({ rpc } as never);
-
-    const res = await testApp().request("/settings/transit-days", {
-      method: "PUT",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ supplierId: SUPPLIER_ID, days: 61 }),
-    });
-
-    expect(res.status).toBe(422);
-    expect(rpc).not.toHaveBeenCalled();
-  });
-
-  it("refuses a null day count — an unknown lorry leg stays unknown, never 0", async () => {
-    const rpc = vi.fn();
-    vi.mocked(userClient).mockReturnValue({ rpc } as never);
-
-    const res = await testApp().request("/settings/transit-days", {
-      method: "PUT",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ supplierId: SUPPLIER_ID, days: null }),
-    });
-
-    expect(res.status).toBe(422);
+    expect(res.status).toBe(404);
     expect(rpc).not.toHaveBeenCalled();
   });
 });
@@ -320,7 +286,7 @@ describe("Purchasing Settings — a supplier's Last PO time (0585)", () => {
   it("carries each supplier's own time from the one window reader", async () => {
     vi.mocked(loadPurchasingSettings).mockResolvedValue({
       ...response,
-      suppliers: [{ id: SUPPLIER_ID, name: "Ohana", categories: [], offDays: null, transitDays: null }],
+      suppliers: [{ id: SUPPLIER_ID, name: "Ohana", categories: [], offDays: null }],
     });
     vi.mocked(loadPoWindows).mockResolvedValue({
       settings: { first: "11:30", second: "16:00", secondEnabled: true },

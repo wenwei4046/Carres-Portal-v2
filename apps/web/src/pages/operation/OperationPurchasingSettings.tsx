@@ -9,7 +9,6 @@ import { toast } from "sonner";
 import {
   PURCHASING_NUMBER_RANGE,
   PRODUCTION_WORKING_DAYS_RANGE,
-  TRANSIT_DAYS_RANGE,
   SUNDAY,
   WEEKDAYS,
   clockWordOf,
@@ -25,7 +24,6 @@ import {
   usePurchasingSettings,
   useCreatePurchasingDestination,
   useSetProductionDays,
-  useSetSupplierTransitDays,
   useSetSupplierTermsDays,
   useSetSupplierAddress,
   useSetPurchasingNumber,
@@ -285,7 +283,6 @@ export default function OperationPurchasingSettings({
   const setNumber = useSetPurchasingNumber();
   const setPoDays = useSetPurchasingPoDays();
   const setProduction = useSetProductionDays();
-  const setTransit = useSetSupplierTransitDays();
   const setTerms = useSetSupplierTermsDays();
   const setAddress = useSetSupplierAddress();
   const setWorkWeek = useSetSupplierWorkWeek();
@@ -296,7 +293,6 @@ export default function OperationPurchasingSettings({
   const [poDraft, setPoDraft] = useState<number[] | null>(null);
   const [weekDraft, setWeekDraft] = useState<Record<string, number[]>>({});
   const [prodDraft, setProdDraft] = useState<Record<string, string>>({});
-  const [transitDraft, setTransitDraft] = useState<Record<string, string>>({});
   const [termsDraft, setTermsDraft] = useState<Record<string, string>>({});
   /* 0611 · keyed `${supplierId}:${kind}` so the two addresses never share a draft. */
   const [addressDraft, setAddressDraft] = useState<Record<string, string>>({});
@@ -762,105 +758,6 @@ export default function OperationPurchasingSettings({
           </Block>
         </div>
 
-        {/* ── Transit days, per supplier ───────────────────────────────────
-            THE SECOND LEG OF THE LEAD TIME (owner correction, 2026-09-09).
-            `purchasing_supplier_settings.transit_days` and its audited write
-            door have existed since migration 0318, and NOTHING in the portal
-            has ever shown or set them — while Manual Purchase told the operator
-            "Add transit days for {supplier} in Settings". This is that field.
-            The stored values are read as they are; nothing is defaulted, and a
-            supplier nobody has set reads `Set a number`. */}
-        <div className="mb-8 max-w-[860px]" data-testid="transit-days-settings">
-          <Block title="Transit days" subtitle={"Working days between the factory finishing and the goods reaching Carres. Counted on the Carres work week, not the factory’s."}>
-          <div className="bg-white">
-            {data.suppliers.length === 0 && (
-              <div className="py-4 text-body text-base-600">
-                No factory has SKUs yet. Add SKUs in Operation Catalog and the
-                factory appears here.
-              </div>
-            )}
-            {data.suppliers.map((s) => {
-              const draft =
-                transitDraft[s.id] ?? (s.transitDays == null ? "" : String(s.transitDays));
-              const n = Number(draft);
-              const valid =
-                draft !== "" &&
-                Number.isInteger(n) &&
-                n >= TRANSIT_DAYS_RANGE.min &&
-                n <= TRANSIT_DAYS_RANGE.max;
-              const dirty = valid && n !== s.transitDays;
-              return (
-                <div
-                  key={s.id}
-                  className="py-3 border-b border-base-100 last:border-b-0 flex items-start justify-between gap-4 flex-wrap"
-                  data-testid={`transit-row-${s.id}`}
-                >
-                  <div className="min-w-[240px]">
-                    <div className="text-body text-base-900">{s.name}</div>
-                    {s.transitDays == null && (
-                      <div
-                        className="text-meta text-warning mt-0.5"
-                        data-testid={`transit-set-a-number-${s.id}`}
-                      >
-                        Set a number
-                      </div>
-                    )}
-                    <ChangeLine
-                      settings={data}
-                      settingKey="supplier_transit_days"
-                      supplierId={s.id}
-                    />
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="number"
-                      min={TRANSIT_DAYS_RANGE.min}
-                      max={TRANSIT_DAYS_RANGE.max}
-                      step={1}
-                      value={draft}
-                      disabled={!canEdit}
-                      onChange={(e) =>
-                        setTransitDraft((d) => ({ ...d, [s.id]: e.target.value }))
-                      }
-                      className={`${INPUT_CLS} w-24 disabled:opacity-60`}
-                      data-testid={`transit-days-${s.id}`}
-                    />
-                    <span className="text-meta text-base-500 w-[86px]">working days</span>
-                    {canEdit && (
-                      <button
-                        type="button"
-                        disabled={!dirty || setTransit.isPending}
-                        onClick={() =>
-                          setTransit
-                            .mutateAsync({ supplierId: s.id, days: n })
-                            .then(() => {
-                              setTransitDraft((d) => {
-                                const next = { ...d };
-                                delete next[s.id];
-                                return next;
-                              });
-                              toast.success("Saved");
-                            })
-                            .catch(fail)
-                        }
-                        className="btn-primary text-meta disabled:opacity-40"
-                        data-testid={`transit-save-${s.id}`}
-                      >
-                        Save
-                      </button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-          <p className="text-label text-base-500 mt-2">
-            Order By allows for this time as well as production time, so the
-            Safety days stay whole.
-          </p>
-          </Block>
-        </div>
-
         {/* ── Payment terms, per supplier (0530) ───────────────────────────
             Days after the bill date. A PO's own terms win over these; the
             bill form fills in the due date from whichever is set. Empty = not
@@ -928,12 +825,13 @@ export default function OperationPurchasingSettings({
         </div>
 
         {/* ── Supplier addresses (0611) ─────────────────────────────────────
-            `Address` prints on the PO and Repair Order PDFs; `Return address`
-            is a Purchase Return's `Return To` (Purchasing §9.6). Two separate
-            facts, saved one at a time: one is never copied into the other,
-            and a blank saves nothing recorded. */}
+            ONE address per supplier (owner ruling 2026-09-29, Jess: "of course
+            return to the supplier"). `Address` prints on the PO and Repair
+            Order PDFs and is also where Purchase Returns go. `Return address`
+            is filled ONLY when the supplier wants returns somewhere else; blank
+            reads `Same as Address`. Each is saved on its own. */}
         <div className="mb-8 max-w-[860px]" data-testid="supplier-address-settings">
-          <Block title="Supplier addresses" subtitle="The Address prints on the PO. Purchase Returns go to the Return address.">
+          <Block title="Supplier addresses" subtitle="The Address prints on the PO. Purchase Returns go there too. Fill Return address only if returns go somewhere else.">
           <div className="bg-white">
             {data.suppliers.map((s) => (
               <div
@@ -958,7 +856,7 @@ export default function OperationPurchasingSettings({
                           maxLength={SUPPLIER_ADDRESS_MAX}
                           value={draft}
                           disabled={!canEdit}
-                          placeholder={canEdit ? undefined : GOODS_ABSENCE_WORDS.notRecorded}
+                          placeholder={kind === "returnAddress" ? "Same as Address" : canEdit ? undefined : GOODS_ABSENCE_WORDS.notRecorded}
                           onChange={(e) => setAddressDraft((d) => ({ ...d, [key]: e.target.value }))}
                         />
                         {canEdit && (
