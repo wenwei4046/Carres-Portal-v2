@@ -2199,10 +2199,14 @@ was not decisive evidence. Current Carres source supplied the concrete reuse/gap
 - **BUILT IN SOURCE / VERIFICATION LIMITED:** existing Monitor/DO/report surfaces, split mint,
   driver/vehicle templates and shared proof-review capability; dated production evidence remains
   bounded by §16 and is not evidence for the newly approved target.
-- **REAL GAP / CONTRADICTION:** detailed non-customer transport action admission, factory-origin
-  receipt boundaries, saved-fact correction admission and external-link DO privacy remain named
-  cross-module dependencies. Their incomplete contracts cannot be silently implemented through a
-  customer-delivery shortcut. Optional structured company-cost modelling remains a proposal below.
+- **REAL GAP / CONTRADICTION:** factory-origin first-handover recording boundaries and saved-fact
+  correction permission/admission remain incomplete for execution. Do not invent a Warehouse receipt
+  or an unrestricted correction right. The non-customer Work admission contract is an incomplete
+  dependency beneath approved Delivery Duty coordination, not a reopened ownership decision.
+  External-link DO download is resolved by §5.5's existing restriction: no download through that
+  link; paper reaches Logistics at handover. It is not a blocking business question unless a new
+  download capability is separately commissioned. Structured company-cost automation is deferred by
+  the owner ruling below, not a remaining proposal.
 
 **COMPANY-COST AUTOMATION SCOPE — OWNER-APPROVED / LOCKED 2026-09-30.** Retain the approved
 service capability and evidenced actual-company-cost workflow under Payment §9 and Delivery §11.2.
@@ -2218,6 +2222,15 @@ The other intentional exclusions in §15 remain: no lorry tracking, route optimi
 runs, customer self-scheduling, second roster/stock/payment truth or external rollout. Default
 morning/afternoon clock values remain unconfigured until evidenced setup; that is not approval to
 copy code examples. New screen wording must pass the existing COPY governance before build.
+
+**Cross-module resolution checked 2026-09-30.** Purchasing §9.13 and Delivery §13.1 agree that
+Delivery Duty coordinates display transport without a Sales Order while Stock/Receiving and
+physical handlers keep their writes. Rental §§4 and 5.8 and Delivery §14.1 establish Diglant Klang
+storage, Carres-arranged collection and NETS for the initial Klang Valley scope; neither authorises
+invented warehouse receipt or appointment of other regions' carriers. Delivery §§6.1 and 13 retain
+append-only correction as approved target but do not fully define the correction permission and
+admission boundary. These findings refine the gap list without granting new permissions or changing
+external operations.
 
 **Current boundary:** the owner approved deferring company-cost automation on 2026-09-30; the
 operating rules above retain their recorded approvals. The named incomplete cross-module contracts
