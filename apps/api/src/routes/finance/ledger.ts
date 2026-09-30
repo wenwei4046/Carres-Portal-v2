@@ -1,4 +1,4 @@
-import { Hono, type Context } from "hono";
+import { Hono, type Context, type MiddlewareHandler } from "hono";
 import type { ZodError } from "zod";
 import {
   departmentRpcArgs,
@@ -9,9 +9,11 @@ import {
   ledgerAccountReorderInput,
   ledgerAccountUpdateInput,
   ledgerAsOfQuery,
+  ledgerBooksClosedInput,
   ledgerEntriesQuery,
   ledgerEntryRef,
   ledgerPeriodQuery,
+  type LedgerBooksClosed,
 } from "@carres/shared";
 import {
   baseSourceType,
@@ -54,7 +56,7 @@ import financeMoneyAccountsRouter from "./money-accounts";
  * and principal — the HTTP mirror of `gl_may_read()`) and reads through
  * `userClient`, so the ledger's own gates see the signed-in user: RLS on the
  * four `gl_*` tables and `gl_report_guard()` inside every report function.
- * Nothing here writes but the one account door. The ledger is written only by `gl_post` / `gl_reverse`.
+ * Nothing here writes but the account doors and the closed-month door. The ledger is written only by `gl_post` / `gl_reverse`.
  *
  *   GET /entries            the Journal, one page, newest first
  *   GET /entries/:ref       one entry (id or entry number) with its lines
@@ -78,6 +80,8 @@ import financeMoneyAccountsRouter from "./money-accounts";
  *   GET /self-check         books · control accounts · receivables · payables · rental months · health
  *   GET /profit-and-loss    gl_profit_and_loss, passed through
  *   GET /balance-sheet      gl_balance_sheet, passed through
+ *   GET /books-closed       the last closed day, or null (gl_config, 0622)
+ *   PUT /books-closed       set or clear it: principal only (gl_set_books_closed_through, 0622)
  *
  *   /money-accounts         the one list of cash, bank and holding accounts
  *                           (0512) — the only writer mounted here; see money-accounts.ts
@@ -514,6 +518,40 @@ financeLedgerRouter.post("/accounts", requireFinance, async (c) => {
   });
   if (error) return accountError(c, error);
   return c.json({ code: String(data) }, 201);
+});
+
+// ── the closed months (0622) ─────────────────────────────────────────────────
+
+/** Principal only: the HTTP mirror of `is_principal()` inside
+ *  `gl_set_books_closed_through`. Refused before any database call. */
+const requirePrincipal: MiddlewareHandler<AppEnv> = async (c, next) => {
+  if (c.var.auth?.role !== "principal") {
+    return c.json({ error: "forbidden", code: "forbidden", message: "Only the principal may close or reopen a month." }, 403);
+  }
+  await next();
+};
+
+/** The last closed day, or null when no month is closed. Finance and principal read it. */
+financeLedgerRouter.get("/books-closed", requireFinance, async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.from("gl_config").select("books_closed_through").limit(1).maybeSingle();
+  if (error) return ledgerError(c, error, "The closed month");
+  const out: LedgerBooksClosed = { closedThrough: (data as { books_closed_through?: string | null } | null)?.books_closed_through ?? null };
+  return c.json(out);
+});
+
+/** Set or clear it. A refusal (a day that has not ended) keeps the database's sentence. */
+financeLedgerRouter.put("/books-closed", requirePrincipal, async (c) => {
+  const body = await parseJsonBody(c, ledgerBooksClosedInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { error } = await sb.rpc("gl_set_books_closed_through", { p_date: body.data.closedThrough });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.status === 500 ? { ...m.body, message: "The closed month could not be saved. Try again." } : m.body, m.status);
+  }
+  const out: LedgerBooksClosed = { closedThrough: body.data.closedThrough };
+  return c.json(out);
 });
 
 // ── the trial balance ────────────────────────────────────────────────────────

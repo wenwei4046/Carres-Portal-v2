@@ -16,8 +16,9 @@
  * method words Cash · Bank transfer · Online payment for the kinds). A row
  * click opens it; the only new phrases are the page word and the add button.
  *
- * Two more tabs sit beside it: `?tab=chart` holds the chart of accounts
- * (ChartOfAccounts.tsx) and `?tab=card` the card payout banks (0541).
+ * Three more tabs sit beside it: `?tab=chart` holds the chart of accounts
+ * (ChartOfAccounts.tsx), `?tab=card` the card payout banks (0541) and
+ * `?tab=closed` the last closed day (0622).
  *
  * An opened account's number changes here too (YH, 24 Sep 2026), through the
  * chart's own door: the same request the Chart of accounts form sends
@@ -37,6 +38,7 @@ import {
 import { ledgerAccountCodeInput } from "@carres/shared/schemas/finance";
 import Button from "@/components/kit/Button";
 import Checkbox from "@/components/kit/Checkbox";
+import DatePicker from "@/components/kit/DatePicker";
 import Icon from "@/components/kit/Icon";
 import Input from "@/components/kit/Input";
 import Modal from "@/components/kit/Modal";
@@ -46,7 +48,9 @@ import ListPageShell from "@/components/ListPageShell";
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
 import ModuleHeader from "@/pages/operation/components/ModuleHeader";
 import { accountLabel, LoadFailed } from "../other-money-in/parts";
-import { useCardRoutes, useMoneyAccounts, useSaveAccount, useSaveCardRoute, useSaveMoneyAccount } from "./api";
+import { useBooksClosed, useCardRoutes, useMoneyAccounts, useSaveAccount, useSaveBooksClosed, useSaveCardRoute, useSaveMoneyAccount } from "./api";
+import { useAuth } from "@/lib/auth";
+import { fmtDate } from "@/lib/fmt-date";
 import { FieldError } from "@/components/kit/FieldFrame";
 import ChartOfAccounts from "./ChartOfAccounts";
 
@@ -54,6 +58,7 @@ const TABS = [
   { value: "money", label: "Money accounts" },
   { value: "chart", label: "Chart of accounts" },
   { value: "card", label: "Card payout banks" },
+  { value: "closed", label: "Closed months" },
 ] as const;
 
 const KIND_OPTIONS = [
@@ -75,7 +80,7 @@ export default function FinanceSettings() {
         <Tabs tabs={TABS} value={tab} label="Finance Settings" onValueChange={(v) => setParams(v === "money" ? {} : { tab: v })} />
       </div>
       <div className="min-h-0 flex-1">
-        {tab === "chart" ? <ChartOfAccounts /> : tab === "card" ? <CardRoutes /> : <MoneyAccounts />}
+        {tab === "chart" ? <ChartOfAccounts /> : tab === "card" ? <CardRoutes /> : tab === "closed" ? <ClosedMonths /> : <MoneyAccounts />}
       </div>
     </div>
   );
@@ -370,5 +375,48 @@ function CardRouteModal({ route, accounts, onClose }: { route: CardRouteRow | nu
         {refusal && <FieldError>{refusal}</FieldError>}
       </div>
     </Modal>
+  );
+}
+
+/**
+ * 0622 — Closed months, `?tab=closed`: the last closed day. The ledger refuses
+ * every entry dated on or before it (a trigger on gl_entries), so a month
+ * Finance reported stays as reported. Finance reads it; only the principal
+ * changes it, forward or back, and the database checks that again. Clearing the
+ * day in the calendar and saving reopens every month.
+ */
+function ClosedMonths() {
+  const query = useBooksClosed();
+  const save = useSaveBooksClosed();
+  const mayChange = useAuth((s) => s.role) === "principal";
+  /* `undefined` = not touched, so the field shows the saved day. */
+  const [day, setDay] = useState<string | null | undefined>(undefined);
+  const [refusal, setRefusal] = useState<string | null>(null);
+
+  if (query.isError) return <LoadFailed what="The closed month" onRetry={() => void query.refetch()} />;
+  if (!query.isSuccess) return null;
+  const closed = query.data.closedThrough;
+  const picked = day === undefined ? closed : day;
+  return (
+    <section className="h-full overflow-auto p-6" data-testid="closed-months">
+      <p className="text-strong text-kit-slate-12">{closed ? `Books closed up to ${fmtDate(closed)}` : "No month is closed"}</p>
+      {closed && <p className="mt-1 max-w-[560px] text-meta text-kit-slate-11">The ledger takes nothing dated on or before this day.</p>}
+      {mayChange ? (
+        <div className="mt-4 flex max-w-[560px] items-end gap-3">
+          <DatePicker id="books-closed-through" label="Close up to" value={picked} onChange={(v) => { setDay(v); setRefusal(null); }} />
+          <Button
+            variant="primary"
+            loading={save.isPending}
+            disabled={picked === closed}
+            onClick={() => save.mutate({ closedThrough: picked }, { onSuccess: () => setDay(undefined), onError: (e) => setRefusal(e.message) })}
+          >
+            Save
+          </Button>
+        </div>
+      ) : (
+        <p className="mt-4 text-meta text-kit-slate-11">Only the principal can change this.</p>
+      )}
+      {refusal && <FieldError>{refusal}</FieldError>}
+    </section>
   );
 }

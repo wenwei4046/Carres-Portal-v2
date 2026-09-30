@@ -1184,3 +1184,65 @@ describe("statements, passed through", () => {
     expect(await json(await get("/balance-sheet?asOf=2026-09-30"))).toEqual({ rows });
   });
 });
+
+describe("GET and PUT /books-closed (0622)", () => {
+  const put = async (body: unknown, role = "principal") =>
+    app.fetch(new Request("http://t/api/finance/ledger/books-closed", {
+      method: "PUT",
+      headers: { Authorization: `Bearer ${await makeJwt(role)}`, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }), env);
+
+  it("reads the closed day from gl_config, for finance", async () => {
+    const { calls } = fakeClient(() => ok({ books_closed_through: "2026-08-31" }));
+    const res = await get("/books-closed");
+    expect(res.status).toBe(200);
+    expect(await json(res)).toEqual({ closedThrough: "2026-08-31" });
+    expect(calls[0]).toMatchObject({ kind: "from", name: "gl_config" });
+  });
+
+  it("reads null as no month closed", async () => {
+    fakeClient(() => ok({ books_closed_through: null }));
+    expect(await json(await get("/books-closed"))).toEqual({ closedThrough: null });
+  });
+
+  it("is not for operation", async () => {
+    fakeClient(() => ok({ books_closed_through: null }));
+    expect((await get("/books-closed", "operation")).status).toBe(403);
+  });
+
+  it("sets the day as the principal, through gl_set_books_closed_through", async () => {
+    const { sb } = fakeClient(() => ok("2026-08-31"));
+    const res = await put({ closedThrough: "2026-08-31" });
+    expect(res.status).toBe(200);
+    expect(await json(res)).toEqual({ closedThrough: "2026-08-31" });
+    expect(sb.rpc).toHaveBeenCalledWith("gl_set_books_closed_through", { p_date: "2026-08-31" });
+  });
+
+  it("clears it with null", async () => {
+    const { sb } = fakeClient(() => ok(null));
+    expect((await put({ closedThrough: null })).status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("gl_set_books_closed_through", { p_date: null });
+  });
+
+  it("refuses finance before the database is asked", async () => {
+    const { sb } = fakeClient(() => ok(null));
+    const res = await put({ closedThrough: "2026-08-31" }, "finance");
+    expect(res.status).toBe(403);
+    expect(await json(res)).toMatchObject({ code: "forbidden", message: "Only the principal may close or reopen a month." });
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
+
+  it("refuses a day that does not exist", async () => {
+    const { sb } = fakeClient(() => ok(null));
+    expect((await put({ closedThrough: "2026-02-31" })).status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
+
+  it("keeps the database's sentence and tag for a day that has not ended", async () => {
+    fakeClient(() => refuse("22023", "books_closed_not_ended", "Choose a day that has ended. 30 Sep 2026 has not ended yet."));
+    const res = await put({ closedThrough: "2026-09-30" });
+    expect(res.status).toBe(422);
+    expect(await json(res)).toMatchObject({ code: "books_closed_not_ended", message: "Choose a day that has ended. 30 Sep 2026 has not ended yet." });
+  });
+});
