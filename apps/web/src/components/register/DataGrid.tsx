@@ -231,6 +231,10 @@ export type DataGridProps<T> = {
       saved one; null when nothing is sorted. The Trial Balance prints its
       headings only while nothing is sorted. Pass a stable function. */
   onSortChange?: (sort: { key: string; dir: "asc" | "desc" } | null) => void;
+  /** Told the grouped columns whenever they change, and once on load with the
+      saved ones; [] when nothing is grouped. The Journal hides its running
+      balance while rows are grouped. Pass a stable function. */
+  onGroupByChange?: (groupBy: string[]) => void;
   /** Which rows a group heading's count counts. Absent = every row. The Trial
       Balance counts its accounts, never its heading rows. */
   countsInGroup?: (row: T) => boolean;
@@ -720,6 +724,7 @@ function DataGridInner<T>({
   storageKey,
   initialGroupBy,
   onSortChange,
+  onGroupByChange,
   countsInGroup,
   fixedGroups,
   rowKey,
@@ -1478,6 +1483,9 @@ function DataGridInner<T>({
   useEffect(() => {
     onSortChange?.(layout.sort);
   }, [layout.sort, onSortChange]);
+  useEffect(() => {
+    onGroupByChange?.(layout.groupBy);
+  }, [layout.groupBy, onGroupByChange]);
 
   // Selection callback when row changes.
   useEffect(() => {
