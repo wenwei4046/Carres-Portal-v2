@@ -2113,34 +2113,33 @@ their absence as a design blind spot:
 | the Edit Delivery page retirement and the relocated writes | `apps/web/src/pages/operation/EditDelivery.tsx`, `apps/api/src/routes/operation/delivery-arrangements.ts` |
 | the append-only Correction of saved delivery facts (§6.1) | a new migration under the governed apply path |
 | Payment's §6 written request filed from a later-date save (the storage-terms acknowledgement is not among the ruled edit-state fields) | `docs/payment/MASTER.md` §6, `payment_delivery_date_requests` |
-| fleet-template binding on the arrangement (the brief still types the driver and vehicle; the saved templates exist in Delivery Settings) | `ops_delivery_arrangements`, `partner_drivers`, `partner_fleet` |
+| Driver-phone storage and immutable template identity remain absent; name/plate template selection is implemented, with release state in §16 | `ops_delivery_arrangements`, `partner_drivers`, `partner_fleet` |
 | Independent split-trip arrangement, earlier-leg arrival enforcement and one scheduled-date writer remain incomplete | Orders §0.0 A2 records these gaps. Split-trip mint already exists in `delivery-order-issue.ts` through `delivery_trip_document_mint`; do not invent a second issuing engine or claim the whole capability is absent |
 | Delivery reports exist; convergence with newly approved timing, agreement and proof rules still needs validation | `OperationDeliveryReport.tsx` and §12; this pass is source inspection, not a new production verification |
 | `Hold delivery` on the Payment, Warehouse and Logistics surfaces, and the Operation words `RM {amount} unpaid` · `Finance hold · {reason}` (§3, owner ruling 2026-09-25) | `delivery-work-status.ts`, `logistics-card.ts`, `delivery-warehouse-schedule.ts`, `PaymentMonitor.tsx`, the partner arrange page and `DeliveryLinkPage.tsx` |
-| the `ETA` field in the Logistics Details edit state (§8.6) — the Operation save already accepts `expectedArrival`; the brief has no input for it | `apps/web/src/pages/operation/components/DeliveryBrief.tsx` |
 | `View Sales Order` in panel 1 of the brief, replacing `Open Sales Order to change` (§8.5) | `DeliveryBrief.tsx`, the governed SO renderer |
 | **measured 2026-09-25 (Law D):** the Monitor register prints the 2026-09-13 status spellings (`Scheduled for {date}`, `Goods collected by {p}`, `Delivered`) from `deliveryWorkStatusLabelOf` while the schedule card prints the §8.4 words through a second function; a transfer leg on the register wears the customer-leg word; the retired `confirm_time` rung is still a kind; `Order details incomplete` still prints the deadline on line two; a leg's status is derived locally (`legWorkStatusOf`); the Work feed reads "logistics assigned" from `orders` columns while Monitor reads the arrangement; three readers derive the delivery day | `packages/shared/src/delivery-work-status.ts`, `apps/web/src/pages/operation/delivery-work.ts`, `apps/api/src/routes/operation/work.ts`, `components/rail/CalendarPanel.tsx` |
 | the Delivery Orders register's date-first pair `DO Date · DO No` (§8.7, UI §6.7) | `DeliveryOrdersRegister.tsx` (`stickyIdentity` → `leadingColumns`) |
 | the Delivery Order brief inside the register row and the two-column DO object (§8.7, §9, owner ruling 2026-09-26) | `DeliveryOrdersRegister.tsx` (`DoExpansion`), `DeliveryOrderPage.tsx`; the acts reuse `DeliveryResultAction`, `WarehouseHandoverBlock`, `DeliveryEvidencePanel` |
 | the POS required-facts gate for address, state, building type, floor, lift and access | **BUILT 2026-09-13 (Delivery Card 18)** — `createOrderInputSchema`, `rawCreateOrderInputSchema`, the POS wizard and the office create door refuse the facts with one wording; `Order details incomplete` now names legacy rows only |
 
-**2026-09-30 convergence audit — measured source, not production verification or build sequencing.**
+**2026-09-30 convergence audit — measured source; production evidence is recorded in §16.**
 The current approved business rules above resolve these points; missing code does not reopen them
 as owner decisions. Additional material implementation limits are:
 
 | Approved boundary | Evidence and remaining limit |
 |---|---|
-| Bulk assignment only for unassigned deliveries; change Logistics one delivery at a time | `/assign` in `delivery-arrangements.ts` accepts multiple scopes with a change reason. It writes each arrangement/event sequentially; its all-or-nothing comment is not proof of atomic completion. Concurrent changes and failed saves must preserve readable, accurate outcomes |
+| Bulk assignment only for unassigned deliveries; change Logistics one delivery at a time | `/assign` in `delivery-arrangements.ts` now rejects a multi-scope selection containing an assigned delivery, even with a reason. Its source writes remain sequential, so this eligibility guard is not an atomic-completion guarantee. Concurrent changes and failed saves must preserve readable, accurate outcomes |
 | Result selection uses the DO's frozen goods scope | `DeliveryResultAction.tsx` currently builds its Unit list from `useOrderAllocation`; current order allocation is not the issued document's scope |
 | Shared Work assignment and actual actor/source remain distinct | `operationWorkCompletedSchema` carries actual completer/time but not the full assignment snapshots or Workspace/Monitor origin; this DTO alone cannot prove §13.1's complete audit |
-| Optional configured periods, honest actual time, immutable proof minimum | §§5–6 and 11 govern the target. Settings' hardcoded periods/proof switches and current result inputs require convergence; this planning pass changes no runtime behaviour |
-| Fleet and ETA reuse existing capabilities | Driver/vehicle templates and ETA save support already exist. Binding the templates and exposing the governed ETA input are integration gaps, not new fleet/tracking engines |
+| Optional configured periods, honest actual time, immutable proof minimum | §§5–6 and 11 govern the target. Settings now presents and validates fixed minimum successful-delivery proof. Hardcoded periods and current result inputs still require convergence |
+| Fleet and ETA reuse existing capabilities | ETA input is production-verified; name/plate template selection is implemented, with release state in §16. Driver phone and immutable template identity remain absent; no new fleet/tracking engine is warranted |
 
 The remaining richer company-cost reference in §11.2 has no approved structured rate model. It is
 not needed to record actual service/cost under Payment §9 and must not be silently promoted into
-pricing law. No new owner decision is needed to correct the implementation limits above. Detailed
-Cards, implementation order and production verification belong to a separately commissioned
-BUILD/DELIVERY lane. This audit does not declare this restarted planning mission complete.
+pricing law. No new owner decision is needed to correct the implementation limits above. Remaining
+engineering execution and production verification follow the owner-approved bounded BUILD
+takeover in §15.2. Historical correction and incomplete factory-origin operations remain restricted.
 
 ### 15.2 · Complete Delivery Blueprint — current owner review
 
@@ -2246,7 +2245,7 @@ below as they occur; takeover is not proof of completion.
 
 ## 16 · Production closure
 
-**2026-09-30 routine UI build — implementation in progress, NOT DEPLOYED.** The first change
+**2026-09-30 routine UI increment — DEPLOYED, PR #1813, main `250781e3f1a0eb6b64922e0f4c62a83eb33176cc`.** The first change
 adds the existing ETA field to Logistics Details (normalising stored SQL clock seconds before
 resaving), adopts the governed Logistics/Company details/Transit points Settings names, removes
 the routine Operation-contact choice and locks minimum success evidence in the settings UI and
@@ -2257,19 +2256,32 @@ Focused checks cover Settings/API policy, bulk rejection, ETA input and failure-
 Seeded Settings preview verified at 390px and the normal desktop viewport: fixed success proof
 is readable policy, only failure-photo evidence remains configurable, and fields stack without
 horizontal overflow on phone. This is component-preview evidence, not production acceptance.
-Full release validation remains owed before production closure. Configurable period persistence, assignment timing, exact DO result scope, actual-date storage and
-complete evidence/audit convergence remain open; this increment is not the whole approved UI scope.
+PR CI and the deployment's repeated checks passed. Both Pages projects, both canonical sites and
+the API Worker reported that exact SHA. Authenticated production read as Principal confirms the
+Settings rail says `Logistics`, routine contact is fixed, the only evidence checkbox is the
+configurable failure-photo requirement, and the DO gate copy no longer implies a mandatory period.
+On Monitor's SO-1203 expansion, Logistics Details exposes the `ETA` time input. No live business
+record was changed during these read checks; persistence/refusal behavior is supported by automated
+API and component tests, not a newly performed production save. Configurable period persistence,
+assignment timing, exact DO result scope, actual-date storage and complete evidence/audit convergence
+remain open; this increment is not the whole approved UI scope.
 
 
-**2026-09-30 fleet-template selection — implementation in progress, NOT DEPLOYED.** Logistics
+**2026-09-30 fleet-template selection — DEPLOYED, PR #1814, main `3a92519735193a4052758b79ff2d8d9ffc149768`.** Logistics
 Details reads active driver and vehicle templates for the chosen company through the existing
 Settings query. The recorded name/plate remains readable if a template was renamed or retired;
 changing company clears the former company's crew. Optional crew can be cleared. A failed template
 read disables selection and preserves the existing recorded facts. The existing arrangement writer
 stores the chosen name/plate snapshot; this does not add template IDs, driver-phone storage or live
 tracking. Four focused tests cover company filtering, saved ETA/agreed-time separation, historical
-values, company changes and read failure. The seeded real component's driver selection was walked;
-full release and authenticated production acceptance remain owed.
+values, company changes and read failure; the 14 Logistics Work card tests also passed. The seeded
+real component's driver selection was walked on desktop, and the observed 390px phone viewport had
+390px document width with stacked driver/vehicle/ETA controls. Complete PR CI and deployment checks
+passed; both Pages projects, both canonical sites and the API Worker reported that exact SHA.
+Authenticated read-only production checks on SO-1203 confirm driver/vehicle comboboxes and the ETA
+time input. NETS currently offers only `Not recorded` in that tested driver's list; no driver was
+invented to populate it. The populated-template selection/save behavior is automated and seeded-preview
+evidence, not a newly performed production save. No live business record was changed.
 
 
 **2026-09-14 · Final convergence — the three 🟡 notes of 2026-09-13 are closed, and a Sales Order opens by its
