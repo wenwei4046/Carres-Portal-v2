@@ -142,6 +142,12 @@ Draft  →  review business impact  →  commit the exact file  →  merge-ready
 ## 6 · Deployment
 
 **Authoritative automation (2026-08-13):** `.github/workflows/ci.yml` owns PR checks and
+The same workflow has a manual `diagnose_schedule` mode for read-only verification: it reads the
+registered schedules and observes scheduled outcomes/exceptions for 95 seconds, without deploying.
+It uses its own concurrency group so diagnostics do not block production delivery. HTTP request
+payloads and credentials are not printed or uploaded. No observed event means execution remains
+unverified; an unsuccessful scheduled event fails the diagnostic. Run during the trigger's hours.
+
 `.github/workflows/deploy-production.yml` owns the post-merge proof. `carres-portal` and
 `carres-pos` are direct-upload Pages projects, so GitHub Actions builds the exact `main` SHA once
 and uploads that same artifact to both. The web build writes `/__carres_deploy.json` from

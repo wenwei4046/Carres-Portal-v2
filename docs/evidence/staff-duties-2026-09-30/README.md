@@ -64,3 +64,9 @@ App lifetime, gated to Operation/Principal. Targeted tests passed 53 cases, incl
 without another collector/mount heartbeat, identity change/sign-out disposal, and unrelated-role
 exclusion. This follow-up awaits its own production verification; the screenshots above verify
 the already deployed Settings UI, not a synthetic staff-activity write.
+
+The live no-candidate state exposed misleading generic write-error feedback. Follow-up #1816
+uses explicit non-blocking check feedback; 43 targeted Duty/activity tests passed. Migration 0625
+was negatively reproduced against the old functions, then its exact committed SQL passed Duty
+and order sequences of no-candidate check → movement → later check → later movement. The newest
+outcome wins while the durable assignment remains correct. This migration is not yet applied.

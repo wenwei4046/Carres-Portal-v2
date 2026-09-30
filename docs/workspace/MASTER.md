@@ -468,7 +468,12 @@ The released #1798 collector uses trusted foreground interactions and removes th
 mount/timer heartbeat as assignment evidence. Follow-up #1816 moves that same collector into App,
 scoped to the authenticated Operation/Principal identity rather than the current module, so Finance
 or People navigation does not lose a Principal's evidence or reset minute deduplication. This
-portal-wide follow-up is committed and awaiting its own deployment verification. Shared validated settings feed independent Office
+portal-wide follow-up is committed and awaiting its own deployment verification. It also replaces
+the misleading no-candidate write-error sentence with `No one else could be assigned at this check.
+Any authorised staff may help.` A successful check with no candidate is not a failed read/write.
+Migration 0625 is committed, NOT APPLIED: both Duty/order projections report the latest recorded
+check or movement outcome, so a later successful movement clears an older no-candidate message.
+The stale-status negative control and both resolver timelines passed exact-file rollback probes. Shared validated settings feed independent Office
 morning and afternoon windows; lunch, background tabs and post-cutoff interactions cannot satisfy
 an earlier check. A failed settings/evidence read aborts the check rather than proving absence.
 The weekday scheduler obtains a fresh source snapshot per period, validates source completion,
