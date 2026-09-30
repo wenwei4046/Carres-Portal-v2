@@ -571,7 +571,7 @@ Monitor `Delivery Status` — the OPERATION's progress, naming the actor and the
     Waiting for customer reply
   once a date is scheduled (time optional, owner ruling 2026-09-24) — the JOURNEY rungs:
     customer leg   Scheduled · Waiting for {partner} pickup · Collected by {partner} ·
-                   On the way to customer · Delivered to customer · Failed Delivery
+                   Delivered to customer · Failed Delivery
     transfer leg   Transfer scheduled · Collected for transfer · In transit to {stop} ·
                    Arrived at {stop} · Transfer failed
   across both      Overdue · Order details incomplete
@@ -581,10 +581,11 @@ Monitor `Delivery Status` — the OPERATION's progress, naming the actor and the
 column, the `DELIVERY STATUS` dropdown, the schedule card and every report read the SAME
 arithmetic): `Confirmed for {weekday, date}` → **`Confirmed`** (the day and window are column 8's
 job, and on a card the date column already names the day) · `Goods collected by {partner}` →
-**`Collected by {partner}`** · `{partner} is delivering to the customer` → **`On the way to
-customer`** · `Delivered` → **`Delivered to customer`** · `Arrived` → **`Arrived at {stop}`**.
+**`Collected by {partner}`** · `Delivered` → **`Delivered to customer`** · `Arrived` → **`Arrived at {stop}`**.
 `Waiting for {partner} pickup` is KEPT: it is a recorded fact (the document exists, the partner
 has not collected) that the new ladder does not otherwise express.
+
+**Owner correction 2026-09-30 / NOT BUILT:** `On the way to customer` and equivalent inferred driver/lorry movement claims are removed. A supplied ETA does not establish vehicle movement. Use the actual recorded collection or delivery fact.
 
 **`Delivered` is reserved for goods that reached the CUSTOMER (Card 20, 2026-09-13).** An
 intermediate Journey leg's success is **`Arrived`** on line one and the partner warehouse the goods
@@ -2885,7 +2886,7 @@ what has not happened yet, in the plainest words available:
 | A DELIVERY lane's plate — a Journey leg | **`Leg {n} · {from} → {to}`** (`Leg 1 · Carres Klang → JB transit warehouse`) | Stage · Hop · Segment |
 | A DELIVERY lane's plate — a split trip | **`Trip {n} · {goods, e.g. Sofa, 2 items}`** · a trip with no Delivery Order yet **`Trip {n} · not booked yet`** | Batch · Part · Shipment |
 | Leg 2's extra gate requirement | **`Leg 1 arrived at {stop}`** met · **`Leg 1 not arrived yet`** unmet | Leg 1 complete · Transit done |
-| DELIVER node, a scope with a Delivery Order | line 1 = Delivery's §8.4 rung through its ONE label function (`Scheduled` · `Waiting for {partner} pickup` · `Collected by {partner}` · `On the way to customer` · `Arrived at {stop}` · `Delivered to customer` · `Failed Delivery` · `Overdue`); line 2 = `Arrived: {date}` · `Delivered: {date}` · `ETA {time}` · the one reason | a second spelling written on this surface — `Delivered` alone · `In transit` |
+| DELIVER node, a scope with a Delivery Order | line 1 = Delivery's §8.4 rung through its ONE label function (`Scheduled` · `Waiting for {partner} pickup` · `Collected by {partner}` · `Arrived at {stop}` · `Delivered to customer` · `Failed Delivery` · `Overdue`); line 2 = `Arrived: {date}` · `Delivered: {date}` · `ETA {time}` · the one reason | a second spelling written on this surface — `Delivered` alone · `In transit` |
 | DELIVER node, no Delivery Order yet | **`Not delivered yet`** (dashed future node) | Pending |
 | A read failed — Delivery | **`Could not read Delivery for this order.`** / **`This does not mean nothing is arranged.`** + **`Try again →`** | `Logistics not assigned` printed from a thrown read |
 | A read failed — Payments | **`Could not read Payments for this order.`** / **`This does not mean the order is unpaid.`** + **`Try again →`** | a balance sentence from a thrown read |

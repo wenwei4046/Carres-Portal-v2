@@ -795,6 +795,8 @@ because Sunday is a non-delivery day. `Month` prints `Deliveries {n}`, `Transfer
 transfers never summed. Day, `3 days`, `Work week` and `Month` share one `?date=` and one
 selection; arrows replace the whole window and never scroll it.
 
+**Owner correction 2026-09-30 — APPROVED TARGET / NOT BUILT.** Remove `On the way to customer` and equivalent driver/lorry movement claims from the Delivery UI. Carres has no driver/lorry tracking system. An ETA or a scheduled day does not prove movement; retain actual recorded collection and delivery results. The replacement calendar-card composition is under owner review: three format proposals only, no application change authorised by that review request.
+
 **The card carries TWO FACTS, never one vague status (owner ruling 2026-09-14).** The compact
 card shows its type (`DELIVERY` · `TRANSFER`), the DO number when present, the SO on its own
 line and the confirmed window. It carries the actual route or delivery locality, each physical
@@ -1363,7 +1365,7 @@ and is not restored. `Booked` stays banned.
 | DO exists, no handover recorded | `Waiting for {partner} pickup` | none | `Handover {date}` when Warehouse scheduled it |
 | Warehouse handed over and the partner's receipt is recorded — a CUSTOMER leg | `Collected by {partner}` | none | `Collected {date} {time}` |
 | Warehouse handed over and the partner's receipt is recorded — a TRANSFER leg | `Collected for transfer` | none | `Collected {date} {time}` |
-| collected, and the partner recorded departure or an ETA — a CUSTOMER leg | `On the way to customer` | none | `ETA {time}` |
+| collected, and the partner recorded an ETA — a CUSTOMER leg | `Collected by {partner}` | none | the recorded collection fact; ETA remains a separate estimate in Logistics Details |
 | collected, and the partner recorded departure or an ETA — a TRANSFER leg | `In transit to {stop}` | none | `ETA {time}` |
 | confirmed day passed with no result | `Overdue` | red | `Ask {partner} for the result` |
 | attempt `delivered` on an intermediate Journey leg — the goods reached the named partner warehouse (Card 20) | `Arrived at {stop}` | green | the stop, `JB transit warehouse`; no proof line, the customer leg owes the proof |
