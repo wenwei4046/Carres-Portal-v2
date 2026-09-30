@@ -50,3 +50,11 @@ remain in the bundle; this proof does not claim global removal beyond the author
 A post-apply rollback probe also passed morning movement → intervening movement → afternoon
 current-actor acceptance, with the stale actor refused. Follow-up reads proved the private clock
 restored and zero future probe receipts or probe tracker rows.
+
+Read-only scheduler diagnostic run
+[36680255269](https://github.com/wenwei4046/Carres-Portal-v2/actions/runs/36680255269) read both
+registered triggers and observed the minute trigger with outcome `ok`, no exceptions. The deployment
+job was skipped. The first post-release catch-up wrote 104 morning receipts at 14:50–14:51 MYT:
+103 `no_candidate`, one `not_assigned`, zero movements. There was no pre-release morning evidence,
+so the engine did not fabricate activity or select a person without it. This is execution proof,
+not evidence that any real employee was absent or that a live reassignment was needed.
