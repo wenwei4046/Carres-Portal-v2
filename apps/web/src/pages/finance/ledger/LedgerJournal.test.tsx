@@ -254,6 +254,22 @@ describe("one account's running balance", () => {
     await waitFor(() => expect(screen.queryByRole("columnheader", { name: "Running balance" })).not.toBeInTheDocument());
   });
 
+  it("hides the balance while the rows are grouped", async () => {
+    window.localStorage.setItem("carres.finance.journal.v1", JSON.stringify({ groupBy: ["source"] }));
+    try {
+      api.fetch.mockImplementation((u: string) => withLedger(u));
+      show("/finance/ledger?account=1210");
+      await screen.findByRole("columnheader", { name: /Amount/ });
+      // The balances have been read; only then does their absence mean anything.
+      await waitFor(() => expect(ledgerAsked()).toHaveLength(1));
+      await new Promise((r) => setTimeout(r, 50));
+      expect(screen.queryByRole("columnheader", { name: "Running balance" })).not.toBeInTheDocument();
+      expect(document.body.textContent).not.toMatch(/RM [\d,.]+ (Debit|Credit)/);
+    } finally {
+      window.localStorage.removeItem("carres.finance.journal.v1");
+    }
+  });
+
   it("says so when the balances cannot be read, and shows no figure", async () => {
     api.fetch.mockImplementation((url: string) => url.startsWith("/api/finance/ledger/account-ledger?")
       ? Promise.reject(new Error("boom")) : answer(url));

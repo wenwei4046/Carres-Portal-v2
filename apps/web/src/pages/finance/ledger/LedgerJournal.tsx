@@ -12,7 +12,7 @@
  * the manual journal form at `?entry=new`; for anyone else `new` is just a
  * number nobody has.
  */
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { DepartmentFilter } from "../department";
 import type { LedgerEntryRow } from "@carres/shared/finance-ledger";
@@ -122,8 +122,11 @@ function JournalRegister({ scope, search, onOpen, onPickDept, onPickAccount, onS
   // One account picked: each entry shows the account's balance after it. The
   // rows run in the ledger's own order (date, then entry number, newest first)
   // so the balances read down the page, and the column shows only while no
-  // column sort is on: sorted any other way, the figures would not follow on.
+  // column sort or grouping is on: in any other order the figures would not
+  // follow on.
   const [sort, setSort] = useState<{ key: string; dir: "asc" | "desc" } | null>(null);
+  const [grouped, setGrouped] = useState(false);
+  const onGroupByChange = useCallback((g: string[]) => setGrouped(g.length > 0), []);
   const loaded = query.data?.rows;
   const rows = useMemo(() => !loaded || !scope.account ? loaded ?? [] : [...loaded].sort((a, b) =>
     b.entry_date.localeCompare(a.entry_date) || (a.entry_no < b.entry_no ? 1 : a.entry_no > b.entry_no ? -1 : 0)),
@@ -149,8 +152,8 @@ function JournalRegister({ scope, search, onOpen, onPickDept, onPickAccount, onS
       accessor: (r) => <ReversalLink row={r} search={search} />,
       searchValue: (r) => ledgerReversalText(r), filterValue: (r) => ledgerReversalKind(r),
       filterType: "enum", exportValue: (r) => ledgerReversalText(r) },
-    ...(balanceData && !sort ? [balanceColumn(balanceData)] : []),
-  ], [search, balanceData, sort]);
+    ...(balanceData && !sort && !grouped ? [balanceColumn(balanceData)] : []),
+  ], [search, balanceData, sort, grouped]);
 
   const accountOptions = useMemo(() => [
     { value: ALL_ACCOUNTS, label: "All accounts" },
@@ -179,7 +182,7 @@ function JournalRegister({ scope, search, onOpen, onPickDept, onPickAccount, onS
         <button type="button" className="underline underline-offset-2" onClick={() => void balances.refetch()}>Try again</button>
       </div>}
       <ListPageShell register>
-        <DataGrid rows={rows} columns={columns} rowKey={(r) => r.id} onSortChange={setSort}
+        <DataGrid rows={rows} columns={columns} rowKey={(r) => r.id} onSortChange={setSort} onGroupByChange={onGroupByChange}
           storageKey="carres.finance.journal.v1" appearance="reference" exportName="Journal"
           groupBanner={false} stickyIdentity isLoading={!query.isSuccess}
           searchPlaceholder="Search entries…"
