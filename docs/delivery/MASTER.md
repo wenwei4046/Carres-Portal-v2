@@ -2143,11 +2143,24 @@ takeover in §15.2. Historical correction and incomplete factory-origin operatio
 
 ### 15.2 · Complete Delivery Blueprint — current owner review
 
-**2026-09-30 consolidated owner-reviewed Blueprint; bounded BUILD takeover below.** Sections
+**2026-09-30 business Blueprint; complete visual UI review remains outstanding.** Sections
 1–15 retain their explicitly approved operating rules, including the owner's assignment-timing,
 actual-date/time and customer-period rulings. The review below synthesises them; it does not
-reopen those decisions. The prior Blueprint approval does not prove the later convergence work is
-built. The remaining recommendation on the structured company-cost reference is marked separately.
+reopen those decisions. Business-rule agreement and the bounded BUILD takeover do not constitute
+approval of a complete rendered UI. Jess explicitly corrected this on 2026-09-30: she had not
+seen the complete design. Existing delivered increments retain their bounded implementation
+evidence; the complete visual design is **PROPOSAL / AWAITING OWNER REVIEW**, not approved.
+
+**Visual review contract — owner-confirmed 2026-09-30.** Present a connected, clickable preview
+inside the project using the existing kit and clearly identified sample data. Cover Monitor,
+schedule, four-panel brief, assignment/date/crew edits, DO register/object, delivery results,
+evidence/review and Settings, including missing information, partial/failed delivery and narrow
+screens. Each surface must map to its governed facts, actions, next destination and exception
+behavior. Walk the rendered flows before presentation; a generated file or successful render
+alone is not validation. Record approval only against the specific visual version and surfaces
+actually shown. Reuse reviewed composition during implementation and compare the resulting UI
+with it before claiming design conformity. Do not maintain a detached HTML design as a second
+authority or treat a generic chat “yes” as approval of unseen screens.
 
 **Operator journey and destinations.**
 
