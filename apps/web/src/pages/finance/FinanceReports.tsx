@@ -222,6 +222,15 @@ export default function FinanceReports() {
           </span>
           <span className="text-label text-muted-foreground">Open →</span>
         </Link>
+        <Link to="/finance/reports/card-charges" data-testid="reports-card-charges-door"
+          className="flex items-center justify-between rounded-card border border-border bg-card px-4 py-3 hover:bg-muted/40">
+          <span>
+            <span className="block text-meta font-semibold">Card charges</span>
+            <span className="block text-label text-muted-foreground">
+              Sales total · Fee · Paid into bank · Fee % · by month and card company</span>
+          </span>
+          <span className="text-label text-muted-foreground">Open →</span>
+        </Link>
 
         {notStarted ? <div role="alert" className="text-body">
           <p>The ledger has no start date yet. Nothing can be totalled.</p>

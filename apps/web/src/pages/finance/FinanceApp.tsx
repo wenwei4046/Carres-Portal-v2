@@ -25,6 +25,7 @@ import SupplierBills from "./payables/SupplierBills";
 import PaymentVouchers from "./payables/PaymentVouchers";
 import FinanceSettings from "./settings/FinanceSettings";
 import DealerCommission from "./reports/DealerCommission";
+import CardCharges from "./reports/CardCharges";
 import ApOutstanding from "./payables/ApOutstanding";
 
 /**
@@ -103,6 +104,8 @@ export default function FinanceApp() {
           <Route path="reports/payment" element={financeOnly(<FinancePaymentReport />)} />
           {/* 0544 — dealer commission and renovation rebate: rates and a read-only report. */}
           <Route path="reports/dealer-commission" element={financeOnly(<DealerCommission />)} />
+          {/* Card sales, card fee and what reached the bank, per month and card company. */}
+          <Route path="reports/card-charges" element={financeOnly(<CardCharges />)} />
           {/* 0268 — the rent-to-own credit gate (9th tab). */}
           <Route path="rental-approver" element={financeOnly(<FinanceRentalApprover />)} />
           {/* 0538 — one month of subscription billing across every agreement. */}

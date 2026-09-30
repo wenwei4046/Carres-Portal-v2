@@ -46,6 +46,7 @@ afterAll(() => _setJwksForTesting(null));
 describe("/api/finance/card-settlement", () => {
   it.each([
     ["GET", "", undefined],
+    ["GET", "/charges?from=2026-09-01&to=2026-09-30", undefined],
     ["POST", "/import", { acquirer: "PBB", fileName: "a.csv", content: pbbFile([sale]) }],
     ["POST", `/rows/${LINE_ID}/match`, { paymentId: PAY_ID }],
     ["POST", "/days/payout", {}],
@@ -62,6 +63,17 @@ describe("/api/finance/card-settlement", () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual(review);
     expect(sb.rpc).toHaveBeenCalledWith("card_settlement_review");
+  });
+
+  it("reads card charges for the dates, and refuses dates that are not a period", async () => {
+    const sb = stubRpc({ data: [], error: null });
+    const res = await call("GET", "/charges?from=2026-01-01&to=2026-09-30");
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("card_charges_source", { p_from: "2026-01-01", p_to: "2026-09-30" });
+    for (const q of ["", "?from=2026-09-01", "?from=2026-09&to=2026-09-30", "?from=2026-09-30&to=2026-09-01"]) {
+      expect((await call("GET", `/charges${q}`)).status).toBe(400);
+    }
+    expect(sb.rpc).toHaveBeenCalledTimes(1);
   });
 
   it("imports the parsed rows with the whole file", async () => {
