@@ -462,59 +462,45 @@ the entered facts for correction without optimistic owner changes.
 
 ### 4.4 · Automatic assignment changes and two daily checks
 
-**Build evidence 2026-09-29 — DRAFT PR #1798 / NOT DEPLOYED.**
-The `codex/staff-activity-checks` draft contains validated company-period windows and trusted
-foreground-interaction collection, plus the Settings time form, manager-gated API and migration
-`0613_work_activity_has_two_office_periods`. The collector is not yet wired to OperationApp;
-no scheduler or assignment resolver has been switched to the new evidence. The old heartbeat and
-`/auto-assign` presence stamp remain until the complete engine is ready; changing them alone
-would retain the old SQL 10:00/all-day assignment semantics.
+**Build evidence 2026-09-30 — PR #1798 / BUILT ON BRANCH, NOT DEPLOYED.**
+The branch wires trusted foreground interaction collection into OperationApp and removes its
+mount/timer heartbeat as assignment evidence. Shared validated settings feed independent Office
+morning and afternoon windows; lunch, background tabs and post-cutoff interactions cannot satisfy
+an earlier check. A failed settings/evidence read aborts the check rather than proving absence.
+The weekday scheduler obtains a fresh source snapshot per period, validates source completion,
+eligibility, settings revision and current assignment under database locks, and appends one
+idempotent checkpoint receipt. An append-only movement ledger also handles explicitly recorded
+unavailability between checkpoints. Stable Sales Order PIC and completed source facts are untouched.
+Late activity does not undo a movement; the following day starts from its dated source allocation.
 
-Supabase connectivity is confirmed for `kfprgpjpaffedghytstl`. An exact-draft rolled-back probe
-verified settings audit, valid/invalid times, revision conflict, manager refusal, activity
-minute deduplication, lunch/overnight exclusion and sealed direct-write/time-spoofing grants.
-No table or probe tracker row persisted. Migration 0613 is **NOT APPLIED**: numbering follows
-tracker 0611 and all-branch maximum 0612 (Supplier Return pickup, owned by another lane).
+Migrations 0613 and 0615–0621 are committed and **NOT APPLIED**. Exact-file rollback probes passed
+settings validation/audit, manager and browser refusals, lunch/overnight exclusion, receipt retries,
+stale source/settings refusal, independent morning/afternoon movement, no late bounce-back, newer
+manual assignment precedence, recorded unavailability, restricted history and unchanged GRN
+amendment authority. Follow-up reads confirmed no probe tables or tracker rows persisted.
+The current live GRN posting gate was already opened to active personal Operation/Principal by
+0601; 0619 preserves the separate original-holder/manual-assignment/Superuser amendment gate when
+automatic responsibility moves. Automatic assignment never grants amendment or approval rights.
 
-**Measured data gap:** both active Operation people (Shasha and Yu Jun) have NULL
-`hr_employees.join_date` and no `hr_employment_events`; no month-of-joining eligibility may be
-inferred from account creation or an invented employment date. This is an automatic-newcomer-PO
-allocation data gap, not an execution-permission gap or a request for Jess to prove existing staff
-tenure. Do not block existing authorised staff from helping, invalidate their recorded assignments,
-or hold unrelated implementation behind a joining-date question. People owns employment facts;
-there is no second Workspace joining-date field.
-The current assignment source remains dated assignments, not the target's general cyclic roster.
+Settings has the two persisted manager-editable times, revision conflict handling and read failure
+states. Duty catalogue/detail use one current person, future assignments, collapsed history and
+the existing kit menu/form. System movements have paginated authenticated history; no private
+People profile is exposed through a historic name. Work and Staff & Duties refresh their shared
+current-person projections. UI remains subject to final browser verification and release checks.
 
-Outstanding before release: period collector wiring, authoritative scheduler/calendar/eligible
-pool, immutable assignment movements/no late bounce-back and shared consumers, missing-period
-versus offline-work evidence handling, full release checks and production verification.
-The shared checkpoint evaluator now separates the two evidence windows, uses the existing Office
-week/holiday contract, waits for the persisted cutoff, and distinguishes unavailable/corrupt
-evidence from a healthy empty result. It uses actual server observation timestamps, not minute
-buckets, so an interaction after the cutoff cannot satisfy the check. Nine focused cases cover
-flexible starts, lunch, cutoff boundaries, weekends, holidays and unavailable evidence. This
-evaluator is not yet connected to a scheduler or assignment writer. The ordinary-work decision
-helper preserves from/to and expected previous receipt for the atomic writer, respects authoritative
-candidate order, refuses completed/approval work, and consumes per-day/per-period receipts to
-prevent repeat movements. Twelve cases cover first receipt, late-activity bounce-back, independent afternoon
-checks, no candidate, source outage and People eligibility. These are decision tests only; the
-source-aware scheduler/resolver integration is not yet implemented and no production movement is
-claimed.
+**Measured data boundary:** Shasha and Yu Jun have no People joining date or employment event.
+No date is invented and execution is unrestricted by tenure. Existing recorded PO assignment
+membership preserves incumbent eligibility when the joining date is absent; a new person with no
+People date and no such membership is excluded from automatic PO allocation only. Known joiners
+enter automatic PO eligibility from the next calendar month. This is not the pending general
+monthly roster/admission engine; current baseline assignment remains the dated source.
 
-Migration `0615_a_work_checkpoint_keeps_an_immutable_assignment_receipt` adds a service-only
-checkpoint receipt primitive with per-scope/day locking, unique period receipts, prior-receipt
-comparison and settings-revision validation. It retains from/to, reason, cutoff and recording time;
-retrying a recorded period returns the committed result. Direct browser reads/writes and direct
-service-role inserts/updates/deletes are revoked. The source-aware caller must still prove calendar,
-complete evidence, allocation eligibility and source completion in the committing transaction;
-the primitive alone is not an allocation authority.
-
-The exact committed 0613 + 0615 files passed a single rolled-back production probe on 2026-09-29:
-duplicate retry, stale assignment, stale settings, approval-duty refusal, browser refusal and
-sealed direct grants. Follow-up reads confirmed both tables absent and no 0615/probe tracker row.
-0615 is **NOT APPLIED**; its number follows measured tracker 0612 and all-branch maximum 0614.
-No scheduler or existing resolver has been activated by this work.
-These components do not prove attendance or claim that automatic reassignment is live.
+**Remaining target work:** complete monthly rotation, the People-owned departure/access workflow
+and restricted former-profile lookup, complete bounded manual-exception convergence across a
+changing monthly baseline, full legacy-history pagination, and original/update/completion Work
+assignment snapshots with originating-surface audit. The two-period movement ledger must not be
+reported as those capabilities. Real browser and production proof, exact-file application and
+release closure remain owed before this branch is described as deployed.
 
 **OWNER RULING 2026-09-29 — APPROVED TARGET / NOT BUILT.** Settings → Staff & Duties contains
 TWO manager-editable time settings, `Morning check time` and `Afternoon check time`, initially
@@ -669,12 +655,12 @@ convergence and the approved plain-person/detail/history redesign remain unfinis
 | Settings relocation is production verified at PR #1791 — delivered; detail redesign remains a target gap | Staff now open the existing page under Settings | Preserve CARD 02; separately converge plain-person details, `Next`, collapsed `History` and manager-only `⋯` |
 | Migration 0437 prefilled named two-person monthly assignments through September 2027 — red target gap | This does not establish general joiner/leaver automation | The approved cyclic allocation and next-month admission rule must produce the single authoritative assignment source |
 | Existing assign writer accepts overlapping rows; current cover writer validates a whole normal-holder period — red target gap | Manual exceptions and automatic leave could otherwise give inconsistent answers | Dated §4.3 exceptions with impact preview and preserved baseline; §4.4 one effective cover answer and eligibility checks |
-| OperationApp.tsx sends a heartbeat on mount and every 15 minutes, including background tabs; shared `countsAsInToday` and migration 0504 use a single 10:00 MYT/all-day stamp — measured source gap | Existing activity cannot distinguish afternoon MC or a tab left open overnight | Implement one two-period evidence/configuration contract before activating the 10:30/15:00 target; reconcile all consumers and verify production |
+| PR #1798 replaces the OperationApp heartbeat and the 0504 presence fallback with period interaction evidence and recorded movements — branch only | Morning use does not satisfy the afternoon check; no late bounce-back | Exact migration application, release and production verification remain required (§4.4) |
 | `operationWorkCompletedSchema` exposes completed actor/time but no assignment snapshots or Workspace/Delivery Monitor origin — measured contract gap | The full newly approved history cannot be claimed from that DTO alone | Preserve existing completion evidence and converge the assignment/update/origin audit across owning-module writers and Work reads |
 | Existing Duty API limits history reads to 200 records — target gap | Older authorised records may not be reachable | Complete bounded history pagination in a separate approved delivery scope |
-| Existing StaffDuties.tsx shows the failure surface on a failed refresh — target gap | Previously known facts disappear during the failure | Preserve known facts and disclose failed refresh in the later page convergence |
+| PR #1798 retains the last successful Duty response on refresh failure — branch only | Staff keep the known facts and can retry | Verify the deployed failure state |
 | HrPersonDrawer ExitBlock explicitly separates exit recording and access disablement — red target gap | Manager can finish one step and miss the other | HR §3 one confirmation, honest scheduled/partial effects, default current-only lists and personnel-only former-profile access |
-| Existing ordinary-action Duty-only permission doors differ from §3's broadened operational target — red target gap | A colleague or newcomer can be blocked from helping | Owning-module permission convergence with immutable actual-actor evidence; approval/amendment/void gates stay separately governed |
+| GRN posting already admits active personal Operation/Principal under 0601; automatic assignment must not expand amendment permission | Helping remains possible regardless of the displayed assignee | 0619 preserves the original/manual GRN amendment authority separately from automatic responsibility; other source-owned permissions remain unchanged |
 
 Reference lessons used during review, never authorities over Carres business rules:
 

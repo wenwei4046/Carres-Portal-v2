@@ -5,6 +5,7 @@ import DutyCatalogue from "./staff-duties/DutyCatalogue";
 import DutyDetail, { DutyHistory } from "./staff-duties/DutyDetail";
 import type { DutyStateFilter } from "./staff-duties/staff-duties-model";
 import Button from "@/components/kit/Button";
+import { useAuth } from "@/lib/auth";
 import { readReturnTo } from "@/lib/return-to";
 import Loading from "@/components/kit/Loading";
 import { appTodayIso } from "@/lib/fmt-date";
@@ -31,6 +32,7 @@ import { useWorkspaceDuties } from "@/lib/queries";
  */
 export default function StaffDuties({ settingsNavigation, activitySettings }: { settingsNavigation?: ReactNode; activitySettings?: ReactNode } = {}) {
   const dutiesQ = useWorkspaceDuties();
+  const personnelManager = useAuth(s => s.role === "principal");
   const navigate = useNavigate();
   const location = useLocation();
   const focusOnReturn = useRef<string | null>(null);
@@ -89,7 +91,7 @@ export default function StaffDuties({ settingsNavigation, activitySettings }: { 
      A healthy response with zero duties is therefore a CONFIGURATION failure,
      not an empty list — `No duties yet` would tell the reader that Carres has
      no duties, which is never true (§4.5). */
-  const broken = dutiesQ.isError || (!dutiesQ.isLoading && duties.length === 0);
+  const broken = !dutiesQ.isLoading && duties.length === 0;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -98,13 +100,18 @@ export default function StaffDuties({ settingsNavigation, activitySettings }: { 
         word="Staff & Duties"
         docTitle="Staff & Duties · Settings · Carres"
         destinationHeader
+        right={personnelManager ? <Button onClick={() => navigate("/hr?tab=people", { state: { returnTo: `${location.pathname}${location.search}` } })}>Manage staff</Button> : undefined}
       />
-      <div className="min-h-0 flex-1 bg-white" data-testid="staff-duties">
+      <div className="flex min-h-0 flex-1 flex-col bg-white" data-testid="staff-duties">
         {(settingsNavigation || workOrigin) ? <div className="flex flex-wrap items-center gap-3 px-6 pt-3">
           {settingsNavigation}
           {workOrigin ? <Button onClick={() => navigate(workOrigin)}>Back to work</Button> : null}
         </div> : null}
         {activitySettings}
+        {dutiesQ.isError && duties.length > 0 ? <div role="alert" className="flex flex-wrap items-center gap-3 px-6 pt-3">
+          <p className="text-meta">Staff &amp; Duties could not be opened</p>
+          <Button onClick={() => void dutiesQ.refetch()}>Try again</Button>
+        </div> : null}
         {dutiesQ.isLoading ? (
           /* Skeletons keep the page's geometry, so nothing jumps when the read
              lands — and nothing here claims a duty is unheld while it is still
@@ -149,7 +156,7 @@ export default function StaffDuties({ settingsNavigation, activitySettings }: { 
         ) : (
           <div className="flex min-h-0 flex-1 flex-col">
             <p className="px-6 pt-3 text-meta text-kit-slate-11">
-              Who holds each company duty today and who covers an absence.
+              Who is assigned to each duty.
             </p>
             <div
               data-testid="staff-duties-split"
@@ -175,12 +182,13 @@ export default function StaffDuties({ settingsNavigation, activitySettings }: { 
                 {selected ? (
                   <>
                     <DutyDetail
+                      key={`detail-${selected.key}`}
                       duty={selected}
                       canAssign={canAssign}
                       today={today}
                       onBack={explicit ? back : undefined}
                     />
-                    <DutyHistory duty={selected} />
+                    <DutyHistory key={`history-${selected.key}`} duty={selected} />
                   </>
                 ) : null}
               </div>

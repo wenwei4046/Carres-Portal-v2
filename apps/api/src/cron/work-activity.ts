@@ -31,6 +31,8 @@ interface Snapshot {
  * Morning is committed before a fresh afternoon snapshot is obtained. */
 export async function runWorkActivityCron(env: Bindings): Promise<void> {
   const sb = adminClient(env);
+  const unavailable = await sb.rpc("workspace_process_recorded_unavailability");
+  if (unavailable.error) throw new Error(`Recorded availability check failed: ${unavailable.error.message}`);
   for (const period of ["morning", "afternoon"] as const) {
     const read = await sb.rpc("workspace_activity_checkpoint_snapshot", { p_period: period });
     if (read.error) throw new Error(`Work activity snapshot failed: ${read.error.message}`);

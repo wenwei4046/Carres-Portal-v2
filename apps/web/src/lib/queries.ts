@@ -2,6 +2,7 @@ import { workspaceActivitySettingsResponseSchema, type WorkspaceActivitySettings
 import { supabase } from "@/lib/supabase";
 import {
   keepPreviousData,
+  useInfiniteQuery,
   useMutation,
   useQuery,
   useQueryClient,
@@ -445,6 +446,7 @@ export const qk = {
   // `List*Query` zod-derived shapes from `@carres/shared` so a wrong key fails
   // typecheck at the call site rather than silently breaking cache reads.
   operation: {
+    workspaceAssignmentHistory: (duty: string) => ["operation", "workspace-assignment-history", duty] as const,
     workActivitySettings: () => ["operation", "work-activity-settings"] as const,
     work:      () => ["operation", "work"] as const,
     /** 0136 — AutoCount-imported orders still in Inbox triage (no logistic
@@ -4311,7 +4313,8 @@ export interface ReceivingDutyContext {
    *  Operations Superuser (unchanged 0425 authority). Absent before 0601,
    *  when `allowed` still meant exactly this. */
   may_amend?: boolean;
-  source: "assignment" | "not_assigned";
+  source: "assignment" | "not_assigned" | "system_assignment";
+  assignment_outcome?: "active" | "reassigned" | "not_assigned" | "no_candidate";
 }
 
 /** `Workspace → Staff & Duties` (0425) — the duty catalogue, each with its
@@ -4354,7 +4357,26 @@ export interface WorkspaceDutiesResponse {
     covers: WorkspaceDutyCover[];
     /** The next cover the resolver will act through on its first day (S2-A). */
     scheduled_cover_id?: string | null;
+    next_assignment_id?: string | null;
   }>;
+}
+
+export interface WorkspaceAssignmentRecord {
+  id: number; office_day: string; period: "morning" | "afternoon" | null;
+  cutoff_at: string; recorded_at: string; from_user_id: string | null; to_user_id: string | null;
+  from_name: string | null; to_name: string | null;
+  outcome: "reassigned" | "not_assigned" | "no_candidate";
+  reason: string;
+}
+export function useWorkspaceAssignmentHistory(duty: string, enabled: boolean) {
+  return useInfiniteQuery({
+    queryKey: qk.operation.workspaceAssignmentHistory(duty),
+    initialPageParam: null as number | null,
+    queryFn: ({ pageParam }) => apiFetch<{ records: WorkspaceAssignmentRecord[] }>(
+      `/api/operation/workspace-duties/${encodeURIComponent(duty)}/history${pageParam ? `?before=${pageParam}` : ""}`),
+    getNextPageParam: (page) => page.records.length === 50 ? page.records.at(-1)?.id : undefined,
+    enabled, staleTime: 30_000,
+  });
 }
 
 export function useWorkspaceDuties(
@@ -4365,6 +4387,7 @@ export function useWorkspaceDuties(
     queryFn: () =>
       apiFetch<WorkspaceDutiesResponse>("/api/operation/workspace-duties"),
     staleTime: 30_000,
+    refetchInterval: 30_000,
     ...opts,
   });
 }
@@ -4380,6 +4403,7 @@ export function useOperationWork(
       await apiFetch<unknown>("/api/operation/work"),
     ),
     staleTime: 30_000,
+    refetchInterval: 30_000,
     ...opts,
   });
 }

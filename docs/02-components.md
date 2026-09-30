@@ -414,6 +414,11 @@ business page adopts one.
 `Drawer` · `Tooltip` · `Popover` · `Tabs` · `DatePicker` · `Toast` ·
 `PageShell` · `DetailShell`
 
+**Dialog focus (2026-09-30, Staff & Duties delivery).** `Modal` accepts an optional
+`returnFocusRef` for a persistent trigger when the opening menu item unmounts. The shared
+`DialogFrame` captures ordinary openers before auto-focus and restores the explicit trigger
+when supplied. No visual token, new component or other page's focus target changes.
+
 ---
 
 # Not built
