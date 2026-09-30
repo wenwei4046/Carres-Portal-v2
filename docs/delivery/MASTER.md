@@ -2204,24 +2204,25 @@ was not decisive evidence. Current Carres source supplied the concrete reuse/gap
   cross-module dependencies. Their incomplete contracts cannot be silently implemented through a
   customer-delivery shortcut. Optional structured company-cost modelling remains a proposal below.
 
-**ONE REMAINING RECOMMENDATION / PROPOSAL, NOT LAW — owner review.** Retain the approved service
-capability and evidenced actual-company-cost workflow under Payment §9 and Delivery §11.2. Exclude
-a new structured rate/automatic company-cost calculation model from this convergence mission.
-Authority searched: Delivery §§11 and 11.2, Payment §9, Sales Orders' one-total rule. None defines
-rate bases or automatic partner-cost calculation; the measured form contains free-text charge lines.
-The alternative is to plan a rate model now, including charging bases, regions, versions and quote
-exceptions. Deferral reduces setup and avoids delaying normal deliveries, but staff still records
-and checks actual logistics cost. Revisit if measured volume/repeated pricing disputes justify a
-separate costing mission. This does not defer actual service evidence or authorised customer billing.
+**COMPANY-COST AUTOMATION SCOPE — OWNER-APPROVED / LOCKED 2026-09-30.** Retain the approved
+service capability and evidenced actual-company-cost workflow under Payment §9 and Delivery §11.2.
+A new structured rate/automatic company-cost calculation model is outside this convergence mission
+and belongs to separate planning. Delivery does not infer rate bases, regions, price versions or
+quote exceptions from the current free-text company-charge lines. Staff continues to record and
+check actual logistics cost and its evidence. This keeps normal delivery moving without introducing
+an unapproved pricing model; revisit the separate costing mission if measured volume or repeated
+pricing disputes justify it. Actual service evidence and authorised customer billing remain in
+scope under their existing owners. This ruling defers automation, not cost recording.
 
 The other intentional exclusions in §15 remain: no lorry tracking, route optimisation, dispatch
 runs, customer self-scheduling, second roster/stock/payment truth or external rollout. Default
 morning/afternoon clock values remain unconfigured until evidenced setup; that is not approval to
 copy code examples. New screen wording must pass the existing COPY governance before build.
 
-**Current boundary:** the above complete synthesis is presented for owner review, with the one
-remaining scope recommendation explicitly unapproved. This restarted mission is not yet declared
-PLAN MISSION COMPLETE and creates no READY scope, Card, implementation sequence or build task.
+**Current boundary:** the owner approved deferring company-cost automation on 2026-09-30; the
+operating rules above retain their recorded approvals. The named incomplete cross-module contracts
+still require reconciliation before claiming this restarted mission complete. No READY scope, Card,
+implementation sequence or build task is created by this review.
 All changes from this mission are on the planning branch until delivered to main; no production
 change or external contact is authorised by this document.
 
