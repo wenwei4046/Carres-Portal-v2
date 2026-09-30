@@ -21,6 +21,11 @@ copy, component, or business-rule system.
 
 ## Decisions
 
+- 2026-09-30 — Delivery visual review is outstanding. The development-only working preview at
+  `apps/web/design/delivery/index.html` reuses the existing kit and page components with blocked
+  network writes. Its proposed DO result composition is not an approved UI or a production
+  business engine. Delivery MASTER §15.2 carries coverage, limitations and the owner-review gate.
+
 - 2026-09-30 — Routine Delivery UI build reuses DeliveryBrief, DeliverySettings and the existing
   Input/Select/Row/PageShell kit. ETA edits the existing arrangement fact; company contact and
   success-proof minimum are fixed policy. No new component or token is introduced.

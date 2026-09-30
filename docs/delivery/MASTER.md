@@ -2162,6 +2162,28 @@ actually shown. Reuse reviewed composition during implementation and compare the
 with it before claiming design conformity. Do not maintain a detached HTML design as a second
 authority or treat a generic chat “yes” as approval of unseen screens.
 
+**Working preview — 2026-09-30, NOT COMPLETE / NOT APPROVAL-READY.**
+`apps/web/design/delivery/index.html` is a development-only entry; the production application
+does not import it. It composes existing Monitor, calendar, register and Settings components
+with a proposed DO detail/result composition using the existing kit. Its sample adapter blocks
+all real API calls; supported arrangement writes change only its in-memory sample. Refresh
+resets it. Settings is read-only. Sample behavior is not a second business engine or release proof.
+
+| Surface | Authority and visible contract | Preview coverage / outstanding verification |
+|---|---|---|
+| Monitor / four panels | §§8.3–8.6; customer facts stay read-only; assignment remains on the same delivery | Rendered and sample assignment readback checked. Existing retired status words and the missing embedded SO document remain defects; existing component reuse is not design conformity |
+| Schedule | §8.2; booked dates only; card opens its DO | Calendar-to-matching-DO navigation checked. Multi-leg transfer examples and responsive calendar acceptance still owed |
+| DO register | §8.7; date-first identity and in-place document brief | Existing register rendered as measured baseline. Its old number-first order and goods-only expansion are NOT the approved target |
+| DO object / result | §§6 and 9; events left/facts right, actual date required, exact time optional, document-scoped goods | Proposed kit composition; blank-date refusal and date-only result checked. Grouped remaining-goods outcomes, historical correction and formal document preview are not complete |
+| Evidence / review | §6.1; result, upload and review remain separate | Partial sample interaction only. Image decoding gates the sample acceptance control; PDF/video, stale packages, unreadable evidence, actor/timestamps and failed-result proof policy are not acceptance-verified |
+| Settings | §11; one central owner for configuration | Existing read-only structure; period definitions, assignment deadline and full edit/review flows still owed |
+
+The first rendered check found and fixed the preview's desktop column ordering and sample
+assignment cache update. At 390px the DO page measured document width = viewport width;
+this is a bounded check, not a claim of the complete §6.0 four-width/zoom/keyboard acceptance.
+No owner visual approval or production deployment is recorded for this preview. Do not advance
+this table to complete merely because the preview opens or its TypeScript check passes.
+
 **Operator journey and destinations.**
 
 | Stage | What the operator does and what completes it | Surface and module consequence |

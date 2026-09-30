@@ -1,0 +1,4 @@
+/* Preview composition; governed 420px side-panel token. Desktop events left,
+   facts right. On narrow screens facts lead. No replacement visual theme. */
+.review-object>div{order:2}.review-object>aside{order:1}
+@media (min-width:1024px){.review-object{grid-template-columns:minmax(0,1fr) 420px}.review-object>div{order:1}.review-object>aside{order:2;position:sticky;top:0;align-self:start}}
