@@ -7,7 +7,7 @@
  * naming its gap while disabled, `Not configured` for a value nobody has
  * recorded, and every change listed with its actor, time, old and new value.
  *
- *   Logistics Partners   one row per partner → its object (seven sections)
+ *   Logistics   one row per partner → its object (seven sections)
  *   Delivery Rules       who contacts the customer · record-on-behalf · the
  *                        shared contact lead (read-only) · Payment's clock and
  *                        the DO gate (read-only mirrors) · proof by result
@@ -48,13 +48,14 @@ import {
 import PageShell from "@/components/kit/PageShell";
 import Button from "@/components/kit/Button";
 import Input from "@/components/kit/Input";
+import Checkbox from "@/components/kit/Checkbox";
 import Select from "@/components/kit/Select";
 import Textarea from "@/components/kit/Textarea";
 import { TemplateLibrary } from "./PaymentTemplateLibrary";
 
 /* ── THE WORDS (COPY-STANDARD, Warehouse Settings grammar + Delivery §11) ── */
 const DS = {
-  partners: "Logistics Partners",
+  partners: "Logistics",
   rules: "Delivery Rules",
   templates: "Message Templates",
   access: "Access",
@@ -69,7 +70,7 @@ const DS = {
   loadFailed: "Delivery Settings could not be loaded. Try again.",
   tryAgain: "Try again",
   loading: "Loading Delivery Settings…",
-  /* Partner details */
+  /* Company details */
   name: "Partner name",
   status: "Status",
   customerPhone: "Customer-facing number",
@@ -138,8 +139,8 @@ const DS = {
     "Read-only mirror of Payment's clock: the Delivery Order needs Amount needed = RM 0 and no open Finance Exception.",
   doRule: "Delivery Order availability",
   doRuleWord:
-    "Read-only mirror of the DO gate: the system issues the document when the day, the window, the goods, the partner and the money all hold.",
-  proof: "Proof required",
+    "The system issues one when goods, logistics, date and money are ready.",
+  proof: "Evidence required by result",
   proofDeliveredPhoto: "Delivered · delivery photo",
   proofDeliveredSigned: "Delivered · signed Delivery Order",
   proofFailedPhoto: "Failed Delivery · photo",
@@ -167,7 +168,7 @@ function listOf(text: string): string[] {
 
 function Row({ label, htmlFor, children }: { label: string; htmlFor?: string; children: ReactNode }) {
   return (
-    <div className="grid grid-cols-[200px_minmax(0,1fr)] items-start gap-3 py-1.5">
+    <div className="grid grid-cols-1 items-start gap-1 py-1.5 md:grid-cols-[200px_minmax(0,1fr)] md:gap-3">
       {htmlFor ? (
         <label htmlFor={htmlFor} className="text-body text-kit-slate-11">
           {label}
@@ -183,7 +184,7 @@ function Row({ label, htmlFor, children }: { label: string; htmlFor?: string; ch
 function SectionCard({ title, blurb, children, testId }: { title: string; blurb?: string; children: ReactNode; testId?: string }) {
   return (
     <section className="rounded-card border border-kit-slate-5 bg-white p-5" data-testid={testId}>
-      <h2 className="text-section">{title}</h2>
+      <h2 className="text-strong text-kit-slate-12">{title}</h2>
       {blurb ? <p className="mt-1 text-body text-kit-slate-11">{blurb}</p> : null}
       <div className="mt-4 grid gap-1">{children}</div>
     </section>
@@ -209,7 +210,7 @@ function ChangesList({ changes, partnerId }: { changes: DeliverySettingChangeRow
   const rows = partnerId ? changes.filter((c) => c.partner_id === partnerId) : changes;
   return (
     <section className="rounded-card border border-kit-slate-5 bg-white p-5" data-testid="delivery-settings-history">
-      <h2 className="text-section">{DS.changes}</h2>
+      <h2 className="text-strong text-kit-slate-12">{DS.changes}</h2>
       {rows.length === 0 ? (
         <p className="mt-2 text-body text-kit-slate-11">{DS.noChanges}</p>
       ) : (
@@ -276,7 +277,7 @@ export default function DeliverySettings() {
   }
 }
 
-/* ── Logistics Partners — one row per partner ─────────────────────────────── */
+/* ── Logistics — one row per partner ─────────────────────────────── */
 function PartnersPage({ data }: { data: DeliverySettingsResponse }) {
   return (
     <PageShell variant="settings" title={DS.partners}>
@@ -622,7 +623,7 @@ function PartnerObject({ data, partnerId, section }: { data: DeliverySettingsRes
         </nav>
 
         {section === "details" && (
-          <SectionCard title="Partner details" testId="delivery-settings-details">
+          <SectionCard title="Company details" testId="delivery-settings-details">
             <Row label={DS.name} htmlFor="dp-name">
               {canEdit ? (
                 <Input id="dp-name" value={draft.details.name} onChange={(e) => set("details", { ...draft.details, name: e.target.value })} />
@@ -751,7 +752,7 @@ function PartnerObject({ data, partnerId, section }: { data: DeliverySettingsRes
         )}
 
         {section === "handover" && (
-          <SectionCard title="Warehouses & handover points" testId="delivery-settings-handover">
+          <SectionCard title="Transit points" testId="delivery-settings-handover">
             <Row label={DS.partnerWarehouse}>
               {partner.operating_party_id ? "Operated site recorded" : <span className="text-kit-slate-9">{NOT_CONFIGURED}</span>}
             </Row>
@@ -909,16 +910,22 @@ function WeekdayPicker({ value, days, onChange, disabled }: { value: number[]; d
 }
 
 /* ── Delivery Rules ───────────────────────────────────────────────────────── */
-type RulesDraft = Record<string, { contactBy: "partner" | "operation"; onBehalf: boolean; proof: ProofRules }>;
+type RulesDraft = Record<string, { contactBy: "partner"; onBehalf: boolean; proof: ProofRules }>;
 
 function rulesDraftOf(data: DeliverySettingsResponse): RulesDraft {
   return Object.fromEntries(
     data.partners.map((p) => [
       p.id,
       {
-        contactBy: p.customer_contact_by ?? "partner",
+        contactBy: "partner",
         onBehalf: p.record_on_behalf_allowed !== false,
-        proof: (p.proof_rules as ProofRules | null) ?? DEFAULT_PROOF_RULES,
+        proof: {
+          ...DEFAULT_PROOF_RULES,
+          ...(p.proof_rules as ProofRules | null),
+          deliveredPhoto: true,
+          deliveredSignedDo: true,
+          partialSignedDo: true,
+        },
       },
     ]),
   );
@@ -976,11 +983,11 @@ function RulesPage({ data }: { data: DeliverySettingsResponse }) {
           const supported = [services.stairCarry && DS.stairCarry, services.dismantling && DS.dismantling, services.disposal && DS.disposal].filter(Boolean).join(" · ");
           return (
             <SectionCard key={p.id} title={p.name} testId={`delivery-settings-rules-${p.id}`}>
-              <Row label={DS.contactBy} htmlFor={`rule-contact-${p.id}`}>
-                {canEdit ? (
-                  <Select id={`rule-contact-${p.id}`} value={r.contactBy} onValueChange={(v) => setRule(p.id, { contactBy: v as "partner" | "operation" })}
-                    options={[{ value: "partner", label: DS.contactByPartner }, { value: "operation", label: DS.contactByOperation }]} />
-                ) : r.contactBy === "partner" ? DS.contactByPartner : DS.contactByOperation}
+              <Row label={DS.contactBy}>
+                <div className="grid gap-1">
+                  <span>Logistics contacts the customer</span>
+                  <span className="text-meta text-kit-slate-11">Carres contacts the customer only for: a known delay · another date requested · customer refused · wrong phone number</span>
+                </div>
               </Row>
               <Row label={DS.onBehalf} htmlFor={`rule-behalf-${p.id}`}>
                 {canEdit ? <YesNo id={`rule-behalf-${p.id}`} value={r.onBehalf} onChange={(v) => setRule(p.id, { onBehalf: v })} /> : r.onBehalf ? DS.yes : DS.no}
@@ -993,10 +1000,11 @@ function RulesPage({ data }: { data: DeliverySettingsResponse }) {
                     ["failedPhoto", DS.proofFailedPhoto],
                     ["partialSignedDo", DS.proofPartialSigned],
                   ] as const).map(([key, label]) => (
-                    <label key={key} className="inline-flex items-center gap-2 text-body">
-                      <input type="checkbox" checked={r.proof[key]} disabled={!canEdit} onChange={(e) => setRule(p.id, { proof: { ...r.proof, [key]: e.target.checked } })} />
-                      {label}
-                    </label>
+                    key === "failedPhoto" ? (
+                      <Checkbox key={key} id={`rule-proof-${p.id}-${key}`} label={label}
+                        checked={r.proof[key]} disabled={!canEdit}
+                        onCheckedChange={(checked) => setRule(p.id, { proof: { ...r.proof, [key]: checked } })} />
+                    ) : <p key={key} className="text-body">{label}</p>
                   ))}
                 </div>
               </Row>

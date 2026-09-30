@@ -133,14 +133,37 @@ Current flow:
 ```
 goods may be arranged
 → Operation assigns the Logistics (Klang Valley pre-selects NETS)
-→ the partner, or Operation on its behalf, contacts the customer
-→ the confirmed day and time window are recorded on the Monitor row
+→ Logistics contacts the customer; Operation may record its evidenced reply
+→ the scheduled date and any agreed optional time period are recorded on the Monitor row
 → the SYSTEM issues the Delivery Order when the governed gate is met
 → Warehouse prepares the exact Units and hands them over; Logistics confirms receipt
 → the partner delivers and records the result
 → Delivery records result, item results, goods location and proof
 → proof accepted and the obligation completes, or explicit next Work begins
 ```
+
+### 2.1 · Logistics assignment timing
+
+**OWNER-APPROVED / LOCKED 2026-09-29 · APPROVED TARGET / NOT BUILT.** Assignment opens early;
+the assignment cut-off determines when it is late. For a delivery with no company assigned, the
+`Assign logistics` action becomes available on the day its Purchase Order is issued. A stock-source
+order without a PO opens that action on the day it enters Operations. This is an opening trigger,
+not a same-day completion deadline. Staff may assign immediately; no action waits until the cut-off
+to become visible.
+
+Delivery Settings → Delivery Rules owns the configurable assignment lead, initially **3 Delivery
+working days** before `Scheduled delivery`, or `Requested delivery` until a schedule exists.
+An evidenced earlier logistics booking/pickup requirement takes precedence. Delivery computes the
+one deadline using the governed calendars and partner schedule; Sales Orders, Monitor and Workspace
+read it. Partner booking cut-off, customer-contact timing, scheduled-date deadline, DO lead time and
+Payment's collection clock remain distinct facts with their existing owners.
+
+An order entering inside the cut-off requires immediate action; the system does not fabricate an
+earlier staff omission. Without a customer date or an evidenced partner deadline, the action remains
+visible with no invented countdown. A later customer-date change preserves the original missed
+deadline in history. Completion is a company recorded on the delivery scope, never acceptance by
+that company. The current Work assignment, actual actor and source-owned completion stay under
+§13.1. This ruling changes timing only; it creates no second Work writer, roster or Payment setting.
 
 ## 3 · Delivery Order and goods scope
 
@@ -209,7 +232,8 @@ path produces the row. **A Journey leg's document is BUILT (Card 14, migration 0
 issuing discipline (`attemptLegDocumentIssue` → `delivery_leg_document_mint`) the moment the
 leg's arrangement carries its partner and its agreed day and the order's money and Finance
 gate holds, numbered on the order and the leg; the customer leg's number mirrors onto the
-order for the legacy readers. A split-trip DO remains approved target (§15.1).
+order for the legacy readers. A split-trip mint path exists in source (`delivery_trip_document_mint`, 0542); independent
+trip arrangement and end-to-end scope convergence remain incomplete (§15.1).
 
 - **Delivery document number — OWNER RULING 2026-09-23 (Jess) · APPROVED / LOCKED · BUILT
   (migration `0575`, PR #1550).** Outright trips issue **`DO2609-4827`** (four random digits, 10,000 a month), Subscription trips
@@ -362,6 +386,9 @@ words (§8.4).
   nothing (`27 Oct`) — never `No time agreed`, because an empty optional field is not an exception.
   A delivery requirement that genuinely needs an appointment time (a specific condominium or
   building) raises its OWN missing item; no order is forced to carry a time.
+- Optional periods use §11.1's approved effective-dated definitions and the actual customer
+  agreement. Settings changes never rewrite an existing booking; a customer-specific window takes
+  precedence. An empty period is not any-time consent.
 - The three delivery date words are **`Requested delivery`** (Sales' customer request) ·
   **`Scheduled delivery`** (Delivery's arrangement) · **`Delivered`** (the recorded result).
 - **ETA** is Logistics' later estimated arrival time on the day and never rewrites the confirmed
@@ -376,16 +403,18 @@ Delivery Date` · `Confirm Delivery Time` · `Confirm Customer Availability` · 
 Address` · `Confirm Site Access` · `Confirm Receiver` · `Obtain Missing Information` · `Confirm
 New Delivery Date after Failed Delivery` · `Confirm Cancellation`.
 
-Each contact record stores purpose, contact owner, channel, person contacted, actual time, result,
-reply evidence, recorder, proxy provenance and explicit next action. **Four identities, separately
-(0499, owner ruling 2026-09-13):** `contact_owner_user_id` is the order's NORMAL responsible
-Operation person, filled by the writer from the one responsibility read
-(`delivery_responsible_operation`) — never the recorder as such, never a shared login, never the
-cover; `acting_user_id` is today's acting person (the buddy cover, else the normal person);
-`recorded_by` is the actual signed-in recorder, evidence only; `on_behalf_of_partner_id` is
-partner provenance when a partner's reply is recorded. Results: `Confirmed` · `No
-Answer` · `Asked to Call Again` · `Requested Another Date` · `Contact Details Incorrect` ·
-`Customer Refused Delivery` · `Waiting for Customer Reply`.
+Each contact record stores purpose, the current Work assignment at the time of the action,
+channel, person contacted, actual time, result, reply evidence, actual recorder, company provenance
+when recorded on behalf of Logistics, and explicit next action. **APPROVED TARGET / NOT BUILT —
+converged 2026-09-30 from §13.1's owner-approved shared assignment rule.** Resolve responsibility
+through Workspace's shared Work Engine, initially from the Sales Order PIC; preserve assignment
+movements and the action's assignment snapshot separately from the actual signed-in recorder.
+An authorised helper may record the reply without taking over the assignment. Recording a
+company's reply does not make the recorder the person who contacted the customer. Preserve the
+actual contact person when known; never invent one from the Work assignee. Existing stored identity
+fields are historical evidence, not a second normal/acting/cover ownership model or staff UI.
+Results: `Confirmed` · `No Answer` · `Asked to Call Again` · `Requested Another Date` ·
+`Contact Details Incorrect` · `Customer Refused Delivery` · `Waiting for Customer Reply`.
 
 **Silence is never a result.** No surface infers `Waiting for customer reply` from a missing
 confirmed date; the words appear only when a contact record carries that result. A sent, copied
@@ -400,7 +429,11 @@ carries `Information received from` records the contact in the same request.
 provenance stays the company's. Carres contacts the customer only for the Workspace §5.10 exceptions
 (a known delay, a company-recorded `Requested Another Date` or `Customer Refused Delivery`, wrong
 contact details) and the separate outstation release (ERP-ARCH §6.5). `customer_contact_by` (0488)
-informs the Monitor ladder only.
+is read-only historical evidence, not a live per-company choice of who contacts the customer.
+Within the customer-agreed date/window, routine booking remains Logistics' responsibility. A
+proposed delivery outside that agreement is an Operation-owned customer exception: record the
+customer's response and required evidence before treating the changed arrangement as agreed.
+Recording it does not rewrite Sales Orders' Requested Delivery Date.
 
 **The deadline** is the Logistics card's `2 working days before` check (owner ruling 2026-09-24):
 a Scheduled delivery date must be recorded by then, counted back from the Scheduled date (else the
@@ -483,13 +516,29 @@ History**; the employee action is **`Record Delivery Result`** and an entry titl
 
 A Delivery Visit exists only when delivery actually proceeds. Advance rescheduling, cancellation,
 waiting for a reply, `Cannot Deliver` and Warehouse-not-ready are arrangement events, not visits.
-Each actual event stores DO, Partner, driver or team, vehicle when known, planned and actual
-times, item results, observed problem, goods location, proof, recorder and proxy provenance.
+Each actual event stores DO, Partner, driver or team, vehicle when known, scheduled facts, the
+actual delivery date, actual time only when reliably known, item results, observed problem, goods
+location, proof, recorder and proxy provenance.
 
 Employee results are **`Delivered`** · **`Partially Delivered`** · **`Failed Delivery`**.
 `Rescheduled` and `Delivery Cancelled` are arrangement states, never results.
 
-`Delivered` requires actual time, receiver, delivered goods and the governed evidence. Missing
+**ACTUAL DELIVERY DATE AND TIME — OWNER-APPROVED 2026-09-30 / APPROVED TARGET / NOT BUILT.**
+For an actual customer delivery or attempted delivery, the actual date is required and must be
+supported by the driver's report or delivery evidence. Exact hour/minute is optional: record it
+only when reliably known, with its source; otherwise leave it unrecorded. Never substitute the
+scheduled time, ETA, upload time, current time or midnight. A missing exact time does not prevent
+recording a truthful result and does not waive any other result or proof requirement.
+
+ERP evidence upload records its own system timestamp and actual uploader; proof review records
+its own system timestamp and actual reviewer. Both remain distinct from when the goods reached
+the customer. The actual delivery performer is not inferred from the uploader or assigned staff.
+A record with no exact actual time supports date-level reporting but cannot establish minute-level
+punctuality. Reliable future driver capture may support a later policy review; it does not silently
+make time mandatory today. This ruling changes customer-delivery result precision, not Warehouse
+handover timestamps, Subscription billing rules or the existing proof-acceptance gate.
+
+`Delivered` requires the actual date, receiver, delivered goods and the governed evidence. Missing
 evidence creates the `Upload delivery proof` work, whose row names `Upload delivery photo` and/or
 `Upload signed DO` (owner ruling 2026-09-25; the paper's full name stays `Signed Delivery Order` in
 prose and on the document); completing or reviewing proof never renames the result.
@@ -498,21 +547,51 @@ For each exact delivered Unit, Delivery emits one idempotent success fact. If St
 was `Supplier Consignment`, Purchasing automatically creates the Consignment Sale Notice for that
 supplier × Delivery Visit. Failed or refused goods create no notice.
 
-`Partially Delivered` preserves delivered goods and requires failed quantity, reason, goods
-location, proof and next Work for every remainder. `Failed Delivery` requires reason, explanation,
-affected goods, actual time where applicable, goods location, reporter, proof and an explicit next
-action. No bare `Failed Delivery` may be saved or closed.
+**RESULT SCOPE — CARRIED-FORWARD OWNER RULINGS, CONVERGED 2026-09-30 / TARGET; END-TO-END
+IMPLEMENTATION NOT VERIFIED.** Expected exact Units come from this DO's frozen goods scope; Operation
+never retypes Unit IDs or substitutes the order's current allocation for the document. A partial
+result selects the exact delivered Units and automatically derives the affected remainder. Only the
+delivered Units move to Customer. Counted goods retain their governed source-line quantities rather
+than invented Unit IDs. Record the reason, current holder/location and concrete next action for each
+affected group of Units, keeping different outcomes distinguishable.
+
+`Failed Delivery` requires a structured reason, affected goods, actual attempt date (exact time
+optional under the rule above), current goods location, reporter, applicable failure evidence and an
+explicit next action. Known reasons do not require redundant free-text explanation; `Other` requires
+a short explanation. A pre-trip customer postponement is an arrangement change; a customer change
+after arrival or an actual delivery attempt is Failed Delivery with the governed reason. No bare
+`Failed Delivery` may be saved or closed.
 
 ### 6.1 · Proof and its review
 
 Proof is bound to the exact event it proves: Logistics confirmation, customer confirmation,
 Warehouse handover, Delivered, Failed Delivery, return or correction. An uploaded file records
 what the driver sent; it is not proof accepted and not a successful delivery. Operation reviews
-delivery proof as **`Proof Accepted`**, **`More Proof Required`** or **`Proof Rejected`**, each
-with a reason. `Proof Accepted` is the fact that turns `Delivered` green everywhere and closes
+delivery proof as **`Proof Accepted`**, **`More Proof Required`** or **`Proof Rejected`**;
+More Proof Required and Proof Rejected require a reason, as governed by COPY-STANDARD. `Proof Accepted` is the fact that turns `Delivered` green everywhere and closes
 `Upload delivery proof`; `Proof Rejected` reopens it with the reason. Saved delivery facts are
 corrected through an append-only Correction containing old value, new value, reason, person, time
 and approval where governed.
+
+**CURRENT SUBMISSION AND REQUIRED EVIDENCE — CARRIED-FORWARD OWNER RULINGS, CONVERGED
+2026-09-30 / TARGET; END-TO-END IMPLEMENTATION NOT VERIFIED.** Drivers send signed DO and delivery
+or service photos into the logistics WhatsApp group; Operation uploads them to the matching DO and
+actual delivery event in ERP. WhatsApp is the submission channel; ERP is the permanent record.
+Preserve separately the delivering logistics company/driver, the evidence reporter/source, submission
+channel and timestamp when known, actual Operation uploader and system upload timestamp, and actual
+reviewer and system review timestamp. Unknown external submission time stays unknown. Neither
+assignment nor upload identifies the person who physically delivered the goods. The source surface
+(Workspace or Delivery Monitor) is separate from the external submission channel and follows §13.1.
+
+A successful customer delivery requires the signed DO and delivery photo. Ordered services such as
+disposal carry their own service evidence. For a partial delivery, success evidence applies to the
+Units delivered and services actually performed; the remainder keeps its own reason, location and
+next action. A failed trip owes no successful-delivery photo or signed success document; record the
+applicable evidence of its failure instead. Upload does not mean Proof Accepted. Missing required
+files remain work even after the actual result is recorded; acceptance checks the applicable required
+evidence. Settings may express the governed requirements by result/service, not switch off these
+owner-required success facts. Future driver mobile/QR submission uses this same evidence model;
+it is not the current submission channel or a claim of live lorry tracking.
 
 **BUILT 2026-09-13 (Card 13, migration 0489).** `delivery_attempt_evidence` binds every file to
 the Delivery Visit it proves (the photo/video uploader stamps and binds in one act; the signed
@@ -542,8 +621,23 @@ The reason dictionary is grouped, versioned, and historical records retain their
 - **External:** severe weather; road disruption; government or building restriction.
 - **Other:** explanation required.
 
-The record also states whether goods remain with Logistics, returned to Warehouse, remain with the
-customer or are unknown. The next action is concrete, in the two-line Work grammar of §10:
+The record distinguishes goods still held by Logistics, a reported return, goods remaining with
+the customer and an unknown location. **CUSTODY RECONCILIATION — carried-forward owner rulings,
+converged 2026-09-30 with Stock's Unit lifecycle and §4; no new implementation claim.** A return
+instruction, planned Inbound arrival or Logistics report does not establish Warehouse receipt.
+Until Warehouse records actual receipt, preserve the last evidenced holder/location and record the
+return report separately; never present goods as physically back merely because return is planned.
+Actual Warehouse receipt puts returned Units on `Check required`, not Ready Stock. Stock owns the
+inspection and subsequent eligibility decision.
+
+For Partial Delivery, customer receipt applies only to the delivered Units in §6's DO scope. The
+remainder keeps its own holder/location and next action; it is neither delivered nor received back
+by subtraction alone. Rebooking, changing Logistics, proof review and closing an exception do not
+move the goods. Continue the same Unit/source/handover chain; never create replacement Unit IDs or
+add inventory quantities to represent a return. An unknown location stays unknown and requires the
+concrete recovery action, not a guessed Warehouse location.
+
+The next action is concrete, in the two-line Work grammar of §10:
 `Confirm New Delivery Date` · `Confirm Delivery Address` · `Confirm Customer Availability` ·
 `Obtain Correct Contact Details` · `Confirm Site Access` · `Return Goods to Warehouse` · `Inspect
 Returned Goods` · `Arrange Replacement Goods` · `Assign Another Logistics` · `Keep NETS and
@@ -932,7 +1026,13 @@ Delivery` are retired as columns; the row's acts live in the panels (§8.6).
 changing a filter clears the selection; the selection toolbar replaces the normal toolbar at the
 same height and reads `{N} selected · Clear · Assign logistics`. Bulk assignment is offered only
 while every selected row is unassigned; a row that already carries a partner turns the act into
-`Change logistics`, one row at a time, through the same governed door. Footer: `{n} deliveries`
+`Change logistics`, one row at a time, through the same governed door. A multi-row selection
+containing an assigned delivery cannot submit a bulk company change, even with a reason. Recheck
+the current assignment when saving so another person's intervening assignment is not overwritten.
+Changing Logistics records the governed reason, previous/new company, actual actor and time; it
+revokes the previous company's answer link (§5.5) but never rewrites custody or past handovers.
+One checkbox identifies the delivery scope, not each goods line or every trip under the same SO.
+Footer: `{n} deliveries`
 or `{n} of {m} deliveries`; empty states `No deliveries` and `No matching deliveries.`.
 **Loading, failed and refused reads are three different pictures (owner ruling 2026-09-25):** 72px
 skeleton rows and `Loading…` in the footer until the read SUCCEEDS — a paused or unfinished read
@@ -1254,7 +1354,7 @@ and is not restored. `Booked` stays banned.
 
 | Recorded facts | Line 1 | Colour | Line 2 |
 |---|---|---|---|
-| no partner on the scope | `Assign logistics` | orange | the contact deadline, as a glyph and a day (§8.3) |
+| no partner on the scope | `Assign logistics` | orange | the assignment deadline from §2.1, as a glyph and a day; absent when no deadline is known |
 | partner set, no contact record, the partner contacts the customer | `Get delivery date from {partner}` | orange | the contact deadline, as a glyph and a day (§8.3) |
 | partner set, no contact record, Carres contacts the customer | `Get delivery date from customer` | orange | the contact deadline, as a glyph and a day (§8.3) |
 | latest contact result is `Waiting for Customer Reply` | `Waiting for customer reply` | orange | `Asked {date}` |
@@ -1630,8 +1730,8 @@ appears in any line. The row's status word carries the fact.
 | Trigger | Line 1 | Line 2 | Owner rule | Completion fact |
 |---|---|---|---|---|
 | no partner on the scope | `Assign logistics` | `Choose the company that carries this delivery` | Current Work assignment, initially Sales Order PIC; Delivery Duty fallback only when no PIC | partner recorded |
-| partner set, no day agreed, partner contacts the customer | `Call NETS` | `Get the scheduled delivery date` | Current Work assignment, initially Sales Order PIC; Delivery Duty fallback only when no PIC | day and window recorded |
-| partner set, no day agreed, Carres contacts the customer | `Call the customer` | `Get the scheduled delivery date` | Current Work assignment, initially Sales Order PIC; Delivery Duty fallback only when no PIC | day and window recorded |
+| partner set, no day agreed, partner contacts the customer | `Call NETS` | `Get the scheduled delivery date` | Current Work assignment, initially Sales Order PIC; Delivery Duty fallback only when no PIC | scheduled date recorded with the required reply evidence; time optional (§5) |
+| partner set, no day agreed, Carres contacts the customer | `Call the customer` | `Get the scheduled delivery date` | Current Work assignment, initially Sales Order PIC; Delivery Duty fallback only when no PIC | scheduled date recorded with the required reply evidence; time optional (§5) |
 | new date later than the requested date, no reply proof | `Call the customer` | `Record the reply and upload the WhatsApp proof` | Current Work assignment, initially Sales Order PIC; Delivery Duty fallback only when no PIC | contact record with proof |
 | collected, no ETA | `Ask NETS` | `Record the delivery ETA` | Current Work assignment, initially Sales Order PIC; Delivery Duty fallback only when no PIC | ETA recorded |
 | confirmed day is today, no result | `Deliver on Thu, 22 Oct` | `Record the delivery result` | Current Work assignment, initially Sales Order PIC; Delivery Duty fallback only when no PIC | attempt recorded |
@@ -1672,7 +1772,7 @@ effective date on every change. It contains no roster, no owner list and no duty
 | Section | Rows |
 |---|---|
 | `Logistics` (the Settings rail row reads `Logistics`, never `Logistics Partners` — `Partner` is a banned UI word) | one row per company opening its object: `Company details` (owner ruling 2026-09-26; `Partner details` retired) (name, `Active` · `Inactive`, customer-facing number, office contact, address, WhatsApp group) · `Coverage` (states, cities and postcodes covered; excluded locations; the `Klang Valley default` flag and its fallback rule) · `Schedule` (pickup weekdays, delivery weekdays per region, transit days, cut-off time, capacity per day, closed dates) · `Transit points` (the Logistics company's own points — `AL Sungai Buloh`, `HOUZS Balakong`, `HOUZS Penang` — registered once in Warehouse Settings → Sites as kind `Logistics transit point`; never a Carres warehouse; owner correction 2026-09-25, Stock §5) and the two-leg handover locations · `Drivers` and `Vehicles` (templates: driver name and phone; plate, vehicle type, capacity) · `Services & charges` (stair carry, dismantling, disposal, surcharge areas, partner charges) · `Portal access` (Warehouse role, Logistics role, data visibility, API scope) |
-| `Delivery Rules` | `Logistics contacts the customer` is fixed (owner ruling 2026-09-25; Carres contacts the customer only for the four Workspace §5.10 exceptions — no per-company choice any more; `customer_contact_by` survives only as read-only history) · the record-on-behalf policy · the contact lead days (reads the shared `chase` setting, one home) · the payment-clearance read rule and DO availability, both read-only mirrors of Payment's clock and the DO gate · proof required by result and goods type · the supported delivery services |
+| `Delivery Rules` | `Logistics contacts the customer` is fixed (owner ruling 2026-09-25; Carres contacts the customer only for the four Workspace §5.10 exceptions — no per-company choice any more; `customer_contact_by` survives only as read-only history) · the configurable logistics assignment lead and deadline in §2.1 · the record-on-behalf policy · the contact lead days (reads the shared `chase` setting, one home) · the payment-clearance read rule and DO availability, both read-only mirrors of Payment's clock and the DO gate · result/goods/service proof requirements governed by §6.1 (required successful-delivery evidence is policy, never a disable switch) · the optional customer-agreed delivery periods in §5 · the supported delivery services |
 | `Message Templates` | WhatsApp, email and copy-message templates per purpose, versioned, one Default per purpose, the Payment template-library grammar |
 | `Access` | which People hold Delivery capabilities; a link to `Settings → Staff & Duties`, never a copy |
 
@@ -1694,13 +1794,78 @@ Routine customer Delivery ownership reads the Sales Order PIC; `delivery_duty` s
 explicit no-PIC fallback and no-Sales-Order display transport coordination (§13.1), through
 `Settings → Staff & Duties`.
 
+### 11.1 · Settings convergence and customer-period rules
+
+**RESOLVED FROM AUTHORITY / APPROVED TARGET, NOT VERIFIED BUILT — 2026-09-30.** Keep the
+four Settings sections above. Sites owns transit-point identity; Staff & Duties owns staff
+assignment; Payment owns its clock and money rule. Delivery consumes those facts. Logistics
+customer contact is fixed under §5.2. Required proof cannot be disabled (§6.1). Driver and vehicle
+templates supply known trip facts, not live lorry tracking. Company schedules feed §5.3's backward
+calculation; assignment timing follows §2.1, separately from contact and booking deadlines.
+The carried-forward owner ruling permits an optional morning, afternoon, any-time or specifically
+agreed window. An empty period is not an explicit any-time agreement. No precise appointment is
+invented. These business concepts do not admit unreviewed new screen labels into COPY-STANDARD.
+
+**MEASURED SOURCE / NOT PRODUCTION VERIFICATION — 2026-09-30.**
+`DeliverySettings.tsx` still contains the routine Operation/Logistics contact choice, old company
+headings, independently typed handover points and four proof switches. The shared
+`DELIVERY_TIME_SLOTS` list hardcodes morning 09:00–12:00, afternoon 12:00–15:00, late afternoon,
+evening and anytime. This source is implementation evidence, not approval of those clock ranges.
+
+**CUSTOMER-PERIOD MEANING — OWNER-APPROVED / LOCKED 2026-09-30; TARGET / NOT BUILT.**
+Delivery Rules maintains effective-dated standard morning/afternoon ranges. Each delivery retains
+the range actually agreed with its customer and the applicable definition/version; an explicitly
+agreed customer-specific window takes precedence for that delivery. Changing a Settings definition
+does not rewrite an existing agreement. Until a range has been configured and actually agreed,
+never convert a period name into clock times. No initial clock boundaries are approved by this
+ruling; the hardcoded source examples above are not defaults to adopt.
+
+A date-only booking remains valid. Empty means no period recorded, not explicit any-time consent.
+Explicit any-time agreement still respects site access and working hours. ETA remains a separate
+estimate; an evidenced breach of the actual agreed range follows §5.2's Operation-owned customer
+exception. Customer messages, Monitor, Work and reporting consume that delivery's recorded
+agreement rather than reinterpret it using today's Settings. A period definition alone is not
+proof of a customer's agreement or of an actual arrival time.
+
+This adds central setup work in exchange for consistent promises and exception handling. Review
+boundary: if evidenced logistics or regional agreements use materially different definitions,
+review the standard's scope instead of silently assigning a misleading range. Existing specific
+customer windows remain expressible. Screen labels still follow COPY-STANDARD; this business
+approval does not authorise application implementation in this PLAN chat.
+
+### 11.2 · Service capability, logistics cost and customer money
+
+**RESOLVED FROM AUTHORITY — Payment §9, Sales Orders' one-total rule, Delivery §§1 and 6.1;
+converged 2026-09-30. No new pricing policy or implementation approval.**
+`Services & charges` describes what a Logistics company supports and its charge information.
+Company support is not an order for that service, evidence that it was performed, or authority to
+charge the customer. Sales Orders owns the ordered service; Delivery records the actual service
+and its evidence. A service already included in the order total is counted once, never levied
+again from a Delivery summary.
+
+Delivery Operations records the company, destination, floor, quantity, carry-up, dismantling,
+disposal/take-out and actual service evidence. Operation may upload the company's actual cost
+after service and negotiate disputed company costs. Normal delivery does not wait for a quote or
+price; only an exceptional extra service explicitly requiring a quote gains that step. A company
+cost is not automatically a customer charge. Finance/Commercial owns customer-charge calculation,
+approval and correction; confirmed charges flow to Payment for invoice/collection. Delivery
+Settings does not become a customer-price calculator or a second payment ledger.
+
+**MEASURED SOURCE / NOT VERIFIED LIVE — 2026-09-30.** The existing Settings form stores company
+service flags and free-text charge lines; this does not establish structured pricing, a verified
+charge calculation or a customer billing integration. The shape of any richer cost reference
+remains unapproved; do not infer new pricing rules or build a rate engine from these text lines.
+
 ## 12 · Reports
 
 Central Reports owns Delivery Commitment Performance, First Delivery Success, Failed Delivery
 Analysis, Logistics Performance, Warehouse Performance, Delivery Proof Control, Schedule
 and Capacity, Customer Contact Performance, Return-to-Warehouse Control and Exception Ageing.
 
-Every measure declares source fact, date basis, coverage and drill-through. First-delivery success
+Every measure declares source fact, date basis, coverage and drill-through. Actual-delivery
+reporting uses §6's recorded date and only a reliably recorded exact time. Upload/review timestamps
+never stand in for the delivery event. Records without exact time cannot establish minute-level
+punctuality; report that coverage separately rather than inventing a time. First-delivery success
 counts only actual delivery events. NETS has no acceptance-speed measure because NETS is
 responsible without Accept; its contact and confirmation timeliness, `Cannot Deliver` rate, result
 timeliness and proof are measured instead. Warehouse and Logistics performance stay separate even
@@ -1937,7 +2102,7 @@ emoji, ticks, checkmarks, warning marks or progress icons inside a status fact; 
 label; a checklist column; a Delivery-local roster; an Operations Superuser fallback owner; a fake
 tab strip on the DO object; a separate Edit Delivery page.
 
-### 15.1 · Implementation gaps deferred to READY FOR CARD
+### 15.1 · Approved-target gaps and measured implementation limits
 
 The approved model is persisted here; the runtime lags it. These are named so that no build reads
 their absence as a design blind spot:
@@ -1948,8 +2113,8 @@ their absence as a design blind spot:
 | the append-only Correction of saved delivery facts (§6.1) | a new migration under the governed apply path |
 | Payment's §6 written request filed from a later-date save (the storage-terms acknowledgement is not among the ruled edit-state fields) | `docs/payment/MASTER.md` §6, `payment_delivery_date_requests` |
 | fleet-template binding on the arrangement (the brief still types the driver and vehicle; the saved templates exist in Delivery Settings) | `ops_delivery_arrangements`, `partner_drivers`, `partner_fleet` |
-| the split-trip DO's own issuing door (a leg DO is built; a split-trip scope still has no door) | `apps/api/src/lib/delivery-order-issue.ts` |
-| central Delivery reports | the Reports destination |
+| Independent split-trip arrangement, earlier-leg arrival enforcement and one scheduled-date writer remain incomplete | Orders §0.0 A2 records these gaps. Split-trip mint already exists in `delivery-order-issue.ts` through `delivery_trip_document_mint`; do not invent a second issuing engine or claim the whole capability is absent |
+| Delivery reports exist; convergence with newly approved timing, agreement and proof rules still needs validation | `OperationDeliveryReport.tsx` and §12; this pass is source inspection, not a new production verification |
 | `Hold delivery` on the Payment, Warehouse and Logistics surfaces, and the Operation words `RM {amount} unpaid` · `Finance hold · {reason}` (§3, owner ruling 2026-09-25) | `delivery-work-status.ts`, `logistics-card.ts`, `delivery-warehouse-schedule.ts`, `PaymentMonitor.tsx`, the partner arrange page and `DeliveryLinkPage.tsx` |
 | the `ETA` field in the Logistics Details edit state (§8.6) — the Operation save already accepts `expectedArrival`; the brief has no input for it | `apps/web/src/pages/operation/components/DeliveryBrief.tsx` |
 | `View Sales Order` in panel 1 of the brief, replacing `Open Sales Order to change` (§8.5) | `DeliveryBrief.tsx`, the governed SO renderer |
@@ -1958,27 +2123,142 @@ their absence as a design blind spot:
 | the Delivery Order brief inside the register row and the two-column DO object (§8.7, §9, owner ruling 2026-09-26) | `DeliveryOrdersRegister.tsx` (`DoExpansion`), `DeliveryOrderPage.tsx`; the acts reuse `DeliveryResultAction`, `WarehouseHandoverBlock`, `DeliveryEvidencePanel` |
 | the POS required-facts gate for address, state, building type, floor, lift and access | **BUILT 2026-09-13 (Delivery Card 18)** — `createOrderInputSchema`, `rawCreateOrderInputSchema`, the POS wizard and the office create door refuse the facts with one wording; `Order details incomplete` now names legacy rows only |
 
-### 15.2 · Whole-domain closure
+**2026-09-30 convergence audit — measured source, not production verification or build sequencing.**
+The current approved business rules above resolve these points; missing code does not reopen them
+as owner decisions. Additional material implementation limits are:
 
-This Blueprint covers purpose, ownership and boundaries; the complete normal lifecycle; exception
-journeys; the daily operator journey; navigation; Monitor's two views, rail, calendar and register;
-the expanded delivery brief and its inline writes; the Delivery Orders register and DO object;
-proof and its review; Failed Delivery and `Cannot Deliver`; the Loan seam; Singapore and East
-Malaysia journeys; the Order Route, Work Engine and Quick Rail connections; Settings; Reports;
-owners, permissions and the Partner Portal and API boundary; the cross-module reconciliation law;
-authoritative completion facts; and the intentional rejects. Automatic allocation, vehicle routing
-and customer self-scheduling are excluded from current truth rather than deferred blind spots.
+| Approved boundary | Evidence and remaining limit |
+|---|---|
+| Bulk assignment only for unassigned deliveries; change Logistics one delivery at a time | `/assign` in `delivery-arrangements.ts` accepts multiple scopes with a change reason. It writes each arrangement/event sequentially; its all-or-nothing comment is not proof of atomic completion. Concurrent changes and failed saves must preserve readable, accurate outcomes |
+| Result selection uses the DO's frozen goods scope | `DeliveryResultAction.tsx` currently builds its Unit list from `useOrderAllocation`; current order allocation is not the issued document's scope |
+| Shared Work assignment and actual actor/source remain distinct | `operationWorkCompletedSchema` carries actual completer/time but not the full assignment snapshots or Workspace/Monitor origin; this DTO alone cannot prove §13.1's complete audit |
+| Optional configured periods, honest actual time, immutable proof minimum | §§5–6 and 11 govern the target. Settings' hardcoded periods/proof switches and current result inputs require convergence; this planning pass changes no runtime behaviour |
+| Fleet and ETA reuse existing capabilities | Driver/vehicle templates and ETA save support already exist. Binding the templates and exposing the governed ETA input are integration gaps, not new fleet/tracking engines |
 
-**PLAN MISSION COMPLETE — 2026-09-13.** The owner approved the complete Blueprint after the
-corrections of 2026-09-12 and 2026-09-13; this MASTER persists the approved operating model and the
-contradicting older text in this file, `../orders/MASTER.md`, `../ui/MASTER.md`,
-`../COPY-STANDARD.md`, `../workspace/MASTER.md` and `../ERP-ARCHITECTURE.md` is overwritten. No
-unresolved owner decision remains. This MASTER authorises no Card, implementation sequencing,
-migration or build work; §15.1 is the dependency list a later BUILD/DELIVERY lane derives its
-scopes from.
+The remaining richer company-cost reference in §11.2 has no approved structured rate model. It is
+not needed to record actual service/cost under Payment §9 and must not be silently promoted into
+pricing law. No new owner decision is needed to correct the implementation limits above. Detailed
+Cards, implementation order and production verification belong to a separately commissioned
+BUILD/DELIVERY lane. This audit does not declare this restarted planning mission complete.
+
+### 15.2 · Complete Delivery Blueprint — current owner review
+
+**2026-09-30 consolidated owner-reviewed Blueprint; bounded BUILD takeover below.** Sections
+1–15 retain their explicitly approved operating rules, including the owner's assignment-timing,
+actual-date/time and customer-period rulings. The review below synthesises them; it does not
+reopen those decisions. The prior Blueprint approval does not prove the later convergence work is
+built. The remaining recommendation on the structured company-cost reference is marked separately.
+
+**Operator journey and destinations.**
+
+| Stage | What the operator does and what completes it | Surface and module consequence |
+|---|---|---|
+| Start the working day | Resolve failed trips, overdue results and missing proof, then due assignments/bookings; each action has its current shared Work assignment | Monitor or Workspace opens the same owning action. Helpers retain their actual identity without taking over responsibility |
+| Read the order | Read customer/access, requested date, goods/accessories/services, PO and Stock readiness; correct missing Sales facts at their owner | Monitor's four panels; Sales Orders owns customer/commercial truth and Purchasing owns supplier dates |
+| Assign Logistics | Assign an unassigned delivery by §2.1's deadline; batch only unassigned scopes; later company changes are single-delivery, reasoned and audited | Monitor. Each split trip/Journey leg retains its scope; changing a company does not move goods |
+| Agree the delivery | Logistics contacts the customer; Operation may record its evidenced reply. Record the agreed date and optional period; outside-agreement exceptions belong to Operation | Delivery Dates. §11.1 preserves the actual agreement despite later Settings changes; Payment owns any storage/collection consequence |
+| Prepare the trip | Read the exact eligible goods, location, booking and money gate; system issues the scoped DO when those facts allow it | Delivery Orders is the formal register. No new unpaid-delivery approval or manual issue door; existing historical approvals retain §3's treatment |
+| Hand over | Warehouse records actual Units loaded; Logistics confirms what it received | Stock/Outbound owns physical handover. Required, loaded and driver-confirmed are distinct; no second quantity or invented receipt |
+| Record the attempt | Record actual date, reliable exact time only when known, full/partial/failed result and the affected goods | DO's frozen scope. Partial remainder retains its own location, reason and next action; pre-trip postponement stays an arrangement change |
+| Receive and review evidence | Driver sends signed DO and goods/service photos; Operation uploads them to ERP and reviews them separately | Result, submission, upload and acceptance are different facts. Missing required proof stays open; service completion is not inferred from goods delivery |
+| Recover and finish | Resolve failed/remaining goods, agreed redelivery and actual returns; Warehouse receipt starts Check required | Same Unit chain. Service/Claims/Commercial owns remedies; Rental reads accepted customer receipt for its service-start witness. Outstanding services, proof and recovery work stay open at day end |
+
+**Page and information architecture.** Monitor retains its work list, company filters, governed
+search/filter/sort/columns/export, delivery-scope checkbox and four expansion panels: Customer
+Address & Access; Delivery Dates; Logistics Details; Items Services & Stock. Its schedule uses the
+governed calendar and two-month date navigation; customer deliveries and intermediate transfers
+remain separately counted. No invented date places unscheduled work on the calendar. Delivery
+Orders retains the formal register and document brief; its number opens the object. Quick Rail
+previews/deep-links, Activity reads source history, Settings owns configuration and Reports owns
+analysis. All use the shared Shell/Register/Object grammar and COPY/tokens; no new layout, label
+or component is admitted by this consolidation.
+
+**Complete capability coverage.** Source/numbering and DO identity are in §3; scoped selection,
+search/filter/export and inline arrangement edits in §8; document/reprint/history in §§3 and 9;
+result corrections and review in §6.1; cancellation/supersession preserve original documents and
+evidence. There is no arrangement-copy or destructive delete workflow. Scans preserve permanent
+Unit identity; this mission proposes no import/backfill or driver rollout. Settings/access are in
+§§11 and 13, reports in §12, special journeys and Subscription in §14. Concurrency/retry and
+partial-save limits remain measured in §15.1, not disguised as completed capabilities. Customer,
+PO, money, Unit custody, Case/remedy, Rental activation and shared Work each retain their writer.
+
+**Research-to-Carres synthesis — evidence, never foreign authority.** The earlier research used
+Onfleet's proof, order and service-availability documentation for separate completion/evidence and
+operational windows; SAP Fiori's object-page guidance for coherent object facts/actions; AutoCount's
+published capability matrix for partial fulfilment and multi-location capability. Carres adapts
+those principles through its own ownership, DO scope and UI kit. No external dispatch/routing or
+self-scheduling model is adopted. 2990's authenticated capability surface was inaccessible; Odoo
+was not decisive evidence. Current Carres source supplied the concrete reuse/gap evidence in
+§15.1. No fresh production walk or pixel validation is claimed.
+
+**Four-way resolution.**
+- **RESOLVED FROM AUTHORITY:** the lifecycle, two destinations, module writers, shared Work
+  ownership, proof/return rules and the newly approved timing/period rules above.
+- **APPROVED TARGET / NOT BUILT OR INCOMPLETE:** independent split arrangements, earlier-leg gate,
+  frozen-DO result selection, assignment audit, settings and scoped proof convergence in §15.1.
+- **BUILT IN SOURCE / VERIFICATION LIMITED:** existing Monitor/DO/report surfaces, split mint,
+  driver/vehicle templates and shared proof-review capability; dated production evidence remains
+  bounded by §16 and is not evidence for the newly approved target.
+- **REAL GAP / CONTRADICTION:** factory-origin first-handover recording boundaries and saved-fact
+  correction permission/admission remain incomplete for execution. Do not invent a Warehouse receipt
+  or an unrestricted correction right. The non-customer Work admission contract is an incomplete
+  dependency beneath approved Delivery Duty coordination, not a reopened ownership decision.
+  External-link DO download is resolved by §5.5's existing restriction: no download through that
+  link; paper reaches Logistics at handover. It is not a blocking business question unless a new
+  download capability is separately commissioned. Structured company-cost automation is deferred by
+  the owner ruling below, not a remaining proposal.
+
+**COMPANY-COST AUTOMATION SCOPE — OWNER-APPROVED / LOCKED 2026-09-30.** Retain the approved
+service capability and evidenced actual-company-cost workflow under Payment §9 and Delivery §11.2.
+A new structured rate/automatic company-cost calculation model is outside this convergence mission
+and belongs to separate planning. Delivery does not infer rate bases, regions, price versions or
+quote exceptions from the current free-text company-charge lines. Staff continues to record and
+check actual logistics cost and its evidence. This keeps normal delivery moving without introducing
+an unapproved pricing model; revisit the separate costing mission if measured volume or repeated
+pricing disputes justify it. Actual service evidence and authorised customer billing remain in
+scope under their existing owners. This ruling defers automation, not cost recording.
+
+The other intentional exclusions in §15 remain: no lorry tracking, route optimisation, dispatch
+runs, customer self-scheduling, second roster/stock/payment truth or external rollout. Default
+morning/afternoon clock values remain unconfigured until evidenced setup; that is not approval to
+copy code examples. New screen wording must pass the existing COPY governance before build.
+
+**Cross-module resolution checked 2026-09-30.** Purchasing §9.13 and Delivery §13.1 agree that
+Delivery Duty coordinates display transport without a Sales Order while Stock/Receiving and
+physical handlers keep their writes. Rental §§4 and 5.8 and Delivery §14.1 establish Diglant Klang
+storage, Carres-arranged collection and NETS for the initial Klang Valley scope; neither authorises
+invented warehouse receipt or appointment of other regions' carriers. Delivery §§6.1 and 13 retain
+append-only correction as approved target but do not fully define the correction permission and
+admission boundary. These findings refine the gap list without granting new permissions or changing
+external operations.
+
+**BUILD TAKEOVER — owner-approved 2026-09-30.** The owner accepted the explicit switch to BUILD
+for routine Delivery UI: Monitor/register/calendar/four panels, assignment and booking, known
+crew/ETA, Delivery Orders/results/evidence/review, and approved Logistics Settings. This closes the
+planning handoff for that bounded operating model, not the unresolved special workflows. Historical
+result correction and factory-origin operations with incomplete contracts remain restricted; no
+new correction permission, fabricated receipt, external rollout or automatic company-cost engine.
+Reuse the existing kit and source writers. Implementation, tests and delivery evidence are recorded
+below as they occur; takeover is not proof of completion.
+
 
 
 ## 16 · Production closure
+
+**2026-09-30 routine UI build — implementation in progress, NOT DEPLOYED.** The first change
+adds the existing ETA field to Logistics Details (normalising stored SQL clock seconds before
+resaving), adopts the governed Logistics/Company details/Transit points Settings names, removes
+the routine Operation-contact choice and locks minimum success evidence in the settings UI and
+API input contract. Bulk assignment rejects every multi-scope selection containing an assigned
+scope even when a reason is supplied. Known failure reasons no longer require redundant prose.
+These changes reuse existing persistence; they do not add migrations or claim atomic bulk writes.
+Focused checks cover Settings/API policy, bulk rejection, ETA input and failure-result submission.
+Seeded Settings preview verified at 390px and the normal desktop viewport: fixed success proof
+is readable policy, only failure-photo evidence remains configurable, and fields stack without
+horizontal overflow on phone. This is component-preview evidence, not production acceptance.
+Full release validation remains owed before production closure. Configurable period persistence, assignment timing, exact DO result scope, fleet binding, actual-date storage and
+complete evidence/audit convergence remain open; this increment is not the whole approved UI scope.
+
 
 **2026-09-14 · Final convergence — the three 🟡 notes of 2026-09-13 are closed, and a Sales Order opens by its
 number.** Main tip `a5646d2d` (Cards 19 → 20 → 21 merged in that order on top of the sibling PR #1288).

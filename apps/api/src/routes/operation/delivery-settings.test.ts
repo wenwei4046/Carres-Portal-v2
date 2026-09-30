@@ -139,13 +139,28 @@ describe("the section doors forward to their SQL doors", () => {
     expect(bad.status).toBe(422);
     const ok = await call("/partner/rules", "principal", {
       method: "PUT",
-      body: JSON.stringify({ partnerId: NETS, customerContactBy: "operation", recordOnBehalfAllowed: false, proofRules: null }),
+      body: JSON.stringify({ partnerId: NETS, customerContactBy: "partner", recordOnBehalfAllowed: false, proofRules: null }),
     });
     expect(ok.status).toBe(200);
     expect(rpcCalls[0]).toEqual({
       fn: "delivery_set_partner_rules",
-      args: { p_partner_id: NETS, p_customer_contact_by: "operation", p_record_on_behalf_allowed: false, p_proof_rules: null },
+      args: { p_partner_id: NETS, p_customer_contact_by: "partner", p_record_on_behalf_allowed: false, p_proof_rules: null },
     });
+  });
+
+  it("refuses disabling required success proof or routine Operation contact before any write", async () => {
+    const { rpcCalls } = mockSb({});
+    const base = { partnerId: NETS, customerContactBy: "partner", recordOnBehalfAllowed: true,
+      proofRules: { deliveredPhoto: true, deliveredSignedDo: true, partialSignedDo: true, failedPhoto: false } };
+    for (const key of ["deliveredPhoto", "deliveredSignedDo", "partialSignedDo"]) {
+      const res = await call("/partner/rules", "principal", { method: "PUT",
+        body: JSON.stringify({ ...base, proofRules: { ...base.proofRules, [key]: false } }) });
+      expect(res.status).toBe(422);
+    }
+    const res = await call("/partner/rules", "principal", { method: "PUT",
+      body: JSON.stringify({ ...base, customerContactBy: "operation" }) });
+    expect(res.status).toBe(422);
+    expect(rpcCalls).toHaveLength(0);
   });
 
   it("POST /partner/vehicle → delivery_save_partner_vehicle; a plate is required", async () => {

@@ -1495,6 +1495,21 @@ describe("`No confirmed date` — the requested-vs-confirmed chase", () => {
     }
   });
 
+  it("exposes the stored ETA as an editable clock time without changing the agreed window", () => {
+    ordersState.data = { orders: [order({ id: "eta-order", so: 1599, delivery_date: "2026-09-10" })] };
+    arrangementsState.data = { arrangements: [arrangement({ order_id: "eta-order", partner_id: "p-nets",
+      partner_name: "NETS", confirmed_date: "2026-09-10", confirmed_time: "Afternoon",
+      expected_arrival: "14:30:00" })] };
+    wrap(<OperationDelivery />, "/operation?tab=delivery&view=all");
+    fireEvent.click(screen.getAllByTitle("Show delivery brief")[0]!);
+    fireEvent.click(screen.getByTestId("delivery-brief-logistics-act"));
+    const eta = within(screen.getByTestId("delivery-brief-logistics-edit")).getByLabelText("ETA");
+    expect(eta).toHaveValue("14:30");
+    fireEvent.change(eta, { target: { value: "15:10" } });
+    expect(eta).toHaveValue("15:10");
+    expect(screen.getByTestId("delivery-brief-dates")).toHaveTextContent("Afternoon");
+  });
+
   it("⭐ a later date than the customer asked for cannot be saved without the WhatsApp reply (§8.6)", () => {
     ordersState.data = { orders: [order({ id: "later", so: 1505, delivery_date: "2026-09-10" })] };
     arrangementsState.data = {

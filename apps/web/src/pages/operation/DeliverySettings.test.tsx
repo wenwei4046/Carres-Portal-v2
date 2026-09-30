@@ -98,7 +98,7 @@ describe("the partner object — seven sections, ONE Save changes naming its gap
   it("opens on Partner details, lists the seven section links, and saves through the details door", async () => {
     renderAt(`/operation/settings/delivery/partners/${NETS}`);
     const nav = screen.getByTestId("delivery-settings-partner-nav");
-    for (const label of ["Partner details", "Coverage", "Schedule", "Warehouses & handover points", "Drivers and Vehicles", "Services & charges", "Portal access"]) {
+    for (const label of ["Company details", "Coverage", "Schedule", "Transit points", "Drivers and Vehicles", "Services & charges", "Portal access"]) {
       expect(within(nav).getByRole("link", { name: label })).toBeInTheDocument();
     }
     const save = screen.getByTestId("delivery-settings-save");
@@ -141,6 +141,19 @@ describe("the partner object — seven sections, ONE Save changes naming its gap
 });
 
 describe("Delivery Rules — per partner, with the shared facts read-only", () => {
+  it("keeps the fixed policy when old company settings contradict it", () => {
+    state.data!.partners[0]!.proof_rules = { deliveredPhoto: false, deliveredSignedDo: false, partialSignedDo: false, failedPhoto: false };
+    renderAt("/operation/settings/delivery/rules");
+    const nets = within(screen.getByTestId(`delivery-settings-rules-${NETS}`));
+    expect(nets.getByText("Logistics contacts the customer")).toBeInTheDocument();
+    for (const name of ["Delivered · delivery photo", "Delivered · signed Delivery Order", "Partially Delivered · signed Delivery Order"]) {
+      expect(nets.getByText(name)).toBeInTheDocument();
+      expect(nets.queryByRole("checkbox", { name })).not.toBeInTheDocument();
+    }
+    expect(nets.getByRole("checkbox", { name: "Failed Delivery · photo" })).toBeEnabled();
+    expect(screen.queryByRole("combobox", { name: "Who contacts the customer" })).not.toBeInTheDocument();
+  });
+
   it("prints who contacts the customer per partner, the shared contact lead, and the two mirrors", () => {
     renderAt("/operation/settings/delivery/rules");
     expect(screen.getByTestId("delivery-settings-rule-mirrors")).toHaveTextContent("3 working days before the requested delivery date");

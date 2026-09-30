@@ -13,16 +13,16 @@ import {
 describe("Delivery Settings — the doors' inputs and the governed words (§11)", () => {
   it("the four rows of the Delivery group and the seven partner sections are the MASTER's", () => {
     expect(DELIVERY_SETTINGS_SECTIONS.map((s) => s.label)).toEqual([
-      "Logistics Partners",
+      "Logistics",
       "Delivery Rules",
       "Message Templates",
       "Access",
     ]);
     expect(PARTNER_SECTIONS.map((s) => s.label)).toEqual([
-      "Partner details",
+      "Company details",
       "Coverage",
       "Schedule",
-      "Warehouses & handover points",
+      "Transit points",
       "Drivers and Vehicles",
       "Services & charges",
       "Portal access",
@@ -52,10 +52,10 @@ describe("Delivery Settings — the doors' inputs and the governed words (§11)"
     expect(bad.success).toBe(false);
   });
 
-  it("who contacts the customer is the partner or Operation — nothing else", () => {
+  it("routine customer contact is Logistics policy, not a company preference", () => {
     const base = { partnerId: "00000000-0000-0000-0000-0000000b0001", recordOnBehalfAllowed: true, proofRules: null };
     expect(partnerRulesInput.safeParse({ ...base, customerContactBy: "partner" }).success).toBe(true);
-    expect(partnerRulesInput.safeParse({ ...base, customerContactBy: "operation" }).success).toBe(true);
+    expect(partnerRulesInput.safeParse({ ...base, customerContactBy: "operation" }).success).toBe(false);
     expect(partnerRulesInput.safeParse({ ...base, customerContactBy: "salesperson" }).success).toBe(false);
   });
 

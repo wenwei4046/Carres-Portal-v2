@@ -229,7 +229,7 @@ export function DeliveryDatesEdit({
         partnerId: card.logisticsPartnerId,
         confirmedDate: date,
         confirmedTime: time ?? null,
-        expectedArrival: arrangement?.expected_arrival ?? null,
+        expectedArrival: arrangement?.expected_arrival?.slice(0, 5) ?? null,
         logisticsNote: arrangement?.logistics_note ?? null,
         replyProofPath: proofPath,
         driverName: arrangement?.driver_name ?? null,
@@ -336,6 +336,7 @@ export function LogisticsDetailsEdit({
   const [reason, setReason] = useState<string | undefined>(undefined);
   const [driver, setDriver] = useState(arrangement?.driver_name ?? "");
   const [vehicle, setVehicle] = useState(arrangement?.vehicle ?? "");
+  const [eta, setEta] = useState(arrangement?.expected_arrival?.slice(0, 5) ?? "");
   const [condo, setCondo] = useState(arrangement?.condo_registration ?? "");
   const [proofPath, setProofPath] = useState<string | null>(arrangement?.reply_proof_path ?? null);
   const [cannotOpen, setCannotOpen] = useState(false);
@@ -387,7 +388,7 @@ export function LogisticsDetailsEdit({
         partnerId: partnerId ?? null,
         confirmedDate: card.confirmedDate,
         confirmedTime: card.confirmedTime,
-        expectedArrival: arrangement?.expected_arrival ?? null,
+        expectedArrival: eta || null,
         logisticsNote: arrangement?.logistics_note ?? null,
         replyProofPath: proofPath,
         driverName: trim(driver) || null,
@@ -460,6 +461,13 @@ export function LogisticsDetailsEdit({
           onChange={(e) => setVehicle(e.target.value)}
         />
       </div>
+      <Input
+        id={`delivery-brief-eta-${card.scopeId}`}
+        label={MONITOR_COPY.eta}
+        type="time"
+        value={eta}
+        onChange={(e) => setEta(e.target.value)}
+      />
       {needsCondo ? (
         <Textarea
           id={`delivery-brief-condo-${card.scopeId}`}

@@ -5874,12 +5874,13 @@ can see or close. It moves to them the day that portal covers appointments.
 > facts once** — the customer promise, the booking gate and the order-lifecycle Work triggers.
 > Sales Orders may never write an arrangement fact, and Delivery may never write a Sales fact.
 
-**`Assign logistics`** — trigger: the order needs delivering and no company is chosen ·
-completion: **a company is recorded. Never "they accepted"** — assigning is our decision ·
-due: **WITHIN THE DAY the Purchase Order is issued** (owner re-ruling 2026-08-16, blueprint card
-§7 — supersedes the 3-working-days-before-the-customer-date law); a stock-source order with no
-PO: **within the order day**. Logistics is assigned the moment purchase starts, not near the
-delivery.
+**`Assign logistics` — OWNER-APPROVED 2026-09-29 / APPROVED TARGET / NOT BUILT.** For a delivery
+with no company assigned, the action opens on the PO issue day, or the day a stock-source order without a
+PO enters Operations. Staff may assign immediately; this opening trigger is not a same-day deadline.
+Delivery owns the configurable deadline and earlier partner-requirement precedence in
+[`../delivery/MASTER.md` §2.1](../delivery/MASTER.md#21--logistics-assignment-timing); Orders reads
+that one calculation. Completion is **a company recorded on the delivery scope, never acceptance by
+the company**. Current Work assignment and actual actor remain separate under the shared resolver.
 
 **`Call {logistics}` over `Get the scheduled delivery date`** (two structured Work lines, owner
 rulings 2026-09-13 / 2026-09-24; never joined with an em dash) — trigger: logistics assigned but

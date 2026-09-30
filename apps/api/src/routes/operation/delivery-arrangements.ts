@@ -743,11 +743,11 @@ async function currentPartners(
 }
 
 /**
- * ASSIGN LOGISTICS — one partner onto one or many scopes, in one transaction.
+ * ASSIGN LOGISTICS — one partner onto eligible unassigned scopes.
  *
- * Refuses the WHOLE request when any scope would be silently overwritten. All
- * or nothing is deliberate: a partly-applied assignment across eleven scopes is
- * a state the operator cannot read back off the screen.
+ * Refuses the whole selection before writing when any scope is ineligible.
+ * The existing source writes are sequential; this validation is not an atomic
+ * transaction guarantee. Transport/write failures must not be called success.
  */
 deliveryArrangementsRouter.post("/assign", requireOperationOrPrincipal, async (c) => {
   const parsed = assignLogisticsInputSchema.safeParse(await c.req.json().catch(() => null));
@@ -769,6 +769,21 @@ deliveryArrangementsRouter.post("/assign", requireOperationOrPrincipal, async (c
   if (!partner) return c.json({ error: "That logistics partner does not exist" }, 404);
 
   const current = await currentPartners(sb, scopes);
+
+  // Bulk assignment is only for unassigned scopes. A reason never authorises a
+  // bulk change, including a mixed selection or a same-company re-selection.
+  if (scopes.length > 1) {
+    const assigned = scopes.filter((scope) =>
+      current.get(`${scope.orderId}#${scope.leg}`)?.partnerId,
+    );
+    if (assigned.length) {
+      return c.json({
+        error: "Some of these already have a logistics partner",
+        code: "bulk_requires_unassigned",
+        scopes: assigned,
+      }, 409);
+    }
+  }
 
   /* THE GATE. A change needs its reason, and the refusal NAMES the scopes so
      the operator can see which of their eleven picks already had a carrier. */
