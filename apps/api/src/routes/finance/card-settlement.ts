@@ -13,6 +13,7 @@ import type { AppEnv } from "../../types";
  * Mounted at `/api/finance/card-settlement`, above the `/finance` catch-all.
  *
  *   GET  /                 the days, their rows and suggestions, the payments to pick from
+ *   GET  /charges          approved card payouts in a period, by department (Reports → Card charges)
  *   POST /import           read the file here, then keep it and its rows whole
  *   POST /rows/:id/match   approve a suggestion or pick by hand; null takes the match off
  *   POST /days/payout      Approve day: prepare the day's one card payout
@@ -54,6 +55,19 @@ financeCardSettlementRouter.get("/", requireFinance, async (c) => {
   const { data, error } = await userClient(c.env, c.var.auth.jwt).rpc("card_settlement_review");
   if (error) return fail(c, error);
   return c.json(data ?? { days: [], rows: [], payments: [] });
+});
+
+/** GET /charges?from=&to= — Reports → Card charges: each approved card payout
+ *  in the dates, split by the department of its matched sales. */
+financeCardSettlementRouter.get("/charges", requireFinance, async (c) => {
+  const from = c.req.query("from") ?? "";
+  const to = c.req.query("to") ?? "";
+  if (!isoDate.safeParse(from).success || !isoDate.safeParse(to).success || to < from) {
+    return c.json({ error: "bad_request", message: "Pick the months." }, 400);
+  }
+  const { data, error } = await userClient(c.env, c.var.auth.jwt).rpc("card_charges_source", { p_from: from, p_to: to });
+  if (error) return fail(c, error);
+  return c.json(data ?? []);
 });
 
 financeCardSettlementRouter.post("/import", requireFinance, async (c) => {

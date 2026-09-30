@@ -4536,6 +4536,24 @@ New on-screen words from Reports → Dealer commission (migration 0544). Not law
 | Quota list, dealer gone | `Dealer not available` |
 | API refusals | `Pick a month.` · `That product is not on the list.` · `That dealer is not on the list.` |
 
+## PROPOSAL — PENDING APPROVAL (card-charges)
+
+New on-screen words from Reports → Card charges (migration 0623). Not law until approved. The columns
+reuse Card settlement's approved words for the same facts: `Card company` · `Sales total` · `Fee` ·
+`Paid into bank`, and the card company names `Public Bank` · `GHL` · `Maybank`.
+
+| Where | Proposed words |
+|---|---|
+| Page, tab title and report door | `Card charges` · tab `Card charges · Carres` |
+| Report door line | `Sales total · Fee · Paid into bank · Fee % · by month and card company` |
+| Report columns and export | `Month` · `Fee %` (fee over Sales total, two places, `1.50%`) |
+| Filters | `From` · `Up to` (month choices) · `Department` with its existing choices |
+| Footer note | `{n} of {m} rows · Only card settlement days whose payout is approved are counted.` |
+| Footer note, a department picked | adds `A Maybank fee is shared across departments by their sales.` |
+| Empty | `No approved card payout in these months. Only card settlement days whose payout is approved are counted.` |
+| Load failure | `Card charges could not be loaded. Try again.` · `Try again` |
+| Refusals (API and database) | `Pick the months.` · `Card charges are for Finance.` |
+
 ## PROPOSAL — PENDING APPROVAL (departments)
 
 NOT LAW. Words the 0540 departments slice puts on screen. Falsifier: Jess or Finance
