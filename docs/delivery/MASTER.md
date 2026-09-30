@@ -2141,24 +2141,89 @@ pricing law. No new owner decision is needed to correct the implementation limit
 Cards, implementation order and production verification belong to a separately commissioned
 BUILD/DELIVERY lane. This audit does not declare this restarted planning mission complete.
 
-### 15.2 · Whole-domain closure
+### 15.2 · Complete Delivery Blueprint — current owner review
 
-This Blueprint covers purpose, ownership and boundaries; the complete normal lifecycle; exception
-journeys; the daily operator journey; navigation; Monitor's two views, rail, calendar and register;
-the expanded delivery brief and its inline writes; the Delivery Orders register and DO object;
-proof and its review; Failed Delivery and `Cannot Deliver`; the Loan seam; Singapore and East
-Malaysia journeys; the Order Route, Work Engine and Quick Rail connections; Settings; Reports;
-owners, permissions and the Partner Portal and API boundary; the cross-module reconciliation law;
-authoritative completion facts; and the intentional rejects. Automatic allocation, vehicle routing
-and customer self-scheduling are excluded from current truth rather than deferred blind spots.
+**2026-09-30 restarted PLAN mission: consolidated review, not a build authorisation.** Sections
+1–15 retain their explicitly approved operating rules, including the owner's assignment-timing,
+actual-date/time and customer-period rulings. The review below synthesises them; it does not
+reopen those decisions. The prior Blueprint approval does not prove the later convergence work is
+built. The remaining recommendation on the structured company-cost reference is marked separately.
 
-**PLAN MISSION COMPLETE — 2026-09-13.** The owner approved the complete Blueprint after the
-corrections of 2026-09-12 and 2026-09-13; this MASTER persists the approved operating model and the
-contradicting older text in this file, `../orders/MASTER.md`, `../ui/MASTER.md`,
-`../COPY-STANDARD.md`, `../workspace/MASTER.md` and `../ERP-ARCHITECTURE.md` is overwritten. No
-unresolved owner decision remains. This MASTER authorises no Card, implementation sequencing,
-migration or build work; §15.1 is the dependency list a later BUILD/DELIVERY lane derives its
-scopes from.
+**Operator journey and destinations.**
+
+| Stage | What the operator does and what completes it | Surface and module consequence |
+|---|---|---|
+| Start the working day | Resolve failed trips, overdue results and missing proof, then due assignments/bookings; each action has its current shared Work assignment | Monitor or Workspace opens the same owning action. Helpers retain their actual identity without taking over responsibility |
+| Read the order | Read customer/access, requested date, goods/accessories/services, PO and Stock readiness; correct missing Sales facts at their owner | Monitor's four panels; Sales Orders owns customer/commercial truth and Purchasing owns supplier dates |
+| Assign Logistics | Assign an unassigned delivery by §2.1's deadline; batch only unassigned scopes; later company changes are single-delivery, reasoned and audited | Monitor. Each split trip/Journey leg retains its scope; changing a company does not move goods |
+| Agree the delivery | Logistics contacts the customer; Operation may record its evidenced reply. Record the agreed date and optional period; outside-agreement exceptions belong to Operation | Delivery Dates. §11.1 preserves the actual agreement despite later Settings changes; Payment owns any storage/collection consequence |
+| Prepare the trip | Read the exact eligible goods, location, booking and money gate; system issues the scoped DO when those facts allow it | Delivery Orders is the formal register. No new unpaid-delivery approval or manual issue door; existing historical approvals retain §3's treatment |
+| Hand over | Warehouse records actual Units loaded; Logistics confirms what it received | Stock/Outbound owns physical handover. Required, loaded and driver-confirmed are distinct; no second quantity or invented receipt |
+| Record the attempt | Record actual date, reliable exact time only when known, full/partial/failed result and the affected goods | DO's frozen scope. Partial remainder retains its own location, reason and next action; pre-trip postponement stays an arrangement change |
+| Receive and review evidence | Driver sends signed DO and goods/service photos; Operation uploads them to ERP and reviews them separately | Result, submission, upload and acceptance are different facts. Missing required proof stays open; service completion is not inferred from goods delivery |
+| Recover and finish | Resolve failed/remaining goods, agreed redelivery and actual returns; Warehouse receipt starts Check required | Same Unit chain. Service/Claims/Commercial owns remedies; Rental reads accepted customer receipt for its service-start witness. Outstanding services, proof and recovery work stay open at day end |
+
+**Page and information architecture.** Monitor retains its work list, company filters, governed
+search/filter/sort/columns/export, delivery-scope checkbox and four expansion panels: Customer
+Address & Access; Delivery Dates; Logistics Details; Items Services & Stock. Its schedule uses the
+governed calendar and two-month date navigation; customer deliveries and intermediate transfers
+remain separately counted. No invented date places unscheduled work on the calendar. Delivery
+Orders retains the formal register and document brief; its number opens the object. Quick Rail
+previews/deep-links, Activity reads source history, Settings owns configuration and Reports owns
+analysis. All use the shared Shell/Register/Object grammar and COPY/tokens; no new layout, label
+or component is admitted by this consolidation.
+
+**Complete capability coverage.** Source/numbering and DO identity are in §3; scoped selection,
+search/filter/export and inline arrangement edits in §8; document/reprint/history in §§3 and 9;
+result corrections and review in §6.1; cancellation/supersession preserve original documents and
+evidence. There is no arrangement-copy or destructive delete workflow. Scans preserve permanent
+Unit identity; this mission proposes no import/backfill or driver rollout. Settings/access are in
+§§11 and 13, reports in §12, special journeys and Subscription in §14. Concurrency/retry and
+partial-save limits remain measured in §15.1, not disguised as completed capabilities. Customer,
+PO, money, Unit custody, Case/remedy, Rental activation and shared Work each retain their writer.
+
+**Research-to-Carres synthesis — evidence, never foreign authority.** The earlier research used
+Onfleet's proof, order and service-availability documentation for separate completion/evidence and
+operational windows; SAP Fiori's object-page guidance for coherent object facts/actions; AutoCount's
+published capability matrix for partial fulfilment and multi-location capability. Carres adapts
+those principles through its own ownership, DO scope and UI kit. No external dispatch/routing or
+self-scheduling model is adopted. 2990's authenticated capability surface was inaccessible; Odoo
+was not decisive evidence. Current Carres source supplied the concrete reuse/gap evidence in
+§15.1. No fresh production walk or pixel validation is claimed.
+
+**Four-way resolution.**
+- **RESOLVED FROM AUTHORITY:** the lifecycle, two destinations, module writers, shared Work
+  ownership, proof/return rules and the newly approved timing/period rules above.
+- **APPROVED TARGET / NOT BUILT OR INCOMPLETE:** independent split arrangements, earlier-leg gate,
+  frozen-DO result selection, assignment audit, settings and scoped proof convergence in §15.1.
+- **BUILT IN SOURCE / VERIFICATION LIMITED:** existing Monitor/DO/report surfaces, split mint,
+  driver/vehicle templates and shared proof-review capability; dated production evidence remains
+  bounded by §16 and is not evidence for the newly approved target.
+- **REAL GAP / CONTRADICTION:** detailed non-customer transport action admission, factory-origin
+  receipt boundaries, saved-fact correction admission and external-link DO privacy remain named
+  cross-module dependencies. Their incomplete contracts cannot be silently implemented through a
+  customer-delivery shortcut. Optional structured company-cost modelling remains a proposal below.
+
+**ONE REMAINING RECOMMENDATION / PROPOSAL, NOT LAW — owner review.** Retain the approved service
+capability and evidenced actual-company-cost workflow under Payment §9 and Delivery §11.2. Exclude
+a new structured rate/automatic company-cost calculation model from this convergence mission.
+Authority searched: Delivery §§11 and 11.2, Payment §9, Sales Orders' one-total rule. None defines
+rate bases or automatic partner-cost calculation; the measured form contains free-text charge lines.
+The alternative is to plan a rate model now, including charging bases, regions, versions and quote
+exceptions. Deferral reduces setup and avoids delaying normal deliveries, but staff still records
+and checks actual logistics cost. Revisit if measured volume/repeated pricing disputes justify a
+separate costing mission. This does not defer actual service evidence or authorised customer billing.
+
+The other intentional exclusions in §15 remain: no lorry tracking, route optimisation, dispatch
+runs, customer self-scheduling, second roster/stock/payment truth or external rollout. Default
+morning/afternoon clock values remain unconfigured until evidenced setup; that is not approval to
+copy code examples. New screen wording must pass the existing COPY governance before build.
+
+**Current boundary:** the above complete synthesis is presented for owner review, with the one
+remaining scope recommendation explicitly unapproved. This restarted mission is not yet declared
+PLAN MISSION COMPLETE and creates no READY scope, Card, implementation sequence or build task.
+All changes from this mission are on the planning branch until delivered to main; no production
+change or external contact is authorised by this document.
 
 
 ## 16 · Production closure
