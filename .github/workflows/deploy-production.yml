@@ -16,7 +16,7 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: production
+  group: ${{ inputs.diagnose_schedule && format('scheduler-diagnostics-{0}', github.run_id) || 'production' }}
   cancel-in-progress: false
 jobs:
   deploy:
