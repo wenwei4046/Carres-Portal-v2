@@ -1811,6 +1811,29 @@ review the standard's scope instead of silently assigning a misleading range. Ex
 customer windows remain expressible. Screen labels still follow COPY-STANDARD; this business
 approval does not authorise application implementation in this PLAN chat.
 
+### 11.2 · Service capability, logistics cost and customer money
+
+**RESOLVED FROM AUTHORITY — Payment §9, Sales Orders' one-total rule, Delivery §§1 and 6.1;
+converged 2026-09-30. No new pricing policy or implementation approval.**
+`Services & charges` describes what a Logistics company supports and its charge information.
+Company support is not an order for that service, evidence that it was performed, or authority to
+charge the customer. Sales Orders owns the ordered service; Delivery records the actual service
+and its evidence. A service already included in the order total is counted once, never levied
+again from a Delivery summary.
+
+Delivery Operations records the company, destination, floor, quantity, carry-up, dismantling,
+disposal/take-out and actual service evidence. Operation may upload the company's actual cost
+after service and negotiate disputed company costs. Normal delivery does not wait for a quote or
+price; only an exceptional extra service explicitly requiring a quote gains that step. A company
+cost is not automatically a customer charge. Finance/Commercial owns customer-charge calculation,
+approval and correction; confirmed charges flow to Payment for invoice/collection. Delivery
+Settings does not become a customer-price calculator or a second payment ledger.
+
+**MEASURED SOURCE / NOT VERIFIED LIVE — 2026-09-30.** The existing Settings form stores company
+service flags and free-text charge lines; this does not establish structured pricing, a verified
+charge calculation or a customer billing integration. The shape of any richer cost reference
+remains unapproved; do not infer new pricing rules or build a rate engine from these text lines.
+
 ## 12 · Reports
 
 Central Reports owns Delivery Commitment Performance, First Delivery Success, Failed Delivery
