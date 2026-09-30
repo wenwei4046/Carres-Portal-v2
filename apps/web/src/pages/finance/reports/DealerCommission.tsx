@@ -3,9 +3,10 @@
  * owed or posted (CLAUDE.md §7); a payout still goes through a payment voucher.
  *
  * One read of `dealer_commission_source(month)`; every figure is the shared
- * `dealerCommissionReport` (Law D). Below the report, Finance keeps the rates:
- * the default commission rate, products with their own rate, and each dealer's
- * renovation quota.
+ * `dealerCommissionReport` (Law D). Below the report, side by side, Finance
+ * keeps the rates: the default commission rate, products with their own rate,
+ * and each dealer's renovation quota. A dealer with no quota opens the quota
+ * form from its own `Quota left` cell.
  *
  * Frame: `ModuleHeader` + `<ListPageShell register>` + the Register engine, the
  * shape every other Finance register draws (Trial Balance, Unpaid by Supplier,
@@ -33,6 +34,7 @@ import { LoadFailed } from "../other-money-in/parts";
 
 const BASE = "/api/finance/dealer-commission";
 const ALL = "all";
+type QuotaDraft = { dealerId: string; quota: string; rebateRate: string; startsOn: string };
 
 /** This month and the 23 before it, newest first (YYYY-MM). */
 function lastMonths(): string[] {
@@ -48,6 +50,7 @@ export default function DealerCommission() {
   const [month, setMonth] = useState(months[0]);
   const [dealerId, setDealerId] = useState(ALL);
   const [outletId, setOutletId] = useState(ALL);
+  const [quota, setQuota] = useState<QuotaDraft | null>(null);
   const q = useQuery({
     queryKey: ["finance", "dealer-commission", month],
     queryFn: () => apiFetch<DcSource>(`${BASE}?month=${month}`),
@@ -66,8 +69,14 @@ export default function DealerCommission() {
     { key: "earned", label: "Commission on collected", width: 200, align: "right", accessor: (r) => rm(r.earned), numberValue: (r) => r.earned, exportValue: (r) => r.earned },
     { key: "still", label: "Commission still to collect", width: 220, align: "right", accessor: (r) => rm(r.stillToCollect), numberValue: (r) => r.stillToCollect, exportValue: (r) => r.stillToCollect },
     { key: "rebate", label: "Rebate this month", width: 170, align: "right", accessor: (r) => (r.rebate === null ? "No quota" : rm(r.rebate)), numberValue: (r) => r.rebate ?? 0, exportValue: (r) => r.rebate ?? "" },
-    { key: "left", label: "Quota left", width: 160, align: "right", accessor: (r) => (r.quotaLeft === null ? "No quota" : rm(r.quotaLeft)), numberValue: (r) => r.quotaLeft ?? 0, exportValue: (r) => r.quotaLeft ?? "" },
-  ], []);
+    { key: "left", label: "Quota left", width: 160, align: "right", numberValue: (r) => r.quotaLeft ?? 0, exportValue: (r) => r.quotaLeft ?? "",
+      searchValue: (r) => (r.quotaLeft === null ? "No quota" : rm(r.quotaLeft)),
+      // No quota yet: the words open the quota form with this dealer chosen.
+      accessor: (r) => (r.quotaLeft === null
+        ? <button type="button" className="hover:underline"
+            onClick={() => setQuota({ dealerId: r.dealerId, quota: "", rebateRate: "5", startsOn: months[0] })}>No quota</button>
+        : rm(r.quotaLeft)) },
+  ], [months]);
 
   return <div className="flex h-full min-h-0 flex-col" data-testid="dealer-commission">
     <ModuleHeader destinationHeader testId="dealer-commission-header" word="Dealer commission" docTitle="Dealer commission · Carres" />
@@ -88,12 +97,12 @@ export default function DealerCommission() {
         statusSummary={(visible) => <span data-testid="dealer-commission-summary">
           {visible.length} of {rows.length} rows · Commission is earned only on money collected. The rebate is the dealer's whole collections, whatever showroom is picked.
         </span>} />
-      {src && <div className="mt-6 min-h-0 overflow-y-auto flex flex-col gap-6"><Rates src={src} /></div>}
+      {src && <div className="mt-6 min-h-0 overflow-y-auto grid grid-cols-1 gap-6 md:grid-cols-2"><Rates src={src} quota={quota} setQuota={setQuota} /></div>}
     </ListPageShell>}
   </div>;
 }
 
-function Rates({ src }: { src: DcSource }) {
+function Rates({ src, quota, setQuota }: { src: DcSource; quota: QuotaDraft | null; setQuota: (q: QuotaDraft | null) => void }) {
   const qc = useQueryClient();
   const save = useMutation({
     mutationFn: (v: { path: string; method: "PUT" | "DELETE"; body?: unknown }) =>
@@ -102,7 +111,6 @@ function Rates({ src }: { src: DcSource }) {
   });
   const [rate, setRate] = useState(String(src.settings.defaultRate));
   const [product, setProduct] = useState<{ modelId: string; rate: string } | null>(null);
-  const [quota, setQuota] = useState<{ dealerId: string; quota: string; rebateRate: string; startsOn: string } | null>(null);
   const [refusal, setRefusal] = useState<string | null>(null);
   const months = useMemo(lastMonths, []);
   const dealerName = (id: string) => src.dealers.find((d) => d.id === id)?.name ?? "Dealer not available";
