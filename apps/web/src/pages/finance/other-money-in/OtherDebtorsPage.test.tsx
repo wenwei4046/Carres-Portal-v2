@@ -97,6 +97,24 @@ describe("Other debtors — the invoice Register", () => {
     expect(screen.queryByRole("button", { name: "Cancel invoice" })).not.toBeInTheDocument();
   });
 
+  it("the switch is the shared one: this list is the current page, the other is a link", async () => {
+    show("/finance/other-debtors");
+    await screen.findByText("ARI-20260915-4821");
+    const nav = screen.getByRole("navigation", { name: "Other debtors" });
+    expect(within(nav).getByText("Invoices")).toHaveAttribute("aria-current", "page");
+    expect(within(nav).queryByRole("link", { name: "Invoices" })).not.toBeInTheDocument();
+    expect(within(nav).getByRole("link", { name: "Parties" })).toHaveAttribute("href", "/finance/other-debtors?view=parties");
+  });
+
+  it("with no party on file the Party control is shut, so no empty list opens", async () => {
+    net.routes["GET /parties"] = [];
+    show("/finance/other-debtors?invoice=new");
+    await screen.findByTestId("other-debtor-invoice-form");
+    const party = await screen.findByRole("combobox", { name: /Party/ });
+    await waitFor(() => expect(party).toHaveTextContent("No party yet. Add one on Parties"));
+    expect(party).toBeDisabled();
+  });
+
   it("refuses an empty new invoice before any round trip", async () => {
     show("/finance/other-debtors?invoice=new");
     fireEvent.click(await screen.findByRole("button", { name: "Save draft" }));
@@ -189,6 +207,9 @@ describe("Other debtors — the party Register", () => {
     expect(screen.getByText("Example Sister Sdn Bhd")).toBeInTheDocument();
     expect(screen.getByText("No number on file")).toBeInTheDocument();
     expect(screen.getByTestId("other-debtor-parties-summary")).toHaveTextContent("2 parties · RM 900.00 outstanding");
+    const nav = screen.getByRole("navigation", { name: "Other debtors" });
+    expect(within(nav).getByText("Parties")).toHaveAttribute("aria-current", "page");
+    expect(within(nav).getByRole("link", { name: "Invoices" })).toHaveAttribute("href", "/finance/other-debtors");
     fireEvent.click(screen.getByRole("button", { name: "New party" }));
     const dialog = await screen.findByRole("dialog");
     fireEvent.change(within(dialog).getByLabelText(/Name/), { target: { value: "Example Landlord Sdn Bhd" } });

@@ -236,6 +236,7 @@ function InvoiceForm({
               onValueChange={setPartyId}
               options={partyOptions}
               placeholder={parties.isLoading ? "Loading parties…" : partyOptions.length ? "Choose a party" : "No party yet. Add one on Parties"}
+              disabled={!partyOptions.length}
               error={fieldErrors.party}
             />
             <Input

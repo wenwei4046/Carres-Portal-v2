@@ -14,7 +14,7 @@
  * no KPI strip. Customer money is never here — it lives in Payments.
  */
 import { useMemo, useState, type ReactNode } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import {
   financePartyKindWord,
   otherDebtorInvoiceNumberWord,
@@ -25,6 +25,7 @@ import {
   type OtherDebtorPartyRow,
 } from "@carres/shared/other-money-in";
 import Button from "@/components/kit/Button";
+import { SegmentedLinks } from "@/components/Segmented";
 import ListPageShell from "@/components/ListPageShell";
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
 import { fmtDate } from "@/lib/fmt-date";
@@ -104,24 +105,11 @@ export default function OtherDebtorsPage() {
 /* ── the two sibling lists, named in Row 2 ─────────────────────────────────── */
 
 function Siblings({ current }: { current: "invoices" | "parties" }) {
-  return (
-    <span className="flex items-center gap-3 text-body">
-      {current === "invoices" ? (
-        <span aria-current="page" className="font-semibold">
-          Invoices
-        </span>
-      ) : (
-        <Link to="/finance/other-debtors">Invoices</Link>
-      )}
-      {current === "parties" ? (
-        <span aria-current="page" className="font-semibold">
-          Parties
-        </span>
-      ) : (
-        <Link to="/finance/other-debtors?view=parties">Parties</Link>
-      )}
-    </span>
-  );
+  const views = [
+    { value: "invoices", to: "/finance/other-debtors", label: "Invoices" },
+    { value: "parties", to: "/finance/other-debtors?view=parties", label: "Parties" },
+  ] as const;
+  return <SegmentedLinks options={views} value={current} ariaLabel="Other debtors" testId="other-debtors-switch" />;
 }
 
 /* ── the invoice Register ──────────────────────────────────────────────────── */
@@ -231,11 +219,11 @@ function InvoiceRegister({ onOpen, onNew }: { onOpen: (id: string) => void; onNe
         searchPlaceholder="Search invoices…"
         toolbarStart={
           <span className="flex items-center gap-4">
+            <DepartmentFilter value={dept} onChange={setDept} />
             <Button variant="primary" size="sm" shape="pill" icon="add" onClick={onNew}>
               New invoice
             </Button>
             <Siblings current="invoices" />
-            <DepartmentFilter value={dept} onChange={setDept} />
           </span>
         }
         emptyMessage="No other debtor invoice yet. Press New invoice to bill a party that is not a customer."

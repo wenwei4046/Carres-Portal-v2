@@ -380,7 +380,7 @@ export default function DealerDrawer({ dealerId, onClose, canSetStatus = true }:
                     className="w-full px-3 py-2 border border-base-200 rounded text-body outline-none focus:border-primary"
                   />
                 </ProfileField>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 items-end gap-3">
                   <ProfileField label="Account number" hint="Digits only, 6 to 20.">
                     <input
                       aria-label="Account number"
