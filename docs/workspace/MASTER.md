@@ -473,7 +473,7 @@ idempotent checkpoint receipt. An append-only movement ledger also handles expli
 unavailability between checkpoints. Stable Sales Order PIC and completed source facts are untouched.
 Late activity does not undo a movement; the following day starts from its dated source allocation.
 
-Migrations 0613 and 0615–0621 are committed and **NOT APPLIED**. Exact-file rollback probes passed
+Migrations 0613, 0615–0621 and 0624 are committed and **NOT APPLIED**. Exact-file rollback probes passed
 settings validation/audit, manager and browser refusals, lunch/overnight exclusion, receipt retries,
 stale source/settings refusal, independent morning/afternoon movement, no late bounce-back, newer
 manual assignment precedence, recorded unavailability, restricted history and unchanged GRN

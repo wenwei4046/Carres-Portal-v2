@@ -460,6 +460,18 @@ describe("Card 06 §7 · the two Work actions", () => {
     });
   });
 
+  it("does not resurrect the legacy PO person when the authoritative actor is null", () => {
+    const items = manualPurchaseWorkItems(input({}), {
+      approver, poDuty,
+      poDutyResolution: {
+        dutyKey: "po_duty", onDate: "2026-09-01", normalOwner: poDuty,
+        buddy: null, activeCover: null, actingPerson: null,
+        state: "not_assigned", assignmentId: null,
+      },
+    }, "2026-09-01");
+    expect(items[0]).toMatchObject({ ownerUserId: null, actingPerson: null, ownerState: "not_assigned" });
+  });
+
   it("an ISSUED PO is a commitment — a missing send confirmation raises no work", () => {
     /* ⭐ OWNER RULING 2026-09-11. This used to keep `Issue PO` open on a fully
        ordered request whose purchase orders carried no confirmed-sent row.
