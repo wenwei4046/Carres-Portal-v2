@@ -385,6 +385,9 @@ words (§8.4).
   nothing (`27 Oct`) — never `No time agreed`, because an empty optional field is not an exception.
   A delivery requirement that genuinely needs an appointment time (a specific condominium or
   building) raises its OWN missing item; no order is forced to carry a time.
+- Optional periods use §11.1's approved effective-dated definitions and the actual customer
+  agreement. Settings changes never rewrite an existing booking; a customer-specific window takes
+  precedence. An empty period is not any-time consent.
 - The three delivery date words are **`Requested delivery`** (Sales' customer request) ·
   **`Scheduled delivery`** (Delivery's arrangement) · **`Delivered`** (the recorded result).
 - **ETA** is Logistics' later estimated arrival time on the day and never rewrites the confirmed
@@ -1769,7 +1772,7 @@ Routine customer Delivery ownership reads the Sales Order PIC; `delivery_duty` s
 explicit no-PIC fallback and no-Sales-Order display transport coordination (§13.1), through
 `Settings → Staff & Duties`.
 
-### 11.1 · Settings convergence and customer-period review
+### 11.1 · Settings convergence and customer-period rules
 
 **RESOLVED FROM AUTHORITY / APPROVED TARGET, NOT VERIFIED BUILT — 2026-09-30.** Keep the
 four Settings sections above. Sites owns transit-point identity; Staff & Duties owns staff
@@ -1787,28 +1790,26 @@ headings, independently typed handover points and four proof switches. The share
 `DELIVERY_TIME_SLOTS` list hardcodes morning 09:00–12:00, afternoon 12:00–15:00, late afternoon,
 evening and anytime. This source is implementation evidence, not approval of those clock ranges.
 
-**PROPOSAL / NOT LAW — customer-period meaning; owner review pending.**
-Authority searched: Delivery §§5, 5.2, 11; Workspace §5.9 and §6.1; COPY-STANDARD's Delivery Dates
-and Delivery Rules entries; carried-forward customer-period ruling. They resolve optionality and
-ownership but do not establish morning/afternoon boundaries or how changed definitions affect
-existing agreements. The whole-domain audit and reference-to-Carres matrix are already research
-input; this is a remaining Settings business choice, not a request to approve the completed audit.
+**CUSTOMER-PERIOD MEANING — OWNER-APPROVED / LOCKED 2026-09-30; TARGET / NOT BUILT.**
+Delivery Rules maintains effective-dated standard morning/afternoon ranges. Each delivery retains
+the range actually agreed with its customer and the applicable definition/version; an explicitly
+agreed customer-specific window takes precedence for that delivery. Changing a Settings definition
+does not rewrite an existing agreement. Until a range has been configured and actually agreed,
+never convert a period name into clock times. No initial clock boundaries are approved by this
+ruling; the hardcoded source examples above are not defaults to adopt.
 
-Recommendation: maintain effective-dated standard morning/afternoon ranges in Delivery Rules.
-Record the range actually agreed for each delivery; a customer's specific window takes precedence
-for that delivery. Changing a definition does not rewrite existing agreements. Until a range has
-been configured and actually agreed, do not convert a period name into clock times. A date-only
-booking remains valid. Explicit any-time agreement still respects site access and working hours.
-ETA remains separate; an evidenced breach of the agreed range follows §5.2's customer exception.
-No initial clock boundary is proposed from the hardcoded examples.
+A date-only booking remains valid. Empty means no period recorded, not explicit any-time consent.
+Explicit any-time agreement still respects site access and working hours. ETA remains a separate
+estimate; an evidenced breach of the actual agreed range follows §5.2's Operation-owned customer
+exception. Customer messages, Monitor, Work and reporting consume that delivery's recorded
+agreement rather than reinterpret it using today's Settings. A period definition alone is not
+proof of a customer's agreement or of an actual arrival time.
 
-Operating alternative: keep morning/afternoon as broad descriptions and record explicit clock
-ranges individually only when the customer agrees one. This reduces central setup but provides no
-clock-based breach assessment for a broad period. The recommended shared definitions add setup
-work but make customer messages and exception handling consistent. Falsifier: observed logistics
-or regional agreements use materially different definitions; then a universal range would misstate
-the promise and the scope must be reviewed. Neither choice authorises implementation or new UI
-wording before owner review.
+This adds central setup work in exchange for consistent promises and exception handling. Review
+boundary: if evidenced logistics or regional agreements use materially different definitions,
+review the standard's scope instead of silently assigning a misleading range. Existing specific
+customer windows remain expressible. Screen labels still follow COPY-STANDARD; this business
+approval does not authorise application implementation in this PLAN chat.
 
 ## 12 · Reports
 
