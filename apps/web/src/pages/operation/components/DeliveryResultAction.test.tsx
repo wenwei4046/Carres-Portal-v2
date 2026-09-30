@@ -106,7 +106,7 @@ beforeEach(() => {
 });
 
 describe("DeliveryResultAction", () => {
-  it("Partially Delivered requires exact delivered Units, a reason, goods location and explanation", () => {
+  it("Partially Delivered requires exact delivered Units, a reason and goods location", () => {
     mount();
     fireEvent.click(screen.getByTestId("do-result-primary-action"));
     fireEvent.click(screen.getByRole("button", { name: "Partially Delivered" }));
@@ -129,6 +129,18 @@ describe("DeliveryResultAction", () => {
     expect(screen.getByText("Failed Delivery")).toBeInTheDocument();
     expect(screen.queryByRole("checkbox", { name: /UNIT-101/ })).toBeNull();
     expect(screen.getByRole("button", { name: "Record Failed Delivery" })).toBeDisabled();
+  });
+
+  it("records a known failure reason without making staff repeat it in an explanation", () => {
+    mount();
+    fireEvent.click(screen.getByTestId("do-result-primary-action"));
+    fireEvent.click(screen.getByRole("button", { name: "Failed" }));
+    fireEvent.change(screen.getByLabelText("Delivery Result reason"), { target: { value: "customer_unreachable" } });
+    fireEvent.change(screen.getByLabelText("Goods location"), { target: { value: "still_with_logistics" } });
+    expect(screen.getByRole("button", { name: "Record Failed Delivery" })).toBeEnabled();
+    fireEvent.click(screen.getByRole("button", { name: "Record Failed Delivery" }));
+    expect(recordAttempt).toHaveBeenCalledWith(expect.objectContaining({ result: "failed", note: null,
+      reasonKey: "customer_unreachable", whereGoods: "still_with_logistics" }), expect.anything());
   });
 
   it("does not record a result when Stock's Unit read failed", () => {

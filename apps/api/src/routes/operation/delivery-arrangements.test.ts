@@ -217,6 +217,20 @@ describe("POST /assign — one partner onto one or many scopes", () => {
     expect(body.scopes[0]?.orderId).toBe(ORDER_B);
   });
 
+  it.each([NETS, AL])("refuses assigned scopes in a bulk request even with a reason (%s)", async (partnerId) => {
+    const { upserts, inserts } = mockSb([
+      { data: { id: partnerId, name: "Logistics" } },
+      { data: [{ id: "arr-1", order_id: ORDER_B, leg: 0, partner_id: NETS }] },
+      { data: [{ id: ORDER_A, delivery_partner_id: null }, { id: ORDER_B, delivery_partner_id: null }] },
+    ]);
+    const res = await assign({ scopes: [{ orderId: ORDER_A, leg: 0 }, { orderId: ORDER_B, leg: 0 }],
+      partnerId, reason: "partner_capacity_full" });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ code: "bulk_requires_unassigned", scopes: [{ orderId: ORDER_B, leg: 0 }] });
+    expect(upserts).toHaveLength(0);
+    expect(inserts).toHaveLength(0);
+  });
+
   it("⭐ a Journey LEG inherits no carrier from the order-level column", async () => {
     // The Sales column was never leg 2's carrier, so assigning one is a first
     // assignment and must not demand a reason.

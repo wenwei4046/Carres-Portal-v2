@@ -11,7 +11,7 @@ import { z } from "zod";
 import { DELIVERY_CONTACT_PURPOSES } from "./delivery-contact";
 
 export const DELIVERY_SETTINGS_SECTIONS = [
-  { slug: "partners", label: "Logistics Partners" },
+  { slug: "partners", label: "Logistics" },
   { slug: "rules", label: "Delivery Rules" },
   { slug: "templates", label: "Message Templates" },
   { slug: "access", label: "Access" },
@@ -20,10 +20,10 @@ export type DeliverySettingsSection = (typeof DELIVERY_SETTINGS_SECTIONS)[number
 
 /** The partner object's sections (§11 · Logistics Partners). */
 export const PARTNER_SECTIONS = [
-  { slug: "details", label: "Partner details" },
+  { slug: "details", label: "Company details" },
   { slug: "coverage", label: "Coverage" },
   { slug: "schedule", label: "Schedule" },
-  { slug: "handover", label: "Warehouses & handover points" },
+  { slug: "handover", label: "Transit points" },
   { slug: "fleet", label: "Drivers and Vehicles" },
   { slug: "services", label: "Services & charges" },
   { slug: "access", label: "Portal access" },
@@ -114,9 +114,13 @@ export const DEFAULT_PROOF_RULES: ProofRules = {
 
 export const partnerRulesInput = z.object({
   partnerId: uuid,
-  customerContactBy: z.enum(["partner", "operation"]),
+  customerContactBy: z.literal("partner"),
   recordOnBehalfAllowed: z.boolean(),
-  proofRules: proofRulesSchema.nullable(),
+  proofRules: proofRulesSchema.extend({
+    deliveredPhoto: z.literal(true),
+    deliveredSignedDo: z.literal(true),
+    partialSignedDo: z.literal(true),
+  }).nullable(),
 });
 export type PartnerRulesInput = z.infer<typeof partnerRulesInput>;
 

@@ -140,7 +140,6 @@ function DeliveryAttemptForm({
   const valid =
     Boolean(reasonKey) &&
     Boolean(whereGoods) &&
-    note.trim().length > 0 &&
     (result === "failed" || delivered.size > 0) &&
     returnActionsComplete &&
     !allocationQ.isLoading &&
@@ -154,7 +153,7 @@ function DeliveryAttemptForm({
         result,
         reasonKey: reasonKey as DeliveryAttemptRecordInput["reasonKey"],
         whereGoods: whereGoods as DeliveryAttemptRecordInput["whereGoods"],
-        note: note.trim(),
+        note: note.trim() || null,
         leg,
         deliveredItemIds: result === "partial" ? [...delivered] : [],
         returned:

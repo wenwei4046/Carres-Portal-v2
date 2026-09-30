@@ -54,7 +54,7 @@ import { TemplateLibrary } from "./PaymentTemplateLibrary";
 
 /* ── THE WORDS (COPY-STANDARD, Warehouse Settings grammar + Delivery §11) ── */
 const DS = {
-  partners: "Logistics Partners",
+  partners: "Logistics",
   rules: "Delivery Rules",
   templates: "Message Templates",
   access: "Access",
@@ -138,8 +138,8 @@ const DS = {
     "Read-only mirror of Payment's clock: the Delivery Order needs Amount needed = RM 0 and no open Finance Exception.",
   doRule: "Delivery Order availability",
   doRuleWord:
-    "Read-only mirror of the DO gate: the system issues the document when the day, the window, the goods, the partner and the money all hold.",
-  proof: "Proof required",
+    "Read-only mirror of the DO gate: the system issues the document when the date, the goods, the partner and the money all hold.",
+  proof: "Evidence required by result",
   proofDeliveredPhoto: "Delivered · delivery photo",
   proofDeliveredSigned: "Delivered · signed Delivery Order",
   proofFailedPhoto: "Failed Delivery · photo",
@@ -622,7 +622,7 @@ function PartnerObject({ data, partnerId, section }: { data: DeliverySettingsRes
         </nav>
 
         {section === "details" && (
-          <SectionCard title="Partner details" testId="delivery-settings-details">
+          <SectionCard title="Company details" testId="delivery-settings-details">
             <Row label={DS.name} htmlFor="dp-name">
               {canEdit ? (
                 <Input id="dp-name" value={draft.details.name} onChange={(e) => set("details", { ...draft.details, name: e.target.value })} />
@@ -909,16 +909,22 @@ function WeekdayPicker({ value, days, onChange, disabled }: { value: number[]; d
 }
 
 /* ── Delivery Rules ───────────────────────────────────────────────────────── */
-type RulesDraft = Record<string, { contactBy: "partner" | "operation"; onBehalf: boolean; proof: ProofRules }>;
+type RulesDraft = Record<string, { contactBy: "partner"; onBehalf: boolean; proof: ProofRules }>;
 
 function rulesDraftOf(data: DeliverySettingsResponse): RulesDraft {
   return Object.fromEntries(
     data.partners.map((p) => [
       p.id,
       {
-        contactBy: p.customer_contact_by ?? "partner",
+        contactBy: "partner",
         onBehalf: p.record_on_behalf_allowed !== false,
-        proof: (p.proof_rules as ProofRules | null) ?? DEFAULT_PROOF_RULES,
+        proof: {
+          ...DEFAULT_PROOF_RULES,
+          ...(p.proof_rules as ProofRules | null),
+          deliveredPhoto: true,
+          deliveredSignedDo: true,
+          partialSignedDo: true,
+        },
       },
     ]),
   );
@@ -976,11 +982,11 @@ function RulesPage({ data }: { data: DeliverySettingsResponse }) {
           const supported = [services.stairCarry && DS.stairCarry, services.dismantling && DS.dismantling, services.disposal && DS.disposal].filter(Boolean).join(" · ");
           return (
             <SectionCard key={p.id} title={p.name} testId={`delivery-settings-rules-${p.id}`}>
-              <Row label={DS.contactBy} htmlFor={`rule-contact-${p.id}`}>
-                {canEdit ? (
-                  <Select id={`rule-contact-${p.id}`} value={r.contactBy} onValueChange={(v) => setRule(p.id, { contactBy: v as "partner" | "operation" })}
-                    options={[{ value: "partner", label: DS.contactByPartner }, { value: "operation", label: DS.contactByOperation }]} />
-                ) : r.contactBy === "partner" ? DS.contactByPartner : DS.contactByOperation}
+              <Row label={DS.contactBy}>
+                <div className="grid gap-1">
+                  <span>Logistics contacts the customer</span>
+                  <span className="text-meta text-kit-slate-11">Carres contacts the customer only for: a known delay · another date requested · customer refused · wrong phone number</span>
+                </div>
               </Row>
               <Row label={DS.onBehalf} htmlFor={`rule-behalf-${p.id}`}>
                 {canEdit ? <YesNo id={`rule-behalf-${p.id}`} value={r.onBehalf} onChange={(v) => setRule(p.id, { onBehalf: v })} /> : r.onBehalf ? DS.yes : DS.no}
@@ -994,7 +1000,7 @@ function RulesPage({ data }: { data: DeliverySettingsResponse }) {
                     ["partialSignedDo", DS.proofPartialSigned],
                   ] as const).map(([key, label]) => (
                     <label key={key} className="inline-flex items-center gap-2 text-body">
-                      <input type="checkbox" checked={r.proof[key]} disabled={!canEdit} onChange={(e) => setRule(p.id, { proof: { ...r.proof, [key]: e.target.checked } })} />
+                      <input type="checkbox" checked={r.proof[key]} disabled={!canEdit || key !== "failedPhoto"} onChange={(e) => setRule(p.id, { proof: { ...r.proof, [key]: e.target.checked } })} />
                       {label}
                     </label>
                   ))}

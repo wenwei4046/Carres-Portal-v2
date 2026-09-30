@@ -2232,15 +2232,31 @@ append-only correction as approved target but do not fully define the correction
 admission boundary. These findings refine the gap list without granting new permissions or changing
 external operations.
 
-**Current boundary:** the owner approved deferring company-cost automation on 2026-09-30; the
-operating rules above retain their recorded approvals. The named incomplete cross-module contracts
-still require reconciliation before claiming this restarted mission complete. No READY scope, Card,
-implementation sequence or build task is created by this review.
-All changes from this mission are on the planning branch until delivered to main; no production
-change or external contact is authorised by this document.
+**BUILD TAKEOVER — owner-approved 2026-09-30.** The owner accepted the explicit switch to BUILD
+for routine Delivery UI: Monitor/register/calendar/four panels, assignment and booking, known
+crew/ETA, Delivery Orders/results/evidence/review, and approved Logistics Settings. This closes the
+planning handoff for that bounded operating model, not the unresolved special workflows. Historical
+result correction and factory-origin operations with incomplete contracts remain restricted; no
+new correction permission, fabricated receipt, external rollout or automatic company-cost engine.
+Reuse the existing kit and source writers. Implementation, tests and delivery evidence are recorded
+below as they occur; takeover is not proof of completion.
+
 
 
 ## 16 · Production closure
+
+**2026-09-30 routine UI build — implementation in progress, NOT DEPLOYED.** The first change
+adds the existing ETA field to Logistics Details (normalising stored SQL clock seconds before
+resaving), adopts the governed Logistics/Company details/Transit points Settings names, removes
+the routine Operation-contact choice and locks minimum success evidence in the settings UI and
+API input contract. Bulk assignment rejects every multi-scope selection containing an assigned
+scope even when a reason is supplied. Known failure reasons no longer require redundant prose.
+These changes reuse existing persistence; they do not add migrations or claim atomic bulk writes.
+Focused checks cover Settings/API policy, bulk rejection, ETA input and failure-result submission.
+Full release validation and visual verification remain owed before production closure. Configurable
+period persistence, assignment timing, exact DO result scope, fleet binding, actual-date storage and
+complete evidence/audit convergence remain open; this increment is not the whole approved UI scope.
+
 
 **2026-09-14 · Final convergence — the three 🟡 notes of 2026-09-13 are closed, and a Sales Order opens by its
 number.** Main tip `a5646d2d` (Cards 19 → 20 → 21 merged in that order on top of the sibling PR #1288).
