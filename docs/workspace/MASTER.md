@@ -464,8 +464,11 @@ the entered facts for correction without optimistic owner changes.
 ### 4.4 · Automatic assignment changes and two daily checks
 
 **Release evidence 2026-09-30 — PR #1798 / DEPLOYED.**
-The release wires trusted foreground interaction collection into OperationApp and removes its
-mount/timer heartbeat as assignment evidence. Shared validated settings feed independent Office
+The released #1798 collector uses trusted foreground interactions and removes the OperationApp
+mount/timer heartbeat as assignment evidence. Follow-up #1816 moves that same collector into App,
+scoped to the authenticated Operation/Principal identity rather than the current module, so Finance
+or People navigation does not lose a Principal's evidence or reset minute deduplication. This
+portal-wide follow-up is committed and awaiting its own deployment verification. Shared validated settings feed independent Office
 morning and afternoon windows; lunch, background tabs and post-cutoff interactions cannot satisfy
 an earlier check. A failed settings/evidence read aborts the check rather than proving absence.
 The weekday scheduler obtains a fresh source snapshot per period, validates source completion,

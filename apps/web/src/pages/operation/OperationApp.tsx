@@ -12,8 +12,6 @@ import {
 // Principal / Finance) merged into ONE role-aware PortalSidebar.
 import PortalSidebar from "@/pages/portal/PortalSidebar";
 import { useAuth } from "@/lib/auth";
-import { observeWorkActivity } from "@/lib/work-activity";
-import { apiFetch } from "@/lib/api";
 import OperationDashboard from "./OperationDashboard";
 // ⭐ SALES ORDER PRODUCTION CUTOVER (owner ruling, 2026-08-10 —
 // `docs/SALES-ORDER-CUTOVER.md`). The two Orders pages now live at TWO
@@ -130,13 +128,6 @@ export default function OperationApp() {
     setMenuOpen(false);
   }, [location.pathname, location.search]);
   const navigate = useNavigate();
-  const activityUserId = useAuth((state) => state.user?.id);
-  useEffect(() => {
-    if (!activityUserId) return;
-    return observeWorkActivity(document, () =>
-      apiFetch("/api/operation/work-activity", { method: "POST" }),
-    );
-  }, [activityUserId]);
   // Catalog split (Loo 2026-07-25) — the selling Product & Maintenance moved
   // to the Admin area (/principal?tab=catalog); Operations keeps only the
   // costing Operation Catalog (0226). A stale `?tab=catalog` deep link here

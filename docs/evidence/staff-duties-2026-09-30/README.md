@@ -58,3 +58,9 @@ job was skipped. The first post-release catch-up wrote 104 morning receipts at 1
 103 `no_candidate`, one `not_assigned`, zero movements. There was no pre-release morning evidence,
 so the engine did not fabricate activity or select a person without it. This is execution proof,
 not evidence that any real employee was absent or that a live reassignment was needed.
+
+Portal-wide collection follow-up (#1816): the collector moves from OperationApp to the authenticated
+App lifetime, gated to Operation/Principal. Targeted tests passed 53 cases, including module changes
+without another collector/mount heartbeat, identity change/sign-out disposal, and unrelated-role
+exclusion. This follow-up awaits its own production verification; the screenshots above verify
+the already deployed Settings UI, not a synthetic staff-activity write.
