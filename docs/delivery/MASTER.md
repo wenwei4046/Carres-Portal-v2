@@ -2267,15 +2267,21 @@ assignment timing, exact DO result scope, actual-date storage and complete evide
 remain open; this increment is not the whole approved UI scope.
 
 
-**2026-09-30 fleet-template selection — implementation in progress, NOT DEPLOYED.** Logistics
+**2026-09-30 fleet-template selection — DEPLOYED, PR #1814, main `3a92519735193a4052758b79ff2d8d9ffc149768`.** Logistics
 Details reads active driver and vehicle templates for the chosen company through the existing
 Settings query. The recorded name/plate remains readable if a template was renamed or retired;
 changing company clears the former company's crew. Optional crew can be cleared. A failed template
 read disables selection and preserves the existing recorded facts. The existing arrangement writer
 stores the chosen name/plate snapshot; this does not add template IDs, driver-phone storage or live
 tracking. Four focused tests cover company filtering, saved ETA/agreed-time separation, historical
-values, company changes and read failure. The seeded real component's driver selection was walked;
-full release and authenticated production acceptance remain owed.
+values, company changes and read failure; the 14 Logistics Work card tests also passed. The seeded
+real component's driver selection was walked on desktop, and the observed 390px phone viewport had
+390px document width with stacked driver/vehicle/ETA controls. Complete PR CI and deployment checks
+passed; both Pages projects, both canonical sites and the API Worker reported that exact SHA.
+Authenticated read-only production checks on SO-1203 confirm driver/vehicle comboboxes and the ETA
+time input. NETS currently offers only `Not recorded` in that tested driver's list; no driver was
+invented to populate it. The populated-template selection/save behavior is automated and seeded-preview
+evidence, not a newly performed production save. No live business record was changed.
 
 
 **2026-09-14 · Final convergence — the three 🟡 notes of 2026-09-13 are closed, and a Sales Order opens by its
