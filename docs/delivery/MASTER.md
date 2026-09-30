@@ -2253,8 +2253,10 @@ API input contract. Bulk assignment rejects every multi-scope selection containi
 scope even when a reason is supplied. Known failure reasons no longer require redundant prose.
 These changes reuse existing persistence; they do not add migrations or claim atomic bulk writes.
 Focused checks cover Settings/API policy, bulk rejection, ETA input and failure-result submission.
-Full release validation and visual verification remain owed before production closure. Configurable
-period persistence, assignment timing, exact DO result scope, fleet binding, actual-date storage and
+Seeded Settings preview verified at 390px and the normal desktop viewport: fixed success proof
+is readable policy, only failure-photo evidence remains configurable, and fields stack without
+horizontal overflow on phone. This is component-preview evidence, not production acceptance.
+Full release validation remains owed before production closure. Configurable period persistence, assignment timing, exact DO result scope, fleet binding, actual-date storage and
 complete evidence/audit convergence remain open; this increment is not the whole approved UI scope.
 
 

@@ -147,8 +147,8 @@ describe("Delivery Rules — per partner, with the shared facts read-only", () =
     const nets = within(screen.getByTestId(`delivery-settings-rules-${NETS}`));
     expect(nets.getByText("Logistics contacts the customer")).toBeInTheDocument();
     for (const name of ["Delivered · delivery photo", "Delivered · signed Delivery Order", "Partially Delivered · signed Delivery Order"]) {
-      expect(nets.getByRole("checkbox", { name })).toBeChecked();
-      expect(nets.getByRole("checkbox", { name })).toBeDisabled();
+      expect(nets.getByText(name)).toBeInTheDocument();
+      expect(nets.queryByRole("checkbox", { name })).not.toBeInTheDocument();
     }
     expect(nets.getByRole("checkbox", { name: "Failed Delivery · photo" })).toBeEnabled();
     expect(screen.queryByRole("combobox", { name: "Who contacts the customer" })).not.toBeInTheDocument();

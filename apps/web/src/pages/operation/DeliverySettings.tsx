@@ -48,6 +48,7 @@ import {
 import PageShell from "@/components/kit/PageShell";
 import Button from "@/components/kit/Button";
 import Input from "@/components/kit/Input";
+import Checkbox from "@/components/kit/Checkbox";
 import Select from "@/components/kit/Select";
 import Textarea from "@/components/kit/Textarea";
 import { TemplateLibrary } from "./PaymentTemplateLibrary";
@@ -167,7 +168,7 @@ function listOf(text: string): string[] {
 
 function Row({ label, htmlFor, children }: { label: string; htmlFor?: string; children: ReactNode }) {
   return (
-    <div className="grid grid-cols-[200px_minmax(0,1fr)] items-start gap-3 py-1.5">
+    <div className="grid grid-cols-1 items-start gap-1 py-1.5 md:grid-cols-[200px_minmax(0,1fr)] md:gap-3">
       {htmlFor ? (
         <label htmlFor={htmlFor} className="text-body text-kit-slate-11">
           {label}
@@ -183,7 +184,7 @@ function Row({ label, htmlFor, children }: { label: string; htmlFor?: string; ch
 function SectionCard({ title, blurb, children, testId }: { title: string; blurb?: string; children: ReactNode; testId?: string }) {
   return (
     <section className="rounded-card border border-kit-slate-5 bg-white p-5" data-testid={testId}>
-      <h2 className="text-section">{title}</h2>
+      <h2 className="text-strong text-kit-slate-12">{title}</h2>
       {blurb ? <p className="mt-1 text-body text-kit-slate-11">{blurb}</p> : null}
       <div className="mt-4 grid gap-1">{children}</div>
     </section>
@@ -209,7 +210,7 @@ function ChangesList({ changes, partnerId }: { changes: DeliverySettingChangeRow
   const rows = partnerId ? changes.filter((c) => c.partner_id === partnerId) : changes;
   return (
     <section className="rounded-card border border-kit-slate-5 bg-white p-5" data-testid="delivery-settings-history">
-      <h2 className="text-section">{DS.changes}</h2>
+      <h2 className="text-strong text-kit-slate-12">{DS.changes}</h2>
       {rows.length === 0 ? (
         <p className="mt-2 text-body text-kit-slate-11">{DS.noChanges}</p>
       ) : (
@@ -999,10 +1000,11 @@ function RulesPage({ data }: { data: DeliverySettingsResponse }) {
                     ["failedPhoto", DS.proofFailedPhoto],
                     ["partialSignedDo", DS.proofPartialSigned],
                   ] as const).map(([key, label]) => (
-                    <label key={key} className="inline-flex items-center gap-2 text-body">
-                      <input type="checkbox" checked={r.proof[key]} disabled={!canEdit || key !== "failedPhoto"} onChange={(e) => setRule(p.id, { proof: { ...r.proof, [key]: e.target.checked } })} />
-                      {label}
-                    </label>
+                    key === "failedPhoto" ? (
+                      <Checkbox key={key} id={`rule-proof-${p.id}-${key}`} label={label}
+                        checked={r.proof[key]} disabled={!canEdit}
+                        onCheckedChange={(checked) => setRule(p.id, { proof: { ...r.proof, [key]: checked } })} />
+                    ) : <p key={key} className="text-body">{label}</p>
                   ))}
                 </div>
               </Row>
