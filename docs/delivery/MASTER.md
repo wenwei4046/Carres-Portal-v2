@@ -620,8 +620,23 @@ The reason dictionary is grouped, versioned, and historical records retain their
 - **External:** severe weather; road disruption; government or building restriction.
 - **Other:** explanation required.
 
-The record also states whether goods remain with Logistics, returned to Warehouse, remain with the
-customer or are unknown. The next action is concrete, in the two-line Work grammar of §10:
+The record distinguishes goods still held by Logistics, a reported return, goods remaining with
+the customer and an unknown location. **CUSTODY RECONCILIATION — carried-forward owner rulings,
+converged 2026-09-30 with Stock's Unit lifecycle and §4; no new implementation claim.** A return
+instruction, planned Inbound arrival or Logistics report does not establish Warehouse receipt.
+Until Warehouse records actual receipt, preserve the last evidenced holder/location and record the
+return report separately; never present goods as physically back merely because return is planned.
+Actual Warehouse receipt puts returned Units on `Check required`, not Ready Stock. Stock owns the
+inspection and subsequent eligibility decision.
+
+For Partial Delivery, customer receipt applies only to the delivered Units in §6's DO scope. The
+remainder keeps its own holder/location and next action; it is neither delivered nor received back
+by subtraction alone. Rebooking, changing Logistics, proof review and closing an exception do not
+move the goods. Continue the same Unit/source/handover chain; never create replacement Unit IDs or
+add inventory quantities to represent a return. An unknown location stays unknown and requires the
+concrete recovery action, not a guessed Warehouse location.
+
+The next action is concrete, in the two-line Work grammar of §10:
 `Confirm New Delivery Date` · `Confirm Delivery Address` · `Confirm Customer Availability` ·
 `Obtain Correct Contact Details` · `Confirm Site Access` · `Return Goods to Warehouse` · `Inspect
 Returned Goods` · `Arrange Replacement Goods` · `Assign Another Logistics` · `Keep NETS and
