@@ -4,7 +4,7 @@
  * engine's `N of M rows` only exist on that path, so asserting them is what
  * fails if the page goes back to hand-rolled chrome.
  */
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -64,5 +64,24 @@ describe("Dealer commission", () => {
     // The scope sits in the register's toolbar, so it is inside the grid frame.
     expect(screen.getByTestId("grid-footer")).toBeTruthy();
     expect(screen.getByText("Showroom")).toBeTruthy();
+  });
+
+  it("opens the quota form for the dealer whose Quota left reads No quota", async () => {
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <MemoryRouter><DealerCommission /></MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    await screen.findByText("Ace Furniture");
+    // Both cards still draw under the register.
+    expect(screen.getByRole("heading", { name: "Commission rates" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Renovation quotas" })).toBeTruthy();
+
+    // Rebate this month stays plain words; only Quota left is the way in.
+    fireEvent.click(screen.getByRole("button", { name: "No quota" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog).toHaveTextContent("Renovation quota");
+    expect(dialog).toHaveTextContent("Ace Furniture");
   });
 });
