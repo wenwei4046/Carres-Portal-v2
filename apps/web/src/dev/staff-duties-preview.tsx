@@ -26,7 +26,7 @@ window.fetch = async (input, init) => {
  if (url.pathname.endsWith("/history")) return json({ records: [{ id: 1, office_day: day, period: "morning", cutoff_at: `${day}T02:30:00Z`, recorded_at: `${day}T02:31:00Z`, from_user_id: people[0].user_id, to_user_id: people[1].user_id, from_name: people[0].name, to_name: people[1].name, outcome: "reassigned", reason: "missing_period_activity" }] });
  if (url.pathname.endsWith("/workspace-duties")) return json({ can_assign: !reader, duties: WORKSPACE_DUTIES.map((d, i) => {
   const person = people[i % 2]; const empty = d.key === "delivery_duty";
-  return { ...d, resolution: { duty_key: d.key, on_date: day, normal_user_id: empty ? null : person.user_id, normal_user_name: empty ? null : person.name, actor_user_id: empty ? null : person.user_id, acting_user_id: empty ? null : person.user_id, acting_user_name: empty ? null : person.name, source: empty ? "not_assigned" : "assignment", is_cover: false, allowed: true },
+  return { ...d, resolution: { duty_key: d.key, on_date: day, normal_user_id: empty ? null : person.user_id, normal_user_name: empty ? null : person.name, actor_user_id: empty ? null : person.user_id, acting_user_id: empty ? null : person.user_id, acting_user_name: empty ? null : person.name, source: empty ? "not_assigned" : "assignment", assignment_outcome: params.has("no-candidate") ? "no_candidate" : undefined, is_cover: false, allowed: true },
    assignments: empty ? [] : [{ id: `fixture-${d.key}`, duty_key: d.key, holder_id: person.user_id, holder_name: person.name, effective_from: day, effective_until: null, assigned_by_name: "Jess", note: null, created_at: `${day}T01:00:00Z` }], covers: [] };
  }) });
  if (url.pathname.endsWith("/staff")) return json({ staff: people, myDuties: [] });

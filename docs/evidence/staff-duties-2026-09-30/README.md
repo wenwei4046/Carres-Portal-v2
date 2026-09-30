@@ -1,6 +1,6 @@
 # Staff & Duties verification · 2026-09-30
 
-These screenshots are local **test fixtures**, using the real SettingsWorkspace, StaffDuties,
+The `preview-*.png` screenshots are local **test fixtures**, using the real SettingsWorkspace, StaffDuties,
 ActivitySettings and kit components. All API requests are intercepted; no business write is made.
 They are not production screenshots or proof of live automatic assignments.
 
@@ -18,8 +18,60 @@ system time/reason separately from effective assignment dates. The single Assign
 its fixed Duty and current assignee, with no default selected person/date. The menu-to-dialog
 focus issue discovered in this walk is fixed through the shared Modal returnFocusRef contract.
 
-Exact committed SQL 0613, 0615–0621 passed rollback probes: independent checkpoints, retry,
+Exact committed SQL 0613, 0615–0621 and 0624 passed rollback probes: independent checkpoints, retry,
 no late bounce-back, manual precedence, recorded unavailability, source/grant guards and unchanged
-GRN amendment authority. All 18 final function bodies matched committed-file hashes in the probe.
+GRN amendment authority. All 19 final function bodies matched committed-file hashes in the probe.
 The availability pass plus both source snapshots took 183 ms on the measured source population.
-No probe table or tracker row remained. This does not claim the migrations are applied.
+No probe fixture or tracker row remained. All nine migrations were subsequently applied and
+their tracker file hashes and all 19 live function bodies matched the exact committed SQL.
+
+## Production proof
+
+PR #1798 merged as `0f80cff62a73d17ade68fce0c07b87a73732cf59`.
+[Deployment run 36677653387](https://github.com/wenwei4046/Carres-Portal-v2/actions/runs/36677653387)
+passed and both Pages projects, both canonical web domains and API `/health` reported that SHA.
+The deployed commit passed shared 3,974, API 3,865 and web 5,815 tests, with 259 existing skips;
+lint, typecheck, build and the browser-secret scan passed.
+
+`production-*.png` are authenticated live screenshots at 1440, 1180, 820, 743 and 390 × 900.
+Every width had `documentElement.scrollWidth === innerWidth`. Desktop retains catalogue/detail;
+narrow screens show one pane. Live facts: PO Yu Jun through 30 September; Next Shasha 1–31 October;
+GRN Shasha; check times 10:30/15:00. History opens/closes without changing assignments. No browser
+console errors were observed. This login is the shared Sara · Principal account: the time fields
+are read-only and the assignment menu is absent. It is not Jess's personal-manager session.
+Manager Save/Cancel, reader access, long names, errors and menu-to-dialog return focus were walked
+in the real-component fixture; SQL manager gates and writes were tested only inside rollback probes.
+
+Downloaded release asset `index-CTAWmece.js` (7,334,920 bytes) was compared to the actual predecessor
+`index-DC6rScYU.js` (7,331,782 bytes): `Morning check time` 0→2, `Afternoon check time` 0→2,
+`Normal owner` 2→0; control `Staff & Duties` 13→17. Other modules' existing `Buddy cover` occurrences
+remain in the bundle; this proof does not claim global removal beyond the authorised surfaces.
+
+A post-apply rollback probe also passed morning movement → intervening movement → afternoon
+current-actor acceptance, with the stale actor refused. Follow-up reads proved the private clock
+restored and zero future probe receipts or probe tracker rows.
+
+Read-only scheduler diagnostic run
+[36680255269](https://github.com/wenwei4046/Carres-Portal-v2/actions/runs/36680255269) read both
+registered triggers and observed the minute trigger with outcome `ok`, no exceptions. The deployment
+job was skipped. The first post-release catch-up wrote 104 morning receipts at 14:50–14:51 MYT:
+103 `no_candidate`, one `not_assigned`, zero movements. There was no pre-release morning evidence,
+so the engine did not fabricate activity or select a person without it. This is execution proof,
+not evidence that any real employee was absent or that a live reassignment was needed.
+
+Portal-wide collection follow-up (#1816): the collector moves from OperationApp to the authenticated
+App lifetime, gated to Operation/Principal. Targeted tests passed 53 cases, including module changes
+without another collector/mount heartbeat, identity change/sign-out disposal, and unrelated-role
+exclusion. See the #1816 release pipeline for the follow-up deployment status; the screenshots above verify
+the already deployed Settings UI, not a synthetic staff-activity write.
+
+The live no-candidate state exposed misleading generic write-error feedback. Follow-up #1816
+uses explicit non-blocking check feedback; 43 targeted Duty/activity tests passed. Migration 0625
+was negatively reproduced against the old functions, then its exact committed SQL passed Duty
+and order sequences of no-candidate check → movement → later check → later movement. The newest
+outcome wins while the durable assignment remains correct. Migration 0625 is applied, with its exact tracker-file hash and both final function hashes reconciled.
+The corrected feedback was also walked at 390 px (`preview-390-no-candidate.png`), without
+horizontal overflow. The fixture is not itself proof of deployment.
+
+The live afternoon check independently began at 15:00:42 MYT, producing another 104 receipts
+(103 no-candidate, one unassigned). Morning and afternoon have distinct durable records.

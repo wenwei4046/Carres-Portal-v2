@@ -328,7 +328,8 @@ describe("Staff & Duties current assignment", () => {
     state.duties!.duties[0].resolution.assignment_outcome = "no_candidate";
     draw();
     expect(screen.getByTestId("selected-duty-po_duty")).toHaveTextContent("Yu Jun");
-    expect(screen.getByRole("alert")).toHaveTextContent("PO Duty could not be updated. Try again.");
+    expect(screen.getByRole("status")).toHaveTextContent("No one else could be assigned at this check. Any authorised staff may help.");
+    expect(screen.queryByText(/could not be updated/)).not.toBeInTheDocument();
   });
   it("keeps future assignments out of the current person", () => {
     const duty = state.duties!.duties.find(d => d.key === "po_duty")!;
