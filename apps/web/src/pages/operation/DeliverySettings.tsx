@@ -7,7 +7,7 @@
  * naming its gap while disabled, `Not configured` for a value nobody has
  * recorded, and every change listed with its actor, time, old and new value.
  *
- *   Logistics Partners   one row per partner → its object (seven sections)
+ *   Logistics   one row per partner → its object (seven sections)
  *   Delivery Rules       who contacts the customer · record-on-behalf · the
  *                        shared contact lead (read-only) · Payment's clock and
  *                        the DO gate (read-only mirrors) · proof by result
@@ -69,7 +69,7 @@ const DS = {
   loadFailed: "Delivery Settings could not be loaded. Try again.",
   tryAgain: "Try again",
   loading: "Loading Delivery Settings…",
-  /* Partner details */
+  /* Company details */
   name: "Partner name",
   status: "Status",
   customerPhone: "Customer-facing number",
@@ -138,7 +138,7 @@ const DS = {
     "Read-only mirror of Payment's clock: the Delivery Order needs Amount needed = RM 0 and no open Finance Exception.",
   doRule: "Delivery Order availability",
   doRuleWord:
-    "Read-only mirror of the DO gate: the system issues the document when the date, the goods, the partner and the money all hold.",
+    "The system issues one when goods, logistics, date and money are ready.",
   proof: "Evidence required by result",
   proofDeliveredPhoto: "Delivered · delivery photo",
   proofDeliveredSigned: "Delivered · signed Delivery Order",
@@ -276,7 +276,7 @@ export default function DeliverySettings() {
   }
 }
 
-/* ── Logistics Partners — one row per partner ─────────────────────────────── */
+/* ── Logistics — one row per partner ─────────────────────────────── */
 function PartnersPage({ data }: { data: DeliverySettingsResponse }) {
   return (
     <PageShell variant="settings" title={DS.partners}>
@@ -751,7 +751,7 @@ function PartnerObject({ data, partnerId, section }: { data: DeliverySettingsRes
         )}
 
         {section === "handover" && (
-          <SectionCard title="Warehouses & handover points" testId="delivery-settings-handover">
+          <SectionCard title="Transit points" testId="delivery-settings-handover">
             <Row label={DS.partnerWarehouse}>
               {partner.operating_party_id ? "Operated site recorded" : <span className="text-kit-slate-9">{NOT_CONFIGURED}</span>}
             </Row>
