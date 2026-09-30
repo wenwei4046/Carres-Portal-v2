@@ -552,6 +552,11 @@ describe("Reports — Export writes the statement on screen", () => {
     expect(asPrinted(sheet.rows)).toEqual(lines(table));
     expect(stem).toBe(`Balance Sheet as of ${fmtDate(TODAY, { year: "always" })}`);
   });
+
+  it("keeps the characters a file name cannot hold out of a department's name", () => {
+    const { stem } = statementExport(parseBalanceSheet(bs(TODAY, bsBody(0)), TODAY), 'KL\\North/2: "A"');
+    expect(stem).toBe(`Balance Sheet as of ${fmtDate(TODAY, { year: "always" })} KL-North-2- -A-`);
+  });
 });
 
 describe("Reports words", () => {

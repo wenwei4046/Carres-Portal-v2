@@ -193,7 +193,7 @@ export function statementExport(report: ProfitAndLoss | BalanceSheet, department
   const when = "asOf" in report ? `as of ${day(report.asOf)}`
     : report.from === `${ym}-01` && report.to === monthEnd(ym!) ? fmtMonth(ym) : `${day(report.from)} to ${day(report.to)}`;
   // A department name is typed by a person; keep the characters a file name cannot hold out of it.
-  const stem = [sheet.name, when, department].filter(Boolean).join(" ").replace(/[\/:*?"<>|]/g, "-");
+  const stem = [sheet.name, when, department].filter(Boolean).join(" ").replace(/[\\/:*?"<>|]/g, "-");
   return { sheet, stem };
 }
 
