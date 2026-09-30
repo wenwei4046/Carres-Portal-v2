@@ -119,7 +119,7 @@ export default function DutyDetail({
         </div>
         <div className="mt-2">
           {person ? <Fact label="Assigned to"><Person name={person.name} testId="duty-avatar-current" /></Fact> : <p className="text-body">Not assigned</p>}
-          {r.assignment_outcome === "no_candidate" ? <p role="alert" className="mt-2 text-meta text-kit-red-11">{duty.label} could not be updated. Try again.</p> : null}
+          {r.assignment_outcome === "no_candidate" ? <p role="status" className="mt-2 text-meta text-kit-slate-11">No one else could be assigned at this check. Any authorised staff may help.</p> : null}
           {r.source !== "system_assignment" && activeAssignment && !r.is_cover ? <p className="text-meta text-kit-slate-11">{activeAssignment.effective_until ? `${fmtDate(activeAssignment.effective_from)} to ${fmtDate(activeAssignment.effective_until)}` : `from ${fmtDate(activeAssignment.effective_from)}`}</p> : null}
           {r.source !== "system_assignment" && r.is_cover && shownCover ? <p className="text-meta text-kit-slate-11">{fmtDate(shownCover.starts_on)} to {fmtDate(shownCover.ends_on)}</p> : null}
         </div>
@@ -223,7 +223,7 @@ export function DutyHistory({ duty }: { duty: Duty }) {
       {open ? <>
       {changes.isLoading ? <p className="text-meta">Loading</p> : changes.isError ? <div role="alert"><p>Staff &amp; Duties could not be opened</p><Button onClick={() => void changes.refetch()}>Try again</Button></div> : null}
       <ul>{changes.data?.pages.flatMap(page => page.records).map(record => <Record key={`system-${record.id}`} testId={`system-assignment-${record.id}`}
-        event={record.outcome === "reassigned" ? `Assigned to ${record.to_name ?? "Name not recorded"} by system` : record.outcome === "not_assigned" ? "Not assigned" : `${duty.label} could not be updated. Try again.`}
+        event={record.outcome === "reassigned" ? `Assigned to ${record.to_name ?? "Name not recorded"} by system` : record.outcome === "not_assigned" ? "Not assigned" : "No one else could be assigned at this check."}
         actor={[fmtDate(record.recorded_at, { time: true })]}
         note={record.reason === "missing_period_activity" ? `Assignment reason: ${record.from_name ?? "Name not recorded"} was not online by ${fmtDate(record.cutoff_at, { timeOnly: true })}` : null} />)}</ul>
       {changes.hasNextPage ? <Button disabled={changes.isFetchingNextPage} onClick={() => void changes.fetchNextPage()}>Next</Button> : null}
