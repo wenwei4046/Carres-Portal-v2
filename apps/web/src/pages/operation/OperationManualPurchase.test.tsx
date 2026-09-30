@@ -2057,11 +2057,11 @@ describe("the fifteen columns, in the approved order (owner ruling 2026-09-18)",
     expect(within(row).getByTestId(`mp-approval-${REQ1}`)).toHaveTextContent("Need approval");
   });
 
-  it("⭐ TWO-LINE STATUS (owner ruling 2026-09-28): plain `Need PO`, and line two says `Need approval first`", async () => {
+  it("⭐ ONE-WORD STATUS (owner ruling 2026-09-29): plain `Need PO` and nothing under it; `Approval Status` carries `Need approval`", async () => {
     await loaded();
     const cell = screen.getByTestId(`mp-status-${REQ1}`);
-    expect(cell).toHaveTextContent("Need PO");
-    expect(within(cell).getByTestId(`mp-status-why-${REQ1}`)).toHaveTextContent("Need approval first");
+    expect(cell).toHaveTextContent(/^Need PO$/);
+    expect(within(screen.getByTestId(`mp-row-${REQ1}`)).getByTestId(`mp-approval-${REQ1}`)).toHaveTextContent("Need approval");
     /* Plain text, never a coloured pill (ONE KIT LAW). */
     expect(cell.querySelector('[data-kit="status-pill"]')).toBeNull();
   });
@@ -2325,8 +2325,7 @@ describe("R2 · group membership", () => {
     });
     await loaded();
     const cell = screen.getByTestId(`mp-status-${REQ1}`);
-    expect(cell).toHaveTextContent("Need PO");
-    expect(within(cell).getByTestId(`mp-status-why-${REQ1}`)).toHaveTextContent("Need approval first");
+    expect(cell).toHaveTextContent(/^Need PO$/);
   });
 
   it("a sent-back request whose requester is unknown says so — never a shared account", async () => {

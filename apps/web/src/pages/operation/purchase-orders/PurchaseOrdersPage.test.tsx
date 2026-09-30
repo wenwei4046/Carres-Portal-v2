@@ -528,8 +528,9 @@ describe("Purchase Orders Register", () => {
     expect(within(unnumberedRow).queryByRole("button", { name: "Manual Purchase Request" })).toBeNull();
     unnumbered.unmount();
 
-    /* Several: the approved count, and the PO's Order Route, where each one is
-       a row — the listing never picks one to stand for the rest. */
+    /* Several: the approved count; clicking it lists every reference IN
+       PLACE (owner 2026-09-29, "why jump to order route???") — the listing
+       never picks one to stand for the rest and never leaves the register. */
     po.sources = [
       { kind: "sales_order", reference: "SO-4001", order_id: "order-1" },
       { kind: "sales_order", reference: "SO-4002", order_id: "order-2" },
@@ -538,6 +539,13 @@ describe("Purchase Orders Register", () => {
     const manyRow = screen.getAllByTestId("grid-row-PO-20260828-4827").at(-1)!;
     expect(manyRow).toHaveTextContent("2 SOs");
     expect(screen.getByTestId("register-search-index")).toHaveTextContent("SO-4002");
+    fireEvent.keyDown(within(manyRow).getByTestId("po-source-PO-20260828-4827"), { key: "Enter" });
+    fireEvent.click(within(manyRow).getByTestId("po-source-PO-20260828-4827"));
+    const list = screen.getByTestId("po-source-list-PO-20260828-4827");
+    expect(within(list).getByRole("button", { name: "SO-4001" })).toBeInTheDocument();
+    expect(within(list).getByRole("button", { name: "SO-4002" })).toBeInTheDocument();
+    /* The page stayed on the register: no PO object opened. */
+    expect(screen.queryByTestId("purchase-order-object")).not.toBeInTheDocument();
     many.unmount();
 
     po.sources = sources;
