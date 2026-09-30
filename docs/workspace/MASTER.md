@@ -526,7 +526,9 @@ and the browser-secret scan. Production screenshots and bundle comparison are in
 `* 1-10 * * 1-5` with outcome `ok` and no exceptions. The first live morning pass recorded 104
 checkpoints at 14:50–14:51 MYT (103 `no_candidate`, one `not_assigned`, zero movements). This was
 the first post-release catch-up, not a claim that the new engine ran at 10:30 before it was deployed.
-No earlier-period activity was fabricated and no unavailable recipient was selected.
+No earlier-period activity was fabricated and no unavailable recipient was selected. The live
+afternoon pass independently began at 15:00:42 MYT and recorded another 104 receipts with the same
+no-candidate/unassigned split; the two periods remain separate.
 
 **OWNER RULING 2026-09-29 — DELIVERED 2026-09-30 (#1798).** Settings → Staff & Duties contains
 TWO manager-editable time settings, `Morning check time` and `Afternoon check time`, initially

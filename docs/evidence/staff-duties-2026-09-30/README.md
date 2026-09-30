@@ -70,3 +70,6 @@ uses explicit non-blocking check feedback; 43 targeted Duty/activity tests passe
 was negatively reproduced against the old functions, then its exact committed SQL passed Duty
 and order sequences of no-candidate check → movement → later check → later movement. The newest
 outcome wins while the durable assignment remains correct. This migration is not yet applied.
+
+The live afternoon check independently began at 15:00:42 MYT, producing another 104 receipts
+(103 no-candidate, one unassigned). Morning and afternoon have distinct durable records.
