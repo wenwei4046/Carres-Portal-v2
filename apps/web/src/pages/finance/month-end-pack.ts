@@ -88,7 +88,7 @@ export function packPeriod(ym: string, today: string): { from: string; to: strin
 // A workbook is filed and re-read in a later year, so its dates always carry the year (fmt-date's document option).
 const day = (iso: string) => fmtDate(iso, { year: "always" });
 const beforeGoLive =(goLive: string) => `The ledger started on ${day(goLive)}. Pick a day from then on.`;
-const noOpening = (goLive: string) => `Since ${day(goLive)} · No opening balances`;
+export const noOpening = (goLive: string) => `Since ${day(goLive)} · No opening balances`;
 
 export function trialBalanceSheet(tb: TrialBalanceReport): PackSheet {
   const head: Cell[][] = [["Trial Balance", `As of ${day(tb.as_of)}`], [noOpening(tb.go_live_on)], []];
