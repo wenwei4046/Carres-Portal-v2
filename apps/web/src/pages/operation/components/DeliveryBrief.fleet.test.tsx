@@ -41,7 +41,7 @@ function mount(driver = "", vehicle = "") {
 }
 function pick(label: string, option: string) {
   fireEvent.click(screen.getByRole("combobox", { name: new RegExp(`^${label}`) }));
-  fireEvent.click(screen.getByRole("option", { name: option, exact: true }));
+  fireEvent.click(screen.getByRole("option", { name: option }));
 }
 beforeEach(() => { save.mockReset().mockResolvedValue({}); fleetError = false; });
 
