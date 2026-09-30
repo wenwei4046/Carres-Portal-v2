@@ -12,6 +12,7 @@ import {
 // Principal / Finance) merged into ONE role-aware PortalSidebar.
 import PortalSidebar from "@/pages/portal/PortalSidebar";
 import { useAuth } from "@/lib/auth";
+import { observeWorkActivity } from "@/lib/work-activity";
 import { apiFetch } from "@/lib/api";
 import OperationDashboard from "./OperationDashboard";
 // ⭐ SALES ORDER PRODUCTION CUTOVER (owner ruling, 2026-08-10 —
@@ -129,20 +130,13 @@ export default function OperationApp() {
     setMenuOpen(false);
   }, [location.pathname, location.search]);
   const navigate = useNavigate();
-  // Presence heartbeat (0235, Jess: opens portal = came to work = available
-  // for auto-assign; MC/no-show = never stamped = skipped). Stamps the
-  // caller's OWN app_users.last_seen_at on mount + every 15 min; fails soft
-  // on a Worker that predates the route.
+  const activityUserId = useAuth((state) => state.user?.id);
   useEffect(() => {
-    const beat = () => {
-      void apiFetch("/api/operation/staff/heartbeat", { method: "POST" }).catch(
-        () => {},
-      );
-    };
-    beat();
-    const t = setInterval(beat, 15 * 60_000);
-    return () => clearInterval(t);
-  }, []);
+    if (!activityUserId) return;
+    return observeWorkActivity(document, () =>
+      apiFetch("/api/operation/work-activity", { method: "POST" }),
+    );
+  }, [activityUserId]);
   // Catalog split (Loo 2026-07-25) — the selling Product & Maintenance moved
   // to the Admin area (/principal?tab=catalog); Operations keeps only the
   // costing Operation Catalog (0226). A stale `?tab=catalog` deep link here

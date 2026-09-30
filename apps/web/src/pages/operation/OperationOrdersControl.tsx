@@ -53,7 +53,6 @@ import { TASKS_KEY } from "./components/rail/TasksPanel";
 import {
   distributeOrders,
   seenTodayMYT,
-  countsAsInToday,
   isOpsManager,
   isOpsManagerRow,
   isOpsGenericAccount,
@@ -2889,11 +2888,11 @@ export default function OperationOrdersControl({ onImport }: Props) {
     const all = data?.orders ?? [];
     const open = all.filter((o) => controlTabOf(o) !== "completed");
     const mine = open.filter((o) => ownerOf(o) === userId);
-    // Same rule as the server sweep: away is out; after the 10:00 MYT cutoff
-    // a member with no heartbeat today is auto-treated absent (Jess round-3).
+    // A manual handover uses the same active, available pool as the durable
+    // order allocation. Portal activity never grants execution permission.
     const others = poolStaff.filter(
       (s) =>
-        s.available && countsAsInToday(s.last_seen_at) && s.user_id !== userId,
+        s.available && s.user_id !== userId,
     );
     if (mine.length === 0 || others.length === 0) {
       toast.error(

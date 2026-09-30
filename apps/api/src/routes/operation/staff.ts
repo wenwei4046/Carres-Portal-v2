@@ -200,10 +200,7 @@ staffRouter.post("/auto-assign", async (c) => {
   requireOperationOrPrincipal(auth.role);
   const sb = userClient(c.env, auth.jwt);
 
-  // 1) The caller counts as present from this very call — and a first-login
-  //    staff enrolls right here, so her very first page load already deals
-  //    her a share (no race with the heartbeat).
-  await sb.rpc("touch_last_seen");
+  // Account enrolment is not evidence that a person is working.
   await autoEnroll(c, sb);
 
   // 2) Who may be dealt an order (0504): pool members who are ACTIVE

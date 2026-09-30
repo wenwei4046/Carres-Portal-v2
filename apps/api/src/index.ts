@@ -142,6 +142,7 @@ import stripeCheckoutRouter from "./routes/stripe-checkout";
 import stripeWebhookRouter from "./routes/stripe-webhook";
 import rentalRouter from "./routes/rental";
 import { runContactByCron, runFollowUpMaintenanceCron } from "./cron/contact-by";
+import { runWorkActivityCron } from "./cron/work-activity";
 import type { AppEnv, Bindings } from "./types";
 
 const app = new Hono<AppEnv>();
@@ -350,6 +351,10 @@ export default {
   scheduled: (_event: ScheduledController, env: Bindings, ctx: ExecutionContext) => {
     ctx.waitUntil(
       (async () => {
+        if (_event.cron === "* 1-10 * * 1-5") {
+          await runWorkActivityCron(env);
+          return;
+        }
         await runContactByCron(env);
         await runFollowUpMaintenanceCron(env);
         // Purchasing MASTER §9.5: an overdue date is PO/Work follow-up,
