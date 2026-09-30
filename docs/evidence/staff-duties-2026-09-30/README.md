@@ -62,7 +62,7 @@ not evidence that any real employee was absent or that a live reassignment was n
 Portal-wide collection follow-up (#1816): the collector moves from OperationApp to the authenticated
 App lifetime, gated to Operation/Principal. Targeted tests passed 53 cases, including module changes
 without another collector/mount heartbeat, identity change/sign-out disposal, and unrelated-role
-exclusion. The #1816 release pipeline is the follow-up deployment evidence; the screenshots above verify
+exclusion. See the #1816 release pipeline for the follow-up deployment status; the screenshots above verify
 the already deployed Settings UI, not a synthetic staff-activity write.
 
 The live no-candidate state exposed misleading generic write-error feedback. Follow-up #1816
@@ -71,7 +71,7 @@ was negatively reproduced against the old functions, then its exact committed SQ
 and order sequences of no-candidate check → movement → later check → later movement. The newest
 outcome wins while the durable assignment remains correct. Migration 0625 is applied, with its exact tracker-file hash and both final function hashes reconciled.
 The corrected feedback was also walked at 390 px (`preview-390-no-candidate.png`), without
-horizontal overflow. Its final deployed UI is verified by the #1816 release pipeline and browser walk.
+horizontal overflow. The fixture is not itself proof of deployment.
 
 The live afternoon check independently began at 15:00:42 MYT, producing another 104 receipts
 (103 no-candidate, one unassigned). Morning and afternoon have distinct durable records.
