@@ -49,6 +49,7 @@ import Input from "@/components/kit/Input";
 import Textarea from "@/components/kit/Textarea";
 import {
   useDeliveryPartners,
+  useDeliverySettings,
   useDeliveryArrangements,
   useRecordCannotDeliver,
   useSalesOrderExpansion,
@@ -326,6 +327,7 @@ export function LogisticsDetailsEdit({
   const arrangement = row.arrangement;
   const leg = card.leg ?? 0;
   const partnersQ = useDeliveryPartners();
+  const fleetQ = useDeliverySettings();
   const partners = useMemo(() => partnersQ.data?.partners ?? [], [partnersQ.data]);
   const save = useSaveDeliveryArrangement(card.orderId, leg);
   const cannot = useRecordCannotDeliver(card.orderId, leg);
@@ -342,6 +344,30 @@ export function LogisticsDetailsEdit({
   const [cannotOpen, setCannotOpen] = useState(false);
   const [cannotReason, setCannotReason] = useState<string | undefined>(undefined);
   const [cannotNote, setCannotNote] = useState("");
+
+  // Fleet templates supply today's known facts. Existing recorded values remain
+  // readable when a template is renamed/retired; changing company clears them.
+  const fleetOptions = (values: string[], recorded: string) => {
+    const names = [...new Set(values)].sort((a, b) => a.localeCompare(b));
+    return [
+      { value: "__not_recorded__", label: "Not recorded" },
+      ...names.map((name) => ({ value: name, label: name })),
+      ...(recorded && !names.includes(recorded) ? [{ value: recorded, label: recorded, disabled: true }] : []),
+    ];
+  };
+  const driverOptions = fleetOptions(
+    (fleetQ.data?.drivers ?? []).filter((d) => d.partner_id === partnerId && d.active).map((d) => d.name), driver,
+  );
+  const vehicleOptions = fleetOptions(
+    (fleetQ.data?.vehicles ?? []).filter((v) => v.partner_id === partnerId && v.active).map((v) => v.plate), vehicle,
+  );
+  const pickPartner = (next: string) => {
+    if (next !== partnerId) {
+      setDriver("");
+      setVehicle("");
+    }
+    setPartnerId(next);
+  };
 
   const chosen = partners.find((p) => p.id === partnerId) ?? null;
   const changing = isLogisticsChange(card.logisticsPartnerId, partnerId ?? null);
@@ -431,7 +457,7 @@ export function LogisticsDetailsEdit({
         id={`delivery-brief-partner-${card.scopeId}`}
         label={MONITOR_COPY.partner}
         value={partnerId}
-        onValueChange={setPartnerId}
+        onValueChange={pickPartner}
         placeholder={MONITOR_COPY.pickOne}
         options={partners.map((p) => ({ value: p.id, label: p.name }))}
         required
@@ -448,17 +474,23 @@ export function LogisticsDetailsEdit({
         />
       ) : null}
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-        <Input
+        <Select
           id={`delivery-brief-driver-${card.scopeId}`}
           label={MONITOR_COPY.driverName}
-          value={driver}
-          onChange={(e) => setDriver(e.target.value)}
+          value={driver || "__not_recorded__"}
+          options={driverOptions}
+          disabled={!fleetQ.data}
+          hint={fleetQ.isError ? "Not available" : undefined}
+          onValueChange={(value) => setDriver(value === "__not_recorded__" ? "" : value)}
         />
-        <Input
+        <Select
           id={`delivery-brief-vehicle-${card.scopeId}`}
           label={MONITOR_COPY.vehiclePlate}
-          value={vehicle}
-          onChange={(e) => setVehicle(e.target.value)}
+          value={vehicle || "__not_recorded__"}
+          options={vehicleOptions}
+          disabled={!fleetQ.data}
+          hint={fleetQ.isError ? "Not available" : undefined}
+          onValueChange={(value) => setVehicle(value === "__not_recorded__" ? "" : value)}
         />
       </div>
       <Input

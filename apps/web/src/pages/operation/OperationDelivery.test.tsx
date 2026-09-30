@@ -63,6 +63,7 @@ vi.mock("@/lib/queries", async () => {
     ...actual,
     useOperationOrders: () => ordersState,
     useDeliveryPartners: () => partnersState,
+    useDeliverySettings: () => ({ data: { drivers: [], vehicles: [] }, isError: false }),
     useDeliveryOrdersRegister: () => docsState,
     useDeliveryArrangements: () => arrangementsState,
     /* The ▸ expansion's Unit facts are their own query — quiet here. */
