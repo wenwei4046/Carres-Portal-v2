@@ -1467,9 +1467,9 @@ export function manualPurchaseWorkItems(
     const legacy = ctx.poDuty
       ? { userId: ctx.poDuty.userId, name: ctx.poDuty.name }
       : null;
-    const normalOwner = resolution?.normalOwner ?? legacy;
+    const normalOwner = resolution ? resolution.normalOwner : legacy;
     const activeCover = resolution?.activeCover ?? null;
-    const actingPerson = resolution?.actingPerson ?? legacy;
+    const actingPerson = resolution ? resolution.actingPerson : legacy;
     items.push({
       ruleKey: "manual_purchase.issue_po",
       module: "purchasing",

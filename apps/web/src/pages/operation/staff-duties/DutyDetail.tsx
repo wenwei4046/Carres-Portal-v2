@@ -1,22 +1,22 @@
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import Button from "@/components/kit/Button";
-import AddCoverForm from "./AddCoverForm";
+import DropdownMenu from "@/components/kit/DropdownMenu";
+import SectionHeader from "@/components/kit/SectionHeader";
 import AssignHolderForm from "./AssignHolderForm";
-import { dutyDisplayState, shownCoverOf } from "./staff-duties-model";
+import { currentDutyPerson, shownCoverOf } from "./staff-duties-model";
 import { apiFetch } from "@/lib/api";
 import { fmtDate } from "@/lib/fmt-date";
 import { personInitials } from "@/lib/staff-avatar";
-import { qk, useOperationStaff } from "@/lib/queries";
+import { qk, useOperationStaff, useWorkspaceAssignmentHistory } from "@/lib/queries";
 import type { WorkspaceDutiesResponse } from "@/lib/queries";
 import type { OpsStaffListResponse } from "@carres/shared";
 
 /**
  * The selected duty (workspace/MASTER.md §4.2, §4.5).
  *
- * Separate LABELLED facts, never one packed sentence: `Normal owner`,
- * `Acting today`, `Effective`, `Cover`, `Reason`. The acting line appears
- * only when somebody is actually covering — printing the holder twice would
- * invent an absence that nobody recorded.
+ * One current assignment, its dates, the next effective assignment and
+ * collapsed immutable history. Internal source identities never become
+ * competing labels for staff.
  *
  * Avatar initials carry the full name for a reader and never replace the
  * printed name.
@@ -65,7 +65,8 @@ export default function DutyDetail({
 }) {
   /** Which focused act is open. One at a time: two overlapping dialogs would
    *  be two answers to the same duty. */
-  const [acting, setActing] = useState<"assign" | "cover" | null>(null);
+  const menuTrigger = useRef<HTMLButtonElement>(null);
+  const [acting, setActing] = useState<"assign" | null>(null);
   /* Bumped on every open so a form arrives EMPTY rather than wearing the last
      attempt's answers. Clearing fields by hand instead would flip the kit
      Select between controlled and uncontrolled. */
@@ -87,7 +88,7 @@ export default function DutyDetail({
   });
   const staff = staffQ.data?.staff ?? [];
   const r = duty.resolution;
-  const note = dutyDisplayState(duty, today);
+  const person = currentDutyPerson(duty);
   /** The cover the detail describes — the resolver's own row by id, today's
    *  or the next scheduled one. Never the first row whose dates match. */
   const shownCover = shownCoverOf(duty);
@@ -112,92 +113,28 @@ export default function DutyDetail({
       ) : null}
 
       <section data-testid={`selected-duty-${duty.key}`}>
-        <h2 className="text-title text-kit-slate-12">{duty.label}</h2>
-
-        {!r.normal_user_id ? (
-          /* A missing holder is an explicit configuration exception — never a
-             silent fallback person (§3, §4.5). */
-          <div className="mt-2">
-            <p className="text-body font-medium text-kit-slate-12">
-              Not assigned
-            </p>
-            <p className="mt-0.5 text-meta text-kit-slate-11">
-              Nobody holds {duty.label}.
-            </p>
-          </div>
-        ) : (
-          <div className="mt-2">
-            <Fact label="Normal owner">
-              <Person name={r.normal_user_name ?? r.normal_user_id} testId="duty-avatar-normal" />
-            </Fact>
-            {r.is_cover && r.acting_user_id ? (
-              <Fact label="Acting today">
-                <Person
-                  name={r.acting_user_name ?? r.acting_user_id}
-                  testId="duty-avatar-acting"
-                />
-              </Fact>
-            ) : null}
-            {activeAssignment ? (
-              <Fact label="Effective">
-                <span className="text-body text-kit-slate-12">
-                  {activeAssignment.effective_until
-                    ? `${fmtDate(activeAssignment.effective_from)} to ${fmtDate(activeAssignment.effective_until)}`
-                    : `from ${fmtDate(activeAssignment.effective_from)}`}
-                </span>
-              </Fact>
-            ) : null}
-            {shownCover ? (
-              <>
-                <Fact label="Cover">
-                  <span className="block text-body text-kit-slate-12">
-                    {`${shownCover.acting_user_name ?? shownCover.acting_user_id} covering for ${shownCover.normal_user_name ?? shownCover.normal_user_id}`}
-                  </span>
-                  <span className="text-body text-kit-slate-12">
-                    {`${fmtDate(shownCover.starts_on)} to ${fmtDate(shownCover.ends_on)}`}
-                  </span>
-                  {note.kind === "cover_scheduled" ? (
-                    <span className="ml-2 text-label text-kit-slate-9">
-                      {note.word}
-                    </span>
-                  ) : null}
-                </Fact>
-                {shownCover.reason ? (
-                  <Fact label="Reason">
-                    <span className="text-body text-kit-slate-12">
-                      {shownCover.reason}
-                    </span>
-                  </Fact>
-                ) : null}
-              </>
-            ) : null}
-          </div>
-        )}
+        <div className="flex items-center justify-between gap-3"><h2 className="text-strong text-kit-slate-12">{duty.label}</h2>
+          {canAssign ? <DropdownMenu label="More actions" trigger={<Button ref={menuTrigger} variant="ghost" size="touch" icon="overflow" aria-label="More actions" />}
+                items={[{ key: "assign", label: "Assign", onSelect: () => { menuTrigger.current?.focus(); setActingSeq(n => n + 1); setActing("assign"); } }]} /> : null}
+        </div>
+        <div className="mt-2">
+          {person ? <Fact label="Assigned to"><Person name={person.name} testId="duty-avatar-current" /></Fact> : <p className="text-body">Not assigned</p>}
+          {r.assignment_outcome === "no_candidate" ? <p role="alert" className="mt-2 text-meta text-kit-red-11">{duty.label} could not be updated. Try again.</p> : null}
+          {r.source !== "system_assignment" && activeAssignment && !r.is_cover ? <p className="text-meta text-kit-slate-11">{activeAssignment.effective_until ? `${fmtDate(activeAssignment.effective_from)} to ${fmtDate(activeAssignment.effective_until)}` : `from ${fmtDate(activeAssignment.effective_from)}`}</p> : null}
+          {r.source !== "system_assignment" && r.is_cover && shownCover ? <p className="text-meta text-kit-slate-11">{fmtDate(shownCover.starts_on)} to {fmtDate(shownCover.ends_on)}</p> : null}
+        </div>
+        {(() => {
+          const next = duty.assignments.find(a => a.id === duty.next_assignment_id);
+          const future = duty.covers.find(c => c.id === duty.scheduled_cover_id && c.starts_on > today);
+          if (!next && !future) return null;
+          return <div className="mt-4"><SectionHeader title="Next" />
+            {next ? <p className="text-body">Assigned to {next.holder_name ?? "Name not recorded"}<br />{fmtDate(next.effective_from)}{next.effective_until ? ` to ${fmtDate(next.effective_until)}` : ""}</p> : null}
+            {future ? <p className="text-body">Assigned to {future.acting_user_name ?? "Name not recorded"}<br />{fmtDate(future.starts_on)} to {fmtDate(future.ends_on)}</p> : null}
+          </div>;
+        })()}
 
         {canAssign ? (
           <>
-            <div className="mt-3 flex flex-wrap gap-2">
-              <Button
-                onClick={() => {
-                  setActingSeq((n) => n + 1);
-                  setActing("assign");
-                }}
-              >
-                Assign holder
-              </Button>
-              {/* §4.4: cover exists only when there is somebody to cover FOR.
-                  An offer the write door would refuse is not an offer. */}
-              {r.normal_user_id ? (
-                <Button
-                  onClick={() => {
-                    setActingSeq((n) => n + 1);
-                    setActing("cover");
-                  }}
-                >
-                  Add cover
-                </Button>
-              ) : null}
-            </div>
             {notice ? (
               <p
                 role="status"
@@ -211,25 +148,20 @@ export default function DutyDetail({
               key={`assign-${duty.key}-${actingSeq}`}
               duty={duty}
               staff={staff}
+              returnFocusRef={menuTrigger}
+              staffLoading={staffQ.isLoading}
+              staffError={staffQ.isError}
+              retryStaff={() => void staffQ.refetch()}
               open={acting === "assign"}
               onClose={() => setActing(null)}
               onDone={setNotice}
             />
-            <AddCoverForm
-              key={`cover-${duty.key}-${actingSeq}`}
-              duty={duty}
-              staff={staff}
-              open={acting === "cover"}
-              onClose={() => setActing(null)}
-              onDone={setNotice}
-            />
+
           </>
         ) : (
           /* §4.5: a reader gets the sentence, never a disabled control — an
              imitation of a capability is worse than its absence. */
-          <p className="mt-3 text-meta text-kit-slate-9">
-            Duty assignments are set by the manager.
-          </p>
+null
         )}
       </section>
     </>
@@ -280,14 +212,21 @@ function Record({
 }
 
 export function DutyHistory({ duty }: { duty: Duty }) {
+  const [open, setOpen] = useState(false);
+  const changes = useWorkspaceAssignmentHistory(duty.key, open);
   return (
     <section
       data-testid={`duty-history-${duty.key}`}
       className="mt-4 border-t border-kit-slate-5 pt-3"
     >
-      <h3 className="text-label uppercase tracking-wide text-kit-slate-9">
-        Assignment &amp; cover history
-      </h3>
+      <SectionHeader title="History" collapsible open={open} onToggle={() => setOpen(value => !value)} />
+      {open ? <>
+      {changes.isLoading ? <p className="text-meta">Loading</p> : changes.isError ? <div role="alert"><p>Staff &amp; Duties could not be opened</p><Button onClick={() => void changes.refetch()}>Try again</Button></div> : null}
+      <ul>{changes.data?.pages.flatMap(page => page.records).map(record => <Record key={`system-${record.id}`} testId={`system-assignment-${record.id}`}
+        event={record.outcome === "reassigned" ? `Assigned to ${record.to_name ?? "Name not recorded"} by system` : record.outcome === "not_assigned" ? "Not assigned" : `${duty.label} could not be updated. Try again.`}
+        actor={[fmtDate(record.recorded_at, { time: true })]}
+        note={record.reason === "missing_period_activity" ? `Assignment reason: ${record.from_name ?? "Name not recorded"} was not online by ${fmtDate(record.cutoff_at, { timeOnly: true })}` : null} />)}</ul>
+      {changes.hasNextPage ? <Button disabled={changes.isFetchingNextPage} onClick={() => void changes.fetchNextPage()}>Next</Button> : null}
       {duty.assignments.length === 0 ? (
         <p className="mt-1 text-meta text-kit-slate-9">No assignments yet</p>
       ) : (
@@ -296,8 +235,9 @@ export function DutyHistory({ duty }: { duty: Duty }) {
             <Record
               key={a.id}
               testId={`assignment-${a.id}`}
-              event={`${a.holder_name ?? a.holder_id} holds ${duty.label}`}
+              event={`Assigned to ${a.holder_name ?? "Name not recorded"}`}
               actor={[
+                fmtDate(a.created_at, { time: true }),
                 a.effective_until
                   ? `${fmtDate(a.effective_from)} to ${fmtDate(a.effective_until)}`
                   : `from ${fmtDate(a.effective_from)}`,
@@ -311,15 +251,16 @@ export function DutyHistory({ duty }: { duty: Duty }) {
         </ul>
       )}
       {duty.covers.length === 0 ? (
-        <p className="mt-2 text-meta text-kit-slate-9">No covers yet</p>
+        null
       ) : (
         <ul className="mt-2">
           {duty.covers.map((v) => (
             <Record
               key={v.id}
               testId={`cover-${v.id}`}
-              event={`${v.acting_user_name ?? v.acting_user_id} covering for ${v.normal_user_name ?? v.normal_user_id}`}
+              event={`Assigned to ${v.acting_user_name ?? "Name not recorded"}`}
               actor={[
+                fmtDate(v.created_at, { time: true }),
                 `${fmtDate(v.starts_on)} to ${fmtDate(v.ends_on)}`,
                 ...(v.assigned_by_name ? [`Added by ${v.assigned_by_name}`] : []),
               ]}
@@ -328,6 +269,7 @@ export function DutyHistory({ duty }: { duty: Duty }) {
           ))}
         </ul>
       )}
+      </> : null}
     </section>
   );
 }

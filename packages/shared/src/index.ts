@@ -3331,3 +3331,17 @@ export * from "./supplier-card";
 export * from "./mission-route";
 
 export * from "./sales-order-register-filters";
+
+export {
+  workspaceActivitySettingsSchema,
+  workspaceActivitySettingsInput,
+  workspaceActivitySettingsResponseSchema,
+  type WorkspaceActivitySettingsResponse,
+  INITIAL_WORKSPACE_ACTIVITY_SETTINGS,
+  workspaceActivityWindow,
+  type WorkspaceActivitySettings,
+} from "./workspace-activity";
+
+export { evaluateWorkspaceActivityCheck, type WorkspaceActivityEvidence, type WorkspaceActivityCheck } from "./workspace-activity-check";
+
+export { decideWorkspaceReassignment, type WorkspaceCheckpointIdentity, type WorkspaceReassignmentDecision } from "./workspace-reassignment";

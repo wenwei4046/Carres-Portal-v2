@@ -52,7 +52,7 @@
  * nothing renders the markup byte for byte as it was, which is why every other
  * modal in the portal is untouched by this card.
  */
-import { useEffect, useRef, type ReactNode } from "react";
+import { useRef, type RefObject, type ReactNode } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import Icon from "./Icon";
 import { DialogContainerProvider } from "./dialog-container";
@@ -95,6 +95,7 @@ export default function DialogFrame({
   kind,
   width,
   children,
+  returnFocusRef,
 }: {
   place: keyof typeof PLACE;
   open: boolean;
@@ -113,6 +114,8 @@ export default function DialogFrame({
    */
   width?: "wide" | "viewer";
   children: ReactNode;
+  /** Persistent trigger for a dialog opened by a menu item that unmounts. */
+  returnFocusRef?: RefObject<HTMLElement>;
 }) {
   /* `side` carries its own width in `PLACE`; only the centred surface chooses.
    * A ternary rather than `width ?? "standard"` so no fallback string appears
@@ -125,12 +128,7 @@ export default function DialogFrame({
   /* WHO HAD FOCUS WHEN THIS OPENED. Captured on the OPEN transition, because
      once the surface has mounted the answer is something inside it. */
   const opener = useRef<HTMLElement | null>(null);
-  useEffect(() => {
-    if (open) {
-      const active = document.activeElement;
-      opener.current = active instanceof HTMLElement ? active : null;
-    }
-  }, [open]);
+
 
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
@@ -154,12 +152,18 @@ export default function DialogFrame({
            * explicitly is its documented way of saying "there is none". */
           aria-describedby={description ? undefined : undefined}
           className={`${SURFACE} ${PLACE[place]} ${widthClass} ${Z_DIALOG} focus:outline-none`}
+          onOpenAutoFocus={() => {
+            // Capture before Radix moves focus into the surface. A parent
+            // effect can run afterwards and incorrectly remember Close.
+            const active = document.activeElement;
+            opener.current = active instanceof HTMLElement ? active : null;
+          }}
           onCloseAutoFocus={(event) => {
             /* Ours runs FIRST and stops Radix's trigger-focus from running at
                all (`composeEventHandlers` checks `defaultPrevented`), so the
                null-trigger path that dropped focus on `<body>` never fires. */
             event.preventDefault();
-            const back = opener.current;
+            const back = returnFocusRef?.current ?? opener.current;
             /* Only if it is still ON the page: a row that the close itself
                removed cannot take focus, and forcing it would throw. Falling
                through to Radix's own behaviour is not an option here — it is
