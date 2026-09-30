@@ -7,8 +7,9 @@
  * Commission, per order:
  *   1. A cashback is spread over the lines by value (RM500 on 1499+999+999 → 2997).
  *   2. Each line's rate: a product rate if Finance set one, else the default.
- *      Service and guarantee lines earn nothing; transport and disposal are
- *      add-ons, which are part of the bill but earn nothing.
+ *      Service, guarantee and accessory lines earn nothing; transport and
+ *      disposal are add-ons. All of them are part of the bill but earn nothing
+ *      (accessories: YH for finance, 30 Sep 2026).
  *   3. Only collected money earns: each line earns rate × its share of what was
  *      collected, shared by value. The rest is "still to collect".
  *   Collected is payments less refunds HQ has paid out, up to the cut off, never
@@ -32,7 +33,7 @@ import { z } from "zod";
  * today such a line still arrives with a null category and still takes the
  * default rate, exactly as it did before.
  */
-export const NO_COMMISSION_CATEGORIES = ["service", "guarantee", "unmatched"];
+export const NO_COMMISSION_CATEGORIES = ["service", "guarantee", "accessory", "unmatched"];
 
 export interface DcLine { modelId: string | null; category: string | null; value: number }
 export interface DcOrder {

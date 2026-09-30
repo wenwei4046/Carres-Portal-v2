@@ -48,6 +48,16 @@ describe("dealer commission", () => {
     expect(orderCommission(o, at25, 1200)).toEqual({ earned: 250, full: 250 });
   });
 
+  it("an accessory is in the bill and earns nothing", () => {
+    const o = order({ lines: [
+      { modelId: null, category: "sofa", value: 1000 },
+      { modelId: null, category: "accessory", value: 1000 },
+    ] });
+    // Paid in full: only the sofa earns. Half paid: the sofa earns on its half.
+    expect(orderCommission(o, at25, 2000)).toEqual({ earned: 250, full: 250 });
+    expect(orderCommission(o, at25, 1000)).toEqual({ earned: 125, full: 250 });
+  });
+
   // 0597: a refund HQ has paid out is money that was not kept.
   const sofa1000 = (payments: DcOrder["payments"], refunds: DcOrder["refunds"]): DcSource => ({
     settings: { defaultRate: 25 }, rates: [], models: [], outlets: [],
