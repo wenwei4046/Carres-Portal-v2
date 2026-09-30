@@ -133,8 +133,8 @@ Current flow:
 ```
 goods may be arranged
 → Operation assigns the Logistics (Klang Valley pre-selects NETS)
-→ the partner, or Operation on its behalf, contacts the customer
-→ the confirmed day and time window are recorded on the Monitor row
+→ Logistics contacts the customer; Operation may record its evidenced reply
+→ the scheduled date and any agreed optional time period are recorded on the Monitor row
 → the SYSTEM issues the Delivery Order when the governed gate is met
 → Warehouse prepares the exact Units and hands them over; Logistics confirms receipt
 → the partner delivers and records the result
@@ -399,16 +399,18 @@ Delivery Date` · `Confirm Delivery Time` · `Confirm Customer Availability` · 
 Address` · `Confirm Site Access` · `Confirm Receiver` · `Obtain Missing Information` · `Confirm
 New Delivery Date after Failed Delivery` · `Confirm Cancellation`.
 
-Each contact record stores purpose, contact owner, channel, person contacted, actual time, result,
-reply evidence, recorder, proxy provenance and explicit next action. **Four identities, separately
-(0499, owner ruling 2026-09-13):** `contact_owner_user_id` is the order's NORMAL responsible
-Operation person, filled by the writer from the one responsibility read
-(`delivery_responsible_operation`) — never the recorder as such, never a shared login, never the
-cover; `acting_user_id` is today's acting person (the buddy cover, else the normal person);
-`recorded_by` is the actual signed-in recorder, evidence only; `on_behalf_of_partner_id` is
-partner provenance when a partner's reply is recorded. Results: `Confirmed` · `No
-Answer` · `Asked to Call Again` · `Requested Another Date` · `Contact Details Incorrect` ·
-`Customer Refused Delivery` · `Waiting for Customer Reply`.
+Each contact record stores purpose, the current Work assignment at the time of the action,
+channel, person contacted, actual time, result, reply evidence, actual recorder, company provenance
+when recorded on behalf of Logistics, and explicit next action. **APPROVED TARGET / NOT BUILT —
+converged 2026-09-30 from §13.1's owner-approved shared assignment rule.** Resolve responsibility
+through Workspace's shared Work Engine, initially from the Sales Order PIC; preserve assignment
+movements and the action's assignment snapshot separately from the actual signed-in recorder.
+An authorised helper may record the reply without taking over the assignment. Recording a
+company's reply does not make the recorder the person who contacted the customer. Preserve the
+actual contact person when known; never invent one from the Work assignee. Existing stored identity
+fields are historical evidence, not a second normal/acting/cover ownership model or staff UI.
+Results: `Confirmed` · `No Answer` · `Asked to Call Again` · `Requested Another Date` ·
+`Contact Details Incorrect` · `Customer Refused Delivery` · `Waiting for Customer Reply`.
 
 **Silence is never a result.** No surface infers `Waiting for customer reply` from a missing
 confirmed date; the words appear only when a contact record carries that result. A sent, copied
@@ -423,7 +425,11 @@ carries `Information received from` records the contact in the same request.
 provenance stays the company's. Carres contacts the customer only for the Workspace §5.10 exceptions
 (a known delay, a company-recorded `Requested Another Date` or `Customer Refused Delivery`, wrong
 contact details) and the separate outstation release (ERP-ARCH §6.5). `customer_contact_by` (0488)
-informs the Monitor ladder only.
+is read-only historical evidence, not a live per-company choice of who contacts the customer.
+Within the customer-agreed date/window, routine booking remains Logistics' responsibility. A
+proposed delivery outside that agreement is an Operation-owned customer exception: record the
+customer's response and required evidence before treating the changed arrangement as agreed.
+Recording it does not rewrite Sales Orders' Requested Delivery Date.
 
 **The deadline** is the Logistics card's `2 working days before` check (owner ruling 2026-09-24):
 a Scheduled delivery date must be recorded by then, counted back from the Scheduled date (else the
@@ -1699,8 +1705,8 @@ appears in any line. The row's status word carries the fact.
 | Trigger | Line 1 | Line 2 | Owner rule | Completion fact |
 |---|---|---|---|---|
 | no partner on the scope | `Assign logistics` | `Choose the company that carries this delivery` | Current Work assignment, initially Sales Order PIC; Delivery Duty fallback only when no PIC | partner recorded |
-| partner set, no day agreed, partner contacts the customer | `Call NETS` | `Get the scheduled delivery date` | Current Work assignment, initially Sales Order PIC; Delivery Duty fallback only when no PIC | day and window recorded |
-| partner set, no day agreed, Carres contacts the customer | `Call the customer` | `Get the scheduled delivery date` | Current Work assignment, initially Sales Order PIC; Delivery Duty fallback only when no PIC | day and window recorded |
+| partner set, no day agreed, partner contacts the customer | `Call NETS` | `Get the scheduled delivery date` | Current Work assignment, initially Sales Order PIC; Delivery Duty fallback only when no PIC | scheduled date recorded with the required reply evidence; time optional (§5) |
+| partner set, no day agreed, Carres contacts the customer | `Call the customer` | `Get the scheduled delivery date` | Current Work assignment, initially Sales Order PIC; Delivery Duty fallback only when no PIC | scheduled date recorded with the required reply evidence; time optional (§5) |
 | new date later than the requested date, no reply proof | `Call the customer` | `Record the reply and upload the WhatsApp proof` | Current Work assignment, initially Sales Order PIC; Delivery Duty fallback only when no PIC | contact record with proof |
 | collected, no ETA | `Ask NETS` | `Record the delivery ETA` | Current Work assignment, initially Sales Order PIC; Delivery Duty fallback only when no PIC | ETA recorded |
 | confirmed day is today, no result | `Deliver on Thu, 22 Oct` | `Record the delivery result` | Current Work assignment, initially Sales Order PIC; Delivery Duty fallback only when no PIC | attempt recorded |
