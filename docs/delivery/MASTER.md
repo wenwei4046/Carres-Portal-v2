@@ -2246,7 +2246,7 @@ below as they occur; takeover is not proof of completion.
 
 ## 16 · Production closure
 
-**2026-09-30 routine UI build — implementation in progress, NOT DEPLOYED.** The first change
+**2026-09-30 routine UI increment — DEPLOYED, PR #1813, main `250781e3f1a0eb6b64922e0f4c62a83eb33176cc`.** The first change
 adds the existing ETA field to Logistics Details (normalising stored SQL clock seconds before
 resaving), adopts the governed Logistics/Company details/Transit points Settings names, removes
 the routine Operation-contact choice and locks minimum success evidence in the settings UI and
@@ -2257,8 +2257,15 @@ Focused checks cover Settings/API policy, bulk rejection, ETA input and failure-
 Seeded Settings preview verified at 390px and the normal desktop viewport: fixed success proof
 is readable policy, only failure-photo evidence remains configurable, and fields stack without
 horizontal overflow on phone. This is component-preview evidence, not production acceptance.
-Full release validation remains owed before production closure. Configurable period persistence, assignment timing, exact DO result scope, actual-date storage and
-complete evidence/audit convergence remain open; this increment is not the whole approved UI scope.
+PR CI and the deployment's repeated checks passed. Both Pages projects, both canonical sites and
+the API Worker reported that exact SHA. Authenticated production read as Principal confirms the
+Settings rail says `Logistics`, routine contact is fixed, the only evidence checkbox is the
+configurable failure-photo requirement, and the DO gate copy no longer implies a mandatory period.
+On Monitor's SO-1203 expansion, Logistics Details exposes the `ETA` time input. No live business
+record was changed during these read checks; persistence/refusal behavior is supported by automated
+API and component tests, not a newly performed production save. Configurable period persistence,
+assignment timing, exact DO result scope, actual-date storage and complete evidence/audit convergence
+remain open; this increment is not the whole approved UI scope.
 
 
 **2026-09-30 fleet-template selection — implementation in progress, NOT DEPLOYED.** Logistics
