@@ -15,7 +15,7 @@ import type {
   MoneyAccountRow,
   MoneyAccountUpdateInput,
 } from "@carres/shared/money-accounts";
-import type { LedgerAccountAddInput, LedgerAccountMoveInput, LedgerAccountReorderInput } from "@carres/shared";
+import type { LedgerAccountAddInput, LedgerAccountMoveInput, LedgerAccountReorderInput, LedgerBooksClosed } from "@carres/shared";
 
 import { apiFetch } from "@/lib/api";
 
@@ -115,5 +115,21 @@ export function useAddAccount() {
   return useMutation<{ code: string }, Error, LedgerAccountAddInput>({
     mutationFn: (v) => apiFetch("/api/finance/ledger/accounts", { method: "POST", body: JSON.stringify(v) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["finance"] }),
+  });
+}
+
+/** 0622 — the last closed day. Finance and principal read it; only the principal saves it. */
+export function useBooksClosed() {
+  return useQuery({
+    queryKey: ["finance", "books-closed"] as const,
+    queryFn: () => apiFetch<LedgerBooksClosed>("/api/finance/ledger/books-closed"),
+  });
+}
+
+export function useSaveBooksClosed() {
+  const qc = useQueryClient();
+  return useMutation<LedgerBooksClosed, Error, LedgerBooksClosed>({
+    mutationFn: (v) => apiFetch("/api/finance/ledger/books-closed", { method: "PUT", body: JSON.stringify(v) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["finance", "books-closed"] }),
   });
 }

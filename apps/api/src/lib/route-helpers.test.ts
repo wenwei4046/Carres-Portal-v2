@@ -58,6 +58,8 @@ describe("mapPgError", () => {
     ["payment_method_required", "choose how the customer paid"],
     ["payment_account_unmapped",
       'payment method "grab_pay" has no money account — add it in Settings → Payment → Payment methods, then record this payment'],
+    // 0622: the closed-month guard on gl_entries, which every posting door reaches.
+    ["books_closed", "The books are closed up to 31 Aug 2026. Date this in an open month."],
   ])("a 22023 tagged %s reaches the caller as that code and its own sentence", (tag, sentence) => {
     const m = mapPgError({ code: "22023", message: sentence, details: tag });
     expect(m.status).toBe(422);

@@ -465,3 +465,13 @@ export const ledgerAccountLedgerQuery = z.object({
   message: departmentFilterMessage, path: ['departmentId'],
 });
 export type LedgerAccountLedgerQuery = z.infer<typeof ledgerAccountLedgerQuery>;
+
+/** 0622 — the last closed day (`gl_config.books_closed_through`). The ledger
+ *  refuses every entry dated on or before it; null means no month is closed. */
+export const ledgerBooksClosedInput = z.object({
+  closedThrough: ledgerIsoDate
+    .refine((v) => { const d = new Date(`${v}T00:00:00Z`); return !Number.isNaN(d.getTime()) && d.toISOString().startsWith(v); },
+      'Use a date like 2026-09-10')
+    .nullable(),
+}).strict();
+export type LedgerBooksClosed = z.infer<typeof ledgerBooksClosedInput>;

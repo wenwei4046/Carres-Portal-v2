@@ -139,6 +139,10 @@ function journalError(c: Context<AppEnv>, error: PgError, goLive: string | null,
       message: `This entry was already recorded${entryNo ? ` as ${entryNo}` : ""} before it was changed. Open it in the Journal. To record another, start a New journal entry.`,
     }, 409);
   }
+  // 0622: the closed-month guard's sentence names the closed day, so it is kept as written.
+  if (error.details === "books_closed") {
+    return c.json({ error: "rule_violation", code: error.details, message: error.message }, 422);
+  }
   const known = error.details ? REFUSALS[error.details] : undefined;
   if (known) {
     let message = known.message;

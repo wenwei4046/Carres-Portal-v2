@@ -4434,6 +4434,22 @@ Card payout banks moves from a block under Money accounts to its own Finance Set
 - `Card payout banks` (the tab name, the same word as the section heading above)
 - `A card account and machine that is not listed here fills in no bank. Whoever records the card payout chooses it.` (the line at the top of the tab: there is no catch-all route, so an unlisted card account and machine leaves Paid into empty on the card payout form)
 
+## Finance Settings — Closed months (migration 0622)
+
+The last closed day. The ledger refuses every entry dated on or before it. Finance reads it; only the principal changes it.
+
+| Where | Words |
+|---|---|
+| Tab (`?tab=closed`) | `Closed months` |
+| Status line | `Books closed up to {date}` · `No month is closed` |
+| Line under the status, when a day is closed | `The ledger takes nothing dated on or before this day.` |
+| Date field (principal only) | `Close up to` · the button `Save` |
+| Line in place of the field (finance) | `Only the principal can change this.` |
+| Load and save failures | `The closed month could not be loaded. Try again.` · `The closed month could not be saved. Try again.` |
+| Refusal (database) on any form that posts | `The books are closed up to {d Mon yyyy}. Date this in an open month.` |
+| Refusal (database) on a void or cancel | `The books are closed up to {d Mon yyyy}. An entry dated {d Mon yyyy} cannot be reversed.` |
+| Refusals (database, saving the day) | `Choose a day that has ended. {d Mon yyyy} has not ended yet.` · `Only the principal may close or reopen a month.` |
+
 ## PROPOSAL — PENDING APPROVAL (exception-buttons)
 
 BR-7: Finance holds and clears a delivery from the Payment Record overflow (Finance and principal only).

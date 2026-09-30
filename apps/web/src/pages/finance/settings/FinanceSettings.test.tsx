@@ -15,6 +15,8 @@ const net = vi.hoisted(() => ({
   /** One write refused: its key, the sentence, and the door's tag (sent up as `code`). */
   refuseOn: null as { key: string; message: string; tag?: string } | null,
   calls: [] as Array<{ key: string; body: unknown }>,
+  closed: null as string | null,
+  role: "finance",
 }));
 vi.mock("@/lib/api", () => ({
   apiFetch: vi.fn(async (path: string, init?: RequestInit) => {
@@ -27,9 +29,14 @@ vi.mock("@/lib/api", () => ({
       return net.rows;
     }
     if (key === "GET /card-routes") return net.routes;
+    if (key === "GET /api/finance/ledger/books-closed") return { closedThrough: net.closed };
     if (net.refuse) throw new Error(net.refuse);
     if (net.refuseOn?.key === key) {
       throw Object.assign(new Error(net.refuseOn.message), { body: { code: net.refuseOn.tag, message: net.refuseOn.message } });
+    }
+    if (key === "PUT /api/finance/ledger/books-closed") {
+      net.closed = body.closedThrough;
+      return body;
     }
     // The chart's door renumbers: like the database's cascade, every list
     // that names the old number reads the new one from here on.
@@ -57,6 +64,9 @@ vi.mock("@/lib/api", () => ({
   }),
 }));
 vi.mock("@/pages/operation/components/GlobalTopBar", () => ({ TopBarIcons: () => null }));
+vi.mock("@/lib/auth", () => ({
+  useAuth: (sel: (s: { role: string }) => unknown) => sel({ role: net.role }),
+}));
 
 const ROWS = [
   { code: "1110", name: "Cash on hand", money_kind: "CASH", is_active: true },
@@ -84,6 +94,8 @@ beforeEach(() => {
   net.refuse = null;
   net.refuseOn = null;
   net.calls = [];
+  net.closed = null;
+  net.role = "finance";
   localStorage.clear();
 });
 
@@ -453,5 +465,60 @@ describe("Finance Settings — the chart of accounts", () => {
     fireEvent.keyDown(window, { key: "s", ctrlKey: true });
     await waitFor(() => expect(writes()).toHaveLength(1));
     expect(writes()[0]).toEqual({ key: "POST /api/finance/ledger/accounts", body: { parentCode: "2100", code: "2140", name: "Deposits held" } });
+  });
+});
+
+/** Open the calendar and pick the chosen day again, which clears it
+ *  (react-day-picker single mode). The trigger's name is its label. */
+function clearTheDay(trigger: HTMLElement) {
+  fireEvent.click(trigger);
+  const cell = screen.getAllByRole("gridcell").find((c) => c.getAttribute("aria-selected") === "true");
+  fireEvent.click(cell!.querySelector("button") ?? cell!);
+}
+
+describe("Finance Settings — closed months (0622)", () => {
+  it("is its own tab and says when no month is closed", async () => {
+    show();
+    await screen.findByText("Public Bank");
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "Closed months" }), { button: 0, ctrlKey: false });
+    expect(await screen.findByText("No month is closed")).toBeInTheDocument();
+  });
+
+  it("finance reads the closed day and has no field to change it", async () => {
+    net.closed = "2026-08-31";
+    show("/finance/settings?tab=closed");
+    expect(await screen.findByText(/^Books closed up to Mon, 31 Aug/)).toBeInTheDocument();
+    expect(screen.getByText("The ledger takes nothing dated on or before this day.")).toBeInTheDocument();
+    expect(screen.getByText("Only the principal can change this.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Save" })).not.toBeInTheDocument();
+  });
+
+  it("the principal gets the field, and Save waits for a different day", async () => {
+    net.role = "principal";
+    net.closed = "2026-08-31";
+    show("/finance/settings?tab=closed");
+    await screen.findByText(/^Books closed up to/);
+    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+    expect(screen.queryByText("Only the principal can change this.")).not.toBeInTheDocument();
+  });
+
+  it("the principal clears the day and saves: every month reopens", async () => {
+    net.role = "principal";
+    net.closed = "2026-08-31";
+    show("/finance/settings?tab=closed");
+    clearTheDay(await screen.findByRole("button", { name: "Close up to" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(writes()).toEqual([{ key: "PUT /api/finance/ledger/books-closed", body: { closedThrough: null } }]));
+    expect(await screen.findByText("No month is closed")).toBeInTheDocument();
+  });
+
+  it("a refusal from the database is shown as its sentence", async () => {
+    net.role = "principal";
+    net.closed = "2026-08-31";
+    net.refuseOn = { key: "PUT /api/finance/ledger/books-closed", message: "Choose a day that has ended. 30 Sep 2026 has not ended yet.", tag: "books_closed_not_ended" };
+    show("/finance/settings?tab=closed");
+    clearTheDay(await screen.findByRole("button", { name: "Close up to" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(await screen.findByText("Choose a day that has ended. 30 Sep 2026 has not ended yet.")).toBeInTheDocument();
   });
 });
