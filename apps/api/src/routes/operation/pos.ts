@@ -1632,8 +1632,46 @@ operationPosRouter.get("/:id/print-data", requireOperation, async (c) => {
     return c.json(m.body, m.status);
   }
 
-  return c.json({ ...(doc as Record<string, unknown>), ...(await poPaperFacts(sb, poId, doc as PoDocumentDates)) });
+  const paper = doc as Record<string, unknown>;
+  return c.json({
+    ...paper,
+    lines: await withModelNames(sb, paper.lines),
+    ...(await poPaperFacts(sb, poId, doc as PoDocumentDates)),
+  });
 });
+
+/**
+ * DESCRIPTION SPEAKS THE PRODUCT (owner ruling, Jess 2026-09-30: the PO paper
+ * printed `ALL-AASNDA-K · King`). Each line gains `model_name`, the Catalog
+ * model's own name for its SKU, ADDED beside the document; nothing the SQL
+ * document answered is overwritten. A SKU Catalog cannot name gets no field,
+ * and the paper falls back to the SKU. A failed read degrades to no names —
+ * the paper still prints.
+ */
+async function withModelNames(sb: ReturnType<typeof userClient>, lines: unknown): Promise<unknown> {
+  if (!Array.isArray(lines) || lines.length === 0) return lines;
+  const skus = [...new Set(lines.map((l) => (l as { sku?: unknown }).sku).filter((v): v is string => typeof v === "string"))];
+  if (skus.length === 0) return lines;
+  let rows: unknown;
+  try {
+    const { data, error } = await sb.from("product_skus").select("sku, product_models(name)").in("sku", skus);
+    if (error || !data) return lines;
+    rows = data;
+  } catch {
+    return lines;
+  }
+  const data = rows;
+  const nameBySku = new Map<string, string>();
+  for (const row of data as Array<{ sku: string; product_models: { name?: string | null } | { name?: string | null }[] | null }>) {
+    const model = Array.isArray(row.product_models) ? row.product_models[0] : row.product_models;
+    const name = model?.name?.trim();
+    if (name) nameBySku.set(row.sku, name);
+  }
+  return lines.map((l) => {
+    const name = nameBySku.get((l as { sku?: string }).sku ?? "");
+    return name ? { ...(l as Record<string, unknown>), model_name: name } : l;
+  });
+}
 
 type PoDocumentDates = { issue_date?: string | null; eta_date?: string | null };
 

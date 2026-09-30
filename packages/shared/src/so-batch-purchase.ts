@@ -48,6 +48,17 @@ import {
  * because the states are the demand's, not the page's, and respelling them is
  * exactly how two surfaces start disagreeing.
  */
+/**
+ * ⭐ DELIVERY METHOD — the two words (owner ruling, Jess 2026-09-30: "delivery
+ * method : we collect? what a bad english?"). Every line names WHO: the
+ * supplier delivers, or Carres collects. `We collect` is retired everywhere —
+ * PO paper, SO Batch review, Catalog supplier setup. One map, every surface.
+ */
+export const DELIVERY_METHOD_WORDS = {
+  supplier_delivers: "Supplier delivers",
+  we_collect: "Carres collects",
+} as const;
+
 export const SO_BATCH_PURCHASE_WORDS = {
   destination: "SO Batch Purchase",
   search: "Search Sales Order, customer, SKU or supplier…",

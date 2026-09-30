@@ -548,7 +548,7 @@ complete governed supplier setup, top to bottom:
 Supplier Name
 Delivery Method
   Supplier delivers
-  We collect
+  Carres collects        (owner ruling 2026-09-30; `We collect` retired)
 Product Categories
 Production Days       one required value for every selected category
 Supplier work week

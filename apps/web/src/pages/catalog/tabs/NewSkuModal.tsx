@@ -11,6 +11,7 @@ import type {
 } from "@carres/shared";
 import type { SofaComboDto } from "@carres/shared";
 import {
+  DELIVERY_METHOD_WORDS,
   PRODUCT_CATEGORIES,
   autoBedSkuDescription,
   canonicalSize,
@@ -362,8 +363,8 @@ export default function NewSkuModal({
               data-testid="new-sku-supplier-add-kind"
               className={INPUT_CLS}
             >
-              <option value="own_logistics">Supplier delivers</option>
-              <option value="factory_pickup">We collect</option>
+              <option value="own_logistics">{DELIVERY_METHOD_WORDS.supplier_delivers}</option>
+              <option value="factory_pickup">{DELIVERY_METHOD_WORDS.we_collect}</option>
             </select>
           </label>
           <div className="block">
