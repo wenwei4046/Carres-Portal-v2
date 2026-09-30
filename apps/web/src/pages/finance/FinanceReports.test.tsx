@@ -11,10 +11,21 @@ import { rm } from "@/lib/format-currency";
 import { statementExport } from "./month-end-pack";
 import { parseBalanceSheet, parseProfitAndLoss } from "./reports/report-queries";
 import { paidBeforeInvoiceNote } from "./reports/StatementTable";
+import { lastMonths } from "./reports/by-month";
 
 const api = vi.hoisted(() => ({ fetch: vi.fn() }));
 vi.mock("@/lib/api", () => ({ apiFetch: api.fetch }));
 vi.mock("@/pages/operation/components/GlobalTopBar", () => ({ TopBarIcons: () => null }));
+/** What Export Excel handed to xlsx: the one sheet's rows and the file name. */
+const xlsx = vi.hoisted(() => ({ rows: [] as unknown[][], file: "" }));
+vi.mock("xlsx", () => ({
+  utils: {
+    book_new: () => ({}),
+    aoa_to_sheet: (rows: unknown[][]) => { xlsx.rows = rows; return {}; },
+    book_append_sheet: () => undefined,
+  },
+  writeFile: (_wb: unknown, file: string) => { xlsx.file = file; },
+}));
 
 // ── dates, from the same business clock the page reads ─────────────────────
 
@@ -559,8 +570,137 @@ describe("Reports — Export writes the statement on screen", () => {
   });
 });
 
+describe("Reports — By month", () => {
+  const PREV2 = shiftMonth(YM, -2);
+  /** Months from `from`'s month back to this one: 0 is this month. */
+  const back = (from: string) => {
+    const [y, m] = from.split("-").map(Number) as [number, number];
+    const [ty, tm] = YM.split("-").map(Number) as [number, number];
+    return ty * 12 + tm - (y * 12 + m);
+  };
+  const H1 = { header_depth: 1, parent_header_code: null };
+  const H2 = { header_depth: 2, parent_header_code: "6000" };
+  /** Different money each month; Rent at RM 0.00 last month; Staff costs a heading two deep, under 6000. */
+  const monthBody = (k: number): Row[] => {
+    const sales = 1000 * (k + 1), rent = k === 1 ? 0 : 100, wages = 50 * (k + 1);
+    return [
+      account("INCOME", "4000", "Income", "4100", "Furniture sales", sales),
+      { ...subtotal("INCOME", "4000", "Income", sales), ...H1 },
+      total("INCOME", sales),
+      account("EXPENSE", "6000", "Operating expenses", "6200", "Rent and utilities", rent),
+      account("EXPENSE", "6T10", "Staff costs", "6T12", "Wages", wages),
+      { ...subtotal("EXPENSE", "6T10", "Staff costs", wages), ...H2 },
+      { ...subtotal("EXPENSE", "6000", "Operating expenses", rent + wages), ...H1 },
+      total("EXPENSE", rent + wages),
+      { section: "NET", row_kind: "NET", header_name: "Net result for the period", amount: sales - rent - wages },
+    ];
+  };
+  beforeEach(() => serve({ pl: (from, to) => pl(from, to, monthBody(back(from))) }));
+
+  /** Each row of a By month table, its cells' text. */
+  const cells = (t: HTMLElement) => Array.from(t.querySelectorAll("tbody tr"))
+    .map((tr) => Array.from(tr.children).map((td) => (td.textContent ?? "").trim()));
+  const loaded = async (testId: string) => {
+    const t = await screen.findByTestId(testId);
+    await within(t).findAllByRole("row");
+    return t;
+  };
+  const reads = (path: string) => api.fetch.mock.calls.map(([u]) => new URL(u as string, "http://portal.test"))
+    .filter((u) => u.pathname === `/api/finance/ledger/${path}`);
+
+  it("each month's column shows what the Profit and Loss shows for that month, line by line", async () => {
+    const view = show("/finance/reports?plView=month&plMonths=3");
+    const byMonth = cells(await loaded("profit-and-loss-by-month"));
+    view.unmount();
+    for (const [i, ym] of [YM, PREV, PREV2].entries()) {
+      const one = show(`/finance/reports?from=${ym}-01&to=${lastDay(ym)}`);
+      const table = screen.getByTestId("profit-and-loss");
+      await within(table).findByRole("link", { name: "4100 Furniture sales" });
+      const single = lines(table).map((l) => l.split(" | "));
+      const column = byMonth.map((r) => [r[0], r[i + 1]]);
+      // Every band, heading, account and the net result the statement prints, with its amount.
+      for (const printed of single) expect(column).toContainEqual(printed);
+      // A row the statement leaves out is an account at RM 0.00 that month.
+      for (const [label, amount] of column) {
+        if (!single.some(([l]) => l === label)) expect([label, amount]).toEqual([label, rm(0)]);
+      }
+      one.unmount();
+    }
+  });
+
+  it("latest month first, a heading two deep with its own subtotal every month, in chart order", async () => {
+    show("/finance/reports?plView=month&plMonths=3");
+    const t = await loaded("profit-and-loss-by-month");
+    expect(Array.from(t.querySelectorAll("th")).map((th) => th.textContent))
+      .toEqual(["Account", fmtMonth(YM), fmtMonth(PREV), fmtMonth(PREV2)]);
+    expect(cells(t)).toEqual([
+      ["Income", rm(1000), rm(2000), rm(3000)],
+      ["4100 Furniture sales", rm(1000), rm(2000), rm(3000)],
+      ["Expense", rm(150), rm(100), rm(250)],
+      ["Operating expenses", rm(150), rm(100), rm(250)],
+      ["6200 Rent and utilities", rm(100), rm(0), rm(100)],
+      ["Staff costs", rm(50), rm(100), rm(150)],
+      ["6T12 Wages", rm(50), rm(100), rm(150)],
+      ["Net result", rm(850), rm(1900), rm(2750)],
+    ]);
+    expect(within(t).getByText("Staff costs")).toHaveClass("pl-4");
+    expect(within(t).getByText("6T12 Wages")).toHaveClass("pl-8");
+  });
+
+  it("carries the department picked into every month's read, on both statements", async () => {
+    show("/finance/reports?dept=SHOWROOM&plView=month&plMonths=12&bsView=month&bsMonths=12");
+    await loaded("profit-and-loss-by-month");
+    await loaded("balance-sheet-by-month");
+    const all = [...reads("profit-and-loss"), ...reads("balance-sheet")];
+    expect(all.length).toBeGreaterThanOrEqual(24);
+    for (const u of all) expect(u.searchParams.get("departmentType")).toBe("SHOWROOM");
+  });
+
+  it("reads each month once and never more than twelve", async () => {
+    show("/finance/reports?plView=month&plMonths=12&bsView=month&bsMonths=12");
+    await loaded("profit-and-loss-by-month");
+    await loaded("balance-sheet-by-month");
+    expect(new Set(reads("profit-and-loss").map(String)).size).toBe(12);
+    expect(new Set(reads("balance-sheet").map(String)).size).toBe(12);
+    // Each Balance Sheet column is as of its month's last day; this month's is today.
+    expect(reads("balance-sheet").map((u) => u.searchParams.get("asOf"))).toContain(TODAY);
+    expect(lastMonths(TODAY, 24)).toHaveLength(12);
+  });
+
+  it("a Months value the page does not offer reads six", async () => {
+    show("/finance/reports?plView=month&plMonths=24");
+    const t = await loaded("profit-and-loss-by-month");
+    expect(t.querySelectorAll("th")).toHaveLength(7);
+  });
+
+  it("a month before go-live prints no figures, and the page says when the ledger started", async () => {
+    const notice = (from: string, to: string) => ({ rows: [{ ordinal: 1, ...BLANK, row_kind: "NOTICE",
+      report_status: "BEFORE_GO_LIVE", go_live_on: GO_LIVE, period_from: from, period_to: to }] });
+    serve({ pl: (from, to) => (to < GO_LIVE ? notice(from, to) : pl(from, to, monthBody(back(from)))) });
+    show("/finance/reports?plView=month&plMonths=6");
+    const t = await loaded("profit-and-loss-by-month");
+    expect(screen.getByTestId("profit-and-loss-by-month-go-live"))
+      .toHaveTextContent(`The ledger started on ${fmtDate(GO_LIVE)}. Months before then have no figures.`);
+    // Months three, four and five back ended before go-live: every cell empty, never RM 0.00.
+    for (const r of cells(t)) expect(r.slice(4)).toEqual(["", "", ""]);
+  });
+
+  it("Export Excel writes the table on screen, numbers as numbers", async () => {
+    show("/finance/reports?dept=SHOWROOM&plView=month&plMonths=3");
+    const t = await loaded("profit-and-loss-by-month");
+    fireEvent.click(within(screen.getByTestId("profit-and-loss-by-month-export")).getByRole("button", { name: "Export Excel" }));
+    await waitFor(() => expect(xlsx.file).toBe(`Profit and Loss by month ${fmtMonth(PREV2)} to ${fmtMonth(YM)} Showroom.xlsx`));
+    expect(xlsx.rows.slice(0, 2)).toEqual([["Profit and Loss by month"], ["Department", "Showroom"]]);
+    const body = xlsx.rows.slice(xlsx.rows.findIndex((r) => r.length === 0) + 1);
+    expect(body[0]).toEqual(["Account", fmtMonth(YM), fmtMonth(PREV), fmtMonth(PREV2)]);
+    expect(body[4]).toEqual(["Operating expenses", 150, 100, 250]);
+    expect(body.slice(1).map((r) => r.map((c) => (typeof c === "number" ? rm(c) : String(c).trim())))).toEqual(cells(t));
+  });
+});
+
 describe("Reports words", () => {
   const here = dirname(fileURLToPath(import.meta.url));
   itSaysNoBannedWord(join(here, "FinanceReports.tsx"), { minStrings: 12, expectString: "No opening balances" });
+  itSaysNoBannedWord(join(here, "reports", "by-month.ts"), { minStrings: 3, expectString: "Net result not yet closed" });
   itSaysNoBannedWord(join(here, "reports", "StatementTable.tsx"), { minStrings: 3, expectString: "Net result not yet closed" });
 });
