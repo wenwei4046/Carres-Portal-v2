@@ -277,6 +277,97 @@ actual component reuse and rendered interaction. Existing style checks cover onl
 passing tests or a screenshot alone does not prove operator success. Do not add duplicated tests
 merely to mirror a trivial change; evidence must fit the behaviour being changed.
 
+### Houzs UX adoption contract — owner direction 2026-10-01
+
+**APPROVED TARGET / NOT BUILT:** Jess approved using the inspected Houzs UX patterns as the
+shared guide and instructed “we just copy and update”. Reuse complete template relationships,
+then adapt Carres business content. This is approval of the reuse direction and the five template
+roles below, not approval of unreviewed layouts, new token values, source-code licensing, a new
+business engine, or BUILD. Existing compatible capabilities are KEEP. The implementation status
+of each adopter remains separate from this target.
+
+**What failed in the reviewed samples:** the local SO/PO/Inbound samples imported existing pages
+and mostly changed spacing/typography. They proved some component reuse but did not demonstrate
+the full approved task-guidance or whole-template adaptation. A visual rhythm toggle is not a
+complete UX blueprint or acceptance evidence. Do not label those baseline samples the final
+Houzs template or copy their outdated fixture business rules into implementation.
+
+#### Reference-to-Carres UX inventory
+
+Reference source: Houzs repo `ecce2e9676acc555efa8b2c30e78052b2ab54749` and the observed
+live pages named below. Live deployment SHA is unknown. Current 2990 equivalence is unknown.
+No Houzs production save, upload or transition was performed. Root reuse licence was not found;
+reference source code remains REUSE CANDIDATE, not COPY REQUIRED. Pattern adoption does not claim
+code-copy rights or reduced integration effort.
+
+| ID | Houzs observed pattern / source | Carres adoption and placement | Reuse evidence / limit |
+|---|---|---|---|
+| UX01 | Home `Needs you`: source identity, waiting reason, Review door | My Work / Team Work uses the existing Work item and Staff & Duties resolution; opens its exact task | Pattern observed; Carres Work is the existing owner. No register-local duplicate work queue. |
+| UX02 | Loading List title plus short instruction | Task page header explains what to check and finish; source number, party and Site visible | Pattern observed; exact copy must pass governed dictionary. No instructional paragraphs repeated on every row. |
+| UX03 | Service Case current stage and stage-specific action | Task/detail action region connects current fact, blocker and authorised action | Live interaction observed. Carres Work/business status remains source; no imported case stages, automatic transitions or new status engine. |
+| UX04 | New SO grouped Customer/Delivery/Items/Payments | Form template groups fields by the work; Block + FieldFrame and kit controls | Grouping observed; specific fields and edit gates remain object-owned. |
+| UX05 | New SO cannot-save count opens six-problem list | Explain all known blockers, point to the affected input, keep valid input; summary and field error agree | Dialog observed. Cross-module aggregate renderer parity remains UNVERIFIED; do not make parallel validators. |
+| UX06 | New SO dependent dates constrained by Processing Date | Explain prerequisites beside dependent controls; source-owned validation controls availability | Observed form constraint; do not copy Houzs date or accounting assumptions. |
+| UX07 | Loading List document header followed by goods/quantity rows | Goods card keeps one source scope, its goods and related exceptions together | Observed layout; loading completion/scan backend not verified. Existing Carres Receiving/Loading is the write door. |
+| UX08 | Service Cases list strong identity, quieter supporting line | Shared register hierarchy; primary fact and supporting evidence, not action instructions in ordinary register cells | Observed visual hierarchy; Carres columns/copy/tokens govern. |
+| UX09 | Service Cases search + Export/Wrap/Columns toolbar | One shared register toolbar grammar; expose useful supported functions consistently | Controls observed; scope, persisted preferences and export correctness not all runtime verified. |
+| UX10 | Service Cases Wrap/Columns controls | Long text and optional columns use existing grid mechanisms; no shrink-to-fit type | Reference controls observed, full behaviour UNVERIFIED. Existing shared implementation first. |
+| UX11 | Service overview metric cards above stage/record content | Overview template distinguishes summary from task/detail; same filtered scope and truthful quantities | Visual grouping observed; click-to-filter and arithmetic not proven. Do not turn every register into KPI cards. |
+| UX12 | Service Case object timeline | History stays with its object, preserves actual person/time/action and source documents | Timeline observed; complete audit integrity not certified. Keep Carres history contracts. |
+
+#### Five shared template roles — composition contract
+
+These are roles assembled from existing shared components, not permission to create five competing
+kits. The fifth operational role connects the previously approved list/detail/form/card families.
+Module-specific field content differs; equivalent behaviours, controls and presentation do not.
+
+| Template | Required reading/action sequence | Existing Carres sources | Allowed differences / forbidden shortcuts |
+|---|---|---|---|
+| Register | Shell and Site/context → factual filters → search/tools → records → goods-only disclosure → exact detail/action door → return to same list context | register/DataGrid, workspace-rail, GoodsMiniTable; SalesOrdersRegister and WarehouseInbound | Module columns, approved filters and source scope differ. Preserve Inbound Site tabs and Receive position. No generic Work rail, expanded editing form, or page-local grid clone. |
+| Object detail | Source identity/version → governed object views → grouped facts → relevant action doors → documents and history | kit/Block, DocumentTable, TotalsSummary; SalesOrderWorkspace, PurchaseOrdersPage, WarehouseUnitDetail | Action placement follows object law; not every informational object needs a permanent task card. Document/cost visibility follows role. Do not show editable-looking disabled inputs merely by preference without comparing existing authority. |
+| Task / operation | Exact source and goods scope → current responsibility/task → required checks/input → explicit missing requirements → one authoritative submission → recorded result and remaining work/handoff | ReceivingWorkspace, WarehouseIncoming, WarehouseOutboundWork; Block + existing Work presentation | Warehouse submission ≠ posted GRN; office direct receipt is its authorised posting door. Loaded ≠ driver-confirmed. Never insert an extra approval or duplicate form to make the visual stages match Houzs. |
+| Form | Grouped inputs → conditional requirements → field-level feedback + consistent blocker explanation → submit → success/error/conflict outcome | Block, FieldFrame, Input, Select, DatePicker, EvidenceUploadField, Modal/DialogFrame | Object validations stay source-owned. No new local colour, control or storage wrapper solely for appearance. Save failure retains valid inputs; concurrency handling requires real integration evidence. |
+| Work / overview card | Identity/scope → factual reason → resolved owner where governed → exact action door; overview counts stay separate from task results | Block and governed My Work/Team Work presentation | Cards do not calculate a competing truth or resolve another staff list. No universal clickable KPI claim without verified behaviour. |
+
+**Left rail boundary:** global navigation changes module; register rail filters the viewed records
+and summaries. It does not become an alternative task engine. Inbound Site remains a tab under
+Stock law. Task forms use their governed full-width workspace and preserve return context; a local
+review of the centre alone does not approve removal of navigation, filtering or Quick Rail.
+
+**Current action boundary:** use the same task identity, responsible duty/person and source action
+as Work. Show fact/blocker and the permitted next step together at the task/detail surface where
+law places them. Do not require a newly invented permanent panel on every page. Exception inputs
+belong beside the affected goods/field. Submission feedback replaces the relevant action state;
+it must not report a pending review as completed stock, payment, delivery or approval.
+
+#### Module adoption and visual acceptance
+
+| Module sample | Required walkthrough | Current review status |
+|---|---|---|
+| Sales Order | Register → goods expansion → detail → permitted amendment → document/history → source-specific result | Real baseline reviewed, NOT final adaptation. Fixture still contains generic management-approval language and old fee arithmetic; missing rendered document. These must not override current Orders authority or its active implementation. |
+| Purchasing | PO detail → supplier reply → goods/source lineage → partial receipt → claim/document/history | Real baseline reviewed, NOT final adaptation. Fixture has MPR header without per-line source, no receipt/claim examples and incomplete PDF evidence. These are sample gaps, not proven production failures. |
+| Warehouse | Inbound exact arrangement → Unit checks → normal/issue/not-received → evidence/blockers → submit result/remaining/handoff | Existing Receiving/Inbound baseline plus a separate local composition proposal. Proposal illustrates warehouse submission, not office posting; no API or live storage verification. |
+
+A module may change field content and existing authorised actions; it may not independently choose
+another toolbar, control, card chrome, error grammar or submit/result pattern. If a required shared
+component is absent, record that exact kit gap here before implementation; do not hide it in a
+module-specific lookalike. Reference mapping, real shared component imports, whole-page sample,
+allowed differences and state evidence must travel together. A next chat reading this contract
+must still read the owning module's current business authority.
+
+**Acceptance before any claim of completed adaptation:** compare before/after at the same viewport
+with real shell width, long content and actual roles; walk normal, missing-input, exception,
+failed-save and completion states. Verify focus/keyboard and narrow-screen access. Check document
+lineage, quantities, responsible actor and cross-module destination. Separate simulated fixtures
+from live observations and tests actually executed. A CSS comparison alone never passes.
+
+**Explicit remaining limits:** no complete Houzs conflict/permission/retry matrix; no verified
+Houzs responsibility engine copy; no all-module whole-page approval; no approved new token values.
+Local review artifacts are not production-ready implementations or portable repo exemplars.
+Do not declare UI kit complete, whole Warehouse PLAN complete or BUILD commissioned from this
+owner direction. The next approval concerns the completed visual/operator examples, not another
+interview about already-decided business rules.
+
 ### Cold-start design contract and actual sample evidence — 2026-10-01
 
 **RULING SCOPE:** the owner commissioned completion of reference extraction, component mapping,
@@ -315,8 +406,10 @@ sources in this worktree remain the earlier inspected baseline; this is not whol
 **Real component sample location (LOCAL REVIEW ARTIFACT, NOT DEPLOYED):**
 `http://127.0.0.1:5427/` on the reviewing host; artifact directory
 `/Users/chaichiewlim/.codex/visualizations/2026/10/01/01a0f544-cea3-7ad2-824d-dd23ea6361a6/component-review/`.
-The hub links Sales list, SO detail/edit, PO register, Warehouse Inbound, WarehouseIncoming count
-and a control-state harness. Actual page imports are from existing `apps/web/src/dev/` fixtures;
+The hub links Sales list, SO detail/edit, PO detail, Warehouse Inbound baseline, WarehouseIncoming count
+and a control-state harness. `inbound-flow.html` is a distinct PROPOSAL composition importing real
+kit controls with local-only fixture state, not the actual ReceivingWorkspace implementation.
+The hub names the old Inbound page as baseline comparison. Actual baseline page imports are from existing `apps/web/src/dev/` fixtures;
 kit controls import the unmodified production components. A local stylesheet proposes Houzs
 reading rhythm and darker blue buttons; it is not an application change or final visual standard.
 The WarehouseInbound fixture's nav is a labelled width stand-in, not proof of full-shell fidelity.
