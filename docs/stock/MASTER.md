@@ -1,5 +1,28 @@
 # STOCK / WAREHOUSE — MASTER
 
+**Shared-template adoption — owner acceptance2026-10-01 / Warehouse adoption not verified:**
+follow UI MASTER **“Confirmed shared template — owner acceptance2026-10-01”**, preserved in
+commit `cecc97e2b`, branch `codex/so-register-pilot`. Until integrated into this branch/main, read
+that exact `docs/ui/MASTER.md` source from the Sales pilot checkout; do not mistake its absence in
+an older checkout for an unresolved owner decision. The one canonical UI MASTER owns the visual
+contract; this module does not duplicate its dimensions or create another kit.
+
+The accepted composition may improve existing confusing Warehouse presentation as well as fill
+missing capabilities. Preserve useful behaviour, Unit/source facts, five destinations, permission
+and write ownership. Warehouse rail summaries/date shortcuts use its own authoritative stock and
+physical-work facts; do not copy Sales monetary summaries, Item commercial columns or customer
+section order into Warehouse. Register Table/Cards must describe the same filtered population.
+Receiving/issue evidence alone establishes physical stock movement; allocation is not receipt.
+Unknown, failed and missing evidence must stay explicit. Current receiving/loading write doors and
+formal completion rules survive presentation changes.
+
+The dedicated **UI Template — BUILD Test Deploy** controller
+(`01a0f7c6-6fed-7282-9f2a-94e8bc94b065`) owns shared-template integration, tests and authorised
+deployment. This Warehouse chat remains PLAN; it does not duplicate that rollout or alter the
+controller's worktree. Accepted UI composition is not production proof or completion of the whole
+Warehouse audit/Blueprint. Warehouse-specific adoption requires its own operator/permission/data
+verification under the controller and the module's authorised scope.
+
 **Shared field-operation UI:** follow [the canonical UI MASTER ruling](../ui/MASTER.md#shared-field-operation-ui--owner-ruling-2026-09-29) (approved direction; implementation and operator validation pending).
 
 **All listing appearance — APPROVED / NOT BUILT (Jess, 2026-09-17):** follow
