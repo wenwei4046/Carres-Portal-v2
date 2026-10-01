@@ -34,13 +34,19 @@ set search_path = public, pg_temp
 as $$
 declare
   v_duty jsonb := public.workspace_resolve_duty('po_duty', null);
+  -- The resolver's system-assignment branch (0625) fills acting_user_id with
+  -- the resolved person EVEN WHEN that person is the normal holder
+  -- (is_cover = false). 0379's contract, which the issue trigger and po_sends
+  -- read, is that acting/cover is set ONLY for a real cover — otherwise the
+  -- normal holder would be recorded as their own cover.
+  v_is_cover boolean := coalesce((v_duty->>'is_cover')::boolean, false);
 begin
   return jsonb_build_object(
     'normal_user_id', nullif(v_duty->>'normal_user_id', '')::uuid,
-    'acting_user_id', nullif(v_duty->>'acting_user_id', '')::uuid,
+    'acting_user_id', case when v_is_cover then nullif(v_duty->>'acting_user_id', '')::uuid end,
     'actor_user_id',  nullif(v_duty->>'actor_user_id', '')::uuid,
-    'is_cover',       coalesce((v_duty->>'is_cover')::boolean, false),
-    'cover_id',       nullif(v_duty->>'cover_id', '')::uuid,
+    'is_cover',       v_is_cover,
+    'cover_id',       case when v_is_cover then nullif(v_duty->>'cover_id', '')::uuid end,
     'month',          to_char(timezone('Asia/Kuala_Lumpur', now()), 'YYYY-MM')
   );
 end;
