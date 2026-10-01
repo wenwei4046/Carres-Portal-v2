@@ -464,6 +464,46 @@ not another status engine. Final full-flow posting, conflict resolution, storage
 proof require the separately commissioned BUILD/DELIVERY lane and controlled integration validation.
 No PLAN completion claim follows from the local fixture results.
 
+### Houzs Inventory density and filter placement — measured 2026-10-01
+
+**FACT / REFERENCE ONLY:** read-only live `/scm/inventory` inspected; browser viewport at
+measurement was 884 × 694 (different from the supplied 1063 × 694 screenshot). First populated
+row was 34px high; description/category were 13px/400 with 16.25px line height; numerical spans
+13px/600, right-aligned; product-code link 12px/400. Body cells had 6px vertical and normally
+12px horizontal padding; synthetic disclosure cell had 20px left padding. Header sample height
+32.375px. Table width was 1581px inside 830px client width (840px outer scrolling container);
+container height 339px, horizontal AND vertical overflow auto. Therefore fourteen selected columns
+are not fourteen simultaneously visible columns. These are measured reference values, NOT changes
+to Carres tokens or approved row-height rules.
+
+The live DOM includes category filters, warehouse selector, search, As of date, own/consignment
+quantity/value summaries and dead-stock selection above the table. The owner's scrolled screenshot
+does not show all that chrome. The screenshot also shows the persistent global navigation; the
+absence of a second factual filter rail must not be described as removing navigation. Scroll
+position, viewport, column preferences and active view can all change what is visible without
+changing the underlying inventory facts. Correctness of live stock arithmetic was not audited.
+
+Source `ecce2e9676acc555efa8b2c30e78052b2ab54749`,
+`frontend/src/pages/scm-v2/Inventory.tsx` and `frontend/src/components/DataTable.tsx` inspected:
+Balance tab uses one shared DataTable; category/search change scoped results, column definitions
+use numeric sort values, row click opens warehouse breakdown and chevron expands variant/PO
+information. Product code links Stock Card. Wrap has persisted table-specific state; the source
+uses `wrapOn = wrapText && layoutFixed`. Source includes column sizing/personal layout mechanisms.
+Controls were observed; no live saved layout was changed, exports were not downloaded, tests were
+not executed and not every control behaviour was certified. Shared reference code does not grant
+copy rights or prove current2990 equivalence.
+
+**RECOMMENDATION / PROPOSAL, NOT APPROVED PRESENTATION CHANGE:** adopt the coherent reading
+hierarchy, aligned numeric columns, restrained row decoration, scoped columns and useful disclosure;
+do not copy the balance arithmetic, cost visibility, large all-row rendering or foreign tabs into
+Carres. First measure available width with real navigation/Quick Rail and identify default task
+columns; row count alone does not diagnose clutter. Top-filter placement is a scoped Inventory
+candidate, not an instruction to remove every module's rail. Preserve existing factual filters
+until a complete compact-top versus rail analysis covers frequent filters, selected-condition
+visibility, summary/export scope, keyboard and narrow screens. The saved owner request to keep
+filtering remains valid. Moving its location is not deleting the capability, but existing explicit
+placement requires reviewed replacement. No code or prototype changes follow from this finding.
+
 ### Houzs Sales Order quick-view measurements — reported reference evidence
 
 **FACT REPORTED BY SALES PLAN REVIEW, 2026-10-01; NOT CARRES VALUES OR APPROVAL.** At the
