@@ -449,6 +449,12 @@ when actionable), invalid, busy, failed/retry, keyboard focus and narrow/long-co
 where applicable. Mark non-applicable states with a reason; do not manufacture states for coverage.
 Keep source evidence distinct from tests executed and runtime observations.
 
+**SO goods-side inspection adoption — APPROVED TARGET / NOT BUILT, 2026-10-01:** inspect the
+existing Drawer/DialogFrame plus compatible goods renderer for the owner-admitted compact goods
+summary door. The line count is not goods quantity. One read-only source, named region, keyboard
+activation, close/focus return and narrow behaviour are required. Component presence is not proof
+of this adoption; no generic full-object drawer or alternate edit form is admitted.
+
 **Other existing exports are not universal templates.** SearchInput, Badge, StatusPill, Drawer,
 Tooltip, Popover, Tabs, Toast and PageShell require inspection of the current adopter before reuse.
 DetailShell embeds an OrderActionTrack/four-fact contract and must not be treated as a generic

@@ -127,6 +127,13 @@ Existing portal navigation | Shared module header/global tools | Existing Quick 
 - Narrow layouts use the existing filter drawer and contained table scrolling. Full-width shell
   evidence is required; an isolated centre cannot prove default columns fit.
 
+**Scoped SO exception — APPROVED TARGET / NOT BUILT, 2026-10-01:** a compact goods summary
+with remaining GOODS LINE count may open read-only goods details at the side. This is only the
+owner-admitted goods-summary inspection surface, not generic full-order quick view or editing.
+Keep existing expansion/full-order navigation and filter context; same source and compatible goods
+renderer, keyboard entry, named panel, close/focus return and narrow contained scrolling. UI MASTER
+“Sales Order compact goods summary and side inspection” owns the exact scope and evidence status.
+
 **Module differences:** admitted filters, source types, columns, quantities and authorised doors.
 No separate card chrome, table engine, date format, selection language or generic local Work rail.
 
