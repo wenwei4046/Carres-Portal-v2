@@ -464,6 +464,32 @@ not another status engine. Final full-flow posting, conflict resolution, storage
 proof require the separately commissioned BUILD/DELIVERY lane and controlled integration validation.
 No PLAN completion claim follows from the local fixture results.
 
+### Houzs Sales Order quick-view measurements — reported reference evidence
+
+**FACT REPORTED BY SALES PLAN REVIEW, 2026-10-01; NOT CARRES VALUES OR APPROVAL.** At the
+sampled live 1054 × 694 viewport, the Sales planner measured the SO quick-view drawer at 520px,
+header 60px, footer 61px, independently scrolling body with 20px padding. Its two-column
+label/value group had 16px padding, 12px row gap / 16px column gap, labels 9.5px/600 and values
+13px/600. Sampled register row was 30.5px. These are reference measurements, not tokens; this
+thread has not independently repeated that browser measurement. Do not shrink Carres type or
+rows to match them. Reference deployment SHA remains unknown.
+
+Source inspected by the Sales planner at Houzs `ecce2e9676acc555efa8b2c30e78052b2ab54749`:
+`ResizableDetailDrawer.tsx` (default 520, bounds 420–1100, pointer resizing),
+`MfgSalesOrdersListV2.tsx` drawer chrome, `SalesOrderDetailV2.tsx` Field/Section/DetailGrid,
+`DetailLayout.tsx` main eight/twelve plus aside four/twelve at its large breakpoint, stacked below.
+Observed full-page groups: Customer, Order info, Delivery address, Lines, Payments, and supporting
+total/slip/dates/people/activity. Source presence is not evidence that all responsive/keyboard or
+resize persistence behaviours were tested. Plain label/value groups and independent scroll are
+reference candidates; tiny labels and reference business writers are not recommended imports.
+
+**PROPOSAL / NOT LAW:** Sales recommends review of optional read-only quick view on row click,
+with chevron still goods-only and number/explicit full-page door opening the actual detail/edit
+surface. This conflicts with UI MASTER §4.1's current three-surface grammar and is NOT admitted.
+Keep current navigation, row sizes and type until a scoped replacement is owner-reviewed. Existing
+Drawer/DialogFrame and Block may support the pattern; compatibility and full adoption are
+UNVERIFIED. This research does not approve a fourth surface or another edit/receipt/payment door.
+
 ### Concrete reference: Houzs Service Case detail card composition
 
 **OWNER-SELECTED REFERENCE / ADAPTATION NOT YET APPROVED, 2026-10-01.** Jess selected the
