@@ -558,6 +558,23 @@ fact is not automatically a disabled form field. Card hierarchy, spacing, densit
 and action discoverability must be assessed together. This reference is available as guidance now;
 its adoption is neither blocked by having existing components nor automatically verified by them.
 
+### First representative design — Sales Orders, owner instruction 2026-10-01
+
+**RULING / DESIGN PRIORITY, NOT BUILD:** Jess directs Sales Orders to be the first complete
+representative page/template design and explicitly requests alignment with its existing PLAN chat.
+Sales owns the coherent new-page recommendation and its SO business fit. Shared UI authority stays
+here; Warehouse and Purchasing review the common grammar against their own journeys and return
+specific missing contracts. They do not start independent visual systems or copy SO-specific fields,
+approval gates or calculations. This prioritises design review, not all-module implementation.
+
+The review presents the NEW design only, with traceable Houzs measurements and real Carres
+component mapping. The first example must cover list/disclosure/detail/edit/document, task/result
+where applicable and failure/narrow/keyboard states. Quick-view admission, framed facts and new
+numeric scales remain scoped proposals until owner-reviewed. No visual approval is inferred from
+this sequencing decision. The stop-coding/PLAN boundary remains effective; no new prototype,
+application code, Card or deployment is commissioned. Existing business work in separately
+commissioned lanes is not re-scoped by this design priority.
+
 ### Documentation-only clarification and review freeze — owner instruction 2026-10-01
 
 **RULING / EFFECTIVE NOW:** stop coding, including local review-page changes. The current commission
