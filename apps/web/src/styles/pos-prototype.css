@@ -4626,6 +4626,139 @@ button.step-pill:disabled { cursor: default; color: inherit; }
   .cfg-root--mattress-bed .cfg-stepperBtn {
     min-width: 44px;
   }
+
+  /* Sofa configurator: the phone chrome follows the catalog/mattress three-row
+     pattern while the existing quick-pick and builder bodies keep their own
+     layout and behavior below it. */
+  .cfg-root--sofa.cfg-root {
+    grid-template-rows: auto auto minmax(0, 1fr);
+  }
+
+  .cfg-root--sofa .sof-responsive-wizardbar {
+    display: grid;
+    grid-template-rows: 48px 44px;
+    min-width: 0;
+    background: var(--pos-panel, #fff);
+    border-bottom: 1px solid var(--line);
+  }
+
+  .cfg-root--sofa .pos-mobile-topbar__avatar:disabled {
+    cursor: default;
+  }
+
+  .cfg-root--sofa .sof-responsive-actionbar {
+    padding: 6px 8px;
+  }
+
+  .cfg-root--sofa .sof-responsive-actionbar .cfg-header__live {
+    width: 100%;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .cfg-root--sofa .sof-responsive-actionbar .cfg-header__total {
+    align-items: flex-start;
+    min-width: 74px;
+    padding-right: 8px;
+  }
+
+  .cfg-root--sofa .sof-responsive-actionbar__actions {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .cfg-root--sofa .sof-responsive-actionbar__actions .btn {
+    min-height: 44px;
+  }
+
+  .cfg-root--sofa .cfg-body {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .cfg-root--sofa .sof-responsive-prelude {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 0;
+    padding: 10px 8px;
+    background: var(--pos-panel, #fff);
+    border-bottom: 1px solid var(--line);
+  }
+
+  .cfg-root--sofa .sof-responsive-prelude__model {
+    margin: 0;
+    font-family: var(--font-title);
+    font-size: 18px;
+    font-weight: 700;
+    line-height: 1.2;
+    color: var(--fg);
+  }
+
+  .cfg-root--sofa .sof-responsive-prelude__modes {
+    width: 100%;
+  }
+
+  .cfg-root--sofa .sof-responsive-prelude__modes .sof-flow__modeTab {
+    flex: 1 1 50%;
+  }
+
+  .cfg-root--sofa .sof-responsive-prelude__sizes {
+    width: 100%;
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .cfg-root--sofa .sof-responsive-prelude__sizes::-webkit-scrollbar {
+    display: none;
+  }
+
+  .cfg-root--sofa .sof-responsive-prelude__sizes .sof-flow__modeTabs {
+    width: max-content;
+  }
+
+  .cfg-root--sofa .sof-responsive-prelude .sof-flow__modeTab,
+  .cfg-root--sofa .sof-responsive-prelude__pwp input,
+  .cfg-root--sofa .sof-responsive-prelude__pwp .btn,
+  .cfg-root--sofa .sof-responsive-prelude__pwp-applied > button {
+    min-height: 44px;
+  }
+
+  .cfg-root--sofa .sof-responsive-prelude__pwp {
+    width: 100%;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .cfg-root--sofa .sof-responsive-prelude__pwp input {
+    flex: 1 1 150px;
+    min-width: 0;
+  }
+
+  .cfg-root--sofa .sof-responsive-prelude__pwp-applied {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .cfg-root--sofa .sof-qp {
+    flex: 1 1 auto;
+    min-height: 0;
+    height: auto !important;
+  }
 }
 
 /* ========= Responsive catalog shell: phone ========= */
