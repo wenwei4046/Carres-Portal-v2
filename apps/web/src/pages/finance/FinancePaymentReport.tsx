@@ -291,7 +291,7 @@ export default function FinancePaymentReport() {
       </div></SectionCard>
 
       <SectionCard><div className="p-3" data-testid="report-storage-waived">
-        <Head note="Approved free-storage decisions, each with its reason and approver (§11). The written request stays on the case.">
+        <Head note="Approved free-storage decisions, each with its reason and approver. The written request stays on the case.">
           Storage waived</Head>
         <div className="space-y-1">
           {waivers.map((c) => <div key={c.id}
