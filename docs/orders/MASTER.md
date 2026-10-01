@@ -2662,6 +2662,36 @@ production operation, Card, complete field-to-Duty matrix, or production-verific
 created by this entry. Existing implementation still classifies mixed drafts as a whole;
 scoped multi-review routing remains target work, not a shipped capability.
 
+#### SO Approver — OWNER-APPROVED 2026-10-01 / TARGET NOT BUILT
+
+Jess approved a dedicated **SO Approver** Duty (the SO commercial-approval responsibility),
+assigned through the existing **Settings → Staff & Duties**. This is a scoped PLAN decision,
+not approval of the entire Sales Order blueprint or a BUILD commission.
+
+- The holder AND any dated cover must be active **Principal** people. Assigning an ordinary
+  employee to this Duty must not grant them Principal or SO approval rights. Changing the
+  eligible person uses the governed assignment mechanism, not a hard-coded name or a local list.
+- The intended initial holder is **Jess**. This records the approved target only: no live
+  assignment, bootstrap, permission change or migration is performed by this PLAN entry.
+- Target SO approval resolves the responsible person through this Duty while retaining the
+  existing Principal qualification, decision reason, customer-agreement evidence and other
+  applicable amendment gates. An unheld Duty or unavailable eligible cover remains explicit;
+  do not fall back to any Principal, an Operation employee or an arbitrary requester choice.
+- The existing implementation still uses the Principal-role gate in
+  `0564_the_amendment_carries_the_whole_change_and_the_customers_agreement.sql`;
+  the shared Duty catalogue does not yet contain SO Approver. **APPROVED TARGET / NOT BUILT**
+  is not evidence that resolution, assignment or production behaviour has changed.
+- **Not approved by this decision:** self-approval or a Primary-holder exception; approval
+  rights for other departments; cancellation after Proceed; folding attribution requests into
+  amendments; a complete field-to-Duty review matrix. The earlier A/B question about a PO Duty
+  signature before effectiveness was withdrawn and remains undecided. Do not infer its approval.
+- PO Duty and Purchasing Approver are not substitutes for this commercial Duty. Delivery Charge
+  Approver's existence alone does not extend its mandate to every SO charge amendment. Existing
+  PIC-first ordinary Delivery work and cross-module write ownership remain unchanged.
+
+The exact UI name **SO Approver** is admitted in COPY-STANDARD. Workspace MASTER owns its
+assignment/cover contract; this MASTER owns the SO decision. No implementation Card is authored.
+
 - **Delivery-date changes belong to the whole-page draft**, not a competing date-only form.
   Preserve customer-request date, reason, Before/After, actor/time and historical document truth.
   One live amendment per order remains the rule. Customer-request date remains distinct from the
