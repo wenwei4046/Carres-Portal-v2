@@ -25,9 +25,20 @@
 ## Reuse-first shared page templates — owner ruling 2026-10-01
 
 **RULING / APPROVED DIRECTION AND DOCUMENTATION COMMISSION.** One Carres kit serves every
-module. Preserve working pages and components; copy/adapt only an evidenced missing capability
-from Houzs. The owner requested this explicit contract in the existing UI MASTER, not another
-kit or a new planning guide. Application changes, implementation Cards, deployment and external
+module. **Houzs-first complete visual templates, then tune for Carres** is the owner's current
+presentation direction. Use coherent reference page families and their related hierarchy, density,
+spacing and controls as the starting point, rather than retaining confusing Carres composition or
+copying isolated decorative pieces. Preserve working business behaviour, permissions, evidence and
+write ownership; reuse existing Carres components where they can deliver the reviewed target.
+Component existence alone does not justify retaining a rejected visual result. This direction
+supersedes the restriction that only a missing capability can justify borrowing presentation.
+It does not approve every Houzs screen or literal pixel value: show complete reference-to-Carres
+samples with realistic Sales, Purchasing and Warehouse content, retain the Carres brand, and
+identify justified adaptations. Existing explicit presentation locks and token values remain in
+force until a concrete replacement is reviewed and persisted; this direction commissions that
+review rather than silently changing them. Reference code copying still requires verified rights,
+dependencies and compatibility; pattern adoption is separate from source-code import.
+The owner requested this explicit contract in the existing UI MASTER, not another kit or guide. Application changes, implementation Cards, deployment and external
 cutover remain outside this PLAN commission. **ADOPTION AND FULL OPERATOR VALIDATION PENDING**:
 a written contract is not proof that all pages comply.
 
