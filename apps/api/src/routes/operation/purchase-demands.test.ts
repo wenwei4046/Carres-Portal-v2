@@ -795,17 +795,17 @@ describe("the buying facts SO Batch Purchase needs", () => {
     expect(row.issueRef).not.toBeNull();
   });
 
-  it("blocks a RECORDED Catalog cost that is not positive, as the issue door does", async () => {
+  it.each([0, -1])("keeps a non-positive Catalog cost buyable without accepting its price: %s", async (cost) => {
     const t = TABLES() as unknown as Record<string, { data: unknown; error: unknown }>;
     const sku = (t.product_skus.data as Record<string, unknown>[]).find(
       (r) => r.sku === "B1201S-K",
     )!;
-    sku.cost = 0;
+    sku.cost = cost;
 
     const { rows } = await rowsOf(t);
     const row = bySku(rows, "B1201S-K")!;
-    expect(row.state).toBe("no_cost");
-    expect(row.issueRef).toBeNull();
+    expect(row.state).not.toBe("no_cost");
+    expect(row.issueRef).not.toBeNull();
   });
 
   it("names a SKU whose Stock identity is Not set before Issue (0443)", async () => {

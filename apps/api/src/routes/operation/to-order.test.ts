@@ -1697,7 +1697,7 @@ describe("the retired door's laws, re-asked of the batch door", () => {
    *     the ABSENCE (no cost, no source, no treatment).
    *   · A DECLARED catalog price that Catalog no longer has → still refused:
    *     the operator reviewed a figure that is gone, which is not an unknown.
-   *   · A RECORDED price that is not positive → still refused. Filling it with
+   *   · A non-positive price carries no commercial claim. Filling it with
    *     RM0 would put a number nobody agreed on a supplier's paper.
    */
   it("⭐ an UNPRICED SKU nobody declared is ISSUED, carrying the absence — never RM0", async () => {
