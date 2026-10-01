@@ -4909,3 +4909,7 @@ Workspace message availability: `Message not available` replaces a placeholder d
 | Sales Orders pilot page-tools overflow (owner approved 2026-10-01) | `Page tools` (accessible trigger/menu name); `Export` · `Columns` with existing submenu words | Order business actions in page-tools menu |
 
 | Sales Orders pilot compact search (owner approved 2026-10-01) | `Search orders…`; accessible scope `Search sales orders by SO number, customer or imported reference` | Unverified whole-database phone/item search claim |
+
+### Accepted Sales Orders shared template — 2026-10-01
+
+Owner-accepted screen vocabulary: `Order summary` · `Stock Status` · `Receipt unconfirmed` · `Not applicable` · `Clear all` · `Open full page` · `Related documents`. These describe the accepted read-only template; receipt uncertainty never asserts a posted receipt.

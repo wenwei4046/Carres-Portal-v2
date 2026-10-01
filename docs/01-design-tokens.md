@@ -339,7 +339,7 @@ Houzs measurements remain provenance in UI MASTER, never the instruction for Car
 | Register toolbar overflow trigger | Existing admitted Button/Icon recipes; new fixed-right adoption not yet verified | Desktop32×32; touch hit target≥40×40; registered overflow icon16/stroke2, control radius6, focus2; centred icon | Owner-approved target2026-10-01. Existing icon/radius/focus tokens retained; no new toolbar height approval |
 | Single-line input | `kit/field-recipe.ts`: height 32, horizontal pad 8, body 13/400/18, border 1, radius 6 | KEEP | Implemented/source inspected; remove generic 32/40/48 size assumption |
 | Search / toolbar field | Same: pill search height 32, horizontal pad 16; toolbar field 40 below768/36 at≥768, horizontal pad12, type14/400/20 | KEEP distinct admitted uses | Implemented/source inspected; no arbitrary per-page search size |
-| Compact Register search | Existing shared search control; scoped owner ruling2026-10-01 | Desktop preferred width280, height32, Inter13/400/18, icon16, radius6/border1; shrink within constrained space without clipping; touch control/hit target≥40 | APPROVED TARGET / runtime acceptance pending. Applies to the Sales-first Register template, not automatic replacement of every search variant. Icon/text gap retains existing admitted recipe; no new spacing token |
+| Compact Register search | Existing shared search control; scoped owner ruling2026-10-01 | Desktop preferred width220, height32, Inter12/400/18, icon16, radius6/border1; shrink within constrained space without clipping; touch control/hit target≥40 | OWNER ACCEPTED / production verification pending. Applies to the Sales-first Register template, not automatic replacement of every search variant. Icon/text gap retains existing admitted recipe; no new spacing token |
 | Textarea | Same: horizontal pad8, vertical pad4, body13/400/18; content-driven height | KEEP; never invent fixed universal multiline height | Source inspected; form supplies content/rows |
 | Label / hint / error | `kit/FieldFrame.tsx`: label11/500/14; vertical field gap4; hint12/400/16; error13/400/18 with icon/text gap6 | KEEP | Source inspected; message wraps and increases height, never clipped to one line |
 | Status pill / neutral badge | `kit/StatusPill.tsx`, `Badge.tsx`: horizontal pad8, vertical pad4, label11/500/14, full radius; pill icon14/gap4 | KEEP; natural one-line height22, not universal24 | Derived from source, not fresh runtime measurement; long status must remain discoverable |
@@ -449,15 +449,6 @@ translates; the store keeps its contract (§0's label-vs-identifier rule).
 **Every word answers one question: who · what · next.** No decoration, no
 marketing language, no unnecessary explanation.
 
-### SO representative correction — 2026-10-01, approved scoped pilot
+### Accepted Sales Orders template — 2026-10-01
 
-This pilot overrides its earlier composition; it does not roll out to other pages.
-Count/summary left; Search 280×32 desktop + Table/Cards + 32×32 Page tools aligned as one right
-cluster. Toolbar content height 40px plus 1px divider, no blank reserved row. Touch controls 40px
-and toolbar 48px plus divider. Rail 240px, existing slate-2 neutral background, selected blue-3
-fill/blue-11 text; nav 36px with 16px icons, groups 36px, options 32px desktop/40px touch.
-Stack the two existing views; Delivery first initially open, other groups initially closed with
-chosen value visible. Desktop main rows 32px, header 36px/600, Inter 13/18, cell horizontal pad 8px;
-mobile rows preserve 40px targets. Cards use the same tools/filter engine. Existing components
-receive these scoped composition capabilities; no alternative kit or new palette.
-Status: local implementation; owner visual acceptance, remote checks and deployment not implied.
+The owner-accepted numeric recipe is governed by [UI MASTER, Confirmed shared template](ui/MASTER.md#confirmed-shared-template--owner-acceptance-2026-10-01): search220×32 desktop, rows32 desktop, body12/18, header11/600/36, touch targets40. Reuse the shared kit; runtime delivery proof is recorded by the BUILD controller.

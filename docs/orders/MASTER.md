@@ -735,138 +735,12 @@ or approval of the whole SO Blueprint is implied by this local approval.
 
 ## Sales Orders Register — find truth, never assign work
 
-### Isolated register pilot — explicit BUILD commission, 2026-10-01
+### Accepted register template — authorised BUILD/DELIVERY
 
-**RULING / LIMITED BUILD AUTHORISED; ISOLATED IMPLEMENTATION, OWNER VISUAL ACCEPTANCE OWED.** Jess
-approved arranging BUILD after the specification is recorded for ONE actual `/operation/orders`
-register sample. This supersedes the earlier no-BUILD boundary only for this pilot. No main merge,
-deployment, live write, duty assignment or Purchasing/Warehouse adoption is authorised. Amendment
-PR1834 is separate. Base: main `36e2840dd8dcce6eeb77252417ab57febbd6848d`; shared UI dependency:
-PR1836 `9de0943f0a87f252fd7d2247cb857ca8473c98fd`, OPEN/unmerged. UI PLAN owns UI/02/03;
-Sales BUILD owns this specification and implementation. This specification is committed before code.
-
-**Current → problem → recommendation → trade-off.** The existing Register already has the
-correct shared grid, rail, goods expansion and full-detail door. It offers no Cards presentation,
-loses temporary grid/scroll context when opening a record, and a remembered open rail can cover
-identity after narrowing. Reuse the same engine with an alternate result renderer, preserve
-session return context, and make a narrow filter an explicitly opened temporary surface. Keep
-40px/51px rows, governed columns and tokens. Cards improve individual-order scanning but display
-fewer records per screen; Table remains the default comparison view. This is falsified if the
-same filtering/export produces different orders or the added chrome hides identity/actions.
-
-**Acceptance composition, not a new kit:**
-
-| Region | Actual source/import | Pilot contract |
-|---|---|---|
-| Portal + header | `OperationApp`, `DestinationHeader` → shared `ModuleHeader` | Same global navigation/Quick Rail/header. No duplicate title, KPI strip or create-order door. |
-| Local rail | `components/workspace-rail`: FilterRail, FilterRailGroup/Row/Select, ShowFiltersButton | Retain Order list/Monthly demand tabs and factual groups. Use existing Delivery conditions, not a new lifecycle/status taxonomy. Count/control placement remains independent of its predicate; no second status strip. |
-| Toolbar | `components/register/DataGrid` existing search, header filters, Export, Columns; kit `Tabs` for Table/Cards | Compact one toolbar, wrapping at narrow width. Table/Cards only changes presentation of Order list; Monthly demand remains a separate existing view. Selection keeps the existing replacement toolbar and output-only actions. |
-| Table | DataGrid + `sales-order-columns` + `register-field-widths` | Keep exact approved leading columns/pinning, 40px rows, sorting/filtering, visible Reset columns, current export. No page-local table or different search engine. |
-| Cards | existing kit `Block`, `Checkbox`, `Button`, formatted date and text tokens | Black SO identity; customer; Customer Requested Delivery Date; Items summary; Delivery fact. View opens the same object; Items opens the same read-only ExpandedLines. Selection is the same key set as Table. No money dashboard, write action or new card chrome. |
-| Goods | current `ExpandedLines` → ConnectedSections + GoodsMiniTable + exported OverflowText | Same six governed columns and exact Unit/source evidence. Long names/configuration accessible by hover, keyboard and click. No child selection or second writer. |
-| Return | existing object route, SalesOrderTabs `backTo`, router state | Record originating register URL; back returns there. Session-only grid state restores search/header filters, expansion, focused row and per-presentation scroll. Persistent column layout remains distinct from temporary session state. No object/detail/edit/PDF redesign. |
-| States | DataGrid skeleton/empty/filter-clear + SalesOrderReadFailure | Both presentations use one loading/error/permission/empty decision. Failed read never appears as no orders or zero Delivery. Existing Retry/clear controls retained. |
-
-**Numerical authority.** `01-design-tokens` owns body13/18, meta12/16, label11/14,
-strong15/22; slate12/11 text, white surface, slate5 1px lines, blue selection/focus; spacing
-2/4/6/8/12/16/24/32; card radius10. UI MASTER §6.0 owns header36, parent40, footer32,
-cell inset8; §6.8–6.9 owns goods51/header27 and connector1. Block owns padding12/16.
-FilterRail owns240 width and896 work-canvas threshold. Existing grid identity breakpoint768
-is preserved. Cards compose these tokens in one column on a phone and multiple columns only
-when content fits; no smaller typography or new fixed card height. Proposed32px parent rows,
-full-order quick-view drawer and grey-fact-box redesign remain unapproved and excluded.
-
-**One scope / counts / search.** Keep `useOperationOrders(stage: proceeded)` and server
-`salesOrderRegisterPopulation`: permitted non-cancelled handed-over non-rental orders, up to500
-returned records; `salesOrderTotal` is the independent permission-scoped unsearched denominator.
-Current server text search covers SO/customer/imported reference; the existing grid also searches
-its loaded column values. This is a measured limitation, not a claim of whole-database phone/item
-search. Both views use the SAME server response and DataGrid search/header-filter/sort result.
-Do not increase a cap or silently change population. Delivery/facet counts describe loaded
-searched/header-filtered records satisfying other rail groups, excluding their own group.
-Use the governed `{n} of {m} sales orders` scope sentence where needed; unknown total has no `of`.
-Never present these as whole-database status totals. Clear filters clears search, header and rail
-conditions together. Hidden selected records never enter current-view export; selected outputs
-continue using the engine's selected-visible intersection. Table/Cards preserves all criteria,
-sort, selection and expansion; only the presentation URL changes.
-
-**Delivery evidence boundary.** Existing `registerDeliveryConditionOf` in
-`packages/shared/src/sales-order-register-filters.ts` is the current Orders-owned read-only
-projection over `resolveUnitAllocation`: physical committed goods versus Stock Units sold to
-this order, sourced by the API from `ops_stock_items`. It is NOT DO issue/dispatch and does not
-assert accepted proof. Reuse that current projection for existing rail conditions; no competing
-percentage/status engine. Card Delivery must not invent a result from a DO number or mirror
-`orders.delivered_at`. Missing allocation/source data is `Unavailable`, never Fully delivered.
-The list currently omits Stock identity scope and accepted outcome provenance. The pilot therefore
-prints `Unavailable` for card Delivery throughout, including apparently sold allocations; it cannot
-prove which rows are counted goods. The existing factual rail stays on its approved projection.
-This limitation is explicit, not a new Delivery engine or completed read-model convergence. A broader Delivery result/read-model convergence is outside this visual pilot;
-record that limitation explicitly in review. No green proof-accepted claim from a Stock result.
-
-**RULING / GOODS-ONLY SIDE INSPECTION — owner instruction 2026-10-01.** Long Items summary
-uses one line, ellipsis and a separately visible `+{n}` suffix; n is additional actual goods lines,
-not units. Click/Enter opens read-only goods at the right using existing kit Drawer/DialogFrame
-and the SAME ExpandedLines/GoodsMiniTable source as row expansion. This narrowly supersedes the
-no-side-surface restriction for goods only, never a whole-order drawer or new edit/write door.
-Full product/configuration/quantity evidence remains accessible; existing row expansion survives.
-Close/Escape returns focus and leaves filters, sort, selection and scroll unchanged. Phone uses
-existing responsive DialogFrame. Shared UI dependency updated to PR1836
-`eda0a5acde5f99c26dbfda4b9d115b0e2e8f8a16`; this ruling is recorded before its code adaptation.
-
-**RULING / COMPLETE SAMPLE AND PAGE TOOLS — owner approval 2026-10-01.** Align Table,
-Cards, rail and toolbar through the shared numeric kit, not isolated page styling. Current
-numeric dependency is UI PR1836 `933fe6d07410f839f639a172e76433d85630f902`.
-Search, current filter summary and Table/Cards remain visible. A stable far-right overflow
-menu contains supported page tools Export and Columns, with icon + text. Preserve current
-export/selected-visible semantics and personal columns. The overflow trigger is32×32 desktop
-and at least40×40 on touch; keyboard open/close/focus return are required. It owns no order
-business actions. No32px row, rail relocation or fixed48px toolbar ruling is inferred.
-
-**RULING / COMPACT SEARCH — owner approval 2026-10-01.** Desktop search is280px wide,
-32px high, Inter13/18, icon16, radius6, border1; it shrinks with available width and has at
-least40px touch height. Placeholder is `Search orders…`; accessible scope describes verified
-SO/customer/imported-reference search, never claims whole-database phone/item search. Keep the
-result count/current filter summary, Table/Cards and far-right page tools visible. Existing
-Carres semantic palette remains; no new colour values or rail movement are approved.
-
-**BUILT / LOCAL VERIFIED — isolated pilot, 2026-10-01; not production or owner acceptance.**
-DataGrid supplies the same sorted/filtered records to Table and Cards, with optional shared-template
-page tools. Columns retains visibility/reset and exposes the same sort/filter controls to Cards;
-there is no second predicate. Counts use the same header/search predicate plus other rail groups.
-Temporary selection/grid state is scoped to this application/query-client and user lifetime.
-StrictMode return is tested: search, focused record and600px scroll survive opening the real object
-and returning. Narrow rail explicitly opens and closes; Escape returns focus. Goods summary retains
-`+9` for ten actual lines even when their quantities differ, and opens the existing560px Drawer
-with the same full goods projection. Desktop40px parent and36px/600 header were browser-measured.
-
-Validation:191 targeted tests across the register, presentation return and shared kit; web typecheck;
-design-standard guard. Local real-shell fixture has72 synthetic records and rejects all API writes.
-Normal/empty/loading/error/denied/no-match/clear, header filtering, Table/Cards result identity,
-menu and goods focus return, full-detail back,1440/1060/825/390 and200% zoom were exercised.
-Evidence lives in `docs/evidence/so-register-pilot/`; font proof uses Chromium
-`CSS.getPlatformFontsForNode`, not just computed font-family. Runtime JSON identifies the tested
-source SHA. Cards use ordinary equal-height grid rows, fluid widths and content-driven Block height;
-the measured dimensions are outcomes, not new frozen tokens. On390px search shrinks and its
-placeholder truncates; its full scope remains accessible. Existing Drawer close and rail toggle
-still have24/28px visible controls: the shared touch-target proposals remain an explicit review gap.
-No new palette, rail navigation/location move,32px parent row, production write or merge/deploy.
-
-**Interaction and responsive acceptance.** 1440/1060/825/390 viewport checks in the real shell;
-no page sideways scroll, scroll is contained by the existing DataGrid/goods surfaces. SO identity
-visible on entry; remembered desktop-open filters do not cover it on a narrow first paint or
-resize. Explicit narrow opening is dismissible by existing close/Escape/outside action and returns
-focus; selected conditions remain visible. Keyboard search, filters, sort, selection, Items,
-long-content reveal, object open and back must work. Do not replace the existing rail with a
-page-local copy. Cards preserve exact selection/export meaning and give full long-text access.
-
-**Verification boundary.** Use the actual OperationApp `/operation/orders` route through a
-DEV-only local fixture entry, all unhandled API requests refused. Record fixture versus real data,
-local URL, screenshots, scenarios and actually executed checks. Cover many rows, long customer/
-address/specification, partial/missing/ambiguous Delivery evidence, no results, read failure,
-permission denial, detail→back and Table→Cards→Table state preservation. Keep fresh screenshot
-proof separate from existing fixtures. No UI VERIFIED claim before runtime proof; owner visual
-acceptance remains owed. Produce a separate draft PR, attach it, and report back to Sales PLAN.
-
+The current owner-approved register, quick view and object composition is defined in
+“Sales Order accepted shared UI template” below and UI MASTER “Confirmed shared template”.
+The dedicated controller is authorised through merge, deployment and authenticated verification.
+Population, permission, export and business-write ownership remain governed by this MASTER.
 
 **THE REGISTER COMPOSITION — OWNER RULING (Jess, 2026-09-21) · BUILT (SALES ORDERS CARD 12, [PR #1497](https://github.com/wenwei4046/Carres-Portal-v2/pull/1497)) · authenticated production walk OWED.** Overwrites the 2026-09-17 date-first pair
 (`SO Date · SO No`), and the 2026-09-18 default order.
@@ -897,9 +771,8 @@ Proceed Date | SO Doc Date | SO No | Sales Location | Salesperson | Customer Req
 - **`Sales Location`** sits right after SO No (owner ruling 2026-09-21; the word replaced `Showroom` the same day — "showroom is sales location"): where the order was sold is read with its identity. It is the outlet, else the dealer, so it is always filled.
 - **`Salesperson`** follows Sales Location (owner ruling 2026-09-21): the existing Sales-ownership field (`salespersons.name`) promoted to a default. It names who SOLD the order, never an action owner.
 - `Items` is a default column (`{first item} + {n} more`).
-- **One line, 40px — owner ruling 2026-09-21 (international register practice: Shopify, Linear,
-  Salesforce, SAP Fiori, AG Grid).** Every row is 40px, set on this page only (`rowHeight={40}`; the engine default stays 38px so no other page
-  moves — owner 2026-09-21), and never grows.
+- **One line, accepted shared-template row height — owner ruling 2026-09-21 (international register practice: Shopify, Linear,
+  Salesforce, SAP Fiori, AG Grid).** The accepted shared template uses32px desktop rows and40px touch targets; cells remain one line.
   Every cell is one line. Registry widths are set so most real values fit whole; a value longer than its
   column ends in `…` and opens whole on hover and keyboard focus (engine `overflowText`), and the column can
   be widened. Dates, `SO No`, `PO No` and `DO No` never cut.

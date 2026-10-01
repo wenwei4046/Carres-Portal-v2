@@ -494,20 +494,9 @@ current shared sources/adopters first. Record READY / REUSE CANDIDATE / COPY REQ
 UNVERIFIED in UI MASTER with evidence; admit a genuinely missing component only through its
 governed review. A component missing from this inventory is not automatically missing from code.
 
-### SO representative correction — 2026-10-01, approved scoped pilot
+### Accepted Sales Orders template — 2026-10-01
 
-This pilot overrides its earlier composition; it does not roll out to other pages.
-Count/summary left; Search 280×32 desktop + Table/Cards + 32×32 Page tools aligned as one right
-cluster. Toolbar content height 40px plus 1px divider, no blank reserved row. Touch controls 40px
-and toolbar 48px plus divider. Rail 240px, existing slate-2 neutral background, selected blue-3
-fill/blue-11 text; nav 36px with 16px icons, groups 36px, options 32px desktop/40px touch.
-Stack the two existing views; Delivery first initially open, other groups initially closed with
-chosen value visible. Desktop main rows 32px, header 36px/600, Inter 13/18, cell horizontal pad 8px;
-mobile rows preserve 40px targets. Cards use the same tools/filter engine. Existing components
-receive these scoped composition capabilities; no alternative kit or new palette.
-Status: local implementation; owner visual acceptance, remote checks and deployment not implied.
-
-SO representative correction: Table/Cards uses the shared Tabs segmented variant, not underlined stage tabs. Outer32px (1px border +2px padding +26px option), radius6; option13/18, padding10 horizontal, selected blue-3/blue-11/600. Touch outer40px. Table body stays Inter13/18; compactness comes from32px rows, not smaller body text.
+The owner-accepted numeric recipe is governed by [UI MASTER, Confirmed shared template](ui/MASTER.md#confirmed-shared-template--owner-acceptance-2026-10-01): search220×32 desktop, rows32 desktop, body12/18, header11/600/36, touch targets40. Reuse the shared kit; runtime delivery proof is recorded by the BUILD controller.
 
 ### Accepted template composition — 2026-10-01
 

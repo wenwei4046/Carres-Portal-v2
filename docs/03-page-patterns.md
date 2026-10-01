@@ -454,17 +454,6 @@ must not dominate the review. Jess's current presentation preference is NEW page
 comparison remains internal evidence. A rejected or withdrawn mock is never a template merely
 because it imports shared components. Do not display an isolated centre as a verified full shell.
 
-### SO representative correction — 2026-10-01, approved scoped pilot
+### Accepted Sales Orders template — 2026-10-01
 
-This pilot overrides its earlier composition; it does not roll out to other pages.
-Count/summary left; Search 280×32 desktop + Table/Cards + 32×32 Page tools aligned as one right
-cluster. Toolbar content height 40px plus 1px divider, no blank reserved row. Touch controls 40px
-and toolbar 48px plus divider. Rail 240px, existing slate-2 neutral background, selected blue-3
-fill/blue-11 text; nav 36px with 16px icons, groups 36px, options 32px desktop/40px touch.
-Stack the two existing views; Delivery first initially open, other groups initially closed with
-chosen value visible. Desktop main rows 32px, header 36px/600, Inter 13/18, cell horizontal pad 8px;
-mobile rows preserve 40px targets. Cards use the same tools/filter engine. Existing components
-receive these scoped composition capabilities; no alternative kit or new palette.
-Status: local implementation; owner visual acceptance, remote checks and deployment not implied.
-
-The owner-accepted 2026-10-01 register/object pattern is governed by [UI MASTER, Confirmed shared template](ui/MASTER.md#confirmed-shared-template--owner-acceptance-2026-10-01). Reuse its geometry and shared components; business summaries and status facts remain module-owned.
+The owner-accepted numeric recipe is governed by [UI MASTER, Confirmed shared template](ui/MASTER.md#confirmed-shared-template--owner-acceptance-2026-10-01): search220×32 desktop, rows32 desktop, body12/18, header11/600/36, touch targets40. Reuse the shared kit; runtime delivery proof is recorded by the BUILD controller.
