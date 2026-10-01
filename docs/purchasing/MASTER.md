@@ -598,8 +598,18 @@ resending, staff check the external conversation to avoid duplicating an unrecor
 The build's shared completion sentence is `Current PO version marked as sent`.
 
 Supplier out-of-stock, delayed model/fabric, changed quantity or changed price is a later exception.
-A supplier price change stops the issue/change and routes to the commercial approver; Operations
-does not decide it.
+**PRICE ISSUES DO NOT STOP OPERATION — OWNER RULING 2026-10-01, APPROVED TARGET / NOT BUILT.**
+Operation proceeds with ordinary PO issue, sending, supplier follow-up and Receiving even while a
+price is missing, changed or disputed. Do not introduce a Commercial Hold or a price-resolution
+prerequisite for those operational acts. Operation does not see costs, edit prices or approve
+commercial terms. Jess and Finance handle price matters in parallel under their existing authority.
+Continuing operational work is neither acceptance of a proposed price nor approval of payment;
+never silently overwrite approved commercial facts with the supplier's disputed proposal. Source
+request approval, quantity, identity, document and other non-price gates remain. This does not
+revoke §5.8.1's separately approved cancellation-fee and supplier-agreement exception rules.
+Older price-refusal implementation descriptions in §§5.6 and 9.2 are not the current target and
+must converge to this ruling. This is governing truth only, not application implementation or an
+expansion of the separate PO-placement unblock BUILD.
 
 #### 5.6.1 Daily PO windows — owner-approved 2026-09-24; BUILT on branch, awaiting owner review (not live)
 
@@ -707,7 +717,7 @@ until Jess approves.**
 - **CATALOG IS THE NORMAL PRICE AUTHORITY.** Issue review is not a second cost-maintenance screen.
   The server reads the governed Catalog cost and sends that value as both the line cost and
   `expected_catalog_cost`; `purchasing_check_line_commercials` re-reads it inside the creation
-  transaction. A missing or changed Catalog cost creates ZERO purchase orders. Commercial
+  transaction. A missing or changed Catalog cost must not block ordinary issue under the 2026-10-01 ruling above. Commercial
   exceptions are approved and maintained in their governed Catalog/approval flow, never typed into
   SO Batch or Manual Purchase Issue review.
 - **SUPPLIER COLLECTION IS MASTER DATA.** A factory-pickup supplier's collector and optional fixed
@@ -716,7 +726,7 @@ until Jess approves.**
   collection arrangement nor asks the operator to choose a collector for one PO. Managers maintain
   both fields in `Settings → Purchasing → Supplier collection`; future factory-pickup suppliers appear from master
   data and future destinations continue to come from the adjacent `Supplier Deliver To` setting.
-- **AN EXCEPTION NEEDS SOMEBODY ELSE'S APPROVAL.** A hand-entered cost and a Free of Charge each
+- **COMMERCIAL APPROVAL — EXISTING IMPLEMENTATION, NOT AN OPERATIONAL PRICE GATE.** A hand-entered cost and a Free of Charge each
   require an open, unexpired `po_cost_approvals` record. `purchasing_approve_po_cost` admits only
   `principal` or `finance`, and refuses a manager who is also today's PO actor: one person cannot be
   both sides of an exception. An approval is SPENT when used.
