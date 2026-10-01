@@ -774,7 +774,7 @@ cell inset8; §6.8–6.9 owns goods51/header27 and connector1. Block owns paddin
 FilterRail owns240 width and896 work-canvas threshold. Existing grid identity breakpoint768
 is preserved. Cards compose these tokens in one column on a phone and multiple columns only
 when content fits; no smaller typography or new fixed card height. Proposed32px parent rows,
-quick-view drawer and grey-fact-box redesign remain unapproved and excluded.
+full-order quick-view drawer and grey-fact-box redesign remain unapproved and excluded.
 
 **One scope / counts / search.** Keep `useOperationOrders(stage: proceeded)` and server
 `salesOrderRegisterPopulation`: permitted non-cancelled handed-over non-rental orders, up to500
@@ -801,6 +801,16 @@ The current SKU-level projection does not prove exact-line fulfilment for ambigu
 configurations or counted goods without governed outcome evidence: their card result stays
 Unavailable. A broader Delivery result/read-model convergence is outside this visual pilot;
 record that limitation explicitly in review. No green proof-accepted claim from a Stock result.
+
+**RULING / GOODS-ONLY SIDE INSPECTION — owner instruction 2026-10-01.** Long Items summary
+uses one line, ellipsis and a separately visible `+{n}` suffix; n is additional actual goods lines,
+not units. Click/Enter opens read-only goods at the right using existing kit Drawer/DialogFrame
+and the SAME ExpandedLines/GoodsMiniTable source as row expansion. This narrowly supersedes the
+no-side-surface restriction for goods only, never a whole-order drawer or new edit/write door.
+Full product/configuration/quantity evidence remains accessible; existing row expansion survives.
+Close/Escape returns focus and leaves filters, sort, selection and scroll unchanged. Phone uses
+existing responsive DialogFrame. Shared UI dependency updated to PR1836
+`eda0a5acde5f99c26dbfda4b9d115b0e2e8f8a16`; this ruling is recorded before its code adaptation.
 
 **Interaction and responsive acceptance.** 1440/1060/825/390 viewport checks in the real shell;
 no page sideways scroll, scroll is contained by the existing DataGrid/goods surfaces. SO identity
