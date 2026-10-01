@@ -1796,8 +1796,13 @@ to the existing changed-buying-line instruction (109 API/SQL tests); 258 real-co
 checks passed with simulated transport/PDF readiness. A production rolled-back negative control
 refused excessive source quantity before numbering and left the PO count unchanged. Applied source
 MD5 `8efc838e3f7fdc78d23059fff0354cba`; issue/remainder bodies matched the locally tested functions.
-No live supplier message or purchase was created. Issue-versus-new-Stock-reservation concurrency
-is a separate unverified seam: the existing Stock draw does not yet share these Order/line locks.
+No live supplier message or purchase was created. Issue-versus-new-Stock-reservation concurrency was then reproduced: Stock checked the remainder
+before waiting on the Order, and could retain that stale answer. Draft migration 0633 (not yet
+applied) gives the existing draw/reserve/use-PO/save/release doors one internal source-lock helper,
+Order then exact line before PO-line/Unit locks; eligibility and ownership do not change.
+Twelve controlled SQL cases now pass, including that independent-connection race, legitimate
+reserve → partial buy → release → final buy and explicit incoming-PO reservation with preserved
+Unit IDs. This is bounded placement integrity work; Receiving lifecycle is not certified by it.
 
 **Reusable presentation evidence (placement scope).** Both issue lanes use
 `so-batch/SoBatchIssueWorkspace.tsx` (Review), kit `Block` / `SalesOrderWorkspace.Fact`,

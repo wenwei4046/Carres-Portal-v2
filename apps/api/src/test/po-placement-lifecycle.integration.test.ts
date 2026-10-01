@@ -36,6 +36,8 @@ describe.skipIf(!url)("ordinary Operation PO placement lifecycle", () => {
     await q("insert into workspace_duty_assignments(duty_key,holder_id,effective_from) values('purchasing_approver',$1,current_date)",[BOSS]);
     await q("insert into orders(id,so,dealer_id,customer_name,customer_phone,delivery_date,status,terms_accepted,salesperson_id) select $1, $3,id,'Fixture customer','0100000000',current_date+30,'proceed_order',true,$2::uuid from dealers limit 1",[SO,OP,SO_NO]);
     await q("insert into order_lines(id,order_id,sku,qty,unit_price) values($1,$2,$3,3,1000)",[LINE,SO,SKU]);
+    await q("insert into order_lines(id,order_id,sku,qty,unit_price) values($1,$2,$3,1,1000)",[id(20),SO,SKU]);
+    await q("insert into ops_stock_items(id,unit_code,sku,warehouse_id,status,condition,date_in) values($1,allocate_unit_id(),$2,$3,'free','new',current_date)",[id(21),SKU,WH]);
     await q("set local session_replication_role=origin");
     // Private local fixtures must be visible to two concurrent connections.
     // They use unique identities and remain only in this local acceptance DB.
@@ -142,6 +144,29 @@ describe.skipIf(!url)("ordinary Operation PO placement lifecycle", () => {
     await q("rollback to savepoint changed_order");
     expect(Number((await q("select count(*) n from purchase_orders where supplier_id=$1",[SUP])).rows[0].n)).toBe(0);
   });
+  it("legitimate reserve, partial buy, release and final buy keep their quantities", async()=>{
+    await as(OP);
+    await q("select ops_stock_pool_draw($1,'used_instead_of_ordering',null,$2,null,null,null,$3,null)",[`SO-${SO_NO}`,id(21),LINE]);
+    expect((await q("select so_line_remaining_requirement($1) n",[LINE])).rows[0].n).toBe(2);
+    const part=(qty:number)=>[{sku:SKU,qty,cost:null,cost_source:null,commercial_treatment:null,sources:[{order_id:SO,so:SO_NO,order_line_id:LINE,qty}]}];
+    await issue(part(2),true);
+    expect((await q("select so_line_remaining_requirement($1) n",[LINE])).rows[0].n).toBe(0);
+    await q("select ops_stock_release($1)",[id(21)]);
+    expect((await q("select so_line_remaining_requirement($1) n",[LINE])).rows[0].n).toBe(1);
+    await issue(part(1),true);
+    expect((await q("select so_line_remaining_requirement($1) n",[LINE])).rows[0].n).toBe(0);
+  });
+  it("anonymous incoming stock remains an explicit choice and keeps its Unit IDs on release", async()=>{
+    await as(OP);
+    const pool=await issue([{sku:SKU,qty:2,cost:null,cost_source:null,commercial_treatment:null}]);
+    expect((await q("select so_line_remaining_requirement($1) n",[LINE])).rows[0].n).toBe(3);
+    await q("select so_batch_use_po_units($1,'used_instead_of_ordering',null,$2,$3,$4)",[`SO-${SO_NO}`,SO,LINE,pool.po_ids[0]]);
+    expect((await q("select so_line_remaining_requirement($1) n",[LINE])).rows[0].n).toBe(1);
+    const ids=(await q("select id,unit_code from ops_stock_items where po_no=$1 order by id",[pool.po_ids[0]])).rows;
+    await q("select so_batch_save_ready_units($1,'used_instead_of_ordering',null,$2,$3,$4::jsonb)",[`SO-${SO_NO}`,SO,LINE,JSON.stringify([ids[0].id])]);
+    expect((await q("select so_line_remaining_requirement($1) n",[LINE])).rows[0].n).toBe(2);
+    expect((await q("select id,unit_code from ops_stock_items where po_no=$1 order by id",[pool.po_ids[0]])).rows).toEqual(ids);
+  });
   it("concurrent ordinary issuers cannot commit the same SO quantity twice", async()=>{
     const a=new pg.Client({connectionString:url}), b=new pg.Client({connectionString:url});
     await Promise.all([a.connect(),b.connect()]);
@@ -162,6 +187,25 @@ describe.skipIf(!url)("ordinary Operation PO placement lifecycle", () => {
       expect(Number((await q("select sum(qty) n from po_line_sources where order_line_id=$1",[LINE])).rows[0].n)).toBe(3);
       expect(Number((await q("select count(*) n from purchase_orders where supplier_id=$1",[SUP])).rows[0].n)).toBe(1);
     } finally { await Promise.all([a.end(),b.end()]); }
+  });
+  it("issue and exact Ready Stock reservation cannot both consume one source", async()=>{
+    const a=new pg.Client({connectionString:url}), b=new pg.Client({connectionString:url});
+    await Promise.all([a.connect(),b.connect()]);
+    async function begin(c:pg.Client){await c.query("begin");await c.query("select set_config('request.jwt.claims',$1,true)",[JSON.stringify({sub:OP,role:"authenticated"})]);await c.query("set local role authenticated");}
+    try {
+      await Promise.all([begin(a),begin(b)]);
+      await a.query("select purchasing_issue_pos_batch($1::jsonb)",[JSON.stringify([{supplier_id:SUP,warehouse_id:WH,destination_id:DEST,eta_date:"2026-11-10",purpose:"customer_sales",so_refs:[SO_NO],lines:[{sku:SKU,qty:1,cost:null,cost_source:null,commercial_treatment:null,sources:[{order_id:SO,so:SO_NO,order_line_id:id(20),qty:1}]}]}])]);
+      let settled=false;
+      const draw=b.query("select ops_stock_pool_draw($1,'used_instead_of_ordering',null,$2,null,null,null,$3,null)",[`SO-${SO_NO}`,id(21),id(20)])
+        .then(()=>({ok:true,code:null}),e=>({ok:false,code:e.message})).finally(()=>{settled=true;});
+      await new Promise(r=>setTimeout(r,150));
+      const waited=!settled;
+      await a.query("commit");
+      const result=await draw;
+      await b.query("rollback");
+      expect(waited).toBe(true);
+      expect(result).toMatchObject({ok:false,code:"line_already_covered"});
+    } finally {await a.query("rollback");await b.query("rollback");await Promise.all([a.end(),b.end()]);}
   });
   it("supplier channel maintenance preserves other contacts and audits the actual editor", async()=>{
     await as(BOSS);
