@@ -88,7 +88,7 @@ function PoSendCard({
   const suppliers = useOperationSuppliers();
   const found = row.data?.pos.find((p) => p.id === po.poId) ?? null;
   const supplier = (suppliers.data?.suppliers ?? []).find((s) => s.id === po.supplierId) as
-    | { whatsapp_group_url?: string | null; contact_email?: string | null; contact?: string | null }
+    | { whatsapp_group_url?: string | null; contact_email?: string | null; po_send_channel?: string | null; contact?: string | null }
     | undefined;
   const destinations = [...(row.data?.destinations ?? []), ...(row.data?.referencedDestinations ?? [])];
   const issued: IssuedPo | null = found

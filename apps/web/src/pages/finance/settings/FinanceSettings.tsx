@@ -12,8 +12,8 @@
  * (0515, 0523).
  *
  * Words: every label is an existing COPY-STANDARD word (Money account,
- * Account, Name, Kind, Status, Active, Not active, Save, Cancel, and the pay
- * method words Cash · Bank transfer · Online payment for the kinds). A row
+ * Account, Name, Kind, Status, Active, Not active, Save, Cancel, and the
+ * kind words Cash · Bank account · Card and online holding). A row
  * click opens it; the only new phrases are the page word and the add button.
  *
  * Three more tabs sit beside it: `?tab=chart` holds the chart of accounts
@@ -366,7 +366,7 @@ function CardRouteModal({ route, accounts, onClose }: { route: CardRouteRow | nu
       }
     >
       <div className="flex flex-col gap-3" data-testid="card-route-form">
-        <Select id="card-route-holding" label="Card account" required value={holding} onValueChange={setHolding}
+        <Select id="card-route-holding" label={MONEY_ACCOUNT_KIND_WORD.HOLDING} required value={holding} onValueChange={setHolding}
           options={opts("HOLDING")} disabled={route !== null} placeholder="Choose an account" />
         <Select id="card-route-channel" label="Machine at" required value={channel}
           onValueChange={(v) => setChannel(v as CardChannel)} options={CHANNEL_OPTIONS} disabled={route !== null} />
