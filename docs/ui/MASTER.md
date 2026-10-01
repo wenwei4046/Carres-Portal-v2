@@ -558,6 +558,29 @@ fact is not automatically a disabled form field. Card hierarchy, spacing, densit
 and action discoverability must be assessed together. This reference is available as guidance now;
 its adoption is neither blocked by having existing components nor automatically verified by them.
 
+### Sales Order compact goods summary and side inspection — owner-approved target
+
+**APPROVED TARGET / NOT BUILT, owner ruling reported by Sales PLAN 2026-10-01.** On an SO
+goods summary with a remaining-line indicator (for example `+9`), Jess requested: “we should
+follow this format when long. click then see details at side”. Show a compact goods summary and
+a count of the remaining GOODS LINES, then open read-only goods details at the side when the
+summary/remaining-lines door is activated. Do not label the line count as quantity or Unit count.
+
+This is an explicit, narrow exception to §4.1's otherwise three-surface grammar: **goods-summary
+inspection only**. It does not admit a generic full-order drawer, an edit form in the side panel,
+rail relocation, new status taxonomy or 32px rows. Preserve the full-order door, existing governed
+goods expansion and current list/filter context. Table and Cards must read the same scoped goods
+source; no independent lookup/calculation that can disagree with the register.
+
+Reuse existing Drawer/DialogFrame and compatible goods renderer after capability inspection;
+no new drawer engine is commissioned. The inspection must have a named heading, keyboard-operable
+entry, contained scrolling, close/focus return and readable narrow-screen behaviour. Exact summary
+truncation/line limit and dimensions follow the recorded module specification and existing token
+law; this ruling does not supply or approve invented pixel values. Sales BUILD records the Orders
+spec before coding within its commissioned pilot. The UI PLAN thread remains documentation-only.
+This is the OWNER'S target, not proof that the pictured Houzs click behaviour was inspected or that
+Carres has built or verified it. Live and test acceptance remain outstanding.
+
 ### Sales Order Table / Cards view — scoped owner direction
 
 **OWNER-REQUESTED CAPABILITY / NOT BUILT, reported by the Sales PLAN chat 2026-10-01.** Jess
