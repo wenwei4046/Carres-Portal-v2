@@ -185,8 +185,10 @@ begin
  -- mutation and before its snapshot. Other services keep their original writer.
  definition:=replace(definition,'for v_addon in select * from jsonb_array_elements(v_a.proposed_snapshot->''addons'') loop',
   E'for v_addon in select * from jsonb_array_elements(v_a.proposed_snapshot->''addons'') loop\n      if v_a.proposed_snapshot ? ''_stair_quote'' and v_addon->>''addon_key''=''STAIR_CARRY'' then continue; end if;');
- definition:=replace(definition,'delete from order_addons where order_id = v_a.order_id and not (id = any(v_keep));',
-  'delete from order_addons where order_id = v_a.order_id and not (id = any(v_keep)) and not (v_a.proposed_snapshot ? ''_stair_quote'' and addon_key=''STAIR_CARRY'');');
+ needle:='not (id = any(v_keep));';
+ if position(needle in definition)=0 then raise exception 'Service preservation boundary changed'; end if;
+ definition:=replace(definition,needle,
+  'not (id = any(v_keep)) and not (v_a.proposed_snapshot ? ''_stair_quote'' and addon_key=''STAIR_CARRY'');');
  definition:=replace(definition,'if v_lines is null and v_header = ''{}''::jsonb then',
   E'if v_lines is null and v_header = ''{}''::jsonb then\n    perform public._sales_order_stamp_staff_quote(v_a.order_id);');
  execute definition;
