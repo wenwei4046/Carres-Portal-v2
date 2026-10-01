@@ -328,7 +328,11 @@ ownership, misattribute the act, grant approval rights or add a PIC approval gat
 amendment must not be presented as already effective. See Orders MASTER for the full ruling.
 Do not infer notification delivery from the existing submission door; it remains unverified.
 
-Requested Delivery Date routing, fee/service approval,
+Requested Delivery Date routing is settled in Orders/Delivery MASTER: evidenced customer
+earlier-date amendments require ready stock, otherwise refuse; evidenced later-date amendments
+apply; neither date change needs PO Duty or supplier confirmation. Carres-initiated early
+arrangements leave the SO date unchanged. This adds no new staff or approval assignment.
+Fee/service approval,
 0329 attribution changes/consolidation and Sales Approver self-approval remain undecided. Do not
 copy Purchasing Approver's own-request rule or bootstrap into this Duty as an assumed decision.
 The existing PIC-first ordinary Delivery ownership remains unchanged.

@@ -2642,9 +2642,9 @@ whole-page submission or the rule against silently saving part of a draft.
   no additional approval permission.
 - Product amendments follow the later **Staff amendments and Sales Approver** ruling below:
   ordinary changes do not require owner approval; issued-PO coverage requires supplier confirmation.
-  Requested Delivery Date routing remains an explicit open decision; it stays in the SO change
-  path and does not wait for an unrelated Purchasing review. No blanket Purchasing commercial
-  approval is granted.
+  Requested Delivery Date changes follow the approved date ruling below, with no PO Duty or
+  supplier-confirmation step for the date itself. No blanket Purchasing commercial approval is
+  granted.
 - Where a submission contains dependent changes, the relevant reviews may proceed in parallel,
   but the linked changes take effect together only after all required approvals. Example:
   “change the bed only if it can arrive on Friday” must never become an approved bed change
@@ -2717,34 +2717,42 @@ that operating model. The code remains unchanged; the following is the approved 
 its audit record identifies who changed what. Supplier confirmation remains necessary where an
 issued PO covers the affected line. Submission eligibility is now settled by the scoped ruling below.
 
-**NOT DECIDED — each requires its own owner decision:** customer-initiated Requested Delivery
-Date amendment rules and their re-booking consequences (the readiness-led early invitation is
-settled separately below); delivery fee/service changes and the existing Delivery Charge Approver's scope;
+**NOT DECIDED — each requires its own owner decision:** delivery fee/service changes and the
+existing Delivery Charge Approver's scope;
 salesperson/dealer/sales-location changes and whether the 0329 lane folds into the amendment;
 Sales Approver self-approval. Ordinary-address amendment restrictions after Proceed were not
 resolved by this ruling either; do not infer them from the floor/lift/stairs rule.
 
-**Earlier-delivery invitation — OWNER-APPROVED 2026-10-01 / TARGET NOT BUILT OR VERIFIED.**
-Do not promise earlier delivery before this order's required goods are actually ready. Merely
-being in a warehouse is not readiness. The agreed delivery scope and existing delivery, money
-and release conditions must be satisfied before Logistics contacts the customer to offer earlier
-receipt. A supplier prediction or a PO Duty enquiry is not a substitute for that readiness.
+**Requested Delivery Date changes — OWNER-APPROVED 2026-10-01 / TARGET NOT BUILT.**
+This resolves the formerly open date-change decision. Preserve the earlier readiness and
+storage-witness clarification; this is not a claim of implementation or production verification.
 
-Once ready, the assigned Logistics company asks whether the customer wants to receive earlier.
-Record the customer's agreement evidence before arranging the earlier delivery; preserve the
-actual contact/recorder. Early stock arrival or this Logistics arrangement does **not** overwrite
-the SO Requested Delivery Date. The customer's acceptance of an earlier arrangement is distinct
-from a customer-initiated request to amend that SO date.
+1. **Customer asks for an earlier date:** the order's required goods must already be in the
+   warehouse and genuinely ready under the existing readiness definition, not merely located
+   there or forecast to arrive. When ready, staff submit the SO amendment with the required
+   customer evidence and it takes effect. If not ready, refuse the amendment; staff tell the
+   customer Carres will contact them when the goods arrive. Do not chase a supplier to pull the
+   customer date forward or promise an earlier date before stock is ready. Actual delivery still
+   requires the existing delivery, money and release conditions; changing the SO date is not a DO
+   or goods-release authorisation.
+2. **Goods ready early; Carres initiates:** once the previously approved readiness and existing
+   delivery/money/release conditions are satisfied, Logistics calls to offer earlier delivery.
+   If the customer accepts, record their reply with **WhatsApp evidence** and arrange it. This is
+   a Delivery arrangement, **not an SO amendment**; the SO Requested Delivery Date stays unchanged.
+   If they decline, keep the original date. Declining early receipt while retaining the original
+   agreed date/window is not customer delay and cannot itself start storage charges.
+3. **Customer asks for a later date:** staff submit the SO amendment with customer evidence and
+   it takes effect. A later date is never a silent edit. Payment's existing written-request /
+   storage evidence, actual Storage Start, free periods and waiver-authority rules remain
+   unchanged; a changed date alone does not prove the storage trigger or grant free storage.
+4. **No PO Duty or supplier confirmation forms part of a date change.** This date-only rule does
+   not remove the separately approved supplier-feasibility gate when the same submission also
+   changes goods/specifications/quantity covered by an issued PO. Linked changes still take effect
+   together after their applicable gates pass; do not apply a dependent date half on its own.
 
-If the customer declines the early offer but keeps the original agreed receipt date/window,
-that is **not customer delay** and must not start storage charges merely because Carres became
-ready early. Payment's existing agreed-scope readiness AND customer-delay witnesses still govern
-Storage Start. Existing valid storage cases are not reset by this clarification.
-
-**Scope left open:** customer-initiated Requested Delivery Date amendments (including whether
-an earlier request can apply directly once goods are ready) and whether a customer's later-date
-request applies directly. The prior three-scenario suggested table is not approved as a whole.
-This ruling neither changes storage rates/waiver authority nor implements scheduling or charging.
+Use the existing single SO amendment and evidence path, actual submitter/Before/After/reason/time
+records and PIC notification target. Delivery arrangements never overwrite the SO promise.
+No storage rates, waiver rights, live charges, code or implementation Cards change in this PLAN.
 
 **Who may submit — OWNER-APPROVED A, 2026-10-01 / TARGET NOT BUILT (PIC notification).**
 Any Operation staff member with the existing order access may submit an SO amendment; submission

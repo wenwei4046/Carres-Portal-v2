@@ -399,7 +399,11 @@ readiness alone cannot start storage charges; that refusal is not a customer-del
 the agreed-scope readiness AND actual customer-delay rule above. Existing valid Storage Start
 facts are not reset. Orders/Delivery MASTER record the readiness, customer evidence and unchanged
 SO Requested Delivery Date boundary. No rate, free period, waiver authority or live charge changes
-are authorised here; customer-requested later-date amendment effectiveness remains undecided.
+are authorised here. **Customer-requested later-date amendments — OWNER-APPROVED 2026-10-01 /
+TARGET NOT BUILT:** staff submit with customer evidence and the SO date change takes effect, per
+Orders MASTER. This does not remove the written-request/storage evidence requirements below,
+automatically start storage, or grant a waiver. Customer date changes require no PO Duty or
+supplier confirmation; money execution and storage authority remain unchanged.
 
 The first valid Storage Start is permanent. Later delay never resets it, a free period or a cycle.
 

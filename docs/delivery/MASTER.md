@@ -435,20 +435,23 @@ proposed delivery outside that agreement is an Operation-owned customer exceptio
 customer's response and required evidence before treating the changed arrangement as agreed.
 Recording it does not rewrite Sales Orders' Requested Delivery Date.
 
-**Readiness-led early offer — OWNER-APPROVED 2026-10-01 / TARGET NOT BUILT OR VERIFIED.**
-For this early invitation, the assigned Logistics company contacts the customer only after the
-order's required goods are genuinely ready and the existing delivery, money and release conditions
-are satisfied. Stock being in a warehouse, or a supplier forecast of early arrival, is insufficient.
-Ask whether the customer wants earlier receipt; record the customer's agreement evidence before
-arranging it, retaining the actual contact and recorder through the existing evidence mechanism.
-This readiness-led invitation is Logistics contact; Operation may record its facts on behalf as
-above. The early arrangement does not overwrite the SO Requested Delivery Date.
+**Requested Delivery Date boundary — OWNER-APPROVED 2026-10-01 / TARGET NOT BUILT.**
+Orders MASTER § Requested Delivery Date changes is the matching owner rule. A customer-initiated
+earlier SO date applies through an evidenced SO amendment only when the order's required goods
+are already in the warehouse and genuinely ready; otherwise refuse it and tell the customer
+Carres will contact them when the goods arrive. Do not chase a supplier or promise an earlier
+date before stock is ready. A customer-initiated later date also applies through an evidenced
+SO amendment: it is never a silent edit. No PO Duty or supplier confirmation is required for the
+date change itself. Independent goods changes in a mixed request keep their applicable gates.
 
-A customer who declines early receipt and keeps the originally agreed date/window has not delayed
-receipt. Do not treat that response as a storage-delay witness. Payment owns Storage Start and
-its existing readiness-plus-customer-delay rule. Customer-initiated SO date amendment rules and
-whether later-date requests apply directly remain undecided in Orders MASTER. This is not approval
-of the earlier three-scenario proposal as a whole and is no implementation/production claim.
+For Carres-initiated early receipt, after genuine readiness and existing delivery/money/release
+conditions are satisfied, Logistics calls the customer. Acceptance must be recorded with WhatsApp
+evidence before arranging the earlier delivery. This is a Delivery arrangement, not an SO
+amendment; leave the SO Requested Delivery Date unchanged. If declined, retain the original date.
+Declining early receipt while keeping that date/window is not customer delay and must not start
+storage charges by itself. Payment's existing readiness-plus-customer-delay, evidence, free-period
+and waiver rules remain unchanged. Actual delivery always retains its existing release gates.
+This records an approved target, not a built or production-verified date workflow.
 
 **The deadline** is the Logistics card's `2 working days before` check (owner ruling 2026-09-24):
 a Scheduled delivery date must be recorded by then, counted back from the Scheduled date (else the
