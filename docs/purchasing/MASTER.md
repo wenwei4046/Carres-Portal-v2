@@ -3468,23 +3468,42 @@ current group's header is sticky inside its own group and stops at its boundary.
 number on desktop, number only on narrow screens. **UI MASTER §6.10 owns this**, once, for every
 grouped listing page; this section neither restates its mechanics nor varies them.
 
-**Rail — owner correction Jess 2026-09-18, BUILT 2026-09-18; missing-confirmation row superseded
-2026-09-24 and RETIRED from the screen 2026-09-26 (`Supplier has not confirmed the PO date` is gone; the
-row is `Confirm tomorrow's supplier delivery`, computed by the ONE call engine per expected arrival).** `Supplier reply` contains `Confirm tomorrow's supplier delivery` when its exact-date
-trigger opens, `Supplier Confirmed Delivery Date changed` and
-`Supplier delivery date passed`, using the existing current-version sent/pending predicates.
-`Receiving` contains `Partly received`. `Supplier` and `Supplier Deliver To` keep their facts and
-selection rules. **The complete label is used everywhere — row, active-condition chip and export —
-and is written once.** `Date changed` named none of the page's three dates, and the group heading
-meant to qualify it scrolls away and does not exist on a chip at all. Icons come from the shared
-kit at its own 16px / stroke 2 / neutral ink with an 8px gap: Supplier reply → message · Receiving
-→ goods · Supplier → supplier · Supplier Deliver To → warehouse. A selected facet clears by being
-clicked again; selects keep their `All …` option. **There is no Clear filters control in the rail**
-(verified: the shared `FilterRail` has never had one). The toolbar's active-condition strip and its
-own `Clear filters` are the shared listing standard's and are unchanged. No duplicate
-`All purchase orders` row, DOCUMENT group or action line. Counts and predicates are preserved:
-a facet's number describes the whole register, never what another facet happens to have selected.
-Appearance follows UI MASTER §6.7 Portal-wide readability; do not duplicate its styling here.
+**Rail — owner-approved 2026-10-01 / APPROVED TARGET, NOT BUILT.** Preserve the
+supplier-follow-up purpose and adopt the confirmed shared template. The complete rail is:
+
+| Group | Filters |
+|---|---|
+| Sending | Confirm PO sent to supplier |
+| Supplier reply | Confirm tomorrow's supplier delivery; Supplier Confirmed Delivery Date changed; Supplier delivery date passed; Balance delivery date not confirmed |
+| Receiving | Partly received |
+| Exceptions | Supplier cannot supply; Waiting for supplier to agree; Open supplier claims |
+
+These are factual PO filters, not a second Work queue, assignment engine or manually maintained
+status. Each filter opens the matching PO list; the existing object remains the action door.
+Use existing source-owned sending, per-batch answer/arrival, receipt, cancellation and Claim
+facts. Balance-date follow-up applies to outstanding goods after partial receipt; inability and
+pending cancellation follow §§5.8.1–2 and keep coverage until a lawful effective result.
+Open claims link to the Claim owner; closing the PO does not close a Claim or extinguish an
+unsent current-version obligation. Counts are distinct POs within each predicate, not Units or
+claim records; a PO may legitimately appear in several filters. Unknown/failed reads are not zero.
+Existing facet counts retain their register-wide scope unless the complete reviewed design
+explicitly changes it; final count scope and empty/error behaviour must be visibly explained.
+Supplier and Supplier Deliver To remain table-header filters, not duplicate rail groups.
+PO Doc Date uses the shared table-header month/date-range filter; it is distinct from arrival
+follow-up. Selected conditions and shared Clear all are above the table, not an additional rail
+reset control. Do not add the earlier proposed generic overview/date/supplier rail alongside this
+approved monitor rail. Exact new labels are registered in COPY-STANDARD; template primitives
+and numerical values remain shared UI authority.
+
+**Design-to-delivery boundary — owner-confirmed 2026-10-01.** Complete the coherent Purchasing
+page design (rail/register/date filters/expansion; PO preview/detail/version/send; supplier
+answers and approved exceptions; Receiving/Claim/document/history connections; role, missing-data,
+failed-save and completion states) and obtain owner review before commissioning that UI build.
+Record approved scope immediately; unresolved composition remains PROPOSAL / NOT LAW. This ruling
+does not approve the entire unfinished design, new PO Status/Receiving Status columns, application
+changes, Cards or deployment. Reuse the existing Purchasing BUILD lane for a later explicit
+takeover and coordinate shared-template work with its existing controller. Independently
+commissioned business fixes keep their existing scope; no duplicate implementation chat.
 
 **Expansion — APPROVED / LOCKED, owner confirmation 2026-09-18 · BUILT 2026-09-18; seventh column
 owner-approved 2026-09-25 · BUILT 2026-09-26 (`GoodsMiniTable` PO layout, page-drawn cell from the ONE
