@@ -419,6 +419,21 @@ allowed differences, realistic source-linked content and the states below.
 | Long content / many records | Full identity can be reached; quantities/actions remain findable; contained scroll |
 | Narrow / keyboard | Same scope/capabilities; logical focus, labels and dialog return; no blocked controls |
 
+**Per-adopter handoff evidence (documentation, not an implementation Card):** name the actual
+route and component import for each region; link each numerical value to 01 and identify every
+proposed exception separately; name the source of content, scope, action and responsibility;
+specify click/keyboard/focus/scroll/narrow behaviour and applicable empty/loading/error/permission
+states; state what an observer will see when the task succeeds, fails or remains pending. Exact
+source/fixture revisions and approval state accompany the evidence. “Use the kit” or “like Houzs”
+without this mapping is not a complete design handoff.
+
+A later authorised implementation review runs on actual Carres routes in an isolated environment,
+with real components and labelled real/fixture data. For the first SO register candidate, exercise
+Table/Cards scope preservation, filters/search/sort, long content, narrow screens, existing detail
+navigation and applicable business regressions. This is an observable acceptance boundary, not
+permission to code or an assertion that the shared renderer already exists. No static duplicate
+HTML or broad rollout substitutes for verified adoption on the actual surface.
+
 Review demonstrations may have scenario controls, but those belong outside the operator page and
 must not dominate the review. Jess's current presentation preference is NEW page only; baseline
 comparison remains internal evidence. A rejected or withdrawn mock is never a template merely

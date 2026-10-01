@@ -586,6 +586,17 @@ here; Warehouse and Purchasing review the common grammar against their own journ
 specific missing contracts. They do not start independent visual systems or copy SO-specific fields,
 approval gates or calculations. This prioritises design review, not all-module implementation.
 
+**KIT FIRST — owner direction reported by Sales PLAN, 2026-10-01.** Update the shared UI/UX
+contract before application work. “Straight to build?” is a question, not a BUILD commission.
+The suggested later implementation boundary is ONE real Carres Sales Order register vertical
+slice, including the requested Table/Cards presentation, shared filtering and existing detail door;
+this is a RECOMMENDATION, not an authorised Card, build plan or whole-module replacement.
+It must use the actual Carres route/components/read model in an isolated local/preview environment,
+not a duplicate static HTML page. Real versus fixture data must be explicitly identified.
+Owner visual review and appropriate business/state evidence precede broad adoption; an isolated
+styling patch is not VERIFIED kit adoption. Proposed 32px rows, quick-view admission and removal
+of governed framed facts remain unapproved. No source-size measurement changes approved values.
+
 The review presents the NEW design only, with traceable Houzs measurements and real Carres
 component mapping. The first example must cover list/disclosure/detail/edit/document, task/result
 where applicable and failure/narrow/keyboard states. Quick-view admission, framed facts and new
