@@ -3320,3 +3320,5 @@ receive these scoped composition capabilities; no alternative kit or new palette
 Status: local implementation; owner visual acceptance, remote checks and deployment not implied.
 
 SO representative correction: Table/Cards uses the shared Tabs segmented variant, not underlined stage tabs. Outer32px (1px border +2px padding +26px option), radius6; option13/18, padding10 horizontal, selected blue-3/blue-11/600. Touch outer40px. Table body stays Inter13/18; compactness comes from32px rows, not smaller body text.
+
+SO preview comparison, owner authorised 2026-10-01: register table body12px/18 replaces13px in this scoped preview; row32, header11/600/36, search/buttons/rail13 unchanged. Browser computed styles verified body12/header11/search13 and rendered row32. This is authorised for comparison, not accepted as a portal-wide font standard; no deployment.

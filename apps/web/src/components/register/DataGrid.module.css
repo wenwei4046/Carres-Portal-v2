@@ -1486,3 +1486,8 @@ div:first-child > .columnsMenuGroup {
 @media (max-width: 767px) {
  .rootReference[data-presentation-tools][data-row-height="32"] .td { height: 40px; }
 }
+
+/* Owner-approved SO preview comparison: body12, line18; geometry unchanged. */
+.rootReference[data-presentation-tools][data-row-height="32"] .td { font-size: var(--fs-12); }
+.rootReference[data-presentation-tools][data-row-height="32"] .td .overflowText { font-size: inherit; }
+.rootReference[data-presentation-tools][data-row-height="32"] .td :global(.text-body) { font-size: inherit; line-height: 18px; }
