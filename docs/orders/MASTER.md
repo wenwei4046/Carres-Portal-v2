@@ -737,7 +737,7 @@ or approval of the whole SO Blueprint is implied by this local approval.
 
 ### Isolated register pilot — explicit BUILD commission, 2026-10-01
 
-**RULING / LIMITED BUILD AUTHORISED; IMPLEMENTATION AND OWNER VISUAL ACCEPTANCE OWED.** Jess
+**RULING / LIMITED BUILD AUTHORISED; ISOLATED IMPLEMENTATION, OWNER VISUAL ACCEPTANCE OWED.** Jess
 approved arranging BUILD after the specification is recorded for ONE actual `/operation/orders`
 register sample. This supersedes the earlier no-BUILD boundary only for this pilot. No main merge,
 deployment, live write, duty assignment or Purchasing/Warehouse adoption is authorised. Amendment
@@ -760,7 +760,7 @@ same filtering/export produces different orders or the added chrome hides identi
 |---|---|---|
 | Portal + header | `OperationApp`, `DestinationHeader` → shared `ModuleHeader` | Same global navigation/Quick Rail/header. No duplicate title, KPI strip or create-order door. |
 | Local rail | `components/workspace-rail`: FilterRail, FilterRailGroup/Row/Select, ShowFiltersButton | Retain Order list/Monthly demand tabs and factual groups. Use existing Delivery conditions, not a new lifecycle/status taxonomy. Count/control placement remains independent of its predicate; no second status strip. |
-| Toolbar | `components/register/DataGrid` existing search, Filters, Export, Columns; kit `Tabs` for Table/Cards | Compact one toolbar, wrapping at narrow width. Table/Cards only changes presentation of Order list; Monthly demand remains a separate existing view. Selection keeps the existing replacement toolbar and output-only actions. |
+| Toolbar | `components/register/DataGrid` existing search, header filters, Export, Columns; kit `Tabs` for Table/Cards | Compact one toolbar, wrapping at narrow width. Table/Cards only changes presentation of Order list; Monthly demand remains a separate existing view. Selection keeps the existing replacement toolbar and output-only actions. |
 | Table | DataGrid + `sales-order-columns` + `register-field-widths` | Keep exact approved leading columns/pinning, 40px rows, sorting/filtering, visible Reset columns, current export. No page-local table or different search engine. |
 | Cards | existing kit `Block`, `Checkbox`, `Button`, formatted date and text tokens | Black SO identity; customer; Customer Requested Delivery Date; Items summary; Delivery fact. View opens the same object; Items opens the same read-only ExpandedLines. Selection is the same key set as Table. No money dashboard, write action or new card chrome. |
 | Goods | current `ExpandedLines` → ConnectedSections + GoodsMiniTable + exported OverflowText | Same six governed columns and exact Unit/source evidence. Long names/configuration accessible by hover, keyboard and click. No child selection or second writer. |
@@ -797,9 +797,10 @@ this order, sourced by the API from `ops_stock_items`. It is NOT DO issue/dispat
 assert accepted proof. Reuse that current projection for existing rail conditions; no competing
 percentage/status engine. Card Delivery must not invent a result from a DO number or mirror
 `orders.delivered_at`. Missing allocation/source data is `Unavailable`, never Fully delivered.
-The current SKU-level projection does not prove exact-line fulfilment for ambiguous same-SKU
-configurations or counted goods without governed outcome evidence: their card result stays
-Unavailable. A broader Delivery result/read-model convergence is outside this visual pilot;
+The list currently omits Stock identity scope and accepted outcome provenance. The pilot therefore
+prints `Unavailable` for card Delivery throughout, including apparently sold allocations; it cannot
+prove which rows are counted goods. The existing factual rail stays on its approved projection.
+This limitation is explicit, not a new Delivery engine or completed read-model convergence. A broader Delivery result/read-model convergence is outside this visual pilot;
 record that limitation explicitly in review. No green proof-accepted claim from a Stock result.
 
 **RULING / GOODS-ONLY SIDE INSPECTION — owner instruction 2026-10-01.** Long Items summary
@@ -827,6 +828,28 @@ least40px touch height. Placeholder is `Search orders…`; accessible scope desc
 SO/customer/imported-reference search, never claims whole-database phone/item search. Keep the
 result count/current filter summary, Table/Cards and far-right page tools visible. Existing
 Carres semantic palette remains; no new colour values or rail movement are approved.
+
+**BUILT / LOCAL VERIFIED — isolated pilot, 2026-10-01; not production or owner acceptance.**
+DataGrid supplies the same sorted/filtered records to Table and Cards, with optional shared-template
+page tools. Columns retains visibility/reset and exposes the same sort/filter controls to Cards;
+there is no second predicate. Counts use the same header/search predicate plus other rail groups.
+Temporary selection/grid state is scoped to this application/query-client and user lifetime.
+StrictMode return is tested: search, focused record and600px scroll survive opening the real object
+and returning. Narrow rail explicitly opens and closes; Escape returns focus. Goods summary retains
+`+9` for ten actual lines even when their quantities differ, and opens the existing560px Drawer
+with the same full goods projection. Desktop40px parent and36px/600 header were browser-measured.
+
+Validation:191 targeted tests across the register, presentation return and shared kit; web typecheck;
+design-standard guard. Local real-shell fixture has72 synthetic records and rejects all API writes.
+Normal/empty/loading/error/denied/no-match/clear, header filtering, Table/Cards result identity,
+menu and goods focus return, full-detail back,1440/1060/825/390 and200% zoom were exercised.
+Evidence lives in `docs/evidence/so-register-pilot/`; font proof uses Chromium
+`CSS.getPlatformFontsForNode`, not just computed font-family. Runtime JSON identifies the tested
+source SHA. Cards use ordinary equal-height grid rows, fluid widths and content-driven Block height;
+the measured dimensions are outcomes, not new frozen tokens. On390px search shrinks and its
+placeholder truncates; its full scope remains accessible. Existing Drawer close and rail toggle
+still have24/28px visible controls: the shared touch-target proposals remain an explicit review gap.
+No new palette, rail navigation/location move,32px parent row, production write or merge/deploy.
 
 **Interaction and responsive acceptance.** 1440/1060/825/390 viewport checks in the real shell;
 no page sideways scroll, scroll is contained by the existing DataGrid/goods surfaces. SO identity

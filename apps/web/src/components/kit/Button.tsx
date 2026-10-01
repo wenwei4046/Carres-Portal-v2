@@ -47,6 +47,8 @@ const SIZE: Record<Size, string> = {
 const ICON_SIZE: Record<Size, 14 | 16> = { md: 16, sm: 14, touch: 14 };
 
 export type ButtonProps = {
+  /** Page-tools trigger: 32px desktop, 40px touch, with an accessible name. */
+  iconOnly?: boolean;
   variant?: Variant;
   size?: Size;
   /**
@@ -72,6 +74,7 @@ export type ButtonProps = {
  */
 const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
   {
+    iconOnly = false,
     variant = "neutral",
     size = "md",
     shape = "control",
@@ -96,7 +99,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
         "transition-[filter,background-color] " +
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9 focus-visible:ring-offset-1 " +
         "disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:brightness-100 " +
-        `${VARIANT[variant]} ${SIZE[size]}`
+        `${VARIANT[variant]} ${iconOnly ? "h-10 w-10 p-0 min-[768px]:h-8 min-[768px]:w-8" : SIZE[size]}`
       }
       {...rest}
     >

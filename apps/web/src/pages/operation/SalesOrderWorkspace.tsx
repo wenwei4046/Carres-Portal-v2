@@ -3791,6 +3791,7 @@ function SalesOrderWorkspaceBody() {
       )}
 
       <SalesOrderTabs
+        backTo={typeof location.state?.salesOrderRegisterReturn === "string" && /^\/operation\/orders(?:\?|$)/.test(location.state.salesOrderRegisterReturn) ? location.state.salesOrderRegisterReturn : undefined}
         identity={soWord}
         /* Capitalize up — owner ruling 2026-08-15. Display only; the
            `Full name` INPUT below stays on the raw draft value, because a

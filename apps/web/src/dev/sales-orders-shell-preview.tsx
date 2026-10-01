@@ -32,7 +32,7 @@ const CITIES: Array<[string, string]> = [
    real name, so the one-line cell's ellipsis and its open-whole door are walked. */
 const SALESPEOPLE = ["Khoo Aik Yean", "Mayson", "Alvin", "Nur Syafiqah Binti Mohd Zulkifli", "tan qu qu"];
 
-const orders = Array.from({ length: 24 }, (_, n) => {
+const orders = Array.from({ length: 72 }, (_, n) => {
   const i = n + 1;
   const [city, state] = CITIES[i % CITIES.length]!;
   return {
@@ -74,8 +74,9 @@ const orders = Array.from({ length: 24 }, (_, n) => {
     ops_delivery_orders: i % 5 === 0 ? [{ do_number: `DO-20260915-${7000 + i}` }] : [],
     order_lines: [
       { id: `line-${i}-1`, sku: i % 2 ? "CODY-SK" : "B1201S-K", qty: 1, unit_price: 2499, attrs: { category: "mattress", fabric_code: "BF-10 Charcoal Velvet", colour: "Deep Ocean Blue" } },
-      ...(i % 3 === 0 ? [{ id: `line-${i}-2`, sku: "MEMORY-FOAM-PILLOW-asd", qty: 2, unit_price: 99, attrs: { category: "accessory" } }] : []),
+      ...(i === 15 ? Array.from({ length: 9 }, (_, k) => ({ id: `line-${i}-${k + 2}`, sku: "MEMORY-FOAM-PILLOW-asd", qty: k + 1, unit_price: 99, attrs: { category: "accessory" } })) : i % 3 === 0 ? [{ id: `line-${i}-2`, sku: "MEMORY-FOAM-PILLOW-asd", qty: 2, unit_price: 99, attrs: { category: "accessory" } }] : []),
     ],
+    allocated_units: i % 8 === 0 ? undefined : [{ sku: i % 2 ? "CODY-SK" : "B1201S-K", status: i % 3 === 0 ? "sold" : "reserved", qty: 1 }],
     order_addons: [],
   };
 });
@@ -140,7 +141,13 @@ const demandPurchase: SoBatchPurchaseResponse = {
 const realFetch = window.fetch.bind(window);
 window.fetch = async (input, init) => {
   const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
-  if (!url.includes("127.0.0.1:88") && !url.includes("localhost:88")) return realFetch(input, init);
+  const path = new URL(url, window.location.href).pathname;
+  if (!path.startsWith("/api/") && !path.startsWith("/rest/")) return realFetch(input, init);
+  if ((init?.method ?? (input instanceof Request ? input.method : "GET")).toUpperCase() !== "GET") return new Response(JSON.stringify({ error: "preview_read_only" }), { status: 405 });
+  const scenario = new URLSearchParams(window.location.search).get("scenario");
+  if (scenario === "loading" && path === "/api/operation/orders") return new Promise<Response>(() => {});
+  if (scenario === "failed" && /\/api\/operation\/orders(?:\?|$)/.test(url)) return new Response(JSON.stringify({ error: "read_failed" }), { status: 500 });
+  if (scenario === "denied" && /\/api\/operation\/orders(?:\?|$)/.test(url)) return new Response(JSON.stringify({ error: "forbidden" }), { status: 403 });
   const expansion = /\/api\/operation\/orders\/([^/]+)\/expansion/.exec(url);
   const order = expansion ? orders.find((o) => o.id === expansion[1]) : undefined;
   if (/\/api\/operation\/orders\/monthly-demand/.test(url)) {
@@ -157,8 +164,19 @@ window.fetch = async (input, init) => {
   if (/\/api\/operation\/purchase\/demands/.test(url)) {
     return new Response(JSON.stringify(demandPurchase), { status: 200, headers: { "content-type": "application/json" } });
   }
+  const detailId = /\/api\/operation\/orders\/([^/?]+)/.exec(path)?.[1];
+  const detail = orders.find(o => o.id === detailId);
+  const json = (body: unknown) => new Response(JSON.stringify(body), { status: 200, headers: { "content-type": "application/json" } });
+  if (detail && path.endsWith(detail.id)) return json({ order: detail, lines: detail.order_lines, addons: [], total: 2499, warehouse: null, stockBalances: [], freeUnits: [], pos: [], history: [], threads: [] });
+  if (detail && path.endsWith("/payments")) return json({ payments: [] });
+  if (detail && path.endsWith("/amendment")) return json({ amendment: null });
+  if (detail && path.endsWith("/correction-work")) return json({ work: [] });
+  if (detail && path.endsWith("/service-cases")) return json({ cases: [] });
+  if (detail && path.endsWith("/revisions")) return json({ revisions: [] });
+  if (path.endsWith("/workspace-duties")) return json({ duties: [] });
+  if (path.endsWith("/customer-type")) return json({ existing: false, matches: 0 });
   const body = /\/api\/operation\/orders(\?|$)/.test(url)
-    ? { orders, salesOrderTotal: orders.length }
+    ? { orders: scenario === "empty" ? [] : orders, salesOrderTotal: scenario === "empty" ? 0 : orders.length }
     : order
       ? { lines: order.order_lines.map((l, k) => ({
           lineId: l.id, sku: l.sku, unitIds: k === 0 && order.so % 2 ? ["KLG-M-240915-01"] : [],
@@ -166,14 +184,15 @@ window.fetch = async (input, init) => {
           deliverTo: order.po_numbers.length ? [{ name: "Carres Klang", qty: l.qty }] : [],
         })) }
       : /\/api\/catalog(\?|$)/.test(url)
-        ? { models: [{ id: "m-cody", name: "Cody" }, { id: "m-b12", name: "Booqit Hybrid" }, { id: "m-pl", name: "Latex Pillow" }],
+        ? { models: [{ id: "m-cody", name: "AKEMI IMMORTAL MATTRESS (183X190X36CM)" }, { id: "m-b12", name: "Booqit Hybrid" }, { id: "m-pl", name: "Latex Pillow" }],
             skus: [
               { id: "s1", modelId: "m-cody", sku: "CODY-SK", variant: "Super King" },
               { id: "s2", modelId: "m-b12", sku: "B1201S-K", variant: "King" },
               { id: "s3", modelId: "m-pl", sku: "MEMORY-FOAM-PILLOW-asd", variant: "Standard" },
             ],
             sofaFabrics: [], addons: [], floorConfig: {} }
-        : url.includes("/rest/") ? [] : {};
+        : null;
+  if (body === null) return new Response(JSON.stringify({ error: "fixture_endpoint_unavailable" }), { status: 404 });
   return new Response(JSON.stringify(body), { status: 200, headers: { "content-type": "application/json" } });
 };
 

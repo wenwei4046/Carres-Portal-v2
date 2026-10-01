@@ -218,7 +218,7 @@ describe("FIX 1 · the register asks the SERVER", () => {
 
   it("the typed term reaches useOperationOrders as { search } — the API is asked, not just the loaded rows filtered", async () => {
     mount();
-    const box = screen.getByPlaceholderText("Search sales orders…");
+    const box = screen.getByPlaceholderText("Search orders…");
     fireEvent.change(box, { target: { value: "  Umi  " } });
     /* The engine debounces 150ms and emits the TRIMMED term; the register
      * must re-call the hook with it. Client-only search would leave every
@@ -234,7 +234,7 @@ describe("FIX 1 · the register asks the SERVER", () => {
 
   it("clearing the box returns the hook to the unfiltered population", async () => {
     mount();
-    const box = screen.getByPlaceholderText("Search sales orders…");
+    const box = screen.getByPlaceholderText("Search orders…");
     fireEvent.change(box, { target: { value: "Umi" } });
     await waitFor(() => {
       expect(
@@ -287,13 +287,16 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     expect(outsideRail("Carres Maluri Cheras")).toHaveLength(1);
   });
 
-  it("keeps one work toolbar with discoverable Search, Export and Columns", () => {
+  it("keeps one work toolbar and an accessible page-tools door without business actions", () => {
     mount();
     expect(screen.getAllByTestId("work-toolbar")).toHaveLength(1);
     expect(screen.getAllByRole("searchbox")).toHaveLength(1);
     expect(screen.queryByRole("button", { name: "Filters" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Export" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Columns" })).toBeInTheDocument();
+    const tools = screen.getByRole("button", { name: "Page tools" });
+    fireEvent.keyDown(tools, { key: "Enter" });
+    expect(screen.getByRole("menuitem", { name: "Export" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "Columns" })).toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "Cancel SO" })).not.toBeInTheDocument();
     /* ⭐ OWNER RULING 2026-09-27 (Jess: "add new sales order should not be
      * here"). A customer order is born in the Sales Portal and nowhere else:
      * the Register carries no create button, on either row. */
@@ -306,13 +309,11 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     expect(within(screen.getByTestId("work-toolbar")).queryByText("Not delivered")).not.toBeInTheDocument();
   });
 
-  it("labels Export and its menu offers Excel, PDF and Print", () => {
+  it("Export behind page tools still offers Excel, PDF and Print", async () => {
     mount();
-    const exportBtn = screen.getByRole("button", { name: "Export" });
-    expect(exportBtn).toHaveTextContent("Export");
-    expect(exportBtn).toHaveAttribute("aria-haspopup", "menu");
-    fireEvent.click(exportBtn);
-    expect(screen.getByRole("menuitem", { name: "Excel" })).toBeInTheDocument();
+    fireEvent.keyDown(screen.getByRole("button", { name: "Page tools" }), { key: "Enter" });
+    fireEvent.click(screen.getByRole("menuitem", { name: "Export" }));
+    expect(await screen.findByRole("menuitem", { name: "Excel" })).toBeInTheDocument();
     expect(screen.getByRole("menuitem", { name: "PDF" })).toBeInTheDocument();
     expect(screen.getByRole("menuitem", { name: "Print" })).toBeInTheDocument();
   });
@@ -713,7 +714,7 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     expect(screen.queryByText("Not recorded")).not.toBeInTheDocument();
   });
 
-  it("names the goods by the catalog: Items {first item} + {n} more, Item = product with its variant beneath", () => {
+  it("names goods by catalog, keeps additional line count separate from quantity, and retains expansion", () => {
     catalogHookState = { data: {
       models: [{ id: "m-1", name: "Cody" }],
       skus: [{ id: "s-1", modelId: "m-1", sku: "B1201S-K", variant: "Super King" }],
@@ -724,7 +725,9 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
       { id: "line-2", sku: "PILLOW-9", qty: 2, unit_price: 99, attrs: {} },
     ] })] };
     mount();
-    expect(within(screen.getByTestId("grid-parent-row")).getByText("Cody + 1 more")).toBeInTheDocument();
+    const summary = within(screen.getByTestId("grid-parent-row")).getByRole("button", { name: "Items · SO-1303" });
+    expect(summary).toHaveTextContent("Cody+1");
+    expect(within(summary).getByText("+1")).toHaveClass("shrink-0");
     fireEvent.click(screen.getByRole("button", { name: "Expand row" }));
     const row = screen.getByTestId("expanded-good-B1201S-K");
     const itemCell = within(row).getByText("Cody").closest("td")!;
@@ -1211,7 +1214,7 @@ describe("Listing Standard 2026-09-16 · page-local", () => {
   /* ⭐ THE 390px DEFECT (Card 12): SO Doc Date led and SO No started past the
      fold. Below a 768px canvas SO No leads and pins alone on first paint, and
      the two dates follow it — still locked, never hideable. */
-  it("below a 768px canvas SO No leads and pins alone, and the two dates stay locked", () => {
+  it("below a 768px canvas SO No leads and pins alone, and the two dates stay locked", async () => {
     const width = vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(400);
     try {
       mount();
@@ -1219,7 +1222,9 @@ describe("Listing Standard 2026-09-16 · page-local", () => {
       expect(ths.slice(0, 3).map((th) => th.getAttribute("title"))).toEqual(["SO No", "Proceed Date", "SO Doc Date"]);
       expect(ths[0]!.style.left).not.toBe("");
       expect(ths[1]!.style.left).toBe("");
-      fireEvent.click(screen.getByRole("button", { name: "Columns" }));
+      fireEvent.keyDown(screen.getByRole("button", { name: "Page tools" }), { key: "Enter" });
+      fireEvent.click(screen.getByRole("menuitem", { name: "Columns" }));
+      await screen.findByRole("checkbox", { name: "SO No" });
       for (const label of ["SO No", "Proceed Date", "SO Doc Date"]) {
         expect(screen.getByRole("checkbox", { name: label })).toBeDisabled();
       }
@@ -1513,5 +1518,39 @@ describe("the Order list rail: Obligations and Service Cases are the server's fa
     expect(screen.getByTestId("sales-orders-rail-obligations-unread")).toBeInTheDocument();
     expect(screen.getByTestId("sales-orders-rail-cases-unread")).toBeInTheDocument();
     expect(shown()).toEqual([]);
+  });
+});
+
+
+describe("the isolated shared-template pilot", () => {
+  it("carries search and selection through Table and Cards without changing the selected output", async () => {
+    listHookState.data = { orders: [order({ id: "a", so: 101, customer_name: "Kimmy" }), order({ id: "b", so: 102, customer_name: "Other" })] };
+    mount("/operation/orders?view=cards");
+    fireEvent.change(screen.getByRole("searchbox"), { target: { value: "Kimmy" } });
+    await waitFor(() => expect(screen.queryByTestId("sales-order-card-102")).not.toBeInTheDocument());
+    fireEvent.click(screen.getByRole("checkbox", { name: "Select SO-101" }));
+    expect(screen.getByRole("button", { name: "Export Excel (1)" })).toBeInTheDocument();
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "Table" }));
+    expect(screen.getAllByTestId("grid-parent-row")).toHaveLength(1);
+    expect(screen.getByRole("checkbox", { name: "Select row" })).toBeChecked();
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "Cards" }));
+    expect(screen.getByRole("checkbox", { name: "Select SO-101" })).toBeChecked();
+  });
+  it("does not convert sold stock without identity/outcome evidence into a delivered card", () => {
+    listHookState.data = { orders: [order({ allocated_units: [{ sku: "B1201S-K", status: "sold", qty: 1 }] })] };
+    mount("/operation/orders?view=cards");
+    expect(within(screen.getByTestId("sales-orders-cards")).getByText("Unavailable")).toBeInTheDocument();
+    expect(within(screen.getByTestId("sales-orders-cards")).queryByText("Fully delivered")).not.toBeInTheDocument();
+  });
+  it("opens goods-only inspection with actual additional line count, never quantity", () => {
+    listHookState.data = { orders: [order({ order_lines: [{ id: "l1", sku: "A", qty: 10, unit_price: 1 }, { id: "l2", sku: "B", qty: 20, unit_price: 1 }] })] };
+    mount("/operation/orders?view=cards");
+    const trigger = screen.getByRole("button", { name: "Items · SO-1303" });
+    expect(trigger).toHaveTextContent("+1");
+    fireEvent.click(trigger);
+    const drawer = screen.getByRole("dialog", { name: "SO-1303 · Items" });
+    expect(within(drawer).getByText("Qty 10")).toBeInTheDocument();
+    expect(within(drawer).getByText("Qty 20")).toBeInTheDocument();
+    expect(within(drawer).queryByRole("button", { name: "Edit" })).not.toBeInTheDocument();
   });
 });

@@ -56,11 +56,16 @@ import {
 } from "@carres/shared";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
+import { useQueryClient, type QueryClient } from "@tanstack/react-query";
 import {
   DataGrid,
   type DataGridColumn,
   type DataGridContextMenuItem,
 } from "@/components/register/DataGrid";
+import Drawer from "@/components/kit/Drawer";
+import Block from "@/components/kit/Block";
+import Checkbox from "@/components/kit/Checkbox";
+import { fmtDate } from "@/lib/fmt-date";
 import Money from "@/components/Money";
 import Button from "@/components/kit/Button";
 import Tabs from "@/components/kit/Tabs";
@@ -165,7 +170,8 @@ function moneyExport(state: MoneyState): string | number {
 function toGridColumn(
   f: RegisterField,
   role: string | null,
-  navigate: ReturnType<typeof useNavigate>,
+  navigate: (path: string) => void,
+  inspectGoods: (row: RegisterRow) => void,
 ): DataGridColumn<RegisterRow> {
   const base: DataGridColumn<RegisterRow> = {
     key: f.key,
@@ -205,6 +211,7 @@ function toGridColumn(
         }
       : {}),
   };
+  if (f.key === "items") return { ...base, accessor: (row) => <GoodsSummary row={row} onOpen={inspectGoods} compact /> };
   if (f.key === "so") {
     return {
       ...base,
@@ -414,6 +421,10 @@ const LIST_CASES = [
   { key: "none", label: "No cases" },
 ] as const;
 type ListCases = (typeof LIST_CASES)[number]["key"];
+const registerSelections = new Map<string, Set<string>>();
+// Return context belongs to this application session, never another query/auth lifetime.
+const registerClients = new WeakMap<QueryClient, number>();
+let nextRegisterClient = 0;
 const distinctWords = (values: Iterable<string | null | undefined>) =>
   [...new Set([...values].map((v) => v?.trim() ?? "").filter(Boolean))].sort((a, b) => a.localeCompare(b));
 const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
@@ -468,7 +479,7 @@ function RailFieldWords({ label }: { label: string }) {
   return <p className="px-2 pt-1 text-meta text-kit-slate-11">{label}</p>;
 }
 
-function ExpandedLines({ row }: { row: RegisterRow }) {
+function ExpandedLines({ row, inspection = false }: { row: RegisterRow; inspection?: boolean }) {
   const lines = row.o.order_lines ?? [];
   const addons = row.o.order_addons ?? [];
   const expansion = useSalesOrderExpansion(row.o.id);
@@ -574,6 +585,18 @@ function ExpandedLines({ row }: { row: RegisterRow }) {
       selectable: false,
     })),
   ];
+  if (inspection) return <div className="space-y-3" data-testid="goods-side-inspection">
+    {expansion.isError && <Button variant="ghost" size="sm" onClick={() => void expansion.refetch()}>Retry</Button>}
+    {miniLines.map((line) => <Block key={line.key} title={line.item} note={`Qty ${line.qty}`}>
+      {line.itemDetail && <p className="break-words text-body text-kit-slate-11">{line.itemDetail}</p>}
+      <dl className="mt-3 grid grid-cols-1 gap-3 text-body">
+        <div><dt className="text-label text-kit-slate-11">SKU</dt><dd className="break-all">{line.sku}</dd></div>
+        <div><dt className="text-label text-kit-slate-11">Category</dt><dd>{line.categoryNode ?? line.category}</dd></div>
+        <div><dt className="text-label text-kit-slate-11">Unit ID</dt><dd className="break-words">{line.unitNode ?? (line.unitIds.join(" · ") || (line.selectable === false ? "Not applicable" : line.unitAbsence))}</dd></div>
+        <div><dt className="text-label text-kit-slate-11">Deliver To</dt><dd className="break-words">{line.deliverToNode ?? (line.deliverTo.join(" · ") || (line.selectable === false ? "Not applicable" : line.deliverToAbsence))}</dd></div>
+      </dl>
+    </Block>)}
+  </div>;
   /* ⭐ THE PURCHASING REFERENCE GEOMETRY (UI MASTER §6.8–§6.9, owner ruling
      2026-09-21): the shared `ConnectedSections` draws the 1px line from under
      the SO row's caret to the goods table's bordered frame. One section, so
@@ -643,17 +666,43 @@ async function openSalesOrderPdf(orderId: string, so: number): Promise<void> {
   }
 }
 
+function GoodsSummary({ row, onOpen, compact = false }: { row: RegisterRow; onOpen: (row: RegisterRow) => void; compact?: boolean }) {
+  const extra = Math.max(0, (row.o.order_lines?.length ?? 0) - 1);
+  const suffix = extra ? ` + ${extra} more` : "";
+  const first = suffix && row.items.endsWith(suffix) ? row.items.slice(0, -suffix.length) : row.items;
+  return <button type="button" className={`flex min-h-10 w-full min-w-0 items-center gap-1 text-left text-body hover:text-kit-blue-11 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9 ${compact ? "-my-px" : ""}`}
+    aria-label={`Items · SO-${row.so}`} title={row.items} onClick={(event) => { event.stopPropagation(); onOpen(row); }}>
+    <span className="min-w-0 truncate">{first}</span>{extra > 0 && <span className="shrink-0 font-medium">+{extra}</span>}
+  </button>;
+}
+
 export default function SalesOrdersRegister() {
-  const navigate = useNavigate();
+  const routerNavigate = useNavigate();
   const [urlParams, setUrlParams] = useSearchParams();
+  const returnTo = `/operation/orders${urlParams.size ? `?${urlParams}` : ""}`;
+  const navigate = useCallback((path: string) => routerNavigate(path, { state: { salesOrderRegisterReturn: returnTo } }), [routerNavigate, returnTo]);
+  const cards = urlParams.get("view") === "cards";
+  const userId = useAuth((s) => s.user?.id ?? "anon");
+  const queryClient = useQueryClient();
+  if (!registerClients.has(queryClient)) registerClients.set(queryClient, ++nextRegisterClient);
+  const registerSession = `${userId}.${registerClients.get(queryClient)}`;
   const seededSearch = urlParams.get("search") ?? "";
   const role = useAuth((s) => s.role);
+  const [goodsTarget, setGoodsTarget] = useState<RegisterRow | null>(null);
 
   /* ── THE RAIL: ONE VIEW SELECTOR, EACH VIEW ITS OWN GROUPS ─────────────── */
   const view: "list" | "monthly" = urlParams.get("view") === "monthly" ? "monthly" : "list";
   const areaRef = useRef<HTMLDivElement>(null);
   const [railOpen, setRailOpen] = useFilterRailOpen("carres.salesOrders.rail", areaRef);
   const railFloats = useFloatingRail(areaRef);
+  const [narrowRailOpen, setNarrowRailOpen] = useState(false);
+  const visibleRail = railFloats ? narrowRailOpen : railOpen;
+  const showRail = () => { if (railFloats) setNarrowRailOpen(true); else setRailOpen(true); };
+  const hideRail = () => { setNarrowRailOpen(false); if (!railFloats) setRailOpen(false); requestAnimationFrame(() => areaRef.current?.querySelector<HTMLElement>('[data-testid="sales-orders-show-filters"]')?.focus()); };
+  useEffect(() => { setNarrowRailOpen(false); }, [railFloats]);
+  useEffect(() => {
+    if (narrowRailOpen) areaRef.current?.querySelector<HTMLElement>('[data-testid="sales-orders-rail"] button')?.focus();
+  }, [narrowRailOpen]);
   const writeParams = useCallback(
     (change: (next: URLSearchParams) => void) => {
       setUrlParams(
@@ -789,13 +838,26 @@ export default function SalesOrdersRegister() {
     [writeParams],
   );
 
-  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [selected, setSelected] = useState<Set<string>>(() => registerSelections.get(registerSession) ?? new Set());
+  const selectionSession = useRef(registerSession);
+  useEffect(() => {
+    if (selectionSession.current !== registerSession) {
+      selectionSession.current = registerSession;
+      setSelected(registerSelections.get(registerSession) ?? new Set());
+    } else registerSelections.set(registerSession, selected);
+  }, [registerSession, selected]);
+  const [facetIds, setFacetIds] = useState<string[]>([]);
+  const receiveFacets = useCallback((next: RegisterRow[]) => {
+    const ids = next.map(row => row.id);
+    setFacetIds(previous => previous.length === ids.length && previous.every((id, i) => id === ids[i]) ? previous : ids);
+  }, []);
   /* FIX 1 — SERVER SEARCH. The engine emits its debounced trimmed term and
      the SAME words go to the API (`?search=`), so a match beyond the loaded
      page is found on the server, not missed in the browser. The engine still
      filters the rows it holds for instant feedback; `keepPreviousData` in the
      query hook keeps the list on screen while the server answers. */
-  const [serverSearch, setServerSearch] = useState("");
+  const [serverSearch, setServerSearch] = useState(seededSearch);
+  const searchChanged = useCallback((query: string) => { setServerSearch(query); if (query !== seededSearch) setParam("search", query); }, [setParam, seededSearch]);
   /* The register still writes nothing itself. `Cancel SO` opens the ONE
      governed cancellation door and that door owns the act — the row is only
      naming which Sales Order the dialog is about. */
@@ -863,6 +925,15 @@ export default function SalesOrdersRegister() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [all, requested?.kind, requested?.month, listDealer, listState, listCity, listDelivery, listObligations, listCases, registerFacts],
   );
+  const facetCount = (group: "delivery" | "obligations" | "cases", value: string | null) => all.filter((r) => facetIds.includes(r.id)).filter((r) =>
+    (!requested || inRequestedNarrowing(r.customerDelivery, requested)) &&
+    (!listDealer || salesLocationOf(r.o) === listDealer) &&
+    (!listState || r.o.customer_address_state?.trim() === listState) &&
+    (!listCity || r.o.customer_address_city?.trim() === listCity) &&
+    (!(group === "delivery" ? value : listDelivery) || registerDeliveryConditionOf(r.o.order_lines ?? [], r.o.allocated_units ?? []) === (group === "delivery" ? value : listDelivery)) &&
+    (!(group === "obligations" ? value : listObligations) || registerFacts?.[r.id]?.obligations === (group === "obligations" ? value : listObligations)) &&
+    (!(group === "cases" ? value : listCases) || registerFacts?.[r.id]?.cases === (group === "cases" ? value : listCases))
+  ).length;
   const activeConditions = useMemo(() => {
     const list = [
       requested && {
@@ -903,7 +974,7 @@ export default function SalesOrdersRegister() {
      Memoized per role so the engine's memo actually hits; the layout store is
      per-role so one machine's Finance login does not restyle Operations'. */
   const columns = useMemo(
-    () => REGISTER_FIELDS.map((f) => toGridColumn(f, role, navigate)),
+    () => REGISTER_FIELDS.map((f) => toGridColumn(f, role, navigate, setGoodsTarget)),
     [navigate, role],
   );
   /* The version resets a SUPERSEDED default. v2 dropped Stage A's nine
@@ -990,7 +1061,7 @@ export default function SalesOrdersRegister() {
     <FilterRail
       testId="sales-orders-rail"
       ariaLabel="Sales Orders filters"
-      onHide={() => setRailOpen(false)}
+      onHide={hideRail}
       header={(
         /* Two views of the same orders: a tab bar, not a collapsible group.
            Edge to edge on the rail's own divider, so there is ONE line and the
@@ -1117,10 +1188,12 @@ export default function SalesOrdersRegister() {
             />
           </FilterRailGroup>
           <FilterRailGroup title="Delivery" icon="goods">
+            <FilterRailRow testId="sales-orders-rail-delivery-all" label="All" resets active={!listDelivery} count={isLoading || isError ? undefined : facetCount("delivery", null)} onClick={() => setParam("delivery", null)} />
             {REGISTER_DELIVERY_CONDITIONS.map((c) => (
               <FilterRailRow
                 key={c.key}
                 label={c.label}
+                count={isLoading || isError ? undefined : facetCount("delivery", c.key)}
                 active={listDelivery === c.key}
                 testId={`sales-orders-rail-delivery-${c.key}`}
                 onClick={() => toggleParam("delivery", c.key)}
@@ -1137,6 +1210,7 @@ export default function SalesOrdersRegister() {
               <FilterRailRow
                 key={o.key}
                 label={o.label}
+                count={isLoading || isError || registerFactsQ.isError || registerFactsQ.data?.failed.obligations ? undefined : facetCount("obligations", o.key)}
                 active={listObligations === o.key}
                 testId={`sales-orders-rail-obligations-${o.key}`}
                 onClick={() => toggleParam("obligations", o.key)}
@@ -1153,6 +1227,7 @@ export default function SalesOrdersRegister() {
               <FilterRailRow
                 key={o.key}
                 label={o.label}
+                count={isLoading || isError || registerFactsQ.isError || registerFactsQ.data?.failed.cases ? undefined : facetCount("cases", o.key)}
                 active={listCases === o.key}
                 testId={`sales-orders-rail-cases-${o.key}`}
                 onClick={() => toggleParam("cases", o.key)}
@@ -1167,6 +1242,9 @@ export default function SalesOrdersRegister() {
   return (
     <div className="flex h-full min-h-0 flex-col">
       <DestinationHeader />
+      {goodsTarget && <Drawer open onOpenChange={(open) => { if (!open) setGoodsTarget(null); }} title={`SO-${goodsTarget.so} · Items`}>
+        <div className="min-w-0 max-w-full overflow-x-auto"><ExpandedLines row={goodsTarget} inspection /></div>
+      </Drawer>}
 
       {cancelTarget && (
         <CancelSalesOrderDialog
@@ -1187,11 +1265,11 @@ export default function SalesOrdersRegister() {
           Below 896px of work area it floats over the content; hidden, it
           leaves the 44px strip that brings it back. */}
       <div ref={areaRef} className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden" data-testid="sales-orders-area">
-      {railOpen ? (
-        railFloats ? <div className="absolute inset-y-0 left-0 z-20 flex shadow-lg">{rail}</div> : rail
+      {visibleRail ? (
+        railFloats ? <div className="absolute inset-0 z-20 flex" onKeyDown={(event) => { if (event.key === "Escape") hideRail(); }}><div className="relative z-10 flex shadow-lg">{rail}</div><button type="button" className="flex-1 bg-kit-slate-12/40" aria-label="Hide filters" onClick={hideRail} /></div> : rail
       ) : (
         <aside className="flex w-11 shrink-0 flex-col items-center gap-2 border-r border-kit-slate-5 bg-white py-2" data-testid="sales-orders-rail-collapsed">
-          <ShowFiltersButton onShow={() => setRailOpen(true)} testId="sales-orders-show-filters" />
+          <ShowFiltersButton onShow={showRail} testId="sales-orders-show-filters" />
           <span className="text-label text-kit-slate-11 [writing-mode:vertical-rl]">Show filters</span>
         </aside>
       )}
@@ -1208,7 +1286,41 @@ export default function SalesOrdersRegister() {
       /* 8px work-surface breathing room — REGISTER STATUS FOOTER law, docs/ui/MASTER.md. */
       <div ref={canvasRef} className="flex min-h-0 min-w-0 flex-1 flex-col p-2" data-testid="register-column">
           <DataGrid<RegisterRow>
+            key={registerSession}
             appearance="reference"
+            sessionKey={`${storageKey}.${registerSession}`}
+            presentationTools
+            searchScope="Search sales orders by SO number, customer or imported reference"
+            toolbarSummary={(visible) => <span className="shrink-0 text-meta tabular-nums text-kit-slate-11" title={`${visible.length} sales orders`}>{visible.length}</span>}
+            presentationKey={cards ? "cards" : "table"}
+            toolbarEnd={<Tabs label="Sales Orders view" value={cards ? "cards" : "table"}
+              onValueChange={(next) => setParam("view", next === "cards" ? "cards" : null)}
+              tabs={[{ value: "table", label: "Table" }, { value: "cards", label: "Cards" }]} />}
+            selectionPrimary={<Tabs label="Sales Orders view" value={cards ? "cards" : "table"}
+              onValueChange={(next) => setParam("view", next === "cards" ? "cards" : null)}
+              tabs={[{ value: "table", label: "Table" }, { value: "cards", label: "Cards" }]} />}
+            renderResults={cards ? (visible) => (
+              <div className="grid grid-cols-1 gap-3 p-3 md:grid-cols-2 2xl:grid-cols-3" data-testid="sales-orders-cards">
+                {visible.map((row) => {
+                  // This list projection lacks identity_scope and outcome provenance.
+                  // It cannot distinguish counted stock from Unit fulfilment. The existing
+                  // rail stays on its governed projection; cards must not claim proof.
+                  return <div key={row.id} data-row-key={row.id} tabIndex={-1} className="min-w-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9" data-testid={`sales-order-card-${row.so}`}>
+                    <Block title={`SO-${row.so}`} headerSlot={<div className="flex items-center gap-3">
+                      <Checkbox id={`card-select-${row.id}`} ariaLabel={`Select SO-${row.so}`} checked={selected.has(row.id)} onCheckedChange={() => toggleRow(row.id)} />
+                      <Button size="touch" variant="ghost" onClick={() => openWorkspace(row)}>View</Button>
+                    </div>}>
+                      <dl className="grid min-w-0 grid-cols-2 gap-3 text-body">
+                        <div className="col-span-2"><dt className="text-label text-kit-slate-11">Customer</dt><dd className="break-words">{row.customer}</dd></div>
+                        <div><dt className="text-label text-kit-slate-11">Customer Requested Delivery Date</dt><dd>{row.customerDelivery ? fmtDate(row.customerDelivery) : ""}</dd></div>
+                        <div className="col-span-2 order-last"><dt className="text-label text-kit-slate-11">Items</dt><dd className="min-w-0"><GoodsSummary row={row} onOpen={setGoodsTarget} /></dd></div>
+                        <div><dt className="text-label text-kit-slate-11">Delivery</dt><dd>Unavailable</dd></div>
+                      </dl>
+                    </Block>
+                  </div>;
+                })}
+              </div>
+            ) : undefined}
             palette="slate"
             searchPresentation="responsive"
             labelledToolbar
@@ -1225,9 +1337,11 @@ export default function SalesOrdersRegister() {
               ) : undefined
             }
             rows={rows}
+            facetRows={all}
+            onFacetRowsChange={receiveFacets}
             columns={columns}
             activeConditions={activeConditions}
-            onClearConditions={() => setParam("requested", null)}
+            onClearConditions={() => writeParams((params) => { for (const key of LIST_PARAMS) params.delete(key); params.delete("search"); })}
             storageKey={storageKey}
             rowKey={(r) => r.id}
             exportName="Sales Orders"
@@ -1243,7 +1357,7 @@ export default function SalesOrdersRegister() {
                by that phone. `?search=` seeds the engine's own search — no new
                page, no new writer, no second list. */
             initialSearch={seededSearch}
-            searchPlaceholder="Search sales orders…"
+            searchPlaceholder="Search orders…"
             isLoading={isLoading}
             emptyMessage={rows.length === 0 && !serverSearch ? "No sales orders yet" : "No sales orders match these filters"}
             noMatchMessage="No sales orders match these filters"
@@ -1274,7 +1388,7 @@ export default function SalesOrdersRegister() {
               "Operation",
             ]}
             onRowDoubleClick={onRowDoubleClick}
-            onSearchChange={setServerSearch}
+            onSearchChange={searchChanged}
             contextMenu={contextMenu}
             expandable={expandable}
             selectable={{

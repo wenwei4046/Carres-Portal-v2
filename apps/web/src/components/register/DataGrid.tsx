@@ -57,6 +57,7 @@ import { Search, Columns3, RotateCcw, Filter, Download, ChevronDown, ChevronRigh
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { appTodayIso } from "@/lib/fmt-date";
 import Button from "@/components/kit/Button";
+import DropdownMenu from "@/components/kit/DropdownMenu";
 import Popover from "@/components/kit/Popover";
 import Tooltip from "@/components/kit/Tooltip";
 import { EXPANSION_JOIN_Y, ExpansionJoinContext } from "./expansion-connector";
@@ -216,8 +217,26 @@ export type DataGridContextMenuItem = {
   divider?: boolean;
 };
 
+// Volatile return context, separate from saved personal column layouts. Opt-in.
+const registerSessions = new Map<string, { search: string; filters: Record<string, string[]>;
+  dateFilters: Record<string, DatePreset>; numberFilters: Record<string, { min?: number; max?: number }>;
+  dateRangeFilters: Record<string, { from?: string; to?: string }>;
+  expanded: string[]; active: string | null; scroll: Record<string, [number, number]> }>();
+
 export type DataGridProps<T> = {
   rows: T[];
+  /** Opt-in shared-template toolbar and numeric recipe for the first adopter. */
+  presentationTools?: boolean;
+  toolbarSummary?: (rows: T[]) => ReactNode;
+  searchScope?: string;
+  /** Alternate presentation consumes this engine's exact sorted/filter result. */
+  renderResults?: (rows: T[], expansion: DataGridRowExpansion) => ReactNode;
+  /** Facet candidates pass through the SAME internal search/header predicate. */
+  facetRows?: T[];
+  onFacetRowsChange?: (rows: T[]) => void;
+  /** Temporary in-app return context; never a personal layout or server setting. */
+  sessionKey?: string;
+  presentationKey?: string;
   columns: DataGridColumn<T>[];
   /** localStorage key for column layout persistence */
   storageKey: string;
@@ -740,6 +759,7 @@ function DataGridInner<T>({
   onFilteredRowsChange,
   onSearchChange,
   initialSearch = "",
+  renderResults, presentationTools = false, toolbarSummary, searchScope, facetRows, onFacetRowsChange, sessionKey, presentationKey = "table",
   appearance = "default",
   palette,
   headerTone,
@@ -778,12 +798,16 @@ function DataGridInner<T>({
   embedded = false,
 }: DataGridProps<T>) {
   const selectionReasonId = useId();
+  const remembered = useRef(sessionKey ? registerSessions.get(sessionKey) : undefined).current;
+  const rememberedScroll = useRef(remembered?.scroll ?? {});
+  const restoreFocus = useRef(Boolean(remembered?.active));
+
   /* HOUZS-style inline expansion (PR so-list-houzs-port). Tracks the set of
      expanded row ids; rendering inserts a colSpan sub-<tr> directly under
      each expanded parent. Stored as a Set so the chevron column accessor
      can read state in O(1). */
   const [expandedRows, setExpandedRows] = useState<Set<string>>(
-    () => new Set(expandable?.defaultExpandedKeys ?? []),
+    () => new Set(remembered?.expanded ?? expandable?.defaultExpandedKeys ?? []),
   );
   const expansionId = expandable?.rowExpansionKey ?? rowKey;
   const toggleExpand = useCallback((id: string) => {
@@ -819,12 +843,12 @@ function DataGridInner<T>({
     [storageKey],
   );
 
-  const [search, setSearch] = useState(initialSearch);
+  const [search, setSearch] = useState(initialSearch || remembered?.search || "");
   /** Listing Standard 2026-09-16: below a 768px canvas a row checkbox gets a
    *  40×40 hit area (its column widens to 40 so the target is not shared). */
   const [narrowCanvas, setNarrowCanvas] = useState(false);
   /** The ONE row that holds the grid's Tab stop (roving tabindex). */
-  const [activeRowKey, setActiveRowKey] = useState<string | null>(null);
+  const [activeRowKey, setActiveRowKey] = useState<string | null>(remembered?.active ?? null);
   /** A keyboard-opened row menu may be followed by the browser's own
    *  `contextmenu` event for the same key press; that one is ignored. */
   const keyboardMenuAt = useRef(0);
@@ -864,18 +888,18 @@ function DataGridInner<T>({
   /* Per-column value filter (Commander 2026-05-29 — "没有 drop-down 菜单让我
      去做选择"). filters[colKey] = the set of allowed values; absent / empty =
      no filter on that column. filterMenu anchors the open dropdown. */
-  const [filters, setFilters] = useState<Record<string, string[]>>({});
+  const [filters, setFilters] = useState<Record<string, string[]>>(remembered?.filters ?? {});
   // Date-preset filters for `filterType: 'date'` columns (colKey → preset).
-  const [dateFilters, setDateFilters] = useState<Record<string, DatePreset>>({});
+  const [dateFilters, setDateFilters] = useState<Record<string, DatePreset>>(remembered?.dateFilters ?? {});
   // Number range filters (`filterType: 'number'`): colKey → {min?, max?}.
   const [numberFilters, setNumberFilters] = useState<
     Record<string, { min?: number; max?: number }>
-  >({});
+  >(remembered?.numberFilters ?? {});
   // Custom date range (`filterType: 'date'`): colKey → {from?, to?} ISO. Sits
   // alongside the preset (if both set, they AND together).
   const [dateRangeFilters, setDateRangeFilters] = useState<
     Record<string, { from?: string; to?: string }>
-  >({});
+  >(remembered?.dateRangeFilters ?? {});
   const [filterMenu, setFilterMenu] = useState<{ colKey: string; x: number; y: number } | null>(
     null,
   );
@@ -883,6 +907,8 @@ function DataGridInner<T>({
   const [filterSearch, setFilterSearch] = useState("");
   /* Same inside-vs-outside scroll guard as the Columns popover — the filter
      dropdown has its own scrollable value list (maxHeight 320 / overflow auto). */
+  const pageToolsRef = useRef<HTMLButtonElement>(null);
+  const filterOrigin = useRef<HTMLElement | null>(null);
   const filterMenuRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const searchIconRef = useRef<HTMLButtonElement>(null);
@@ -936,7 +962,7 @@ function DataGridInner<T>({
      don't dismiss it. Escape also closes for keyboard parity. */
   useEffect(() => {
     if (!columnsMenuOpen) return;
-    const close = () => setColumnsMenuOpen(false);
+    const close = () => { setColumnsMenuOpen(false); if (presentationTools) pageToolsRef.current?.focus(); };
     /* Scrolling the menu's OWN list must not close the menu. We listen on the
        capture phase so we still catch scrolls of any outer page container, but
        skip the event when it originates inside the menu itself. */
@@ -960,7 +986,7 @@ function DataGridInner<T>({
   /* Close the per-column filter dropdown on outside click / Escape. */
   useEffect(() => {
     if (!filterMenu) return;
-    const close = () => setFilterMenu(null);
+    const close = () => { setFilterMenu(null); filterOrigin.current?.focus(); };
     /* Same inside-scroll guard as the Columns menu: scrolling the filter
        dropdown's own list shouldn't dismiss it. */
     const onScroll = (e: Event) => {
@@ -983,7 +1009,8 @@ function DataGridInner<T>({
   // Reset the numbering type-to-find when the open column changes / closes.
   useEffect(() => {
     setFilterSearch("");
-  }, [filterMenu?.colKey]);
+    if (filterMenu && presentationTools) requestAnimationFrame(() => filterMenuRef.current?.querySelector<HTMLElement>("input, button")?.focus());
+  }, [filterMenu?.colKey, presentationTools]);
 
   // Value a column reports for grouping/sorting (groupValue → searchValue → text).
   const colValue = useCallback((c: DataGridColumn<T>, row: T): string => {
@@ -1343,7 +1370,7 @@ function DataGridInner<T>({
      JSX cells, constructs React nodes) on every character. */
   const searchBlobs = useMemo(() => {
     const m = new Map<T, string>();
-    for (const row of rows) {
+    for (const row of facetRows ?? rows) {
       let blob = "";
       for (const c of columns) {
         const sv = c.searchValue ? c.searchValue(row) : coerceSearchString(c.accessor(row));
@@ -1357,7 +1384,7 @@ function DataGridInner<T>({
       m.set(row, blob);
     }
     return m;
-  }, [rows, columns]);
+  }, [rows, facetRows, columns]);
 
   /* Debounce the value that drives filtering (the input itself stays bound to
      `search`, so typing is instant) — keeps large lists responsive while
@@ -1371,21 +1398,13 @@ function DataGridInner<T>({
     onSearchChange?.(debouncedSearch.trim());
   }, [debouncedSearch, onSearchChange]);
 
-  const filteredRows = useMemo(() => {
+  const filterRow = useMemo(() => {
     const q = debouncedSearch.trim().toLowerCase();
     const active = Object.entries(filters).filter(([, vals]) => vals.length > 0);
     const activeDates = Object.entries(dateFilters);
     const activeNumbers = Object.entries(numberFilters);
     const activeDateRanges = Object.entries(dateRangeFilters);
-    if (
-      !q &&
-      active.length === 0 &&
-      activeDates.length === 0 &&
-      activeNumbers.length === 0 &&
-      activeDateRanges.length === 0
-    )
-      return rows;
-    return rows.filter((row) => {
+    return (row: T) => {
       if (q && !(searchBlobs.get(row) ?? "").includes(q)) return false;
       for (const [colKey, vals] of active) {
         const c = columns.find((cc) => cc.key === colKey);
@@ -1420,9 +1439,8 @@ function DataGridInner<T>({
         if (range.max != null && n > range.max) return false;
       }
       return true;
-    });
+    };
   }, [
-    rows,
     columns,
     debouncedSearch,
     filters,
@@ -1432,6 +1450,10 @@ function DataGridInner<T>({
     filterColValue,
     searchBlobs,
   ]);
+
+  const filteredRows = useMemo(() => rows.filter(filterRow), [rows, filterRow]);
+  const facetCandidates = useMemo(() => facetRows?.filter(filterRow), [facetRows, filterRow]);
+  useEffect(() => { if (facetCandidates) onFacetRowsChange?.(facetCandidates); }, [facetCandidates, onFacetRowsChange]);
 
   // Distinct values for the currently-open filter dropdown.
   const filterValues = useMemo(() => {
@@ -2029,6 +2051,32 @@ function DataGridInner<T>({
      cases the normal full map renders, byte-identical to before. So at today's
      list sizes this is a no-op; it only kicks in past VIRTUAL_THRESHOLD rows. */
   const scrollRef = useRef<HTMLDivElement>(null);
+  const sessionSnapshot = useRef({ search, filters, dateFilters, numberFilters, dateRangeFilters,
+    expanded: [...expandedRows], active: activeRowKey, scroll: rememberedScroll.current });
+  sessionSnapshot.current = { search, filters, dateFilters, numberFilters, dateRangeFilters,
+    expanded: [...expandedRows], active: activeRowKey, scroll: rememberedScroll.current };
+  useLayoutEffect(() => () => {
+    if (sessionKey) {
+      const viewport = scrollRef.current;
+      if (viewport && restoredPresentation.current === presentationKey) rememberedScroll.current[presentationKey] = [viewport.scrollTop, viewport.scrollLeft];
+      registerSessions.set(sessionKey, sessionSnapshot.current);
+    }
+  }, [sessionKey, presentationKey]);
+  const restoredPresentation = useRef<string | null>(null);
+  useLayoutEffect(() => {
+    if (!sessionKey || isLoading || errorState != null || restoredPresentation.current === presentationKey) return;
+    const saved = rememberedScroll.current[presentationKey]?.slice();
+    const frame = requestAnimationFrame(() => {
+      const viewport = scrollRef.current;
+      if (viewport && saved) { viewport.scrollTop = saved[0]!; viewport.scrollLeft = saved[1]!; }
+      if (viewport && restoreFocus.current && activeRowKey) {
+        const row = [...viewport.querySelectorAll<HTMLElement>("[data-row-key]")].find(el => el.dataset.rowKey === activeRowKey);
+        if (row) { row.focus({ preventScroll: true }); restoreFocus.current = false; }
+      }
+      restoredPresentation.current = presentationKey;
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [sessionKey, presentationKey, isLoading, sortedRows.length]);
   const [emptyViewportWidth, setEmptyViewportWidth] = useState<number>();
   useEffect(() => {
     const viewport = scrollRef.current;
@@ -2747,6 +2795,11 @@ function DataGridInner<T>({
       data-testid={isReference ? "sales-orders-grid" : undefined}
       style={rowHeight ? ({ "--grid-row-h": `${rowHeight}px` } as CSSProperties) : undefined}
       data-row-height={rowHeight}
+      data-presentation-tools={presentationTools || undefined}
+      onFocusCapture={sessionKey ? (event) => {
+        const row = (event.target as HTMLElement).closest<HTMLElement>("[data-row-key]");
+        if (row?.dataset.rowKey) setActiveRowKey(row.dataset.rowKey);
+      } : undefined}
     >
       {/* Toolbar — search LEFT (REGISTER LAW 2: always left, compact ~200px;
           2990 kept it right — that is the one composition change the laws
@@ -2755,7 +2808,7 @@ function DataGridInner<T>({
       {!(selectable && selectedOrIndeterminateVisibleRows.length > 0) ? (
       <div className={styles.toolbar} data-testid={isReference ? "work-toolbar" : undefined}>
         {isReference && toolbarStart}
-        {isReference && <div className={styles.toolbarSpacer} />}
+        {isReference && !presentationTools && <div className={styles.toolbarSpacer} />}
         {!embedded && searchPresentation === "responsive" ? (
           /* R4 (owner ruling 2026-09-16): both forms are rendered and the
              TOOLBAR's own width chooses (container query), so a narrow canvas
@@ -2788,6 +2841,8 @@ function DataGridInner<T>({
                 className={styles.searchInput}
                 type="search"
                 aria-label="Search"
+                title={searchScope}
+                aria-description={searchScope}
                 placeholder={searchPlaceholder}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -2839,6 +2894,8 @@ function DataGridInner<T>({
                 className={styles.searchInput}
                 type="search"
                 aria-label="Search"
+                title={searchScope}
+                aria-description={searchScope}
                 placeholder={searchPlaceholder}
                 value={search}
                 autoFocus={isReference && searchOpen}
@@ -2885,8 +2942,8 @@ function DataGridInner<T>({
             filter + sort) across the visible data columns. System-wide: every
             list rendered through DataGrid gets it for free (Wei Siang
             2026-06-19). Wording says the scope out loud (REGISTER LAW 3). */}
-        <div className={styles.columnsAnchor}>
-          <button
+        <div className={presentationTools ? styles.toolsAnchor : styles.columnsAnchor}>
+          {!presentationTools && <button
             ref={outputBtnRef}
             type="button"
             aria-label="Export"
@@ -2911,11 +2968,13 @@ function DataGridInner<T>({
                 <ChevronDown size={12} strokeWidth={2} aria-hidden />
               </>
             )}
-          </button>
+          </button>}
           {outputMenuOpen && (
             <div
               className={styles.columnsMenu}
               role="menu"
+              data-testid="register-output-menu"
+              onKeyDown={(event) => { if (event.key === "Escape") { setOutputMenuOpen(false); pageToolsRef.current?.focus(); } }}
               style={
                 outputMenuPos
                   ? { position: "fixed", top: outputMenuPos.top, right: outputMenuPos.right }
@@ -2961,8 +3020,8 @@ function DataGridInner<T>({
             </div>
           )}
         </div>
-        <div className={styles.columnsAnchor}>
-          <button
+        <div className={presentationTools ? styles.toolsAnchor : styles.columnsAnchor}>
+          {!presentationTools && <button
             ref={columnsBtnRef}
             type="button"
             aria-label="Columns"
@@ -2982,7 +3041,7 @@ function DataGridInner<T>({
           >
             <Columns3 size={14} strokeWidth={1.75} aria-hidden />
             {(!isReference || labelledToolbar) && <span>Columns</span>}
-          </button>
+          </button>}
           {columnsMenuOpen && (
             <>
               <div className={styles.columnsMenuBackdrop} onClick={() => setColumnsMenuOpen(false)} />
@@ -3080,7 +3139,8 @@ function DataGridInner<T>({
                        no group falls under "Other"; no groups at all = 2990's
                        flat list, byte-identical. */
                     const item = (c: DataGridColumn<T>) => (
-                      <label key={c.key} className={styles.columnsMenuItem}>
+                      <div key={c.key} className="flex items-center gap-1">
+                      <label className={styles.columnsMenuItem}>
                         <input
                           type="checkbox"
                           checked={!effectiveHidden.has(c.key)}
@@ -3090,6 +3150,20 @@ function DataGridInner<T>({
                         />
                         <span>{c.label || c.key}</span>
                       </label>
+                      {presentationTools && <>
+                        {c.sortable !== false && <Button variant="ghost" size="touch" aria-label={c.label} onClick={() => toggleSort(c.key)}>
+                          {layout.sort?.key === c.key && layout.sort.dir === "desc" ? <ArrowDown size={14} aria-hidden /> : <ArrowUp size={14} aria-hidden />}
+                          {layout.sort?.key === c.key && <span className="sr-only">{layout.sort.dir === "asc" ? "sorted ascending" : "sorted descending"}</span>}
+                        </Button>}
+                        {c.filterable !== false && <Button variant="ghost" size="touch" aria-label={`Filter ${c.label}`} onClick={(event) => {
+                          event.stopPropagation();
+                          const rect = pageToolsRef.current?.getBoundingClientRect();
+                          filterOrigin.current = pageToolsRef.current;
+                          setColumnsMenuOpen(false);
+                          setFilterMenu({ colKey: c.key, x: Math.max(8, (rect?.right ?? window.innerWidth) - 224), y: rect?.bottom ?? 80 });
+                        }}><Filter size={14} aria-hidden /></Button>}
+                      </>}
+                      </div>
                     );
                     if (!columns.some((c) => c.chooserGroup)) return columns.map(item);
                     const order: string[] = [...(chooserGroupOrder ?? [])];
@@ -3114,7 +3188,23 @@ function DataGridInner<T>({
             </>
           )}
         </div>
+        {!isLoading && errorState == null && toolbarSummary?.(sortedRows)}
         {isReference && toolbarEnd}
+        {presentationTools && <div className="ml-auto shrink-0">
+          <DropdownMenu label="Page tools" trigger={<Button ref={pageToolsRef} iconOnly icon="overflow" aria-label="Page tools" />}
+            items={[
+              { key: "export", label: "Export", icon: "download", disabled: sortedRows.length === 0, onSelect: () => {
+                const r = pageToolsRef.current?.getBoundingClientRect();
+                if (r) setOutputMenuPos({ top: r.bottom + 4, right: window.innerWidth - r.right });
+                requestAnimationFrame(() => { setOutputMenuOpen(true); requestAnimationFrame(() => document.querySelector<HTMLElement>('[data-testid="register-output-menu"] button')?.focus()); });
+              } },
+              { key: "columns", label: "Columns", icon: "settings", onSelect: () => {
+                const r = pageToolsRef.current?.getBoundingClientRect();
+                if (r) setColumnsMenuPos({ top: r.bottom + 4, right: window.innerWidth - r.right });
+                requestAnimationFrame(() => { setColumnsMenuOpen(true); requestAnimationFrame(() => columnsMenuRef.current?.querySelector<HTMLElement>("button, input")?.focus()); });
+              } },
+            ]} />
+        </div>}
       </div>
       ) : (
         <div className={`${styles.toolbar} ${styles.selectionBar}`} data-testid="selection-bar">
@@ -3313,9 +3403,15 @@ function DataGridInner<T>({
       {/* Table */}
       <div
         ref={scrollRef}
+        onScroll={(event) => {
+          if (sessionKey && restoredPresentation.current === presentationKey) rememberedScroll.current[presentationKey] = [event.currentTarget.scrollTop, event.currentTarget.scrollLeft];
+        }}
         className={`${styles.scroll} ${embedded ? styles.scrollEmbedded : ""}`}
         data-testid={isReference ? "grid-scroll" : undefined}
       >
+        {renderResults && !isLoading && errorState == null && sortedRows.length > 0
+          ? renderResults(sortedRows, rowExpansionApi)
+          : <>
         {/* ⭐ NO HEADER ABOVE ALL GROUPS — owner ruling, Jess 2026-09-18.
             This SUPERSEDES the single global header.
 
@@ -3444,6 +3540,7 @@ function DataGridInner<T>({
               </tfoot>
             )}
         </table>
+        </>}
       </div>
 
       {/* Status / footer — hidden in embedded (drill-down) mode where the

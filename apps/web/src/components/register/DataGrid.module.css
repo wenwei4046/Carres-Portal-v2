@@ -118,6 +118,8 @@
   line-height: 14px;
   font-weight: 700;
 }
+/* Approved 600 header weight, opt-in with the first shared-template pilot. */
+.rootReference[data-presentation-tools] .th { font-weight: 600; }
 .rootReference .td {
   box-sizing: border-box;
   /* 38px baseline; a page with an owner-ruled exception sets --grid-row-h. */
@@ -1444,3 +1446,30 @@ div:first-child > .columnsMenuGroup {
 .checkRefused { cursor: help; }
 .checkRefused input:disabled { pointer-events: none; }
 .checkRefused:focus-visible { outline: 2px solid theme("colors.kit.blue.9"); outline-offset: -2px; }
+
+/* Pilot overflow preserves existing menus without empty toolbar flex items. */
+.toolsAnchor { display: contents; }
+
+/* Owner-approved compact search; limited to the first template adopter. */
+.rootReference[data-presentation-tools] .searchResponsiveIcon { display: none; }
+.rootReference[data-presentation-tools] .searchResponsiveBox {
+  display: inline-flex;
+  flex: 0 1 280px;
+  width: 280px;
+  max-width: 280px;
+  min-width: 0;
+  height: 32px;
+  border-radius: 6px;
+  padding: 0 8px;
+}
+.rootReference[data-presentation-tools] .searchInput { min-width: 0; font-size: var(--fs-13); line-height: 18px; text-overflow: ellipsis; }
+.rootReference[data-presentation-tools] .searchResponsiveBox > svg { width: 16px; height: 16px; flex: none; }
+@media (max-width: 767px) {
+  .rootReference[data-presentation-tools] .searchResponsiveBox { height: 40px; }
+}
+.rootReference[data-presentation-tools] .toolbar:not(.selectionBar) { flex-wrap: nowrap; }
+/* Keep the admitted 16px checkbox glyph, while its card hit area is 40px. */
+@media (max-width: 767px) {
+  .rootReference[data-presentation-tools] [data-kit="checkbox"] { position: relative; }
+  .rootReference[data-presentation-tools] [data-kit="checkbox"]::after { content: ""; position: absolute; inset: -12px; }
+}
