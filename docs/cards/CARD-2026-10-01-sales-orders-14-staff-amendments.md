@@ -87,7 +87,10 @@ only; no main merge, deployment or live operational write is authorised.
 ## Remaining business boundary
 
 Whole-SO cancellation after Proceed stays refused until its complete cross-module
-consequence law is approved. No payout, ordinary-address expansion, attribution
+consequence law is approved. The refund guard covers only the existing SO obligation
+`order_refunds` / `refund_decide`; legacy Finance `refunds` / `approval_decide` APIs
+remain unchanged under Payment MASTER §13 and are not certified against the new Duty.
+No payout, ordinary-address expansion, attribution
 consolidation or manual delivery-charge lane is introduced. The system-priced
 charge target is retained in the governing MASTER as approved/not built. This
 scoped implementation does not declare the whole Sales Orders PLAN complete.

@@ -9,8 +9,10 @@ accounting controls and audit ownership remain with their owning workflows; no s
 or refund writer is created. System-priced delivery-charge changes have no manual approval lane; Operation cannot override the
 computed charge. Correct lower system charges are not discretionary product discounts, but resulting
 customer refunds retain Sales Approver and money-execution controls (Orders MASTER § System-priced
-delivery charges, owner-confirmed 2026-10-01 / TARGET NOT BUILT). 0630 gates the existing refund approval writer through Sales Approver; it neither pays a refund nor
-creates a new money door. Whole-SO cancellation after Proceed remains unavailable pending its complete
+delivery charges, owner-confirmed 2026-10-01 / TARGET NOT BUILT). 0630 gates the Sales Order obligation writer `order_refunds` / `refund_decide` through Sales Approver;
+it neither pays a refund nor creates a new money door. The separate legacy Finance `refunds` /
+`approval_decide` APIs remain untouched under §13 and its non-destructive retirement boundary;
+this scoped review does not certify those APIs against the new Duty or introduce a refund UI. Whole-SO cancellation after Proceed remains unavailable pending its complete
 consequence law. No live refund, assignment, merge or deployment is authorised.
 
 **All listing appearance — APPROVED / NOT BUILT (Jess, 2026-09-17):** follow
