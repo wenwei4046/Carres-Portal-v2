@@ -2637,8 +2637,9 @@ whole-page submission or the rule against silently saving part of a draft.
   destinations before submission and resolves the responsible people through the governed
   Staff & Duties mechanism. Never hard-code a name, let the requester arbitrarily choose the
   approver, or treat a department label as a person's identity. Where approval is required under
-  the later staff-amendment ruling, its role qualification remains required. Submission eligibility
-  and self-approval remain undecided; no permission is inferred from an assignment.
+  the later staff-amendment ruling, its role qualification remains required. Submission follows
+  the any-Operation ruling below; self-approval remains undecided. An assignment alone grants
+  no additional approval permission.
 - Product amendments follow the later **Staff amendments and Sales Approver** ruling below:
   ordinary changes do not require owner approval; issued-PO coverage requires supplier confirmation.
   Requested Delivery Date routing remains an explicit open decision; it stays in the SO change
@@ -2714,14 +2715,33 @@ that operating model. The code remains unchanged; the following is the approved 
 
 **Accepted trade-off:** no second person checks an ordinary product change before it applies;
 its audit record identifies who changed what. Supplier confirmation remains necessary where an
-issued PO covers the affected line. This does not grant every staff member submission permission.
+issued PO covers the affected line. Submission eligibility is now settled by the scoped ruling below.
 
-**NOT DECIDED — each requires its own owner decision:** who may submit (any Operation staff or
-only the order PIC); Requested Delivery Date rules including supplier timing and logistics
+**NOT DECIDED — each requires its own owner decision:** Requested Delivery Date rules including supplier timing and logistics
 re-booking; delivery fee/service changes and the existing Delivery Charge Approver's scope;
 salesperson/dealer/sales-location changes and whether the 0329 lane folds into the amendment;
 Sales Approver self-approval. Ordinary-address amendment restrictions after Proceed were not
 resolved by this ruling either; do not infer them from the floor/lift/stairs rule.
+
+**Who may submit — OWNER-APPROVED A, 2026-10-01 / TARGET NOT BUILT (PIC notification).**
+Any Operation staff member with the existing order access may submit an SO amendment; submission
+is not restricted to that order's PIC. Principal submission remains permitted. Salespeople and
+Dealers remain unable to submit through this Operations amendment door and ask Operation to make
+the change. This changes no other record-access or approval right.
+
+The system automatically notifies **that order's PIC** about the amendment, using the governed
+shared notification/activity mechanism rather than a module-specific task engine. Keep the actual
+submitter, Before/After, reason, customer evidence and times; the PIC is not falsely recorded as
+the actor when a colleague helped. Helping does not transfer the order's PIC responsibility. The
+notification must make clear whether the amendment is still waiting or effective; notifying the
+PIC is not another approval gate. Existing supplier-confirmation, customer-evidence, exception
+approval and linked-effectiveness rules still apply.
+
+This preserves coverage when the PIC is away or busy. Repeated incidents where PICs are unaware
+are grounds to review notification delivery and this policy with the owner, not permission to
+automatically switch to PIC-only submission. Existing broad submission capability does not prove
+that automatic PIC notification is built or verified. No code, live notification or permission
+change is performed by this PLAN entry.
 
 This is a scoped PLAN ruling, not approval of the whole module blueprint, implementation Cards,
 BUILD, a migration or production changes. Workspace owns assignment/cover; Orders owns amendment

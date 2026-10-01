@@ -319,7 +319,16 @@ line means ordinary application on submission with the required customer evidenc
 trade-off is no second-person check on ordinary product changes; retain the actual submitter and
 confirmation actors. Linked changes remain one effective outcome.
 
-Who may submit (all Operation versus PIC), Requested Delivery Date routing, fee/service approval,
+**SO submission — owner-approved A, 2026-10-01; PIC notification TARGET NOT BUILT.** Any
+Operation staff member with existing order access may submit; it is not PIC-only. Principal
+submission remains permitted, while Salespeople/Dealers continue to request changes through
+Operation. Automatically notify the order PIC via the shared notification/activity mechanism,
+retaining the actual submitter and Before/After evidence. Notification does not transfer PIC
+ownership, misattribute the act, grant approval rights or add a PIC approval gate. A waiting
+amendment must not be presented as already effective. See Orders MASTER for the full ruling.
+Do not infer notification delivery from the existing submission door; it remains unverified.
+
+Requested Delivery Date routing, fee/service approval,
 0329 attribution changes/consolidation and Sales Approver self-approval remain undecided. Do not
 copy Purchasing Approver's own-request rule or bootstrap into this Duty as an assumed decision.
 The existing PIC-first ordinary Delivery ownership remains unchanged.
