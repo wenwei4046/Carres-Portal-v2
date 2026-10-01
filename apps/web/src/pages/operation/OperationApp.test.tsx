@@ -102,6 +102,8 @@ vi.mock("./DeliveryOrderPage", () => ({
 // production walk found broken: the route existed and the `isUrlDriven` gate
 // did not include it, so the main pane rendered nothing.
 // The right rail self-fetches (tasks/notes) — stub it; this suite tests routing.
+// Shell routing tests isolate network readers; addressed activity has its own hook tests.
+vi.mock("@/lib/use-addressed-activity", () => ({ useAddressedActivity: vi.fn() }));
 vi.mock("./components/OperationRightRail", () => ({
   default: () => <div data-testid="right-rail-stub">rail</div>,
 }));
