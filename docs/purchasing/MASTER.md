@@ -615,9 +615,8 @@ Finance owns invoice price differences, deposits, refunds and payment; it may ho
 never reverse the physical receipt merely because of a price dispute. No automatic payment or
 settlement follows from operational continuation or price approval.
 
-Older price-refusal implementation descriptions in §§5.6 and 9.2 are not the current operational
-target and must converge to this ruling. No application implementation or expansion of the separate
-PO-placement unblock BUILD is commissioned here.
+The price-change exception workflow remains an approved target. Its recording, decision and
+revision capability is not added to the separately commissioned PO-placement unblock.
 
 #### 5.6.1 Daily PO windows — owner-approved 2026-09-24; MERGED (#1621) and DEPLOYED, 0584/0585 APPLIED; owner walk owed
 
@@ -2669,13 +2668,11 @@ document do not change.
   `cost_required` for a SKU Catalog had never priced; it now issues the line carrying the
   same absence Manual Purchase sends (no cost, no cost source, no treatment), and 0573's
   `v_price_not_recorded` verdict skips the cost-source gate and the approval engine for
-  exactly that line. **Two cases stay refused, because they cost a supplier different
-  things:** a DECLARED catalog price that Catalog no longer has (the operator reviewed a
-  figure that is gone — the schema makes them declare a positive number, so that is not an
-  unknown), and a RECORDED price that is not positive (a Catalog mistake; filling it with
-  RM0 would put a number nobody agreed on a supplier's paper). Free of charge keeps its own
-  declared decision and its own reason. The web never sends line decisions today, so the
-  no-decision path is the live one.
+  exactly that line. Ordinary issue also treats non-positive Catalog values as no commercial
+  claim under the 2026-10-01 ruling: no invented RM0/free-of-charge decision and no Catalog
+  overwrite. Legacy explicit commercial declarations retain their own approval/consistency
+  checks; Operation has no cost-entry control in either issue review.
+
 
 **ONE REVIEW SURFACE FOR BOTH BUYING LANES — owner instruction 2026-09-23, BUILT
 (CARD 13-B).** `Review Purchase Orders` is `so-batch/SoBatchIssueWorkspace`, used by SO
@@ -2732,8 +2729,9 @@ Supplier × Category production number. This REPLACES Card 06 §7's "the approve
 Manual Delivery Date becomes the official PO delivery date": a request raised for
 a showroom two months out used to print that far date on the factory's paper. The
 MPR's own `Delivery Date` keeps every other job — `Order By`, the timing rail and
-the document partition above. A supplier × category with no recorded production
-number issues with NO date and the paper prints `Not recorded`.
+the document partition above. Missing furniture Supplier × Category production settings now
+refuse issue by name in both lanes before a PO exists; other categories do not inherit an
+unapproved furniture production default.
 
 **BOTH DOORS NOW STAMP THE SAME DATE — BUILT (CARD 13-B), 2026-09-23.** The SO Batch
 issue path used to stamp production + transit through `expectedArrivalOf`; it calls
