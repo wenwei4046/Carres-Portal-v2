@@ -245,6 +245,15 @@ function makeSb(tables: Record<string, { data: unknown; error: unknown }>) {
     tables.product_skus?.data ??
     []) as { sku: string }[];
 
+  /* A configured Catalog row carries its Stock identity (0442), and a
+     configured Deliver To its address; a fixture that wants either missing
+     writes it as `null`. */
+  const withIdentity = (t: { data: unknown; error: unknown }) => ({
+    ...t,
+    data: Array.isArray(t.data)
+      ? (t.data as Record<string, unknown>[]).map((r) => ({ stock_identity_mode: "unit", ...r }))
+      : t.data,
+  });
   const from = vi.fn((table: string) => {
     tableCalls[table] = (tableCalls[table] ?? 0) + 1;
     if (table === "product_skus") {
@@ -261,13 +270,15 @@ function makeSb(tables: Record<string, { data: unknown; error: unknown }>) {
         Promise.resolve(
           existenceRead
             ? { data: fullCatalog.map((r) => ({ sku: r.sku })), error: null }
-            : (tables.product_skus ?? { data: [], error: null }),
+            : withIdentity(tables.product_skus ?? { data: [], error: null }),
         ).then(res, rej);
       return b;
     }
     if (table === "purchasing_destinations") {
       return destBuilder(
-        (tables.purchasing_destinations.data as { id: string; name: string }[]) ?? [],
+        ((tables.purchasing_destinations.data as { id: string; name: string }[]) ?? []).map(
+          (r) => ({ address: "1 Test Road", ...r }),
+        ),
       );
     }
     return builder(table, tables[table] ?? { data: [], error: null });
@@ -1410,6 +1421,55 @@ describe("the batch issue refuses before it creates anything", () => {
     expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
   });
 
+  it("⭐ a Deliver To with no address is refused BEFORE the PO exists", async () => {
+    const tables = TABLES();
+    tables.purchasing_destinations = {
+      data: [
+        { id: KLANG, name: "Carres Klang", is_default: true, active: true, address: null },
+      ],
+      error: null,
+    };
+    const sb = makeSb(tables);
+    const demands = await readyDemands(sb);
+    sb.rpcCalls.length = 0;
+    const first = demands[0]!;
+    const res = await postBatch({
+      selections: [
+        { demandId: first.demandId, allocations: [{ destinationId: KLANG, qty: first.qty }] },
+      ],
+      documentDecisions: pricedAll(demands, KLANG),
+    });
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { code?: string; message?: string };
+    expect(body.code).toBe("destination_address_missing");
+    expect(body.message).toContain("Carres Klang has no address on file.");
+    expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
+  });
+
+  it("⭐ a SKU whose Stock identity is Not set is refused by name before the PO exists", async () => {
+    const tables = TABLES();
+    tables.product_skus = {
+      data: (tables.product_skus.data as Record<string, unknown>[]).map((r) => ({
+        ...r,
+        stock_identity_mode: null,
+      })),
+      error: null,
+    };
+    const sb = makeSb(tables);
+    const demands = await readyDemands(sb);
+    sb.rpcCalls.length = 0;
+    const first = demands[0]!;
+    const res = await postBatch({
+      selections: [
+        { demandId: first.demandId, allocations: [{ destinationId: KLANG, qty: first.qty }] },
+      ],
+      documentDecisions: [],
+    });
+    expect(res.status).toBe(422);
+    expect(((await res.json()) as { code?: string }).code).toBe("catalog_identity_mode_missing");
+    expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
+  });
+
   it("a destination nobody has heard of", async () => {
     const sb = makeSb(TABLES());
     const demands = await readyDemands(sb);
@@ -2018,7 +2078,7 @@ describe("closure §1 · one governed PO actor authority", () => {
     const body = (await res.json()) as { code?: string; message?: string; action?: string };
     expect(body.code).toBe("not_po_duty");
     /* ⭐ THE TWO LINES (closure §9): the fact, then the act, naming the person. */
-    expect(body.message).toBe("You do not hold PO duty today.");
+    expect(body.message).toBe("Only Operation staff may issue a purchase order.");
     expect(body.action).toBe("Ask Li Ching to issue this purchase order.");
     expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
   });
@@ -2062,7 +2122,7 @@ describe("closure §1 · one governed PO actor authority", () => {
     expect(res.status).toBe(403);
     const body = (await res.json()) as { code?: string; message?: string; action?: string };
     expect(body.code).toBe("not_po_duty");
-    expect(body.message).toBe("You do not hold PO duty today.");
+    expect(body.message).toBe("Only Operation staff may issue a purchase order.");
     expect(body.action?.length).toBeGreaterThan(0);
   });
 

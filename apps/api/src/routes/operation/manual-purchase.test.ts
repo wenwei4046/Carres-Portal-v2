@@ -96,7 +96,15 @@ const LINES = [
  *  resolves to the canned result for its table. */
 function tableStub(result: unknown, opts?: { filterInBy?: string }) {
   const q: Record<string, unknown> = {};
-  let rows = result;
+  /* A configured Catalog row (it has `product_models`) always carries its
+     Stock identity (0442); a fixture that wants `Not set` writes `null`. */
+  let rows = Array.isArray(result)
+    ? (result as Record<string, unknown>[]).map((r) =>
+        r && typeof r === "object" && "sku" in r && "product_models" in r
+          ? { stock_identity_mode: "unit", ...r }
+          : r,
+      )
+    : result;
   const chain = () => q;
   for (const m of ["select", "eq", "order", "limit", "not", "gt", "is", "maybeSingle"]) {
     q[m] = vi.fn(chain);
@@ -391,7 +399,7 @@ describe("closure §2 · Catalog is the manual lane's normal price authority", (
     expect(res.status).toBe(403);
     const body = (await res.json()) as { code?: string; message?: string; action?: string };
     expect(body.code).toBe("not_po_duty");
-    expect(body.message).toBe("You do not hold PO duty today.");
+    expect(body.message).toBe("Only Operation staff may issue a purchase order.");
     expect(body.action?.length).toBeGreaterThan(0);
   });
 });

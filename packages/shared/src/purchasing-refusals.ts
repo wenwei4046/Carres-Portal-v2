@@ -76,10 +76,12 @@ export function purchasingRefusal(
   const dest = some(facts.destination, "that place");
 
   switch (code) {
-    // ── WHO MAY ACT (0379) ────────────────────────────────────────────────
+    // ── WHO MAY ACT (0627 · owner ruling 2026-09-29) ──────────────────────
+    /* Every active Operation person may issue; PO Duty is the normal owner,
+       not the permission. The code keeps its wire spelling. */
     case "not_po_duty":
       return {
-        wrong: "You do not hold PO duty today.",
+        wrong: "Only Operation staff may issue a purchase order.",
         todo: `Ask ${some(facts.actor, "today's PO duty holder")} to issue this purchase order.`,
       };
     case "no_po_duty_holder":
@@ -245,6 +247,18 @@ export function purchasingRefusal(
       return {
         wrong: `${dest} is closed.`,
         todo: "Choose another Deliver To place, then issue again.",
+      };
+    /* 0443 · Catalog has not answered for a SKU, so no Unit ID can be born
+       with the PO. COPY-STANDARD `Stock identity`. */
+    case "sku_not_in_catalog":
+      return {
+        wrong: `${sku} is not in the Catalog.`,
+        todo: `Add ${sku} to the SKU catalog.`,
+      };
+    case "catalog_identity_mode_missing":
+      return {
+        wrong: `${sku} has no Stock identity.`,
+        todo: `Set the Stock identity of ${sku} to Unit ID or Quantity in Catalog.`,
       };
     case "destination_address_missing":
       return {
@@ -563,6 +577,8 @@ export const PURCHASING_REFUSAL_CODES = [
   "unknown_destination",
   "inactive_destination",
   "destination_address_missing",
+  "sku_not_in_catalog",
+  "catalog_identity_mode_missing",
   "unknown_demand",
   "unknown_build",
   "duplicate_demand",
