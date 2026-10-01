@@ -24,6 +24,28 @@
 
 ## Reuse-first shared page templates — owner ruling 2026-10-01
 
+### Reference geometry with Carres colour — owner direction, 2026-10-01
+
+**APPROVED DIRECTION / implementation not verified.** Use the measured Houzs geometry and
+information hierarchy as the reference, adapted to Inter and the existing Carres semantic palette.
+Copying the relationship between text, whitespace, surfaces and emphasis does not approve literal
+Houzs green, a new hex palette, or all reference dimensions. The pending warm-grey hex proposal is
+withdrawn from the current direction; it supplies no tokens. Carres canvas/surface/slate text and
+borders remain authoritative; blue retains admitted primary/selection/focus roles and red retains
+error/destructive-condition meaning under existing action rules. This does not add a danger Button
+variant or recolour actions merely because their verb sounds destructive.
+
+**APPROVED TARGET — compact search, owner follow-up2026-10-01.** Canonical dimensions are in
+01§7.2. Placeholder is `Search orders…`; an accessible hint describes only the actual supported
+search fields. Do not advertise phone or universal server search without implementation proof.
+Visible toolbar content is count/filter summary, search, admitted Table/Cards and far-right `⋯`.
+The search and right-toolbar design are settled for this scope; actual pilot acceptance remains
+pending. Existing Carres neutral canvas, white surfaces, dark/mid neutral text, light neutral
+header/hover/borders, blue primary/selection/focus and red error/destructive-condition roles remain;
+no palette token changes. Left rail/location relocation,32px main rows and a generic full-order
+drawer remain unapproved. No automatic global adoption, merge or deployment is authorised.
+
+
 ### Register toolbar — owner-approved target, 2026-10-01
 
 **APPROVED TARGET / NOT BUILT.** Jess approved the Sales planner's fixed far-right overflow
