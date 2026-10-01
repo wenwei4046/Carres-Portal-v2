@@ -1,7 +1,7 @@
 # UI — MASTER
 
 > **The only UI-architecture document.** Overwritten when re-ruled; never versioned.
-> **You read `CLAUDE.md` and this file.**
+> **Start with `AGENTS.md` and the ERP PLAN CHAT START PROTOCOL; this is the shared UI authority.**
 >
 > **THE TOKEN VALUES ARE NOT HERE AND NEVER WILL BE.** They live in three standards that are
 > the vocabulary itself, and this file links to them rather than copying them:
@@ -464,6 +464,49 @@ not another status engine. Final full-flow posting, conflict resolution, storage
 proof require the separately commissioned BUILD/DELIVERY lane and controlled integration validation.
 No PLAN completion claim follows from the local fixture results.
 
+### Documentation-only clarification and review freeze — owner instruction 2026-10-01
+
+**RULING / EFFECTIVE NOW:** stop coding, including local review-page changes. The current commission
+is to clarify the existing UI/UX authorities and align the module planners. No application code,
+new prototype code, Cards, deploy or live writes are authorised by it. UI MASTER is the single
+shared authority; there is no separate UX-kit document. 01 owns numeric tokens, 02 component
+contracts, 03 full page/interaction composition, COPY the actual user-facing vocabulary, module
+MASTERs the business rules. This is one design system with several responsibilities, not separate
+kits. No new colours, dimensions, English product copy or business decisions are silently approved.
+
+**Review sample freeze:** `warehouse-ui-preview.html` is withdrawn. The later local
+`inbound-flow.html` composition is also NOT ACCEPTED AS A BUILD REFERENCE: Jess could not identify
+its purpose and challenged its value. It is independently composed, not a verified Houzs receiving
+screen copy; its review chrome, invented explanatory copy and simulated result are not product
+law. Baseline SO/PO fixtures and CSS-only rhythm changes are likewise not final adaptation. No
+planner or builder may infer visual approval from these files or their screenshots. Keep their
+limitations visible in evidence; do not ask the owner to approve them as complete templates.
+
+**What a design must specify before it can direct BUILD:** page purpose/user/entry source;
+exact applicable template role and existing shell; reference interaction with provenance;
+ordered regions and every region's job; real shared component mapping; actual source of each
+fact/action/owner; primary and secondary doors; disclosure/edit/submit/result behaviour;
+all applicable states; narrow/keyboard/long-content behaviour; allowed business differences;
+known gaps with evidence; operator acceptance. A list of five arrows is not such a specification.
+A written specification is not proof of a working interface. Both documentation and review
+outcomes retain APPROVED TARGET / IMPLEMENTED / VERIFIED distinctions.
+
+**Shared gaps consolidated from Sales and Purchasing PLAN reviews — PROPOSAL detail, NOT new
+component admission:** blocker summaries need field/row targets and recovery actions from the same
+validator; responsibility can be missing and must not be fabricated; linked sections need truthful
+loading/failed/empty/denied states; current/proposed/sent/historical document identity must remain
+separate; completed business effect and later PDF/storage failure need different recovery; stale
+business fixtures need explicit source revisions. These are cross-module contracts to verify
+against existing components, not reasons to create parallel engines. Actual Sales representative
+recommendation was read; its source candidate is `768fd8db9cce1518f3a4aecade4ba8022b647df0`, not
+proof of production verification. Module-specific quantities, fees and gates remain module-owned.
+
+**Conflict resolution without another owner questionnaire:** use the latest explicit scoped
+module/owner ruling for a real exception; preserve it and name its scope. Older generic examples
+must not override it. If two current explicit rulings still conflict, mark the exact unresolved
+business/presentation consequence; never silently select whichever produces the preferred layout.
+Do not rewrite locked token values or approved action placement merely to make a document shorter.
+
 ### Current status and document ownership
 
 **IMPLEMENTED IN INSPECTED CODE / NOT A WHOLE-KIT VERIFICATION:** ModuleHeader, DataGrid,
@@ -473,8 +516,11 @@ claim-photo support versus a line-level string-array form, and Unit Current work
 Issues, are measured workflow-integration gaps, not evidence that a new uploader or Work engine
 is needed.
 
-**PENDING:** reconcile stale DataTable scope and pending-admission prose against actual adopters;
-complete real composed template samples and relevant state/viewport/operator evidence. Do not
+**DOCUMENTATION RECONCILED, 2026-10-01:** 02 scopes bounded DataTable versus Register/DataGrid,
+Block versus existing legacy surfaces, real control adopters and unverified candidate names.
+03 specifies the five roles, field/action placement and full state coverage; it no longer assigns
+every operational module the batch Workspace pattern. Token values remain unchanged.
+**PENDING:** completed real composed samples and relevant state/viewport/operator evidence. Do not
 claim these are delivered because this section is saved. Keep the existing document split:
 this MASTER owns contracts and exceptions; 01 owns values; 02 owns component API/use/state;
 03 owns composition/examples; module MASTERs own business semantics; `/ui` shows actual examples.

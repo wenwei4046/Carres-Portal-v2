@@ -16,8 +16,10 @@ This file describes the common patterns; it is not a second reference selection 
 to redesign each page independently. The current listing contract is UI MASTER §6.0; its detailed
 Register/Object Detail rules govern where an older example below differs.
 
-**One purpose per page. One primary action. Business logic belongs to modules,
-never to a pattern.**
+**One purpose per page and one obvious primary next action for the current task.**
+Secondary authorised actions remain discoverable. Existing UI MASTER/module-specific action
+placement wins; this does not impose a new button location. Business logic belongs to modules,
+never to a pattern.
 
 **One obvious reading path.** Within three
 seconds the operator knows: where they are · what needs attention · what to do
@@ -94,30 +96,117 @@ Carres Examples**
 
 ---
 
-# List
+# List / Register
 
-**Purpose.** Browse and manage records.
+**Purpose.** Find and compare authoritative records, then open the exact record or governed task.
+This is not an alternate My Work queue. A task queue and a document register are distinct.
 
-**Information Hierarchy.** 1 Records · 2 Filters · 3 Sorting · 4 Pagination
+**Composition (existing governed contract, not a new layout approval):**
 
-**Regions.** Toolbar · Filters · Table · Pagination
+```text
+Existing portal navigation | Shared module header/global tools | Existing Quick Rail
+                          | Governed Site/view tabs when applicable
+                          | Filter rail | Search / page tools
+                          |             | Register header + rows
+                          |             |   Goods-only expansion when opened
+                          |             | Scope-matched footer / pagination
+```
 
----
+- Global navigation changes destination. The factual rail narrows the same record population;
+  Site remains a tab where the module has ruled it, including Inbound. Neither creates local Work.
+- Keep existing shared toolbar order and permitted actions under UI MASTER §6.0. A selection
+  action states the selected scope; no hidden rows silently join a destructive/batch operation.
+- Use DataGrid, content-led column recipes and governed defaults. Main identity, important facts
+  and task door must be readable at the measured shell width. Do not shrink type to force columns.
+- Expansion has one admitted purpose: scoped child goods/evidence with real headings and aligned
+  quantities. Edit opens the owning surface; only explicitly ruled inline-edit exceptions survive.
+- Number/link opens the exact object; return preserves current filters, sort and position under
+  the existing state contract. Personal saved layouts and temporary filters are different state.
+- Loading/error/denied do not render as empty. Empty filtered results retain criteria and a clear
+  way to remove them. Row/quantity summaries and export use the same authorised population.
+- Narrow layouts use the existing filter drawer and contained table scrolling. Full-width shell
+  evidence is required; an isolated centre cannot prove default columns fit.
 
-# Detail
+**Module differences:** admitted filters, source types, columns, quantities and authorised doors.
+No separate card chrome, table engine, date format, selection language or generic local Work rail.
 
-**Purpose.** View one record.
+# Detail / Object
 
-**Information Hierarchy.** 1 Identity · 2 Current status · 3 Current action ·
-4 Details · 5 History
+**Purpose.** Understand one record, inspect its evidence/history and reach lawful actions.
+An object does not gain a permanent Current Action box merely because a shared kit can draw one.
 
-**Regions.** Header · Summary · Detail sections · Activity timeline
+**Composition:** object identity/version and governed actions → existing object views → grouped
+facts → source-linked documents/evidence → actual history. A genuine pending task appears in the
+object's governed action region, with its existing Work/source responsibility and applicable gates.
+Read-only completed objects do not acquire invented work.
 
-### Carres Examples
+- Use Block and the actual approved object adopter, not an assumed universal DetailShell.
+- Keep same field/group identity between view and edit. A section has one fact owner and one
+  write door; cross-module summaries link there rather than embedding another private form.
+- Current version, proposal, last sent version and historical original/reconstruction are labelled
+  accurately. Unknown/unreadable document is not no document; authorised commercial data remains
+  protected in the preview and attachment as well as the on-screen fields.
+- A document split follows the explicit object rule (UI MASTER §4.1 and owning MASTER), not a
+  universal “all details split” or “no views split” inference. It is not introduced merely to
+  resemble Houzs. Preserve governed SO/PO/GRN arrangements and narrow stacking rules.
+- History preserves actual actor/time/source; business completion, document sending and claim
+  closure can be independent facts. A single Complete badge cannot suppress another obligation.
 
-**Order Detail** — the Golden Template. Six questions in the order a human asks
-them, and the System Model is re-fitted to serve it, never the reverse.
-Detail in `orders/MASTER.md`.
+**Module differences:** factual groups, document obligations, views, permissions and action gates.
+The shared template owns hierarchy/controls, never a universal overall status or approval engine.
+
+### Carres examples
+
+SalesOrderWorkspace · PurchaseOrdersPage · WarehouseUnitDetail are real adopters. Their module
+MASTERs own business content. An existing adopter is evidence, not proof that all states or the
+new Houzs adaptation are approved. UI MASTER records sample and source revisions.
+
+# Task / Operation
+
+**Purpose.** Finish one source-scoped job. This is the operational role within the approved
+list/detail/form/card families, not another business status engine or compulsory wizard.
+
+```text
+Exact source / party / Site / goods scope
+Current applicable task + factual blocker + resolved responsibility
+Necessary checks and input, grouped by work
+  Affected good/Unit → its condition, reason and evidence
+Final checks + one authoritative submission
+Actual result → remaining obligation → next responsible owner / exact door
+```
+
+- Enter from an exact arrangement/Work item and preserve its scope; a PO is not automatically
+  the entire arriving batch. Use the existing authorised Receiving/Loading workspace.
+- The action region summarises; the form performs. Do not repeat editable fields or create a
+  second submit path in a rail, modal and page. Exception inputs stay with the affected item.
+- Only show steps that correspond to actual decisions/work. No invented serial approval because
+  a reference has a stage bar; parallel legitimate work remains possible.
+- Before submission show specific missing requirements with field/row targets. Errors and
+  summaries use the same validation facts. Keep valid input and evidence on recoverable failure.
+- After submission show the actual outcome, remaining work and owner. Warehouse submission is
+  not posted GRN; office direct receiving follows its posting authority; loading is not driver
+  confirmation. No invented Mark done or manually chosen responsibility list.
+- Missing/unresolved owner is stated honestly, not replaced with a guessed person. Qualified help
+  follows existing permissions and records the actual performer; duty accountability stays intact.
+- Unknown timeout result is not definite failure. A file-generation error after business success
+  is not permission to repeat the business transaction. These require source integration proof.
+
+**Evidence status:** target composition; actual module adoption and all-state verification remain
+tracked in UI MASTER. A local simulated task is not verified Receiving/Stock/Work behaviour.
+
+# Work card / Overview card / Goods card
+
+**These are different jobs sharing Block chrome, not interchangeable contents.**
+
+| Role | Reading sequence | Interaction and scope |
+|---|---|---|
+| Work card | Record/party → reason → resolved owner where governed → exact action | Existing My Work/Team Work item; assigned versus actual completed actor preserved. No second work engine. |
+| Overview card | Metric label → value → scope/period | Link/filter only if supported and verified; failure is unknown, never zero. Does not replace a record/task. |
+| Goods card | Source identity → destination/date facts → goods/quantities → scoped exception evidence | Loading List supplies hierarchy inspiration; Carres Unit and source contracts supply meaning. No service/transport line masquerading as a physical Unit. |
+
+The common kit owns card chrome and text roles. Modules supply facts and real actions. Card click,
+secondary link and primary action must have distinct, accessible purposes. No clickable whole-card
+surface that consumes an inner control's action; no hidden hover-only essential door.
 
 ---
 
@@ -163,7 +252,7 @@ history: a superseded example is a page somebody will build.
 
 ---
 
-# Workspace
+# Batch workspace
 
 **Purpose.** Decide, across many records at once, and commit in one act.
 
@@ -181,10 +270,10 @@ time down a queue (that is Queue).
 **Layout.** Two panes, no page scroll.
 
 ```
-┌ shell header — module word · tabs · page-meta · global icons ─────────────┐
+┌ shared module header — governed page name and global tools ─────────────┐
 ├──────────────┬───────────────────────────────────────────────────────────┤
 │ NAVIGATOR    │ toolbar    search ···· scope · selection · PRIMARY ACTION  │
-│ ~200px       ├───────────────────────────────────────────────────────────┤
+│ shared width ├───────────────────────────────────────────────────────────┤
 │              │ banners    blocked / held / result — only when non-empty   │
 │ engine-      ├───────────────────────────────────────────────────────────┤
 │ guided       │                                                           │
@@ -254,28 +343,42 @@ engine owns the timing arithmetic and every rail category derives from it ·
 `Order By` drives the `ORDER TIMING` rows — it is a planned date, never an
 unlock date, and every timing row remains orderable.
 
-**Purchase Orders** · **Receiving** · **Claims** · **Payments** — the same
-pattern. Each is recorded here as it is built.
+Do not classify Purchase Orders, Receiving, Claims or Payments wholesale as batch workspaces.
+Choose by the actual surface: register, detail, single operation or genuine batch decision. Their
+module authority determines the job and existing governed layout.
 
 ---
 
-# Create
+# Form — Create / Edit
 
-**Purpose.** Create a new record.
+**Purpose.** Enter or amend one object's facts with one authoritative result. Group by meaning
+and task, not by database field order. Create and edit share controls and group identity, but
+permissions, required evidence and effects come from the owning business object.
 
-**Information Hierarchy.** 1 Required · 2 Optional · 3 Review · 4 Submit
+**Placement contract:**
 
-**Regions.** Form · Context panel · Actions
+| Region | What belongs here | What does not |
+|---|---|---|
+| Identity/context | Object/source, draft or current version and relevant party | Unrelated summary cards or repeated page titles |
+| Field group | Stable heading, visible labels, known values, necessary hints, conditional fields | Explanatory engineering text, unknown values guessed as zero |
+| Goods/lines | Source identity, quantity/unit, line-specific inputs and evidence | Concatenated prose instead of structured line facts |
+| Validation | Field/line error plus consistent known-blocker summary where needed | Separate frontend approval rules or an unlocatable wall of errors |
+| Review/submit | Exact scope/effect and existing confirm/save action | A second full form or hidden auto-submit on field inspection |
+| Outcome | Applied, waiting, rejected or unknown as actually returned; retained draft where applicable | Generic Saved implying every downstream job is complete |
 
----
-
-# Edit
-
-**Purpose.** Modify an existing record.
-
-**Information Hierarchy.** 1 Current information · 2 Editable fields · 3 Save
-
-**Regions.** Form · History · Actions
+- Known facts are prefilled. Required/read-only/disabled are different meanings, not one grey style.
+- Dependent input explains its prerequisite. A conditional field appears with its relevant choice;
+  switching choice must not silently submit or destroy evidence without the existing discard rule.
+- Editing preserves group order. Unsaved changes remain evident; cancel returns to the original
+  object and respects its existing draft/discard behaviour. Do not invent autosave from a reference.
+- Derived amounts/stock/status remain computed by their owning source. A visual review never
+  creates editable substitutes or parallel calculations.
+- Busy submission prevents accidental repeat. Validation, denied access, upload failure, server
+  failure and stale-version conflict have distinct recovery. Valid input survives where safe;
+  conflicting records require re-checking current truth before a new effective result.
+- PDF preview follows object law. Current, proposed and sent historical versions cannot be mixed.
+- Use actual kit fields/Modal/DatePicker/uploader. Components with incomplete state evidence are
+  marked UNVERIFIED rather than replaced by local controls.
 
 ---
 
@@ -293,3 +396,30 @@ pattern. Each is recorded here as it is built.
 Safety days (`Safety days · 14 working days` — `Extra time allowed for
 delays.`). A supplier × category with no number reads `Set a number` and
 is never defaulted.
+
+
+# Required state and review coverage
+
+This is a coverage contract, not a claim of implementation. UI MASTER holds exact runtime/test
+provenance and the module MASTER owns business acceptance. Before a template is an approved BUILD
+reference, its whole-page sample must identify source commit, reference page, real component map,
+allowed differences, realistic source-linked content and the states below.
+
+| Situation | Required visible behaviour |
+|---|---|
+| Normal populated | Identity, hierarchy, scope and exact action readable without an explanation from the designer |
+| Empty / no search matches | State distinguishes empty population from narrowed results; criteria retained |
+| Loading / failed reader | Busy or failure distinct from zero; scoped retry; unaffected facts remain readable |
+| Denied / read-only | Correct absence of restricted action/data; no fake empty or pointless retry |
+| Required / conditional / invalid | Exact missing item and resolution; same fact in field and summary |
+| Upload pending / failed | File-level state, safe retry and source association; no false saved evidence |
+| Unsaved / submitting / conflict | Retain valid draft, explain current version; no duplicate or silent partial result |
+| Success / waiting / partial | Show actual effect, remaining quantities/obligations and truthful handoff |
+| Historical / document failure | Correct version/actor; distinguish business success from missing file capture |
+| Long content / many records | Full identity can be reached; quantities/actions remain findable; contained scroll |
+| Narrow / keyboard | Same scope/capabilities; logical focus, labels and dialog return; no blocked controls |
+
+Review demonstrations may have scenario controls, but those belong outside the operator page and
+must not dominate the review. Jess's current presentation preference is NEW page only; baseline
+comparison remains internal evidence. A rejected or withdrawn mock is never a template merely
+because it imports shared components. Do not display an isolated centre as a verified full shell.
