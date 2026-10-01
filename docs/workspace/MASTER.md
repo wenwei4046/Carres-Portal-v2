@@ -332,8 +332,11 @@ Requested Delivery Date routing is settled in Orders/Delivery MASTER: evidenced 
 earlier-date amendments require ready stock, otherwise refuse; evidenced later-date amendments
 apply; neither date change needs PO Duty or supplier confirmation. Carres-initiated early
 arrangements leave the SO date unchanged. This adds no new staff or approval assignment.
-Fee/service approval,
-0329 attribution changes/consolidation and Sales Approver self-approval remain undecided. Do not
+System-priced delivery-charge changes have no manual approval lane: staff cannot override the
+computed price (Orders MASTER, owner-confirmed 2026-10-01 / TARGET NOT BUILT). Do not assign a
+new SO charge-waiver task to Delivery Charge Approver; that Duty remains for its other governed
+uses. Customer refunds still route to Sales Approver. Non-delivery service exceptions, 0329
+attribution changes/consolidation and Sales Approver self-approval remain undecided. Do not
 copy Purchasing Approver's own-request rule or bootstrap into this Duty as an assumed decision.
 The existing PIC-first ordinary Delivery ownership remains unchanged.
 

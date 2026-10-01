@@ -6,9 +6,12 @@ cancellation after Proceed before it takes effect, under Orders MASTER § Staff 
 Sales Approver. Ordinary SO amendments need no owner approval. This SO commercial decision does
 not itself send money, post a refund or rewrite a receipt/invoice. Existing money execution,
 accounting controls and audit ownership remain with their owning workflows; no second ledger
-or refund writer is created. Delivery fee/service change rules remain undecided, and the
-existence of Delivery Charge Approver does not decide their routing. No live refund or build is
-authorised by this PLAN.
+or refund writer is created. **System-priced delivery charges — owner-confirmed 2026-10-01 /
+TARGET NOT BUILT:** address/delivery-service changes recalculate through the existing system price;
+Operation cannot manually override it, so there is no charge-approval lane on that SO path. A lower
+correct system charge is not a discretionary product discount, but any resulting customer refund
+still requires Sales Approver and the existing money execution controls. No automatic payout or
+live refund/build is authorised. See Orders MASTER § System-priced delivery charges.
 
 **All listing appearance — APPROVED / NOT BUILT (Jess, 2026-09-17):** follow
 [UI MASTER §6.7 Portal-wide listing readability](../ui/MASTER.md#portal-wide-listing-readability--built-2026-09-17-slice-1--authenticated-walk-owed).

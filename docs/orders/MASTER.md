@@ -2717,11 +2717,30 @@ that operating model. The code remains unchanged; the following is the approved 
 its audit record identifies who changed what. Supplier confirmation remains necessary where an
 issued PO covers the affected line. Submission eligibility is now settled by the scoped ruling below.
 
-**NOT DECIDED — each requires its own owner decision:** delivery fee/service changes and the
-existing Delivery Charge Approver's scope;
+**NOT DECIDED — each requires its own owner decision:** service-price exceptions beyond the
+system-priced delivery-charge scope settled below;
 salesperson/dealer/sales-location changes and whether the 0329 lane folds into the amendment;
 Sales Approver self-approval. Ordinary-address amendment restrictions after Proceed were not
 resolved by this ruling either; do not infer them from the floor/lift/stairs rule.
+
+**System-priced delivery charges — OWNER-CONFIRMED 2026-10-01 / TARGET NOT BUILT.**
+Operation does not decide the delivery price or collect the customer's money personally; the
+customer pays the company through the existing governed money workflow. At order entry the
+system calculates the delivery charge. During an amendment, changed address or added delivery
+services are inputs to the same governed pricing rules: the system recalculates, not the employee.
+Staff cannot manually set, discount or waive this charge. Accordingly there is no separate manual
+delivery-charge approval step on this SO amendment path. Do not build the withdrawn proposal's
+Delivery Charge Approver discount/waiver lane here. The existing Duty is not deleted or repurposed
+for unrelated governed actions.
+
+Preserve customer-agreement evidence, Before/After, reason, actual actor and PIC notification.
+A correct system recalculation, including a lower calculated delivery charge, is not a discretionary
+product-price reduction. The Sales Approver gate for a customer refund remains, and refund execution
+stays with its owning money workflow; lower recalculation never automatically pays money out.
+Product-price reductions and the other previously approved exception gates remain unchanged.
+This does not authorise editing price rules through the SO, removing ordinary goods/PO checks, or
+setting arbitrary non-delivery service prices. No new live payment, application change or Duty
+assignment is made by this PLAN. Current code is not certified to enforce this target.
 
 **Requested Delivery Date changes — OWNER-APPROVED 2026-10-01 / TARGET NOT BUILT.**
 This resolves the formerly open date-change decision. Preserve the earlier readiness and
