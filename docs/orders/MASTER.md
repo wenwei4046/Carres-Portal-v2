@@ -812,6 +812,15 @@ Close/Escape returns focus and leaves filters, sort, selection and scroll unchan
 existing responsive DialogFrame. Shared UI dependency updated to PR1836
 `eda0a5acde5f99c26dbfda4b9d115b0e2e8f8a16`; this ruling is recorded before its code adaptation.
 
+**RULING / COMPLETE SAMPLE AND PAGE TOOLS — owner approval 2026-10-01.** Align Table,
+Cards, rail and toolbar through the shared numeric kit, not isolated page styling. Current
+numeric dependency is UI PR1836 `933fe6d07410f839f639a172e76433d85630f902`.
+Search, current filter summary and Table/Cards remain visible. A stable far-right overflow
+menu contains supported page tools Export and Columns, with icon + text. Preserve current
+export/selected-visible semantics and personal columns. The overflow trigger is32×32 desktop
+and at least40×40 on touch; keyboard open/close/focus return are required. It owns no order
+business actions. No32px row, rail relocation or fixed48px toolbar ruling is inferred.
+
 **Interaction and responsive acceptance.** 1440/1060/825/390 viewport checks in the real shell;
 no page sideways scroll, scroll is contained by the existing DataGrid/goods surfaces. SO identity
 visible on entry; remembered desktop-open filters do not cover it on a narrow first paint or
