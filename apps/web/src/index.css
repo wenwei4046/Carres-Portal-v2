@@ -534,3 +534,10 @@
 [data-kit='tabs'][data-variant='segmented'] [data-kit='tab'][data-state='active'] { background: theme('colors.kit.blue.3'); color: theme('colors.kit.blue.11'); font-weight: 600; }
 [data-kit='tabs'][data-variant='segmented'] [data-kit='tab-indicator'] { display: none; }
 @media (max-width: 767px) { [data-kit='tabs'][data-variant='segmented'] [data-kit='tab'] { height: 34px; } }
+/* Owner-selected B: neutral group headings distinguish filters from white data. */
+.so-template-rail [data-rail-group] { padding: 4px 0; }
+.so-template-rail [data-rail-group] > button { background: theme('colors.kit.slate.3'); border-radius: 4px; }
+.so-template-rail [data-rail-group] > button:hover { background: theme('colors.kit.slate.4'); }
+.so-template-rail [data-rail-group] > div { padding-left: 16px; }
+.so-template-rail [data-rail-group] > div > button { font-size: 12px; line-height: 18px; }
+[data-testid='register-column']:has([data-presentation-tools]) { background: theme('colors.kit.slate.2'); }
