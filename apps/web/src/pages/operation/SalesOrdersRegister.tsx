@@ -666,7 +666,7 @@ function ExpandedLines({ row, inspection = false, compact = false }: { row: Regi
     <thead className="sticky top-0 bg-kit-slate-3 text-label text-kit-slate-11"><tr><th className="p-2 text-left">Item</th><th className="p-2 text-right">Qty</th><th className="p-2 text-right">Amount</th><th className="p-2 text-left">Stock Status</th></tr></thead>
     <tbody>{miniLines.map((line, index) => {
       const source = index < lines.length ? lines[index] : addons[index - lines.length];
-      const stock = line.selectable === false ? "—" : STOCK_STATUSES.find(status => status.key === stockStatusOf(row, line.sku))!.label;
+      const stock = line.selectable === false ? "Not applicable" : STOCK_STATUSES.find(status => status.key === stockStatusOf(row, line.sku))!.label;
       return <tr key={line.key} className="border-b border-kit-slate-5"><td className="p-2">{line.item}{line.itemDetail && <div className="text-meta text-kit-slate-11">{line.itemDetail}</div>}</td><td className="p-2 text-right">{line.qty}</td><td className="p-2 text-right whitespace-nowrap">{source.unit_price == null ? "Not recorded" : <Money value={Number(source.unit_price) * line.qty} />}</td><td className="p-2"><span className="rounded-full bg-kit-slate-3 px-2 py-1 text-meta text-kit-slate-11" title="Recorded warehouse receipt for this order">{stock}</span></td></tr>;
     })}</tbody>
   </table></div>;
@@ -1039,7 +1039,8 @@ export default function SalesOrdersRegister() {
   const [filteredSummaryRows, setFilteredSummaryRows] = useState<RegisterRow[] | null>(null);
   const receiveSummaryRows = useCallback((next: RegisterRow[]) => setFilteredSummaryRows(previous => previous && previous.length === next.length && previous.every((row, index) => row.id === next[index].id && JSON.stringify([row.total, row.paid, row.balance]) === JSON.stringify([next[index].total, next[index].paid, next[index].balance])) ? previous : next), []);
   const summaryRows = filteredSummaryRows ?? rows;
-  const [quickOrder, setQuickOrder] = useState<RegisterRow | null>(null);
+  const [quickOrderSnapshot, setQuickOrder] = useState<RegisterRow | null>(null);
+  const quickOrder = quickOrderSnapshot ? all.find(row => row.id === quickOrderSnapshot.id) ?? quickOrderSnapshot : null;
   const columns = useMemo(
     () => [
       { key: "stock_status", label: "Stock Status", width: REGISTER_FIELDS.find(f => f.key === "salesperson")!.width, group: "Operation" as const, on: true as const, text: (r: RegisterRow) => STOCK_STATUSES.find(status => status.key === stockStatusOf(r))!.label },
@@ -1220,9 +1221,9 @@ export default function SalesOrdersRegister() {
   return (
     <div className="flex h-full min-h-0 flex-col">
       <DestinationHeader />
-      {quickOrder && <Drawer open onOpenChange={(open) => { if (!open) setQuickOrder(null); }} title={`SO-${quickOrder.so} · ${quickOrder.customer}`} headerActions={<><span className="rounded-full bg-kit-blue-3 px-2 py-1 text-meta text-kit-blue-11">{REGISTER_DELIVERY_CONDITIONS.find(c => c.key === registerDeliveryConditionOf(quickOrder.o.order_lines ?? [], quickOrder.o.allocated_units ?? []))?.label ?? "Not recorded"}</span><Button iconOnly icon="print" variant="ghost" aria-label="Print sales order" onClick={() => void printSalesOrders([quickOrder])} /><Button iconOnly icon="open" variant="ghost" aria-label="Open full page" onClick={() => openWorkspace(quickOrder)} /></>}>
+      {quickOrder && <Drawer variant="quick-view" open onOpenChange={(open) => { if (!open) setQuickOrder(null); }} title={`SO-${quickOrder.so} · ${quickOrder.customer}`} headerActions={<><span className="rounded-full bg-kit-blue-3 px-2 py-1 text-meta text-kit-blue-11">{REGISTER_DELIVERY_CONDITIONS.find(c => c.key === registerDeliveryConditionOf(quickOrder.o.order_lines ?? [], quickOrder.o.allocated_units ?? []))?.label ?? "Not recorded"}</span><Button iconOnly icon="print" variant="ghost" aria-label="Print sales order" onClick={() => void printSalesOrders([quickOrder])} /><Button iconOnly icon="open" variant="ghost" aria-label="Open full page" onClick={() => openWorkspace(quickOrder)} /></>}>
         <div className="flex flex-col gap-3" data-testid="sales-order-quick-view">
-          <Block title="SO info"><dl className="grid grid-cols-2 gap-3 text-body">
+          <Block title="SO info" tone="muted"><dl className="grid grid-cols-2 gap-3 text-body">
             <div><dt className="text-label text-kit-slate-11">Phone</dt><dd>{quickOrder.o.customer_phone || "Not given"}</dd></div>
             <div><dt>Email</dt><dd className="break-words">{quickOrder.o.customer_email || "Not given"}</dd></div>
             <div><dt className="text-label text-kit-slate-11">Sales Location</dt><dd>{salesLocationOf(quickOrder.o)}</dd></div>

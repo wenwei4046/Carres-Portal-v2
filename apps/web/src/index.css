@@ -555,14 +555,14 @@
 
 /* Sales Order summary leaves the existing 64px utility rail visible. */
 @media (min-width: 768px) {
-  [data-kit='drawer']:has([data-testid='sales-order-quick-view']) { right: 4rem; }
+  [data-kit='drawer'][data-variant='quick-view'] { right: 4rem; }
 }
 
 /* Sales-order quick view: owner-approved dark identity bar. */
-[data-kit='drawer']:has([data-testid='sales-order-quick-view']) > header { background: theme("colors.kit.slate.12"); color: white; }
-[data-kit='drawer']:has([data-testid='sales-order-quick-view']) > header h2,
-[data-kit='drawer']:has([data-testid='sales-order-quick-view']) > header button { color: white; }
+[data-kit='drawer'][data-variant='quick-view'] > header { background: theme("colors.kit.slate.12"); color: white; }
+[data-kit='drawer'][data-variant='quick-view'] > header h2,
+[data-kit='drawer'][data-variant='quick-view'] > header button { color: white; }
 
 [data-testid='sales-order-quick-view'] dt { font-size: var(--fs-12); color: theme("colors.kit.slate.11"); }
 [data-testid='sales-order-quick-view'] dd { font-weight: 600; margin-top: 4px; }
-[data-testid='sales-order-quick-view'] > section:first-child { background: theme("colors.kit.slate.3"); }
+

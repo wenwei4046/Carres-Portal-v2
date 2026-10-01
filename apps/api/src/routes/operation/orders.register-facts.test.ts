@@ -93,8 +93,8 @@ describe("GET /api/operation/orders/register-facts", () => {
     const res = await read();
     expect(res.status).toBe(200);
     const body = (await res.json()) as { facts: Record<string, unknown>; failed: unknown };
-    expect(body.facts[id(1)]).toEqual({ obligations: "none", cases: "none", stock: { MS12: "received" } });
-    expect(body.facts[id(2)]).toEqual({ obligations: "outstanding", cases: "open", stock: { MS12: "issue" } });
+    expect(body.facts[id(1)]).toEqual({ obligations: "none", cases: "none", stock: { MS12: "unknown" } });
+    expect(body.facts[id(2)]).toEqual({ obligations: "outstanding", cases: "open", stock: { MS12: "unknown" } });
     expect(body.facts[id(3)]).toEqual({ obligations: "outstanding", cases: "closed", stock: { MS12: "unknown" } });
     expect(body.failed).toEqual({ obligations: false, cases: false });
   });

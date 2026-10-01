@@ -858,14 +858,6 @@ operationOrdersRouter.get("/register-facts", requireOperation, async (c) => {
     ),
   ]);
 
-  const stockUnits = [...(reserved ?? []), ...(sold ?? [])];
-  const receiptOutcomes = await readAll<{ stock_item_id: string; outcome: string }>(
-    b => sb.from("receiving_unit_results").select("id, stock_item_id, outcome").in("stock_item_id", b),
-    [...new Set(stockUnits.map(u => u.id))],
-  );
-  const outcomesByUnit = new Map<string, string[]>();
-  for (const result of receiptOutcomes ?? []) outcomesByUnit.set(result.stock_item_id, [...(outcomesByUnit.get(result.stock_item_id) ?? []), result.outcome]);
-
   const byOrder = <T,>(rows: T[] | null, key: (r: T) => string | null | undefined) => {
     const map = new Map<string, T[]>();
     for (const r of rows ?? []) {
@@ -922,13 +914,10 @@ operationOrdersRouter.get("/register-facts", requireOperation, async (c) => {
     const stock: Record<string, string> = {};
     const required = new Map<string, number>();
     for (const line of o.order_lines ?? []) required.set(line.sku, (required.get(line.sku) ?? 0) + Number(line.qty));
-    for (const [sku, qty] of required) {
-      const mine = (unitsBy.get(o.id) ?? []).filter(u => u.sku === sku);
-      const answers = mine.map(u => outcomesByUnit.get(u.id) ?? []);
-      const issue = answers.some(a => a.some(v => v === "received_with_issue"));
-      const confirmed = mine.reduce((n, u, i) => n + (answers[i]!.includes("received") ? Number(u.qty) || 1 : 0), 0);
-      const known = mine.length > 0 && answers.every(a => a.length === 1);
-      stock[sku] = !receiptOutcomes || !reserved || !sold ? "unknown" : issue ? "issue" : confirmed >= qty ? "received" : confirmed > 0 ? "partial" : known ? "pending" : "unknown";
+    for (const sku of required.keys()) {
+      // Associated Units alone cannot prove this exact line's latest posted receipt.
+      // Keep the display unknown until Stock supplies that source-linked projection.
+      stock[sku] = "unknown";
     }
     facts[o.id] = { obligations, cases: caseFact, stock };
   }

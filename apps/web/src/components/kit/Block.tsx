@@ -30,6 +30,7 @@ export default function Block({
      mono UPPERCASE title beside a left band — is RETIRED. Purchase Orders,
      Manual Purchase, the Review Purchase Orders pane, Supplier Claims and
      Purchasing Settings draw this same card. */
+  tone,
   note,
   headerSlot,
   subtitle,
@@ -39,6 +40,8 @@ export default function Block({
   children,
 }: {
   title: string;
+  /** Quiet summary identity surface, using the accepted slate-3 token. */
+  tone?: "muted";
   /** ⭐ THE WORK ROUTE CARD'S SECOND LINE (Workspace MASTER §5.10 BUILD SHEET,
    *  Jess 2026-09-28): under the title, inside the header, 13/400 — red when
    *  missed, amber when due, else grey. It says WHY the card is here. */
@@ -88,7 +91,7 @@ export default function Block({
   const bodyId = `block-b-${title.replace(/\s+/g, "-").toLowerCase()}`;
 
   return (
-    <section className="rounded-card border border-kit-slate-5 bg-white px-4 py-3" data-block={title}>
+    <section className={`rounded-card border border-kit-slate-5 ${tone === "muted" ? "bg-kit-slate-3" : "bg-white"} px-4 py-3`} data-block={title}>
       {/* ⭐ ONE CARD, ONE CHROME — every page draws its cards from here.
           A white card with a 1px rule under the title; the title is
           `text-strong` slate-12 BLACK bold, sentence case (ONE KIT LAW, Jess

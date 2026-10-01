@@ -25,6 +25,7 @@ export default function Drawer({
   title,
   description,
   headerActions,
+  variant,
   footer,
   children,
 }: {
@@ -33,11 +34,14 @@ export default function Drawer({
   title: string;
   description?: string;
   headerActions?: ReactNode;
+  /** Accepted read-only quick-view template. */
+  variant?: "quick-view";
   footer?: ReactNode;
   children: ReactNode;
 }) {
   return (
     <DialogFrame
+      variant={variant}
       kind="drawer"
       place="side"
       open={open}

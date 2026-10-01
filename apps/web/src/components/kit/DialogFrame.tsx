@@ -92,6 +92,7 @@ export default function DialogFrame({
   title,
   description,
   headerActions,
+  variant,
   footer,
   kind,
   width,
@@ -105,6 +106,7 @@ export default function DialogFrame({
   title: string;
   description?: string;
   headerActions?: ReactNode;
+  variant?: "quick-view";
   /** The actions. One `primary` — §3.4 bans two blue actions in one block. */
   footer?: ReactNode;
   /** The `data-kit` value, so a test can tell a modal from a drawer. */
@@ -150,6 +152,7 @@ export default function DialogFrame({
         <Dialog.Content
           ref={setContainer}
           data-kit={kind}
+          data-variant={variant}
           /* Radix warns when Content carries no Description. Passing undefined
            * explicitly is its documented way of saying "there is none". */
           aria-describedby={description ? undefined : undefined}
@@ -187,7 +190,7 @@ export default function DialogFrame({
             <Dialog.Close
               aria-label="Close"
               data-kit="dialog-close"
-              className="rounded-control p-1 text-kit-slate-11 hover:bg-kit-slate-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9"
+              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-control text-kit-slate-11 hover:bg-kit-slate-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9 md:h-8 md:w-8"
             >
               <Icon name="close" size={16} />
             </Dialog.Close></div>

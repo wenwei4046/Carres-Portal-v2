@@ -85,7 +85,7 @@ tables. Those follow content-led widths, governed row recipes and contained scro
 
 ## Compact Register search — approved target
 
-**APPROVED TARGET / runtime acceptance pending — owner2026-10-01.** Clear compact search uses
+**OWNER ACCEPTED TEMPLATE / production verification pending — owner2026-10-01.** Clear compact search uses
 Inter and existing Carres colours. Canonical dimensions live in01§7.2. Use the existing shared
 search control; preserve query, clear and keyboard access. Placeholder: `Search orders…`.
 Accessible hint names only verified supported search fields. Shrink on constrained screens
@@ -512,3 +512,5 @@ SO representative correction: Table/Cards uses the shared Tabs segmented variant
 ### Accepted template composition — 2026-10-01
 
 Use existing DataGrid, FilterRail, Block, Drawer/DialogFrame, Button, Icon, Tooltip and Badge components under [UI MASTER, Confirmed shared template](ui/MASTER.md#confirmed-shared-template--owner-acceptance-2026-10-01). This acceptance creates no second kit. Square return controls use canonical back icon and kit neutral-control geometry; pills remain status badges. Shared /ui examples and adoption tests are required by the authorised BUILD controller before claiming kit convergence.
+
+Accepted quick-view composition: existing Drawer `variant="quick-view"` owns the dark header and header actions; Block `tone="muted"` supplies the quiet identity section. `/ui` renders these same primitives. Close uses the canonical 32px desktop / 40px touch target. No page-local replacement drawer or card is admitted.

@@ -178,10 +178,12 @@ window.fetch = async (input, init) => {
   const detail = orders.find(o => o.id === detailId);
   const json = (body: unknown) => new Response(JSON.stringify(body), { status: 200, headers: { "content-type": "application/json" } });
   if (detail && path.endsWith(detail.id)) return json({ order: detail, lines: detail.order_lines, addons: [], total: 2499, warehouse: null, stockBalances: [], freeUnits: [], pos: [], history: [], threads: [] });
+  if (path === "/api/ops/service-cases") return json({ items: [], total: 0 });
+  if (detail && path.endsWith("/refunds")) return json({ refunds: [] });
   if (detail && path.endsWith("/payments")) return json({ payments: [] });
   if (detail && path.endsWith("/amendment")) return json({ amendment: null });
   if (detail && path.endsWith("/correction-work")) return json({ work: [] });
-  if (detail && path.endsWith("/service-cases")) return json({ cases: [] });
+  if (detail && path.endsWith("/service-cases")) return json({ items: [] });
   if (detail && path.endsWith("/revisions")) return json({ revisions: [] });
   if (path.endsWith("/workspace-duties")) return json({ duties: [] });
   if (path.endsWith("/customer-type")) return json({ existing: false, matches: 0 });
