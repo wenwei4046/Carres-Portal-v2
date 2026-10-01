@@ -84,13 +84,16 @@ describe("closed sets", () => {
     expect(true).toBe(true);
   });
 
-  it("carries the 40 original meanings plus seven registered additions, and renders the mapped glyph", () => {
+  it("carries the admitted icon meanings and renders the mapped glyph", () => {
     // 40 = §5.3 verbatim; +3 = mattress · bedframe · sofa (Loo, 2026-07-31,
     // the To Order rail); +1 = columnFilter (Jess, 2026-08-01, the Excel ▼).
     // +2 = pillow · protector for the owner-approved line-by-line calendar cards.
     // +1 = mail, the Email door in Work's Communication (Workspace §5.10
     // BUILD SHEET, Jess 2026-09-28).
-    expect(ICON_NAMES).toHaveLength(51);
+    // Table and Cards are admitted by the owner-approved2026-10-01 template amendment.
+    expect(ICON_NAMES).toHaveLength(53);
+    expect(ICON_NAMES).toContain("table");
+    expect(ICON_NAMES).toContain("cards");
     expect(ICON_NAMES).toContain("mail");
     expect(ICON_NAMES).toContain("panelToggle");
     expect(ICON_NAMES).toContain("pillow");
