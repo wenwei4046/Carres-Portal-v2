@@ -1186,6 +1186,21 @@ describe("POST …/to-order/issue-batch — one door, one transaction", () => {
     expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(1);
   });
 
+  it("an authenticated ordinary caller sees the locked-source refusal after a stale read", async()=>{
+    const sb=makeSb(TABLES());
+    const demands=await readyDemands(sb);
+    const original=sb.rpc.getMockImplementation()!;
+    sb.rpc.mockImplementation(async (fn,args)=>fn === "purchasing_issue_pos_batch"
+      ? {data:null,error:{code:"P0001",message:"Source requirement changed",details:"unknown_demand"}} as never
+      : original(fn,args));
+    const res=await postBatch({selections:allTo(demands,KLANG)});
+    expect(res.status).toBe(422);
+    const body=await res.json() as Record<string,unknown>;
+    expect(body).toMatchObject({code:"unknown_demand"});
+    expect(JSON.stringify(body)).toContain("Go back to buying and tick the lines again.");
+    expect(body).not.toHaveProperty("pos");
+  });
+
   it("derives Catalog cost and the fixed collection partner from governed data", async () => {
     const tables = TABLES();
     (tables.suppliers.data as Record<string, unknown>[])[0]!.kind = "factory_pickup";

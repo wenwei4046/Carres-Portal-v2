@@ -1779,6 +1779,17 @@ tracked by that PR and the canonical deployment probes; this does not certify th
   API route removed). A line's Deliver To moves only through `Change Deliver To` (0610), which keeps
   Units and Sales Order lineage and mints a version.
 
+**PLACEMENT RETRY ACCEPTANCE — BUILD, 2026-10-01.** Controlled ordinary-person SQL
+acceptance exposed a duplicate SO issue: two calls carrying the same exact source each minted a
+PO. The authenticated API normally rechecks before calling SQL, but concurrent callers can share
+that earlier read. Migration 0631 (not yet applied) checks the complete batch against the existing
+`so_line_remaining_requirement` after the issue lock and exact Order/line locks, before numbering.
+Repeated references share one source cap; distinct same-SKU source lines and legitimate partial
+quantities retain separate lineage. That same remainder counts a reserved Unit and its linked PO
+line once. Unsent/non-cancelled commitment still covers; anonymous incoming stock is not reserved
+by inference. The existing changed-buying-line refusal returns staff to selection. Test and
+production evidence must remain separate; this is not a claim that a real PO was sent.
+
 **RESERVE GOODS ALREADY ON A PO — OWNER RULING, APPROVED / LOCKED 2026-09-28 (Jess, "yes"). MERGED (#1723); migration 0600 APPLIED 2026-09-28 (tracker `20260928102149`).**
 Measured on production `b5e959d6`: SO-1358 (Ohana Fenrir King, qty 1) printed five
 contradicting facts on one row — `Need PO` · `Already on a PO` · `Not ordered yet` · `No purchase
