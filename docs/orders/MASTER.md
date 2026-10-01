@@ -2490,7 +2490,8 @@ the amendment machinery, the goods truth and the Order Route architecture are un
   approval, instead of riding the one amendment the ruling describes.
 
   **THE REMAINING DIFFERENCE, stated so it cannot be lost:** folding 0329 into the amendment lane —
-  one commit, one request, one approval, one applied revision, with the attribution approver's GATE 3
+  one submission and one request, with the required scoped approvals and an applied revision only
+  when the linked changes may take effect together (2026-10-01 ruling below), with the attribution approver's GATE 3
   right preserved. It is a **design change, not a missing check**, so it is not done inside a test or
   evidence card. It needs its own owner decision before it is built; until then this entry is the
   honest record and the 2026-09-22 ruling remains the target, not a claim about today.
@@ -2619,6 +2620,47 @@ planned `proceed_date`.
   is read-only on both surfaces.
 
 ### Amend delivery date · money · ownership · actions
+
+#### Amendment review ownership — OWNER-APPROVED 2026-10-01 / TARGET NOT BUILT
+
+**Submit once; the system routes the reviews; linked changes take effect together.** This
+replaces the assumption that one request necessarily means one approver, not the single
+whole-page submission or the rule against silently saving part of a draft.
+
+- Staff submit one amendment with the reason and Before/After. The system shows its review
+  destinations before submission and resolves the responsible people through the governed
+  Staff & Duties mechanism. Never hard-code a name, let the requester arbitrarily choose the
+  approver, or treat a department label as a person's identity. Existing approval rights remain
+  required; this ruling grants no new permission or self-approval right.
+- A product-only amendment routes to the applicable approval Duty. A customer-requested-date-only
+  amendment stays in the Sales Order governed change path and routes to the applicable approval
+  Duty; it does not wait for an unrelated Purchasing review. This ruling does not assign all
+  commercial or price decisions to Purchasing.
+- Where a submission contains dependent changes, the relevant reviews may proceed in parallel,
+  but the linked changes take effect together only after all required approvals. Example:
+  “change the bed only if it can arrive on Friday” must never become an approved bed change
+  with the Friday condition rejected. A rejection must not silently apply the other half.
+- Do not automatically create one independent amendment per department or assume every field
+  can take effect separately. One live amendment per order remains the rule. This approval does
+  not authorise arbitrary partial application within a mixed request.
+- Delivery may update its own actual delivery arrangements through its governed door, retaining
+  audit evidence. It may not thereby overwrite the Sales Order's Requested Delivery Date,
+  customer promise or customer address. Sales Orders owns those facts; Delivery reads them.
+- Preserve reasons, Before/After, requester, actual reviewers, decisions and times, historical
+  documents, and the effective approved revision. Pending changes do not enter the effective
+  SO document. Linked PO, Stock, Delivery and Payment records remain with their owning modules;
+  an SO approval is not permission to silently rewrite those records.
+
+**Reference boundary:** Houzs `ecce2e9676acc555efa8b2c30e78052b2ab54749`,
+`backend/src/scm/shared/amendment-lane.ts`, supplies evidence of automatic routing, a separate
+price lane and special handling that keeps related date removals together. It is code evidence,
+not proof of runtime acceptance or a Carres authority. The unconditional split-and-apply model
+and Logistics self-approval of Carres customer promises are not adopted.
+
+**Delivery boundary:** this is an approved business-model delta only. No application code,
+production operation, Card, complete field-to-Duty matrix, or production-verification claim is
+created by this entry. Existing implementation still classifies mixed drafts as a whole;
+scoped multi-review routing remains target work, not a shipped capability.
 
 - **Delivery-date changes belong to the whole-page draft**, not a competing date-only form.
   Preserve customer-request date, reason, Before/After, actor/time and historical document truth.
