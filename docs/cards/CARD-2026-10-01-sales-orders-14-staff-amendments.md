@@ -132,7 +132,9 @@ remain outside this commission. Keep their existing guarded behavior visible.
   file was also applied locally before the final combined check. Purchasing also delivered 0633 in PR1837,
   main `36e2840dd8dcce6eeb77252417ab57febbd6848d`, tracker `20261001064254`,
   file MD5 `b71e5e603b66adc6ab2bd0276abdfd6b`; its exact committed file was applied locally,
-  then all **71 combined DB/API/pricing checks passed**.
+  then all **71 combined DB/API/pricing checks passed**. After integrating main
+  `36e2840dd8dcce6eeb77252417ab57febbd6848d`, combined SO **43** + Purchasing **12**
+  real PostgreSQL scenarios passed (**55 total**, none skipped).
   This chat made no live schema or operational write. 0632 belongs to SO PR #1834;
   0633 belongs to Purchasing PR #1837 and was delivered by that chat, not this one.
 - Initial read-only live availability check: Sales Approver and Delivery Duty have
