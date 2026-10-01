@@ -145,6 +145,7 @@ export function WaitingRequest(props: {
   const needsSalesReview = Boolean(g?.sales_approval_required && !g.sales_approval_recorded);
   const canDecide = g ? props.canDecide && (needsSalesReview
     ? g.sales_approver.actor_user_id === userId : g.legacy_review_required) : props.canDecide;
+  const canReject = !g?.sales_approval_required || g.sales_approver.actor_user_id === userId;
   /* Both facts come from the SERVER on every read. The screen never decides
      for itself that a change is agreed, and the database refuses regardless. */
   const recorded = Boolean(a.customer_agreement_kind);
@@ -209,10 +210,10 @@ export function WaitingRequest(props: {
               <Textarea id="so-decision" label="Management decision reason" rows={2} value={decision}
                 onChange={(e) => setDecision(e.target.value)} />
               <div className="flex flex-wrap justify-end gap-2">
-                <Button variant="neutral" disabled={!decision.trim() || props.busy}
+                {canReject && <Button variant="neutral" disabled={!decision.trim() || props.busy}
                   onClick={() => props.onDecide("reject", decision.trim())} data-testid="decide-reject">
                   Reject
-                </Button>
+                </Button>}
                 <Button variant="primary" disabled={!decision.trim() || props.busy || (!needsSalesReview && (!recorded || !covered || Boolean(g?.supplier_waiting.length)))}
                   onClick={() => props.onDecide("approve", decision.trim())} data-testid="decide-approve">
                   {needsSalesReview ? "Approve" : "Approve and apply"}

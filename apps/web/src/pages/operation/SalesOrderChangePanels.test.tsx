@@ -45,3 +45,10 @@ it("a recorded price approval does not bypass evidence for the remaining legacy 
   expect(screen.getByTestId("decide-approve")).toHaveTextContent("Approve and apply");
   expect(screen.getByTestId("decide-approve")).toBeDisabled();
 });
+
+it("a legacy reviewer cannot reject another Duty's recorded price decision", () => {
+  show(true, "operator", { legacy_review_required: true, sales_approval_recorded: true,
+    sales_approver: { actor_user_id: "someone-else", acting_user_name: "Price reviewer" } });
+  expect(screen.getByTestId("decide-approve")).toBeInTheDocument();
+  expect(screen.queryByTestId("decide-reject")).not.toBeInTheDocument();
+});

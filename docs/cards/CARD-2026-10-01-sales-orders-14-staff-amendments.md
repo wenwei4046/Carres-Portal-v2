@@ -1,7 +1,7 @@
 # SALES ORDERS — CARD 14 · Staff amendments and exception approval
 
 Module: Sales Orders · Sequence: 14 · Lane: scoped BUILD
-Status: IMPLEMENTED FOR REVIEW — final repository checks in progress; no production deployment or live assignment authorised.
+Status: IMPLEMENTED FOR REVIEW — local verification complete; no production deployment or live assignment authorised.
 Authority: Jess's scoped BUILD commission; documentation PR #1826, head
 `3408afea35cc4ca4b8a024c04f4df9bc847cec03`; Orders MASTER § Staff amendments and
 Sales Approver and Requested Delivery Date changes. The complete module PLAN is
@@ -36,7 +36,8 @@ remains an approved target outside this scoped implementation.
 
 ## Verification
 
-Measured on the isolated build branch, based on main `2b9119eb0`; no production claim:
+Measured on the isolated build branch, initially based on main `2b9119eb0`, then
+integrated with main `45f43e96b` in `c36135ef4`; no production claim:
 
 - Real local PostgreSQL: **28/28 pass**, including atomic ordinary apply, dated Principal cover, same-person
   Sales Approver approval, parallel evidence/supplier/price gates, exact-line PO
@@ -47,11 +48,20 @@ Measured on the isolated build branch, based on main `2b9119eb0`; no production 
 - Shared suite: **192 files / 3,975 tests pass**. API suite: **202 files / 3,890 tests
   pass**, 26 database-dependent files skipped in that generic run. The 28 tests above
   were separately executed on real PostgreSQL and are not counted as skipped passes.
-- Targeted page/notification contract tests: **98/98 pass**.
+- Full web run: **407 files / 5,831 tests passed**, with 2 files / 3 tests skipped.
+  Its one failing file was the shell routing fixture (43 tests lacked the query
+  provider after notification moved to the phone-capable app shell). It now isolates
+  that separately tested reader; the corrected shell/panel/notification run passed
+  **50/50**. This is a documented correction and rerun, not a claim that the earlier
+  full command exited green.
+- After main integration: **178 web, 275 API and 37 shared tests passed**. The final
+  added rejection-permission guard passed all **6 panel tests**. Earlier page and
+  notification contract run passed **98/98**.
 - Additional partner/Work boundary tests: **16/16 pass**; together with the real
   PostgreSQL suite the final focused run passed **44/44**.
 - Full migration replay: this branch **618 applied / 7 failed**; clean detached
-  baseline `2b9119eb0` **616 applied / the same 7 failed**. Both new migrations pass.
+  baseline `2b9119eb0` **616 applied / the same 7 failed**. After main integration the replay is **620 applied / the same 7 failed** (main added
+  0627–0628). Both new scoped migrations pass.
   Existing failures: 0149, 0317, 0339, 0398a, 0453, 0561 and 0588. The last is an
   unallowlisted `42P16` view-column issue reproduced in the baseline. No committed
   migration or replay allowlist was edited to hide it.
@@ -64,9 +74,15 @@ Measured on the isolated build branch, based on main `2b9119eb0`; no production 
   [Assigned self-approval](../evidence/sales-orders-14/self-approval.png).
   These screenshots prove rendering/interaction, not persisted production state.
 
-Remaining checks: full web suite, API/web type checks, local production bundle,
-migration naming/immutability gate and final lint. Their exact results must replace
-this paragraph before review handoff. No production Duty holder is assigned.
+Final API/web type checks and the local production bundle pass. Lint passes its
+existing warn-only baseline (8,321 findings); migration naming/immutability validates
+both new files, and whitespace checks pass. Read-only production tracker and all
+committed branch heads were checked before numbering: the highest existing number
+was 0628. No production Duty holder is assigned; local preview/database processes
+were stopped after verification.
+
+Review: [PR #1834](https://github.com/wenwei4046/Carres-Portal-v2/pull/1834). Review
+only; no main merge, deployment or live operational write is authorised.
 
 ## Remaining business boundary
 

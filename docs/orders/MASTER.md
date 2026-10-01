@@ -2829,7 +2829,7 @@ arrangement but cannot originate one without the existing customer-evidence door
 whole-order cancellation refusal remains because its complete cross-module consequences are not yet
 approved. Refund approval is gated through Sales Approver on the existing refund writer; payout is not
 performed or broadened. Fee/service, attribution and ordinary-address policy have not been expanded.
-Verification and review evidence: [Sales Orders Card 14](../cards/CARD-2026-10-01-sales-orders-14-staff-amendments.md).
+Verification and review evidence: [Sales Orders Card 14](../cards/CARD-2026-10-01-sales-orders-14-staff-amendments.md) · [PR #1834](https://github.com/wenwei4046/Carres-Portal-v2/pull/1834).
 Neither main merge nor deployment is authorised. The module PLAN is not declared complete.
 
 - **Delivery-date changes belong to the whole-page draft**, not a competing date-only form.
