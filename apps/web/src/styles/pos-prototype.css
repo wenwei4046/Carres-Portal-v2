@@ -5186,6 +5186,38 @@ button.step-pill:disabled { cursor: default; color: inherit; }
     outline: 2px solid var(--c-burnt);
     outline-offset: -2px;
   }
+
+  .cfg-root--mattress-bed .cfg-wizardbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: 48px 44px;
+    height: auto;
+    padding: 0;
+  }
+
+  .cfg-root--mattress-bed .cfg-wizardbar > [data-testid="cfg-topbar-brand"] {
+    display: none !important;
+  }
+
+  .cfg-root--mattress-bed .cfg-wizardbar__mobile-main {
+    grid-column: 1;
+    grid-row: 1;
+    display: flex;
+  }
+
+  .cfg-root--mattress-bed .cfg-wizardbar__mobile-steps {
+    grid-column: 1;
+    grid-row: 2;
+    display: grid;
+  }
+
+  .cfg-root--mattress-bed .pos-tablet-topbar__icon {
+    display: none;
+  }
+
+  .cfg-root--mattress-bed .pos-tablet-topbar__avatar:disabled {
+    cursor: default;
+  }
 }
 
 /* ========= Responsive catalog shell: tablet portrait ========= */
