@@ -82,6 +82,24 @@ confirmed document is not automatically a completed physical job. The Houzs ligh
 pill is a reference interaction, not permission to copy its green/brass palette, label vocabulary
 or status mapping. Icons, text and state meaning remain readable without colour alone.
 
+### Colour contrast finding — measured palette pairs, 2026-10-01
+
+**FACT / CALCULATED TOKEN PAIRS, NOT A FULL RUNTIME AUDIT.** Using opaque sRGB values
+from the installed Radix palette and WCAG relative-luminance calculation: white on blue-9
+(`#0090ff`) is 3.26:1; white on existing blue-11 (`#0d74ce`) is 4.77:1. Slate-12 and slate-11
+on white are 16.39:1 and 5.94:1. Green-11 on green-3 is 4.21:1; amber-11 on amber-3 is
+4.25:1; red-11 on red-3 is 4.54:1. Rounded figures are for reporting, not boundary decisions.
+The normal-text minimum is 4.5:1 under
+[WCAG 2.2 contrast minimum](https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html).
+These results invalidate a blanket assertion that the proposed semantic pairs are already
+suitable for small labels. Actual component foreground/background/opacity must still be checked.
+
+**PROPOSAL / NOT APPROVED / NOT BUILT:** retain the blue brand family, evaluate existing blue-11
+as the filled primary-button background with white text rather than blue-9; separately evaluate
+darker existing semantic foregrounds for small success/warning labels. Do not replace the brand
+token globally or silently approve hover/focus/disabled states from this calculation. Real component
+samples and owner review remain required before changing locked colour use.
+
 ### Houzs selection and copy boundary
 
 Reference fixed at `ecce2e9676acc555efa8b2c30e78052b2ab54749` in
