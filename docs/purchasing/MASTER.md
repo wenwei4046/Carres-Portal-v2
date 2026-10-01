@@ -6824,6 +6824,32 @@ are snapshots, not editable truth or a second settlement ledger.
 
 ---
 
+
+### 12.1 Reference capability disposition — owner ruling 2026-10-01
+
+**APPROVED SCOPE DECISIONS; not an implementation or production verification claim.** The owner
+closed the remaining Houzs capability choices for this review as follows:
+
+| Capability | Carres disposition |
+|---|---|
+| Supplier on-time / quality performance | KEEP the approved §12 delivery/claim performance reporting target; complete through the reporting surface, not a new Purchasing scoring engine. Approved does not mean built. |
+| Scheduled future supplier prices | Catalog owns price maintenance; do not create a competing Purchasing price scheduler. |
+| Copy previous PO | REJECT for this scope. New purchases continue from authorised source demand; no blank/independent PO entrance. This is a scope ruling, not a verified claim about a Houzs button's runtime behaviour. |
+| Multi-PO printing / multi-PO date recording | DEFER until measured operator need warrants it. Existing multi-line recording within one PO remains; it is not equivalent to cross-PO bulk operation. |
+| Excess receipt | KEEP Receiving's Extra Qty handling and existing stock-availability safeguards; do not introduce a second overreceipt engine. |
+
+**Immediate delivery priority:** complete the already commissioned PO-placement unblock. Supplier
+WhatsApp group/email maintenance belongs in Settings under §11, with authorised editing and
+actor/time/old/new audit; it is not an external-contact or channel-cutover authorisation. Current
+supplier-specific missing-contact, address and production-day lists must be remeasured at delivery;
+chat-provided examples are not verified live master data and missing values must not be invented.
+The four approved exception rulings remain approved targets; recording them does not silently add
+their implementation to the placement-unblock commission. No duplicate BUILD chat is required when
+that commissioned work is already in progress. This review does not certify the whole module as
+built or production-verified.
+
+---
+
 ## 13 · Permissions
 
 | Role | May do | May not do |
