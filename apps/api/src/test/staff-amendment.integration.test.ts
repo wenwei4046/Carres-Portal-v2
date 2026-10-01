@@ -114,6 +114,15 @@ describe.skipIf(!LOCAL)("staff amendment policy on real PostgreSQL", () => {
     expect(await one("select submitted_by,sales_approved_by,decided_by from sales_order_amendments where id=$1",[r.id]))
       .toEqual({submitted_by:PR,sales_approved_by:PR,decided_by:OP});
   });
+  it("dated Principal cover is the resolved reviewer and can decide their own request",async()=>{
+    await assign("sales_approver",PR);
+    await q("select set_config('request.jwt.claims','',true)");
+    await q("insert into workspace_duty_covers(duty_key,normal_user_id,acting_user_id,starts_on,ends_on,reason) values('sales_approver',$1,$2,current_date,current_date,'Local cover fixture')",[PR,OTHER]);
+    await as(OTHER); const r=await submit(proposal(1000,1));
+    await as(PR); await refused("select sales_order_decide_amendment($1,'approve','normal holder')",[r.id],"sales_approver_required");
+    await as(OTHER);
+    expect((await one("select sales_order_decide_amendment($1,'approve','cover decision') r",[r.id])).r.status).toBe("applied");
+  });
   it("a PO on another line does not hold an ordinary change",async()=>{
     const other=(await one("insert into order_lines(order_id,sku,qty,unit_price) values($1,'TRION-Q',1,2749) returning id",[order])).id;
     await coverLine(other);

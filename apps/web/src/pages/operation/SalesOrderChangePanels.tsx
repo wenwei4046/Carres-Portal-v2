@@ -160,7 +160,7 @@ export function WaitingRequest(props: {
           {a.stale ? "Out of date. Propose again" : "Amendment request"}
         </h2>
         <span className="text-meta text-kit-slate-11">
-          Submitted {fmtDate(a.submitted_at)} · on Rev {a.base_revision}
+          Submitted {fmtDate(a.submitted_at)} · {a.submitted_by_name ?? "Not recorded"} · on Rev {a.base_revision}
         </span>
       </div>
       {a.reason && <p className="mb-2 mt-1 text-body text-kit-slate-12">Reason for change: {a.reason}</p>}

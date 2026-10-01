@@ -38,16 +38,18 @@ remains an approved target outside this scoped implementation.
 
 Measured on the isolated build branch, based on main `2b9119eb0`; no production claim:
 
-- Real local PostgreSQL: **27/27 pass**, including atomic ordinary apply, same-person
+- Real local PostgreSQL: **28/28 pass**, including atomic ordinary apply, dated Principal cover, same-person
   Sales Approver approval, parallel evidence/supplier/price gates, exact-line PO
   coverage, ambiguous legacy-source refusal, earlier-date warehouse readiness,
   PIC attribution and existing refund approval without payout.
 - Negative control: replacing the local readiness helper with unconditional `true`
   made the earlier-date refusal test fail; original helper restored and suite passed.
 - Shared suite: **192 files / 3,975 tests pass**. API suite: **202 files / 3,890 tests
-  pass**, 26 database-dependent files skipped in that generic run. The 27 tests above
+  pass**, 26 database-dependent files skipped in that generic run. The 28 tests above
   were separately executed on real PostgreSQL and are not counted as skipped passes.
 - Targeted page/notification contract tests: **98/98 pass**.
+- Additional partner/Work boundary tests: **16/16 pass**; together with the real
+  PostgreSQL suite the final focused run passed **44/44**.
 - Full migration replay: this branch **618 applied / 7 failed**; clean detached
   baseline `2b9119eb0` **616 applied / the same 7 failed**. Both new migrations pass.
   Existing failures: 0149, 0317, 0339, 0398a, 0453, 0561 and 0588. The last is an
@@ -58,7 +60,8 @@ Measured on the isolated build branch, based on main `2b9119eb0`; no production 
   pending with actual recorder/evidence; a confirmed dated answer refreshes the
   request; assigned price approval records through its own door. No browser errors.
   [Supplier waiting](../evidence/sales-orders-14/supplier-waiting.png) ·
-  [Price review](../evidence/sales-orders-14/price-review.png).
+  [Price review](../evidence/sales-orders-14/price-review.png) ·
+  [Assigned self-approval](../evidence/sales-orders-14/self-approval.png).
   These screenshots prove rendering/interaction, not persisted production state.
 
 Remaining checks: full web suite, API/web type checks, local production bundle,
