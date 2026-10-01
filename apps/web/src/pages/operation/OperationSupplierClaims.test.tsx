@@ -248,7 +248,7 @@ describe("the claim record — where the supplier reply is recorded (§9.5, 2026
     show("/operation?tab=claims&po=PO-other&claim=c2");
     expect(screen.getByTestId("object-identity")).toHaveTextContent("SC-1002");
     expect(screen.queryByTestId("claim-record-reply")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("link", { name: "Supplier Claims" }));
+    fireEvent.click(screen.getByRole("link", { name: "Back to Supplier Claims" }));
     await waitFor(() => expect(screen.queryByTestId("claim-object")).not.toBeInTheDocument());
     expect(screen.getByTestId("claims-rail-source")).toHaveTextContent("PO: PO-other");
   });

@@ -52,7 +52,7 @@ describe("Sales Order object template contract", () => {
        survives as the parameterized DEFAULT. */
     expect(header).toContain('backTo = "/operation/orders"');
     expect(header).toContain('backLabel = "Sales Orders"');
-    expect(header).toContain("aria-label={backLabel}");
+    expect(header).toContain('aria-label={`Back to ${backLabel}`}');
     expect(header).not.toContain("Back to Sales Orders");
     expect(workspace).toContain('const OBJECT_VIEWS = ["Order", "Revisions", "History", "Order Route"]');
     expect(header).not.toContain('word="Sales Order"');

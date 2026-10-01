@@ -97,7 +97,7 @@ describe("the header is the Sales Order page's — owner ruling 2026-09-26", () 
   it("prints ← Inventory, the Unit ID as identity and the Item beside it", () => {
     loaded();
     renderAt("u1000082");
-    expect(screen.getByRole("link", { name: "Inventory" })).toHaveAttribute("href", "/operation?tab=stock-onhand");
+    expect(screen.getByRole("link", { name: "Back to Inventory" })).toHaveAttribute("href", "/operation?tab=stock-onhand");
     expect(screen.getByTestId("object-identity")).toHaveTextContent("U1-000-082");
     expect(screen.getByTestId("object-identity-customer")).toHaveTextContent("Jager · Super Single");
   });
@@ -105,7 +105,7 @@ describe("the header is the Sales Order page's — owner ruling 2026-09-26", () 
   it("returns a directly opened Unit to the real Inventory destination", () => {
     loaded();
     renderAt("U1-000-082");
-    fireEvent.click(screen.getByRole("link", { name: "Inventory" }));
+    fireEvent.click(screen.getByRole("link", { name: "Back to Inventory" }));
     expect(screen.getByText("Inventory destination")).toBeInTheDocument();
   });
 

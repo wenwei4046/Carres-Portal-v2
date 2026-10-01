@@ -321,7 +321,7 @@ it("returns from a Unit without losing the register, search, rail or scroll", as
   fireEvent.click(screen.getByRole("link", { name: "U1-000-084" }));
   await screen.findByTestId("stock-unit-detail");
   // The object header's own back door (the Sales Order page's grammar, 2026-09-26).
-  fireEvent.click(screen.getByRole("link", { name: "Inventory" }));
+  fireEvent.click(screen.getByRole("link", { name: "Back to Inventory" }));
   await waitFor(() => expect(screen.queryByTestId("stock-unit-detail")).not.toBeInTheDocument());
   expect(screen.getByText("U1-000-084")).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Clear filters" })).toBeInTheDocument();
