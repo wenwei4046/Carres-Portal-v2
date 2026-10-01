@@ -668,7 +668,7 @@ manualPurchaseRouter.get("/", requireOperation, async (c) => {
       .order("name"),
     sb
       .from("suppliers")
-      .select("id, name, kind, address, whatsapp_group_url, contact_email, contact"),
+      .select("id, name, kind, address, whatsapp_group_url, po_send_channel, contact_email, contact"),
     sb.from("app_users").select("id, name, email"),
     forCaseIds.length > 0
       ? sb
@@ -853,6 +853,7 @@ manualPurchaseRouter.get("/", requireOperation, async (c) => {
         address: (r.address as string | null) ?? null,
         whatsappGroupUrl: (r.whatsapp_group_url as string | null) ?? null,
         contactEmail: (r.contact_email as string | null) ?? null,
+        poSendChannel: (r.po_send_channel as string | null) ?? null,
         contact: (r.contact as string | null) ?? null,
       };
     }),
@@ -2458,7 +2459,7 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
   const skus = [...new Set(toIssue.map((l) => l.sku as string))];
   const { data: catRows, error: catErr } = await sb
     .from("product_skus")
-    .select("sku, supplier_id, cost, product_models!inner(category)")
+    .select("sku, supplier_id, cost, stock_identity_mode, product_models!inner(category)")
     .in("sku", skus);
   if (catErr) return fail(c, catErr);
   const catalog = new Map(
@@ -2468,6 +2469,7 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
         supplierId: r.supplier_id as string | null,
         cost: r.cost as number | null,
         category: (r.product_models as unknown as { category: string }).category,
+        stockIdentityMode: ((r as { stock_identity_mode?: string | null }).stock_identity_mode ?? null),
       },
     ]),
   );
@@ -2498,9 +2500,9 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
   /* ⭐ THE SETTINGS THE PO's OWN DELIVERY DATE IS COMPUTED FROM (owner
      correction 2026-09-22). Read ONCE for the whole batch, through the one
      loader every purchasing surface uses — a second reader of the same numbers
-     is how two screens came to disagree about a 13-day supplier. A failed read
-     is not a guessed date: the POs are then born with none, and the paper says
-     `Not recorded`. */
+     is how two screens came to disagree about a 13-day supplier. A missing
+     furniture production value blocks issue by name; a failed read never
+     creates a document with a guessed date. */
   let settings: LoadedPurchasingSettings | null = null;
   try {
     settings = await loadPurchasingSettings(sb);
@@ -2550,8 +2552,16 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
        treatment. Recording the price later is Finance's own act, not a
        re-issue. A price that IS recorded keeps every existing rule, including
        the free-of-charge reason. */
-    /* Catalog is the commercial authority for this normal purchase. The
-       creation RPC rechecks the same value inside the transaction. */
+    if (["mattress", "bedframe", "sofa"].includes(cat.category) &&
+        !settings?.productionDays.some((p) => p.supplierId === cat.supplierId && p.category === cat.category)) {
+      return refuse(c, 422, "production_days_required", {
+        sku: l.sku as string, supplier: supplierNameById.get(cat.supplierId) ?? null,
+      });
+    }
+    /* 0443 · named before the transaction, not as a rolled-back batch. */
+    if (cat.stockIdentityMode == null) {
+      return refuse(c, 422, "catalog_identity_mode_missing", { sku: l.sku as string });
+    }
     const req = reqById.get(l.request_id as string)!;
     const destinationId =
       ((l.destination_id as string | null) ?? (req.destination_id as string));
@@ -2562,6 +2572,28 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
     const group = groups.get(key) ?? { lines: [], destinationId, deliveryDate };
     group.lines.push(l);
     groups.set(key, group);
+  }
+
+  /* ⭐ A Deliver To with no address is refused BEFORE the PO exists: the PO
+     document refuses it (`destination_address_missing`), but only when the
+     PDF is drawn, after the PO number is spent. Same rule as SO Batch. */
+  const groupDestinationIds = [...new Set([...groups.values()].map((g) => g.destinationId))];
+  if (groupDestinationIds.length > 0) {
+    const { data: destRows, error: destErr } = await sb
+      .from("purchasing_destinations")
+      .select("id, name, address, warehouse_id, warehouses(address)")
+      .in("id", groupDestinationIds);
+    if (destErr) return fail(c, destErr);
+    for (const d of (destRows ?? []) as Record<string, unknown>[]) {
+      const wh = d.warehouses as { address?: string | null } | { address?: string | null }[] | null;
+      const whAddress = Array.isArray(wh) ? wh[0]?.address : wh?.address;
+      const address = d.warehouse_id != null ? whAddress ?? null : (d.address as string | null) ?? null;
+      if (typeof address !== "string" || address.trim() === "") {
+        return refuse(c, 422, "destination_address_missing", {
+          destination: (d.name as string | null) ?? null,
+        });
+      }
+    }
   }
 
   const governedPos: Record<string, unknown>[] = [];
@@ -2617,10 +2649,8 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
          promise — a request raised for a showroom two months out used to put
          that far date on the factory's paper as if the factory had agreed it.
  
-         A supplier × category with no recorded production number yields NULL:
-         the PO is born with no delivery date and prints `Not recorded`,
-         because an unknown date is recorded as unknown (P1) — never today's
-         planning guess, and never the requester's wish. */
+         A missing furniture production number was refused above. Other categories
+         retain their own lead-time model; no furniture default is invented. */
       eta_date: settings == null ? null : poDeliveryDateOf(settings, {
         supplierId: first.supplierId,
         category: first.category,
@@ -2636,7 +2666,8 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
            for "price not recorded"; `normal` would claim a number nobody
            recorded and `free_of_charge` would claim a decision nobody made. */
         const cost = catalog.get(l.sku as string)!.cost;
-        const priced = cost != null && cost > 0;
+        // Do not turn an invalid Catalog value into a free-of-charge decision.
+        const priced = cost != null && Number.isFinite(cost) && cost > 0;
         return {
           sku: l.sku,
           qty: l.issueQty,
@@ -2693,19 +2724,21 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
       name: string | null;
       whatsappGroupUrl: string | null;
       contactEmail: string | null;
+      poSendChannel: string | null;
       contact: string | null;
     }
   >();
   if (issuedSupplierIds.length > 0) {
     const { data: doorRows } = await sb
       .from("suppliers")
-      .select("id, name, whatsapp_group_url, contact_email, contact")
+      .select("id, name, whatsapp_group_url, po_send_channel, contact_email, contact")
       .in("id", issuedSupplierIds);
     for (const row of (doorRows ?? []) as Record<string, unknown>[]) {
       doorsBySupplier.set(row.id as string, {
         name: (row.name as string | null) ?? null,
         whatsappGroupUrl: (row.whatsapp_group_url as string | null) ?? null,
         contactEmail: (row.contact_email as string | null) ?? null,
+        poSendChannel: (row.po_send_channel as string | null) ?? null,
         contact: (row.contact as string | null) ?? null,
       });
     }
@@ -2733,6 +2766,7 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
         destination: destNameById.get((po?.destination_id as string) ?? "") ?? null,
         whatsappGroupUrl: doors?.whatsappGroupUrl ?? null,
         contactEmail: doors?.contactEmail ?? null,
+        poSendChannel: doors?.poSendChannel ?? null,
         contact: doors?.contact ?? null,
       };
     }),

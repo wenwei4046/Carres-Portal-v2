@@ -124,6 +124,7 @@ export {
   purchasingSetProductionDaysInput,
   purchasingSetSupplierTermsDaysInput,
   purchasingSetSupplierAddressInput,
+  purchasingSetSupplierChannelInput,
   SUPPLIER_ADDRESS_MAX,
   purchasingSetWorkWeekInput,
   type PurchasingCategory,
@@ -146,6 +147,7 @@ export {
   type PurchasingSetProductionDaysInput,
   type PurchasingSetSupplierTermsDaysInput,
   type PurchasingSetSupplierAddressInput,
+  type PurchasingSetSupplierChannelInput,
   type PurchasingSetWorkWeekInput,
 } from "./purchasing-settings";
 
@@ -532,7 +534,6 @@ export {
   // PO Revisions (0364) — a sent PO keeps its number and mints a version.
   revisePoInput,
   setMessageTemplateInput,
-  setLineDestinationInput,
   setLineOpsRemarkInput,
   changePoDeliverToInput,
   recordBalanceDateInput,
@@ -2421,6 +2422,7 @@ export {
   purchaseDemandStateWords,
   purchaseDemandRailWords,
   purchaseDemandBlockerOf,
+  catalogCostBlocksIssue,
   purchaseDemandTimingOf,
   purchaseDemandSafetyDaysLeft,
   purchaseDemandQuantities,

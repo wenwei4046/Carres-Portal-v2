@@ -1856,7 +1856,7 @@ describe("closure §2 · Catalog remains the selected issue price authority", ()
           Object.assign(new Error("refused"), {
             body: {
               code: "not_po_duty",
-              message: "You do not hold PO duty today.",
+              message: "Only Operation staff may issue a purchase order.",
               action: "Ask Shasha to issue this purchase order.",
             },
           }),
@@ -1869,7 +1869,7 @@ describe("closure §2 · Catalog remains the selected issue price authority", ()
     });
     await tickReady();
     const err = await issueFromReview();
-    expect(err).toHaveTextContent("You do not hold PO duty today.");
+    expect(err).toHaveTextContent("Only Operation staff may issue a purchase order.");
     expect(err).toHaveTextContent("Ask Shasha to issue this purchase order.");
   });
 

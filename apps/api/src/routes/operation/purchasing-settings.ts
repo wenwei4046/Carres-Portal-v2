@@ -9,6 +9,7 @@ import {
   purchasingSetProductionDaysInput,
   purchasingSetSupplierTermsDaysInput,
   purchasingSetSupplierAddressInput,
+  purchasingSetSupplierChannelInput,
   purchasingSetSupplierCollectionInput,
   purchasingSetWorkWeekInput,
   purchasingSettingsResponseSchema,
@@ -216,6 +217,19 @@ purchasingSettingsRouter.put("/supplier-address", requireOperationOrPrincipal, a
   const { error } = await sb.rpc("purchasing_set_supplier_address", {
     p_supplier_id: parsed.data.supplierId,
     p_kind: parsed.data.kind === "address" ? "address" : "return_address",
+    p_text: parsed.data.text,
+  });
+  if (error) return fail(c, error);
+  return respondWithSettings(c);
+});
+
+purchasingSettingsRouter.put("/supplier-channel", requireOperationOrPrincipal, async (c) => {
+  const parsed = await parseJsonBody(c, purchasingSetSupplierChannelInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { error } = await sb.rpc("purchasing_set_supplier_channel", {
+    p_supplier_id: parsed.data.supplierId,
+    p_kind: parsed.data.kind === "contactEmail" ? "contact_email" : parsed.data.kind === "poSendChannel" ? "po_send_channel" : "whatsapp_group_url",
     p_text: parsed.data.text,
   });
   if (error) return fail(c, error);
