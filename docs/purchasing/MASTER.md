@@ -923,10 +923,11 @@ Operation person may record what the supplier answered — on a PO (`Record supp
 a Supplier Claim (`Record supplier reply`, §9.5) — because the holder may be on medical leave or the
 job not yet handed to the buddy. The record stores the actual recorder and server time as its own
 fact; normal PO Duty and any dated cover are shown and stored separately and are never rewritten
-by who recorded. This widens RECORDING only: issuing a PO, `Change Deliver To`, revising or
-cancelling a PO, and authorising a claim outcome stay with PO Duty, dated cover and the Operations
-Superuser (§5.3), because those are Carres commitments to the supplier. The Work occurrence still
-routes to PO Duty; anyone's recorded answer closes it.
+by who recorded. Recording permission does not itself grant commitment-change or approval rights.
+Ordinary PO issue follows §5.3; outstanding-goods cancellation follows §5.8.1, including staff help
+and the commercial-exception boundary. Other revisions, destination changes and claim outcomes
+retain their separately governed permissions. Work assignment remains separate from actual execution;
+a recorded answer closes only the occurrence whose governed completion condition it satisfies.
 
 **Delay reasons converge — OWNER-APPROVED (Jess, 2026-09-25) · BUILT (0585 `purchasing_supplier_delay_reasons()` and the shared `PO_DELAY_REASONS` are the same eight; the per-line form reads the shared list).** The eight reasons
 above replace the built `PO_DELAY_REASONS` (`packages/shared/src/po-workspace.ts`: Production Delay ·
@@ -981,7 +982,9 @@ and goods still pending) → `Confirm PO sent to supplier`. Reuse the authoritat
 completion and quantity facts; an unknown read is never silently zero. A completed PO without
 a sent mark stays in `Completed`; its cell may still say `Sending not confirmed`.
 
-Each line retains Order Qty, Received Qty and Pending Delivery Qty. Receiving records Damaged Qty,
+Each line retains Order Qty, Received Qty, Cancelled Qty and Pending Delivery Qty. Effective
+cancellation reduces only the outstanding commitment under §5.8.1; original ordered and received
+quantities remain historical facts. Receiving records Damaged Qty,
 Wrong Item Qty and Extra Qty separately; damaged, wrong and extra goods do not reduce Pending
 Delivery Qty and never create available stock. A supplier date may split by quantity. An
 passed or changed supplier promise creates supplier-contact work; it never rewrites the original
@@ -994,6 +997,76 @@ cannot confirm delivery of a PO it never received, and until the mark the PO act
 window's send line alone. **Fixed 2026-09-28** — the Work projection had derived the check for
 unsent POs (PO-20260903-4316 / -7907, found by the Workspace Work BUILD chat); the PO Register
 facet and the Order Route already required the send mark.
+
+
+### 5.8.1 Cancel goods not received
+
+**OWNER RULING 2026-10-01 — APPROVED / LOCKED TARGET; implementation and production verification
+are not claimed.** This governs cancellation of outstanding PO goods, not customer cancellation,
+physical returns, supplier settlement or a new price-approval process.
+
+**One source-owned cancellation flow.** On the PO, the last `Edit` action is `Cancel goods not
+received`. Select the affected lines and outstanding quantities, retaining original ordered and
+received quantities. Whole unreceived cancellation and partial outstanding cancellation use this
+same flow. Record why cancellation is sought and the supplier facts. `Customer cancelled` is not
+a manually selectable substitute for cancelling the SO: show that source reason only from an
+effective Orders cancellation. Purchasing never changes the customer's demand by choosing a reason.
+
+**Who may help.** Any active authorised Operation person, and Jess as an authorised Principal
+person, may request cancellation and complete the ordinary evidenced cancellation below without
+holding PO Duty or changing assignment first. Preserve `Assigned to`; record each actual updater
+and completer, time, quantity, reason and evidence. Medical leave does not create a duty-only gate.
+This grants no commercial exception approval, Finance powers or self-approval exception. Workspace
+§3 remains the owner of assignment and actual-actor presentation.
+
+| Supplier facts | Purchasing result |
+|---|---|
+| Supplier explicitly cannot supply the identified outstanding quantity, with evidence | Operation may cancel that quantity. Deposits, refunds or other financial matters remain Finance follow-up; cancellation never settles them. A supplier fee demand or contradictory shipping evidence requires exception handling. |
+| Carres requests cancellation; supplier agreement is not yet evidenced | Retain the outstanding commitment and procurement coverage; show `Waiting for supplier to agree`. Do not treat a request as cancellation or trigger duplicate buying. |
+| Supplier agrees and explicitly confirms no cancellation fee | Operation may complete the cancellation without additional owner approval. Existing deposits/refunds remain Finance's responsibility and do not require Operation to inspect money. |
+| Supplier disagrees, goods have shipped, or a cancellation fee is requested | Do not complete an ordinary cancellation. Purchasing Approver handles the commercial exception under existing authority; Finance handles money. A cancellation fee is not a PO unit-price change and must not be put through a price-change flow merely for convenience. |
+| Cancellation fee is not confirmed | Keep the request pending and retain procurement coverage while the supplier facts are confirmed. Do not silently interpret an unknown answer as no fee. |
+
+The supplier-fact question is `Supplier charges for this cancellation?`, with `Yes`, `No` and
+`Not confirmed`. It has no monetary amount field for Operation and no assumed `No`. Evidence may
+be a screenshot, email or PDF through the existing evidence upload. Preserve what quantity and
+supplier statement it supports. Supplier inability is itself evidenced refusal to supply; it is
+not a Carres request waiting for the supplier to agree a second time. Where fee facts are unknown,
+retain the unresolved request rather than inventing a no-fee answer.
+
+**Completion and consequences.**
+- Recheck current receipt, outstanding quantity and affected Unit facts at submission. Concurrent
+  receiving or cancellation cannot cancel a received Unit or consume the same outstanding quantity
+  twice. A refused or failed save changes neither coverage nor Work completion.
+- Keep Order Qty unchanged; retain Received Qty and explicit Cancelled Qty. If no goods were
+  received and the whole PO is effectively cancelled, show `Cancelled`. If some goods were received
+  and all remaining commitments are cancelled, show `Completed`, with the ordered/received/cancelled
+  breakdown. Outstanding uncancelled goods keep their existing receipt and follow-up journey.
+- Preserve the PO number and historical sent documents; effective cancellation creates the next
+  version with the affected quantities. Use the existing supplier-send flow to communicate that
+  version. A pending request is not an effective cancelled document or a confirmed send.
+- Retire only affected not-yet-received exact Units; never delete or reuse their IDs. Quantity-mode
+  goods have no Unit IDs. Preserve lineage and resolve affected incoming allocations through their
+  existing owners; never erase receipt, stock or delivery facts. Goods arriving after effective
+  cancellation follow Receiving's governed extra/discrepancy path, not automatic available stock.
+- Recompute SO and Manual Purchase coverage through the ONE demand calculation (§5.1): still-valid
+  requirement less allocated usable stock and other valid PO coverage. Never add a fixed cancelled
+  quantity back to buying. Applied source cancellations and existing alternative supply count;
+  Purchasing does not cancel the source or change SKU. Close only follow-up for the cancelled
+  balance; retain supplier-send and other genuinely unfinished actions.
+- Finance receives a traceable cancellation notification with the original PO link, affected lines,
+  quantities and evidence, through the shared Work/handoff grammar. It must be actionable and
+  traceable, not dependent on Finance discovering a changed row. Finance owns deposit/refund/fee
+  follow-up and settlement. Purchasing supplies read-only cancellation facts; Operation sees no
+  costs or financial amounts. Cancellation notification is never proof of refund or settlement.
+
+**Business acceptance boundary.** Both supplier-initiated and Carres-requested cancellation must
+preserve the original PO/receipt history, handle partial and whole unreceived cancellation, keep
+pending requests covered, recompute actual remaining need without duplicate buying, retain actual
+actors when colleagues help, and expose the Finance continuation without leaking money to
+Operation. Evidence and the current receipt check are required; approver absence does not block
+an evidenced ordinary no-fee cancellation. This approved rule does not commission application
+implementation or expand the separate PO-placement unblock BUILD scope.
 
 ---
 
@@ -3262,8 +3335,7 @@ Document               the current version's PDF, full width, last
 - **State lives in the header**, next to `number · party`, in the §5.8 vocabulary; the `Status`
   and `PO Version` facts are retired from the fact grid; the version is the number's `(n)` and the
   send record is the `Sent` fact.
-- **`Edit ▾`** holds `Revise quantity or Deliver To` · `Change Deliver To` (§5.4) · `Cancel purchase
-  order` last (destructive). Each opens the 50/50 edit split; `Record supplier answer` opens the
+- **`Edit ▾`** holds `Revise quantity or Deliver To` · `Change Deliver To` (§5.4) · `Cancel goods not received` (§5.8.1) last (destructive). Each opens the 50/50 edit split; `Record supplier answer` opens the
   560px right panel of §5.7 instead.
 - **Geometry (tokens only):** header 50px, title `text-page`, state `text-body` slate-11; view strip
   36px with a 2px blue-9 underline; blocks white, 1px slate-5, `rounded-card`, 16px padding, 24px
@@ -3289,7 +3361,7 @@ unsent PO now says `Send {PO No}({n}) to {Supplier}` (the 2026-09-25 send line).
 differences from the sketch above:** `Source` stays removed (owner 2026-09-26); `Supplier reply`
 stays inside `Purchase order` (§5.7, owner 2026-09-26); the fact keeps `PO Delivery Date` because the
 PO read carries no working-day count (the PDF prints `PO {n}-Day`); `Edit ▾` has no `Change Deliver
-To` or `Cancel purchase order` item because neither door exists yet; with no action and no expected
+To` or cancellation item because neither door exists yet; with no action and no expected
 date the block reads `Nothing to do now`. The page's own raw-hex table band and line colours were
 removed; the tables are the kit's.
 
