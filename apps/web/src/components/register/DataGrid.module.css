@@ -198,19 +198,19 @@
 .toolbarPill {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   font-family: var(--font-button);
-  font-size: var(--fs-12);
-  font-weight: 600;
-  letter-spacing: 0.02em;
+  font-size: var(--fs-13);
+  font-weight: 500;
+  letter-spacing: normal;
   color: var(--c-ink);
   background: var(--c-paper);
   border: 1px solid var(--line);
   border-radius: var(--radius-sm, 6px);
-  padding: 4px 10px;
+  padding: 0 12px;
   cursor: pointer;
   white-space: nowrap;
-  height: 28px;
+  height: 32px;
 }
 .toolbarPill:hover:not(:disabled) {
   background: var(--c-cream);
@@ -1514,3 +1514,19 @@ div:first-child > .columnsMenuGroup {
 .root .toolbar { border-bottom: 0; }
 .rootReference .toolbar:not(.selectionBar) { height: 40px; min-height: 40px; margin-bottom: 0; }
 .rootReference.rootLabelledToolbar .toolbar { height: auto; }
+
+/* Owner-approved icon+word grammar: narrow controls wrap, never hide labels. */
+@media (max-width: 767px) {
+  .rootReference .toolbar,
+  .rootReference[data-presentation-tools] .toolbar:not(.selectionBar) {
+    height: auto;
+    min-height: 48px;
+    flex-wrap: wrap;
+    overflow: visible;
+  }
+  .rootReference[data-presentation-tools] .searchResponsiveBox {
+    flex: 0 0 min(220px, 100%);
+    max-width: 100%;
+  }
+  .toolbarPill { height: 40px; }
+}
