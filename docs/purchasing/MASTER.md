@@ -599,17 +599,30 @@ The build's shared completion sentence is `Current PO version marked as sent`.
 
 Supplier out-of-stock, delayed model/fabric, changed quantity or changed price is a later exception.
 **PRICE ISSUES DO NOT STOP OPERATION — OWNER RULING 2026-10-01, APPROVED TARGET / NOT BUILT.**
-Operation proceeds with ordinary PO issue, sending, supplier follow-up and Receiving even while a
-price is missing, changed or disputed. Do not introduce a Commercial Hold or a price-resolution
-prerequisite for those operational acts. Operation does not see costs, edit prices or approve
-commercial terms. Jess and Finance handle price matters in parallel under their existing authority.
-Continuing operational work is neither acceptance of a proposed price nor approval of payment;
-never silently overwrite approved commercial facts with the supplier's disputed proposal. Source
-request approval, quantity, identity, document and other non-price gates remain. This does not
-revoke §5.8.1's separately approved cancellation-fee and supplier-agreement exception rules.
-Older price-refusal implementation descriptions in §§5.6 and 9.2 are not the current target and
-must converge to this ruling. This is governing truth only, not application implementation or an
-expansion of the separate PO-placement unblock BUILD.
+Operation proceeds with issuing, sending, supplier follow-up, receiving and delivering; a supplier
+price issue never stops those operations. There is no Commercial Hold state or button; the earlier
+2026-08-17 hold proposal is withdrawn. Ordinary operational continuation does not approve a price
+or payment, and source authorisation, quantity, identity, document and other non-price gates remain.
+
+Any authorised active Operation person records only `Price changed` with evidence through the
+existing `Record supplier answer` entrance and continues work. There is no price-number field or
+cost display for Operation. Evidence access must preserve that same confidentiality, including
+attachments containing quotation amounts; uploading evidence cannot create a cost-viewing loophole.
+Recording the fact alone never updates the PO price, Catalog or a supplier invoice.
+
+Purchasing Approver, currently Jess, decides whether to accept the proposed price, retain the PO
+price or cancel through §5.8.1. Accepting a changed price produces the next version of the same PO
+and the normal resend journey, preserving historical versions. Prompt the authorised person to
+consider a Catalog update; never update Catalog automatically from one PO decision. This is distinct
+from first recording a previously absent price under §9.2. Retaining the old price records the
+Carres decision, not invented supplier agreement. Cancellation retains all §5.8.1 conditions.
+Finance owns invoice price differences, deposits, refunds and payment; it may hold payment but
+never reverse the physical receipt merely because of a price dispute. No automatic payment or
+settlement follows from operational continuation or price approval.
+
+Older price-refusal implementation descriptions in §§5.6 and 9.2 are not the current operational
+target and must converge to this ruling. No application implementation or expansion of the separate
+PO-placement unblock BUILD is commissioned here.
 
 #### 5.6.1 Daily PO windows — owner-approved 2026-09-24; BUILT on branch, awaiting owner review (not live)
 
