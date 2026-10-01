@@ -1789,20 +1789,22 @@ quantities retain separate lineage. That same remainder counts a reserved Unit a
 line once. Unsent/non-cancelled commitment still covers; anonymous incoming stock is not reserved
 by inference. The existing changed-buying-line refusal returns staff to selection. Test and
 production evidence must remain separate; this is not a claim that a real PO was sent.
-Nine local SQL cases passed, including two concurrent ordinary issuers (one success, one refusal),
+Twelve local SQL cases passed, including two concurrent ordinary issuers (one success, one refusal),
 three-unit SO/MPR document and actor checks, legitimate 1+2 buys, duplicate source aggregation,
 separate same-SKU lines and linked-Unit deduplication. The authenticated API maps the atomic refusal
-to the existing changed-buying-line instruction (109 API/SQL tests); 258 real-component journey
+to the existing changed-buying-line instruction (112 API/SQL tests); 258 real-component journey
 checks passed with simulated transport/PDF readiness. A production rolled-back negative control
 refused excessive source quantity before numbering and left the PO count unchanged. Applied source
 MD5 `8efc838e3f7fdc78d23059fff0354cba`; issue/remainder bodies matched the locally tested functions.
 No live supplier message or purchase was created. Issue-versus-new-Stock-reservation concurrency was then reproduced: Stock checked the remainder
-before waiting on the Order, and could retain that stale answer. Draft migration 0633 (not yet
-applied) gives the existing draw/reserve/use-PO/save/release doors one internal source-lock helper,
+before waiting on the Order, and could retain that stale answer. Migration 0633 (APPLIED 2026-10-01, tracker `20261001064254`) gives the existing draw/reserve/use-PO/save/release doors one internal source-lock helper,
 Order then exact line before PO-line/Unit locks; eligibility and ownership do not change.
 Twelve controlled SQL cases now pass, including that independent-connection race, legitimate
 reserve → partial buy → release → final buy and explicit incoming-PO reservation with preserved
-Unit IDs. This is bounded placement integrity work; Receiving lifecycle is not certified by it.
+Unit IDs. The 0633 production probe rolled back all five body patches and the internal helper;
+its negative control refused direct authenticated helper access. Exact committed file MD5
+`b71e5e603b66adc6ab2bd0276abdfd6b` matches the tracker, and all six production function
+bodies match the tested local functions. This is bounded placement integrity work; Receiving lifecycle is not certified by it.
 
 **Reusable presentation evidence (placement scope).** Both issue lanes use
 `so-batch/SoBatchIssueWorkspace.tsx` (Review), kit `Block` / `SalesOrderWorkspace.Fact`,
