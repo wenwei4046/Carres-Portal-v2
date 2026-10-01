@@ -22,6 +22,47 @@
 
 # §1 · Overview
 
+## Houzs-based shared page templates — owner direction 2026-10-01
+
+**RULING / APPROVED DIRECTION / TEMPLATE SELECTION, IMPLEMENTATION AND OPERATOR VALIDATION
+PENDING.** Jess approved adopting suitable corresponding Houzs pages as the concrete layout and
+interaction baseline, rather than letting each module or build chat invent another page. This
+changes the reuse direction, not Carres business ownership or a claim that the templates are built.
+
+- Keep **one existing Carres kit**. Adopt the selected reference's useful page structure and
+  interaction in shared components; retain Carres token values, COPY-STANDARD, navigation,
+  permissions, Unit/quantity semantics and source-owned actions. Recolouring foreign components
+  alone is not kit adoption. Do not introduce a parallel Houzs component library.
+- Every adopting page names its common template and its justified business differences. Reuse
+  the shared Shell/Register/Object Detail grammar and the approved field-operation direction
+  below. Operational schedules remain a justified workspace, not a forced table. Common
+  structure does not require identical columns or identical physical steps.
+- Select the concrete reference before describing a page as ready to copy: record repository
+  commit, page/file, retained interactions, necessary Carres adaptations and available runtime
+  evidence in this MASTER or the owning module's existing authority. Do not leave the builder
+  only the instruction "copy Houzs" or create another template guide.
+- A missing shared capability is resolved through the **existing kit admission** process and
+  its `/ui` example, never a page-local lookalike. Use an existing equivalent where available;
+  the finding that pages differ is not proof that a new component is necessary.
+- Review the complete relevant page states and its owning business journey against the selected
+  template. A visually similar default screen, passing component tests or a merged PR alone
+  cannot establish consistent UI or successful operator delivery. Preserve failure, retry,
+  permissions, long-content and narrow-screen behaviour as well as the normal path.
+
+**Evidence boundary.** Warehouse inspected Houzs commit
+`ecce2e9676acc555efa8b2c30e78052b2ab54749`, including
+`frontend/src/pages/scm-v2/Inventory.tsx` and `StockTakeDetail.tsx`, related backend rules and
+test files. This is reference-code evidence, not observed current 2990 behaviour, a frozen
+portal-wide template selection, or verified source-copy permission. Rights, dependencies,
+security and compatibility remain to be checked for any proposed source-code copying.
+
+**Approval boundary.** This direction does not approve all findings in the Warehouse review,
+override an explicit module-specific owner ruling without resolving the conflict, or authorise
+application code, Cards, deployment or external cutover in the PLAN chat. It does remove the
+assumption that every page may freely choose a different shell or interaction merely because
+its individual components already exist. Concrete template choices and ordinary compatible
+implementation details are the planner/builder's work, not a serial questionnaire for Jess.
+
 **Workspace destination label — owner ruling 2026-09-29 / BUILT; production verification pending.**
 The main-menu link to `/operation?tab=work` reads `Workspace`, matching the page heading.
 Keep its route, icon, permissions, selected treatment and `My Task` / `Team Work` scopes.
@@ -77,9 +118,9 @@ a value.
 Implementation.** On a conflict, Business wins and the Design System follows.
 
 ```
-LOCKED, never invented   token VALUES · component internals
-YOURS to improve         composition — layout, hierarchy, readability, scalability
-STOP and ask             a component that does not exist. Never draw one inline "just this once"
+LOCKED, never invented   token VALUES · component internals · admitted shared template contracts
+YOURS to improve         composition within those contracts; justify business-specific differences
+KIT ADMISSION           a missing component or shared template capability; never a page-local copy
 ```
 
 **A rule that exists only as documentation is temporary and incomplete.** Every UI rule must
@@ -95,7 +136,7 @@ execution work:
 ```
 BEFORE build   the token values, the kit, COPY-STANDARD and the page patterns
                BIND exactly as before — the law order is unchanged. The chat
-               composes with its own best judgment inside those laws; it does
+               composes within the admitted shared template using its own judgment; it does
                not wait for a layout sign-off.
 AFTER build    the owner reviews the LIVE surface asynchronously. A review
                verdict is a normal re-ruling: it changes the next commit,

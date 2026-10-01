@@ -1,6 +1,6 @@
 # 03 · PAGE PATTERNS
 
-> **Status: FROZEN.** Standard page layouts for the whole Carres Portal.
+> **Status: GOVERNED SHARED PATTERNS.** Standard page layouts for the whole Carres Portal.
 >
 > Business modules REUSE these patterns and never invent their own page layout.
 > A module's shape is recorded here as a **Carres Example** under the pattern it
@@ -10,14 +10,20 @@
 Page patterns use `01-design-tokens.md` and `02-components.md` only. They never
 define typography, colour, spacing or component styles.
 
+The current shared-template direction and its approval boundaries live in
+[`ui/MASTER.md`, Houzs-based shared page templates](ui/MASTER.md#houzs-based-shared-page-templates--owner-direction-2026-10-01).
+This file describes the common patterns; it is not a second reference selection or an authority
+to redesign each page independently. The current listing contract is UI MASTER §6.0; its detailed
+Register/Object Detail rules govern where an older example below differs.
+
 **One purpose per page. One primary action. Business logic belongs to modules,
 never to a pattern.**
 
-**One obvious reading path** (`UI_KIT_MASTER` §5, Loo 2026-08-02). Within three
+**One obvious reading path.** Within three
 seconds the operator knows: where they are · what needs attention · what to do
 next.
 
-**Vertical chrome is economical** (`UI_KIT_MASTER` §11, Loo 2026-08-02). Never
+**Vertical chrome is economical.** Never
 stack breadcrumb + title + tabs + summary + toolbar + filters + table header
 without proving every layer earns its height. The active tab is never repeated
 as a second page title unless the title adds information the tab does not.
@@ -33,37 +39,30 @@ ONE component rendered as the page's first child. A page draws no breadcrumb,
 no title, no global icons of its own — it structurally cannot forget or
 mis-draw the header, because it never draws one.
 
-**One row · 44px · white · never scrolls.** Screens are wide and short, so the
-header spends width, not height. White with a 1px bottom hairline; the only
-colour allowed above the content is the blue active underline and a red count
-badge — never a brand colour, except the logo.
+The current header contract, dimensions and contents live once in
+[`ui/MASTER.md` §6.0](ui/MASTER.md#60--listing-template--every-portal-listing--owner-rulings-2026-09-21-jess).
+Use the shared module header, with page name and global tools. Page actions belong in the
+toolbar; do not reconstruct the header locally or restore an old module-tab header example.
 
 ```
-Module word │ Tab  Tab  Tab  Tab │ ····· page-meta │ 🔔 ❓ ⚙
+Page name │ Jump to · alerts · help · settings
 ─────────────────────────────────────────────────────────────
 page content — the only scroll area
 ```
 
-**The five slots.** Any future function is placed by asking ONE question —
-*who is it for?* — and the answer is final:
+**Placement follows purpose**, within the current UI MASTER contract:
 
 | It is for… | Slot |
 |---|---|
-| every page in the portal | **A** — global icon cluster (Bell · Help · Settings; ⌘K later) |
-| the workload of one tab | **B** — a count badge on the tab word |
-| this page only | **C** — the page's own toolbar row, right end |
-| a selection | **D** — the batch bar, rendered only while something is selected |
-| one record's identity | **E** — the Detail page title block (title + StatusPill + one meta line) |
+| every page in the portal | the shared header's global tools |
+| this page only | the page toolbar, using the shared controls |
+| a selection | the shared selection toolbar, only while something is selected |
+| one record's identity | the governed Object Detail header |
 
-A list page never repeats the lit tab as a title (that is Slot E's job on a
-Detail page, where the title is the RECORD's name). Nothing else may enter the
-header — an H1, a description, a search box, a page action or a KPI in the
-header is a defect, not a variant.
-
-**Carres Example.** Purchasing — `PurchasingTabs` is the module's shell row
-(module word · 5 tabs · page-meta slot · global icons); To Order, Purchase
-Orders, Receiving, Claims and Settings all render it first and draw nothing
-above their own toolbar.
+The shared header names the page once. Search and page actions stay in the toolbar;
+no extra title, explanatory banner or KPI strip is added above a register without its
+governed business purpose. Module destinations and object identity follow their current
+owning MASTER, not the superseded Purchasing tab-shell example.
 
 ---
 
