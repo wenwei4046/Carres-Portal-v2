@@ -1,5 +1,18 @@
 # PAYMENT — MASTER
 
+**SO amendment commercial exception boundary — OWNER-APPROVED 2026-10-01 / TARGET NOT BUILT.**
+Sales Approver must approve a customer price decrease, a customer refund or whole-SO
+cancellation after Proceed before it takes effect, under Orders MASTER § Staff amendments and
+Sales Approver. Ordinary SO amendments need no owner approval. This SO commercial decision does
+not itself send money, post a refund or rewrite a receipt/invoice. Existing money execution,
+accounting controls and audit ownership remain with their owning workflows; no second ledger
+or refund writer is created. **System-priced delivery charges — owner-confirmed 2026-10-01 /
+TARGET NOT BUILT:** address/delivery-service changes recalculate through the existing system price;
+Operation cannot manually override it, so there is no charge-approval lane on that SO path. A lower
+correct system charge is not a discretionary product discount, but any resulting customer refund
+still requires Sales Approver and the existing money execution controls. No automatic payout or
+live refund/build is authorised. See Orders MASTER § System-priced delivery charges.
+
 **All listing appearance — APPROVED / NOT BUILT (Jess, 2026-09-17):** follow
 [UI MASTER §6.7 Portal-wide listing readability](../ui/MASTER.md#portal-wide-listing-readability--built-2026-09-17-slice-1--authenticated-walk-owed).
 This is the shared default, not a PO visual pilot. Preserve this module's filter content,
@@ -381,6 +394,19 @@ Storage begins only when both facts exist: **Carres can complete the agreed deli
 **the customer delays/refuses it or will not arrange receipt**. Storage Start is the later fact.
 Supplier/Carres delay and goods-not-ready days are never charged. The system derives the date;
 staff cannot key an earlier one.
+
+**Early receipt declined — OWNER-APPROVED 2026-10-01 / TARGET NOT BUILT OR VERIFIED.**
+When Carres becomes ready earlier and Logistics offers earlier receipt, a customer who declines
+that offer but retains the original agreed receipt date/window is **not delaying**. Early goods
+readiness alone cannot start storage charges; that refusal is not a customer-delay witness. Keep
+the agreed-scope readiness AND actual customer-delay rule above. Existing valid Storage Start
+facts are not reset. Orders/Delivery MASTER record the readiness, customer evidence and unchanged
+SO Requested Delivery Date boundary. No rate, free period, waiver authority or live charge changes
+are authorised here. **Customer-requested later-date amendments — OWNER-APPROVED 2026-10-01 /
+TARGET NOT BUILT:** staff submit with customer evidence and the SO date change takes effect, per
+Orders MASTER. This does not remove the written-request/storage evidence requirements below,
+automatically start storage, or grant a waiver. Customer date changes require no PO Duty or
+supplier confirmation; money execution and storage authority remain unchanged.
 
 The first valid Storage Start is permanent. Later delay never resets it, a free period or a cycle.
 
