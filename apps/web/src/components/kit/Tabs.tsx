@@ -42,6 +42,7 @@ export default function Tabs({
   label,
   fill = false,
   orientation = "horizontal",
+  variant = "underline",
 }: {
   tabs: readonly TabDef[];
   value: string;
@@ -52,12 +53,14 @@ export default function Tabs({
    *  must keep every tab on one row (Work's Communication, Workspace §5.10). */
   fill?: boolean;
   orientation?: "horizontal" | "vertical";
+  variant?: "underline" | "segmented";
 }) {
   return (
     <RadixTabs.Root orientation={orientation} value={value} onValueChange={onValueChange}>
       <RadixTabs.List
         aria-label={label}
         data-kit="tabs"
+        data-variant={variant}
         className={`flex items-center border-b border-kit-slate-5 ${fill ? "gap-0" : "gap-4"}`}
       >
         {tabs.map((t) => (

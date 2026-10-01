@@ -1284,10 +1284,10 @@ export default function SalesOrdersRegister() {
             searchScope="Search sales orders by SO number, customer or imported reference"
             toolbarSummary={(visible) => <span className="shrink-0 text-meta tabular-nums text-kit-slate-11" title={`${visible.length} sales orders`} aria-label={`${visible.length} sales orders`}><span className="hidden md:inline">{visible.length} sales orders</span><span className="md:hidden">{visible.length}</span></span>}
             presentationKey={cards ? "cards" : "table"}
-            toolbarEnd={<Tabs label="Sales Orders view" value={cards ? "cards" : "table"}
+            toolbarEnd={<Tabs variant="segmented" label="Sales Orders view" value={cards ? "cards" : "table"}
               onValueChange={(next) => setParam("view", next === "cards" ? "cards" : null)}
               tabs={[{ value: "table", label: "Table" }, { value: "cards", label: "Cards" }]} />}
-            selectionPrimary={<Tabs label="Sales Orders view" value={cards ? "cards" : "table"}
+            selectionPrimary={<Tabs variant="segmented" label="Sales Orders view" value={cards ? "cards" : "table"}
               onValueChange={(next) => setParam("view", next === "cards" ? "cards" : null)}
               tabs={[{ value: "table", label: "Table" }, { value: "cards", label: "Cards" }]} />}
             renderResults={cards ? (visible) => (

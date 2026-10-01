@@ -506,3 +506,5 @@ chosen value visible. Desktop main rows 32px, header 36px/600, Inter 13/18, cell
 mobile rows preserve 40px targets. Cards use the same tools/filter engine. Existing components
 receive these scoped composition capabilities; no alternative kit or new palette.
 Status: local implementation; owner visual acceptance, remote checks and deployment not implied.
+
+SO representative correction: Table/Cards uses the shared Tabs segmented variant, not underlined stage tabs. Outer32px (1px border +2px padding +26px option), radius6; option13/18, padding10 horizontal, selected blue-3/blue-11/600. Touch outer40px. Table body stays Inter13/18; compactness comes from32px rows, not smaller body text.
