@@ -2662,12 +2662,18 @@ production operation, Card, complete field-to-Duty matrix, or production-verific
 created by this entry. Existing implementation still classifies mixed drafts as a whole;
 scoped multi-review routing remains target work, not a shipped capability.
 
-#### SO Approver — OWNER-APPROVED 2026-10-01 / TARGET NOT BUILT
+#### Sales Approver — OWNER-APPROVED 2026-10-01 / TARGET NOT BUILT
 
-Jess approved a dedicated **SO Approver** Duty (the SO commercial-approval responsibility),
+The earlier pasted approval matrix is **WITHDRAWN / NOT A PROPOSAL OF RECORD**. This owner
+ruling supersedes it; do not infer authority from any row in that matrix. **Sales Approver**
+replaces the earlier proposed name SO Approver; there is one Duty, not two.
+
+Jess approved a dedicated **Sales Approver** Duty (approves Sales Order amendment requests),
 assigned through the existing **Settings → Staff & Duties**. This is a scoped PLAN decision,
 not approval of the entire Sales Order blueprint or a BUILD commission.
 
+- The target shared catalogue is `packages/shared/src/workspace-duties-catalogue.ts`, using
+  the existing Principal-qualified pattern (`roles: ["principal"]`). This PLAN does not edit it.
 - The holder AND any dated cover must be active **Principal** people. Assigning an ordinary
   employee to this Duty must not grant them Principal or SO approval rights. Changing the
   eligible person uses the governed assignment mechanism, not a hard-coded name or a local list.
@@ -2679,17 +2685,24 @@ not approval of the entire Sales Order blueprint or a BUILD commission.
   do not fall back to any Principal, an Operation employee or an arbitrary requester choice.
 - The existing implementation still uses the Principal-role gate in
   `0564_the_amendment_carries_the_whole_change_and_the_customers_agreement.sql`;
-  the shared Duty catalogue does not yet contain SO Approver. **APPROVED TARGET / NOT BUILT**
+  the shared Duty catalogue does not yet contain Sales Approver. **APPROVED TARGET / NOT BUILT**
   is not evidence that resolution, assignment or production behaviour has changed.
-- **Not approved by this decision:** self-approval or a Primary-holder exception; approval
-  rights for other departments; cancellation after Proceed; folding attribution requests into
-  amendments; a complete field-to-Duty review matrix. The earlier A/B question about a PO Duty
-  signature before effectiveness was withdrawn and remains undecided. Do not infer its approval.
+- **One submission = one amendment request = one final decision/outcome.** The system routes
+  the required approvals automatically; this does not mean there can be only one reviewer.
+  Linked changes take effect together only after all required approvals and the existing 0564
+  customer-agreement evidence gate. Reviewers resolve through Staff & Duties, never hard-coded
+  names. Delivery arrangements never overwrite the customer's Requested Delivery Date.
+- **NOT DECIDED; each requires its own owner decision:** self-approval of one's own request;
+  approval rights for other Duties/actors (PO Duty, Delivery Charge Approver, order PIC, HR);
+  cancellation after Proceed; folding the salesperson/dealer/location request (0329) into the
+  amendment; whether ordinary address fields join floor/lift/stairs as amendment-only after
+  Proceed. The PO Duty pre-effectiveness supplier-confirmation question remains open; do not
+  infer approval from the earlier withdrawn A/B discussion or matrix.
 - PO Duty and Purchasing Approver are not substitutes for this commercial Duty. Delivery Charge
   Approver's existence alone does not extend its mandate to every SO charge amendment. Existing
   PIC-first ordinary Delivery work and cross-module write ownership remain unchanged.
 
-The exact UI name **SO Approver** is admitted in COPY-STANDARD. Workspace MASTER owns its
+The exact UI name **Sales Approver** is admitted in COPY-STANDARD. Workspace MASTER owns its
 assignment/cover contract; this MASTER owns the SO decision. No implementation Card is authored.
 
 - **Delivery-date changes belong to the whole-page draft**, not a competing date-only form.

@@ -302,8 +302,8 @@ may not assign), so 0533 assigned Jess once from 2026-09-18 with `assigned_by` N
 runs only when the Duty has no assignment history; it created no cover. Until a second Principal
 person exists, Jess has no eligible cover: her approvals wait while she is away.
 
-**SO Approver — OWNER-APPROVED 2026-10-01 / TARGET NOT BUILT.** Orders MASTER
-§ “SO Approver” admits one dedicated SO commercial-approval Duty, UI name **SO Approver**
+**Sales Approver — OWNER-APPROVED 2026-10-01 / TARGET NOT BUILT.** Orders MASTER
+§ “Sales Approver” admits one dedicated SO commercial-approval Duty, UI name **Sales Approver**
 (COPY-STANDARD). Its holder and dated cover must both be active Principal people. The intended
 initial holder is Jess; this PLAN records no live assignment or bootstrap. Resolve through the
 existing Staff & Duties/Shared Duty Resolver and governed assignment history, never a module
@@ -312,6 +312,8 @@ Missing eligible assignment/cover stays visible and must not bypass approval. As
 not confer Principal powers. The current catalogue and SO SQL role gate are unchanged and this
 Duty is not built. Self-approval, other departments' approval rights and post-Proceed cancellation
 are expressly outside this approval; purchasing pre-effectiveness signatures remain undecided.
+The earlier pasted approval matrix is withdrawn, not a proposal of record. Orders MASTER also
+keeps attribution-lane consolidation and ordinary-address amendment restrictions undecided.
 Do not copy Purchasing Approver's separate own-request rule or bootstrap into this Duty as an
 assumed owner decision. Orders owns the amendment policy; Workspace owns assignment and cover.
 
