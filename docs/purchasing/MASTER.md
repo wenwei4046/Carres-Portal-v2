@@ -316,39 +316,33 @@ retype it.
 
 ### 5.3 One PO issue authority
 
-**OPERATIONAL PERMISSION — OWNER-APPROVED 2026-09-29 / TARGET / NOT BUILT.** Every active
-Operation staff person, including a joining-month newcomer, may perform ordinary PO work and
-issue a PO without holding PO Duty or cover. The first-month restriction affects allocation to
-PO Duty, not permission to place/issue PO. Record normal Duty holder, cover and actual issuer
-separately. Existing approved-demand, document, quantity and commercial approval gates remain;
-no approval capability or self-approval exception is granted. This overrides the ordinary-Operation
-Duty-only issue gate described in the implementation evidence below; it is not proof of deployment.
+**OPERATIONAL PERMISSION — OWNER RULING 2026-09-29 · BUILT (migration 0627).** Every active
+Operation staff person, including a joining-month newcomer, may perform ordinary PO work and issue
+and confirm-send a PO without holding PO Duty or cover. The first-month restriction affects
+allocation to PO Duty, not permission to place/issue PO. Existing approved-demand, document,
+quantity and commercial approval gates remain; no approval capability or self-approval exception is
+granted. Commercial approval never follows from issue authority.
 
 Current PO Duty, or the dated cover while one is in force, is the normal work owner and remains
-accountable for PO issuance. A governed Operations Superuser may also complete any operational PO
-action without becoming — or being displayed/audited as — the duty holder. Jess is an Operations
-Superuser through Principal authority as a principal **person** (`is_operations_superuser`, 0533);
-`operation@carres.com` is the explicitly governed shared Operations Superuser (its flag). The shared
-owner login `principal@carres.com` is not a person and executes no duty (owner ruling 2026-09-18). The measured existing implementation refuses an ordinary Operations login that is neither duty,
-cover nor superuser; that restriction must converge to the 2026-09-29 approved target above.
-Commercial approval remains separate and never follows from issue authority.
+accountable for PO issuance; it is no longer the permission. A governed Operations Superuser may
+also complete any operational PO action without becoming — or being displayed/audited as — the duty
+holder. Jess is an Operations Superuser through Principal authority as a principal **person**
+(`is_operations_superuser`, 0533); `operation@carres.com` is the explicitly governed shared
+Operations Superuser (its flag). Other shared logins (`is_person = false`) are not people and may not
+issue (0592). The shared owner login `principal@carres.com` executes no duty (owner ruling
+2026-09-18).
 
-**HOW IT IS ENFORCED — migrations 0379 / 0380 plus 0403, and the dependent web/API code, are
-production-verified at `98ce4220d15cd81482aef05124dbec470c2ed87b` on 29 Aug 2026. A real
-`operation@carres.com` walk selected an eligible SO, saw the compact duty chip and active `Issue PO`
-action, and reached `Review Purchase Orders`; the preview was not issued.**
-`purchasing_po_actor()` is the production-verified **legacy module-local resolver**, not the final
-architecture authority. **OWNER RULING 2026-09-01 supersedes its ownership boundary:** it must
-converge behind ERP Architecture Law F.1's Shared Duty Resolver; no new Purchasing page or API may
-read `ops_po_duty` or `ops_po_duty_cover` directly. Until that convergence is built, its existing
-behaviour is implementation evidence only: it reads the month's duty holder and dated cover and
-returns normal holder and acting cover separately. `is_operations_superuser()` reads Principal or the governed `app_users` capability;
-application code never checks an email. `purchasing_actor_may_issue()` combines duty, dated cover
-and that capability, and is asked by SO Batch Purchase, Manual Purchase, the API issue routes, the
-creation authority `purchasing_issue_pos_batch`, and the evidence door
-`purchasing_confirm_po_sent`. PO History records actual actor, normal duty, dated cover and the
-authority used as distinct fields; a superuser is never rewritten as Yu Jun or the cover. Cover has
-no browser write policy.
+**HOW IT IS ENFORCED (0627).** `purchasing_actor_may_issue(user)` = Operations Superuser **or** an
+active, person `operation` account. It is asked by SO Batch Purchase, Manual Purchase, the API issue
+routes, the creation authority `purchasing_issue_pos_batch` and the evidence door
+`purchasing_confirm_po_sent`. `purchasing_po_actor()` no longer reads `ops_po_duty` /
+`ops_po_duty_cover`: it returns the Shared Duty Resolver's answer (`workspace_resolve_duty('po_duty')`,
+ERP Architecture Law F.1) as normal holder, acting cover and actor, for ownership display only. PO
+History records actual actor, normal duty, dated cover and the authority used as distinct fields —
+`po_duty` · `po_duty_cover` · `operations_superuser` · `operation_staff`; a superuser or other staff
+issuer is never rewritten as the duty holder or the cover. Cover has no browser write policy. A
+refused caller reads `Only Operation staff may issue a purchase order.` and the unavailable button
+`Only Operation staff can issue this PO`.
 
 **Current roster, effective 2026-09-07:** Yu Jun and Shasha are the two Operation staff in the
 monthly PO/GRN rotation. The two duties remain opposite in every month so the person who issues a PO
@@ -601,7 +595,7 @@ Supplier out-of-stock, delayed model/fabric, changed quantity or changed price i
 A supplier price change stops the issue/change and routes to the commercial approver; Operations
 does not decide it.
 
-#### 5.6.1 Daily PO windows — owner-approved 2026-09-24; BUILT on branch, awaiting owner review (not live)
+#### 5.6.1 Daily PO windows — owner-approved 2026-09-24; MERGED (#1621) and DEPLOYED, 0584/0585 APPLIED; owner walk owed
 
 SO demand is accumulated for batch review; PO Duty does not issue one PO action per Sales Order.
 Purchasing Settings owns an editable first standard window, initially `11:30 AM` Malaysia time,
@@ -673,8 +667,8 @@ facts, the one send area and the completion fact below.
 - **Retired with this journey:** the per-Sales-Order `issue_po` card and `confirm_ready_date`
   (`Supplier date missing`); the day-before check (§5.7) replaces the latter.
 
-**BUILD FACTS — branch `build/work-po-windows`, migrations 0584 / 0585 NOT APPLIED; nothing is live
-until Jess approves.**
+**BUILD FACTS — merged (#1621); migrations 0584 / 0585 APPLIED 2026-09-25 (tracker
+`20260925114116` / `20260925114246`).**
 
 - **Admission time is the Sales Order's `Proceed`** (`orders.proceeded_at`) — the moment the order
   enters SO Batch (§9.1). An order with no recorded Proceed time gets no window; none is guessed.
@@ -1491,7 +1485,23 @@ Module Register rails remain factual filters and do not copy central Work action
 
 ### 9.1 SO Batch Purchase
 
-**RESERVE GOODS ALREADY ON A PO — OWNER RULING, APPROVED / LOCKED 2026-09-28 (Jess, "yes"). BUILT on branch build/purchasing-use-this-po (migration 0600 not yet applied).**
+**PO PLACEMENT UNBLOCK — BUILT 2026-10-01 (migration 0627), applies to SO Batch and Manual Purchase.**
+- **One cost rule** (`catalogCostBlocksIssue`, shared by the row and both issue doors): a Catalog cost
+  that is NOT RECORDED never blocks; the PO line is born with no commercial claim (0573). Only a
+  recorded cost that is not positive blocks the row (`Catalog cost is missing`) and refuses at Issue
+  (`cost_required`). Before this, SO Batch refused every unpriced line that the door would accept.
+- **Blockers named before Issue, never after the PO exists.** A SKU whose Catalog `Stock identity` is
+  `Not set` reads `Stock identity not set` with `Fix in Catalog` (row state `no_stock_identity`); a
+  SKU not in Catalog reads `SKU not found`; missing production days read `Production days not set`.
+  A Deliver To with no address is refused when it is chosen for the row and again by the issue door
+  (`destination_address_missing`), because the PO document cannot print it and the PO number would
+  otherwise be spent on an unprintable PO. The door codes `sku_not_in_catalog` and
+  `catalog_identity_mode_missing` answer in the approved two lines.
+- **The unversioned 0311 line-destination door is revoked** (`purchasing_set_line_destination`, its
+  API route removed). A line's Deliver To moves only through `Change Deliver To` (0610), which keeps
+  Units and Sales Order lineage and mints a version.
+
+**RESERVE GOODS ALREADY ON A PO — OWNER RULING, APPROVED / LOCKED 2026-09-28 (Jess, "yes"). MERGED (#1723); migration 0600 APPLIED 2026-09-28 (tracker `20260928102149`).**
 Measured on production `b5e959d6`: SO-1358 (Ohana Fenrir King, qty 1) printed five
 contradicting facts on one row — `Need PO` · `Already on a PO` · `Not ordered yet` · `No purchase
 needed` · tick refused with `Nothing to buy` — because an open PO carried an unreserved quantity of
@@ -3258,7 +3268,7 @@ Document               the current version's PDF, full width, last
   date passed → `Ask {Supplier} when the goods will arrive`; short receipt → `Ask {Supplier} for the
   balance delivery date`. Waiting with nothing due prints `Nothing to do until {date}` and no
   button. `Completed` / `Cancelled` hide the block. Recording buttons are open to any Operation
-  person (§5.7); issue/edit buttons follow §5.3 and say `Only PO Duty can issue POs` otherwise.
+  person (§5.7); issue/edit buttons follow §5.3 and say `Only Operation staff can issue POs` otherwise.
 - **State lives in the header**, next to `number · party`, in the §5.8 vocabulary; the `Status`
   and `PO Version` facts are retired from the fact grid; the version is the number's `(n)` and the
   send record is the `Sent` fact.
@@ -3467,8 +3477,8 @@ and `U1-000-` regular. Order 1 / Received 0 / Damaged 1 / Pending 1 and the sepa
 remained. This one-Unit live record does not prove consecutive-range grouping;
 that boundary is covered by local actual-PDF mixed-outcome tests. No receipt was changed.
 
-**WHO RECEIVED THE GOODS — owner ruling 2026-09-28 (Jess). BUILT ON BRANCH `build/receiving-closure`
-(migration 0601, NOT YET APPLIED).**
+**WHO RECEIVED THE GOODS — owner ruling 2026-09-28 (Jess). MERGED (#1738); migration 0601 APPLIED 2026-09-28
+(tracker `20260928131254`).**
 The GRN names the party that physically received the goods, not a person's name. At a
 partner-run warehouse the receiver is the operating company (NETS today; its PIC changes, so a
 name is not recorded and never asked) and the signed Supplier DO photo is the proof. At a
@@ -3482,8 +3492,8 @@ showroom) is the receiver; otherwise the saver is, by name only when the account
 trigger stamps it when any door posts. The form shows it before saving as a grey automatic fact.
 Older GRNs print `Received by Not recorded`.
 
-**Remaining document boundary.** Arrival time and category are BUILT ON BRANCH (0601, not
-applied). `Goods Received Date` is stored as a time point (`goods_received_time`), captured on
+**Remaining document boundary.** Arrival time and category are MERGED (#1738), 0601
+APPLIED 2026-09-28. `Goods Received Date` is stored as a time point (`goods_received_time`), captured on
 Office receiving and on the Warehouse count (default now in Kuala Lumpur, never in the future), and
 printed in KL time on the register, record and GRN. Older records keep their date and `Time not
 recorded`. The receipt reader prints the Catalog category (`catalogCategoryWordOf`), or `Not
@@ -3624,8 +3634,8 @@ Warehouse submits count                (or Operation enters goods directly)
 - **The corrected location/date words (owner correction §3):** `Supplier Deliver To` = where the PO
   instructed the supplier to deliver · `Goods arrived at` = where the goods physically arrived ·
   `Goods Received Date` = the physical arrival date and time, stored as a time point with time
-  zone and shown in `Asia/Kuala_Lumpur` on screen and PDF (Jess 2026-09-17; BUILT ON BRANCH, 0601
-  not applied: `goods_received_time`, the old date column kept in step). An older record keeps its
+  zone and shown in `Asia/Kuala_Lumpur` on screen and PDF (Jess 2026-09-17; MERGED #1738, 0601
+  APPLIED: `goods_received_time`, the old date column kept in step). An older record keeps its
   date and shows `Time not recorded`; it is never back-filled to midnight or to the save time. `Actual Site`, `Delivery Location`
   and `Goods Received At` are retired from every Receiving surface, filter, table, export, GRN
   and report; `Delivery Location` stays reserved for the customer's delivery address.
@@ -3659,8 +3669,8 @@ Warehouse submits count                (or Operation enters goods directly)
   and `operation_receive_po_with_do`. **Who may post (owner ruling 2026-09-25, recorded in §7.3):** every
   active Operation staff member may post a receipt; receiving is never blocked because the GRN
   Duty holder is absent. GRN Duty keeps the Work card; the GRN records the actual actor. The
-  earlier GRN-Duty/cover/Superuser-only gate (`receiving_actor_context()`, 0425) is overwritten for POSTING only. BUILT ON BRANCH (0601, not
-  applied): `allowed` means an active Operation staff member or the principal; a non-duty saver is
+  earlier GRN-Duty/cover/Superuser-only gate (`receiving_actor_context()`, 0425) is overwritten for POSTING only. MERGED (#1738), 0601
+  APPLIED 2026-09-28: `allowed` means an active Operation staff member or the principal; a non-duty saver is
   labelled `Operation staff`. **Amend Receiving and Void Receiving authority is unchanged:** GRN
   Duty, its dated cover or an Operations Superuser (`may_amend`, `receiving_require_amend_authority`,
   refusals `no_grn_duty_holder` / `not_grn_duty`), in page, API and SQL. The Warehouse role still
@@ -3717,7 +3727,7 @@ Warehouse submits count                (or Operation enters goods directly)
   available stock. `Goods Received Date` is the physical arrival date and time (see above).
 - **A posted GRN has no ordinary Edit.** `Amend Receiving` (`receiving_amend`) corrects a recording
   mistake only; damage or returns found later go to Supplier Claims / returns, never rewritten as
-  "not received". **Jess 2026-09-17 — BUILT ON BRANCH (0601, not applied):**
+  "not received". **Jess 2026-09-17 — MERGED (#1738), 0601 APPLIED 2026-09-28:**
   - The person names each exact Unit in both directions (`Received` ↔ `Not received`); the system
     never picks another Unit (today the function picks the newest free or oldest incoming Unit —
     that behaviour is retired). Received Qty is counted from the named Unit outcomes — the `Received` ones only; a `Received with issue` Unit is a physical arrival that counts in `Damaged Qty`, never in `Received Qty` (COPY-STANDARD, correction 2026-09-23). Quantity lines
@@ -3761,8 +3771,8 @@ Warehouse submits count                (or Operation enters goods directly)
 
 ### 9.5 Supplier Claims — approved complete Blueprint
 
-**Build state — slice C1 MERGED (#1789) with migration 0607 APPLIED; slice C2 BUILT ON BRANCH
-`build/purchase-return-issue`, 2026-09-29, migration 0609 NOT APPLIED; not merged, not deployed.**
+**Build state — slice C1 MERGED (#1789) with migration 0607 APPLIED; slice C2 MERGED
+(#1795) with migration 0609 APPLIED 2026-09-29 (tracker `20260929102247`).**
 C1 delivers the confirmed 12-column Register (engine `pinnedPrefix`, 51px two-line rows, four
 closed rail groups), the full-width record in the approved order, `Record what we asked` · `Record
 supplier reply` (answer · Applies to · Supplier's date · Evidence · Note) · `Claim sent to supplier`
@@ -3771,8 +3781,7 @@ on the record's Result section, the ONE supplier-side decision and Authorised Ou
 2026-09-29 below) through the existing `POST /:id/carres-execution`, and the server-confirmed `Plan
 Repair` / `Plan Supplier replacement` / `Issue Purchase Return` doors; the missing fact names itself
 (`Authorised Outcome` · `Units` · `PO Duty`). **Slice C3 — the per-Unit read-only row expansion —
-BUILT ON BRANCH `build/claim-unit-evidence-received-date`, 2026-09-29, migration 0614 NOT APPLIED;
-not merged, not deployed** (see "Row expansion" below for what it does and its one limit).
+MERGED (#1802) with migration 0614 APPLIED 2026-09-29 (tracker `20260929151311`)** (see "Row expansion" below for what it does and its one limit).
 **Still APPROVED TARGET / NOT BUILT:** Stock-Unit intake, Split/Cancel/Reopen, the claim pack PDF and
 the two Settings rows (0606, Settings lane). **0607 snapshots `claim_reply_waiting_days` /
 `claim_escalation_extra_days` onto the claim when the ask is recorded** (read by name, 2 and 2 when
@@ -3800,8 +3809,8 @@ translated; the legacy 0324 customer-resolution door is closed to callers. The r
 `Issue Purchase Return` for Return to supplier; `Plan Repair` (server-confirmed: decision Repair ·
 exact Units held on the claim · the actor may act) opening the Repair Order create page prefilled
 with the Claim; `Plan Supplier replacement` for Replacement, opening its existing owning door (the
-supplier-replacement arrival source). **BUILT ON BRANCH `build/purchase-return-issue` 2026-09-29
-(PR #1795), 0609 NOT APPLIED.**
+supplier-replacement arrival source). **MERGED (#1795), 0609 APPLIED
+2026-09-29.**
 
 **OWNER-APPROVED / LOCKED — 2026-09-06; claim boundary owner-approved 2026-09-14.** This is the
 single complete Supplier Claims operating model. Existing built facts and unbuilt target rules are
@@ -4255,7 +4264,7 @@ No New Claim, module Work page, dashboard, second sidebar or duplicate editors. 
 contract; reuse existing kit components rather than freezing page-local dimensions.
 
 **APPROVED — register defaults; owner-confirmed column order, two-line identity and status words,
-2026-09-18 · BUILT ON BRANCH 2026-09-29 (slice C1).** Opening Supplier Claims shows every permitted claim — new, historical,
+2026-09-18 · MERGED (#1789, slice C1).** Opening Supplier Claims shows every permitted claim — new, historical,
 closed and cancelled — newest report first, in ONE ungrouped list. There are no group bands, no
 View selector and no setup step before records appear. Purchase Orders' four groups are that
 page's ruling and are not copied here. Search and factual filters are optional, start clear on
@@ -4329,7 +4338,7 @@ leading controls plus `Claim status` and `Supplier Claim No`; below 768px only `
 No.` pins**, and `Claim status` scrolls with the rest. `Claim Reported` is never pinned here.
 Consequence for build: the shipped `DataGrid leadingColumns` capability forces `date · identity`
 to lead and cannot express this order — Supplier Claims does NOT adopt it; the engine
-takes the page's own leading columns through `pinnedPrefix` (BUILT ON BRANCH 2026-09-29, slice C1). No column is hidden by width; the
+takes the page's own leading columns through `pinnedPrefix` (MERGED #1789, slice C1). No column is hidden by width; the
 approved defaults or the person's saved layout always show and overflow scrolls inside the grid.
 Horizontal scrolling uses the shared pinned offsets, so a pinned cell never covers adjacent
 content.
@@ -4384,7 +4393,7 @@ loaded page; collapsed groups do not filter.
 
 #### Row expansion — the per-Unit evidence inspector
 
-**Build (2026-09-29, 0614, BUILT ON BRANCH, NOT APPLIED).** `SupplierClaimUnitsTable` draws the
+**Build (2026-09-29, MERGED #1802, 0614 APPLIED).** `SupplierClaimUnitsTable` draws the
 five columns below from `GET /api/operation/supplier-claims/:id/inspection` (read when the row is
 expanded) through the ONE shared arithmetic `supplierClaimInspectionRows`: one row per held tracked
 Unit (`Qty 1`) with its own receiving problem note (`receiving_unit_results`), counted stock on one
@@ -4396,7 +4405,7 @@ is attributed only when its `unit_code` is one of that claim's Units. **Limit, n
 Receiving form still uploads line-level photos, so until Receiving sends per-Unit photos (a §9.4 UI
 change needing its own approval) new evidence also lands on `Whole claim`.
 
-**OWNER-CONFIRMED 2026-09-18 · APPROVED; BUILT ON BRANCH 2026-09-29 (above).** The expansion has exactly one job: read the
+**OWNER-CONFIRMED 2026-09-18 · APPROVED; MERGED (#1789, above).** The expansion has exactly one job: read the
 problem and its evidence for each affected Unit. **It is read-only. It contains no editor, no
 uploader, no delete control and no status change.** It replaces the earlier "photo thumbnails"
 inspector completely.
@@ -4543,8 +4552,8 @@ editor, no second reply form, no inline reply in the register.** Case, Stock, Re
 ownership boundaries are unchanged: the record reads their facts and links to them, and never
 writes them.
 
-**Implementation state of reply recording — BUILT ON BRANCH 2026-09-29 (slice C1), 0607 NOT
-APPLIED.** `POST /:id/response` now calls `supplier_claim_record_reply` (0607: append-only
+**Implementation state of reply recording — MERGED (#1789, slice C1), 0607 APPLIED
+2026-09-29.** `POST /:id/response` now calls `supplier_claim_record_reply` (0607: append-only
 `supplier_claim_replies` with scope, Units, supplier's date, evidence and recorder; a reply before
 the ask is contact evidence that the ask promotes). The scope-less 0291 door is revoked from
 signed-in callers. The record page calls it through the reply form. Production proof (record,
@@ -4555,10 +4564,10 @@ History, register column) is owed after 0607 is applied and the PR deployed.
 | Target | State | The build's obligation |
 |---|---|---|
 | The ONE shared read-only saved-evidence viewer (UI MASTER §6.8) | **DEPLOYED KIT + CLAIM-RECORD PHOTOS; authenticated readback recorded** | Registered in the kit with Receiving as the first consumer. Supplier Claims, Stock and Service Case reuse the same implementation — never a page-local copy |
-| The Supplier Response recording surface on the full-width claim record | **BUILT ON BRANCH 2026-09-29 (C1); 0607 not applied; production proof owed** | The build **must** ship a working reply-recording journey, not a read-only page plus a promise |
+| The Supplier Response recording surface on the full-width claim record | **MERGED (#1789, C1); 0607 APPLIED 2026-09-29; production proof owed** | The build **must** ship a working reply-recording journey, not a read-only page plus a promise |
 
-**SUPPLIER REPLY RECORDING — OWNER-APPROVED (Jess, 2026-09-25) · BUILT ON BRANCH 2026-09-29
-(slice C1, 0607 not applied).** The measurement below is the pre-build baseline. Measured on
+**SUPPLIER REPLY RECORDING — OWNER-APPROVED (Jess, 2026-09-25) · MERGED (#1789)
+(slice C1, 0607 APPLIED 2026-09-29).** The measurement below is the pre-build baseline. Measured on
 production 2026-09-25: 71 claims (70 `open`, 1 `closed`), 70 with `requested_action`, **1** with
 `supplier_response`; the three SQL doors exist (`supplier_claim_record_request` ·
 `supplier_claim_record_response` · `supplier_claim_close`, 0291) and **no web caller** exists for
@@ -4931,8 +4940,8 @@ stream bytes exists — every statement in 0548 is idempotent (`create … if no
 `create or replace`, `drop policy/trigger if exists` then create).
 
 **CREATION DOOR — OWNER-APPROVED (Jess, 2026-09-25; decision list overwritten by the owner ruling
-of 2026-09-29) · BUILT ON BRANCH `build/purchase-return-issue` 2026-09-29 (slice C2, PR #1795);
-migration 0609 NOT APPLIED; not merged, not deployed.** Built: `Record what Carres does next` on the
+of 2026-09-29) · MERGED (slice C2, #1795);
+migration 0609 APPLIED 2026-09-29.** Built: `Record what Carres does next` on the
 claim record's Result section (the three supplier-side decisions of §9.5's 2026-09-29 ruling); `Issue Purchase Return` once `Return to
 supplier` is recorded — the approved form beside its DRAFT paper, calling the ONE 0548 door
 (`purchasing_issue_purchase_return`, re-issued by 0609 with the same signature: claim must be open,
@@ -4949,7 +4958,7 @@ editor~~ BUILT 2026-09-29 (0611): Settings → Purchasing → `Supplier addresse
 supplier's `Address` (PO / Repair Order PDF) and `Return address` (this `Return To`) one field at a
 time through `purchasing_set_supplier_address`; blank saves nothing recorded (Settings shows a blank
 `Return address` as `Same as Address`), and one address is never copied into the other. **OWNER RULING (Jess, 2026-09-29, relayed by the Settings lane) —
-BUILT ON BRANCH `build/claim-unit-evidence-received-date`, migration 0614 NOT APPLIED:** `Return To`
+MERGED (#1802), migration 0614 APPLIED 2026-09-29:** `Return To`
 = the supplier's `Return address` when filled, otherwise its `Address`; Issue refuses only when BOTH
 are blank, `Add the address of {Supplier}` (detail `address_missing`). 0614 re-issues
 `purchasing_issue_purchase_return` from the 0609 body applied in production with only that change;
@@ -4957,15 +4966,15 @@ the resolved value is still snapshotted onto `purchase_return_units.return_to`, 
 shows it with `From Return address` / `From Address` under it (words owner-approved 2026-09-30); (2) Stock's Outbound `Return to supplier` handover (Stock §12.8): Stock writer LIVE (0612,
 `stock_record_supplier_return_pickup`); Outbound screen pending owner design approval. Pickup proof
 files live in the private `issue-evidence` bucket under `purchase_return/<id>/…`; (3) `Supplier
-Received Date` — `Record supplier receipt` BUILT ON BRANCH `build/claim-unit-evidence-received-date`
-2026-09-29, migration 0614 NOT APPLIED: on the PR record's Pickup block, date (not future, not before
+Received Date` — `Record supplier receipt` MERGED (#1802),
+migration 0614 APPLIED 2026-09-29: on the PR record's Pickup block, date (not future, not before
 that Unit's Actual Pickup Date), exact Units (partial allowed, each once), supplier evidence (photo /
 video / PDF under `purchase_return_receipt/<id>/…`, or `Who confirmed` + `When they confirmed` +
 `Time`), recorder. Append-only `purchase_return_supplier_receipts` + `…_receipt_units` through
 `purchase_return_record_supplier_receipt`; it writes no pickup, no custody and not the 0548 column
 `supplier_received_date`, which is no longer read — the register and record read the ledger. A Unit
 Stock has not picked up is refused `{Unit ID}: Not picked up`. No Work item: §9.6 names none; (4) the
-evidence viewer for Pickup proof and Supplier receipt proof — BUILT ON BRANCH (same PR): the Units
+evidence viewer for Pickup proof and Supplier receipt proof — MERGED (#1802): the Units
 table's `Photo 1` / `Photos {n}` / `Video {n}` open the shared SavedEvidenceViewer through `GET
 /:id/evidence`; a PDF receipt is counted in History (`Evidence {n}`), never as a photo.
 **Build decisions that read like business rules — PROPOSAL / NOT LAW (2026-09-29):** (h) a Unit is
@@ -5085,7 +5094,7 @@ view; 50/50 remains reserved for issuing/revising. No application build is claim
 
 ### 9.7 Repair Orders
 
-**Owner-confirmed business blueprint — 2026-09-18; price/approval and owner-consent rulings 2026-09-19. SLICE A DEPLOYED (#1757, 0602 APPLIED); SLICE B (PDF + Work) BUILT ON BRANCH; the rest APPROVED TARGET / NOT BUILT.**
+**Owner-confirmed business blueprint — 2026-09-18; price/approval and owner-consent rulings 2026-09-19. SLICE A DEPLOYED (#1757, 0602 APPLIED); SLICE B (PDF + Work) MERGED (#1773); the rest APPROVED TARGET / NOT BUILT.**
 
 #### Build state — slice A merged #1757 (0602 APPLIED); slice B on branch `build/repair-orders-pdf-work`, 2026-09-29 (no migration)
 
@@ -5101,8 +5110,8 @@ view; 50/50 remains reserved for issuing/revising. No application build is claim
 | **Goods sent for repair cannot be promised (owner, 2026-09-28).** `repair_order_create` puts each Unit `In repair` through Stock's governed flag door `ops_stock_flag_repair` (`needs_repair`), which every sell path already honours (`unit_availability` → not available; pool draw, bind and Use this PO refuse it). No custody is written. The same door lifts it when the repair ends for that Unit: the RO is cancelled, the Unit is removed before Issue (`repair_order_remove_unit`; the last Unit cannot be removed, cancel instead), or its return inspection is recorded (Stock's `ops_stock_resolve_unit_hold`, observed by a trigger). A Unit already `In repair` outside an RO is refused by name | 0602 |
 | `Repair Quotation`: photo or PDF, recorded at create or once later on the object (`repair_order_record_quotation`); the upload slot admits PDF for the `repair_quotation` purpose only and the `issue-evidence` bucket admits `application/pdf` | 0602, `routes/ops/issues.ts` |
 | Pickup: the `Hand {n} Units` door opens Stock's arrival-source form with `?ro=`; the pickup itself is Stock's existing `arrival_source_handover` (the ONE custody writer) and the return is Receiving's `receiving_arrival_post` with a GRN — proven end to end on a replayed chain | `ArrivalSourceWorkspace.tsx`, integration test |
-| **Slice B · the A4 `REPAIR ORDER` — BUILT ON BRANCH.** PO chrome (full header every page, `RO…(n)` hero); Supplier · Supplier Pickup/Return Location · RO Details (`Supplier Claim No` only when present); `Reason` box = each Unit's recorded sentence verbatim; goods `Category · PO No / Unit ID · Items · Qty · Problem · Repair Requirement` + `TOTAL`; `DAMAGE PHOTOS · {Unit ID}` pages (4 per sheet) from the Unit/Claim evidence read through; no photo = one sentence. Payload `GET /:id/print-data` carries no figure; Cost Responsibility is omitted from the supplier paper (DOCUMENT-KIT §4 names goods, never value). Object header `Open PDF`; Issue is the 50/50 with the paper | `repair-order-template.tsx`, `repair-order-pdf.ts`, `RepairOrderObject.tsx`, `repair-orders.ts` |
-| **Slice B · Work — BUILT ON BRANCH.** `repairOrderWorkItems` projects four rules into the ONE feed (PO Duty, Office calendar, deep link = RO object): `repair_order.issue` (due next Office working day after RO Doc Date; closes on confirmed send) · `repair_order.confirm_receipt` (due next Office working day after the send; closes on evidenced receipt) · `repair_order.return_date_passed` (opens the day after the Carres target; closes only when every Unit is back on a posted GRN or the RO is cancelled; a Supplier reply never closes it) · `repair_order.owner_consent` (no date; closes on `given` for every non-Carres Unit, refusal keeps it open). The 0584 Completed writer wraps issue, supplier-receipt, owner-consent, cancel and Receiving's arrival post. Route: the `Returned` stop is grey while the Supplier holds the goods, `Missed` after the target | `repair-order-work.ts` (shared + api), `work.ts`, `warehouse-receipts.ts` |
+| **Slice B · the A4 `REPAIR ORDER` — MERGED (#1773).** PO chrome (full header every page, `RO…(n)` hero); Supplier · Supplier Pickup/Return Location · RO Details (`Supplier Claim No` only when present); `Reason` box = each Unit's recorded sentence verbatim; goods `Category · PO No / Unit ID · Items · Qty · Problem · Repair Requirement` + `TOTAL`; `DAMAGE PHOTOS · {Unit ID}` pages (4 per sheet) from the Unit/Claim evidence read through; no photo = one sentence. Payload `GET /:id/print-data` carries no figure; Cost Responsibility is omitted from the supplier paper (DOCUMENT-KIT §4 names goods, never value). Object header `Open PDF`; Issue is the 50/50 with the paper | `repair-order-template.tsx`, `repair-order-pdf.ts`, `RepairOrderObject.tsx`, `repair-orders.ts` |
+| **Slice B · Work — MERGED (#1773).** `repairOrderWorkItems` projects four rules into the ONE feed (PO Duty, Office calendar, deep link = RO object): `repair_order.issue` (due next Office working day after RO Doc Date; closes on confirmed send) · `repair_order.confirm_receipt` (due next Office working day after the send; closes on evidenced receipt) · `repair_order.return_date_passed` (opens the day after the Carres target; closes only when every Unit is back on a posted GRN or the RO is cancelled; a Supplier reply never closes it) · `repair_order.owner_consent` (no date; closes on `given` for every non-Carres Unit, refusal keeps it open). The 0584 Completed writer wraps issue, supplier-receipt, owner-consent, cancel and Receiving's arrival post. Route: the `Returned` stop is grey while the Supplier holds the goods, `Missed` after the target | `repair-order-work.ts` (shared + api), `work.ts`, `warehouse-receipts.ts` |
 
 **Owner rulings on the slice A report (2026-09-28):** pickup only from Carres Sites (accepted); a
 Unit on an active RO is NOT sellable (decision 1 rejected, built as above); the held-for-inspection,

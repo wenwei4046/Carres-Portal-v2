@@ -508,6 +508,7 @@ describe("grouping, filtering, counting", () => {
       no_sku: 1,
       no_supplier: 0,
       no_cost: 0,
+      no_stock_identity: 0,
       no_production_days: 0,
       no_pickup_partner: 0,
     });

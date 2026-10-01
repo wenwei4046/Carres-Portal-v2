@@ -2303,7 +2303,7 @@ describe("approved PO Safety Days column", () => {
   it("explains denied Issue authority in the selected toolbar", () => {
     renderRegister({ mayIssue: false });
     fireEvent.click(screen.getByTestId("so-batch-select-o1"));
-    expect(screen.getByText("Only PO Duty can issue this PO")).toBeInTheDocument();
+    expect(screen.getByText("Only Operation staff can issue this PO")).toBeInTheDocument();
   });
 });
 

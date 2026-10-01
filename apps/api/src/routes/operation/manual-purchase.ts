@@ -12,6 +12,7 @@ import {
   poSupplierDeliveryDateOf,
   type PoDatePromise,
   PURCHASING_REFUSAL_CODES,
+  catalogCostBlocksIssue,
   purchasingRefusal,
   purchasingSuppliersOnly,
   railItemLabel,
@@ -2458,7 +2459,7 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
   const skus = [...new Set(toIssue.map((l) => l.sku as string))];
   const { data: catRows, error: catErr } = await sb
     .from("product_skus")
-    .select("sku, supplier_id, cost, product_models!inner(category)")
+    .select("sku, supplier_id, cost, stock_identity_mode, product_models!inner(category)")
     .in("sku", skus);
   if (catErr) return fail(c, catErr);
   const catalog = new Map(
@@ -2468,6 +2469,7 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
         supplierId: r.supplier_id as string | null,
         cost: r.cost as number | null,
         category: (r.product_models as unknown as { category: string }).category,
+        stockIdentityMode: ((r as { stock_identity_mode?: string | null }).stock_identity_mode ?? null),
       },
     ]),
   );
@@ -2551,7 +2553,16 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
        re-issue. A price that IS recorded keeps every existing rule, including
        the free-of-charge reason. */
     /* Catalog is the commercial authority for this normal purchase. The
-       creation RPC rechecks the same value inside the transaction. */
+       creation RPC rechecks the same value inside the transaction. ONE cost
+       rule with SO Batch (`catalogCostBlocksIssue`): only a recorded price
+       that is not positive refuses. */
+    if (catalogCostBlocksIssue(cat.cost)) {
+      return refuse(c, 422, "cost_required", { sku: l.sku as string });
+    }
+    /* 0443 · named before the transaction, not as a rolled-back batch. */
+    if (cat.stockIdentityMode == null) {
+      return refuse(c, 422, "catalog_identity_mode_missing", { sku: l.sku as string });
+    }
     const req = reqById.get(l.request_id as string)!;
     const destinationId =
       ((l.destination_id as string | null) ?? (req.destination_id as string));
@@ -2562,6 +2573,28 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
     const group = groups.get(key) ?? { lines: [], destinationId, deliveryDate };
     group.lines.push(l);
     groups.set(key, group);
+  }
+
+  /* ⭐ A Deliver To with no address is refused BEFORE the PO exists: the PO
+     document refuses it (`destination_address_missing`), but only when the
+     PDF is drawn, after the PO number is spent. Same rule as SO Batch. */
+  const groupDestinationIds = [...new Set([...groups.values()].map((g) => g.destinationId))];
+  if (groupDestinationIds.length > 0) {
+    const { data: destRows, error: destErr } = await sb
+      .from("purchasing_destinations")
+      .select("id, name, address, warehouse_id, warehouses(address)")
+      .in("id", groupDestinationIds);
+    if (destErr) return fail(c, destErr);
+    for (const d of (destRows ?? []) as Record<string, unknown>[]) {
+      const wh = d.warehouses as { address?: string | null } | { address?: string | null }[] | null;
+      const whAddress = Array.isArray(wh) ? wh[0]?.address : wh?.address;
+      const address = d.warehouse_id != null ? whAddress ?? null : (d.address as string | null) ?? null;
+      if (typeof address !== "string" || address.trim() === "") {
+        return refuse(c, 422, "destination_address_missing", {
+          destination: (d.name as string | null) ?? null,
+        });
+      }
+    }
   }
 
   const governedPos: Record<string, unknown>[] = [];
@@ -2636,7 +2669,9 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
            for "price not recorded"; `normal` would claim a number nobody
            recorded and `free_of_charge` would claim a decision nobody made. */
         const cost = catalog.get(l.sku as string)!.cost;
-        const priced = cost != null && cost > 0;
+        // A recorded non-positive price was refused above; what is left is a
+        // positive price or the honest absence of one.
+        const priced = cost != null;
         return {
           sku: l.sku,
           qty: l.issueQty,

@@ -6,6 +6,7 @@ import {
   documentPartitionKey,
   poDeliveryDateOf,
   PURCHASING_REFUSAL_CODES,
+  catalogCostBlocksIssue,
   purchasingRefusal,
   stockMatchKey,
   railItemLabel,
@@ -379,17 +380,25 @@ toOrderRouter.post("/issue-batch", requireOperation, async (c) => {
   /* ── 4 · the destinations, read once ────────────────────────────────────── */
   const destRes = await sb
     .from("purchasing_destinations")
-    .select("id, name, is_default, active");
+    .select("id, name, is_default, active, address, warehouse_id, warehouses(address)");
   if (destRes.error) return fail(c, destRes.error);
   const destById = new Map(
-    ((destRes.data ?? []) as Record<string, unknown>[]).map((d) => [
-      d.id as string,
-      {
-        id: d.id as string,
-        name: (d.name as string) ?? "",
-        active: d.active !== false,
-      },
-    ]),
+    ((destRes.data ?? []) as Record<string, unknown>[]).map((d) => {
+      /* The SAME address the PO document prints (`purchasing_po_document`):
+         a warehouse Deliver To reads its warehouse, any other its own. */
+      const wh = d.warehouses as { address?: string | null } | { address?: string | null }[] | null;
+      const whAddress = Array.isArray(wh) ? wh[0]?.address : wh?.address;
+      const address = d.warehouse_id != null ? whAddress ?? null : (d.address as string | null) ?? null;
+      return [
+        d.id as string,
+        {
+          id: d.id as string,
+          name: (d.name as string) ?? "",
+          active: d.active !== false,
+          hasAddress: typeof address === "string" && address.trim() !== "",
+        },
+      ];
+    }),
   );
 
   /* ── 5 · every refusal, before a single document is composed ────────────── */
@@ -430,6 +439,13 @@ toOrderRouter.post("/issue-batch", requireOperation, async (c) => {
       if (!dest) return refuse(c, 422, "unknown_destination");
       if (!dest.active) {
         return refuse(c, 422, "inactive_destination", { destination: dest.name });
+      }
+      /* ⭐ NAMED BEFORE THE PO EXISTS. The PO document refuses a Deliver To
+         with no address (`destination_address_missing`), but only when the
+         PDF is drawn — after the PO was issued and its number spent. The
+         door now refuses first, so no unprintable PO is ever created. */
+      if (!dest.hasAddress) {
+        return refuse(c, 422, "destination_address_missing", { destination: dest.name });
       }
       total += a.qty;
       allocations.push({
@@ -635,6 +651,11 @@ toOrderRouter.post("/issue-batch", requireOperation, async (c) => {
         qty: src.qty,
       }));
       const liveCost = res.data.catalog.get(line.sku)?.cost ?? null;
+      /* 0443 · the creation door refuses this inside the transaction; named
+         here first so the operator reads the SKU, not a rolled-back batch. */
+      if ((res.data.catalog.get(line.sku)?.stockIdentityMode ?? null) == null) {
+        return refuse(c, 422, "catalog_identity_mode_missing", { sku: line.sku });
+      }
       /* Issue review is not a cost-maintenance screen. With no legacy
          exception declaration, Catalog is the only commercial input; SQL
          rechecks the same live value inside the creation transaction. */
@@ -671,7 +692,7 @@ toOrderRouter.post("/issue-batch", requireOperation, async (c) => {
           });
           continue;
         }
-        if (liveCost <= 0) return refuse(c, 422, "cost_required", facts);
+        if (catalogCostBlocksIssue(liveCost)) return refuse(c, 422, "cost_required", facts);
         lines.push({
           sku: line.sku,
           qty: line.qty,

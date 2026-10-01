@@ -166,16 +166,6 @@ export const setMessageTemplateInput = z.object({
 export type SetMessageTemplateInput = z.infer<typeof setMessageTemplateInput>;
 
 /**
- * Where each LINE goes (Jess, 2026-08-02) — the three per-line write doors
- * (0311). Purchasing's only per-line job is the destination; the ops remark
- * is its own internal note and never prints.
- */
-export const setLineDestinationInput = z.object({
-  destinationId: z.string().uuid(),
-}).strict();
-export type SetLineDestinationInput = z.infer<typeof setLineDestinationInput>;
-
-/**
  * `Change Deliver To` (Purchasing MASTER §5.4, Jess 2026-09-22 · build
  * 2026-09-29, 0610) — POST /api/operation/pos/:id/change-deliver-to →
  * `purchasing_change_po_deliver_to`. Part or all of ONE line's undelivered
