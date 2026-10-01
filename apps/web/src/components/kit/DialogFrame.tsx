@@ -178,15 +178,18 @@ export default function DialogFrame({
           }}
         >
           <header className="flex items-start justify-between gap-4 border-b border-kit-slate-6 px-4 py-3">
-            <div className="flex flex-col gap-1">
-              <Dialog.Title className="text-strong text-kit-slate-12">{title}</Dialog.Title>
+            <div className={`flex flex-col gap-1 ${variant === "quick-view" ? "min-w-0 flex-1" : ""}`}>
+              <Dialog.Title
+                className={`text-strong text-kit-slate-12 ${variant === "quick-view" ? "truncate" : ""}`}
+                title={variant === "quick-view" && typeof title === "string" ? title : undefined}
+              >{title}</Dialog.Title>
               {description && (
                 <Dialog.Description className="text-meta text-kit-slate-11">
                   {description}
                 </Dialog.Description>
               )}
             </div>
-            <div className="flex items-center gap-2">{headerActions}
+            <div className={`flex items-center gap-2 ${variant === "quick-view" ? "shrink-0" : ""}`}>{headerActions}
             <Dialog.Close
               aria-label="Close"
               title="Close"
