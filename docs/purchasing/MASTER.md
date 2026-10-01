@@ -1,5 +1,11 @@
 # PURCHASING — MASTER
 
+**SO blueprint direct dependency — APPROVED TARGET / NOT BUILT, Jess 2026-10-01.**
+Orders MASTER §0.0 requires PO revision and `po_line_sources` coverage to remain consistent,
+including shared lines and receipts. Purchasing owns the fix and supplier commitment; SO reads
+and links. Acceptance: no duplicated or understated SO procurement coverage after PO revision;
+unknown legacy lineage is not fabricated. This is a bounded dependency, not full module redesign.
+
 **SO amendment supplier confirmation — OWNER-APPROVED 2026-10-01 / TARGET NOT BUILT.**
 An issued PO covering the changed SO line requires PO Duty to record the supplier answer that
 the change can be made before the amendment takes effect. No reply or an unknown supplier date

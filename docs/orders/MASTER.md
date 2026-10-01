@@ -1,6 +1,6 @@
 # ORDERS — MASTER
 
-**All listing appearance — APPROVED / NOT BUILT (Jess, 2026-09-17):** follow
+**All listing appearance — governed shared standard; SO register rendered locally at audit commit 74b4981, production walk not established by this audit:** follow
 [UI MASTER §6.7 Portal-wide listing readability](../ui/MASTER.md#portal-wide-listing-readability--built-2026-09-17-slice-1--authenticated-walk-owed).
 This is the shared default, not a PO visual pilot. Preserve this module's filter content,
 control types, special schedules and business behavior; no page-local appearance specification.
@@ -40,10 +40,78 @@ control types, special schedules and business behavior; no page-local appearance
 
 ---
 
-# §0.0 · SALES ORDER BLUEPRINT 2026-09-26 — PLAN MISSION COMPLETE · READY SCOPES
+# §0.0 · SALES ORDER COMPLETE BLUEPRINT — owner-approved 2026-10-01 · PLAN COMPLETE
+
+Jess approved the consolidated whole-domain recommendation after the scoped amendment rulings.
+This closes PLAN review; it does not certify whole-module implementation or authorise deployment.
+Keep the current navigation, flat register, 40px rows / 51px goods rows, order detail and PDF split,
+revision/history, one amendment entry and owning-module boundaries. Apply the existing One Kit;
+no full-page replacement or alternative design system is approved.
+
+**Evidence boundary.** Complete audit: Carres `74b4981b62a50cb159d677e07429f8fc03fcf519`,
+Houzs `ecce2e9676acc555efa8b2c30e78052b2ab54749`, local 2990 committed source
+`a600b8d7417120d25bbd021820fc6b3ec4f92081` (not verified against its latest remote).
+301 scoped unit/mock/source tests passed; desktop 1440px and phone 390px real Carres components
+were observed with isolated fixture data. These are not production, full keyboard or live-data
+acceptance. Current main checked during consolidation: `86046dde04d29856a78be6a8f7cf0923405f6f00`.
+PR #1834 at `26f8e808919ecdd46211adf1f25a8c77059cad6c` is IMPLEMENTED FOR REVIEW for its
+scoped amendment slice, with GitHub CI success independently checked. Its Card owns detailed
+local verification (including 28 database scenarios); no deployment or production verification
+is claimed. Other rows below remain APPROVED TARGET / NOT BUILT unless separately evidenced.
+
+## Approved handoff scopes and business acceptance
+
+| Capability / scope | Keep or exact improvement | Acceptance boundary / owning dependency |
+|---|---|---|
+| Register, filters, reports and exports | KEEP shared DataGrid; IMPROVE the complete permission-scoped population, stable sort, totals and export rather than filtering a truncated 500-order sample | More than 500 matching orders do not disappear; list, totals and all-matching export reconcile; selected-row export is explicitly distinct; pagination changes loading only |
+| Monthly demand | KEEP two blocks, one month-row table, one-select Sales Location and existing rail; preserve active location/region/category through month, Before, After and no-date drill-down and return | The opened orders are the exact same population, no silent filter loss; no pivot, chart, multi-select or second coverage table |
+| Unknown facts and line attribution | IMPROVE unreadable versus genuine zero, missing catalogue versus source failure, and exact SO-line/Unit attribution | Unsupported purchase calculations are not zero; repeated SKUs do not establish line identity; uncertain legacy allocation stays visibly uncertain; Purchasing/Stock/Delivery own facts and calculations |
+| Staff amendments | KEEP the single whole-page draft and evidence gate; implement the current Staff amendments and Sales Approver, date and system-charge rulings in this MASTER | One request, one effective result after applicable gates; mixed changes never partially apply; ordinary changes do not wait for owner approval; actual submitter/confirmers and PIC notification preserved |
+| Concurrent editing | IMPROVE save/submit with the editor's original baseline, in addition to approval-time stale checks | Two editors cannot silently overwrite one another; conflict keeps the draft and exposes what changed; same amendment entry, no new draft engine |
+| Documents, history and failures | KEEP issued originals, immutable revisions, labelled reconstruction and real actor history; make failed original capture visible and retryable, with governed actionable write errors | File failure does not undo an effective revision, impersonate an actor, fabricate a signature or pass reconstruction off as the issued original; retry cannot duplicate the business change |
+| Existing approved document details | IMPROVE multiple-PO cell to first reference plus more, and deliver already-approved numbering with compatibility | Old references remain searchable/linked, historical documents are never renumbered, no unrelated Subscription redesign |
+| Direct Purchasing / Delivery dependencies | IMPROVE PO revision/source-share consistency and prove preceding-leg arrival, split-trip and Unit/line consequences in owning modules | No understated procurement demand or premature next-leg release; SO reads and links rather than writing PO, stock, delivery or money facts |
+| Work, Quick Rail and Calendar | KEEP shared Work/duty/history engines; integrate approved shared destinations and exact object/date deep-links | No duplicate personnel list, customer centre or SO-private task engine; shared customer identity/portal scope remains Workspace/UI-owned |
+
+**Staff journey.** Find the order with the existing register, check current promise and issued
+file, edit once, review Before/After and evidence, then see whether the request took effect or
+which supplier/eligible approver is awaited. The original effective order stays authoritative
+while waiting. Work points the responsible person to the owning confirmation/action. Operation
+helpers retain their own identity; the PIC receives the outcome. Purchasing manages the supplier
+commitment, Delivery manages arrangements and issued DOs, and Payment manages refunds and actual
+money. History and saved documents explain what happened without inventing missing evidence.
+
+**UI reuse decision.** Existing Carres table, rail, Tabs, Modal/DialogFrame, EmptyState, buttons,
+detail/PDF and Work components are READY. Houzs shared list/export predicates and save/confirmation
+interactions are REUSE CANDIDATES as patterns. Reference source-code rights/dependencies and Carres
+schema/security compatibility are not cleared; no source copy is designated COPY REQUIRED and no
+unmeasured saving is promised. Reject its independent partial amendment lanes or logistics control
+over the SO customer promise. A real missing shared interaction follows UI MASTER admission and
+its /ui example, not a page-local replacement. Every delivered slice must specify visible fields,
+actions, permission/loading/empty/error/waiting/success states and measured desktop/phone journeys.
+
+**Intentional exclusions.** Preserve 0329's separate attribution request and eligibility; do not
+expand post-Proceed ordinary-address restrictions, arbitrary non-delivery service pricing,
+copy/scan/bulk amendment or approval, Subscription scope, or full Purchasing/Delivery redesign.
+Previously approved future targets are not cancelled. Sales Approver's post-Proceed cancellation
+gate is approved but not a complete stock/PO/refund consequence policy: approval alone never means
+all obligations are settled. Unsupported consequences must not execute automatically. Genuine
+blocking contradictions are reported together with the smallest recommendation; missing code is
+not a new owner decision.
+
+**Delivery control.** This document is the one plan authority, not a second implementation queue.
+BUILD owns Cards only under its explicit commission. #1834 remains a partial commissioned slice;
+plan approval does not expand it silently. Release requires exact-head checks, migration upgrade
+proof, duty configuration readiness, real staff journeys and recovery steps. A passing CI or
+rendered fixture is not live acceptance. Merge to main currently triggers deployment; no main
+merge, production write or live duty assignment is authorised by this PLAN ruling.
+
+## Preserved approved scopes from the 2026-09-26 blueprint
+
 
 **Eight segments were reviewed and approved by Jess on 2026-09-25/26 and are persisted in this
-MASTER, COPY-STANDARD and UI MASTER as APPROVED TARGET / NOT BUILT.** The Order Route Blueprint of
+MASTER, COPY-STANDARD and UI MASTER.** Implementation is partial and evidenced per scope below;
+no blanket NOT BUILT or whole-module production claim applies. The Order Route Blueprint of
 2026-09-24 is folded in and its file deleted (Law 5). Every scope below is a dependency-ordered,
 unnumbered BUILD handoff boundary: it has approved business truth, approved UI/word truth, one owner
 and an acceptance boundary, and no owner decision blocks it. The BUILD/DELIVERY lane authors Cards.
@@ -55,7 +123,7 @@ and an acceptance boundary, and no owner decision blocks it. The BUILD/DELIVERY 
 | **C · SO page locked state** | §0.1 THE LOCKED STATE (five rules) | View and Rev 1 render zero row writers, `RM 1,399.00` text, `RM 0.00` discount, no `*`, no TBD checkbox in Edit |
 | **D · Register close-out + no dash (portal-wide)** | §0.1 REGISTER CLOSE-OUT · COPY NO DASH ANYWHERE ON A SCREEN · UI §6.0 empty-cell line · `Not applicable` on Service rows | menu `Edit · View · Print · ─ Cancel SO`; one population predicate; the 154-file dash sweep leaves no `—`/`–` printed as a value anywhere in `apps/web` (PDFs and WhatsApp templates included) |
 | **E · Read-failure faces** | § A READ FAILURE HAS THREE FACES | a 403 on each of the five surfaces prints the permission words with no retry; no `error.message` on screen; kit `EmptyState` + `Button` only |
-| **F · Monthly demand + rail** | §0.1 Monthly demand (2026-09-22 model + 2026-09-26 UI, KIT AND SOURCES) · UI §6.7 rail note · COPY Monthly demand words | `FilterRailMultiSelect` admitted through the kit with a `/ui` example; the matrix reconciles with its drill-down at one scope; the strip reads SO Batch's and Stock's arithmetic and buys nothing; measured at 1440/1180/820/743/390 |
+| **F · Monthly demand + rail** | §0.1 Monthly demand (2026-09-22 model + 2026-09-26 UI, KIT AND SOURCES) · UI §6.7 rail note · COPY Monthly demand words | Existing single-select shared rail and two-block month table reconcile with same-scope drill-down; quantities read owning calculations and buy nothing; measured at 1440/1180/820/743/390 |
 
 **Scope A is delivered in three dependency-ordered slices (BUILD lane, 2026-09-27).**
 
@@ -235,7 +303,7 @@ answers per order `obligations` through `completionOfOrder` (the ONE composition
 group says it could not read. **Monthly demand Export BUILT 2026-09-28:** the view's own Row 2 carries
 `Export` alone (no Search, no Columns) and writes the `By month` table as on screen (`Monthly demand
 {first} to {last} {date}.xlsx`; `Unavailable` stays a word). **Not built in F:** a custom date range;
-search and multi-selection in the Dealer group (a kit admission first). **Measured gaps:**
+search in the Sales Location select (a kit admission first). Multi-selection is not an approved target. **Measured gaps:**
 SO Batch Purchase reads only `proceed_order` orders and only Mattress / Bedframe / Sofa lines, so
 `To buy` is `0` for an Accessory or a `Not in catalog` line; a Unit sold before 0471 names no line
 and is matched to the first line of its SKU.
@@ -576,7 +644,7 @@ prints `Not recorded → No` / `Not recorded → Yes`. A line-3 note longer than
 and opens whole on hover, focus and click through the engine's `OverflowText` — the Register's
 rule, not a second one. The stored event is never rewritten.
 
-## Monthly demand — owner approved 2026-09-22 · APPROVED TARGET / NOT BUILT
+## Monthly demand — approved model · composition BUILT 2026-09-28; correctness close-out approved 2026-10-01
 
 **Purpose and placement.** Jess approved a six-month view of the quantities still owed on
 accepted Sales Orders, for Operation to plan stock, purchasing and supplier capacity. Sales Orders
@@ -599,7 +667,7 @@ rail belongs to this monthly view and filters Sales Location, customer delivery 
 and product category. Dealer location and customer delivery destination remain different facts.
 Both views use the shared rail shell under the following owner ruling.
 
-**Left rail — owner approved 2026-09-22 · APPROVED TARGET / NOT BUILT.**
+**Left rail — approved shared composition; built evidence in Scope F above.**
 Use the existing `FilterRail` family in `workspace-rail.tsx`, with governed 240px width,
 wrapping labels and collapse behaviour. One view selector chooses Order list or Monthly demand;
 each view exposes only its own controls. Do not add a second handmade rail.
@@ -610,7 +678,7 @@ each view exposes only its own controls. Do not add a second handmade rail.
   rail (owner ruling 2026-09-28). These are read-only factual filters, not a mutable
   overall status, work queue or new status/group column. Service case filters read Service's truth.
   Unknown underlying facts must not be classified as completed or no cases.
-- Monthly demand: starting month, 3/6-month period with explicit first/last month and year;
+- Monthly demand: starting month, one-to-six-month period with explicit first/last month and year;
   Sales Location, customer delivery State / City, actual catalog product categories.
   The requested-delivery-date basis remains explicit. Delivery/completion/service-case filters
   do not appear here and do not silently carry over from the list.
@@ -618,33 +686,18 @@ each view exposes only its own controls. Do not add a second handmade rail.
   approval inferred from silence. Click a selected facet again to deselect; a select retains All;
   no chosen values means All. Month/period controls retain their selected reporting window.
   This does not remove the shared active-condition/list-toolbar clear control or alter other pages.
-- Dealer supports search and multi-selection; selected choices remain visible. Product-category
-  selection may also narrow to several actual categories. This SO-specific approved target exceeds
-  the existing single-slot FilterRailSelect: its multi-select interaction is NOT BUILT and must be
-  admitted through governed kit design before application implementation. Do not change other
-  modules' single-selection behaviour as a side effect. New English copy remains subject to COPY
-  reconciliation; this approval is not a claim that all illustrated wording is registered.
+- Sales Location uses the existing single-select control; categories follow the current governed
+  facet interaction. No FilterRailMultiSelect is approved for this view.
 - Source classifications are catalog-owned; never print Other goods. Missing classifications are
   traceable data errors, not silently omitted physical demand. Services are separate from Qty.
 
-**Quantity matrix.** Columns are calendar months with years; rows are product categories.
-Every number means physical goods still owed to the customer, not order lines or original sold
-quantity: use the effective commitment and authoritative actual fulfilment. Partial delivery
-reduces only the quantity actually fulfilled. Gifts count in their actual product category;
-services do not count as physical pieces. Applied cancellations/amendments change the effective
-demand; pending requests do not. Preserve quantity unit and product/configuration identity.
-Expand a category into model, size and purchasing-relevant configuration. Clicking a month/product
-quantity exposes the contributing SOs and dealers under exactly the same filters and permissions.
-An empty result is not evidence of zero demand when its underlying facts failed to load.
-
-**Selected-month coverage.** Below the matrix, expose remaining customer demand, allocated stock
-coverage, valid PO coverage and remaining purchase requirement. Read the owning Stock and
-Purchasing calculations; do not create a second demand engine or allocate/purchase from this
-report. Stock and PO coverage must not double-count the same quantity, including after PO receipt.
-Available but unallocated stock is not represented as stock already arranged for these orders.
-PO coverage is not proof of timely delivery: separately expose supplier timing risks or unknown
-arrival evidence against the customer's requested date, without inventing a new promised date.
-Counts and drill-downs must reconcile at the same scope; unavailable coverage is unknown, not zero.
+**Quantity and coverage.** Use the two-block month-row composition in UI, KIT AND SOURCES below.
+Effective committed quantities and authoritative actual fulfilment determine the figures; pending
+amendments do not. Gifts count in their real category, services are not physical pieces. Coverage
+and To buy read the owning Purchasing/Stock calculations without double-counting receipts or
+creating an allocation writer. Exact line identity matters; uncertain legacy attribution and
+unavailable or unsupported calculations are not known zero. Every month/boundary/no-date door
+preserves the same scope and permissions. No category/configuration expansion or coverage strip.
 
 **Forecast boundary.** Confirmed demand is the approved planning baseline. Future sales targets
 or predicted new dealer orders would be a separately identified input; no target-entry engine,
@@ -686,9 +739,7 @@ operating model above is unchanged; this fixes how it is drawn and where every n
   `Sales Location` is one select (a search box waits for a kit admission); there is NO multi-select
   and NO `FilterRailMultiSelect`; the 2026-09-22 multi-selection line is withdrawn and no kit
   component is admitted. Several sales locations together = `All sales locations`.
-- **One page, three blocks, dictionary words only — OWNER CORRECTION 2026-09-26 (Jess: the pivot
-  "Excel listing" was confusing; reference shape = summary numbers · month chart · period table).**
-  **Corrected again the same day (Jess: "4 KPI is what? repeated?"): two blocks, not three.**
+- **One page, two blocks, dictionary words only — owner ruling 2026-09-26.**
   ① `This month · {Mon YYYY}` — THREE numbers for the current month (or the month the operator
   chose): `Total Qty` · `Delivered` · `Not delivered`. They never repeat the table's `Total` row —
   they are one month, the table is every month. No unit line; `Qty` is in the word. ② One table,
@@ -710,18 +761,18 @@ operating model above is unchanged; this fixes how it is drawn and where every n
   `ops_stock_items` reserved to these lines; `Pending Delivery Qty` = the PO word, `po_line_sources`
   on non-cancelled POs less received (Rental §5.6's evidenced Diglant supply counted once); `To buy`
   = `soBatchOrderLineOutstandingQty`, SO Batch's one arithmetic. Nothing is bought or reserved here.
-- **States:** skeleton = rail groups + a 10-column, 3-row matrix + the strip; filtered empty `No
+- **States:** skeleton = rail groups, the three this-month figures and the 9-column month table; filtered empty `No
   Sales Orders in these months` (the `No delivery date` row still shows); whole failure `Monthly
   demand could not be loaded` + `Try again`; a single failed source prints `Unavailable` in its
   numbers only; permission follows the Register's scope.
-- **Responsive:** 1440 / 1180 rail beside the three blocks (the month table is ~900px and never
-  scrolls sideways; the bars share one row); below 896px
-  (`FILTER_RAIL_FLOAT_BELOW_PX`) the rail floats behind `Show filters`; at 743 the four numbers become two rows of two and the bars wrap under them; at 390 `Period` moves under the toolbar and every target is
-  40px; the page never scrolls sideways.
+- **Responsive:** desktop rail beside the two approved blocks; below the shared rail breakpoint,
+  use its existing floating filter control. Preserve all table facts, readable type and keyboard
+  access through the shared grid's own scrolling viewport; do not make the whole page scroll
+  sideways. Verify 1440 / 1180 / 820 / 743 / 390 with long names and realistic quantities.
 - **Flat data-table treatment — owner ruling 2026-09-27:** the month table (9 columns, numbers under
   distinct words) draws NO column separators (tokens §5.1 column-count rule); the Register (11 columns,
   look-alike neighbours) keeps its 1px lines; header filter icons appear on hover, focus or an active
-  filter only (UI §6.0 rule 6); each rail group carries its 11px supporting line (UI §6.7).
+  filter only (UI §6.0 rule 6); rail groups follow the current UI §6.7 rule: title and chosen value, no supporting description.
 - Words registered in COPY-STANDARD § Monthly demand words with this ruling.
 
 **Acceptance boundary and remaining design work.** Review must demonstrate a month/year boundary,

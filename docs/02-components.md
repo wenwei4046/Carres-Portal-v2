@@ -40,9 +40,11 @@ when composition cannot.
 
 ## DataTable
 
-**Purpose.** The ONE list table.
+**Purpose.** Existing compact DataTable; not the Register DataGrid template.
 
-**When to use.** Any list of records an operator scans, compares and acts on.
+**When to use.** Existing compact embedded lists that fit this component. Portal registers use
+DataGrid and UI MASTER §6.0, §§6.7–6.10, including their shared horizontal viewport and content
+width rules. This component’s percentage widths and no-scroll behaviour do not override those rules.
 
 **When NOT to use.** A single record's fields (that is a detail region), or
 fewer than three rows of unrelated facts (that is a card).

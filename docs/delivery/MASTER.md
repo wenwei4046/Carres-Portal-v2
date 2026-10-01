@@ -1,5 +1,12 @@
 # DELIVERY — MASTER
 
+**SO blueprint direct dependency — APPROVED TARGET / NOT BUILT, Jess 2026-10-01.**
+Orders MASTER §0.0 requires validation of preceding-leg arrival before next-leg DO release,
+split-trip arrangements and exact Unit/SO-line attribution. Delivery owns these writes and must
+preserve existing money/release gates. SO only reads and links. Acceptance: a route display cannot
+substitute for enforced release conditions; no premature next-leg issue or invented historical
+line attribution. This is a bounded dependency, not full module redesign.
+
 **Shared field-operation UI:** follow [the canonical UI MASTER ruling](../ui/MASTER.md#shared-field-operation-ui--owner-ruling-2026-09-29) (approved direction; implementation and operator validation pending).
 
 **All listing appearance — APPROVED / NOT BUILT (Jess, 2026-09-17):** follow
