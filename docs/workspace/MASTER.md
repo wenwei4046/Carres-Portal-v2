@@ -336,8 +336,12 @@ System-priced delivery-charge changes have no manual approval lane: staff cannot
 computed price (Orders MASTER, owner-confirmed 2026-10-01 / TARGET NOT BUILT). Do not assign a
 new SO charge-waiver task to Delivery Charge Approver; that Duty remains for its other governed
 uses. Customer refunds still route to Sales Approver. Non-delivery service exceptions, 0329
-attribution changes/consolidation and Sales Approver self-approval remain undecided. Do not
-copy Purchasing Approver's own-request rule or bootstrap into this Duty as an assumed decision.
+attribution changes/consolidation remain undecided. **Sales Approver self-approval — owner-approved
+2026-10-01 / TARGET NOT BUILT:** the currently resolved eligible Principal holder or dated cover
+may decide their own SO exception request, retaining reason, customer evidence, actual submitter,
+approver and times. This does not allow another Principal to bypass duty resolution or change
+Finance/refund execution controls or other Duties' own-request rules. Do not copy Purchasing
+Approver's own-request prohibition or bootstrap into this Duty as an assumed decision.
 The existing PIC-first ordinary Delivery ownership remains unchanged.
 
 **`Finance Approver` (`finance_approver`) takes Finance users only.** Its holder and cover pickers

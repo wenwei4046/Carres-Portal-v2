@@ -2638,8 +2638,8 @@ whole-page submission or the rule against silently saving part of a draft.
   Staff & Duties mechanism. Never hard-code a name, let the requester arbitrarily choose the
   approver, or treat a department label as a person's identity. Where approval is required under
   the later staff-amendment ruling, its role qualification remains required. Submission follows
-  the any-Operation ruling below; self-approval remains undecided. An assignment alone grants
-  no additional approval permission.
+  the any-Operation ruling below; Sales Approver self-approval follows its scoped ruling below.
+  An assignment alone grants no additional approval permission.
 - Product amendments follow the later **Staff amendments and Sales Approver** ruling below:
   ordinary changes do not require owner approval; issued-PO coverage requires supplier confirmation.
   Requested Delivery Date changes follow the approved date ruling below, with no PO Duty or
@@ -2719,9 +2719,23 @@ issued PO covers the affected line. Submission eligibility is now settled by the
 
 **NOT DECIDED — each requires its own owner decision:** service-price exceptions beyond the
 system-priced delivery-charge scope settled below;
-salesperson/dealer/sales-location changes and whether the 0329 lane folds into the amendment;
-Sales Approver self-approval. Ordinary-address amendment restrictions after Proceed were not
+salesperson/dealer/sales-location changes and whether the 0329 lane folds into the amendment.
+Ordinary-address amendment restrictions after Proceed were not
 resolved by this ruling either; do not infer them from the floor/lift/stairs rule.
+
+**Sales Approver self-approval — OWNER-APPROVED 2026-10-01 / TARGET NOT BUILT.**
+The person currently resolved as Sales Approver through Staff & Duties (eligible holder or dated
+Principal cover) may decide their own submitted SO exception request. This is a specific SO
+approval rule, not permission for every Principal to bypass the resolved Duty or for Operation
+to approve commercial exceptions. Retain the decision reason, required customer evidence,
+actual submitter, actual approver and their timestamps; show the real same-person record rather
+than inventing a second reviewer. Required supplier confirmation and linked-effectiveness gates
+remain. The owner accepts the absence of a second-person review for this SO decision.
+
+Actual refund/payment execution retains its existing owning-module controls; this decision does
+not override Finance controls, Purchasing Approver's own-request prohibition, or other Duties'
+self-approval rules. No live approval, assignment, code or production verification is performed
+by this PLAN entry.
 
 **System-priced delivery charges — OWNER-CONFIRMED 2026-10-01 / TARGET NOT BUILT.**
 Operation does not decide the delivery price or collect the customer's money personally; the
