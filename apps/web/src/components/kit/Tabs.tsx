@@ -70,7 +70,7 @@ export default function Tabs({
             disabled={t.disabled}
             data-kit="tab"
             /* §3.5: "Underline tab hover — darken the text, not the
-             * background." The selected tab is the only blue on the bar.
+             * background." The selected label is dark semibold; its indicator is blue.
              *
              * The indicator is a BACKGROUND BAR, not a border, and that is
              * deliberate: §4.3 says borders are "1px only… no coloured
@@ -81,7 +81,7 @@ export default function Tabs({
             className={
               `group relative flex items-center gap-2 px-1 py-2 text-body ${fill ? "flex-auto justify-center" : ""} ` +
               "text-kit-slate-11 hover:text-kit-slate-12 " +
-              "data-[state=active]:text-kit-slate-12 " +
+              "data-[state=active]:text-kit-slate-12 data-[state=active]:font-semibold " +
               "disabled:opacity-40 disabled:cursor-not-allowed " +
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9"
             }

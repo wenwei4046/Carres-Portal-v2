@@ -130,7 +130,7 @@ describe("Journal", () => {
     expect(api.fetch).toHaveBeenCalledWith("/api/finance/ledger/entries/JE-202609-0003");
     // The register itself is not read to open one entry.
     expect(api.fetch.mock.calls.some(([u]) => String(u).startsWith("/api/finance/ledger/entries?"))).toBe(false);
-    fireEvent.click(screen.getByRole("link", { name: "Journal" }));
+    fireEvent.click(screen.getByRole("link", { name: "Back to Journal" }));
     expect(screen.getByTestId("where")).toHaveTextContent(/^\/finance\/ledger$/);
   });
 

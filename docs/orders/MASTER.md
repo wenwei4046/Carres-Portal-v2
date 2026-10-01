@@ -6775,7 +6775,7 @@ the normal discoverable doors already governed for Edit, output or View Flow.
 Jess accepted the rendered Sales Orders pilot and authorised the dedicated BUILD controller
 through tests, merge, deployment and authenticated production verification. The shared
 composition and numeric recipes live in UI MASTER “Confirmed shared template” and the kit;
-this module owns the following business-specific application. Production proof remains owed.
+this module owns the following business-specific application. Delivered evidence is below.
 
 - Order list rail: Order summary (Sales orders, Total payable, Paid to date, Balance due), then
   Customer Requested Delivery Date shortcuts. Both open initially. Aggregates follow the SAME
@@ -6797,6 +6797,12 @@ this module owns the following business-specific application. Production proof r
   posted non-void receipt. The unsafe classification is excluded until the Stock-owned source
   projection proves those facts. No receipt facts are fabricated.
 
-Delivery evidence: source is PR #1838, branch `codex/so-register-pilot`, preserved from cecc97e2b.
-Local targeted checks and rendered fixture walks are evidence only; CI, deployment revision and
-real authenticated production proof are tracked before this section can claim delivered status.
+Delivery is production-verified for the accepted pilot/action amendment: PR #1838 and #1839,
+exact amendment SHA `f04ed27ccd7f5129ec5dd0125b39ce4970869cee`, successful CI `36883995352`
+and Deploy `36886061086`. All five production revision surfaces converged. Authenticated
+read-only verification proved identical Kimmy/SO-1303 Table/Cards results and RM2,499/1,250/1,249
+summary, truthful receipt/document absences, narrow icon-plus-word controls, read-first object,
+five Items columns, protected lines, rendered PDF and Back restoring search/view context.
+UI MASTER “Confirmed shared template” owns the full bounded evidence and shared reuse follow-up.
+Print invocation showed no observed error; its separate viewer was not observable, so physical
+printing/viewer completion remains unverified. No business-data writes or migration were performed.

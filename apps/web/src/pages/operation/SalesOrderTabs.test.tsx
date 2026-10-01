@@ -30,9 +30,9 @@ describe("the object header below 768px", () => {
     expect(row.className).toContain("flex-wrap");
     expect(row.className).toContain("md:flex-nowrap");
     const order = (el: HTMLElement) => /(?:^|\s)order-(\d)/.exec(el.className)?.[1];
-    expect(order(screen.getByRole("link", { name: "Sales Orders" }))).toBe("1");
+    expect(order(screen.getByRole("link", { name: "Back to Sales Orders" }))).toBe("1");
     expect(order(screen.getByTestId("object-header-global"))).toBe("2");
-    /* The row breaks after the icons, and only below 768px. */
+    /* The mobile row breaks after icons; shared container rules also cover narrow shell content. */
     const breaker = screen.getByTestId("object-header-break");
     expect(breaker.className).toContain("basis-full");
     expect(breaker.className).toContain("md:hidden");

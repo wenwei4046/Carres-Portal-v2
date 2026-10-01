@@ -558,11 +558,29 @@
   [data-kit='drawer'][data-variant='quick-view'] { right: 4rem; }
 }
 
-/* Sales-order quick view: owner-approved dark identity bar. */
+/* Shared quick view: owner-approved dark identity bar and fact typography. */
 [data-kit='drawer'][data-variant='quick-view'] > header { background: theme("colors.kit.slate.12"); color: white; }
 [data-kit='drawer'][data-variant='quick-view'] > header h2,
 [data-kit='drawer'][data-variant='quick-view'] > header button { color: white; }
 
-[data-testid='sales-order-quick-view'] dt { font-size: var(--fs-12); color: theme("colors.kit.slate.11"); }
-[data-testid='sales-order-quick-view'] dd { font-weight: 600; margin-top: 4px; }
+[data-kit='drawer'][data-variant='quick-view'] dt { font-size: 12px; color: theme("colors.kit.slate.11"); }
+[data-kit='drawer'][data-variant='quick-view'] dd { font-weight: 600; margin-top: 4px; }
 [data-kit="drawer"][data-variant="quick-view"] > header button:hover { background: theme("colors.kit.slate.11"); }
+
+@media (max-width: 767px) {
+  [data-kit='drawer'][data-variant='quick-view'] > header { flex-wrap: wrap; gap: 8px; }
+  [data-kit='drawer'][data-variant='quick-view'] > header > div:first-child { flex-basis: 100%; }
+  [data-kit='drawer'][data-variant='quick-view'] > header > div:last-child { width: 100%; justify-content: flex-end; }
+}
+
+/* Object identity/actions wrap by available content width, including shell rails. */
+[data-kit='object-header'] { container-type: inline-size; }
+@container (max-width: 1023px) {
+  [data-kit='object-header'] [data-slot='object-header-row'] { flex-wrap: wrap; height: auto; }
+  [data-kit='object-header'] [data-slot='object-header-row'] > a { order: 1; }
+  [data-kit='object-header'] [data-slot='object-header-divider'], [data-kit='object-header'] [data-slot='object-header-spacer'] { display: none; }
+  [data-kit='object-header'] [data-testid='object-header-identity'] { order: 3; flex: 1 1 0%; height: 44px; }
+  [data-kit='object-header'] [data-testid='object-header-actions'] { order: 4; }
+  [data-kit='object-header'] [data-testid='object-header-global'] { order: 2; margin-left: auto; }
+  [data-kit='object-header'] [data-testid='object-header-break'] { display: block; order: 2; flex-basis: 100%; }
+}

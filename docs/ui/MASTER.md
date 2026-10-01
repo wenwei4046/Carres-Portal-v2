@@ -3327,7 +3327,7 @@ All listing pages follow **active filter chips → toolbar → table header/resu
 
 ## Confirmed shared template — owner acceptance 2026-10-01
 
-Jess accepted the rendered Sales Orders pilot as the shared TEMPLATE and authorised a dedicated BUILD controller through testing and deployment. This supersedes earlier unapproved visual-composition restrictions for the accepted elements below; approval is not proof of production deployment. Business facts, permissions and module workflows remain module-owned.
+Jess accepted the rendered Sales Orders pilot as the shared TEMPLATE and authorised a dedicated BUILD controller through testing and deployment. This supersedes earlier unapproved visual-composition restrictions for the accepted elements below; production evidence below bounds the delivered reference. Business facts, permissions and module workflows remain module-owned.
 
 - Action grammar (owner amendment2026-10-01): Print/Export/Edit use canonical icon16 plus visible word; labels remain on narrow screens and toolbars wrap. Back/Close/More are shared icon-only controls with tooltip and accessible name. Content tabs Order/Revisions/History/Order Route stay text-only, selected black600 with blue underline. Status pills retain text; icons are not added indiscriminately. No2990 comparison was verified for this amendment.
 - Register presentation uses existing Tabs segmented variant: Table icon `Table2`, Cards icon `LayoutGrid`, both16px inheriting text colour with visible words. The same controls remain during selection; decorative icons are hidden from accessibility and names stay Table/Cards. This narrowly approved presentation amendment changes no data/filter engine or Purchasing business scope.
@@ -3338,4 +3338,30 @@ Jess accepted the rendered Sales Orders pilot as the shared TEMPLATE and authori
 - Sales Order Items example: five columns Item, Qty, Unit (RM), Disc (RM), Amount (RM); item name, code and configuration share Item. No sequence/code columns, numbers do not repeat RM below RM headers, amount remains on one line. Preserve per-line editing/protection and service rows; footer Total payable and category Quantity; omit empty Services: None. Printed PDF remains governed separately.
 - Quick view: read-only, dark header document number and customer, status pill, Print icon plus word, Open full page/Close icons; no footer. Existing rounded Block cards: grey SO info, remaining sections white. Customer Phone/Email FIRST in SO info, followed by sales attribution/dates/Dealer; no standalone Customer card duplicating header name. Delivery, Items with truthful Stock Status, Payment, Related documents follow. Full object opens read-only with deliberate Edit. Missing or failed source facts remain explicit unknown/error, never invented stock receipt or document numbers.
 
-Visual acceptance evidence: local pilot http://127.0.0.1:5197/sales-orders-register-pilot.html; implementation source worktree `/Users/chaichiewlim/.codex/worktrees/so-amendment-baseline/Carres-Portal-v2`, branch `codex/so-register-pilot`. Remaining delivery gates: reconcile stale kit/module rules, source tests and shared /ui examples; audit all mutations and stock provenance; validate authenticated real data, responsive/accessibility/return/print behaviors; PR review and required CI; merge/deploy under owner's new explicit authorisation; verify production. Local screenshots and passing subsets do not prove these gates.
+**DELIVERED / PRODUCTION-VERIFIED — accepted SO pilot and action amendment, 2026-10-01.**
+PR #1838 merged as `c926e3f76d6508245b91da2bda44783e69798898`; PR #1839 merged as
+`f04ed27ccd7f5129ec5dd0125b39ce4970869cee`. Exact-head CI `36883995352` and production
+Deploy `36886061086` succeeded. `verify-production.mjs` proved that amendment SHA on both
+Pages sites, both canonical ERP/POS domains and API Worker health. Governance, types, complete
+shared/API/web tests, production build and web-bundle secret guard passed; no migration or
+business-data write was performed.
+
+Authenticated read-only ERP proof as Sara · Principal: 31 orders; searching Kimmy returned
+SO-1303 in both Table and Cards, with Total payable RM2,499, Paid to date RM1,250 and Balance
+due RM1,249, and footer 1 of 31. The summary retains the Loaded orders only tooltip while
+its redundant paragraph is absent. Canonical Table/Cards icons and words remain visible at
+390px with page width390 and no page overflow. Quick view retains source document/absence
+truth, Receipt unconfirmed, visible Print and40px touch controls. Full object is read-first,
+with five Items columns, protected supplier-commitment rules and a rendered PDF canvas;
+Back restores the register's search and presentation. Production console errors were absent.
+Print was invoked without an observed error; the separate print viewer was not exposed by
+browser tooling, so that viewer and physical printing are not claimed verified.
+
+Shared reuse follow-up corrects selected kit tabs to semibold600, truncates long quick-view
+identity only when needed with its full tooltip, and keeps header actions from shrinking.
+At <=767px the identity and action group use two rows inside the same header. Fact labels
+use12px and values600 for every shared quick-view drawer. Local /ui measurement proved dark
+selected labels600 and blue indicators; SO390 proof showed title356px, header95px and all
+40px actions visible without page overflow. Purchasing's read-only prototype reviewer confirmed
+its long PO identity fits the same390px recipe. Focused follow-up checks:117 passed plus
+29 kit/module-tab checks. The full-object header reuses its existing two-row layout when available content width is <=1023px (including shell rails), preserving identity/actions/global tools. Back accessible name matches its destination tooltip. This is shared template reuse, not Purchasing or Warehouse completion.

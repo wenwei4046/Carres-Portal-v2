@@ -3357,7 +3357,7 @@ describe("Card 05 · the object detail", () => {
   it("the Object Header: one back destination, the identity, one state pill", async () => {
     const detail = await openObject();
     // The shared object header (Law C) with the Register as back destination.
-    expect(within(detail).getByLabelText("Manual Purchase Request")).toBeInTheDocument();
+    expect(within(detail).getByLabelText("Back to Manual Purchase Request")).toBeInTheDocument();
     /* Card 08 §3.3 — the identity is `{Need for} · {For}` (REQ1's retired
        purpose prints its own truthful word; its For was never stored), and
        no number or UUID appears anywhere in the header. */
@@ -3389,7 +3389,7 @@ describe("Card 05 · the object detail", () => {
     const detail = await openObject();
     // The Register surface is preserved (hidden), not unmounted.
     expect(screen.getByTestId("mp-register-surface")).toHaveAttribute("aria-hidden", "true");
-    fireEvent.click(within(detail).getByLabelText("Manual Purchase Request"));
+    fireEvent.click(within(detail).getByLabelText("Back to Manual Purchase Request"));
     await screen.findByTestId("purchasing-tabs");
     expect(screen.queryByTestId("mp-detail")).toBeNull();
     expect(screen.getByTestId("mp-register-surface")).not.toHaveAttribute("aria-hidden");
@@ -3720,7 +3720,7 @@ describe("Card 06 §7 / Card 08 · the Work deep link opens the exact request by
     expect(screen.getByTestId("object-identity")).toHaveTextContent("Display");
     expect(screen.getByTestId("mp-detail").textContent).not.toContain("REQ-0001");
     // `‹ Manual Purchase` returns to the Register — not a reopen loop.
-    fireEvent.click(screen.getByRole("link", { name: "Manual Purchase Request" }));
+    fireEvent.click(screen.getByRole("link", { name: "Back to Manual Purchase Request" }));
     await waitFor(() => expect(screen.queryByTestId("mp-detail")).toBeNull());
   });
 
