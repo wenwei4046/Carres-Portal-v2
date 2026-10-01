@@ -534,10 +534,14 @@
 [data-kit='tabs'][data-variant='segmented'] [data-kit='tab'][data-state='active'] { background: theme('colors.kit.blue.3'); color: theme('colors.kit.blue.11'); font-weight: 600; }
 [data-kit='tabs'][data-variant='segmented'] [data-kit='tab-indicator'] { display: none; }
 @media (max-width: 767px) { [data-kit='tabs'][data-variant='segmented'] [data-kit='tab'] { height: 34px; } }
-/* Owner-selected B: neutral group headings distinguish filters from white data. */
-.so-template-rail [data-rail-group] { padding: 4px 0; }
+/* SO filter card palette: neutral headings and white content. */
 .so-template-rail [data-rail-group] > button { background: theme('colors.kit.slate.3'); border-radius: 4px; }
 .so-template-rail [data-rail-group] > button:hover { background: theme('colors.kit.slate.4'); }
 .so-template-rail [data-rail-group] > div { padding-left: 16px; }
 .so-template-rail [data-rail-group] > div > button { font-size: 12px; line-height: 18px; }
 [data-testid='register-column']:has([data-presentation-tools]) { background: theme('colors.kit.slate.2'); }
+/* Owner-selected C2 replaces B's unframed groups in the SO pilot. */
+.so-template-rail [data-rail-group] { margin: 4px 0; padding: 0; border: 1px solid theme('colors.kit.slate.6'); border-radius: 6px; background: white; }
+.so-template-rail [data-rail-group] > button { width: 100%; border-radius: 5px; }
+.so-template-rail [data-rail-group] > button[aria-expanded='true'] { border-radius: 5px 5px 0 0; border-bottom: 1px solid theme('colors.kit.slate.6'); }
+.so-template-rail [data-rail-group] > div { margin-top: 0; padding: 4px 8px 4px 16px; }
