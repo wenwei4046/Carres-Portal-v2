@@ -1444,10 +1444,13 @@ protectors) and pillows are warehouse ready stock. Fulfil their customer require
 existing governed quantity-stock allocation and delivery path, using measured usable stock; do
 not impose a 7-working-day production wait or generate a supplier purchase for stock-covered
 quantity. Historical quantity-mode procurement configuration findings do not establish a customer
-fulfilment lead time. Warehouse stock and supplier replenishment are different facts: actual
-shortages/replenishment retain their existing source/approval path, and any supplier replenishment
-lead time must come from its own evidence/settings, not an invented accessory default. Ready-stock
-business practice does not authorise fabricating stock availability or changing Catalog identity mode.
+fulfilment lead time. **China replenishment takes 2 months of order lead time (owner confirmed
+2026-10-01).** Plan replenishment of these two goods ahead using that lead time; this is not a
+customer-order production wait, a 7-working-day accessory default, or an automatic promise of
+supplier delivery. Keep the approved duration in months; do not silently convert it to 60 days or
+treat it as supplier working days. Actual shortages/replenishment retain the existing source and
+approval path. Ready-stock business practice does not authorise fabricating stock availability,
+changing Catalog identity mode, or creating an automatic reorder threshold.
 
 Legacy showroom stock receives a Unit ID during opening count with supplier, ownership, model,
 location, existing serial/label and photo evidence. Until the physical label is attached, the Unit
@@ -6814,8 +6817,13 @@ production data has been changed. Do not ask the owner to supply these values ag
 **MP / PILLOW — OWNER CORRECTION 2026-10-01, APPROVED / LOCKED.** MP/protectors and pillows
 are ready stock at the warehouse, not goods requiring a standard 7-working-day production wait.
 Use actual governed stock availability for customer fulfilment. No 7-day accessory default is
-approved, and no such default is to be populated by the placement-unblock BUILD. Supplier
-replenishment timing is separate; this correction neither assigns it 0 days nor invents a value.
+approved, and no such default is to be populated by the placement-unblock BUILD. **For these two
+goods, replenishment orders from China require 2 months of order lead time (owner confirmed
+2026-10-01).** This governs advance replenishment planning, not a delay on customer fulfilment
+from available warehouse stock. Preserve the duration as months, not an assumed 60 days or a
+working-day production value; do not write it blindly into the existing Supplier × Category
+Production Days field. This approval supplies the replenishment lead time only, not a minimum
+stock level, automatic purchase authority, separate transit duration or guaranteed arrival date.
 
 Supplier WhatsApp group/email maintenance is an approved §11 capability, not an owner data-entry
 omission. Verify its actual delivery state in BUILD. Resolve a PO's address from its governed
