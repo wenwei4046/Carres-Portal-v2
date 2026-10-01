@@ -558,6 +558,25 @@ fact is not automatically a disabled form field. Card hierarchy, spacing, densit
 and action discoverability must be assessed together. This reference is available as guidance now;
 its adoption is neither blocked by having existing components nor automatically verified by them.
 
+### Sales Order Table / Cards view — scoped owner direction
+
+**OWNER-REQUESTED CAPABILITY / NOT BUILT, reported by the Sales PLAN chat 2026-10-01.** Jess
+selected the Table/Cards toggle at Houzs `/scm/sales-orders?view=cards` and requested this function
+to understand order delivery progress. Include this capability in the first Sales representative
+design; it is not rejected as unnecessary. The reporting Sales planner owns verification of the
+reference interaction and current Orders/Delivery semantics. This direction does not commission
+application or prototype code, approve final card composition or introduce a global card-view
+requirement for every register.
+
+**RECOMMENDED CONTRACT / PROPOSAL detail:** Table and Cards are two presentations of the same
+permission-scoped, filtered SO population; preserve search/filter/sort when switching. Proposed
+card content is SO identity, customer, requested date and Delivery-owned fulfilment facts, with
+partial versus complete delivery distinguished according to the existing authority. DO issuance,
+dispatch or a locally inferred percentage cannot establish delivered. No parallel status engine,
+new Work card or cross-module writer. Exact labels/aggregation, pagination, selection/export scope,
+responsive layout and zero/error/loading states require existing-authority verification and owner
+review of the complete design. Do not infer finished delivery from a reference's cosmetic badge.
+
 ### First representative design — Sales Orders, owner instruction 2026-10-01
 
 **RULING / DESIGN PRIORITY, NOT BUILD:** Jess directs Sales Orders to be the first complete
