@@ -18,6 +18,11 @@ Register/Object Detail rules govern where an older example below differs.
 
 **Self-contained Carres measurements:** [01 §§7–8](01-design-tokens.md#7--canonical-component-measurements--scoped-not-one-size-for-every-surface) owns the scoped numeric recipes, source/target/status matrix and unresolved conflicts. Use it with these component/pattern contracts. Reference screenshots do not supply missing numbers; proposed sizes do not override approved sizes.
 
+**Owner direction2026-10-01:** adapt measured Houzs geometry/hierarchy to Inter and existing
+Carres semantic colours. Do not introduce the withdrawn warm-grey hex proposal or literal Houzs
+palette. Compact search numerical candidate lives in01§7.2 and is not yet approved; the fixed
+far-right secondary-tools menu is approved. Reference styling does not change business actions.
+
 **One purpose per page and one obvious primary next action for the current task.**
 Secondary authorised actions remain discoverable. Existing UI MASTER/module-specific action
 placement wins; this does not impose a new button location. Business logic belongs to modules,

@@ -83,6 +83,14 @@ tables. Those follow content-led widths, governed row recipes and contained scro
 
 ---
 
+## Compact Register search — reference adaptation
+
+Owner direction2026-10-01: clear, compact search using Inter and existing Carres colours.
+Exact candidate dimensions live in01§7.2 and remain PROPOSAL, not an admitted replacement of every
+search variant. Use the existing shared search control; preserve query, clear and keyboard access.
+Placeholder promises only fields verified for the adopter (SO/customer/imported-reference where
+supported). Narrow layout must not hide the active query; approved secondary-tool overflow remains.
+
 ## Register toolbar overflow
 
 **APPROVED TARGET / NOT BUILT — 2026-10-01.** Use the existing admitted shared menu/control
