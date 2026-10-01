@@ -42,9 +42,31 @@ The owner requested this explicit contract in the existing UI MASTER, not anothe
 cutover remain outside this PLAN commission. **ADOPTION AND FULL OPERATOR VALIDATION PENDING**:
 a written contract is not proof that all pages comply.
 
-### One source and explicit template selection
+### Approved reference template families — owner selection 2026-10-01
 
-Use the following actual sources. Paths below are relative to `apps/web/src/`. Existing
+**RULING / APPROVED TARGET DIRECTION / NOT BUILT.** The owner explicitly selected complete
+Houzs **list, detail, form and card** templates as the visual starting point for Carres, with
+Carres blueprint concepts adapted into them. This is one shared presentation programme for
+Sales Orders, Purchasing and Warehouse, not four independent page-local designs.
+
+| Approved family | Reference basis already inspected | Carres adaptation to present for review |
+|---|---|---|
+| List | Service Cases register and shared DataTable | Complete toolbar, table, expansion and footer composition with Carres fields, retained filter rail and authorised actions; preserve search, scope and selection behaviour. |
+| Detail | DetailLayout and inspected SCM detail surfaces | Complete identity/action/section/document/history composition using the owning Carres blueprint; no automatic requirement that every object become a drawer. |
+| Form | SCM FormCard/FormGrid and Sales Order form source | Complete grouped fields, goods, validation and save arrangement; preserve Carres required facts, approvals and source-owned writes. |
+| Card | Overview Needs you, summary cards and Loading List goods cards | Distinct task, summary and goods compositions with coherent text hierarchy and spacing; preserve true Work ownership and physical-work outcomes. |
+
+The selection approves these complete reference families, not a claim that all adaptations,
+values or states have been shown or verified. Present realistic complete pages for owner review,
+including necessary small-screen/state variants and explicit deviations from the reference.
+Keep the Carres brand and business truth. Do not restart approved module business blueprints.
+Do not equate this selection with source-code licence clearance, blanket backend copying,
+application implementation permission or completed kit adoption.
+
+### Existing implementation sources and preservation contracts
+
+The following sources identify current reuse and business-preservation boundaries, not a veto on
+the approved Houzs-first visual adaptation. Paths below are relative to `apps/web/src/`. Existing
 module-specific business rules and explicit presentation exceptions remain binding; identical
 visual grammar never means identical fields, permissions or lifecycle.
 
