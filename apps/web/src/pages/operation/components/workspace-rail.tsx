@@ -129,18 +129,6 @@ function railStorageKey(railKey: string | null, groupKey: string): string | null
   return railKey ? `carres.filterRail.${railKey}.${groupKey}` : null;
 }
 
-/* A group opens only when the operator opened it (international facet
-   panels: Shopify, Linear, SAP Fiori — headers first, one click to see a
-   group's choices). The chosen value always shows on the header. */
-function readGroupOpen(key: string | null): boolean {
-  if (!key) return false;
-  try {
-    return localStorage.getItem(key) === "1";
-  } catch {
-    return false;
-  }
-}
-
 /** Reports a control's chosen label to its group heading while it is chosen. */
 function useReportChosen(label: string | null) {
   const group = useContext(GroupContext);
@@ -280,6 +268,7 @@ export function FilterRailGroup({
   children,
   chosen,
   groupKey,
+  defaultOpen = false,
 }: {
   title: string;
   icon: IconName;
@@ -287,10 +276,11 @@ export function FilterRailGroup({
   chosen?: string | null;
   /** Stable storage name when the title is not (defaults to the title). */
   groupKey?: string;
+  defaultOpen?: boolean;
 }) {
   const { railKey } = useContext(RailContext);
   const storageKey = railStorageKey(railKey, groupKey ?? title);
-  const [open, setOpenState] = useState(() => readGroupOpen(storageKey));
+  const [open, setOpenState] = useState(() => { try { const saved = storageKey ? localStorage.getItem(storageKey) : null; return saved == null ? defaultOpen : saved === "1"; } catch { return defaultOpen; } });
   const [reported, setReported] = useState<ReadonlyArray<readonly [string, string]>>([]);
   const report = useCallback((id: string, label: string | null) => {
     setReported((prev) => {
@@ -333,7 +323,7 @@ export function FilterRailGroup({
         <span className="min-w-min flex-1 break-normal text-body font-semibold text-kit-slate-12">
           {title}
         </span>
-        {shown != null && (
+        {!open && shown != null && (
           <span
             className="min-w-0 max-w-[45%] truncate text-body font-semibold text-kit-blue-11"
             title={shown}
@@ -768,4 +758,34 @@ export function FilterRailMonthGrid({
       })}
     </div>
   );
+}
+
+/** Shared value-list filter: OR within a group; owner-approved SO pilot. */
+export function FilterRailMultiSelect({label, values, options, onChange, allLabel, testId, compact = false}: {
+ label: string; values: readonly string[]; options: readonly {value:string; label:string}[];
+ onChange:(values:string[])=>void; allLabel:string; testId:string; compact?:boolean;
+}) {
+ const [query,setQuery]=useState("");
+ const [expanded,setExpanded]=useState(false);
+ const listId=useId();
+ useReportChosen(values.length ? (values.length===1 ? values[0] : `${values.length} selected`) : null);
+ const content = <div data-testid={testId} className="flex min-w-0 flex-col gap-1">
+  <input aria-label={`Search ${label}`} placeholder="Search…" value={query} onChange={e=>setQuery(e.target.value)} className="h-8 min-w-0 rounded-control border border-kit-slate-6 bg-white px-2 text-body" />
+  <button type="button" aria-pressed={!values.length} onClick={()=>onChange([])} className="min-h-8 rounded-control px-2 text-left text-body font-medium hover:bg-kit-slate-3">{allLabel}</button>
+  <div className={compact ? "max-h-36 overflow-y-auto" : "max-h-48 overflow-y-auto"}>
+   {options.filter(o=>o.label.toLocaleLowerCase().includes(query.toLocaleLowerCase())).map(o=><button
+    key={o.value} type="button" aria-pressed={values.includes(o.value)}
+    onClick={()=>onChange(values.includes(o.value)?values.filter(v=>v!==o.value):[...values,o.value])}
+    className={`flex min-h-8 w-full items-center rounded-control px-2 py-1 text-left text-body ${values.includes(o.value)?"bg-kit-blue-3 text-kit-blue-11":"hover:bg-kit-slate-3"}`}>
+    <span className="min-w-0 break-words">{o.label}</span>
+   </button>)}
+  </div>
+ </div>;
+ if (!compact) return content;
+ return <div className="flex min-w-0 flex-col gap-1">
+  <button type="button" className="flex h-8 w-full items-center justify-between rounded-control border border-kit-slate-6 bg-white px-2 text-left text-body" aria-label={`Select ${label}`} aria-expanded={expanded} aria-controls={listId} onClick={()=>setExpanded(value=>!value)}>
+   <span className="truncate">{values.length === 0 ? allLabel : values.length === 1 ? values[0] : `${values.length} selected`}</span><span aria-hidden="true">{expanded ? "▴" : "▾"}</span>
+  </button>
+  {expanded && <div id={listId} className="rounded-control border border-kit-slate-6 bg-white p-1">{content}</div>}
+ </div>;
 }

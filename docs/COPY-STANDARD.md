@@ -2638,6 +2638,7 @@ the drawer and the DO document read them from the shared modules (`delivery-paym
 
 | Meaning | Use exactly | Do NOT use |
 |---|---|---|
+| Sales Order register presentation (owner-requested pilot, 2026-10-01) | **`Table`** · **`Cards`**; existing `Sales Orders view` accessible group name. `Unavailable` for a Delivery fact whose source/identity is not sufficient; never inferred Fully delivered. | Board · a new status taxonomy |
 | The register's search placeholder | **`Search sales orders…`** | `SO number, customer, phone or item…` — the box is a governed 200px, so the long form clipped at every width, not only a narrow one |
 | The register column after SO No | **`Sales Location`** (owner ruling 2026-09-21) | `Showroom` · Outlet · Branch · Store |
 | The register's footer count (Listing Standard, owner approved 2026-09-16) | **`{n} sales orders`** · singular **`1 sales order`** · narrowed or capped **`{n} of {m} sales orders`** (`{m}` is the SERVER's `salesOrderTotal` — every Sales Order this user may read, rentals excluded, search not applied; when it is unknown the footer prints **`{n} sales orders`** with no `of`) · ticked **`{n} selected sales orders`** / **`1 selected sales order`** | `{n} orders` · `{n} of {m} orders` · `{n} rows` |
@@ -4904,3 +4905,11 @@ Workspace message availability: `Message not available` replaces a placeholder d
 | PO view (a PO serving two or more orders) | `{PO No} · {Supplier}` over `PO Delivery Date {date} · Expected arrival {date} · Related orders · {n}` · a related order line `{SO No} · {customer} · Requested {date}` · on the order it opens: `Back to {PO No}` | copying the PO's act onto each order |
 | Communication | `Communication` · tabs `Supplier` · `Warehouse` · `Logistics` · `Customer` · `To` (recorded channels only: `{party} · WhatsApp group` · `{party} · Email`) · `Template` · `Message` · `Message not available` · `Copy message` · `History {n}` | a typed recipient · a message with a missing field · a dash |
 | Empty and failure | `Nothing assigned to you` + `See Team Work` · `Nothing due on {date}` + `Open {date}` / `Open Missed` · `No missed work` · `No open work. Every track is clear.` · `Could not refresh {source}` · `Last updated {time}` · `Work could not be loaded. Try again.` | `0` for a failed source |
+
+| Sales Orders pilot page-tools overflow (owner approved 2026-10-01) | `Page tools` (accessible trigger/menu name); `Export` · `Columns` with existing submenu words | Order business actions in page-tools menu |
+
+| Sales Orders pilot compact search (owner approved 2026-10-01) | `Search orders…`; accessible scope `Search sales orders by SO number, customer or imported reference` | Unverified whole-database phone/item search claim |
+
+### Accepted Sales Orders shared template — 2026-10-01
+
+Owner-accepted screen vocabulary: `Order summary` · `Stock Status` · `Receipt unconfirmed` · `Not applicable` · `Clear all` · `Open full page` · `Related documents`. These describe the accepted read-only template; receipt uncertainty never asserts a posted receipt.

@@ -512,3 +512,57 @@
   font-feature-settings: "zero" 0;
   font-variant-numeric: lining-nums tabular-nums;
 }
+
+/* Owner-approved SO representative template, 2026-10-01. Existing tokens only. */
+.so-template-rail { background: theme('colors.kit.slate.2'); }
+.so-template-rail [data-testid='sales-orders-rail-fixed'] { padding: 8px 12px; }
+.so-rail-navigation [data-kit='tabs'] { flex-direction: column; align-items: stretch; gap: 4px; border: 0; padding-right: 28px; }
+.so-rail-navigation [data-kit='tab'] { height: 36px; justify-content: flex-start; padding: 0 8px; border-radius: 6px; font-weight: 500; }
+.so-rail-navigation [data-kit='tab'][data-state='active'] { background: theme('colors.kit.blue.3'); color: theme('colors.kit.blue.11'); font-weight: 600; }
+.so-rail-navigation [data-kit='tab-indicator'] { display: none; }
+.so-template-rail [data-rail-group] { border-top: 0; padding: 4px 0; }
+.so-template-rail [data-rail-group] > button { min-height: 36px; padding-top: 6px; padding-bottom: 6px; }
+.so-template-rail [data-rail-group] > div > button { min-height: 32px; padding-top: 7px; padding-bottom: 7px; }
+.so-template-rail [data-rail-group] > div > button[aria-pressed='true'] { background: theme('colors.kit.blue.3'); color: theme('colors.kit.blue.11'); }
+@media (max-width: 767px) {
+ .so-template-rail [data-kit='tab'], .so-template-rail [data-rail-group] button { min-height: 40px; }
+}
+
+/* Shared compact view switch; no underline stage-tab styling. */
+[data-kit='tabs'][data-variant='segmented'] { gap: 2px; padding: 2px; border: 1px solid theme('colors.kit.slate.6'); border-radius: 6px; background: white; }
+[data-kit='tabs'][data-variant='segmented'] [data-kit='tab'] { height: 26px; padding: 0 10px; border-radius: 4px; font-size: 13px; line-height: 18px; font-weight: 500; }
+[data-kit='tabs'][data-variant='segmented'] [data-kit='tab'][data-state='active'] { background: theme('colors.kit.blue.3'); color: theme('colors.kit.blue.11'); font-weight: 600; }
+[data-kit='tabs'][data-variant='segmented'] [data-kit='tab-indicator'] { display: none; }
+@media (max-width: 767px) { [data-kit='tabs'][data-variant='segmented'] [data-kit='tab'] { height: 34px; } }
+/* SO filter card palette: neutral headings and white content. */
+.so-template-rail [data-rail-group] > button { background: theme('colors.kit.slate.3'); border-radius: 4px; }
+.so-template-rail [data-rail-group] > button:hover { background: theme('colors.kit.slate.4'); }
+.so-template-rail [data-rail-group] > div { padding-left: 16px; }
+.so-template-rail [data-rail-group] > div > button { font-size: 12px; line-height: 18px; }
+[data-testid='register-column']:has([data-presentation-tools]) { background: theme('colors.kit.canvas'); }
+/* Owner-selected C2 replaces B's unframed groups in the SO pilot. */
+.so-template-rail [data-rail-group] { margin: 4px 0; padding: 0; border: 1px solid theme('colors.kit.slate.6'); border-radius: 6px; background: white; }
+.so-template-rail [data-rail-group] > button { width: 100%; border-radius: 5px; }
+.so-template-rail [data-rail-group] > button[aria-expanded='true'] { border-radius: 5px 5px 0 0; border-bottom: 1px solid theme('colors.kit.slate.6'); }
+.so-template-rail [data-rail-group] > div { margin-top: 0; padding: 4px 8px 4px 16px; }
+
+/* SO representative surface hierarchy: blue selection is unchanged. */
+.so-template-rail { border-right-color: theme('colors.kit.slate.6'); }
+.so-template-rail [data-rail-group] button[aria-pressed='true'] { background: theme('colors.kit.blue.3'); color: theme('colors.kit.blue.11'); }
+@media (max-width: 767px) {
+ .so-template-rail [data-rail-group] button { min-height: 40px; }
+}
+
+/* Sales Order summary leaves the existing 64px utility rail visible. */
+@media (min-width: 768px) {
+  [data-kit='drawer'][data-variant='quick-view'] { right: 4rem; }
+}
+
+/* Sales-order quick view: owner-approved dark identity bar. */
+[data-kit='drawer'][data-variant='quick-view'] > header { background: theme("colors.kit.slate.12"); color: white; }
+[data-kit='drawer'][data-variant='quick-view'] > header h2,
+[data-kit='drawer'][data-variant='quick-view'] > header button { color: white; }
+
+[data-testid='sales-order-quick-view'] dt { font-size: var(--fs-12); color: theme("colors.kit.slate.11"); }
+[data-testid='sales-order-quick-view'] dd { font-weight: 600; margin-top: 4px; }
+[data-kit="drawer"][data-variant="quick-view"] > header button:hover { background: theme("colors.kit.slate.11"); }

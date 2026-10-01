@@ -2577,9 +2577,7 @@ function SalesOrderWorkspaceBody() {
         <table className={SO_TABLE} data-testid="edit-goods">
           <thead>
             <tr className={SO_HEAD_ROW}>
-              <th className={`${th} text-left`} style={{ width: 28 }}>#</th>
-              <th className={`${th} text-left`} style={{ minWidth: 104 }}>Item Code</th>
-              <th className={`${th} text-left`} style={{ minWidth: 130 }}>Description</th>
+              <th className={`${th} text-left`} style={{ minWidth: 180 }}>Item</th>
               <th className={`${th} text-center`}>Qty</th>
               <th className={`${th} text-right`}>Unit (RM)</th>
               <th className={`${th} text-right`}>Disc (RM)</th>
@@ -2595,12 +2593,9 @@ function SalesOrderWorkspaceBody() {
               const open = configOpen.has(l.key);
               return [
                 <tr key={l.key} className={`${open ? "" : "border-b border-kit-slate-5"} align-top`} data-testid={`edit-line-${i + 1}`}>
-                  <td className={`px-2 py-2 text-base-500 ${strike}`}>{i + 1}</td>
-                  {/* The UI font at 13px, like every other cell (kit-sizes card,
-                      2026-09-23) — it was 12px JetBrains Mono. */}
-                  <td className={`break-words px-2 py-2 ${strike}`}>{l.sku}</td>
                   <td className="px-2 py-2">
-                    <div className={strike}>{nameOfSku(l.sku)}</div>
+                    <div className={`font-medium ${strike}`}>{nameOfSku(l.sku)}</div>
+                    <div className={`break-words text-meta text-base-600 ${strike}`}>{l.sku}</div>
                     {configWords(l.attrs) && <div className={`text-meta text-base-600 ${strike}`}>{configWords(l.attrs)}</div>}
                     {!known && <div className="text-meta text-kit-amber-11">{NOT_IN_CATALOG}</div>}
                     {l.added && <div className="text-meta text-kit-blue-11">New line</div>}
@@ -2614,7 +2609,7 @@ function SalesOrderWorkspaceBody() {
                         just told them they do not have. Measured in the shell
                         preview: the row buttons were clickable while the header
                         still offered `Edit`. */}
-                    <span className="mt-1 inline-flex flex-wrap gap-x-4 text-meta">
+                    <span className={formLocked ? "hidden" : "mt-1 inline-flex flex-wrap gap-x-4 text-meta"}>
                       {!formLocked && canConfig && !protectedLine(l) && (
                         <button type="button" className="text-kit-blue-11 hover:underline" aria-expanded={open}
                           aria-label={`Configure ${nameOfSku(l.sku)}`}
@@ -2642,8 +2637,8 @@ function SalesOrderWorkspaceBody() {
                       </div>
                     )}
                   </td>
-                  <td className="px-2 py-2 text-right">
-                    {formLocked || l.removed || protectedLine(l) ? <span className={`tabular-nums ${strike}`}>{fmtMoney(l.unit_price)}</span> : (
+                  <td className="whitespace-nowrap px-2 py-2 text-right">
+                    {formLocked || l.removed || protectedLine(l) ? <span className={`tabular-nums ${strike}`}>{fmtMoney(l.unit_price).replace(/^RM\s*/, "")}</span> : (
                       <div className="min-w-[80px]">
                         <Input id={`so-edit-price-${l.key}`} aria-label={`Unit price ${nameOfSku(l.sku)}`} type="number" min={0} step="0.01"
                           value={String(l.unit_price)}
@@ -2652,12 +2647,12 @@ function SalesOrderWorkspaceBody() {
                     )}
                   </td>
                   {/* Zero is the fact, the dash was the banned absent-value glyph. */}
-                  <td className={`whitespace-nowrap px-2 py-2 text-right tabular-nums ${strike}`}>{fmtMoney(discountOf(l))}</td>
-                  <td className={`whitespace-nowrap px-2 py-2 text-right tabular-nums ${strike}`}>{fmtMoney(l.qty * l.unit_price)}</td>
+                  <td className={`whitespace-nowrap px-2 py-2 text-right tabular-nums ${strike}`}>{fmtMoney(discountOf(l)).replace(/^RM\s*/, "")}</td>
+                  <td className={`whitespace-nowrap px-2 py-2 text-right tabular-nums ${strike}`}>{fmtMoney(l.qty * l.unit_price).replace(/^RM\s*/, "")}</td>
                 </tr>,
                 open && canConfig ? (
                   <tr key={`${l.key}-config`} className="border-b border-kit-slate-5 bg-kit-slate-2">
-                    <td colSpan={7} className="px-2 py-3">
+                    <td colSpan={5} className="px-2 py-3">
                       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                         {model!.skus.length > 1 && (
                           <Select id={`so-edit-size-${l.key}`} label="Size" value={l.sku}
@@ -2684,24 +2679,23 @@ function SalesOrderWorkspaceBody() {
               const strike = a.removed ? "line-through text-base-500" : "";
               return (
                 <tr key={a.key} className="border-b border-kit-slate-5 align-top" data-testid={`edit-service-${a.addon_key}`}>
-                  <td className="px-2 py-2" />
-                  <td className={`break-words px-2 py-2 ${strike}`}>{serviceCodeWord(a.addon_key, addonSkuByKey.get(a.addon_key))}</td>
                   <td className="px-2 py-2">
-                    <div className={strike}>{nameOfAddon(a.addon_key)}</div>
+                    <div className={`font-medium ${strike}`}>{nameOfAddon(a.addon_key)}</div>
+                    <div className={`break-words text-meta text-base-600 ${strike}`}>{serviceCodeWord(a.addon_key, addonSkuByKey.get(a.addon_key))}</div>
                     {typeof a.attrs?.["size"] === "string" && <div className={`text-meta text-base-600 ${strike}`}>{String(a.attrs["size"])}</div>}
                     {a.added && <div className="text-meta text-kit-blue-11">New line</div>}
                   </td>
                   <td className={`px-2 py-2 text-center ${strike}`}>{a.qty}</td>
-                  <td className={`whitespace-nowrap px-2 py-2 text-right tabular-nums ${strike}`}>{fmtMoney(a.unit_price)}</td>
-                  <td className={`whitespace-nowrap px-2 py-2 text-right tabular-nums ${strike}`}>{fmtMoney(discountOf(a))}</td>
-                  <td className={`whitespace-nowrap px-2 py-2 text-right tabular-nums ${strike}`}>{fmtMoney(a.qty * a.unit_price)}</td>
+                  <td className={`whitespace-nowrap px-2 py-2 text-right tabular-nums ${strike}`}>{fmtMoney(a.unit_price).replace(/^RM\s*/, "")}</td>
+                  <td className={`whitespace-nowrap px-2 py-2 text-right tabular-nums ${strike}`}>{fmtMoney(discountOf(a)).replace(/^RM\s*/, "")}</td>
+                  <td className={`whitespace-nowrap px-2 py-2 text-right tabular-nums ${strike}`}>{fmtMoney(a.qty * a.unit_price).replace(/^RM\s*/, "")}</td>
                 </tr>
               );
             })}
           </tbody>
           <tfoot>
             <tr className="font-semibold text-base-900">
-              <td colSpan={6} className="px-2 py-2 text-right">TOTAL PAYABLE</td>
+              <td colSpan={4} className="whitespace-nowrap px-2 py-2 text-right">TOTAL PAYABLE</td>
               <td className="whitespace-nowrap px-2 py-2 text-right tabular-nums" data-testid="edit-total">
                 {fmtMoney(
                   draft.lines.filter((l) => !l.removed && l.sku.trim()).reduce((n, l) => n + l.qty * l.unit_price, 0) +
@@ -2760,8 +2754,8 @@ function SalesOrderWorkspaceBody() {
       </div>
       )}
       <p className="mt-3 flex flex-wrap gap-x-6 text-body text-base-900" data-testid="edit-qty-line">
-        <span>Qty: {qtyWords(draft.lines.filter((l) => l.sku.trim()), categoryOfSku)}</span>
-        <span>Services: {servicesWords(draft.addons, nameOfAddon)}</span>
+        <span>Quantity: {qtyWords(draft.lines.filter((l) => l.sku.trim()), categoryOfSku)}</span>
+        {draft.addons.length > 0 && <span>Services: {servicesWords(draft.addons, nameOfAddon)}</span>}
       </p>
     </div>
   );
@@ -3791,6 +3785,7 @@ function SalesOrderWorkspaceBody() {
       )}
 
       <SalesOrderTabs
+        backTo={typeof location.state?.salesOrderRegisterReturn === "string" && /^\/operation\/orders(?:\?|$)/.test(location.state.salesOrderRegisterReturn) ? location.state.salesOrderRegisterReturn : undefined}
         identity={soWord}
         /* Capitalize up — owner ruling 2026-08-15. Display only; the
            `Full name` INPUT below stays on the raw draft value, because a

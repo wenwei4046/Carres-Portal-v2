@@ -73,7 +73,6 @@ export default function PaymentLedger({ orderId, saved }: {
        small heading is the in-card label rank, 13/600 — the same as
        `Emergency contact` and `Billing`. */
     <div className="text-body" data-testid="so-payment-saved">
-      <p className="font-semibold text-kit-slate-11">Payment details recorded at sale</p>
       <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-3">
         <FieldFrame id="so-payment-method" label="Method">
           <div id="so-payment-method" className={CAPTURE_FIELD} data-testid="money-instalment">

@@ -3720,7 +3720,7 @@ describe("Card 06 §7 / Card 08 · the Work deep link opens the exact request by
     expect(screen.getByTestId("object-identity")).toHaveTextContent("Display");
     expect(screen.getByTestId("mp-detail").textContent).not.toContain("REQ-0001");
     // `‹ Manual Purchase` returns to the Register — not a reopen loop.
-    fireEvent.click(screen.getByText("Manual Purchase Request", { selector: "a *, a" }));
+    fireEvent.click(screen.getByRole("link", { name: "Manual Purchase Request" }));
     await waitFor(() => expect(screen.queryByTestId("mp-detail")).toBeNull());
   });
 

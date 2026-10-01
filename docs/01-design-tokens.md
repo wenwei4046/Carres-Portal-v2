@@ -302,38 +302,124 @@ Validated 2026-07-31: the kebab is `overflow`, and `more` does not exist.
 
 ---
 
-## 7 · Sizing
+## 7 · Canonical component measurements — scoped, not one size for every surface
 
-| | |
-|---:|---|
-| button-sm / md / lg | 32 / 40 / 48 |
-| input-sm / md / lg | 32 / 40 / 48 |
-| **row-compact** | **40 — the portal's table row** |
-| row-default | 48 |
-| row-comfortable | 56 |
-| badge-height | 24 |
+**Documentation reconciliation, 2026-10-01. No application change.** This section replaces the
+obsolete generic sizing/layout tables. It records the current shared recipes and later scoped
+rulings; it does not approve every implementation difference. Values are CSS pixels unless noted.
+`KEEP` below means retain the stated admitted recipe in its scope, not production verification.
+A proposed value is **PROPOSAL / NOT LAW** until reviewed. Source inspection does not prove that a
+font loaded, a control is accessible, or a page rendered correctly.
 
-**Rows are 40px FIXED and content adapts to the row, never the reverse.**
-Cells clip their own overflow and ellipsis-truncate. Validated on the Purchase
-Order Items table, 2026-07-31.
+**Source basis:** application files in the inspected checkout, compared with main
+`36e2840dd8dcce6eeb77252417ab57febbd6848d` for the previously recorded shared-source scope.
+Paths below are relative to `apps/web/src/` except `tailwind.config.ts`, under `apps/web/`.
+Reported Sales pilot runtime evidence is separately identified; its changes are not assumed merged.
+Houzs measurements remain provenance in UI MASTER, never the instruction for Carres values.
 
----
+### 7.1 Type, spacing, colour and icons
 
-## 8 · Layout
+| Item | Current Carres value / source | Exact recommended target | Status / evidence |
+|---|---|---|---|
+| Latin UI family | Inter → DM Sans → system-ui → sans-serif; `tailwind.config.ts` sans/display/body | KEEP Inter; no imported Houzs display face | Owner confirmed Inter; actual loaded face still needs runtime verification |
+| Mixed Chinese text | Noto Sans SC → DM Sans → system-ui → sans-serif; config + `lib/cjk.ts` | KEEP scoped CJK fallback | Source present; do not claim all glyphs rendered in Inter |
+| Type ramp | §1: page 24/600/32; title 20/600/28; strong 15/600/22; body 13/400/18; meta 12/400/16; label 11/500/14; control 14/400/20 (size/weight/line) | KEEP all seven; scoped table header 11/600/14 | Approved ramp; source matches. See table-header conflict below |
+| Letter spacing / number alignment | Ordinary type has no extra tracking; numeric roles use tabular figures | 0 additional tracking for ordinary body/control text; tabular numbers, amounts right aligned | KEEP; no blanket adoption of Houzs uppercase tracking |
+| Spacing scale | §3: 2, 4, 6, 8, 12, 16, 24, 32 | KEEP; select by recipe below | Approved; not permission to mix arbitrary gaps per page |
+| Borders / focus / radius / icons | §§4–6: border 1, focus 2; radius 4/6/10/full plus scoped Work 9; Lucide stroke 2, sizes 14/16/18 | KEEP; control 6, Block 10, status full | Approved; no second icon set or imported palette |
+| Colours | §2 named Carres palette and state roles | KEEP §2 values; source and target use same names | No new colour approval in this reconciliation |
 
-| | |
-|---:|---|
-| desktop-max-width | 1280 |
-| desktop-min-width | 1024 |
-| sidebar-width | 280 |
-| sidebar-collapsed-width | 72 |
-| **workspace-rail-width** | **200 — the Workspace navigator** (`03`) |
-| topbar-height | 64 |
-| page-padding | 32 |
-| section-gap | 32 |
-| card-gap | 20 |
-| dialog-sm / md / lg | 480 / 640 / 960 |
-| side-panel-width | 420 |
+### 7.2 Controls and field groups
+
+| Item | Current Carres value / source | Exact recommended target | Status / evidence |
+|---|---|---|---|
+| Button small | `kit/Button.tsx`: height 24, horizontal pad 8, gap 4, icon 14 | KEEP desktop compact recipe | Implemented/source inspected; not a 40px touch target |
+| Button medium | Same: height 32, horizontal pad 12, gap 8, icon 16 | KEEP standard desktop recipe | Implemented/source inspected |
+| Touch / Work toolbar button | Same: height 40 below viewport 768, 36 at ≥768; horizontal pad 12, gap 6, icon 14 | KEEP admitted scoped recipe; retain ≥40 touch hit target where needed | Approved scoped recipe; touch interaction needs actual verification |
+| Register toolbar overflow trigger | Existing admitted Button/Icon recipes; new fixed-right adoption not yet verified | Desktop32×32; touch hit target≥40×40; registered overflow icon16/stroke2, control radius6, focus2; centred icon | Owner-approved target2026-10-01. Existing icon/radius/focus tokens retained; no new toolbar height approval |
+| Single-line input | `kit/field-recipe.ts`: height 32, horizontal pad 8, body 13/400/18, border 1, radius 6 | KEEP | Implemented/source inspected; remove generic 32/40/48 size assumption |
+| Search / toolbar field | Same: pill search height 32, horizontal pad 16; toolbar field 40 below768/36 at≥768, horizontal pad12, type14/400/20 | KEEP distinct admitted uses | Implemented/source inspected; no arbitrary per-page search size |
+| Compact Register search | Existing shared search control; scoped owner ruling2026-10-01 | Desktop preferred width220, height32, Inter12/400/18, icon16, radius6/border1; shrink within constrained space without clipping; touch control/hit target≥40 | OWNER ACCEPTED / production verification pending. Applies to the Sales-first Register template, not automatic replacement of every search variant. Icon/text gap retains existing admitted recipe; no new spacing token |
+| Textarea | Same: horizontal pad8, vertical pad4, body13/400/18; content-driven height | KEEP; never invent fixed universal multiline height | Source inspected; form supplies content/rows |
+| Label / hint / error | `kit/FieldFrame.tsx`: label11/500/14; vertical field gap4; hint12/400/16; error13/400/18 with icon/text gap6 | KEEP | Source inspected; message wraps and increases height, never clipped to one line |
+| Status pill / neutral badge | `kit/StatusPill.tsx`, `Badge.tsx`: horizontal pad8, vertical pad4, label11/500/14, full radius; pill icon14/gap4 | KEEP; natural one-line height22, not universal24 | Derived from source, not fresh runtime measurement; long status must remain discoverable |
+
+### 7.3 Register filter rail
+
+| Item | Current Carres value / source | Exact recommended target | Status / evidence |
+|---|---|---|---|
+| Rail width | `operation/components/workspace-rail.tsx`:240 | KEEP240 for FilterRail family | Governed family; Sales pilot reports runtime240. Not global navigation width |
+| Rail inset / scroll | Horizontal12, bottom12; fixed header pad12 when present; remaining body vertically scrolls | KEEP | Source inspected |
+| Group / header | Group vertical8, separator1; group header minimum36, horizontal6, gap8; body top4, child gap2 | KEEP | Source inspected |
+| Filter row | Minimum36; horizontal8, vertical9, gap8; body13/400/18 | KEEP; two-line label naturally54 before any supporting line | Source arithmetic; minimum is not a clipping height |
+| Count / selection | Count nonshrinking on right, tabular, 12px with18 line height for factual rows; selected label600 and2px left rule; scoped workspace marker3 | KEEP respective variants | Source inspected; do not recolour every selected filter as a record selection |
+| Collapse control |28×28, inset8; current source | PROPOSAL: retain desktop geometry; ensure40×40 touch hit area on touch surface | Accessibility gap, not approved geometry change |
+| Narrow canvas | Below896 **available canvas** pixels floats; absent saved preference starts closed | KEEP896 rule, retain chosen filters | Approved responsive contract; browser viewport is not canvas width |
+
+### 7.4 Register and goods tables
+
+| Item | Current Carres value / source | Exact recommended target | Status / evidence |
+|---|---|---|---|
+| Sales main row | `SalesOrdersRegister.tsx` explicitly `rowHeight=40` | KEEP40 | Approved Sales baseline; do not replace with generic engine38 |
+| Generic reference / Purchasing parent | `register/DataGrid.module.css` baseline38; UI MASTER Shared Purchasing geometry minimum38 | KEEP38 in that scope | Approved scoped exception; not a Sales size |
+| Two-line goods | UI MASTER owner ruling2026-09-26:51; name13/18 plus secondary11/14 | KEEP51 across the same goods table; grow consistently when required by admitted content | Approved shared baseline; not a licence to clip meaningful quantities |
+| Reference table header | CSS height36, horizontal8, line14, size11, **weight700**; UI MASTER says600 | Target36 minimum,11/600/14; horizontal8, up to two lines with vertical4 | REAL GAP: weight700 source contradicts governed600; no code changed here |
+| Checkbox | Shared Purchasing geometry:16×16, vertically centred | KEEP16 visible control; apply touch hit-target requirement separately | Approved geometry; icon size is not hit-target size |
+| Cell inset / rules | Reference DataGrid horizontal8, vertical0; goods family ordinarily8 per side; separator1 | KEEP by row recipe; apply §5.1 separator conditions | Source inspected; do not add padding that silently grows the governed row |
+| Goods header exception | `GoodsMiniTable.tsx`: normal horizontal8/vertical6; Purchasing layout explicitly40 high | KEEP existing scoped Purchasing40 header pending joined-table alignment review | Implemented/source inspected; not universal36 claim |
+| Toolbar / footer | Reference DataGrid45 toolbar (vertical6/horizontal12); footer32 (horizontal12); labelled toolbar wraps with auto height | KEEP respective variants; footer remains outside row scroll | Source inspected; actual overflow still requires page verification |
+| Expansion | Shared Purchasing target top12/bottom16; DataGrid generic nonflush inset12 vertically; flush0 | Preserve named adopter recipe; converge discrepancies only in approved scope | REAL GAP where an adopter claims Purchasing geometry but uses generic inset; not universal spacing override |
+| Column widths | Governed field-width registry + UI MASTER content measurements; sort/filter controls require space | Keep registry widths and page-specific approved roles; do not divide screen equally | Width depends on fact, not table width; personal column state survives |
+| Scroll | DataGrid owns table viewport; content width may exceed available canvas | KEEP bounded horizontal/vertical scroll and admitted pinned identity | No promise all14 columns fit one page; no shrinking text to force fit |
+| Denser Sales candidate | Existing Sales40 / goods51 | **PROPOSAL ONLY:** main32, header36; goods51 retained | Sales planner's candidate, not owner-approved. Needs Inter/long content/control fit and 200% zoom review |
+
+## 8 · Composition, overlays and responsive measurements
+
+There is no global rule that every page has32px padding, a1280px maximum, a200px rail or a420px
+side panel. Use the admitted shell/component's scope. The legacy `kit/PageShell` has its own
+24px padding and height-budget contract; this does not override the operation shell. Do not
+change global navigation, its collapse width or the top bar from a warehouse/register proposal.
+Their actual shell adoption must be measured before a new numeric target is admitted.
+
+### 8.1 Cards and detail groups
+
+| Item | Current Carres value / source | Exact recommended target | Status / evidence |
+|---|---|---|---|
+| Shared Block | `kit/Block.tsx`: horizontal16/vertical12, radius10, border1; white | KEEP | Approved shared card; source inspected |
+| Card title / grouping | strong15/600/22; header bottom pad8/divider1; body top12/group gap12; subtitle top4/meta12/400/16 | KEEP | Source inspected; title is a card heading, not page24 heading |
+| Cards grid | New Sales pilot reports gap12 and container pad12 | PROPOSAL: gap12/pad12, minimum useful card width320; available inner width≥984 three columns,≥652 two, below652 one | Composition target pending sample review; thresholds calculated as columns×320 + gaps, not device breakpoints |
+| Card width / height | Sales BUILD reports426×214 at1440×1000 with72 synthetic records | Width fluid in grid; height auto; no fixed426×214 token | Reported runtime outcome only; not independently re-run here or production-verified |
+| Card facts | Pilot reports label11/500/14, value13/400/18; title15/600/22 | KEEP type ramp; fields wrap, quantity/status retain identifiable labels | Reported pilot measurement; same records/filter population as Table required |
+
+### 8.2 Modal and admitted goods side inspection
+
+| Item | Current Carres value / source | Exact recommended target | Status / evidence |
+|---|---|---|---|
+| Centred widths | Config `modal512`, `modal-wide600`, `modal-viewer880`; UI MASTER centred surface ruling | KEEP three named widths, capped at viewport width; max height85vh | Approved; no caller-chosen fourth width |
+| Drawer width / height | Config560; DialogFrame width100% capped560, full viewport height, leading radius10 | KEEP `min(560px, viewport width)`; content height never fixes drawer height | Existing component; Sales pilot reports560 at1440. Scoped goods use approved; not general full-order drawer admission |
+| Header | `kit/DialogFrame.tsx`: horizontal16/vertical12, gap16, divider1; title15/600/22, description12/400/16 separated4 | KEEP; natural header height, no fixed Houzs60 | Source inspected; long heading allowed |
+| Body / footer | Body pad16, flex remaining space, vertical scroll; footer horizontal16/vertical12, gap8, divider1 | KEEP; optional footer absent means0 footer band | Source inspected; header/footer stay outside body scroll |
+| Close | Icon16 + pad4 each side =24 visible target; focus ring2 | PROPOSAL: ≥40 touch hit area; retain clear Close label and focus return | Source gap against touch law; source focus handling present, runtime needs verification |
+| Goods summary | Compact summary + remaining goods-line count; click opens readonly goods inspection | Same560 shared drawer and goods source; preserve full-order door and list context | Owner-approved scoped target; pilot reported separately. No edit form or status engine inside |
+
+### 8.3 Loading, empty, error and accessibility geometry
+
+| Item | Current Carres value / source | Exact recommended target | Status / evidence |
+|---|---|---|---|
+| Empty region | `kit/EmptyState.tsx`: horizontal16/vertical32, gap8; icon18, heading15/600/22, detail12/400/16 | KEEP; content-driven height, one relevant action | Source inspected; not reused to disguise failed or denied reads |
+| Loading skeleton | `kit/Loading.tsx`:3 lines default; bar16high, gap8; last width60%, preceding100%; radiusfull | KEEP current primitive; region remains labelled busy | Source inspected; row-skeleton alternative not admitted by this record |
+| Spinner | Same: default16, admitted14/16/18; stroke2 | KEEP; preserve control dimensions while saving | Source inspected |
+| Field error | FieldFrame body13/400/18, gap6; wraps | KEEP; no universal fixed height; error links to exact input | Source inspected; server error must preserve entered work |
+| Region error / permission | Actual adopter-dependent, no universal numerical error component proved | PROPOSAL: shared message region pad16/gap8, body13/400/18, one32px desktop retry control (40 touch) when retry meaningful | NOT LAW; report missing shared recipe rather than draw it locally |
+| Touch / focus | §9 touch minimum40, focus2; some24/28 desktop controls remain | KEEP40 touch acceptance; keyboard visible focus and return; no clipping at200% zoom | Existing requirement; source dimensions alone do not prove compliance |
+| Responsive review | Rail896canvas, toolbar768viewport, drawer viewport cap; card thresholds above are proposal | Verify390/820/1180/1440 viewport and200% zoom with actual shell | Acceptance sizes, not four new layout breakpoints; retain filters, identity and action access |
+
+**Sales-first acceptance boundary.** Sales Orders is the first complete shared-template sample.
+Purchasing and Warehouse reuse the accepted component geometry and interaction grammar, keeping
+their own fields, actors, workflows and permission rules. A numeric table is not acceptance of a
+page. Sales must report actual font loading and per-surface computed values, long data and narrow
+screen results before calling the sample verified. This PLAN document neither commissions code
+nor extends the separately authorised Sales pilot to merge/deploy or other module builds.
 
 ---
 
@@ -362,3 +448,7 @@ translates; the store keeps its contract (§0's label-vs-identifier rule).
 
 **Every word answers one question: who · what · next.** No decoration, no
 marketing language, no unnecessary explanation.
+
+### Accepted Sales Orders template — 2026-10-01
+
+The owner-accepted numeric recipe is governed by [UI MASTER, Confirmed shared template](ui/MASTER.md#confirmed-shared-template--owner-acceptance-2026-10-01): search220×32 desktop, rows32 desktop, body12/18, header11/600/36, touch targets40. Reuse the shared kit; runtime delivery proof is recorded by the BUILD controller.

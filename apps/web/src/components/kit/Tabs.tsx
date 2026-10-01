@@ -22,6 +22,7 @@
  */
 import * as RadixTabs from "@radix-ui/react-tabs";
 import Badge from "./Badge";
+import Icon, { type IconName } from "./Icon";
 
 export interface TabDef {
   value: string;
@@ -31,6 +32,7 @@ export interface TabDef {
    *  is five numbers saying nothing, and §1.3 is a budget. */
   count?: number;
   disabled?: boolean;
+  icon?: IconName;
 }
 
 export default function Tabs({
@@ -39,6 +41,8 @@ export default function Tabs({
   onValueChange,
   label,
   fill = false,
+  orientation = "horizontal",
+  variant = "underline",
 }: {
   tabs: readonly TabDef[];
   value: string;
@@ -48,12 +52,15 @@ export default function Tabs({
   /** The tabs share the bar's width by their own length, with no gap — a narrow pane that
    *  must keep every tab on one row (Work's Communication, Workspace §5.10). */
   fill?: boolean;
+  orientation?: "horizontal" | "vertical";
+  variant?: "underline" | "segmented";
 }) {
   return (
-    <RadixTabs.Root value={value} onValueChange={onValueChange}>
+    <RadixTabs.Root orientation={orientation} value={value} onValueChange={onValueChange}>
       <RadixTabs.List
         aria-label={label}
         data-kit="tabs"
+        data-variant={variant}
         className={`flex items-center border-b border-kit-slate-5 ${fill ? "gap-0" : "gap-4"}`}
       >
         {tabs.map((t) => (
@@ -79,6 +86,7 @@ export default function Tabs({
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9"
             }
           >
+            {t.icon && <Icon name={t.icon} />}
             {t.label}
             {t.count !== undefined && <Badge>{t.count}</Badge>}
             <span

@@ -648,7 +648,7 @@ export default function UiShowcase() {
             <Panel
               title="Panel — with a right slot"
               right={
-                <Button size="sm" icon="open">
+                <Button iconOnly icon="open">
                   Open order
                 </Button>
               }
@@ -775,21 +775,21 @@ export default function UiShowcase() {
           </Modal>
 
           <Drawer
+            variant="quick-view"
             open={drawerOpen}
             onOpenChange={setDrawerOpen}
             title="SO-1256 · Tan Wei Ming"
-            footer={<Button icon="open">Open order</Button>}
+            headerActions={<><Button variant="ghost" iconOnly icon="print" aria-label="Print" /><Button variant="ghost" iconOnly icon="open" aria-label="Open full page" /></>}
           >
-            <div className="flex flex-col gap-4">
-              <p className="text-body text-kit-slate-11">
-                The surface only. §1.4's ordered blocks — identity · current action · current issues ·
-                progress · sections · activity — are `DetailShell`, card D0.5c.
-              </p>
-              <EmptyState
-                icon="goods"
-                title="Nothing waiting on stock"
-                detail="Every line on this order has arrived."
-              />
+            <div className="flex flex-col gap-4" data-testid="sales-order-quick-view">
+              <Block title="SO info" tone="muted">
+                <p className="text-body">Customer Phone · Not recorded</p>
+                <p className="text-body">Email · Not recorded</p>
+              </Block>
+              <Block title="Delivery"><p className="text-body">Not recorded</p></Block>
+              <Block title="Items"><p className="text-body">No items on this order</p></Block>
+              <Block title="Payment"><p className="text-body">Not recorded</p></Block>
+              <Block title="Related documents"><p className="text-body">No PO yet</p></Block>
             </div>
           </Drawer>
         </Section>

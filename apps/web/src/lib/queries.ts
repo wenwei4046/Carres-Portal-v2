@@ -2999,6 +2999,7 @@ export interface DeliveryLedgerEntry {
 }
 
 export interface opsRemarkEmbed {
+  line_received?: Record<string, number> | null;
   // Optional (C2): the list no longer renders these remark fields in-row, and
   // test fixtures build partial overlays (e.g. just `balance`), so they're not
   // required on the embed type. Still selected by the query when present.
@@ -6162,7 +6163,7 @@ export function useMonthlyDemandFacts(enabled: boolean) {
  *  obligations through the object page's completion, cases from Service. A
  *  fact the server could not establish is `null` and matches no filter. */
 export interface SalesOrderRegisterFacts {
-  facts: Record<string, { obligations: "outstanding" | "none" | null; cases: "open" | "closed" | "none" | null }>;
+  facts: Record<string, { obligations: "outstanding" | "none" | null; cases: "open" | "closed" | "none" | null; stock?: Record<string, string> }>;
   failed: { obligations: boolean; cases: boolean };
 }
 

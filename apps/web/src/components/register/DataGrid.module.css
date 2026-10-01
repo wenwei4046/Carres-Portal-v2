@@ -118,6 +118,8 @@
   line-height: 14px;
   font-weight: 700;
 }
+/* Approved 600 header weight, opt-in with the first shared-template pilot. */
+.rootReference[data-presentation-tools] .th { font-weight: 600; }
 .rootReference .td {
   box-sizing: border-box;
   /* 38px baseline; a page with an owner-ruled exception sets --grid-row-h. */
@@ -1444,3 +1446,71 @@ div:first-child > .columnsMenuGroup {
 .checkRefused { cursor: help; }
 .checkRefused input:disabled { pointer-events: none; }
 .checkRefused:focus-visible { outline: 2px solid theme("colors.kit.blue.9"); outline-offset: -2px; }
+
+/* Pilot overflow preserves existing menus without empty toolbar flex items. */
+.toolsAnchor { display: contents; }
+
+/* Owner-approved compact search; limited to the first template adopter. */
+.rootReference[data-presentation-tools] .searchResponsiveIcon { display: none; }
+.rootReference[data-presentation-tools] .searchResponsiveBox {
+  display: inline-flex;
+  flex: 0 1 220px;
+  width: 220px;
+  max-width: 220px;
+  min-width: 0;
+  height: 32px;
+  border-radius: 6px;
+  padding: 0 8px;
+}
+.rootReference[data-presentation-tools] .searchInput { min-width: 0; font-size: var(--fs-13); line-height: 18px; text-overflow: ellipsis; }
+.rootReference[data-presentation-tools] .searchResponsiveBox > svg { width: 16px; height: 16px; flex: none; }
+@media (max-width: 767px) {
+  .rootReference[data-presentation-tools] .searchResponsiveBox { height: 40px; }
+}
+.rootReference[data-presentation-tools] .toolbar:not(.selectionBar) { flex-wrap: nowrap; }
+/* Keep the admitted 16px checkbox glyph, while its card hit area is 40px. */
+@media (max-width: 767px) {
+  .rootReference[data-presentation-tools] [data-kit="checkbox"] { position: relative; }
+  .rootReference[data-presentation-tools] [data-kit="checkbox"]::after { content: ""; position: absolute; inset: -12px; }
+}
+
+/* SO template correction: summary left, one right-aligned tools cluster. */
+.rootReference[data-presentation-tools] .toolbar:not(.selectionBar) { height: 41px; min-height: 41px; padding: 4px 12px; }
+.rootReference[data-presentation-tools] .toolbar > .searchResponsiveBox { order: 2; margin-left: auto; }
+.rootReference[data-presentation-tools] .toolbar > span { order: 0; }
+.rootReference[data-presentation-tools] .toolbar > [data-kit],
+.rootReference[data-presentation-tools] .toolbar > div:has(> [data-kit="tabs"]) { order: 3; }
+.pageTools { order: 4; flex: none; }
+.rootReference[data-presentation-tools] .toolbar > div:has(> [data-kit="tabs"]) { flex: none; }
+@media (max-width: 767px) { .rootReference[data-presentation-tools] .toolbar:not(.selectionBar) { height: 49px; min-height: 49px; } }
+@media (max-width: 767px) {
+ .rootReference[data-presentation-tools][data-row-height="32"] .td { height: 40px; }
+}
+
+/* Owner-approved SO preview comparison: body12, line18; geometry unchanged. */
+.rootReference[data-presentation-tools][data-row-height="32"] .td { font-size: var(--fs-12); }
+.rootReference[data-presentation-tools][data-row-height="32"] .td .overflowText { font-size: inherit; }
+.rootReference[data-presentation-tools][data-row-height="32"] .td :global(.text-body) { font-size: inherit; line-height: 18px; }
+
+/* Scoped whole-page spacing correction. Absent conditions still take no space. */
+.rootReference[data-presentation-tools] .conditionBar { min-height: 36px; padding: 6px 12px; margin-bottom: 8px; font-size: var(--fs-12); }
+.rootReference[data-presentation-tools] .conditionChip { min-height: 24px; font-size: var(--fs-12); }
+.rootReference[data-presentation-tools] .conditionChipRemove { min-width: 24px; min-height: 24px; }
+.rootReference[data-presentation-tools] .toolbar:not(.selectionBar) { height: 40px; min-height: 40px; margin-bottom: 0; }
+.rootReference[data-presentation-tools] .scroll { scrollbar-width: thin; scrollbar-color: theme("colors.kit.slate.9") theme("colors.kit.slate.3"); }
+.rootReference[data-presentation-tools] .scroll::-webkit-scrollbar { width: 8px; height: 8px; }
+.rootReference[data-presentation-tools] .scroll::-webkit-scrollbar-thumb { background: theme("colors.kit.slate.9"); border-radius: 4px; }
+.rootReference[data-presentation-tools] .scroll::-webkit-scrollbar-track { background: theme("colors.kit.slate.3"); }
+
+.rootReference[data-presentation-tools] .toolbar { border-bottom: 0; }
+
+.rootReference[data-presentation-tools] .conditionClear { color: var(--fg-muted); }
+
+/* Shared listing template: filters, tools, results in DOM/keyboard order. */
+.root .conditionBar { min-height: 36px; padding: 6px 12px; border-bottom: 0; margin-bottom: 8px; }
+.root .conditionChip { min-height: 24px; }
+.root .conditionChipRemove { min-width: 24px; min-height: 24px; }
+.root .conditionClear { color: var(--fg-muted); }
+.root .toolbar { border-bottom: 0; }
+.rootReference .toolbar:not(.selectionBar) { height: 40px; min-height: 40px; margin-bottom: 0; }
+.rootReference.rootLabelledToolbar .toolbar { height: auto; }

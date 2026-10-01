@@ -1,6 +1,7 @@
 # 02 · COMPONENTS
 
-> **Status: FROZEN.** Reusable UI components for the whole Carres Portal.
+> **Status: GOVERNED COMPONENT CONTRACTS.** Existing token values remain frozen.
+> Source existence, adopted usage and production verification are separate claims.
 >
 > **This file documents the components we ACTUALLY USE, in the order we use
 > them** (Loo, 2026-07-31). A component is written up when a real page proves
@@ -12,6 +13,8 @@ Every component reads `01-design-tokens.md` and may never define its own
 colour, typography, radius, spacing, elevation or size.
 
 Source: `apps/web/src/components/kit/`. Live at **`/ui`**.
+
+**Self-contained Carres measurements:** [01 §§7–8](01-design-tokens.md#7--canonical-component-measurements--scoped-not-one-size-for-every-surface) owns the scoped numeric recipes, source/target/status matrix and unresolved conflicts. Use it with these component/pattern contracts. Reference screenshots do not supply missing numbers; proposed sizes do not override approved sizes.
 
 ---
 
@@ -40,9 +43,12 @@ when composition cannot.
 
 ## DataTable
 
-**Purpose.** The ONE list table.
+**Purpose.** The existing bounded kit table; it is not the universal ERP Register engine.
 
-**When to use.** Any list of records an operator scans, compares and acts on.
+**When to use.** Existing bounded table adopters whose content fits this contract. ERP document
+registers use `components/register/DataGrid.tsx` and UI MASTER §6.0/§6.7; goods disclosure uses
+GoodsMiniTable and the source-specific quantity contract. Preserve a working adopter unless a
+measured need justifies migration.
 
 **When NOT to use.** A single record's fields (that is a detail region), or
 fewer than three rows of unrelated facts (that is a card).
@@ -51,7 +57,7 @@ fewer than three rows of unrelated facts (that is a card).
 header, optional whole-row selection, rows, and one of empty / loading in
 place of rows.
 
-**Behaviour.**
+**Behaviour of this component, NOT portal-wide table law.**
 - **Never scrolls horizontally on any screen.** The table is always exactly its
   container width; long content ellipsis-truncates.
 - **Rows are 40px fixed.** Content adapts to the row.
@@ -68,19 +74,42 @@ place of rows.
 **Accessibility.** `label` names the table for a screen reader. Select-all shows
 the indeterminate dash on a partial tick.
 
-**Do.** Give every column a width; the set sums to 100.
+**Do, for this bounded component only.** Give every column a width; the set sums to 100.
+Do not transfer percentage widths, forced truncation or fixed-height rules to DataGrid or goods
+tables. Those follow content-led widths, governed row recipes and contained scrolling.
 **Don't.** Add a column whose only job is to hold an icon with no meaning.
 
 **Used by.** Purchase Orders → Items (first business page, 2026-07-31).
 
 ---
 
+## Compact Register search — approved target
+
+**OWNER ACCEPTED TEMPLATE / production verification pending — owner2026-10-01.** Clear compact search uses
+Inter and existing Carres colours. Canonical dimensions live in01§7.2. Use the existing shared
+search control; preserve query, clear and keyboard access. Placeholder: `Search orders…`.
+Accessible hint names only verified supported search fields. Shrink on constrained screens
+without clipping or hiding the active query; retain touch adaptation. Visible toolbar content:
+count/filter summary, search, admitted Table/Cards, fixed far-right secondary-tool menu. Scope is
+the Sales-first Register template, not automatic replacement of every search variant.
+
+## Register toolbar overflow
+
+**OWNER ACCEPTED TEMPLATE / production verification pending — 2026-10-01.** Use the existing admitted shared menu/control
+family; do not build a page-local toolbar or new menu engine. Search/current filter summary and
+admitted Table/Cards stay visible. Fixed far-right `⋯` holds supported secondary page tools
+(Export, Columns; Wrap/reset only if supported). Entries use icon plus text; order writers do
+not belong here. Trigger dimensions live only in 01 §7.2. Retain keyboard naming, menu navigation,
+focus return and scoped selection/export rules. Narrow layouts overflow secondary tools first.
+This governs Register adoption; the batch GridToolbar below retains its distinct selection job.
+
 ## GridToolbar
 
 **Purpose.** The one row above a grid: how to narrow it, what is selected, and
 the single action that acts on the selection.
 
-**When to use.** Every **Workspace** page (`03-page-patterns.md`). One per page.
+**When to use.** Its existing batch-workspace adopters. Other registers use their governed
+shared toolbar; do not replace it solely because this component is named GridToolbar.
 
 **When NOT to use.** A Detail page's action group — that is the title block.
 Filters that need more than a search box: those are the navigator or the
@@ -275,6 +304,10 @@ open it by keyboard because a click-only test proves nothing.
 
 ## Panel
 
+**Scope.** Existing explicitly governed adopters only. The current object/detail/review card
+choice is Block under ONE KIT LAW; this older component is not a second selectable card style.
+Do not migrate working governed exceptions without scoped review.
+
 **Purpose.** A Card that has a title.
 
 **When to use.** The one question: does this surface need to say what it IS? If
@@ -290,6 +323,9 @@ divider. **It does not collapse** — a collapsible region is `SectionHeader`.
 ---
 
 ## Card
+
+**Scope.** Existing primitive/adopters, not an alternative object-card chrome. Use Block for
+new compositions under ONE KIT LAW.
 
 **Purpose.** The white surface.
 
@@ -405,26 +441,65 @@ keeps arrival evidence at receipt scope; no Unit attribution is inferred.
 
 ---
 
-# Built, not yet proven by a real page
+# Shared control and state contract
 
-These exist in `components/kit/` and render on `/ui`. They are written up when a
-business page adopts one.
+**Documentation clarification, 2026-10-01.** Input, Select, DatePicker, Modal and related fields
+have real SO/PO/Receiving adopters; the former blanket “not proven by a real page” inventory was
+inaccurate. Adoption is not all-state or production verification. UI MASTER holds dated evidence.
+The following maps existing sources and required review coverage, not new component admission.
 
-`Input` · `Textarea` · `SearchInput` · `Badge` · `StatusPill` · `Modal` ·
-`Drawer` · `Tooltip` · `Popover` · `Tabs` · `DatePicker` · `Toast` ·
-`PageShell` · `DetailShell`
+| Need | Existing source | Required behaviour / evidence boundary |
+|---|---|---|
+| Text, multiline, numeric entry | kit/Input, Textarea, FieldFrame and existing source-specific numeric fields | Visible label, known value, required/read-only distinction, format hint when necessary, field error associated with input. Do not invent numeric formatting or allow source-owned calculated totals to become editable. |
+| Short choice / searchable choice | kit/Select and current admitted searchable picker | One value, correct empty placeholder, unavailable options explained, long label readable, keyboard selection and contained popup. Do not silently substitute one control for a locked module choice. |
+| Dates | kit/DatePicker and governed fmtDate | Clear date meaning, existing constraints, keyboard-accessible calendar, locale-independent stored value. Supplier, requested and actual dates stay separate. |
+| Form groups and read-only facts | kit/Block, FieldFrame and existing detail field recipes | Same group identity between read/edit, stable label hierarchy, required facts visible. Collapsed groups reveal errors/unsaved content rather than hiding them. |
+| One bounded confirmation | kit/Modal → DialogFrame | Named purpose, source identity and effect, cancel preserves valid draft, focus stays within and returns to persistent opener. Do not move a complete operation into a second modal form. |
+| Evidence input | EvidenceUploadField plus existing authorised source wrapper | Accepted types/limits from source, per-file pending/failed/retry states, link exact record/line/Unit, no success before storage result. Do not duplicate uploader or mix unrelated evidence. |
+| Evidence/document viewing | SavedEvidenceViewer / PdfPreview | Current/proposed/sent/historical identity; loading, absent, unreadable and denied differ; post-result PDF failure does not imply business transaction failure. |
+| Loading / empty / failure / denied | Existing Loading, EmptyState and source-owned error presentation | A failed read is not zero/no records; useful retry where valid; denied access is not a recurring retry loop. No new universal Alert/Banner is implicitly admitted. |
+| Save blockers | Source-owned validation plus existing field feedback | Same problem in summary and field; record/row/field target plus recovery action. Shared all-known-blockers renderer is UNVERIFIED, not an existing engine claim. |
+| Business result and handoff | Existing object result + Work/Duties | Show what changed, what remains and who is responsible from actual source. Timeout may mean outcome unknown; check the same operation before retrying. A success toast alone is insufficient. |
 
-**Dialog focus (2026-09-30, Staff & Duties delivery).** `Modal` accepts an optional
-`returnFocusRef` for a persistent trigger when the opening menu item unmounts. The shared
-`DialogFrame` captures ordinary openers before auto-focus and restores the explicit trigger
-when supplied. No visual token, new component or other page's focus target changes.
+**Dialog focus.** Modal accepts `returnFocusRef` for a persistent trigger when the opening menu
+item unmounts. DialogFrame captures ordinary openers before auto-focus and restores the explicit
+trigger when supplied. The WarehouseIncoming sampled close-return gap remains an adopter issue;
+no page-local replacement modal is justified.
+
+**Coverage required per control:** default, populated, required, read-only, disabled (with reason
+when actionable), invalid, busy, failed/retry, keyboard focus and narrow/long-content behaviour,
+where applicable. Mark non-applicable states with a reason; do not manufacture states for coverage.
+Keep source evidence distinct from tests executed and runtime observations.
+
+**SO goods-side inspection adoption — BUILT / production verification pending, 2026-10-01:** inspect the
+existing Drawer/DialogFrame plus compatible goods renderer for the owner-admitted compact goods
+summary door. The line count is not goods quantity. One read-only source, named region, keyboard
+activation, close/focus return and narrow behaviour are required. Component presence is not proof
+of this adoption; no generic full-object drawer or alternate edit form is admitted.
+
+**Other existing exports are not universal templates.** SearchInput, Badge, StatusPill, Drawer,
+Tooltip, Popover, Tabs, Toast and PageShell require inspection of the current adopter before reuse.
+DetailShell embeds an OrderActionTrack/four-fact contract and must not be treated as a generic
+cross-module object shell. The actual object composition governs.
 
 ---
 
-# Not built
+# Names previously requested — implementation status requires inspection
 
 `Alert` · `Banner` · `Skeleton` · `Switch` · `Radio` · `Breadcrumb` ·
 `Pagination` · `Number Input` · `Currency Input` · `Side Panel`
 
-Listing a name here is not a plan to build it. It is a record that the problem
-has come up and has no component yet.
+This historical candidate list is neither proof of absence nor permission to build. Search the
+current shared sources/adopters first. Record READY / REUSE CANDIDATE / COPY REQUIRED / ENGINE GAP /
+UNVERIFIED in UI MASTER with evidence; admit a genuinely missing component only through its
+governed review. A component missing from this inventory is not automatically missing from code.
+
+### Accepted Sales Orders template — 2026-10-01
+
+The owner-accepted numeric recipe is governed by [UI MASTER, Confirmed shared template](ui/MASTER.md#confirmed-shared-template--owner-acceptance-2026-10-01): search220×32 desktop, rows32 desktop, body12/18, header11/600/36, touch targets40. Reuse the shared kit; runtime delivery proof is recorded by the BUILD controller.
+
+### Accepted template composition — 2026-10-01
+
+Use existing DataGrid, FilterRail, Block, Drawer/DialogFrame, Button, Icon, Tooltip and Badge components under [UI MASTER, Confirmed shared template](ui/MASTER.md#confirmed-shared-template--owner-acceptance-2026-10-01). This acceptance creates no second kit. Square return controls use canonical back icon and kit neutral-control geometry; pills remain status badges. Shared /ui examples and adoption tests are required by the authorised BUILD controller before claiming kit convergence.
+
+Accepted quick-view composition: existing Drawer `variant="quick-view"` owns the dark header and header actions; Block `tone="muted"` supplies the quiet identity section. `/ui` renders these same primitives. Close uses the canonical 32px desktop / 40px touch target. No page-local replacement drawer or card is admitted.

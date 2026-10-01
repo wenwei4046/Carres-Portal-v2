@@ -703,7 +703,7 @@ describe("Sales Order object template contract", () => {
   });
 
   it("keeps the items table on the document's own columns, and protects a gift line", () => {
-    for (const column of ["#", "Item Code", "Description", "Qty", "Unit (RM)", "Disc (RM)", "Amount (RM)", "TOTAL PAYABLE"])
+    for (const column of ["Item", "Qty", "Unit (RM)", "Disc (RM)", "Amount (RM)", "TOTAL PAYABLE"])
       expect(workspace, `${column} left the draft table`).toContain(column);
     expect(workspace).toContain("const protectedLine = (l: DraftLine) =>");
     expect(workspace).toContain("Free item. It follows the item it came with");
@@ -808,7 +808,7 @@ describe("Sales Order object template contract", () => {
     /* ⭐ THE DOCUMENT'S OWN COLUMNS, AND ONLY THOSE (ruling 2026-09-21): the
        page keeps the SO document's table so staff can check page against paper
        column by column. */
-    for (const label of ["#", "Item Code", "Description", "Qty", "Unit (RM)", "Disc (RM)", "Amount (RM)"]) {
+    for (const label of ["Item", "Qty", "Unit (RM)", "Disc (RM)", "Amount (RM)"]) {
       expect(workspace).toContain(`>${label}</th>`);
     }
     /* ⛔ THE CROSS-MODULE FACTS ARE NOT DELETED — they are read where they are
@@ -1365,15 +1365,15 @@ describe("Sales Order object page — one form grammar", () => {
     expect(goods).toContain('text-right`}>Amount (RM)</th>');
     /* The ONE table prints the agreed unit price and the line amount straight
        off the draft line — the same values the document prints. */
-    expect(goods).toContain("{fmtMoney(l.unit_price)}");
-    expect(goods).toContain("{fmtMoney(l.qty * l.unit_price)}");
+    expect(goods).toContain('{fmtMoney(l.unit_price).replace(/^RM\\s*/, "")}');
+    expect(goods).toContain('{fmtMoney(l.qty * l.unit_price).replace(/^RM\\s*/, "")}');
     /* A SERVICE row carries the same two columns off `order_addons`, so the
        table has one shape down its whole length. */
-    expect(goods).toContain("{fmtMoney(a.unit_price)}");
-    expect(goods).toContain("{fmtMoney(a.qty * a.unit_price)}");
+    expect(goods).toContain('{fmtMoney(a.unit_price).replace(/^RM\\s*/, "")}');
+    expect(goods).toContain('{fmtMoney(a.qty * a.unit_price).replace(/^RM\\s*/, "")}');
     /* ⭐ THE RULED COLUMNS ARE THE DOCUMENT'S OWN (owner ruling 2026-09-21),
-       and they are the SAME seven in View and in Edit. */
-    for (const label of ["#", "Item Code", "Description", "Qty", "Unit (RM)", "Disc (RM)", "Amount (RM)"]) {
+       and they are the SAME five in View and in Edit. */
+    for (const label of ["Item", "Qty", "Unit (RM)", "Disc (RM)", "Amount (RM)"]) {
       expect(goods).toContain(`>${label}</th>`);
     }
   });
@@ -1677,7 +1677,7 @@ describe("the locked state (owner ruling 2026-09-26)", () => {
     expect(table).not.toBe("");
     /* Both boxes sit behind the lock, so no qty or price <input> exists in View or oldrev. */
     expect(table.match(/\{formLocked \|\| l\.removed \|\| protectedLine\(l\) \? /g)).toHaveLength(2);
-    expect(table).toContain("<span className={`tabular-nums ${strike}`}>{fmtMoney(l.unit_price)}</span>");
+    expect(table).toContain('<span className={`tabular-nums ${strike}`}>{fmtMoney(l.unit_price).replace(/^RM\\s*/, "")}</span>');
     /* Every number box left in the table is on the unlocked side of those two gates. */
     expect(table.match(/type="number"/g)).toHaveLength(2);
   });
@@ -1685,7 +1685,7 @@ describe("the locked state (owner ruling 2026-09-26)", () => {
   it("rule 2 — `Disc (RM)` prints money, never a dash", () => {
     expect(workspace).not.toContain('text-base-500">—</td>');
     expect(table).not.toContain(">—</td>");
-    expect(table.match(/\{fmtMoney\(discountOf\((l|a)\)\)\}<\/td>/g)).toHaveLength(2);
+    for (const line of ["l", "a"]) expect(table).toContain(`{fmtMoney(discountOf(${line})).replace(/^RM\\s*/, "")}</td>`);
     /* Zero unless the line really carries a numeric discount. */
     expect(workspace).toContain('typeof (row as { discount?: unknown }).discount === "number"');
   });

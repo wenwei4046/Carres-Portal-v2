@@ -39,7 +39,7 @@
  *   No price yet / Paid in full                     the money states
  *   No date yet    a promise with no date on it
  */
-import { parseEmergencyContact } from "@carres/shared";
+import { parseEmergencyContact, REGISTER_DELIVERY_CONDITIONS, registerDeliveryConditionOf } from "@carres/shared";
 
 import { REGISTER_FIELD_WIDTH as W } from "@/components/register/register-field-widths";
 import { fmtDate } from "@/lib/fmt-date";
@@ -173,6 +173,7 @@ export const MUTED_ABSENCES: ReadonlySet<string> = new Set([NOT_RECORDED, NO_PO_
 
 /** One register row: the order, plus every fact already resolved to a string. */
 export interface RegisterRow {
+  stockFacts?: Record<string, string>;
   o: operationOrderListRow;
   id: string;
   so: number;
@@ -348,6 +349,8 @@ export const REGISTER_FIELDS: readonly RegisterField[] = [
           : `${r.deliveryOrders.length} Delivery Orders` },
 
   /* ── OPTIONAL — hidden by default, openable from Columns ────────────────── */
+  { key: "delivery_status", label: "Delivery Status", width: W.placeWord, group: "Delivery",
+    text: (r) => REGISTER_DELIVERY_CONDITIONS.find((condition) => condition.key === registerDeliveryConditionOf(r.o.order_lines ?? [], r.o.allocated_units ?? []))?.label ?? NOT_RECORDED },
   { key: "total", label: "Total", width: W.amount, align: "right", numeric: true,
     group: "Money", text: (r) => moneyText(r.total),
     sortBy: (r) => (r.total.kind === "amount" ? r.total.value : -1),
@@ -358,7 +361,7 @@ export const REGISTER_FIELDS: readonly RegisterField[] = [
      label is presentation, an identifier is a contract, and renaming it would
      silently reset every saved column layout (01-design-tokens §0). `balance`
      remains the ruled GOODS word for short-delivery quantity elsewhere. */
-  { key: "balance", label: "Outstanding", width: W.amount, align: "right", numeric: true,
+  { key: "balance", label: "Balance Due", width: W.amount, align: "right", numeric: true,
     group: "Money", text: (r) => moneyText(r.balance),
     sortBy: (r) => (r.balance.kind === "amount" ? r.balance.value : -1),
     kind: "number",

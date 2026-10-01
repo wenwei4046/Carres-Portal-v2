@@ -670,17 +670,17 @@ operating model above is unchanged; this fixes how it is drawn and where every n
 
 - **Same destination, one rail.** `Sales Orders` keeps Row 1 and Row 2 (Search · Export · Columns;
   no create button — owner 2026-09-27). A 240px `FilterRail` (the Warehouse/Delivery grammar) carries a FIXED
-  top region with the kit `Tabs` bar `Order list` · `Monthly demand` (owner ruling 2026-09-28: a tab bar, not a collapsible group; every group closed until clicked, no description under a title); the scrolling region shows only
+  top region with the kit `Tabs` views `Order list` · `Monthly demand` (owner correction 2026-10-01: stacked 36px navigation rows with icons; Delivery first and initially expanded in Order list; remaining groups initially closed, chosen values remain visible); the scrolling region shows only
   the chosen view's groups. In `Monthly demand`, Search and Columns hide (the matrix's columns are
   months) and Export produces the matrix.
-- **Order list groups:** `Sales Location` (`All sales locations`) · `Customer Delivery
+- **Order list groups (Delivery appears first, remaining groups preserve these controls):** `Sales Location` (`All sales locations`) · `Customer Delivery
   Location` (two selects) · `Delivery` (`All` · `Not delivered` · `Partially delivered` · `Fully delivered`) · `Obligations`
   (`All` · `Outstanding obligations` · `No action required`) · `Service Cases` (`All` · `Has open
   cases` · `Closed cases only` · `No cases`). **Monthly demand groups:** `Period` (`Starting month`
   select · `Months` select `1 · 2 · 3 · 4 · 5 · 6`, default 6 — owner 2026-09-26; the resolved window printed beneath: `Oct 2026 – Mar 2027`) ·
   `Sales Location` · `Customer Delivery Location` · `Product category`. No `Clear filters` control in the rail (owner instruction); a chosen row is unchosen by
   pressing it again.
-- **The rail is the shared rail, unchanged — OWNER CORRECTION 2026-09-26 (Jess: "left rail is icon +
+- **The rail uses the shared controls (SO pilot composition superseded by the 2026-10-01 correction below) — OWNER CORRECTION 2026-09-26 (Jess: "left rail is icon +
   title", "not like other pages?").** Every group is single-choice like every other Portal rail
   (icon + 13px/600 title, 36px rows, chosen value in blue at the right, press again to unchoose);
   `Sales Location` is one select (a search box waits for a kit admission); there is NO multi-select
@@ -735,6 +735,13 @@ or approval of the whole SO Blueprint is implied by this local approval.
 
 ## Sales Orders Register — find truth, never assign work
 
+### Accepted register template — authorised BUILD/DELIVERY
+
+The current owner-approved register, quick view and object composition is defined in
+“Sales Order accepted shared UI template” below and UI MASTER “Confirmed shared template”.
+The dedicated controller is authorised through merge, deployment and authenticated verification.
+Population, permission, export and business-write ownership remain governed by this MASTER.
+
 **THE REGISTER COMPOSITION — OWNER RULING (Jess, 2026-09-21) · BUILT (SALES ORDERS CARD 12, [PR #1497](https://github.com/wenwei4046/Carres-Portal-v2/pull/1497)) · authenticated production walk OWED.** Overwrites the 2026-09-17 date-first pair
 (`SO Date · SO No`), and the 2026-09-18 default order.
 
@@ -764,9 +771,8 @@ Proceed Date | SO Doc Date | SO No | Sales Location | Salesperson | Customer Req
 - **`Sales Location`** sits right after SO No (owner ruling 2026-09-21; the word replaced `Showroom` the same day — "showroom is sales location"): where the order was sold is read with its identity. It is the outlet, else the dealer, so it is always filled.
 - **`Salesperson`** follows Sales Location (owner ruling 2026-09-21): the existing Sales-ownership field (`salespersons.name`) promoted to a default. It names who SOLD the order, never an action owner.
 - `Items` is a default column (`{first item} + {n} more`).
-- **One line, 40px — owner ruling 2026-09-21 (international register practice: Shopify, Linear,
-  Salesforce, SAP Fiori, AG Grid).** Every row is 40px, set on this page only (`rowHeight={40}`; the engine default stays 38px so no other page
-  moves — owner 2026-09-21), and never grows.
+- **One line, accepted shared-template row height — owner ruling 2026-09-21 (international register practice: Shopify, Linear,
+  Salesforce, SAP Fiori, AG Grid).** The accepted shared template uses32px desktop rows and40px touch targets; cells remain one line.
   Every cell is one line. Registry widths are set so most real values fit whole; a value longer than its
   column ends in `…` and opens whole on hover and keyboard focus (engine `overflowText`), and the column can
   be widened. Dates, `SO No`, `PO No` and `DO No` never cut.
@@ -6763,3 +6769,33 @@ the normal discoverable doors already governed for Edit, output or View Flow.
 | ~~**D9**~~ | ✅ **FIXED 2026-08-08** — `lineClass` answers `unknown` where it used to answer `acc`, and `acc` is now earned by an accessory word instead of by elimination. **20 orders that could never fail a stock check → 0**, with **zero** lines re-classified into anything else. Two follow-ups named and left open on purpose: delete the `lineCategory` display fold, and name the sixteen SKUs alongside migration 0148. See the D9 block above |
 | ~~**D10**~~ | ✅ **RETIRED 2026-08-28, on the owner's explicit instruction** (red line 5 — the files were not deleted until asked for by name). **Half of it was already done:** `OperationOrders.tsx`, the 450-line kanban, no longer exists. What survived was a dead ISLAND the audit never named — `OrderColumn.tsx` had zero importers and `OrderCard.tsx` was imported only by `OrderColumn`, both orphaned when the kanban went. `OrderCustomerCard` was not a file at all: an exported component inside `OrderDetailDrawer.tsx` whose only importer was its own test. Its comment promised *"the Edit affordance only shows for status 'place'"* and the component carried no such check — unreachable, and fail-safe at the server (`update_order` 422s on a non-Place order), so no data was ever at risk. **Deleting it revealed more dead code, which is the point:** `CompactField` was its private helper and went with it, and two imports went stale. `GuaranteeCoverStrip` was NOT deleted — only the drawer's import of it; `PosOrderDetail.tsx` renders it. Precedent: the Cancel SO closeout deleted `CancelOrderDialog` for this exact shape. | fixed |
 | ~~**D11**~~ | ✅ **FIXED 2026-08-28 — two controls, two handles.** `receive-po-<id>` named BOTH the primary `Check in` button and the always-available `Direct receive →` escape hatch, so a test could only tell two different affordances apart by their WORDS. The hatch is now `direct-receive-<id>`; the primary keeps `receive-po-<id>`. **It stayed open for a boundary reason, not a technical one** — `OhanaSofaTab.test.tsx` recorded it as *REPORTED, NOT FIXED* because *"renaming one reaches the component, and the S2 card rules components DO NOT TOUCH"*; that note is corrected in the same change. The suite that previously had to accept *either* control now asserts the hatch is present **and the primary is not**, which is the fact the shared handle could never express. Procurement suites 43 pass. | fixed |
+
+### Sales Order accepted shared UI template — owner-approved 2026-10-01
+
+Jess accepted the rendered Sales Orders pilot and authorised the dedicated BUILD controller
+through tests, merge, deployment and authenticated production verification. The shared
+composition and numeric recipes live in UI MASTER “Confirmed shared template” and the kit;
+this module owns the following business-specific application. Production proof remains owed.
+
+- Order list rail: Order summary (Sales orders, Total payable, Paid to date, Balance due), then
+  Customer Requested Delivery Date shortcuts. Both open initially. Aggregates follow the SAME
+  filtered loaded result as Table/Cards, with explicit loaded-population and missing-money scope.
+  Payment, Delivery and Stock Status filters live in columns; no duplicate rail or case filter.
+  Monthly demand retains its own governed single-choice filters and views.
+- Row click and Cards View open read-only quick view. Dark SO/customer header carries status,
+  Print, Open full page and Close; no footer. Grey SO info starts with customer Phone/Email,
+  then sales attribution/dates/Dealer. Delivery, Items, Payment and Related documents are white
+  Block cards. No separate duplicate customer card. Source failures and absences stay explicit.
+- Full page opens read-only until deliberate Edit. Fixed white identity header and slate-2 tabs
+  sit above one scrolling left form and independent right PDF. Back preserves register context.
+- Items has five columns Item, Qty, Unit (RM), Disc (RM), Amount (RM). Name, code and config share
+  Item; no sequence/code columns. Money units appear in column headers; Total payable retains its
+  currency. Natural rows, no separate vertical Items scroller, category Quantity footer, no empty
+  Services line. Preserve all commercial/edit/protected-line rules. PDF keeps its printed columns.
+- Stock Status remains unknown: associated reserved/sold Units cannot prove an exact-line latest
+  posted non-void receipt. The unsafe classification is excluded until the Stock-owned source
+  projection proves those facts. No receipt facts are fabricated.
+
+Delivery evidence: source is PR #1838, branch `codex/so-register-pilot`, preserved from cecc97e2b.
+Local targeted checks and rendered fixture walks are evidence only; CI, deployment revision and
+real authenticated production proof are tracked before this section can claim delivered status.
