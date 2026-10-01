@@ -277,6 +277,77 @@ actual component reuse and rendered interaction. Existing style checks cover onl
 passing tests or a screenshot alone does not prove operator success. Do not add duplicated tests
 merely to mirror a trivial change; evidence must fit the behaviour being changed.
 
+### Cold-start design contract and actual sample evidence — 2026-10-01
+
+**RULING SCOPE:** the owner commissioned completion of reference extraction, component mapping,
+new-chat discoverability and review samples. The four Houzs template families are approved direction;
+the proposed visual overrides and layouts remain **PROPOSAL / NOT APPROVED / NOT BUILT** until reviewed.
+The Constitution already requires UI MASTER, copy, navigation and token authority at Plan start;
+do not introduce another constitution or a competing design guide.
+
+**Every new chat's concrete lookup contract:** identify the page's list/detail/form/card family;
+read its row here and the owning module MASTER; use the existing numerical source in 01, component
+contract in 02 and composition in 03; inspect the named real adopter and review evidence. Record
+`reference → Carres component → sample → permitted business differences → required states`.
+Missing sample or unsupported capability is an explicit gap, never permission to invent a local
+lookalike. Existing inline/local controls are measured migration candidates, not automatic precedent.
+One admitted shared component owns appearance and interaction; a module supplies business content,
+authorised actions and data. Document reading alone cannot enforce compliance: review must compare
+real imports, actual rendering and operator completion before marking an adopter verified.
+
+| Reference role | Carres shared source / actual adopter | Uniform behaviour; business-specific content |
+|---|---|---|
+| DataTable search, columns, row disclosure | register/DataGrid + workspace-rail + GoodsMiniTable; SalesOrdersRegister | Shared register mechanics and visual hierarchy; source columns and actions belong to module. |
+| DetailLayout identity/sections | kit/Block, DocumentTable, TotalsSummary; SalesOrderWorkspace, PurchaseOrdersPage, WarehouseUnitDetail | Identity, grouped facts, document/history and real action doors; no generic order-specific DetailShell forced onto Unit. |
+| FormCard/FormGrid | kit/Block + FieldFrame + Input/Select/DatePicker; SalesOrderWorkspace edit | Consistent labels, spacing, read-only/required/error/disabled controls; object-specific validation. |
+| Overview task card / LoadingList goods card | kit/Block + existing Work presentation; ReceivingWorkspace / WarehouseIncoming | Clear source, current job, missing prerequisites, one next action and truthful result; never import Houzs service stages or fabricate Work completion. |
+| Select and date controls | kit/Select, DatePicker, Popover and field-recipe | Keyboard operation, disabled values, label/error association, contained overlay; no foreign date format imported. |
+| Confirmation / preview surface | kit/Modal → DialogFrame; existing SavedEvidenceViewer/PdfPreview | Named modal, keyboard/focus return and bounded context; source-specific confirmation/evidence. |
+| Upload / retry | components/EvidenceUploadField plus source-specific wrappers | File rules, per-file progress/failure/retry and evidence association; storage rights/source ownership unchanged. |
+| SaveProblemsList / blocked-save explanation | Existing source-owned validation; common controls do not provide one universal save engine | Explain all known blockers and how to resolve them. Aggregate-renderer parity across modules remains UNVERIFIED; do not invent backend validation or report a simulation as a business test. |
+
+**Fresh main safety check:** fetched `origin/main` at
+`36e2840dd8dcce6eeb77252417ab57febbd6848d` without checkout/reset of another chat.
+Compared to `86046dde04d29856a78be6a8f7cf0923405f6f00`, no diff in the inspected UI MASTER,
+01/02/03 standards, shared component directory or SalesOrderWorkspace. The read-only application
+sources in this worktree remain the earlier inspected baseline; this is not whole-main certification.
+
+**Real component sample location (LOCAL REVIEW ARTIFACT, NOT DEPLOYED):**
+`http://127.0.0.1:5427/` on the reviewing host; artifact directory
+`/Users/chaichiewlim/.codex/visualizations/2026/10/01/01a0f544-cea3-7ad2-824d-dd23ea6361a6/component-review/`.
+The hub links Sales list, SO detail/edit, PO register, Warehouse Inbound, WarehouseIncoming count
+and a control-state harness. Actual page imports are from existing `apps/web/src/dev/` fixtures;
+kit controls import the unmodified production components. A local stylesheet proposes Houzs
+reading rhythm and darker blue buttons; it is not an application change or final visual standard.
+The WarehouseInbound fixture's nav is a labelled width stand-in, not proof of full-shell fidelity.
+The local samples are not distributed by this docs PR; a new chat on another host must not claim
+it viewed them from this URL. Source entry names above and measured evidence below remain available.
+
+| Evidence / exercise | Observed result | Boundary / disposition |
+|---|---|---|
+| Houzs live SO new form | Grouped Customer/Order Info/Delivery/Line Items/Payments; cannot-save summary opened a six-problem dialog without submitting | Reuse explicit prerequisites and grouped feedback; Houzs states/business rules not imported. |
+| Houzs live case detail | Current stage, stage actions, required resolution and timeline visibly connected; existing record contains automatic-on-open stage history | Read-only viewing only; no edit/transition/upload performed. Never copy autosave or stage writes by copying the layout. |
+| Houzs problem dialog Escape | Escape left the dialog open in the sampled new-SO form; OK closed it | Observed keyboard difference; reuse Carres governed modal behaviour, not this limitation. |
+| Carres Select keyboard | Space opens, ArrowDown/Enter selects, focus returns to trigger; disabled option is exposed disabled | Runtime local real component; not all module adapters verified. |
+| Carres DatePicker | Calendar opens with day buttons; Escape dismisses; minimum-date capability exists in source | Browser sample plus source; not all locales/date edge cases tested. |
+| Carres Modal | Named dialog; Tab remains in dialog; Escape closes and returns to Review trigger | Runtime local real component; separate automated focus test passed. |
+| Carres long option at 390px | Original shared Select list right edge 420.72px exceeds viewport; isolated proposed max-width/wrapping yielded right edge 380px | REAL GAP; proposed fix only in review stylesheet, production unchanged. |
+| Carres upload failure/retry | Real EvidenceUploadField shows failed filename and Retry; after local mock recovery shows Uploaded and one photo attached | Local signing/storage stub only; no real upload, permissions or storage integration certified. |
+| Carres permission/error | Real SO fixture receiving payment 403 shows role-unavailable message; real Inbound 503 shows failure and Try again instead of zero | Actual component with simulated HTTP responses; backend access enforcement not exercised. |
+| Carres save conflict/server failure | Control harness retains values and shows supplied conflict/error explanation | Harness-owned simulation only, NOT evidence that all actual business forms handle conflicts correctly. |
+| Carres WarehouseIncoming exception branch | Count opens per-Unit outcomes; Received with issue reveals issue kind and damage-photo requirement; missing DO/photo keeps submission disabled | Actual component, local fixture; no receipt created. Existing source already guides part of the work; preserve it. |
+| WarehouseIncoming modal close | Cancel closes; focus observed on containing page rather than Count trigger | REAL GAP in sampled fixture; adopt shared DialogFrame focus-return contract, no second modal engine. |
+| Existing automated checks actually executed | DialogFrame.focus.test.tsx: 1 passed; SalesOrderWorkspace.block.test.tsx: 8 passed | Nine tests passed; no claim of full application, Houzs or production verification. |
+
+**Workflow-guidance acceptance for Warehouse and other task pages:** show (1) task/source identity,
+(2) current required check/input, (3) exact blockers, (4) authorised next action, (5) recorded result,
+remaining quantity/work and receiving owner. Warehouse submission remains distinct from office GRN
+posting; Loaded remains distinct from driver confirmation. Work/Duties determines responsibility;
+the owning business result determines completion. Reference stage progress is a presentation lesson,
+not another status engine. Final full-flow posting, conflict resolution, storage and role-matrix
+proof require the separately commissioned BUILD/DELIVERY lane and controlled integration validation.
+No PLAN completion claim follows from the local fixture results.
+
 ### Current status and document ownership
 
 **IMPLEMENTED IN INSPECTED CODE / NOT A WHOLE-KIT VERIFICATION:** ModuleHeader, DataGrid,
