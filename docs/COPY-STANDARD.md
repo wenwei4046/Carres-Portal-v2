@@ -3068,7 +3068,7 @@ Sep`), never an instruction (`PO V1` / `Send the new version to supplier` is ban
 | Total quantity on the current PO | **`Order Qty`** | Ordered (as this column) · Qty |
 | Correct and accepted quantity posted through Receiving | **`Received Qty`** | Received (bare) |
 | Order Qty − Received Qty — pieces, never money | **`Pending Delivery Qty`** | Open Balance · Open · Outstanding |
-| The current official document version | **`PO Version`**, valued `PO V1` · `PO V2` · `PO V3` | Current Version · Version 1 · PDF Version 1 |
+| The current official document version on the PO register (owner 2026-10-01; approved target, not built) | **`PO Version`**, valued `{base PO No}-V{n}`, e.g. `PO-20260903-4316-V1`; no intervening spaces; sending evidence remains a separate supporting line | PO V1 · spaced number/version · parenthesised register version · Current Version · PDF Version 1 |
 | Current version sending evidence, inside PO Version on the listing | **`PO sent to supplier · {channel} · {date}`** / **`Sending not confirmed`** | Supplier Has · No current PDF |
 
 The three quantity words above remain in PO detail and receiving progress, not PO listing columns

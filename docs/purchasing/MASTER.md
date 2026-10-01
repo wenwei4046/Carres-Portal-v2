@@ -3419,7 +3419,13 @@ PO**, and a decorative arrow concatenated into a document number makes one targe
   actual receipt in Receiving. `Received Qty` is the shared `warehouseReceiptTotals` reader, so the
   count beside a GRN here and the count on the GRN itself cannot drift (Law D); damaged and
   wrong-item units are not received, which is that same arithmetic, not a second one.
-- `PO Version`: `{PO No}({n})` with `PO sent to supplier · {channel} · {date}` for the current version,
+- **PO Version display — owner ruling 2026-10-01 / APPROVED TARGET, NOT BUILT:**
+  display the existing base PO number followed immediately by `-V{n}`, for example
+  `PO-20260903-4316-V1`. No space or parentheses separates the version from the number.
+  This replaces the register’s former `{PO No}({n})` / `PO V1` presentation; it does not
+  renumber existing POs, change the new-number allocation scheme, or regenerate historical
+  issued PDFs. The version comes from the actual document version, never a guessed default.
+  Show `PO sent to supplier · {channel} · {date}` separately as supporting text for the current version,
   or `Sending not confirmed` when the CURRENT version's confirmation is missing. Earlier evidence
   stays in Revisions. Missing evidence never proves the PO was never sent.
 
