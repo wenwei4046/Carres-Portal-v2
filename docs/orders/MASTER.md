@@ -735,6 +735,90 @@ or approval of the whole SO Blueprint is implied by this local approval.
 
 ## Sales Orders Register — find truth, never assign work
 
+### Isolated register pilot — explicit BUILD commission, 2026-10-01
+
+**RULING / LIMITED BUILD AUTHORISED; IMPLEMENTATION AND OWNER VISUAL ACCEPTANCE OWED.** Jess
+approved arranging BUILD after the specification is recorded for ONE actual `/operation/orders`
+register sample. This supersedes the earlier no-BUILD boundary only for this pilot. No main merge,
+deployment, live write, duty assignment or Purchasing/Warehouse adoption is authorised. Amendment
+PR1834 is separate. Base: main `36e2840dd8dcce6eeb77252417ab57febbd6848d`; shared UI dependency:
+PR1836 `9de0943f0a87f252fd7d2247cb857ca8473c98fd`, OPEN/unmerged. UI PLAN owns UI/02/03;
+Sales BUILD owns this specification and implementation. This specification is committed before code.
+
+**Current → problem → recommendation → trade-off.** The existing Register already has the
+correct shared grid, rail, goods expansion and full-detail door. It offers no Cards presentation,
+loses temporary grid/scroll context when opening a record, and a remembered open rail can cover
+identity after narrowing. Reuse the same engine with an alternate result renderer, preserve
+session return context, and make a narrow filter an explicitly opened temporary surface. Keep
+40px/51px rows, governed columns and tokens. Cards improve individual-order scanning but display
+fewer records per screen; Table remains the default comparison view. This is falsified if the
+same filtering/export produces different orders or the added chrome hides identity/actions.
+
+**Acceptance composition, not a new kit:**
+
+| Region | Actual source/import | Pilot contract |
+|---|---|---|
+| Portal + header | `OperationApp`, `DestinationHeader` → shared `ModuleHeader` | Same global navigation/Quick Rail/header. No duplicate title, KPI strip or create-order door. |
+| Local rail | `components/workspace-rail`: FilterRail, FilterRailGroup/Row/Select, ShowFiltersButton | Retain Order list/Monthly demand tabs and factual groups. Use existing Delivery conditions, not a new lifecycle/status taxonomy. Count/control placement remains independent of its predicate; no second status strip. |
+| Toolbar | `components/register/DataGrid` existing search, Filters, Export, Columns; kit `Tabs` for Table/Cards | Compact one toolbar, wrapping at narrow width. Table/Cards only changes presentation of Order list; Monthly demand remains a separate existing view. Selection keeps the existing replacement toolbar and output-only actions. |
+| Table | DataGrid + `sales-order-columns` + `register-field-widths` | Keep exact approved leading columns/pinning, 40px rows, sorting/filtering, visible Reset columns, current export. No page-local table or different search engine. |
+| Cards | existing kit `Block`, `Checkbox`, `Button`, formatted date and text tokens | Black SO identity; customer; Customer Requested Delivery Date; Items summary; Delivery fact. View opens the same object; Items opens the same read-only ExpandedLines. Selection is the same key set as Table. No money dashboard, write action or new card chrome. |
+| Goods | current `ExpandedLines` → ConnectedSections + GoodsMiniTable + exported OverflowText | Same six governed columns and exact Unit/source evidence. Long names/configuration accessible by hover, keyboard and click. No child selection or second writer. |
+| Return | existing object route, SalesOrderTabs `backTo`, router state | Record originating register URL; back returns there. Session-only grid state restores search/header filters, expansion, focused row and per-presentation scroll. Persistent column layout remains distinct from temporary session state. No object/detail/edit/PDF redesign. |
+| States | DataGrid skeleton/empty/filter-clear + SalesOrderReadFailure | Both presentations use one loading/error/permission/empty decision. Failed read never appears as no orders or zero Delivery. Existing Retry/clear controls retained. |
+
+**Numerical authority.** `01-design-tokens` owns body13/18, meta12/16, label11/14,
+strong15/22; slate12/11 text, white surface, slate5 1px lines, blue selection/focus; spacing
+2/4/6/8/12/16/24/32; card radius10. UI MASTER §6.0 owns header36, parent40, footer32,
+cell inset8; §6.8–6.9 owns goods51/header27 and connector1. Block owns padding12/16.
+FilterRail owns240 width and896 work-canvas threshold. Existing grid identity breakpoint768
+is preserved. Cards compose these tokens in one column on a phone and multiple columns only
+when content fits; no smaller typography or new fixed card height. Proposed32px parent rows,
+quick-view drawer and grey-fact-box redesign remain unapproved and excluded.
+
+**One scope / counts / search.** Keep `useOperationOrders(stage: proceeded)` and server
+`salesOrderRegisterPopulation`: permitted non-cancelled handed-over non-rental orders, up to500
+returned records; `salesOrderTotal` is the independent permission-scoped unsearched denominator.
+Current server text search covers SO/customer/imported reference; the existing grid also searches
+its loaded column values. This is a measured limitation, not a claim of whole-database phone/item
+search. Both views use the SAME server response and DataGrid search/header-filter/sort result.
+Do not increase a cap or silently change population. Delivery/facet counts describe loaded
+searched/header-filtered records satisfying other rail groups, excluding their own group.
+Use the governed `{n} of {m} sales orders` scope sentence where needed; unknown total has no `of`.
+Never present these as whole-database status totals. Clear filters clears search, header and rail
+conditions together. Hidden selected records never enter current-view export; selected outputs
+continue using the engine's selected-visible intersection. Table/Cards preserves all criteria,
+sort, selection and expansion; only the presentation URL changes.
+
+**Delivery evidence boundary.** Existing `registerDeliveryConditionOf` in
+`packages/shared/src/sales-order-register-filters.ts` is the current Orders-owned read-only
+projection over `resolveUnitAllocation`: physical committed goods versus Stock Units sold to
+this order, sourced by the API from `ops_stock_items`. It is NOT DO issue/dispatch and does not
+assert accepted proof. Reuse that current projection for existing rail conditions; no competing
+percentage/status engine. Card Delivery must not invent a result from a DO number or mirror
+`orders.delivered_at`. Missing allocation/source data is `Unavailable`, never Fully delivered.
+The current SKU-level projection does not prove exact-line fulfilment for ambiguous same-SKU
+configurations or counted goods without governed outcome evidence: their card result stays
+Unavailable. A broader Delivery result/read-model convergence is outside this visual pilot;
+record that limitation explicitly in review. No green proof-accepted claim from a Stock result.
+
+**Interaction and responsive acceptance.** 1440/1060/825/390 viewport checks in the real shell;
+no page sideways scroll, scroll is contained by the existing DataGrid/goods surfaces. SO identity
+visible on entry; remembered desktop-open filters do not cover it on a narrow first paint or
+resize. Explicit narrow opening is dismissible by existing close/Escape/outside action and returns
+focus; selected conditions remain visible. Keyboard search, filters, sort, selection, Items,
+long-content reveal, object open and back must work. Do not replace the existing rail with a
+page-local copy. Cards preserve exact selection/export meaning and give full long-text access.
+
+**Verification boundary.** Use the actual OperationApp `/operation/orders` route through a
+DEV-only local fixture entry, all unhandled API requests refused. Record fixture versus real data,
+local URL, screenshots, scenarios and actually executed checks. Cover many rows, long customer/
+address/specification, partial/missing/ambiguous Delivery evidence, no results, read failure,
+permission denial, detail→back and Table→Cards→Table state preservation. Keep fresh screenshot
+proof separate from existing fixtures. No UI VERIFIED claim before runtime proof; owner visual
+acceptance remains owed. Produce a separate draft PR, attach it, and report back to Sales PLAN.
+
+
 **THE REGISTER COMPOSITION — OWNER RULING (Jess, 2026-09-21) · BUILT (SALES ORDERS CARD 12, [PR #1497](https://github.com/wenwei4046/Carres-Portal-v2/pull/1497)) · authenticated production walk OWED.** Overwrites the 2026-09-17 date-first pair
 (`SO Date · SO No`), and the 2026-09-18 default order.
 

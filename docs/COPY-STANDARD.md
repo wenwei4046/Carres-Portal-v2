@@ -2638,6 +2638,7 @@ the drawer and the DO document read them from the shared modules (`delivery-paym
 
 | Meaning | Use exactly | Do NOT use |
 |---|---|---|
+| Sales Order register presentation (owner-requested pilot, 2026-10-01) | **`Table`** · **`Cards`**; existing `Sales Orders view` accessible group name. `Unavailable` for a Delivery fact whose source/identity is not sufficient; never inferred Fully delivered. | Board · a new status taxonomy |
 | The register's search placeholder | **`Search sales orders…`** | `SO number, customer, phone or item…` — the box is a governed 200px, so the long form clipped at every width, not only a narrow one |
 | The register column after SO No | **`Sales Location`** (owner ruling 2026-09-21) | `Showroom` · Outlet · Branch · Store |
 | The register's footer count (Listing Standard, owner approved 2026-09-16) | **`{n} sales orders`** · singular **`1 sales order`** · narrowed or capped **`{n} of {m} sales orders`** (`{m}` is the SERVER's `salesOrderTotal` — every Sales Order this user may read, rentals excluded, search not applied; when it is unknown the footer prints **`{n} sales orders`** with no `of`) · ticked **`{n} selected sales orders`** / **`1 selected sales order`** | `{n} orders` · `{n} of {m} orders` · `{n} rows` |
