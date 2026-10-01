@@ -2034,7 +2034,7 @@ dictionary with the approved Receiving build; each is registered here so no chat
 | `Only Operation staff may save a receiving.` | the refused act | The page states the same rule the SQL door holds (0601, owner ruling 2026-09-25): every active Operation staff member and the principal may post. `Only GRN duty may save a receiving.` and `Not your duty today` are RETIRED. Amend and Void keep the GRN Duty authority; their doors are simply not offered to anyone else. |
 | `Operation staff` | the posting label beside `Saved by` | A saver who is neither GRN Duty, its cover nor an Operations Superuser (0601). |
 | `Staff & Duties` | Global Settings destination + page (production verified 2026-09-29, PR #1791) | The ONE company-wide assignment surface (Law F.1). A module names the duty it needs; it never keeps a second assignment list. |
-| `Sales Approver` | Staff & Duties duty name; scoped SO approval responsibility | **OWNER-APPROVED 2026-10-01 / TARGET NOT BUILT.** Required before price decreases, customer refunds and whole-SO cancellation after Proceed take effect. Ordinary amendments do not require this approval. Holder and cover must be active Principal people assigned through Settings → Staff & Duties. Orders MASTER § Staff amendments and Sales Approver owns the gates; self-approval and fee/service rules remain undecided. Replaces the withdrawn all-amendments mandate; catalogue code is not changed by this PLAN. |
+| `Sales Approver` | Staff & Duties duty name; scoped SO approval responsibility | **OWNER-APPROVED 2026-10-01 / IMPLEMENTATION FOR REVIEW.** Required before price decreases, customer refunds and whole-SO cancellation after Proceed take effect. Ordinary amendments do not require this approval. Holder and cover must be active Principal people assigned through Settings → Staff & Duties. Orders MASTER § Staff amendments and Sales Approver owns the gates; the currently resolved eligible Sales Approver may decide their own SO exception with reason, customer evidence and actual-actor records (owner-approved 2026-10-01 / IMPLEMENTATION FOR REVIEW); other Duties and refund execution controls are unchanged. Correct system delivery-charge recalculation is not a discretionary product discount; any customer refund still requires this Duty. Replaces the withdrawn all-amendments mandate; catalogue and qualification are implemented for review; no live assignment is included. |
 | `GRN Duty` | duty label | The receiving duty's name everywhere — pages, history, work rows. |
 | `Nobody holds GRN Duty.` | Staff & Duties resolution · unassigned states | The honest unassigned answer (owner correction 2026-09-04): no rota recommendation is ever shown as if it were an assignment. Posting is never refused for it (owner ruling 2026-09-25). |
 | Assignment presentation (owner ruling 2026-09-29; NOT BUILT) | `Assigned to {name}`; history records changes, completer remains separate | `{acting} covering for {holder}` · normal/acting/cover badges |
@@ -2739,7 +2739,7 @@ words and puts the reason after a `·`, exactly as stair carry already qualifies
 |---|---|---|
 | The bar that appears when something has changed | **`⚠ {n} changes`** with **`Discard`** and **`Save`** | Unsaved changes · You have edits · Save changes · Apply |
 | The mark on the document preview while changes are unsaved | **`UNSAVED`** | Draft · Preview · Not saved yet |
-| A submitted amendment, above the document | **`⚠ Amendment pending approval: delivery date → {date}`** | Pending change · Proposed · Awaiting sign-off |
+| A submitted amendment, above the document | **`⚠ Amendment request pending: delivery date → {date}`** | Pending change · Proposed · Awaiting sign-off |
 | The three-field section that moves the promised date | **`Change delivery date`**, with the note **`creates a Revision · needs approval`** | Amend delivery date · Reschedule · Postpone · `Change delivery date` WITHOUT its note (the note is what carries "this is not a quiet edit") |
 | SO edit confirmation dialog | **`Your changes`** — opens from Save / Submit amendment request; Cancel keeps the draft | a second edit page |
 | Its three fields, in order | **`Requested date (from customer)`** · **`New delivery date`** · **`Reason for change`** (required) | Request date · New date · Notes · Remark · the retired `Amend …` trio |
@@ -2981,9 +2981,17 @@ automatically become a Sales Order state. These words are approved target copy, 
 | Print that revision's own retained document | **Print this version** |
 | SO quantity footer, on page and document | **`Qty:`** followed by category quantities (e.g. `Mattress 2 · Accessory 1`) |
 | SO services footer, separate from goods quantity | **`Services:`** followed by the actual service names (e.g. `Delivery fee · Stair carry`); billing quantities remain on their service rows |
-| A submitted proposal awaiting its authorised decision | **Waiting for management** |
-| Impact heading before a decision | **Before approval** |
+| A submitted amendment awaiting its applicable evidence, supplier answer or exception review | **Amendment request** |
+| Impact heading before effectiveness | **Before the change** |
 | Decision field | **Management decision reason** |
+| Scoped price-review action, which may finish before other gates | **Approve** — records Sales Approver’s review; does not claim effectiveness |
+| Shared Work action/result for that price review | **Review amendment** · **Amendment decision recorded** (approval or rejection; never call a rejected request approved) |
+| Supplier feasibility record on the SO amendment | **Supplier answer** · **Confirmed** · **Waiting** · **Refused** · **Supplier Confirmed Delivery Date** · **Evidence** · **Record supplier answer** · **Supplier answer recorded** |
+| Existing PO source cannot identify one of two same-SKU SO lines | **Order line not recorded** |
+| Before-submit and PIC notification facts | **PO Duty** / **Sales Approver** + resolved name or **Not assigned**; **Amendment request · Submitted** / **Amendment request · Saved** / **Amendment request · Rejected** |
+| Ordinary amendment evidence reminder | **Record how the customer agreed before this change takes effect.** |
+| Existing live amendment blocks another | **An earlier change is still pending.** |
+| New goods consequence | **{name}: new goods. Purchasing buys them after the amendment takes effect** |
 | Negative decision | **Reject** |
 | Positive decision that atomically creates the next revision | **Approve and apply** |
 | Re-propose a complete historical version as a new governed change | **Propose this version again** |
@@ -4760,7 +4768,7 @@ the dictionary is how a proposal is recorded, never how it becomes law.
 
 Approved wording is reused wherever it already exists: the decision controls stay
 **`Management decision reason`** · **`Reject`** · **`Approve and apply`**, the waiting state stays
-**`Waiting for management`** and the impact heading stays **`Before approval`** — all from
+**`Amendment request`** and the impact heading is **`Before the change`** — all from
 § "The Sales Order amendment words" above. Nothing in that approved table is re-spelled here.
 
 | Meaning | Proposed wording | Status |

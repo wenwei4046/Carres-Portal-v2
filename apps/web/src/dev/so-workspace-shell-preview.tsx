@@ -25,7 +25,7 @@ const STATE = new URLSearchParams(window.location.search).get("state") ?? "full"
 const ROLE = new URLSearchParams(window.location.search).get("as") === "principal" ? "principal" : "operation";
 useAuth.setState({
   role: ROLE as never,
-  user: { email: "operation@carres.co" } as never,
+  user: { id: ROLE === "principal" ? "preview-principal" : "preview-operation", email: "operation@carres.co" } as never,
 });
 
 const ID = "11111111-1111-1111-1111-111111111111";
@@ -94,12 +94,29 @@ const PAYMENTS = [
 
 /* The preview's own amendment lane, so a walk can submit, record the customer agreement and decide. */
 const LIVE: { amendment: Record<string, unknown> | null } = { amendment: null };
+const AMENDMENT_GATES = {
+  supplier_confirmations: [] as Array<Record<string, unknown>>,
+  supplier_scope: STATE === "amendment-supplier" ? [{ po_id: "PO-2048", po_line_id: "pl1", order_line_id: "l1" }] : [],
+  supplier_waiting: STATE === "amendment-supplier" ? [{ po_id: "PO-2048", po_line_id: "pl1", order_line_id: "l1" }] : [],
+  sales_approval_required: STATE === "amendment-price", sales_approval_recorded: false, legacy_review_required: false,
+  po_duty: { actor_user_id: "preview-operation", acting_user_name: "Mei Ling" },
+  sales_approver: { actor_user_id: "preview-principal", acting_user_name: "Jess" },
+};
+if (STATE.startsWith("amendment-")) LIVE.amendment = {
+  id: "aaaaaaaa-1111-2222-3333-444444444444", order_id: ID, status: "submitted", reason: "Customer requested a change",
+  base_revision: 1, stale: false, submitted_by: new URLSearchParams(window.location.search).has("self") ? "preview-principal" : "other-operation", submitted_by_name: new URLSearchParams(window.location.search).has("self") ? "Jess" : "Shasha",
+  submitted_at: "2026-10-01T02:00:00Z", customer_asked_on: "2026-10-01",
+  proposed_snapshot: { lines: LINES.map((l) => l.id === "l1" ? { ...l, qty: STATE === "amendment-price" ? 2 : 3, unit_price: STATE === "amendment-price" ? 1800 : l.unit_price } : l) },
+  customer_agreement_kind: "customer_confirmation", customer_agreement_reference: "WhatsApp customer reply",
+  customer_agreement_covers_proposal: true, gates: AMENDMENT_GATES,
+};
 const realFetch = window.fetch.bind(window);
 window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
   const json = (body: unknown, status = 200) =>
     new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 
+  if (url.includes("/activity")) return json([]);
   if (url.includes(`/payments`)) {
     if (["empty", "saved", "agreement-zero"].includes(STATE)) return json({ payments: [] });
     if (STATE === "forbidden") return json({ error: "Operation or principal only" }, 403);
@@ -112,9 +129,17 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     ] });
   if (url.includes("/revisions"))
     return json({ revisions: [{ revision: 1, snapshot: { header: { so: 1319, delivery_date: "2026-09-24", proceed_date: "2026-08-26", customer_name: ORDER.customer_name }, lines: LINES.map((l) => ({ ...l, unit_price: String(l.unit_price) })), addons: ADDONS.map((a) => ({ addon_key: a.addon_key, qty: a.qty, unit_price: String(a.unit_price) })) }, created_at: "2026-08-21T02:00:00Z", created_by: null, created_by_name: "Preview", actor_kind: "human", change_type: null, note: null }] });
+  if (url.includes("/amendment-routing")) return json(AMENDMENT_GATES);
+  if (url.includes("/supplier-confirmation")) {
+    const b = JSON.parse(String(init?.body ?? "{}"));
+    AMENDMENT_GATES.supplier_confirmations.push({ po_id:b.poId,po_line_id:b.poLineId,order_line_id:b.orderLineId,
+      answer:b.answer,supplier_date:b.supplierDate,reference:b.reference,by_name:"Mei Ling",at:new Date().toISOString() });
+    if (b.answer === "confirmed" && b.supplierDate) { LIVE.amendment = null; return json({ status: "applied", revision: 2 }); }
+    return json({ status:"submitted",gates:AMENDMENT_GATES });
+  }
   if (url.includes("/changes")) {
     LIVE.amendment = {
-      id: "aaaaaaaa-1111-2222-3333-444444444444", status: "submitted", reason: "Preview request",
+      order_id: ID, gates: AMENDMENT_GATES, submitted_by: "preview-operation", id: "aaaaaaaa-1111-2222-3333-444444444444", status: "submitted", reason: "Preview request",
       base_revision: 1, base_contractual_hash: "h", current_contractual_hash: "h", stale: false,
       proposed_snapshot: JSON.parse(String((init?.body ?? "{}"))).lines
         ? { lines: JSON.parse(String(init?.body)).lines, addons: JSON.parse(String(init?.body)).addons }
@@ -190,6 +215,7 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   if (url.match(/\/api\/operation\/orders\/[0-9a-f-]+$/))
     return json({ order: ORDER, lines: LINES, addons: ADDONS, total: 3780 + SERVICES_TOTAL,
       warehouse: null, stockBalances: [], freeUnits: [], pos: [], history: [], threads: [] });
+  if (url.includes("/api/")) return json({ error: "Preview fixture unavailable", message: "Preview fixture unavailable" }, 404);
   return realFetch(input as RequestInfo, init);
 };
 

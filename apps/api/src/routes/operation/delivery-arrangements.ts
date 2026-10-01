@@ -1,3 +1,4 @@
+import { earlyDeliveryRefusal } from "../../lib/early-delivery";
 import { Hono } from "hono";
 import {
   assignLogisticsInputSchema,
@@ -898,14 +899,20 @@ deliveryArrangementsRouter.put("/:orderId", requireOperationOrPrincipal, async (
      Sales promise itself is never touched here. */
   const requestedDate = order.delivery_date_tbd ? null : (order.delivery_date as string | null);
   const later = laterThanRequested(input.confirmedDate, requestedDate);
-  if (later && !input.replyProofPath) {
+  const earlier = Boolean(input.confirmedDate && requestedDate && input.confirmedDate < requestedDate);
+  if ((later || earlier) && !input.replyProofPath) {
     return c.json(
       {
         error: "Save scheduled delivery: upload the WhatsApp reply",
-        code: "later_date_needs_reply_proof",
+        code: earlier ? "earlier_date_needs_reply_proof" : "later_date_needs_reply_proof",
       },
       409,
     );
+  }
+
+  if (earlier && input.confirmedDate) {
+    const refusal = await earlyDeliveryRefusal(sb, orderId, input.confirmedDate);
+    if (refusal) return c.json({ error: refusal, code: "early_delivery_not_ready" }, 409);
   }
 
   const current = await currentPartners(sb, [{ orderId, leg }]);

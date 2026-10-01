@@ -435,8 +435,19 @@ proposed delivery outside that agreement is an Operation-owned customer exceptio
 customer's response and required evidence before treating the changed arrangement as agreed.
 Recording it does not rewrite Sales Orders' Requested Delivery Date.
 
-**Requested Delivery Date boundary — OWNER-APPROVED 2026-10-01 / TARGET NOT BUILT.**
-Orders MASTER § Requested Delivery Date changes is the matching owner rule. A customer-initiated
+**SO delivery-charge recalculation — OWNER-CONFIRMED 2026-10-01 / TARGET NOT BUILT.**
+Orders MASTER § System-priced delivery charges governs this amendment path: address changes or
+added delivery services trigger the existing system pricing rules. Operation cannot hand-edit,
+discount or waive the computed delivery charge, so this path has no manual charge-approval step.
+This supersedes the proposed SO Delivery Charge Approver waiver lane; it does not retire that
+Duty or redefine unrelated exceptions. Correct recalculation can lower the charge, but customer
+refunds retain Sales Approver and the owning money workflow. Preserve evidence and before/after.
+
+**Requested Delivery Date boundary — OWNER-APPROVED 2026-10-01 / IMPLEMENTATION FOR REVIEW.**
+Orders MASTER § Requested Delivery Date changes is the matching owner rule. The existing
+arrangement door now checks early-date WhatsApp evidence, exact physical readiness and existing
+money/release conditions. The partner portal cannot bypass the evidence requirement. This is local
+review-branch implementation; production has not been changed. A customer-initiated
 earlier SO date applies through an evidenced SO amendment only when the order's required goods
 are already in the warehouse and genuinely ready; otherwise refuse it and tell the customer
 Carres will contact them when the goods arrive. Do not chase a supplier or promise an earlier

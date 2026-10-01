@@ -180,6 +180,7 @@ describe("GET /api/operation/workspace-duties", () => {
       "grn_duty",
       "storage_waiver_approver",
       "purchasing_approver",
+      "sales_approver",
       "delivery_charge_approver",
       "payment_approver",
       "finance_approver",

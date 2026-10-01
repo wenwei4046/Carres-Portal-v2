@@ -1,14 +1,17 @@
 # PAYMENT — MASTER
 
-**SO amendment commercial exception boundary — OWNER-APPROVED 2026-10-01 / TARGET NOT BUILT.**
+**SO amendment commercial exception boundary — OWNER-APPROVED 2026-10-01 / SCOPED IMPLEMENTATION FOR REVIEW.**
 Sales Approver must approve a customer price decrease, a customer refund or whole-SO
 cancellation after Proceed before it takes effect, under Orders MASTER § Staff amendments and
 Sales Approver. Ordinary SO amendments need no owner approval. This SO commercial decision does
 not itself send money, post a refund or rewrite a receipt/invoice. Existing money execution,
 accounting controls and audit ownership remain with their owning workflows; no second ledger
-or refund writer is created. Delivery fee/service change rules remain undecided, and the
-existence of Delivery Charge Approver does not decide their routing. No live refund or build is
-authorised by this PLAN.
+or refund writer is created. System-priced delivery-charge changes have no manual approval lane; Operation cannot override the
+computed charge. Correct lower system charges are not discretionary product discounts, but resulting
+customer refunds retain Sales Approver and money-execution controls (Orders MASTER § System-priced
+delivery charges, owner-confirmed 2026-10-01 / TARGET NOT BUILT). 0630 gates the existing refund approval writer through Sales Approver; it neither pays a refund nor
+creates a new money door. Whole-SO cancellation after Proceed remains unavailable pending its complete
+consequence law. No live refund, assignment, merge or deployment is authorised.
 
 **All listing appearance — APPROVED / NOT BUILT (Jess, 2026-09-17):** follow
 [UI MASTER §6.7 Portal-wide listing readability](../ui/MASTER.md#portal-wide-listing-readability--built-2026-09-17-slice-1--authenticated-walk-owed).

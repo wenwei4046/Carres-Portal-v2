@@ -1,3 +1,5 @@
+import { useDebouncedValue } from "@/lib/useDebouncedValue";
+import { useAmendmentRouting } from "@/lib/queries";
 /**
  * SalesOrderWorkspace — the Sales Order object page. Commercial changes leave
  * through Amendment, never this form.
@@ -1819,6 +1821,24 @@ function SalesOrderWorkspaceBody() {
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, editing, order, draft, baseline, storedHeader]);
+  const routingProposal = useMemo(() => {
+    if (changeClass?.action !== "submit") return null;
+    const proposed: Record<string, unknown> = {};
+    const header: Record<string, unknown> = {};
+    const values = draftHeader();
+    for (const key of changeClass.header) {
+      if (key === "delivery_date" || key === "delivery_date_tbd") proposed[key] = values[key] ?? null;
+      else header[key] = values[key] ?? null;
+    }
+    if (Object.keys(header).length) proposed.header = header;
+    if (changeClass.linesChanged) proposed.lines = liveLines(draft);
+    if (changeClass.addonsChanged) proposed.addons = liveAddons(draft);
+    if (changeClass.installmentChanged) proposed.installment_months = draft.installment_months;
+    return proposed;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [changeClass, draft]);
+  const debouncedRouting = useDebouncedValue(routingProposal, 250);
+  const routingQ = useAmendmentRouting(orderId ?? null, editing ? debouncedRouting : null);
   /* The count is what the REVIEW lists — one number, one source, so the header
      and the Before/After can never disagree (the summary rows are not changes). */
   const SUMMARY_ROWS = new Set(["Qty", "Services", "Total payable"]);
@@ -1839,7 +1859,7 @@ function SalesOrderWorkspaceBody() {
   const categoryOfSku = useCallback((sku: string) => catalogBySku.get(sku)?.category ?? null, [catalogBySku]);
   const consequencesFor = (after: { lines: DraftLine[]; addons: DraftAddon[]; header: Record<string, unknown> }) => {
     const out: string[] = [];
-    const poSkus = new Set((detailQ.data?.pos ?? []).flatMap((po) => po.lines.map((l) => l.sku)));
+    const scopedLines = new Set((liveAmendment?.gates?.supplier_scope ?? routingQ.data?.supplier_scope ?? []).map((scope) => scope.order_line_id));
     const unitsOf = new Map((goodsTruthQ.data?.lines ?? []).map((l) => [l.lineId, (l.verifiedUnitIds ?? l.unitIds ?? []) as string[]]));
     for (const l of after.lines) {
       const was = baseline.lines.find((b) => b.id && b.id === l.id);
@@ -1847,9 +1867,9 @@ function SalesOrderWorkspaceBody() {
         JSON.stringify(was.attrs ?? null) !== JSON.stringify(l.attrs ?? null);
       if (!changed) continue;
       const name = nameOfSku(l.sku);
-      if (l.added) out.push(`${name}: new goods. Purchasing buys them after approval`);
-      else if (poSkus.has(l.sku)) out.push(`${name}: already ordered from the supplier. Purchasing settles it with the supplier`);
-      else out.push(`${name}: no PO yet. Purchasing re-counts what to buy`);
+      if (l.added) out.push(`${name}: new goods. Purchasing buys them after the amendment takes effect`);
+      else if (l.id && scopedLines.has(l.id)) out.push(`${name}: already ordered from the supplier. Purchasing settles it with the supplier`);
+      else if (routingQ.data || liveAmendment?.gates) out.push(`${name}: no PO yet. Purchasing re-counts what to buy`);
       const units = l.id ? unitsOf.get(l.id) ?? [] : [];
       if (units.length) out.push(`${name}: Unit ${units.join(", ")} reserved. Warehouse keeps the Unit until the change is decided`);
     }
@@ -1971,9 +1991,9 @@ function SalesOrderWorkspaceBody() {
 
   const changesMut = useSubmitSalesOrderChanges(orderId ?? "", {
     onSuccess: (r) => {
-      if (r.action === "saved") toast.success(`Saved (${r.revision})`);
+      if (r.action === "saved" || r.action === "applied") toast.success(`Saved (${r.revision})`);
       else {
-        toast.success("Sent for approval. The order stays as it is until management approves.");
+        toast.success("Submitted");
         if (changeAgreement && !r.agreementRecorded) toast.error("The customer agreement was not recorded. Record it on the request.");
       }
       setDraft(baseline);
@@ -1985,7 +2005,7 @@ function SalesOrderWorkspaceBody() {
       void detailQ.refetch();
       void amendmentQ.refetch();
       /* A correction mints a version; that version keeps the sheet it issued. */
-      if (r.action === "saved") void keepIssuedDocument(r.revision);
+      if (r.action === "saved" || r.action === "applied") void keepIssuedDocument(r.revision);
     },
     onError: (e) => toast.error(e.message),
   });
@@ -2007,7 +2027,7 @@ function SalesOrderWorkspaceBody() {
   };
   const decideMut = useDecideSalesOrderAmendment(orderId ?? "", {
     onSuccess: (r) => {
-      toast.success(r.status === "applied" ? `Approved and applied (${r.revision})` : "Rejected. The order is unchanged.");
+      toast.success(r.status === "applied" ? `Saved (${r.revision})` : r.status === "rejected" ? "Rejected. The order is unchanged." : "Approved");
       void revisionsQ.refetch();
       void baseQ.refetch();
       void detailQ.refetch();
@@ -2018,7 +2038,10 @@ function SalesOrderWorkspaceBody() {
     onError: (e) => toast.error(e.message),
   });
   const agreementMut = useRecordAmendmentAgreement(orderId ?? "", {
-    onSuccess: () => toast.success("Customer agreement recorded"),
+    onSuccess: (r) => {
+      toast.success("Customer agreement recorded");
+      if (r.status === "applied" && r.revision) void keepIssuedDocument(r.revision);
+    },
     onError: (e) => toast.error(e.message),
   });
 
@@ -2823,20 +2846,17 @@ function SalesOrderWorkspaceBody() {
         </div>
       )}
 
-      {/* 0562 · the supplier-commitment notice (owner ruling 2026-09-21), in both states. */}
-      {mode === "object" && (detailQ.data?.pos ?? []).length > 0 && (
-        <p className="rounded-card border border-kit-slate-5 bg-white px-4 py-3 text-body text-kit-slate-12" data-testid="supplier-commitment-notice">
-          This SO is already ordered from the supplier. Your change goes for approval first; the order changes only after it is approved.
-        </p>
-      )}
       {mode === "object" && !editing && liveAmendment && requestView && (
         <WaitingRequest
+          orderId={orderId ?? ""}
           amendment={liveAmendment}
           rows={requestView.rows}
           consequences={requestView.consequences}
           canDecide={role === "principal"}
+          onApplied={(revision) => void keepIssuedDocument(revision)}
           busy={decideMut.isPending || agreementMut.isPending}
           onRecordAgreement={(a) => agreementMut.mutate({ amendmentId: liveAmendment.id, ...a })}
+          lineLabel={(id) => nameOfSku(baseline.lines.find((line) => line.id === id)?.sku ?? "")}
           onDecide={(decision, note) => decideMut.mutate({ amendmentId: liveAmendment.id, decision, note })}
           onProposeAgain={() => startEdit(withProposal(baseline, proposalOf(liveAmendment)), liveAmendment.id)}
         />
@@ -3772,14 +3792,15 @@ function SalesOrderWorkspaceBody() {
           footer={<>
             <Button variant="neutral" disabled={changesMut.isPending} onClick={() => setReviewOpen(false)}>Cancel</Button>
             <Button variant="primary" loading={changesMut.isPending}
-              disabled={!changeReason.trim() || liveBlocksCommercial || changeCount === 0}
+              disabled={!changeReason.trim() || liveBlocksCommercial || changeCount === 0 || (changeClass?.action === "submit" && (!routingQ.data || routingQ.isFetching || routingProposal !== debouncedRouting))}
               onClick={onCommit} data-testid="workspace-confirm-save">{commitWord}</Button>
           </>}>
         <DraftReview
           rows={draftRows}
+          routing={routingQ.data}
           consequences={consequencesFor({ lines: draft.lines, addons: draft.addons, header: draftHeader() })}
           commercial={changeClass?.action === "submit"}
-          blocked={liveBlocksCommercial ? "An earlier change is still waiting for management." : null}
+          blocked={liveBlocksCommercial ? "An earlier change is still pending." : routingQ.error?.message ?? null}
           reason={changeReason}
           onReason={setChangeReason}
           askedOn={changeAskedOn}
@@ -4007,7 +4028,7 @@ function SalesOrderWorkspaceBody() {
                     className="mx-auto mb-3 max-w-[700px] rounded-control border border-kit-slate-5 bg-kit-amber-3 px-3 py-2 text-body font-medium text-kit-amber-11"
                     data-testid="pending-amendment-banner"
                   >
-                    ⚠ Amendment pending approval{pendingDeliveryDate ? `: delivery date → ${fmtDate(pendingDeliveryDate)}` : ""}. The document shows the order as it is now.
+                    ⚠ Amendment request pending{pendingDeliveryDate ? `: delivery date → ${fmtDate(pendingDeliveryDate)}` : ""}. The document shows the order as it is now.
                   </div>
                 )}
                 <div className="relative mx-auto max-w-[700px]">

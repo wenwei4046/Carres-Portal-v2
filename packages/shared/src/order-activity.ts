@@ -36,6 +36,9 @@ export type OrderEventType =
   // edits (previously silent)
   | "order.date_changed"
   | "order.field_changed"
+  | "amendment.submitted"
+  | "amendment.applied"
+  | "amendment.rejected"
   // money
   | "payment.received"
   | "payment.voided"
@@ -96,6 +99,9 @@ export const ORDER_EVENT_TYPES: Record<OrderEventType, OrderEventTypeMeta> = {
 
   "order.date_changed": M("edit", "Delivery date changed"),
   "order.field_changed": M("edit", "Order details changed"),
+  "amendment.submitted": M("edit", "Amendment request · Submitted"),
+  "amendment.applied": M("edit", "Amendment request · Saved"),
+  "amendment.rejected": M("edit", "Amendment request · Rejected"),
 
   "payment.received": M("money", "Payment received", { customerVisible: true }),
   "payment.voided": M("money", "Payment voided"),

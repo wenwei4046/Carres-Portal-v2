@@ -1,6 +1,6 @@
 # PURCHASING — MASTER
 
-**SO amendment supplier confirmation — OWNER-APPROVED 2026-10-01 / TARGET NOT BUILT.**
+**SO amendment supplier confirmation — OWNER-APPROVED 2026-10-01 / IMPLEMENTATION FOR REVIEW.**
 An issued PO covering the changed SO line requires PO Duty to record the supplier answer that
 the change can be made before the amendment takes effect. No reply or an unknown supplier date
 means waiting, never default application. This replaces a purely after-effectiveness supplier
@@ -8,6 +8,11 @@ follow-up for those changes; it is not blanket commercial approval for PO Duty. 
 is never automatically rewritten: Purchasing settles its own change with the supplier. Ordinary
 SO changes without issued-PO coverage do not acquire this supplier gate. See Orders MASTER
 § Staff amendments and Sales Approver for evidence, exception approval and undecided scopes.
+
+0630 records feasibility against the SO amendment’s exact terms and covered PO/source lines, through
+the SO object and PO Duty’s shared Work destination. Confirmed, waiting and refused answers retain
+reference, date, recorder and time; an unknown date continues waiting. This does not rewrite an issued
+PO or replace its governed supplier reply/document history. No production change is authorised.
 
 **All listing appearance — BUILT 2026-09-17 (SLICE 1) · authenticated walk OWED (approved Jess, 2026-09-17):** follow
 [UI MASTER §6.7 Portal-wide listing readability](../ui/MASTER.md#portal-wide-listing-readability--built-2026-09-17-slice-1--authenticated-walk-owed).

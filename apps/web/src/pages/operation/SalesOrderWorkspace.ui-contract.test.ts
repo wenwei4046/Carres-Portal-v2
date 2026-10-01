@@ -186,7 +186,7 @@ describe("Sales Order object template contract", () => {
 
   it("keeps a pending amendment out of the document body and on a banner", () => {
     expect(workspace).toContain('data-testid="pending-amendment-banner"');
-    expect(workspace).toContain("⚠ Amendment pending approval");
+    expect(workspace).toContain("⚠ Amendment request pending");
     /* The banner names the promised date when the proposal moves it, and says
        plainly that the document still shows the order as it is now. */
     expect(workspace).toContain("The document shows the order as it is now.");
@@ -366,7 +366,7 @@ describe("Sales Order object template contract", () => {
     expect(workspace).not.toContain('label="Delivery date to be confirmed"');
     expect(workspace).toContain('delivery_date_tbd: "Delivery date to be confirmed"');
     expect(workspace).toContain("<WaitingRequest");
-    expect(panels).toContain("Waiting for management");
+    expect(panels).toContain("Amendment request");
     expect(panels).toContain("Out of date. Propose again");
   });
 
@@ -698,7 +698,7 @@ describe("Sales Order object template contract", () => {
     /* No tick box, ever: every kind names a pointer outside the record. */
     expect(agreement).not.toMatch(/type=["']checkbox["']/);
     expect(panels).toContain("customer_agreement_covers_proposal");
-    expect(panels).toContain("disabled={!decision.trim() || !recorded || !covered || props.busy}");
+    expect(panels).toContain("!recorded || !covered");
     expect(workspace).toContain("useRecordAmendmentAgreement");
   });
 
@@ -738,7 +738,7 @@ describe("Sales Order object template contract", () => {
        shown as itself, never redrawn from the snapshot beside it. */
     expect(workspace).toContain('if (mode === "oldrev" && storedDocumentUrl) return null;');
     /* Both minting doors keep the sheet: a correction and an approved change. */
-    expect(workspace).toContain('if (r.action === "saved") void keepIssuedDocument(r.revision);');
+    expect(workspace).toContain('if (r.action === "saved" || r.action === "applied") void keepIssuedDocument(r.revision);');
     expect(workspace).toContain('if (r.status === "applied") void keepIssuedDocument(Number(r.revision));');
     /* ⭐ AND PRINTING IS THE OTHER HALF OF "READ" — the gap this was missing.
        The pane showing the stored file proved nothing about the button the

@@ -18,6 +18,8 @@ export const WORKSPACE_DUTIES = [
   // 0533 (owner ruling 2026-09-18): held and covered by an active Principal
   // PERSON only — Operation staff can never hold or cover it.
   { key: "purchasing_approver", label: "Purchasing Approver", roles: ["principal"] },
+  // Scoped commercial exceptions only; no live holder is bootstrapped.
+  { key: "sales_approver", label: "Sales Approver", roles: ["principal"] },
   { key: "delivery_charge_approver", label: "Delivery Charge Approver" },
   { key: "payment_approver", label: "Payment Approver" },
   // 0508: releases money on the Finance side (payment vouchers, cancelling a

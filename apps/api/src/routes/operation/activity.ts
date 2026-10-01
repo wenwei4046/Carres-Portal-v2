@@ -33,14 +33,16 @@ function order1(o: unknown): OrderEmbed {
 activityRouter.get("/", requireOperationOrPrincipal, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
   const PER = 150;
+  const addressed = c.req.query("addressed") === "me";
+  let activity = sb.from("ops_activity_log")
+    .select("id, order_id, action, detail, actor_id, occurred_at, orders(so, customer_name)");
+  if (addressed) activity = activity.eq("detail->>recipient_id", c.var.auth.id);
 
   const [actRes, annRes] = await Promise.all([
-    sb
-      .from("ops_activity_log")
-      .select("id, order_id, action, detail, actor_id, occurred_at, orders(so, customer_name)")
+    activity
       .order("occurred_at", { ascending: false })
       .limit(PER),
-    sb
+    addressed ? Promise.resolve({ data: [], error: null }) : sb
       .from("order_annotations")
       .select("id, order_id, content, tag, created_by, created_at, orders(so, customer_name)")
       .order("created_at", { ascending: false })

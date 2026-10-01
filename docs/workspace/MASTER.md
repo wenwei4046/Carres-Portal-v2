@@ -302,14 +302,21 @@ may not assign), so 0533 assigned Jess once from 2026-09-18 with `assigned_by` N
 runs only when the Duty has no assignment history; it created no cover. Until a second Principal
 person exists, Jess has no eligible cover: her approvals wait while she is away.
 
-**Sales Approver — OWNER-APPROVED 2026-10-01 / TARGET NOT BUILT.** Orders MASTER
+**Sales Approver — OWNER-APPROVED 2026-10-01 / IMPLEMENTATION FOR REVIEW.** Orders MASTER
 § “Staff amendments and Sales Approver” replaces the earlier all-amendments approval ruling and
 withdrawn matrix. Ordinary SO amendments need no owner approval. Sales Approver is required before
 price decreases, customer refunds and whole-SO cancellation after Proceed take effect. Holder and
 any cover must be active Principal people, assigned only through Settings → Staff & Duties and
 resolved through the shared mechanism; no hard-coded person, local roster or expanded role rights.
-A required approval cannot pass when its eligible assignment is unresolved. The catalogue and
-live assignments are unchanged by this PLAN. This Duty is NOT BUILT.
+A required approval cannot pass when its eligible assignment is unresolved. The catalogue and Principal qualification are implemented for review in 0629; holder/cover assignment
+uses the existing doors. No bootstrap or live assignment is included.
+
+The shared Work registry admits `orders.amendment_supplier` and `orders.amendment_sales` from the
+amendment's own gates. They resolve PO Duty / Sales Approver respectively and deep-link to the same
+SO object; no separate task store or deadline is invented. Confirmation/decision writers use the shared
+completion recorder. Withdrawal does not masquerade as completed supplier work. The PIC's notification
+uses addressed shared Activity events with the actual colleague and pending/effective/rejected outcome.
+This is review-branch implementation, not production delivery.
 
 For an ordinary amendment whose changed line is covered by an issued PO, PO Duty records the
 supplier's confirmation that the change can be made before it takes effect. No supplier answer or
@@ -332,9 +339,16 @@ Requested Delivery Date routing is settled in Orders/Delivery MASTER: evidenced 
 earlier-date amendments require ready stock, otherwise refuse; evidenced later-date amendments
 apply; neither date change needs PO Duty or supplier confirmation. Carres-initiated early
 arrangements leave the SO date unchanged. This adds no new staff or approval assignment.
-Fee/service approval,
-0329 attribution changes/consolidation and Sales Approver self-approval remain undecided. Do not
-copy Purchasing Approver's own-request rule or bootstrap into this Duty as an assumed decision.
+System-priced delivery-charge changes have no manual approval lane: staff cannot override the
+computed price (Orders MASTER, owner-confirmed 2026-10-01 / TARGET NOT BUILT). Do not assign a
+new SO charge-waiver task to Delivery Charge Approver; that Duty remains for its other governed
+uses. Customer refunds still route to Sales Approver. Non-delivery service exceptions, 0329
+attribution changes/consolidation remain undecided. **Sales Approver self-approval — owner-approved
+2026-10-01 / IMPLEMENTATION FOR REVIEW:** the currently resolved eligible Principal holder or dated cover
+may decide their own SO exception request, retaining reason, customer evidence, actual submitter,
+approver and times. This does not allow another Principal to bypass duty resolution or change
+Finance/refund execution controls or other Duties' own-request rules. Do not copy Purchasing
+Approver's own-request prohibition or bootstrap into this Duty as an assumed decision.
 The existing PIC-first ordinary Delivery ownership remains unchanged.
 
 **`Finance Approver` (`finance_approver`) takes Finance users only.** Its holder and cover pickers

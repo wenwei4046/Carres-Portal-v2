@@ -4,11 +4,11 @@
  * agreement evidence):
  *
  *   DraftReview      while editing — Before/After, what it starts elsewhere
- *                    (`Before approval`), `Reason for change`, the customer's
+ *                    (`Before the change`), `Reason for change`, the customer's
  *                    request date and, for a commercial change, the customer
  *                    agreement evidence. The SERVER still decides Save vs
  *                    Submit on commit.
- *   WaitingRequest   a live request — `Waiting for management` or
+ *   WaitingRequest   a live request — `Amendment request` or
  *                    `Out of date — propose again`; its evidence; the
  *                    principal's `Approve and apply` / `Reject`. Nothing here
  *                    changes the effective order or its document until the
@@ -20,9 +20,14 @@
 import { useState } from "react";
 import Button from "@/components/kit/Button";
 import DatePicker from "@/components/kit/DatePicker";
+import Input from "@/components/kit/Input";
+import Select from "@/components/kit/Select";
+import { useAuth } from "@/lib/auth";
+import { useRecordAmendmentSupplier } from "@/lib/queries";
+import { toast } from "sonner";
 import Textarea from "@/components/kit/Textarea";
 import { fmtDate } from "@/lib/fmt-date";
-import type { SalesOrderAmendment } from "@/lib/queries";
+import type { AmendmentGates, SalesOrderAmendment } from "@/lib/queries";
 import type { DiffRow } from "./sales-order-change";
 import { AgreementForm, AgreementOnRecord, type RecordedAgreement } from "./customer-agreement";
 
@@ -55,7 +60,7 @@ function Consequences({ items }: { items: string[] }) {
   if (items.length === 0) return null;
   return (
     <div className="mt-3">
-      <p className="text-meta text-kit-slate-11">Before approval</p>
+      <p className="text-meta text-kit-slate-11">Before the change</p>
       <ul className="mt-1 space-y-1 text-body text-kit-slate-12" data-testid="change-consequences">
         {items.map((t) => (
           <li key={t}>{t}</li>
@@ -66,6 +71,7 @@ function Consequences({ items }: { items: string[] }) {
 }
 
 export function DraftReview(props: {
+  routing?: AmendmentGates;
   rows: DiffRow[];
   consequences: string[];
   commercial: boolean;
@@ -90,10 +96,14 @@ export function DraftReview(props: {
         {props.blocked
           ? props.blocked
           : props.commercial
-            ? "These changes go for approval. The order stays as it is until approved."
+            ? "Your changes"
             : "This correction saves as a new revision."}
       </p>
       <DiffTable rows={props.rows} label="Before and after" />
+      {props.routing && <div className="mt-3 text-body text-kit-slate-11">
+        {props.routing.supplier_scope.length > 0 && <p>PO Duty · {props.routing.po_duty.acting_user_name ?? "Not assigned"} · Record supplier answer</p>}
+        {props.routing.sales_approval_required && <p>Sales Approver · {props.routing.sales_approver.acting_user_name ?? "Not assigned"}</p>}
+      </div>}
       {props.commercial && <Consequences items={props.consequences} />}
       <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
         <DatePicker id="so-change-asked" label="Requested date (from customer)" value={props.askedOn} onChange={props.onAskedOn} />
@@ -105,8 +115,7 @@ export function DraftReview(props: {
           <div className="sm:col-span-3 border-t border-kit-blue-6 pt-3">
             <p className="text-label text-kit-slate-11">Customer agreement</p>
             <p className="mt-1 text-meta text-kit-slate-11">
-              You can send the request without it, but management cannot approve until it is
-              recorded.
+              Record how the customer agreed before this change takes effect.
             </p>
             <AgreementForm idPrefix="so-change-agreement" value={props.agreement} onChange={props.onAgreement} />
           </div>
@@ -117,6 +126,7 @@ export function DraftReview(props: {
 }
 
 export function WaitingRequest(props: {
+  orderId: string;
   amendment: SalesOrderAmendment;
   rows: DiffRow[];
   consequences: string[];
@@ -125,9 +135,16 @@ export function WaitingRequest(props: {
   onRecordAgreement: (a: RecordedAgreement) => void;
   onDecide: (decision: "approve" | "reject", note: string) => void;
   onProposeAgain: () => void;
+  onApplied?: (revision: number) => void;
+  lineLabel?: (id: string) => string;
 }) {
   const a = props.amendment;
   const [decision, setDecision] = useState("");
+  const userId = useAuth((state) => state.user?.id);
+  const g = a.gates;
+  const needsSalesReview = Boolean(g?.sales_approval_required && !g.sales_approval_recorded);
+  const canDecide = g ? props.canDecide && (needsSalesReview
+    ? g.sales_approver.actor_user_id === userId : g.legacy_review_required) : props.canDecide;
   /* Both facts come from the SERVER on every read. The screen never decides
      for itself that a change is agreed, and the database refuses regardless. */
   const recorded = Boolean(a.customer_agreement_kind);
@@ -140,7 +157,7 @@ export function WaitingRequest(props: {
     >
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-strong text-kit-slate-12">
-          {a.stale ? "Out of date. Propose again" : "Waiting for management"}
+          {a.stale ? "Out of date. Propose again" : "Amendment request"}
         </h2>
         <span className="text-meta text-kit-slate-11">
           Submitted {fmtDate(a.submitted_at)} · on Rev {a.base_revision}
@@ -179,7 +196,15 @@ export function WaitingRequest(props: {
               />
             )}
           </div>
-          {props.canDecide && (
+          {g && g.supplier_scope.length > 0 && <div className="mt-3 border-t border-kit-slate-5 pt-3">
+            <p className="text-label text-kit-slate-11">PO Duty · {g.po_duty.acting_user_name ?? "Not assigned"} · Record supplier answer</p>
+            {g.supplier_scope.map((scope) => <SupplierConfirmation key={`${scope.po_line_id}:${scope.order_line_id}`}
+              orderId={props.orderId} amendmentId={a.id} scope={scope} label={props.lineLabel?.(scope.order_line_id)}
+              recorded={g.supplier_confirmations?.filter((r) => r.po_line_id === scope.po_line_id && r.order_line_id === scope.order_line_id).at(-1)}
+              canRecord={g.po_duty.actor_user_id === userId} onApplied={props.onApplied} />)}
+          </div>}
+          {g?.sales_approval_required && <p className="mt-3 text-body">Sales Approver · {g.sales_approval_recorded ? (g.sales_approval?.name ?? "Not recorded") : (g.sales_approver.acting_user_name ?? "Not assigned")}{g.sales_approval_recorded ? ` · Approved · ${g.sales_approval?.at ? fmtDate(g.sales_approval.at) : "Not recorded"}` : ""}</p>}
+          {canDecide && (
             <div className="mt-3 flex flex-col gap-3 border-t border-kit-amber-6 pt-3">
               <Textarea id="so-decision" label="Management decision reason" rows={2} value={decision}
                 onChange={(e) => setDecision(e.target.value)} />
@@ -188,9 +213,9 @@ export function WaitingRequest(props: {
                   onClick={() => props.onDecide("reject", decision.trim())} data-testid="decide-reject">
                   Reject
                 </Button>
-                <Button variant="primary" disabled={!decision.trim() || !recorded || !covered || props.busy}
+                <Button variant="primary" disabled={!decision.trim() || props.busy || (!needsSalesReview && (!recorded || !covered || Boolean(g?.supplier_waiting.length)))}
                   onClick={() => props.onDecide("approve", decision.trim())} data-testid="decide-approve">
-                  Approve and apply
+                  {needsSalesReview ? "Approve" : "Approve and apply"}
                 </Button>
               </div>
             </div>
@@ -199,4 +224,36 @@ export function WaitingRequest(props: {
       )}
     </section>
   );
+}
+
+function SupplierConfirmation(props: {
+  orderId: string; amendmentId: string;
+  scope: { po_id: string; po_line_id: string; order_line_id: string };
+  recorded?: NonNullable<AmendmentGates["supplier_confirmations"]>[number];
+  label?: string; canRecord: boolean; onApplied?: (revision: number) => void;
+}) {
+  const [answer, setAnswer] = useState<"confirmed" | "waiting" | "refused" | undefined>();
+  const [date, setDate] = useState<string | null>(null);
+  const [reference, setReference] = useState("");
+  const mutation = useRecordAmendmentSupplier(props.orderId, {
+    onSuccess: (r) => { toast.success("Supplier answer recorded"); if(r.status === "applied" && r.revision) props.onApplied?.(r.revision); },
+    onError: (e) => toast.error(e.message),
+  });
+  return <div className="mt-2 grid gap-3 sm:grid-cols-2">
+    <p className="text-body sm:col-span-2">{props.scope.po_id} · {props.label}</p>
+    {props.recorded && <p className="text-meta text-kit-slate-11 sm:col-span-2">
+      {({ confirmed: "Confirmed", waiting: "Waiting", refused: "Refused" })[props.recorded.answer]} · {props.recorded.supplier_date ? fmtDate(props.recorded.supplier_date) : "Not recorded"} · {props.recorded.reference} · {props.recorded.by_name ?? "Not recorded"} · {fmtDate(props.recorded.at)}
+    </p>}
+    {props.canRecord && <>
+      <Select id={`supplier-answer-${props.scope.po_line_id}-${props.scope.order_line_id}`} label="Supplier answer" value={answer} onValueChange={(value) => setAnswer(value as typeof answer)}
+        options={[{ value: "confirmed", label: "Confirmed" }, { value: "waiting", label: "Waiting" }, { value: "refused", label: "Refused" }]} />
+      <DatePicker id={`supplier-date-${props.scope.po_line_id}-${props.scope.order_line_id}`} label="Supplier Confirmed Delivery Date" value={date} onChange={setDate} />
+      <Input id={`supplier-evidence-${props.scope.po_line_id}-${props.scope.order_line_id}`} label="Evidence" value={reference} onChange={(e) => setReference(e.target.value)} />
+      <Button variant="neutral" disabled={!answer || !reference.trim() || mutation.isPending}
+        onClick={() => mutation.mutate({ amendmentId:props.amendmentId,poId:props.scope.po_id,
+          poLineId:props.scope.po_line_id,orderLineId:props.scope.order_line_id,answer:answer!,supplierDate:date,reference:reference.trim() })}>
+        Record supplier answer
+      </Button>
+    </>}
+  </div>;
 }

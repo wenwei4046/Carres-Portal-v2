@@ -2627,7 +2627,7 @@ planned `proceed_date`.
 
 ### Amend delivery date · money · ownership · actions
 
-#### Amendment review ownership — OWNER-APPROVED 2026-10-01 / TARGET NOT BUILT
+#### Amendment review ownership — OWNER-APPROVED 2026-10-01 / SCOPED IMPLEMENTATION FOR REVIEW
 
 **Submit once; the system routes the reviews; linked changes take effect together.** This
 replaces the assumption that one request necessarily means one approver, not the single
@@ -2638,8 +2638,8 @@ whole-page submission or the rule against silently saving part of a draft.
   Staff & Duties mechanism. Never hard-code a name, let the requester arbitrarily choose the
   approver, or treat a department label as a person's identity. Where approval is required under
   the later staff-amendment ruling, its role qualification remains required. Submission follows
-  the any-Operation ruling below; self-approval remains undecided. An assignment alone grants
-  no additional approval permission.
+  the any-Operation ruling below; Sales Approver self-approval follows its scoped ruling below.
+  An assignment alone grants no additional approval permission.
 - Product amendments follow the later **Staff amendments and Sales Approver** ruling below:
   ordinary changes do not require owner approval; issued-PO coverage requires supplier confirmation.
   Requested Delivery Date changes follow the approved date ruling below, with no PO Duty or
@@ -2666,12 +2666,11 @@ price lane and special handling that keeps related date removals together. It is
 not proof of runtime acceptance or a Carres authority. The unconditional split-and-apply model
 and Logistics self-approval of Carres customer promises are not adopted.
 
-**Delivery boundary:** this is an approved business-model delta only. No application code,
-production operation, Card, complete field-to-Duty matrix, or production-verification claim is
-created by this entry. Existing implementation still classifies mixed drafts as a whole;
-scoped multi-review routing remains target work, not a shipped capability.
+**Delivery boundary:** scoped ordinary-goods, supplier-feasibility and price reviews are implemented
+for review under Sales Orders Card 14. The complete field-to-Duty matrix remains undecided; no
+production operation or production-verification claim is made.
 
-#### Staff amendments and Sales Approver — OWNER-APPROVED 2026-10-01 / TARGET NOT BUILT
+#### Staff amendments and Sales Approver — OWNER-APPROVED 2026-10-01 / IMPLEMENTATION FOR REVIEW
 
 **This ruling REPLACES both earlier pastes:** the approval matrix and the “Sales Approver
 approves every amendment” ruling. Neither remains a ruling or proposal of record. There is one
@@ -2679,9 +2678,8 @@ Duty, **Sales Approver**; the earlier name SO Approver is retired.
 
 **OWNER-REPORTED OPERATING REALITY (Jess, 2026-10-01):** staff decide and make ordinary order
 changes themselves; Jess does not approve those changes. This is the owner's account of actual
-operations, not a newly observed production-system test. The built Principal-only gate in
-`0564_the_amendment_carries_the_whole_change_and_the_customers_agreement.sql` does not match
-that operating model. The code remains unchanged; the following is the approved target.
+operations, not a newly observed production-system test. The scoped implementation reuses the 0564 evidence/revision writer and applies the following
+approved gates; production verification remains outstanding.
 
 1. **Ordinary SO amendments do not need owner approval.** Staff submit once: one amendment
    request and one final decision/outcome. Preserve the existing 0564 customer-agreement evidence
@@ -2707,7 +2705,7 @@ that operating model. The code remains unchanged; the following is the approved 
    `roles: ["principal"]`. Holder and any cover must be active Principal people, assigned only
    through **Settings → Staff & Duties**. Resolve people through the shared mechanism, never a
    hard-coded name or a module roster. An unresolved required approval cannot silently pass.
-   This PLAN adds the word to COPY-STANDARD but does not modify catalogue code or live assignments.
+   The catalogue and qualification are implemented for review in 0629. No live assignment or bootstrap is included.
 5. Keep who submitted, Before/After, reason, customer evidence, who confirmed and when. Linked
    changes take effect together only when all applicable confirmations/approvals and evidence
    gates are satisfied, never as independently effective department fragments. Delivery
@@ -2717,15 +2715,48 @@ that operating model. The code remains unchanged; the following is the approved 
 its audit record identifies who changed what. Supplier confirmation remains necessary where an
 issued PO covers the affected line. Submission eligibility is now settled by the scoped ruling below.
 
-**NOT DECIDED — each requires its own owner decision:** delivery fee/service changes and the
-existing Delivery Charge Approver's scope;
-salesperson/dealer/sales-location changes and whether the 0329 lane folds into the amendment;
-Sales Approver self-approval. Ordinary-address amendment restrictions after Proceed were not
+**NOT DECIDED — each requires its own owner decision:** service-price exceptions beyond the
+system-priced delivery-charge scope settled below;
+salesperson/dealer/sales-location changes and whether the 0329 lane folds into the amendment.
+Ordinary-address amendment restrictions after Proceed were not
 resolved by this ruling either; do not infer them from the floor/lift/stairs rule.
 
-**Requested Delivery Date changes — OWNER-APPROVED 2026-10-01 / TARGET NOT BUILT.**
-This resolves the formerly open date-change decision. Preserve the earlier readiness and
-storage-witness clarification; this is not a claim of implementation or production verification.
+**Sales Approver self-approval — OWNER-APPROVED 2026-10-01 / IMPLEMENTATION FOR REVIEW.**
+The person currently resolved as Sales Approver through Staff & Duties (eligible holder or dated
+Principal cover) may decide their own submitted SO exception request. This is a specific SO
+approval rule, not permission for every Principal to bypass the resolved Duty or for Operation
+to approve commercial exceptions. Retain the decision reason, required customer evidence,
+actual submitter, actual approver and their timestamps; show the real same-person record rather
+than inventing a second reviewer. Required supplier confirmation and linked-effectiveness gates
+remain. The owner accepts the absence of a second-person review for this SO decision.
+
+Actual refund/payment execution retains its existing owning-module controls; this decision does
+not override Finance controls, Purchasing Approver's own-request prohibition, or other Duties'
+self-approval rules. No live approval, assignment, code or production verification is performed
+by this PLAN entry.
+
+**System-priced delivery charges — OWNER-CONFIRMED 2026-10-01 / TARGET NOT BUILT.**
+Operation does not decide the delivery price or collect the customer's money personally; the
+customer pays the company through the existing governed money workflow. At order entry the
+system calculates the delivery charge. During an amendment, changed address or added delivery
+services are inputs to the same governed pricing rules: the system recalculates, not the employee.
+Staff cannot manually set, discount or waive this charge. Accordingly there is no separate manual
+delivery-charge approval step on this SO amendment path. Do not build the withdrawn proposal's
+Delivery Charge Approver discount/waiver lane here. The existing Duty is not deleted or repurposed
+for unrelated governed actions.
+
+Preserve customer-agreement evidence, Before/After, reason, actual actor and PIC notification.
+A correct system recalculation, including a lower calculated delivery charge, is not a discretionary
+product-price reduction. The Sales Approver gate for a customer refund remains, and refund execution
+stays with its owning money workflow; lower recalculation never automatically pays money out.
+Product-price reductions and the other previously approved exception gates remain unchanged.
+This does not authorise editing price rules through the SO, removing ordinary goods/PO checks, or
+setting arbitrary non-delivery service prices. No new live payment, application change or Duty
+assignment is made by this PLAN. Current code is not certified to enforce this target.
+
+**Requested Delivery Date changes — OWNER-APPROVED 2026-10-01 / IMPLEMENTATION FOR REVIEW.**
+Preserve the readiness and storage-witness clarification. Scoped implementation is under review;
+this is not a production-verification claim.
 
 1. **Customer asks for an earlier date:** the order's required goods must already be in the
    warehouse and genuinely ready under the existing readiness definition, not merely located
@@ -2752,9 +2783,9 @@ storage-witness clarification; this is not a claim of implementation or producti
 
 Use the existing single SO amendment and evidence path, actual submitter/Before/After/reason/time
 records and PIC notification target. Delivery arrangements never overwrite the SO promise.
-No storage rates, waiver rights, live charges, code or implementation Cards change in this PLAN.
+No storage rates, waiver rights or live charges change in this implementation.
 
-**Who may submit — OWNER-APPROVED A, 2026-10-01 / TARGET NOT BUILT (PIC notification).**
+**Who may submit — OWNER-APPROVED A, 2026-10-01 / IMPLEMENTATION FOR REVIEW.**
 Any Operation staff member with the existing order access may submit an SO amendment; submission
 is not restricted to that order's PIC. Principal submission remains permitted. Salespeople and
 Dealers remain unable to submit through this Operations amendment door and ask Operation to make
@@ -2771,14 +2802,35 @@ approval and linked-effectiveness rules still apply.
 This preserves coverage when the PIC is away or busy. Repeated incidents where PICs are unaware
 are grounds to review notification delivery and this policy with the owner, not permission to
 automatically switch to PIC-only submission. Existing broad submission capability does not prove
-that automatic PIC notification is built or verified. No code, live notification or permission
-change is performed by this PLAN entry.
+that automatic PIC notification is built or verified. PIC-addressed immutable activity and the shared Activity notification reader are implemented for review;
+no live notification was sent during verification.
 
-This is a scoped PLAN ruling, not approval of the whole module blueprint, implementation Cards,
-BUILD, a migration or production changes. Workspace owns assignment/cover; Orders owns amendment
+The separate scoped BUILD commission implements these rulings for review; it does not approve
+the whole module Blueprint or any production change. Workspace owns assignment/cover; Orders owns amendment
 policy. Current implementation notes elsewhere describe the built 0564 behaviour, not a competing
 approved target. Neither the earlier all-Principal target nor the withdrawn matrix may be used
 as implementation authority.
+
+**Scoped implementation boundary — 2026-10-01, review branch only.** Migrations 0629–0630 add the
+qualified Duty and the amendment gates without changing RLS, live assignments or owning PO/money
+writers. Submit + evidence + eligible ordinary application are one transaction; supplier and price
+reviews may arrive in either order, with one effective revision. Pre-submit routing and shared Work
+read that same policy. Supplier answers retain the exact covered line, terms, answer, date, reference,
+actual recorder and time. Ambiguous legacy SKU-only PO lineage is refused until its existing source
+association is known. PIC-addressed activity keeps the colleague as actor and never transfers the PIC.
+
+Earlier-date readiness reads exact reserved Units, warehouse holder, physical receipt and existing
+Stock sellability; unallocated, showroom, held, repair or damaged goods do not establish readiness.
+Delivery's early arrangement also checks the existing release/money gate and requires WhatsApp evidence;
+it does not write the SO date or storage trigger. The partner portal may retain an evidenced early
+arrangement but cannot originate one without the existing customer-evidence door.
+
+**Still blocked / unchanged:** the existing post-Proceed
+whole-order cancellation refusal remains because its complete cross-module consequences are not yet
+approved. Refund approval is gated through Sales Approver on the existing refund writer; payout is not
+performed or broadened. Fee/service, attribution and ordinary-address policy have not been expanded.
+Verification and review evidence: [Sales Orders Card 14](../cards/CARD-2026-10-01-sales-orders-14-staff-amendments.md).
+Neither main merge nor deployment is authorised. The module PLAN is not declared complete.
 
 - **Delivery-date changes belong to the whole-page draft**, not a competing date-only form.
   Preserve customer-request date, reason, Before/After, actor/time and historical document truth.

@@ -102,14 +102,14 @@ describe("POST /api/operation/orders/:id/changes — the server chooses the comm
   });
 
   it("a quantity change SUBMITS an amendment with the full line set; the stored configuration rides along", async () => {
-    const rpc = mockDb((name) => ({ data: name === "sales_order_submit_amendment" ? { id: AMEND, base_revision: 1 } : {}, error: null }));
+    const rpc = mockDb((name) => ({ data: name === "sales_order_submit_staff_amendment" ? { id: AMEND, base_revision: 1, status: "submitted", agreement_recorded: false } : {}, error: null }));
     const l = lines();
     l[1]!.qty = 1;
     const res = await post({ header: header(), lines: l, addons: addons(), reason: "Customer keeps one pillow" });
     expect(res.status).toBe(201);
     const out = await bodyOf(res);
     expect(out).toMatchObject({ action: "submitted", amendmentId: AMEND, agreementRecorded: false });
-    const call = rpc.mock.calls.find(([n]) => n === "sales_order_submit_amendment")!;
+    const call = rpc.mock.calls.find(([n]) => n === "sales_order_submit_staff_amendment")!;
     const proposed = (call[1] as { p_proposed: Record<string, unknown> }).p_proposed;
     expect(proposed.lines).toEqual([
       { id: L1, sku: "TRION-Q", qty: 1, unit_price: 2749, attrs: { gap: "KIV", specials: [{ code: "Front Drawer" }] } },
@@ -120,27 +120,28 @@ describe("POST /api/operation/orders/:id/changes — the server chooses the comm
   });
 
   it("a mixed change goes to review WHOLE — the phone rides in the proposal with its base, nothing is saved", async () => {
-    const rpc = mockDb((name) => ({ data: name === "sales_order_submit_amendment" ? { id: AMEND, base_revision: 1 } : {}, error: null }));
+    const rpc = mockDb((name) => ({ data: name === "sales_order_submit_staff_amendment" ? { id: AMEND, base_revision: 1, status: "submitted", agreement_recorded: false } : {}, error: null }));
     const res = await post({
       header: header({ customer_phone: "0199999999", proceed_date: "2026-09-20" }), lines: lines(), addons: [], reason: "Customer call",
       agreement: { kind: "customer_confirmation", reference: "WhatsApp 22 Sep 09:40" },
     });
     expect(res.status).toBe(201);
-    expect((await bodyOf(res)).agreementRecorded).toBe(true);
-    const proposed = (rpc.mock.calls.find(([n]) => n === "sales_order_submit_amendment")![1] as { p_proposed: Record<string, unknown> }).p_proposed;
+    expect((await bodyOf(res)).action).toBe("submitted");
+    const proposed = (rpc.mock.calls.find(([n]) => n === "sales_order_submit_staff_amendment")![1] as { p_proposed: Record<string, unknown> }).p_proposed;
     expect(proposed.header).toEqual({ customer_phone: "0199999999", proceed_date: "2026-09-20" });
     expect(proposed.base_header).toEqual({ customer_phone: "0100000000", proceed_date: "2026-09-17" });
     expect(proposed.addons).toEqual([]);
-    expect(rpc).toHaveBeenCalledWith("sales_order_record_amendment_agreement", {
-      p_amendment_id: AMEND, p_kind: "customer_confirmation", p_reference: "WhatsApp 22 Sep 09:40", p_detail: null,
-    });
+    expect(rpc).toHaveBeenCalledWith("sales_order_submit_staff_amendment", expect.objectContaining({
+      p_agreement: { kind: "customer_confirmation", reference: "WhatsApp 22 Sep 09:40" },
+    }));
+    expect(rpc).not.toHaveBeenCalledWith("sales_order_record_amendment_agreement", expect.anything());
     expect(rpc).not.toHaveBeenCalledWith("sales_order_save_revision", expect.anything());
   });
 
   it("the delivery promise travels at the top level the impact read and banner already use", async () => {
-    const rpc = mockDb((name) => ({ data: name === "sales_order_submit_amendment" ? { id: AMEND, base_revision: 1 } : {}, error: null }));
+    const rpc = mockDb((name) => ({ data: name === "sales_order_submit_staff_amendment" ? { id: AMEND, base_revision: 1, status: "submitted", agreement_recorded: false } : {}, error: null }));
     await post({ header: header({ delivery_date: "2026-11-02" }), lines: lines(), addons: addons(), reason: "Customer moved" });
-    const proposed = (rpc.mock.calls.find(([n]) => n === "sales_order_submit_amendment")![1] as { p_proposed: Record<string, unknown> }).p_proposed;
+    const proposed = (rpc.mock.calls.find(([n]) => n === "sales_order_submit_staff_amendment")![1] as { p_proposed: Record<string, unknown> }).p_proposed;
     expect(proposed).toEqual({ delivery_date: "2026-11-02" });
   });
 
@@ -153,18 +154,18 @@ describe("POST /api/operation/orders/:id/changes — the server chooses the comm
   it("proposing again over an OUT-OF-DATE request withdraws it first", async () => {
     const rpc = mockDb((name) => {
       if (name === "sales_order_amendment_live") return { data: { amendment: { id: AMEND, stale: true } }, error: null };
-      if (name === "sales_order_submit_amendment") return { data: { id: "ffffffff-9932-48c2-bdb2-02ff2f615be4", base_revision: 3 }, error: null };
+      if (name === "sales_order_submit_staff_amendment") return { data: { id: "ffffffff-9932-48c2-bdb2-02ff2f615be4", base_revision: 3 }, error: null };
       return { data: {}, error: null };
     });
     const l = lines();
     l[1]!.qty = 1;
     await post({ header: header(), lines: l, addons: addons(), reason: "again", replaceAmendmentId: AMEND });
     const names = rpc.mock.calls.map(([n]) => n);
-    expect(names.indexOf("sales_order_withdraw_amendment")).toBeLessThan(names.indexOf("sales_order_submit_amendment"));
+    expect(names.indexOf("sales_order_withdraw_amendment")).toBeLessThan(names.indexOf("sales_order_submit_staff_amendment"));
   });
 
   it("the database's refusal reaches the page as its own code", async () => {
-    mockDb((name) => (name === "sales_order_submit_amendment"
+    mockDb((name) => (name === "sales_order_submit_staff_amendment"
       ? { data: null, error: { code: "22023", details: "amendment_exists", message: "An amendment is already open on this sales order" } }
       : { data: {}, error: null }));
     const l = lines();

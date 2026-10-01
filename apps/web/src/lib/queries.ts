@@ -446,6 +446,8 @@ export const qk = {
   // typecheck at the call site rather than silently breaking cache reads.
   operation: {
     workspaceAssignmentHistory: (duty: string) => ["operation", "workspace-assignment-history", duty] as const,
+    amendmentRouting: (id: string, proposed: unknown) => ["operation", "orders", id, "amendment-routing", proposed] as const,
+    addressedActivity: (userId: string) => ["operation", "addressed-activity", userId] as const,
     workActivitySettings: () => ["operation", "work-activity-settings"] as const,
     work:      () => ["operation", "work"] as const,
     /** 0136 — AutoCount-imported orders still in Inbox triage (no logistic
@@ -6457,12 +6459,25 @@ export interface SalesOrderAmendment {
   /** The sender's real name, resolved by the API through the one actor
    *  resolver. Null when unresolved — a person is never invented. */
   submitted_by_name?: string | null;
+  gates?: AmendmentGates;
 }
 
 /** How the customer's acceptance is evidenced (0562). A signed document, a
  *  traceable reference to the customer's own confirmation, or — for a Staff
  *  correction where the agreement did not change — the revision whose signed
  *  agreement still covers it. */
+export interface AmendmentGates {
+  supplier_confirmations?: Array<{ po_id: string; po_line_id: string; order_line_id: string; answer: "confirmed" | "waiting" | "refused"; supplier_date: string | null; reference: string; by_name?: string | null; at: string }>;
+  sales_approval?: { by: string | null; name: string | null; at: string | null; note: string | null };
+  supplier_scope: Array<{ po_id: string; po_line_id: string; order_line_id: string }>;
+  supplier_waiting: Array<{ po_id: string; po_line_id: string; order_line_id: string }>;
+  sales_approval_required: boolean;
+  legacy_review_required: boolean;
+  sales_approval_recorded: boolean;
+  sales_approver: { actor_user_id?: string | null; acting_user_name?: string | null };
+  po_duty: { actor_user_id?: string | null; acting_user_name?: string | null };
+}
+
 export type CustomerAgreementKind =
   | "signed_document"
   | "customer_confirmation"
@@ -6546,7 +6561,7 @@ export function useDecideSalesOrderAmendment(
   orderId: string,
   opts?: Partial<
     UseMutationOptions<
-      { id: string; status: "applied" | "rejected"; revision?: number },
+      { id: string; status: "applied" | "rejected" | "submitted" | "issued" | "accepted"; revision?: number },
       ApiError,
       { amendmentId: string; decision: "approve" | "reject"; note: string }
     >
@@ -6555,7 +6570,7 @@ export function useDecideSalesOrderAmendment(
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ amendmentId, decision, note }) =>
-      apiFetch<{ id: string; status: "applied" | "rejected"; revision?: number }>(
+      apiFetch<{ id: string; status: "applied" | "rejected" | "submitted" | "issued" | "accepted"; revision?: number }>(
         `/api/operation/orders/amendment/${amendmentId}/decide`,
         { method: "POST", body: JSON.stringify({ decision, note }) },
       ),
@@ -6582,7 +6597,7 @@ export function useRecordAmendmentAgreement(
   orderId: string,
   opts?: Partial<
     UseMutationOptions<
-      { id: string; customer_agreement_kind: CustomerAgreementKind },
+      { id: string; customer_agreement_kind: CustomerAgreementKind; status?: string; revision?: number },
       ApiError,
       { amendmentId: string; kind: CustomerAgreementKind; reference: string; detail?: string }
     >
@@ -6591,13 +6606,13 @@ export function useRecordAmendmentAgreement(
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ amendmentId, kind, reference, detail }) =>
-      apiFetch<{ id: string; customer_agreement_kind: CustomerAgreementKind }>(
+      apiFetch<{ id: string; customer_agreement_kind: CustomerAgreementKind; status?: string; revision?: number }>(
         `/api/operation/orders/amendment/${amendmentId}/agreement`,
         { method: "POST", body: JSON.stringify({ kind, reference, detail }) },
       ),
     ...opts,
     onSuccess: async (...args) => {
-      await qc.invalidateQueries({ queryKey: [...qk.operation.order(orderId), "amendment"] });
+      await invalidateSalesOrder(qc, orderId);
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
   });
@@ -6619,6 +6634,7 @@ export interface SalesOrderChangesInput {
 }
 export type SalesOrderChangesResult =
   | { action: "saved"; revision: number; changed?: string[] }
+  | { action: "applied"; amendmentId: string; revision: number; agreementRecorded: true }
   | { action: "submitted"; amendmentId: string; baseRevision: number; agreementRecorded: boolean };
 
 function invalidateSalesOrder(qc: ReturnType<typeof useQueryClient>, orderId: string) {
@@ -6697,7 +6713,7 @@ export function useSubmitSalesOrderAmendment(
       ),
     ...opts,
     onSuccess: async (...args) => {
-      await qc.invalidateQueries({ queryKey: [...qk.operation.order(orderId), "amendment"] });
+      await invalidateSalesOrder(qc, orderId);
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
   });
@@ -12461,5 +12477,33 @@ export function useSaveWorkActivitySettings() {
       )),
     onSuccess: (data) => client.setQueryData(qk.operation.workActivitySettings(), data),
     onError: () => { void client.invalidateQueries({ queryKey: qk.operation.workActivitySettings() }); },
+  });
+}
+
+export function useRecordAmendmentSupplier(orderId: string, opts?: {
+  onSuccess?: (r: { status: string; revision?: number }) => void;
+  onError?: (e: ApiError) => void;
+}) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { amendmentId: string; poId: string; poLineId: string; orderLineId: string;
+      answer: "confirmed" | "waiting" | "refused"; supplierDate: string | null; reference: string }) => {
+      const { amendmentId, ...body } = input;
+      return apiFetch<{ status: string; revision?: number }>(`/api/operation/orders/amendment/${amendmentId}/supplier-confirmation`, {
+        method: "POST", body: JSON.stringify(body),
+      });
+    },
+    onSuccess: async (r) => { await invalidateSalesOrder(qc, orderId); opts?.onSuccess?.(r); },
+    onError: opts?.onError,
+  });
+}
+
+export function useAmendmentRouting(orderId: string | null, proposed: Record<string, unknown> | null) {
+  return useQuery({
+    queryKey: qk.operation.amendmentRouting(orderId ?? "", proposed),
+    enabled: Boolean(orderId && proposed), staleTime: 0,
+    queryFn: () => apiFetch<AmendmentGates>(`/api/operation/orders/${orderId}/amendment-routing`, {
+      method: "POST", body: JSON.stringify({ proposed }),
+    }),
   });
 }
