@@ -430,7 +430,9 @@ sources in this worktree remain the earlier inspected baseline; this is not whol
 The hub links Sales list, SO detail/edit, PO detail, Warehouse Inbound baseline, WarehouseIncoming count
 and a control-state harness. `inbound-flow.html` is a distinct PROPOSAL composition importing real
 kit controls with local-only fixture state, not the actual ReceivingWorkspace implementation.
-The hub names the old Inbound page as baseline comparison. Actual baseline page imports are from existing `apps/web/src/dev/` fixtures;
+Owner review preference: show the NEW Inbound proposal only; old Inbound links and comparison
+controls are removed from its review entry. Baseline evidence remains for internal audit, not a
+required owner-facing before/after screen. Actual baseline page imports are from existing `apps/web/src/dev/` fixtures;
 kit controls import the unmodified production components. A local stylesheet proposes Houzs
 reading rhythm and darker blue buttons; it is not an application change or final visual standard.
 The WarehouseInbound fixture's nav is a labelled width stand-in, not proof of full-shell fidelity.
