@@ -3420,8 +3420,12 @@ PO**, and a decorative arrow concatenated into a document number makes one targe
   count beside a GRN here and the count on the GRN itself cannot drift (Law D); damaged and
   wrong-item units are not received, which is that same arithmetic, not a second one.
 - **PO Version display — owner ruling 2026-10-01 / APPROVED TARGET, NOT BUILT:**
-  display the existing base PO number followed immediately by `-V{n}`, for example
-  `PO-20260903-4316-V1`. No space or parentheses separates the version from the number.
+  display dated PO numbers as `PO-YYMMDD-RRRR-V{n}`, for example
+  `PO-260903-4389-V1` (owner correction: remove the leading `20` from the displayed year).
+  Apply the same displayed identity to the register, preview, full detail, revision labels and
+  newly rendered document previews. No space or parentheses separates any part.
+  Preserve stored base identities and resolve/search both the original and shortened display;
+  non-date legacy numbers must not acquire an invented date.
   This replaces the register’s former `{PO No}({n})` / `PO V1` presentation; it does not
   renumber existing POs, change the new-number allocation scheme, or regenerate historical
   issued PDFs. The version comes from the actual document version, never a guessed default.
