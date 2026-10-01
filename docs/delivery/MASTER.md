@@ -435,6 +435,21 @@ proposed delivery outside that agreement is an Operation-owned customer exceptio
 customer's response and required evidence before treating the changed arrangement as agreed.
 Recording it does not rewrite Sales Orders' Requested Delivery Date.
 
+**Readiness-led early offer — OWNER-APPROVED 2026-10-01 / TARGET NOT BUILT OR VERIFIED.**
+For this early invitation, the assigned Logistics company contacts the customer only after the
+order's required goods are genuinely ready and the existing delivery, money and release conditions
+are satisfied. Stock being in a warehouse, or a supplier forecast of early arrival, is insufficient.
+Ask whether the customer wants earlier receipt; record the customer's agreement evidence before
+arranging it, retaining the actual contact and recorder through the existing evidence mechanism.
+This readiness-led invitation is Logistics contact; Operation may record its facts on behalf as
+above. The early arrangement does not overwrite the SO Requested Delivery Date.
+
+A customer who declines early receipt and keeps the originally agreed date/window has not delayed
+receipt. Do not treat that response as a storage-delay witness. Payment owns Storage Start and
+its existing readiness-plus-customer-delay rule. Customer-initiated SO date amendment rules and
+whether later-date requests apply directly remain undecided in Orders MASTER. This is not approval
+of the earlier three-scenario proposal as a whole and is no implementation/production claim.
+
 **The deadline** is the Logistics card's `2 working days before` check (owner ruling 2026-09-24):
 a Scheduled delivery date must be recorded by then, counted back from the Scheduled date (else the
 Requested date) on the Mon–Sat delivery week with Malaysian public holidays. The `3 working days

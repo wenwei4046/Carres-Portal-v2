@@ -392,6 +392,15 @@ Storage begins only when both facts exist: **Carres can complete the agreed deli
 Supplier/Carres delay and goods-not-ready days are never charged. The system derives the date;
 staff cannot key an earlier one.
 
+**Early receipt declined — OWNER-APPROVED 2026-10-01 / TARGET NOT BUILT OR VERIFIED.**
+When Carres becomes ready earlier and Logistics offers earlier receipt, a customer who declines
+that offer but retains the original agreed receipt date/window is **not delaying**. Early goods
+readiness alone cannot start storage charges; that refusal is not a customer-delay witness. Keep
+the agreed-scope readiness AND actual customer-delay rule above. Existing valid Storage Start
+facts are not reset. Orders/Delivery MASTER record the readiness, customer evidence and unchanged
+SO Requested Delivery Date boundary. No rate, free period, waiver authority or live charge changes
+are authorised here; customer-requested later-date amendment effectiveness remains undecided.
+
 The first valid Storage Start is permanent. Later delay never resets it, a free period or a cycle.
 
 During the delivery-window call, Operation sends the prepared `Request a later delivery date`
