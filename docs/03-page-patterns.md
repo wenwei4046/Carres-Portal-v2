@@ -11,7 +11,7 @@ Page patterns use `01-design-tokens.md` and `02-components.md` only. They never
 define typography, colour, spacing or component styles.
 
 The current shared-template direction and its approval boundaries live in
-[`ui/MASTER.md`, Houzs-based shared page templates](ui/MASTER.md#houzs-based-shared-page-templates--owner-direction-2026-10-01).
+[`ui/MASTER.md`, Reuse-first shared page templates](ui/MASTER.md#reuse-first-shared-page-templates--owner-ruling-2026-10-01).
 This file describes the common patterns; it is not a second reference selection or an authority
 to redesign each page independently. The current listing contract is UI MASTER §6.0; its detailed
 Register/Object Detail rules govern where an older example below differs.

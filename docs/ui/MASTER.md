@@ -22,30 +22,34 @@
 
 # §1 · Overview
 
-## Houzs-based shared page templates — owner direction 2026-10-01
+## Reuse-first shared page templates — owner ruling 2026-10-01
 
 **RULING / APPROVED DIRECTION / TEMPLATE SELECTION, IMPLEMENTATION AND OPERATOR VALIDATION
-PENDING.** Jess approved adopting suitable corresponding Houzs pages as the concrete layout and
-interaction baseline, rather than letting each module or build chat invent another page. This
-changes the reuse direction, not Carres business ownership or a claim that the templates are built.
+PENDING.** Preserve working Carres pages and components. Copy or adapt from Houzs only the
+capabilities or interactions Carres actually lacks, and integrate them into the one existing
+shared template/kit. The owner does not authorise a wholesale page replacement, a new kit or a
+portal-wide rewrite to make Carres resemble Houzs. Existing inconsistency calls for targeted
+adoption of Carres's shared components, not replacement of working behaviour.
 
-- Keep **one existing Carres kit**. Adopt the selected reference's useful page structure and
-  interaction in shared components; retain Carres token values, COPY-STANDARD, navigation,
+- Keep **one existing Carres kit**. First map the needed capability to the existing kit and
+  source-owned workflow. Use that implementation where it exists. Only an evidenced gap leads
+  to selecting a Houzs reference for the missing part; retain Carres token values, COPY-STANDARD, navigation,
   permissions, Unit/quantity semantics and source-owned actions. Recolouring foreign components
   alone is not kit adoption. Do not introduce a parallel Houzs component library.
 - Every adopting page names its common template and its justified business differences. Reuse
   the shared Shell/Register/Object Detail grammar and the approved field-operation direction
   below. Operational schedules remain a justified workspace, not a forced table. Common
   structure does not require identical columns or identical physical steps.
-- Select the concrete reference before describing a page as ready to copy: record repository
-  commit, page/file, retained interactions, necessary Carres adaptations and available runtime
+- Select the concrete reference before describing a missing part as ready to copy: record the
+  Carres gap, repository commit, page/file, retained interactions, necessary Carres adaptations and available runtime
   evidence in this MASTER or the owning module's existing authority. Do not leave the builder
   only the instruction "copy Houzs" or create another template guide.
 - A missing shared capability is resolved through the **existing kit admission** process and
   its `/ui` example, never a page-local lookalike. Use an existing equivalent where available;
   the finding that pages differ is not proof that a new component is necessary.
-- Review the complete relevant page states and its owning business journey against the selected
-  template. A visually similar default screen, passing component tests or a merged PR alone
+- Review changed page states and the affected business journey against the existing shared
+  template, plus the selected reference for the adopted part. Preserve working surrounding
+  behaviour; this is not a mandate to redesign unrelated pages. A visually similar default screen, passing component tests or a merged PR alone
   cannot establish consistent UI or successful operator delivery. Preserve failure, retry,
   permissions, long-content and narrow-screen behaviour as well as the normal path.
 
@@ -53,7 +57,7 @@ changes the reuse direction, not Carres business ownership or a claim that the t
 `ecce2e9676acc555efa8b2c30e78052b2ab54749`, including
 `frontend/src/pages/scm-v2/Inventory.tsx` and `StockTakeDetail.tsx`, related backend rules and
 test files. This is reference-code evidence, not observed current 2990 behaviour, a frozen
-portal-wide template selection, or verified source-copy permission. Rights, dependencies,
+portal-wide replacement selection, or verified source-copy permission. Rights, dependencies,
 security and compatibility remain to be checked for any proposed source-code copying.
 
 **Approval boundary.** This direction does not approve all findings in the Warehouse review,

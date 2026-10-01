@@ -1,10 +1,11 @@
 # STOCK / WAREHOUSE — MASTER
 
-**Houzs template adoption — owner direction 2026-10-01:** follow the
-[canonical shared-template ruling](../ui/MASTER.md#houzs-based-shared-page-templates--owner-direction-2026-10-01).
-Use a selected corresponding reference page as the layout/interaction baseline through the one
-Carres kit; preserve this module's Unit facts, five destinations, source ownership and explicit
-owner rulings. Concrete reference selection and operator validation remain pending. This direction
+**Reuse first, copy only missing parts — owner ruling 2026-10-01:** follow the
+[canonical shared-template ruling](../ui/MASTER.md#reuse-first-shared-page-templates--owner-ruling-2026-10-01).
+Keep working Carres pages and components. Use Houzs only for evidenced missing capabilities or
+interactions, integrated into the one existing kit/template; no wholesale Warehouse page rewrite.
+Preserve Unit facts, five destinations, source ownership and explicit owner rulings.
+Concrete reference selection for gaps and operator validation remain pending. This direction
 does not approve the whole new Warehouse audit/Blueprint or authorise BUILD in the PLAN chat.
 
 **Shared field-operation UI:** follow [the canonical UI MASTER ruling](../ui/MASTER.md#shared-field-operation-ui--owner-ruling-2026-09-29) (approved direction; implementation and operator validation pending).
