@@ -20,8 +20,9 @@ Register/Object Detail rules govern where an older example below differs.
 
 **Owner direction2026-10-01:** adapt measured Houzs geometry/hierarchy to Inter and existing
 Carres semantic colours. Do not introduce the withdrawn warm-grey hex proposal or literal Houzs
-palette. Compact search numerical candidate lives in01§7.2 and is not yet approved; the fixed
-far-right secondary-tools menu is approved. Reference styling does not change business actions.
+palette. Compact search dimensions in01§7.2 and the fixed far-right secondary-tools menu are
+APPROVED TARGETS awaiting actual pilot acceptance. Visible toolbar content is count/filter summary,
+search, admitted Table/Cards and `⋯`. Left rail changes remain unapproved. Reference styling does not change business actions.
 
 **One purpose per page and one obvious primary next action for the current task.**
 Secondary authorised actions remain discoverable. Existing UI MASTER/module-specific action

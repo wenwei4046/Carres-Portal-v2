@@ -83,13 +83,15 @@ tables. Those follow content-led widths, governed row recipes and contained scro
 
 ---
 
-## Compact Register search — reference adaptation
+## Compact Register search — approved target
 
-Owner direction2026-10-01: clear, compact search using Inter and existing Carres colours.
-Exact candidate dimensions live in01§7.2 and remain PROPOSAL, not an admitted replacement of every
-search variant. Use the existing shared search control; preserve query, clear and keyboard access.
-Placeholder promises only fields verified for the adopter (SO/customer/imported-reference where
-supported). Narrow layout must not hide the active query; approved secondary-tool overflow remains.
+**APPROVED TARGET / runtime acceptance pending — owner2026-10-01.** Clear compact search uses
+Inter and existing Carres colours. Canonical dimensions live in01§7.2. Use the existing shared
+search control; preserve query, clear and keyboard access. Placeholder: `Search orders…`.
+Accessible hint names only verified supported search fields. Shrink on constrained screens
+without clipping or hiding the active query; retain touch adaptation. Visible toolbar content:
+count/filter summary, search, admitted Table/Cards, fixed far-right secondary-tool menu. Scope is
+the Sales-first Register template, not automatic replacement of every search variant.
 
 ## Register toolbar overflow
 
