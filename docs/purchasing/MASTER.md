@@ -3509,6 +3509,19 @@ changes, Cards or deployment. Reuse the existing Purchasing BUILD lane for a lat
 takeover and coordinate shared-template work with its existing controller. Independently
 commissioned business fixes keep their existing scope; no duplicate implementation chat.
 
+**Complete-preview review gate — owner ruling 2026-10-02.** Before showing Jess any revised
+Purchasing preview as final, the Purchasing design chat checks the complete affected page from
+top to bottom against the current accepted Sales Order template: shell/header, rail, register
+tools/filters/selection, Table/Cards, expansion, quick view, object card interiors, edit/review,
+versions/history/documents and narrow-screen behaviour. The existing Sales Order chat must
+independently review the same complete surface; differences are corrected and rechecked until
+both reviews agree the scoped preview is complete. A single-card or screenshot clearance is
+not whole-page clearance. Record exactly what was inspected and any prototype-only or unverified
+behaviour; never present sample integrations as working production capabilities. Do not ask Jess
+to catch remaining template errors one at a time or show intermediate partial fixes as final.
+This review gate does not authorise application implementation or deployment.
+
+
 **Expansion — APPROVED / LOCKED, owner confirmation 2026-09-18 · BUILT 2026-09-18; seventh column
 owner-approved 2026-09-25 · BUILT 2026-09-26 (`GoodsMiniTable` PO layout, page-drawn cell from the ONE
 reader `poLineSupplierAnswersOf`; the parent prints one date or `{n} dates` from `poSupplierAnswerSummaryOf`).** Read-only ordered goods, exactly in order:
