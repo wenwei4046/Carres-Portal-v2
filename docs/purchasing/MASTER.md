@@ -1792,11 +1792,14 @@ production evidence must remain separate; this is not a claim that a real PO was
 Twelve local SQL cases passed, including two concurrent ordinary issuers (one success, one refusal),
 three-unit SO/MPR document and actor checks, legitimate 1+2 buys, duplicate source aggregation,
 separate same-SKU lines and linked-Unit deduplication. The authenticated API maps the atomic refusal
-to the existing changed-buying-line instruction (112 API/SQL tests); 258 real-component journey
+to the existing changed-buying-line instruction (209 API/SQL tests); 258 real-component journey
 checks passed with simulated transport/PDF readiness. A production rolled-back negative control
 refused excessive source quantity before numbering and left the PO count unchanged. Applied source
 MD5 `8efc838e3f7fdc78d23059fff0354cba`; issue/remainder bodies matched the locally tested functions.
-No live supplier message or purchase was created. Issue-versus-new-Stock-reservation concurrency was then reproduced: Stock checked the remainder
+No live supplier message or purchase was created. The Register read also nets a linked Unit
+and its own PO source once (six projection cases: incoming/reserved/sold, excess Units,
+separate PO-line binding and cancelled commitment); the buying calculation retains its existing
+Unit netting, and a legitimate one-of-three partial source still offers two to buy. Issue-versus-new-Stock-reservation concurrency was then reproduced: Stock checked the remainder
 before waiting on the Order, and could retain that stale answer. Migration 0633 (APPLIED 2026-10-01, tracker `20261001064254`) gives the existing draw/reserve/use-PO/save/release doors one internal source-lock helper,
 Order then exact line before PO-line/Unit locks; eligibility and ownership do not change.
 Twelve controlled SQL cases now pass, including that independent-connection race, legitimate
