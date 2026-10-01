@@ -193,6 +193,12 @@ describe("Reports → Payment", () => {
     await waitFor(() => expect(screen.getByTestId("report-storage-waived"))
       .toHaveTextContent("No free storage has been approved."));
   });
+  it("the waiver note reads as a sentence, with no document section number on screen", () => {
+    show();
+    const card = screen.getByTestId("report-storage-waived");
+    expect(card).toHaveTextContent("each with its reason and approver. The written request stays on the case.");
+    expect(card).not.toHaveTextContent("§");
+  });
   it("Export Excel writes one sheet per section from the same reads", async () => {
     show();
     const { writeFile, utils } = await import("xlsx");
