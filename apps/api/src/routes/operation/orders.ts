@@ -1,3 +1,4 @@
+import { priceStaffAmendment, sameStairQuote } from "../../lib/staff-amendment-pricing";
 import { amendmentWorkCompletion } from "../../lib/amendment-work";
 import { Hono } from "hono";
 import { bodyTouchesDeliveryDate, salesOrderWorkCompletion } from "../../lib/sales-order-work-completion";
@@ -1292,6 +1293,7 @@ operationOrdersRouter.get("/:id", requireOperation, async (c) => {
   });
 
   return c.json({
+    editBaseline: editBaselineOf(order as StoredOrder, rawLines, addons),
     order,
     lines: linesWithCategory,
     addons,
@@ -2618,7 +2620,6 @@ operationOrdersRouter.post(
       const m = mapPipelineV2Error(error);
       return c.json(m.body, m.status);
     }
-    if ((data as { status?: string } | null)?.status === "applied") await restampAppliedAmendment(sb, c.req.param("amendmentId"));
     return c.json(data, 201);
   },
 );
@@ -2809,22 +2810,7 @@ operationOrdersRouter.post(
       const m = mapPipelineV2Error(error);
       return c.json(m.body, m.status);
     }
-    /* 0562 · THE STAIR FEE IS PRICED FROM WHAT THE ORDER NOW SAYS. Until this
-       card, an approved amendment could not move the three delivery inputs and
-       carried no quantities the fee is priced from, so the stamp could not go
-       stale here. It can now — an approved change moves floor, lift, stair
-       count and line quantities in one complete version. The same re-stamp the
-       office save runs reads the SAVED row back and runs the ONE arithmetic
-       (Law D); it writes nothing when the number has not moved, and it never
-       fails the decision that already succeeded. */
-    /* ⛔ AND IT NEVER FAILS A DECISION THAT ALREADY SUCCEEDED. The amendment is
-       applied and its revision is minted before this runs; a throw here would
-       tell the principal their approval failed when it did not. The re-stamp
-       helper makes that promise for itself, so the READ that finds the order
-       has to make it too - caught here rather than merely intended. */
-    if ((data as { status?: string } | null)?.status === "applied") {
-      await restampAppliedAmendment(sb, amendmentId);
-    }
+    // The stored quote is stamped inside the one effective revision transaction.
     return c.json(data);
   },
 );
@@ -2864,6 +2850,12 @@ const changeAddonInput = z
   })
   .strict();
 const salesOrderChangesInput = z.object({
+  expectedStairQuote: z.record(z.unknown()).nullable().optional(),
+  expected: z.object({
+    status: z.string(), header: z.record(z.unknown()),
+    lines: z.array(changeLineInput), addons: z.array(changeAddonInput),
+    installment_months: z.number().nullable(),
+  }).strict(),
   header: revisionHeaderInput
     .extend({
       delivery_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
@@ -2901,6 +2893,17 @@ function headerOf(order: StoredOrder): SalesOrderChangeSide["header"] {
   return out;
 }
 
+/** The unedited payload, sorted by identity. Keep it separate from form normalization. */
+function editBaselineOf(order: StoredOrder, lines: SalesOrderChangeSide["lines"], addons: SalesOrderChangeSide["addons"]): SalesOrderChangeSide & { status: string } {
+  return {
+    status: order.status ?? "",
+    header: Object.fromEntries(Object.entries(headerOf(order)).map(([key, value]) => [key, value ?? null])),
+    lines: lines.map(({ id, sku, qty, unit_price, attrs }) => ({ id, sku, qty, unit_price: Number(unit_price), attrs: attrs ?? null })).sort((a,b) => (a.id ?? "").localeCompare(b.id ?? "")),
+    addons: addons.map(({ id, addon_key, qty, unit_price, attrs }) => ({ id, addon_key, qty, unit_price: Number(unit_price), attrs: attrs ?? null })).sort((a,b) => (a.id ?? "").localeCompare(b.id ?? "")),
+    installment_months: order.installment_months ?? null,
+  };
+}
+
 operationOrdersRouter.post("/:id/changes", requireOperation, salesOrderWorkCompletion({ rules: ["ask_delivery_date"], orderId: (c) => c.req.param("id") ?? null }), async (c) => {
   const id = c.req.param("id");
   const raw = await c.req.json().catch(() => ({}));
@@ -2914,42 +2917,21 @@ operationOrdersRouter.post("/:id/changes", requireOperation, salesOrderWorkCompl
   const body = parsed.data;
   const sb = userClient(c.env, c.var.auth.jwt);
 
-  /* The STORED order is the only base the server trusts — never the browser's
-     idea of what it was. */
-  const [orderRes, linesRes, addonsRes] = await Promise.all([
-    sb.from("orders").select("*").eq("id", id).maybeSingle(),
-    sb.from("order_lines").select("id, sku, qty, unit_price, attrs").eq("order_id", id)
-      .order("created_at", { ascending: true }).order("id", { ascending: true }),
-    sb.from("order_addons").select("id, addon_key, qty, unit_price, attrs").eq("order_id", id)
-      .order("id", { ascending: true }),
-  ]);
-  for (const r of [orderRes, linesRes, addonsRes]) {
-    if (r.error) {
-      const m = mapPgError(r.error);
-      return c.json(m.body, m.status);
-    }
-  }
-  const order = orderRes.data as StoredOrder | null;
-  if (!order) return c.json({ error: "not_found", code: "not_found", message: "Order not found" }, 404);
-
-  const current: SalesOrderChangeSide = {
-    header: headerOf(order),
-    lines: ((linesRes.data ?? []) as SalesOrderChangeSide["lines"]).map((l) => ({ ...l, unit_price: Number(l.unit_price) })),
-    addons: ((addonsRes.data ?? []) as SalesOrderChangeSide["addons"]).map((a) => ({ ...a, unit_price: Number(a.unit_price) })),
-    installment_months: order.installment_months ?? null,
-  };
+  // Classify against the exact payload the operator opened. The commit RPC
+  // compares it to current truth under order + source-line locks before ANY write.
+  const current: SalesOrderChangeSide = body.expected;
   /* A draft line/service without `attrs` keeps the stored configuration. */
   const storedLine = new Map(current.lines.map((l) => [l.id, l]));
   const storedAddon = new Map(current.addons.map((a) => [a.id, a]));
   const draft: SalesOrderChangeSide = {
     header: body.header as SalesOrderChangeSide["header"],
-    lines: body.lines.map((l) => ({ ...l, attrs: "attrs" in l ? (l.attrs ?? null) : (storedLine.get(l.id)?.attrs ?? null) })),
-    addons: body.addons.map((a) => ({ ...a, attrs: "attrs" in a ? (a.attrs ?? null) : (storedAddon.get(a.id)?.attrs ?? null) })),
+    lines: body.lines.map((l) => ({ ...l, attrs: "attrs" in l ? (l.attrs ?? null) : (storedLine.get(l.id)?.attrs ?? null) })).sort((a,b) => (a.id ?? "").localeCompare(b.id ?? "")),
+    addons: body.addons.map((a) => ({ ...a, attrs: "attrs" in a ? (a.attrs ?? null) : (storedAddon.get(a.id)?.attrs ?? null) })).sort((a,b) => (a.id ?? "").localeCompare(b.id ?? "")),
     installment_months: body.installment_months === undefined ? current.installment_months : body.installment_months,
   };
   const cls = classifySalesOrderChange(current, draft, {
-    proceeded: order.status === "proceed_order",
-    proceedRecorded: Boolean(order.proceed_date),
+    proceeded: body.expected.status === "proceed_order",
+    proceedRecorded: Boolean(current.header.proceed_date),
   });
   if (cls.action === "none") {
     return c.json({ error: "rule_violation", code: "nothing_changed", message: "Nothing changed" }, 422);
@@ -2958,19 +2940,18 @@ operationOrdersRouter.post("/:id/changes", requireOperation, salesOrderWorkCompl
   if (cls.action === "save") {
     const header: Record<string, unknown> = {};
     for (const k of cls.header) header[k] = (body.header as Record<string, unknown>)[k] ?? null;
-    const { data, error } = await sb.rpc("sales_order_save_revision", {
-      p_order_id: id,
-      p_header: header,
-      p_lines: null,
-      p_change: { change_type: "staff_correction", note: body.reason },
+    let priced;
+    try { priced = await priceStaffAmendment(sb, id, { header }, current); }
+    catch { return c.json({ error: "rule_violation", code: "stair_pricing_unavailable", message: "Action changed · Review again" }, 422); }
+    if (!sameStairQuote(priced.quote, body.expectedStairQuote)) return c.json({ error: "rule_violation", code: "stair_pricing_changed", message: "Action changed · Review again" }, 422);
+    const { data, error } = await sb.rpc("sales_order_commit_staff_change", {
+      p_order_id: id, p_expected: body.expected, p_action: "save", p_header: header,
+      p_proposed: priced.proposed, p_reason: body.reason, p_customer_asked_on: null,
+      p_agreement: null, p_replace: null,
     });
     if (error) {
       const m = mapPipelineV2Error(error);
       return c.json(m.body, m.status);
-    }
-    if (touchesStairInputs(header)) {
-      const restamp = await restampStairCarry(sb, id);
-      if (!restamp.ok) console.error("stair carry re-stamp failed", { orderId: id, reason: restamp.reason });
     }
     return c.json({ action: "saved", ...(data as Record<string, unknown>) }, 201);
   }
@@ -2997,24 +2978,15 @@ operationOrdersRouter.post("/:id/changes", requireOperation, salesOrderWorkCompl
   if (cls.addonsChanged) proposed.addons = draft.addons.map(({ id: aid, ...a }) => (aid ? { id: aid, ...a } : a));
   if (cls.installmentChanged) proposed.installment_months = draft.installment_months;
 
-  if (body.replaceAmendmentId) {
-    const live = await sb.rpc("sales_order_amendment_live", { p_order_id: id });
-    const a = (live.data as { amendment?: { id?: string; stale?: boolean } | null } | null)?.amendment;
-    if (a?.id === body.replaceAmendmentId && a.stale) {
-      const w = await sb.rpc("sales_order_withdraw_amendment", {
-        p_amendment_id: a.id,
-        p_reason: "Out of date - proposed again on the current order",
-      });
-      if (w.error) {
-        const m = mapPipelineV2Error(w.error);
-        return c.json(m.body, m.status);
-      }
-    }
-  }
-  const { data, error } = await sb.rpc("sales_order_submit_staff_amendment", {
-    p_order_id: id, p_proposed: proposed, p_reason: body.reason,
+  let priced;
+  try { priced = await priceStaffAmendment(sb, id, proposed, current); }
+  catch { return c.json({ error: "rule_violation", code: "stair_pricing_unavailable", message: "Action changed · Review again" }, 422); }
+  if (!sameStairQuote(priced.quote, body.expectedStairQuote)) return c.json({ error: "rule_violation", code: "stair_pricing_changed", message: "Action changed · Review again" }, 422);
+  const { data, error } = await sb.rpc("sales_order_commit_staff_change", {
+    p_order_id: id, p_expected: body.expected, p_action: "submit", p_header: null,
+    p_proposed: priced.proposed, p_reason: body.reason,
     p_customer_asked_on: body.customerAskedOn ?? null,
-    p_agreement: body.agreement ?? null,
+    p_agreement: body.agreement ?? null, p_replace: body.replaceAmendmentId ?? null,
   });
   if (error) {
     const m = mapPipelineV2Error(error);
@@ -3022,7 +2994,6 @@ operationOrdersRouter.post("/:id/changes", requireOperation, salesOrderWorkCompl
   }
   const outcome = data as { id: string; base_revision: number; status: string; revision?: number; agreement_recorded: boolean };
   if (outcome.status === "applied") {
-    await restampAppliedAmendment(sb, outcome.id);
     return c.json({ action: "applied", amendmentId: outcome.id, revision: outcome.revision, agreementRecorded: true }, 201);
   }
   return c.json({ action: "submitted", amendmentId: outcome.id, baseRevision: outcome.base_revision, agreementRecorded: outcome.agreement_recorded }, 201);
@@ -3498,28 +3469,19 @@ operationOrdersRouter.post("/amendment/:amendmentId/supplier-confirmation", requ
     p_answer: b.answer, p_supplier_date: b.supplierDate, p_reference: b.reference,
   });
   if (error) { const m = mapPipelineV2Error(error); return c.json(m.body, m.status); }
-  if ((data as { status?: string } | null)?.status === "applied") await restampAppliedAmendment(sb, c.req.param("amendmentId"));
   return c.json(data, 201);
 });
 
-async function restampAppliedAmendment(sb: ReturnType<typeof userClient>, amendmentId: string) {
-  try {
-    const owner = await sb.from("sales_order_amendments").select("order_id").eq("id", amendmentId).maybeSingle();
-    const orderId = (owner.data as { order_id?: string } | null)?.order_id;
-    if (!orderId) throw new Error(owner.error?.message ?? "amendment owner unreadable");
-    const result = await restampStairCarry(sb, orderId);
-    if (!result.ok) throw new Error(result.reason);
-  } catch (e) {
-    console.error("stair carry re-stamp skipped", { amendmentId, reason: e instanceof Error ? e.message : String(e) });
-  }
-}
-
 operationOrdersRouter.post("/:id/amendment-routing", requireOperation, async (c) => {
-  const parsed = z.object({ proposed: z.record(z.unknown()) }).safeParse(await c.req.json().catch(() => null));
+  const parsed = z.object({ proposed: z.record(z.unknown()), expected: salesOrderChangesInput.shape.expected.optional() }).safeParse(await c.req.json().catch(() => null));
   if (!parsed.success) return c.json({ error: "invalid_input" }, 422);
-  const { data, error } = await userClient(c.env, c.var.auth.jwt).rpc("sales_order_amendment_route", {
-    p_order_id: c.req.param("id"), p_proposed: parsed.data.proposed,
+  const sb = userClient(c.env, c.var.auth.jwt);
+  let priced;
+  try { priced = await priceStaffAmendment(sb, c.req.param("id"), parsed.data.proposed, parsed.data.expected); }
+  catch { return c.json({ error: "rule_violation", code: "stair_pricing_unavailable", message: "Action changed · Review again" }, 422); }
+  const { data, error } = await sb.rpc("sales_order_amendment_route", {
+    p_order_id: c.req.param("id"), p_proposed: priced.proposed,
   });
   if (error) { const m = mapPipelineV2Error(error); return c.json(m.body, m.status); }
-  return c.json(data);
+  return c.json({ ...(data as Record<string, unknown>), stair_quote: priced.quote, priced_addons: priced.proposed.addons ?? null });
 });

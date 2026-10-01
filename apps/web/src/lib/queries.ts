@@ -3300,6 +3300,8 @@ export interface operationOrderDetailPo {
   lines: operationOrderDetailPoLine[];
 }
 export interface operationOrderDetailResponse {
+  /** Exact before-edit payload, frozen with the draft. */
+  editBaseline?: Record<string, unknown>;
   order: operationOrderDetailOrder;
   lines: operationOrderDetailLine[];
   addons: operationOrderDetailAddon[];
@@ -6471,6 +6473,8 @@ export interface SalesOrderAmendment {
  *  correction where the agreement did not change — the revision whose signed
  *  agreement still covers it. */
 export interface AmendmentGates {
+  stair_quote?: Record<string, unknown> | null;
+  priced_addons?: Array<{ id?: string; addon_key: string; qty: number; unit_price: number; attrs?: Record<string, unknown> | null }> | null;
   supplier_confirmations?: Array<{ po_id: string; po_line_id: string; order_line_id: string; answer: "confirmed" | "waiting" | "refused"; supplier_date: string | null; reference: string; by_name?: string | null; at: string }>;
   sales_approval?: { by: string | null; name: string | null; at: string | null; note: string | null };
   supplier_scope: Array<{ po_id: string; po_line_id: string; order_line_id: string }>;
@@ -6626,6 +6630,8 @@ export function useRecordAmendmentAgreement(
  * The page sends its whole draft; the SERVER classifies it and either saves a
  * correction or submits an amendment request (orders/MASTER § VIEW FIRST). */
 export interface SalesOrderChangesInput {
+  expectedStairQuote?: Record<string, unknown> | null;
+  expected: Record<string, unknown>;
   header: Record<string, unknown>;
   lines: Array<{ id?: string; sku: string; qty: number; unit_price: number; attrs?: Record<string, unknown> | null }>;
   addons: Array<{ id?: string; addon_key: string; qty: number; unit_price: number; attrs?: Record<string, unknown> | null }>;
@@ -12502,12 +12508,12 @@ export function useRecordAmendmentSupplier(orderId: string, opts?: {
   });
 }
 
-export function useAmendmentRouting(orderId: string | null, proposed: Record<string, unknown> | null) {
+export function useAmendmentRouting(orderId: string | null, proposed: Record<string, unknown> | null, expected?: Record<string, unknown> | null) {
   return useQuery({
-    queryKey: qk.operation.amendmentRouting(orderId ?? "", proposed),
+    queryKey: [...qk.operation.amendmentRouting(orderId ?? "", proposed), expected],
     enabled: Boolean(orderId && proposed), staleTime: 0,
     queryFn: () => apiFetch<AmendmentGates>(`/api/operation/orders/${orderId}/amendment-routing`, {
-      method: "POST", body: JSON.stringify({ proposed }),
+      method: "POST", body: JSON.stringify({ proposed, expected: expected ?? undefined }),
     }),
   });
 }

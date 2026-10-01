@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import pg from "pg";
+import { priceStaffAmendment } from "../lib/staff-amendment-pricing";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 // Real PostgreSQL, local disposable fixtures only. Never count a skip as a pass.
 const URL = process.env.CARRES_TEST_DATABASE_URL ?? "";
@@ -17,7 +19,14 @@ describe.skipIf(!LOCAL)("staff amendment policy on real PostgreSQL", () => {
   const as = (id: string) => q("select set_config('request.jwt.claims',$1,true)", [JSON.stringify({sub:id,role:"authenticated"})]);
   const proposal = (price = 2749, qty = 2) => ({lines:[{id:line,sku:"TRION-Q",qty,unit_price:price,attrs:{gap:"KIV"}}]});
   const agreement = {kind:"customer_confirmation",reference:"WhatsApp fixture reply 1"};
+  async function price(p: unknown) {
+    const adapter={from:(table:string)=>({select:()=>({eq:()=>({maybeSingle:async()=>({error:null,data:table==="orders"
+      ? await one("select o.*,coalesce((select jsonb_agg(to_jsonb(l)) from order_lines l where l.order_id=o.id),'[]') order_lines,coalesce((select jsonb_agg(jsonb_build_object('id',a.id,'addon_key',a.addon_key,'qty',a.qty,'unit_price',a.unit_price,'attrs',a.attrs)) from order_addons a where a.order_id=o.id),'[]') order_addons from orders o where o.id=$1",[order])
+      : table==="floor_config" ? await one("select * from floor_config where id=1") : await one("select key from addons where key='STAIR_CARRY'")})})})})};
+    return (await priceStaffAmendment(adapter as unknown as SupabaseClient,order,p as Record<string,unknown>)).proposed;
+  }
   async function submit(p: unknown = proposal(), evidence: unknown = agreement) {
+    p=await price(p);
     return (await one("select sales_order_submit_staff_amendment($1,$2,'Customer request',null,$3) r",[order,JSON.stringify(p),evidence ? JSON.stringify(evidence):null])).r;
   }
   async function refused(sql: string, values: unknown[], code: string) {
@@ -41,6 +50,118 @@ describe.skipIf(!LOCAL)("staff amendment policy on real PostgreSQL", () => {
   });
   afterEach(async()=>{if(db){await q("rollback").catch(()=>{});await db.end();}});
 
+  async function guarded(expected: unknown, proposed: unknown = proposal(), replace: string | null = null, evidence: unknown = agreement) {
+    proposed=await price(proposed);
+    return one("select sales_order_commit_staff_change($1,$2,'submit',null,$3,'Customer request',null,$4,$5) r",[order,JSON.stringify(expected),JSON.stringify(proposed),evidence ? JSON.stringify(evidence):null,replace]);
+  }
+  it("a draft opened before another staff edit cannot overwrite that change",async()=>{
+    const expected=(await one("select _sales_order_edit_baseline($1) b",[order])).b;
+    await q("update orders set customer_phone='0199999999' where id=$1",[order]);
+    await refused("select sales_order_commit_staff_change($1,$2,'submit',null,$3,'Customer request',null,$4,null)",[order,JSON.stringify(expected),JSON.stringify(proposal()),JSON.stringify(agreement)],"order_edit_stale");
+    expect((await one("select qty from order_lines where id=$1",[line])).qty).toBe(1);
+    expect((await one("select count(*)::int n from sales_order_amendments where order_id=$1",[order])).n).toBe(0);
+  });
+  it("a current opened baseline commits the ordinary change once; retry is stale",async()=>{
+    const expected=(await one("select _sales_order_edit_baseline($1) b",[order])).b;
+    expect((await guarded(expected)).r.status).toBe("applied");
+    await refused("select sales_order_commit_staff_change($1,$2,'submit',null,$3,'retry',null,$4,null)",[order,JSON.stringify(expected),JSON.stringify(proposal()),JSON.stringify(agreement)],"order_edit_stale");
+  });
+  it("a failed replacement retains the previous request and its evidence",async()=>{
+    const old=await submit(proposal(),null);
+    await q("update order_lines set unit_price=2800 where id=$1",[line]);
+    const expected=(await one("select _sales_order_edit_baseline($1) b",[order])).b;
+    const replacement=await price(proposal(2800));
+    await refused("select sales_order_commit_staff_change($1,$2,'submit',null,$3,'replace',null,$4,$5)",[order,JSON.stringify(expected),JSON.stringify(replacement),JSON.stringify({...agreement,reference:" "}),old.id],"agreement_reference_required");
+    expect((await one("select status from sales_order_amendments where id=$1",[old.id])).status).toBe("submitted");
+    expect((await one("select count(*)::int n from sales_order_amendments where order_id=$1",[order])).n).toBe(1);
+  });
+  it("no PIC addresses the event to the resolved Delivery Duty without changing ownership",async()=>{
+    await assign("delivery_duty",OTHER);
+    const r=await submit();
+    const event=await one("select detail from ops_activity_log where detail->>'amendment_id'=$1 order by occurred_at desc limit 1",[r.id]);
+    expect(event.detail).toMatchObject({recipient_id:OTHER,recipient_duty:"delivery_duty",recipient_outcome:"assignment"});
+    expect((await one("select assigned_staff from ops_order_control where order_id=$1",[order]))?.assigned_staff ?? null).toBeNull();
+  });
+  it("no PIC and no Delivery Duty leaves an explicit unassigned event, not a false notification",async()=>{
+    const r=await submit();
+    const event=await one("select detail from ops_activity_log where detail->>'amendment_id'=$1 order by occurred_at desc limit 1",[r.id]);
+    expect(event.detail).toMatchObject({recipient_id:null,recipient_duty:"delivery_duty",recipient_outcome:"not_assigned"});
+  });
+  async function stairs() {
+    await q("insert into floor_config(id,free_up_to_floor,per_floor_per_item) values(1,2,50) on conflict(id) do update set free_up_to_floor=2,per_floor_per_item=50");
+    await q("update orders set delivery_floor=3,delivery_has_lift=false,delivery_stair_items=2,stair_rate_per_floor_per_item=50,stair_rate_free_up_to_floor=2 where id=$1",[order]);
+    await q("insert into order_addons(order_id,addon_key,qty,unit_price) values($1,'STAIR_CARRY',1,50)",[order]);
+  }
+  async function money() {
+    const row=await one("select (select qty from order_lines where id=$2) qty,(select coalesce(sum(qty*unit_price),0)::numeric from order_addons where order_id=$1 and addon_key='STAIR_CARRY') fee,(select snapshot->'addons' from sales_order_revisions where order_id=$1 order by revision desc limit 1) snapshot",[order,line]);
+    return {...row,fee:Number(row.fee)};
+  }
+  async function failFeeWrite() {
+    await q("create function pg_temp.refuse_stair_fixture() returns trigger language plpgsql as $$ begin if new.addon_key='STAIR_CARRY' then raise exception 'fixture fee write failed' using detail='fixture_fee_failure'; end if; return new; end $$");
+    await q("create trigger local_stair_failure before insert on order_addons for each row execute function pg_temp.refuse_stair_fixture()");
+  }
+  it("ordinary no-PO goods and pinned fee become effective in the same immutable revision",async()=>{
+    await stairs();
+    const r=await submit();expect(r.status).toBe("applied");
+    expect(await money()).toMatchObject({qty:2,fee:100,snapshot:[{addon_key:"STAIR_CARRY",qty:1,unit_price:100}]});
+  });
+  it("supplier-final apply includes the fee and price exception's complete financial impact",async()=>{
+    await stairs();await assign("po_duty",OP);await assign("sales_approver",PR);
+    const {po,pl}=await coverLine();const r=await submit(proposal(1000));
+    expect((await one("select sales_order_amendment_impact($1) impact",[r.id])).impact.commercial_delta).toBe(-699);
+    await as(PR);await q("select sales_order_decide_amendment($1,'approve','Price agreed')",[r.id]);
+    expect(await money()).toMatchObject({qty:1,fee:50});
+    await as(OP);await q("select sales_order_record_supplier_confirmation($1,$2,$3,$4,'confirmed','2026-10-29','Supplier reply')",[r.id,po,pl,line]);
+    expect(await money()).toMatchObject({qty:2,fee:100,snapshot:[{addon_key:"STAIR_CARRY",qty:1,unit_price:100}]});
+    await refused("select sales_order_record_supplier_confirmation($1,$2,$3,$4,'confirmed','2026-10-29','Retry')",[r.id,po,pl,line],"already_decided");
+    expect((await one("select count(*)::int n from sales_order_revisions where order_id=$1",[order])).n).toBe(2);
+  });
+  it("failure writing a computed fee rolls back ordinary goods, fee, request and revision",async()=>{
+    await stairs();const proposed=await price(proposal());await failFeeWrite();
+    await refused("select sales_order_submit_staff_amendment($1,$2,'why',null,$3)",[order,JSON.stringify(proposed),JSON.stringify(agreement)],"fixture_fee_failure");
+    expect(await money()).toMatchObject({qty:1,fee:50,snapshot:null});
+    expect((await one("select count(*)::int n from sales_order_amendments where order_id=$1",[order])).n).toBe(0);
+  });
+  it("supplier-final fee failure leaves its prior pending request unchanged and can be retried",async()=>{
+    await stairs();await assign("po_duty",OP);const {po,pl}=await coverLine();const r=await submit();await failFeeWrite();
+    await refused("select sales_order_record_supplier_confirmation($1,$2,$3,$4,'confirmed','2026-10-29','Supplier reply')",[r.id,po,pl,line],"fixture_fee_failure");
+    expect(await money()).toMatchObject({qty:1,fee:50});
+    expect(await one("select status,supplier_confirmations from sales_order_amendments where id=$1",[r.id])).toEqual({status:"submitted",supplier_confirmations:[]});
+    await q("drop trigger local_stair_failure on order_addons");
+    await q("select sales_order_record_supplier_confirmation($1,$2,$3,$4,'confirmed','2026-10-29','Retry after recovery')",[r.id,po,pl,line]);
+    expect(await money()).toMatchObject({qty:2,fee:100,snapshot:[{addon_key:"STAIR_CARRY",unit_price:100}]});
+  });
+  it("a changed pricing pin makes a pending proposal stale rather than changing its agreed fee",async()=>{
+    await stairs();await assign("po_duty",OP);const {po,pl}=await coverLine();const r=await submit();
+    await q("update orders set stair_rate_per_floor_per_item=60 where id=$1",[order]);
+    expect((await one("select sales_order_amendment_live($1) r",[order])).r.amendment.stale).toBe(true);
+    await refused("select sales_order_record_supplier_confirmation($1,$2,$3,$4,'confirmed','2026-10-29','Supplier reply')",[r.id,po,pl,line],"amendment_stale");
+    expect(await money()).toMatchObject({qty:1,fee:50});
+  });
+  it("a later live tariff change cannot reprice an order's pinned fee",async()=>{
+    await stairs();await assign("po_duty",OP);const {po,pl}=await coverLine();const r=await submit();
+    await q("update floor_config set per_floor_per_item=90,free_up_to_floor=1 where id=1");
+    await q("select sales_order_record_supplier_confirmation($1,$2,$3,$4,'confirmed','2026-10-29','Supplier reply')",[r.id,po,pl,line]);
+    expect(await money()).toMatchObject({qty:2,fee:100,snapshot:[{addon_key:"STAIR_CARRY",unit_price:100}]});
+    expect((await one("select stair_rate_per_floor_per_item rate from orders where id=$1",[order])).rate).toBe("50.00");
+  });
+  it("an unpinned tariff move invalidates the proposed amount before final effect",async()=>{
+    await stairs();await q("update orders set stair_rate_per_floor_per_item=null,stair_rate_free_up_to_floor=null where id=$1",[order]);
+    await q("update floor_config set per_floor_per_item=50,free_up_to_floor=2 where id=1");
+    await assign("po_duty",OP);const {po,pl}=await coverLine();const r=await submit();
+    await q("update floor_config set per_floor_per_item=60 where id=1");
+    await refused("select sales_order_record_supplier_confirmation($1,$2,$3,$4,'confirmed','2026-10-29','Supplier reply')",[r.id,po,pl,line],"amendment_stale");
+    expect(await money()).toMatchObject({qty:1,fee:50});
+    expect((await one("select sales_order_amendment_live($1) r",[order])).r.amendment.stale).toBe(true);
+  });
+  it("a pre-Proceed floor correction keeps its original snapshot and removes the fee atomically",async()=>{
+    await stairs();await q("update orders set status='place' where id=$1",[order]);
+    const expected=(await one("select _sales_order_edit_baseline($1) b",[order])).b;
+    const proposed=await price({header:{delivery_floor:2}});
+    await q("select sales_order_commit_staff_change($1,$2,'save',$3,$4,'Floor corrected',null,null,null)",[order,JSON.stringify(expected),JSON.stringify({delivery_floor:2}),JSON.stringify(proposed)]);
+    expect(await money()).toMatchObject({qty:1,fee:0,snapshot:[]});
+    expect((await one("select snapshot->'addons' addons from sales_order_revisions where order_id=$1 and revision=1",[order])).addons).toEqual([{addon_key:"STAIR_CARRY",qty:1,unit_price:50,attrs:null}]);
+  });
   it("ordinary no-PO amendment applies once with actual actor and evidence",async()=>{
     const r=await submit(); expect(r.status).toBe("applied");
     expect((await one("select qty from order_lines where id=$1",[line])).qty).toBe(2);
@@ -143,19 +264,33 @@ describe.skipIf(!LOCAL)("staff amendment policy on real PostgreSQL", () => {
   });
   it("approval can precede supplier confirmation without partial effectiveness",async()=>{
     await assign("po_duty",OP);await assign("sales_approver",PR);
-    const {po,pl}=await coverLine();const r=await submit({...proposal(1000),delivery_date:"2026-11-02"});
+    const {po,pl}=await coverLine();
+    const mixed={...proposal(1000),delivery_date:"2026-11-02"};mixed.lines[0]!.attrs.gap="BLACK";
+    const r=await submit(mixed);
     await as(PR);
     expect((await one("select sales_order_decide_amendment($1,'approve','price agreed') r",[r.id])).r.status).toBe("submitted");
     expect((await one("select unit_price from order_lines where id=$1",[line])).unit_price).toBe("2749.00");
     await as(OP);
     const applied=await one("select sales_order_record_supplier_confirmation($1,$2,$3,$4,'confirmed','2026-10-29','Supplier reply') r",[r.id,po,pl,line]);
     expect(applied.r.status).toBe("applied");
+    expect(await one("select qty,unit_price,attrs from order_lines where id=$1",[line])).toEqual({qty:2,unit_price:"1000.00",attrs:{gap:"BLACK"}});
+    expect((await one("select delivery_date::text d from orders where id=$1",[order])).d).toBe("2026-11-02");
     expect((await one("select sales_approved_by,decided_by from sales_order_amendments where id=$1",[r.id]))).toEqual({sales_approved_by:PR,decided_by:OP});
+  });
+  it("supplier refusal holds every part of a mixed goods, price and date change",async()=>{
+    await assign("po_duty",OP);await assign("sales_approver",PR);
+    const {po,pl}=await coverLine(); const r=await submit({...proposal(1000),delivery_date:"2026-11-02"});
+    await as(PR); await q("select sales_order_decide_amendment($1,'approve','price agreed')",[r.id]);
+    await as(OP);const answer=await one("select sales_order_record_supplier_confirmation($1,$2,$3,$4,'refused',null,'Supplier cannot change') r",[r.id,po,pl,line]);
+    expect(answer.r.status).toBe("submitted");
+    expect(await one("select qty,unit_price from order_lines where id=$1",[line])).toEqual({qty:1,unit_price:"2749.00"});
+    expect((await one("select delivery_date::text d from orders where id=$1",[order])).d).toBe("2026-10-26");
+    expect((await one("select qty from purchase_order_lines where id=$1",[pl])).qty).toBe(1);
   });
   async function readyUnit(kind="warehouse_operator", condition="new") {
     const wh=await one("select id from warehouses limit 1");
     const holder=await one("insert into stock_operating_parties(code,name,kind) values($1,'Test holder',$2) returning id",[order,kind]);
-    await q("insert into ops_stock_items(sku,warehouse_id,holder_party_id,status,reserved_order_line_id,condition) values('TRION-Q',$1,$2,'reserved',$3,$4)",[wh.id,holder.id,line,condition]);
+    await q("insert into ops_stock_items(unit_code,sku,warehouse_id,holder_party_id,status,reserved_order_line_id,condition) values(allocate_unit_id(),'TRION-Q',$1,$2,'reserved',$3,$4)",[wh.id,holder.id,line,condition]);
   }
   it("earlier date succeeds only with this line's ready warehouse Unit",async()=>{
     await readyUnit();expect((await submit({delivery_date:"2026-10-20"})).status).toBe("applied");
@@ -211,8 +346,10 @@ describe.skipIf(!LOCAL)("staff amendment policy on real PostgreSQL", () => {
     expect((await one("select qty from order_lines where id=$1",[line])).qty).toBe(1);
   });
   it("Operation uses the granted public door under the actual authenticated database role",async()=>{
+    const expected=(await one("select _sales_order_edit_baseline($1) b",[order])).b;
     await q("set local role authenticated");
-    expect((await submit()).status).toBe("applied");
+    expect((await guarded(expected)).r.status).toBe("applied");
+    expect((await one("select has_function_privilege('authenticated','sales_order_submit_staff_amendment(uuid,jsonb,text,date,jsonb)','execute') allowed")).allowed).toBe(false);
     await q("reset role");
   });
   it("ambiguous legacy PO lineage cannot silently bypass confirmation",async()=>{
@@ -223,6 +360,31 @@ describe.skipIf(!LOCAL)("staff amendment policy on real PostgreSQL", () => {
   });
   it("date-only change ignores an issued PO covering the same line",async()=>{
     await coverLine();expect((await submit({delivery_date:"2026-11-02"})).status).toBe("applied");
+  });
+
+  it("a held source line times out with no partial request; a changed line is stale after release",async()=>{
+    const expected=(await one("select _sales_order_edit_baseline($1) b",[order])).b;
+    // Commit only this disposable fixture so the second connection sees the source.
+    await q("commit");
+    const blocker=new pg.Client({connectionString:URL}); await blocker.connect();
+    try {
+      await blocker.query("begin");
+      await blocker.query("update order_lines set qty=4 where id=$1",[line]);
+      await q("begin"); await as(OP); await q("set local lock_timeout='150ms'");
+      await expect(guarded(expected)).rejects.toMatchObject({code:"55P03"});
+      await q("rollback");
+      expect((await one("select count(*)::int n from sales_order_amendments where order_id=$1",[order])).n).toBe(0);
+      await blocker.query("commit");
+      await q("begin"); await as(OP);
+      await refused("select sales_order_commit_staff_change($1,$2,'submit',null,$3,'retry',null,$4,null)",[order,JSON.stringify(expected),JSON.stringify(proposal()),JSON.stringify(agreement)],"order_edit_stale");
+      expect((await one("select qty from order_lines where id=$1",[line])).qty).toBe(4);
+    } finally {
+      await blocker.query("rollback"); await blocker.end(); await q("rollback");
+      await q("delete from orders where id=$1",[order]);
+      await q("delete from app_users where id=any($1::uuid[])",[[OP,PR,OTHER]]);
+      await q("delete from auth.users where id=any($1::uuid[])",[[OP,PR,OTHER]]);
+      await q("begin");
+    }
   });
 
 });

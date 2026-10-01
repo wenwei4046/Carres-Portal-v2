@@ -2811,13 +2811,17 @@ policy. Current implementation notes elsewhere describe the built 0564 behaviour
 approved target. Neither the earlier all-Principal target nor the withdrawn matrix may be used
 as implementation authority.
 
-**Scoped implementation boundary — 2026-10-01, review branch only.** Migrations 0629–0630 add the
+**Scoped implementation boundary — 2026-10-01, review branch only.** Migrations 0629–0630 and 0632 add the
 qualified Duty and the amendment gates without changing RLS, live assignments or owning PO/money
 writers. Submit + evidence + eligible ordinary application are one transaction; supplier and price
 reviews may arrive in either order, with one effective revision. Pre-submit routing and shared Work
 read that same policy. Supplier answers retain the exact covered line, terms, answer, date, reference,
 actual recorder and time. Ambiguous legacy SKU-only PO lineage is refused until its existing source
-association is known. PIC-addressed activity keeps the colleague as actor and never transfers the PIC.
+association is known. PIC-addressed activity keeps the colleague as actor and never transfers the PIC. A missing PIC uses
+the shared Delivery Duty fallback; an unheld fallback is recorded as unassigned, never notified to
+an invented person. The whole-page commit compares the frozen opened payload under Order/source-line
+locks before writing; stale replacement is atomic. Issued-file capture refuses a newer live revision
+as an earlier original; failed capture retains the approved labelled reconstruction.
 
 Earlier-date readiness reads exact reserved Units, warehouse holder, physical receipt and existing
 Stock sellability; unallocated, showroom, held, repair or damaged goods do not establish readiness.
@@ -2826,10 +2830,18 @@ it does not write the SO date or storage trigger. The partner portal may retain 
 arrangement but cannot originate one without the existing customer-evidence door.
 
 **Still blocked / unchanged:** the existing post-Proceed
-whole-order cancellation refusal remains because its complete cross-module consequences are not yet
-approved. Sales Order refund-obligation approval (`order_refunds` / `refund_decide`) is gated through
+whole-order cancellation refusal remains; the approved whole-domain target is not implemented by
+this scoped commission. Sales Order refund-obligation approval (`order_refunds` / `refund_decide`) is gated through
 Sales Approver; payout is not performed or broadened. Legacy Finance refund APIs remain outside this
 scoped change under Payment MASTER §13; no claim of universal refund-path convergence is made. Fee/service, attribution and ordinary-address policy have not been expanded.
+**Release review — corrected scoped candidate, not production verified.** Stair-fee changes reuse
+existing arithmetic and pinning before review. The same fee inputs/rate are checked under the source
+locks, and the existing fee writer runs with goods/header changes before the immutable snapshot.
+Fee-inclusive impact, final supplier application, rollback, retry and tariff-staleness checks pass
+locally. No staff-amendment post-commit restamping remains. System-priced delivery-charge convergence
+is still outside this commission. Old clients must reload; pending fee-affecting requests without a
+valid quote require guarded re-proposal. Duty availability and exact-head release checks remain
+preflight requirements; the approved PDF reconstruction fallback is not itself a release blocker.
 Verification and review evidence: [Sales Orders Card 14](../cards/CARD-2026-10-01-sales-orders-14-staff-amendments.md) · [PR #1834](https://github.com/wenwei4046/Carres-Portal-v2/pull/1834).
 Neither main merge nor deployment is authorised. The module PLAN is not declared complete.
 

@@ -573,6 +573,19 @@ function draftTemplateData(
 /* Exported for `SalesOrderWorkspace.historical-document.test.ts` — the
    signature rule is a business guarantee about a CUSTOMER DOCUMENT, so it
    is proved by calling the builder, not by grepping this file. */
+/** Read the live sheet first, then prove it still belongs to the minted revision.
+ * If another revision won the race, keep the labelled reconstruction instead of
+ * filing its newer goods/date/money as this revision's issued original. */
+export async function readIssuedDocumentCandidate(
+  revision: number,
+  readCurrent: () => Promise<SalesOrderTemplateData | null>,
+  readLatestRevision: () => Promise<number | null>,
+): Promise<SalesOrderTemplateData | null> {
+  const current = await readCurrent();
+  if (!current || await readLatestRevision() !== revision) return null;
+  return current;
+}
+
 export function snapshotTemplateData(
   snap: SalesOrderSnapshot,
   base: SalesOrderTemplateData | null,
@@ -1224,6 +1237,7 @@ function SalesOrderWorkspaceBody() {
   /* ── The draft — seeded from the order, empty for CREATE. ─────────────── */
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
   const [baseline, setBaseline] = useState<Draft>(EMPTY_DRAFT);
+  const [editBaseline, setEditBaseline] = useState<Record<string, unknown> | null>(null);
   const [draftSeed, setDraftSeed] = useState<string>("");
   const order = detailQ.data?.order;
   const detailLines = detailQ.data?.lines ?? [];
@@ -1321,6 +1335,7 @@ function SalesOrderWorkspaceBody() {
     };
     setDraft(next);
     setBaseline(next);
+    setEditBaseline(detailQ.data?.editBaseline ?? null);
     setDraftSeed(seed);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
@@ -1822,7 +1837,7 @@ function SalesOrderWorkspaceBody() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, editing, order, draft, baseline, storedHeader]);
   const routingProposal = useMemo(() => {
-    if (changeClass?.action !== "submit") return null;
+    if (!changeClass || changeClass.action === "none" || (changeClass.action === "save" && !changeClass.header.some(k => ["delivery_floor", "delivery_has_lift", "delivery_stair_items"].includes(k)))) return null;
     const proposed: Record<string, unknown> = {};
     const header: Record<string, unknown> = {};
     const values = draftHeader();
@@ -1838,7 +1853,9 @@ function SalesOrderWorkspaceBody() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [changeClass, draft]);
   const debouncedRouting = useDebouncedValue(routingProposal, 250);
-  const routingQ = useAmendmentRouting(orderId ?? null, editing ? debouncedRouting : null);
+  const routingQ = useAmendmentRouting(orderId ?? null, editing ? debouncedRouting : null, editBaseline);
+  const reviewAddons: DraftAddon[] = routingProposal && routingQ.data?.priced_addons
+    ? routingQ.data.priced_addons.map((a, i) => ({ ...a, key: a.id ?? `priced-${i}`, attrs: a.attrs ?? null })) : draft.addons;
   /* The count is what the REVIEW lists — one number, one source, so the header
      and the Before/After can never disagree (the summary rows are not changes). */
   const SUMMARY_ROWS = new Set(["Qty", "Services", "Total payable"]);
@@ -1925,7 +1942,7 @@ function SalesOrderWorkspaceBody() {
             : []),
         ],
         before: { lines: baseline.lines as EditLine[], addons: baseline.addons as EditAddon[] },
-        after: { lines: draft.lines as EditLine[], addons: draft.addons as EditAddon[] },
+        after: { lines: draft.lines as EditLine[], addons: reviewAddons as EditAddon[] },
         nameOfSku,
         nameOfAddon,
         categoryOf: categoryOfSku,
@@ -1966,9 +1983,18 @@ function SalesOrderWorkspaceBody() {
   const keepIssuedDocument = async (revision: number | null | undefined) => {
     if (!orderId || !revision) return;
     try {
-      const fresh = await baseQ.refetch();
-      const base0 = fresh.data ?? null;
-      if (!base0) return;
+      const base0 = await readIssuedDocumentCandidate(revision,
+        async () => { const result = await baseQ.refetch(); return result.error ? null : result.data ?? null; },
+        async () => {
+          const result = await revisionsQ.refetch();
+          if (result.error || !result.data?.revisions.length) return null;
+          return Math.max(...result.data.revisions.map((row) => row.revision));
+        },
+      );
+      if (!base0) {
+        toast.error("Reconstructed copy. The original issued document is unavailable.");
+        return;
+      }
       /* ⛔ A NEW VERSION NEVER INHERITS AN OLDER VERSION'S SIGNATURE — owner
          ruling 2026-09-23. `base` carries the order's stored eSign PNG, which
          the customer put on whatever version was in front of them THEN. Storing
@@ -1982,10 +2008,14 @@ function SalesOrderWorkspaceBody() {
         : base0;
       const blob = await renderSalesOrderPdf(issued);
       const out = await storeIssuedSalesOrderDocument(orderId, revision, blob);
-      if (!out.stored) console.error("issued document not kept", { orderId, revision, reason: out.reason });
+      if (!out.stored) {
+        console.error("issued document not kept", { orderId, revision, reason: out.reason });
+        toast.error("Reconstructed copy. The original issued document is unavailable.");
+      }
       void revisionsQ.refetch();
     } catch (e) {
       console.error("issued document not kept", { orderId, revision, reason: e instanceof Error ? e.message : String(e) });
+      toast.error("Reconstructed copy. The original issued document is unavailable.");
     }
   };
 
@@ -2014,7 +2044,10 @@ function SalesOrderWorkspaceBody() {
     const err = validateDraft(false);
     if (err) return void toast.error(err);
     if (!changeReason.trim()) return void toast.error("Reason for change");
+    if (!editBaseline) return void toast.error("Action changed · Review again");
     changesMut.mutate({
+      expected: editBaseline,
+      expectedStairQuote: routingQ.data?.stair_quote ?? null,
       header: draftHeader(),
       lines: liveLines(draft),
       addons: liveAddons(draft),
@@ -3792,13 +3825,13 @@ function SalesOrderWorkspaceBody() {
           footer={<>
             <Button variant="neutral" disabled={changesMut.isPending} onClick={() => setReviewOpen(false)}>Cancel</Button>
             <Button variant="primary" loading={changesMut.isPending}
-              disabled={!changeReason.trim() || liveBlocksCommercial || changeCount === 0 || (changeClass?.action === "submit" && (!routingQ.data || routingQ.isFetching || routingProposal !== debouncedRouting))}
+              disabled={!changeReason.trim() || liveBlocksCommercial || changeCount === 0 || (routingProposal !== null && (!routingQ.data || routingQ.isFetching || routingProposal !== debouncedRouting))}
               onClick={onCommit} data-testid="workspace-confirm-save">{commitWord}</Button>
           </>}>
         <DraftReview
           rows={draftRows}
           routing={routingQ.data}
-          consequences={consequencesFor({ lines: draft.lines, addons: draft.addons, header: draftHeader() })}
+          consequences={consequencesFor({ lines: draft.lines, addons: reviewAddons, header: draftHeader() })}
           commercial={changeClass?.action === "submit"}
           blocked={liveBlocksCommercial ? "An earlier change is still pending." : routingQ.error?.message ?? null}
           reason={changeReason}
