@@ -82,6 +82,28 @@ confirmed document is not automatically a completed physical job. The Houzs ligh
 pill is a reference interaction, not permission to copy its green/brass palette, label vocabulary
 or status mapping. Icons, text and state meaning remain readable without colour alone.
 
+### Three-module alignment evidence — 2026-10-01
+
+**FACT / SOURCE INSPECTION, NOT ALL-PAGE PRODUCTION ACCEPTANCE.** At inspected main
+`86046dde04d29856a78be6a8f7cf0923405f6f00`, use the same table to track actual reuse rather
+than infer delivery from coordination acknowledgments. Sales Order and Purchasing PLAN chats
+acknowledge the shared direction; that does not certify rendered or business parity.
+
+| Surface | Sales Orders | Purchasing PO | Warehouse | Remaining gap / verdict |
+|---|---|---|---|---|
+| Filter rail | workspace-rail FilterRail family | same family | same family in Inbound/Outbound | READY shared source; scoped counts, small-screen use and actual adoption still require page evidence. |
+| Goods expansion | GoodsMiniTable through ExpandedLines | GoodsMiniTable through OrderedGoods | InboundExpansion; Outbound local goods/Unit rendering | Existing implementations, not a missing table engine. Compare and unify compatible visual grammar; preserve receiving/loading-specific facts. |
+| Detail card | SalesOrderWorkspace imports kit/Block | PurchaseOrdersPage imports kit/Block | WarehouseUnitDetail imports kit/Block | READY card source, not proof all complete detail compositions match current law. |
+| Execution workflow | Order amendment | Purchase Review/PDF/send | Receiving and Loading | Different legitimate jobs; reuse controls/feedback, do not force identical forms or share write ownership. |
+| Typography/colour | Same governed kit baseline | Same governed kit baseline | Same governed kit baseline | Contrast findings below apply to candidate pairs; actual overrides/all-state use not yet audited comprehensively. |
+| Work/ownership | Shared Work/Duties contract | same contract | same contract; Unit work currently only Issues | Integration evidence incomplete; do not invent another task list or claim all action links are wired. |
+
+**Shared remaining acceptance:** a real approved exemplar per applicable template; component/source
+mapping for each adopter; reviewed allowed differences; relevant state/viewport evidence; source-owned
+workflow outcomes. Only then may a row be labelled adopted/verified. Existing colour adjustments
+remain proposals; prior confirmations that values are unchanged describe current implementation,
+not approval or deployment of the darker-button proposal.
+
 ### Colour contrast finding — measured palette pairs, 2026-10-01
 
 **FACT / CALCULATED TOKEN PAIRS, NOT A FULL RUNTIME AUDIT.** Using opaque sRGB values
