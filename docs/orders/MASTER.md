@@ -821,6 +821,13 @@ export/selected-visible semantics and personal columns. The overflow trigger is3
 and at least40×40 on touch; keyboard open/close/focus return are required. It owns no order
 business actions. No32px row, rail relocation or fixed48px toolbar ruling is inferred.
 
+**RULING / COMPACT SEARCH — owner approval 2026-10-01.** Desktop search is280px wide,
+32px high, Inter13/18, icon16, radius6, border1; it shrinks with available width and has at
+least40px touch height. Placeholder is `Search orders…`; accessible scope describes verified
+SO/customer/imported-reference search, never claims whole-database phone/item search. Keep the
+result count/current filter summary, Table/Cards and far-right page tools visible. Existing
+Carres semantic palette remains; no new colour values or rail movement are approved.
+
 **Interaction and responsive acceptance.** 1440/1060/825/390 viewport checks in the real shell;
 no page sideways scroll, scroll is contained by the existing DataGrid/goods surfaces. SO identity
 visible on entry; remembered desktop-open filters do not cover it on a narrow first paint or

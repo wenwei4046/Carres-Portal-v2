@@ -4907,3 +4907,5 @@ Workspace message availability: `Message not available` replaces a placeholder d
 | Empty and failure | `Nothing assigned to you` + `See Team Work` · `Nothing due on {date}` + `Open {date}` / `Open Missed` · `No missed work` · `No open work. Every track is clear.` · `Could not refresh {source}` · `Last updated {time}` · `Work could not be loaded. Try again.` | `0` for a failed source |
 
 | Sales Orders pilot page-tools overflow (owner approved 2026-10-01) | `Page tools` (accessible trigger/menu name); `Export` · `Columns` with existing submenu words | Order business actions in page-tools menu |
+
+| Sales Orders pilot compact search (owner approved 2026-10-01) | `Search orders…`; accessible scope `Search sales orders by SO number, customer or imported reference` | Unverified whole-database phone/item search claim |
