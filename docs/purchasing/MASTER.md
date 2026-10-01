@@ -1167,6 +1167,44 @@ the same PO number is recorded for research, not permission for Purchasing to ed
 has no cost/price controls; existing commercial and Finance boundaries remain. This ruling is not
 part of the PO-placement unblock BUILD and is not a whole-module PLAN completion declaration.
 
+### 5.8.3 Customer cancellation — reuse, retain or seek supplier cancellation
+
+**OWNER RULING 2026-10-01 — APPROVED / LOCKED TARGET / NOT BUILT.** Apply only after the
+customer cancellation takes effect through Orders. A request or pending amendment is not effective
+cancellation. Orders hands the affected supplier commitment to Purchasing; it never silently
+cancels the PO. Staff carry out the following ordinary work without a new owner-approval gate.
+
+1. First look for another effective SO requirement for exactly the same model, size, configuration,
+   fabric and colour. Use the existing `Use this PO` reservation capability for suitable incoming
+   goods, preserving the original source and allocation history. Do not take another customer's
+   reserved goods or create a duplicate purchase. Stock retains reservation ownership; actual
+   received goods use its existing Ready Stock path.
+2. If there is no immediate matching customer, retain mattresses and accessories such as pillows
+   and protectors. Continue normal receipt; eligible received goods become unreserved stock for
+   later customers. Do not cancel these merely because the original SO was cancelled.
+3. For bedframes and sofas, consider the actual fabric/colour and resale suitability. Staff may
+   retain common, readily resalable colours (for example white) without asking Jess to approve.
+   For special fabrics/colours that are difficult to resell, ask the supplier whether production
+   has started. If it has not, request cancellation through §5.8.1 and wait for supplier agreement;
+   no request alone releases the outstanding supplier commitment.
+4. If production has begun or finished and cancellation is unavailable, continue the supplier
+   commitment and normal receipt, then retain eligible goods as stock. Goods not yet physically
+   received remain incoming; they never become available stock merely because cancellation failed.
+
+Record the actual staff decision to retain or seek cancellation, its reason, supplier reply,
+affected quantity, person and time. Retain original SO/PO/Unit and allocation history. Ordinary
+staff may help without a reassignment or Jess's approval; choosing to retain existing committed
+goods is not a new purchase and must not create an MPR, additional demand or another PO. This
+specific customer-cancellation retention rule does not authorise unrelated new stock purchases or
+price/payment decisions. It is distinct from §5.8.2's response to supplier inability to supply.
+§5.8.1 still governs effective cancellation, evidence and commercial exceptions.
+
+The 2026-10-01 owner correction replaces the proposal to require Jess's approval before retaining
+common-colour bedframes/sofas. There is no per-case boss approval for these ordinary decisions.
+Source cancellation and subsequent allocation must affect only the relevant source quantity; other
+customers' quantities, actual receipt facts and Stock/Delivery commitments remain governed by their
+owners. UI and implementation must preserve that boundary rather than changing a whole PO line.
+
 ---
 
 ## 6 · Document and Unit identity
