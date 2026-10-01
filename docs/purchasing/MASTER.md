@@ -556,8 +556,8 @@ Add Supplier
 ```
 
 `Product Categories` is a multi-select of the governed Purchasing production categories:
-`Mattress` · `Bedframe` · `Sofa`, with accessory-category coverage required by the 2026-10-01
-production-day ruling in §11. It is never a free-text category creator. Every selected category
+`Mattress` · `Bedframe` · `Sofa`. MP/protectors and pillows follow the warehouse-stock
+ruling in §11; no accessory production-day default is authorised by that ruling. It is never a free-text category creator. Every selected category
 requires its own `Production Days`; one generic supplier lead time is forbidden. For this setup
 door, the selected categories are the authority for which Supplier × Category Production Days rows
 must exist; the form does not wait for a SKU to be linked before those values can be stored.
@@ -1439,12 +1439,15 @@ rather than an identity to invent. The 0442 apply classified 225 SKUs `exact_uni
 0443's preflight restored exactly the 39 `po_mint` Units the retired 0366 destination trigger had
 voided — identities already printed on supplier paper — and invented none.
 
-**ACCESSORY PRODUCTION DAYS — APPROVED TARGET, configuration application not verified.** The
-prior measured four-row production-day configuration could block quantity-mode accessory buying.
-It is historical evidence, not a current live count. The owner has now supplied accessory lead
-time: 7 working days (§11, 2026-10-01). Populate missing applicable Supplier × Category settings
-through the governed audited door; no further owner lead-time question is needed. Verify current
-configuration and the quantity-mode journey before claiming the block resolved.
+**MP / PILLOW STOCK PATH — OWNER CORRECTION 2026-10-01, APPROVED TARGET.** MP (mattress
+protectors) and pillows are warehouse ready stock. Fulfil their customer requirements through the
+existing governed quantity-stock allocation and delivery path, using measured usable stock; do
+not impose a 7-working-day production wait or generate a supplier purchase for stock-covered
+quantity. Historical quantity-mode procurement configuration findings do not establish a customer
+fulfilment lead time. Warehouse stock and supplier replenishment are different facts: actual
+shortages/replenishment retain their existing source/approval path, and any supplier replenishment
+lead time must come from its own evidence/settings, not an invented accessory default. Ready-stock
+business practice does not authorise fabricating stock availability or changing Catalog identity mode.
 
 Legacy showroom stock receives a Unit ID during opening count with supplier, ownership, model,
 location, existing serial/label and photo evidence. Until the physical label is attached, the Unit
@@ -6801,13 +6804,18 @@ Settings lives under the global header gear and requires authorised roles. It in
 - customer-privacy exclusion from supplier documents.
 
 **PRODUCTION-DAY VALUES — OWNER CONFIRMED 2026-10-01, APPROVED / LOCKED.** Mattress: **7 working
-days**; Bedframe: **7 working days**; Sofa: **14 working days**; accessories (including pillows and
-protectors): **7 working days**. The owner reconfirmed the first three as earlier supplied values
-and set accessories to 7. Apply these values to missing applicable Supplier × Category settings,
+days**; Bedframe: **7 working days**; Sofa: **14 working days**. Apply these values to missing
+applicable Supplier × Category settings,
 using the existing supplier-working-calendar calculation, not calendar days or added transit.
 Do not silently replace an existing explicit supplier-specific value. The live set of missing
 rows must be rechecked by the commissioned BUILD; recording this ruling does not claim any
 production data has been changed. Do not ask the owner to supply these values again.
+
+**MP / PILLOW — OWNER CORRECTION 2026-10-01, APPROVED / LOCKED.** MP/protectors and pillows
+are ready stock at the warehouse, not goods requiring a standard 7-working-day production wait.
+Use actual governed stock availability for customer fulfilment. No 7-day accessory default is
+approved, and no such default is to be populated by the placement-unblock BUILD. Supplier
+replenishment timing is separate; this correction neither assigns it 0 days nor invents a value.
 
 Supplier WhatsApp group/email maintenance is an approved §11 capability, not an owner data-entry
 omission. Verify its actual delivery state in BUILD. Resolve a PO's address from its governed
