@@ -586,30 +586,38 @@ here; Warehouse and Purchasing review the common grammar against their own journ
 specific missing contracts. They do not start independent visual systems or copy SO-specific fields,
 approval gates or calculations. This prioritises design review, not all-module implementation.
 
-**KIT FIRST — owner direction reported by Sales PLAN, 2026-10-01.** Update the shared UI/UX
-contract before application work. “Straight to build?” is a question, not a BUILD commission.
-The suggested later implementation boundary is ONE real Carres Sales Order register vertical
-slice, including the requested Table/Cards presentation, shared filtering and existing detail door;
-this is a RECOMMENDATION, not an authorised Card, build plan or whole-module replacement.
-It must use the actual Carres route/components/read model in an isolated local/preview environment,
-not a duplicate static HTML page. Real versus fixture data must be explicitly identified.
-Owner visual review and appropriate business/state evidence precede broad adoption; an isolated
-styling patch is not VERIFIED kit adoption. Proposed 32px rows, quick-view admission and removal
-of governed framed facts remain unapproved. No source-size measurement changes approved values.
+**KIT FIRST + NARROW SO BUILD PILOT — owner approval reported by Sales PLAN, 2026-10-01.**
+After specification is recorded, Jess explicitly approved ONE real Sales Order register pilot
+in existing Sales BUILD chat `01a0f59c-6316-72d0-94dd-1e8600577cd4`. Use a separate isolated
+branch/PR from the existing amendment work. The authorised scope is the actual register route,
+Table/Cards, shared filters and bounded scroll/layout acceptance with the existing detail door.
+Retain current 40/51 baseline row recipes; proposed 32px rows, quick-view admission and removal
+of governed framed facts remain unapproved. No merge, deployment or broad rollout is authorised.
+
+The Sales BUILD chat owns the Orders pilot specification and the authorised implementation;
+this UI PLAN thread owns shared UI/02/03 documentation. Warehouse and Purchasing remain
+DESIGN ONLY. This scoped exception does not authorise prototype/application coding in this thread
+or supersede the no-coding instruction for the wider UI-kit commission. Approval is NOT verified
+adoption. The pilot must use actual Carres route/components/read model in an isolated local/preview
+environment, explicitly label real versus fixture data, and supply owner visual review plus
+appropriate business/state evidence before any later rollout. Duplicate static HTML and isolated
+styling patches are not accepted substitutes. No source-size measurement changes approved values.
 
 The review presents the NEW design only, with traceable Houzs measurements and real Carres
 component mapping. The first example must cover list/disclosure/detail/edit/document, task/result
 where applicable and failure/narrow/keyboard states. Quick-view admission, framed facts and new
 numeric scales remain scoped proposals until owner-reviewed. No visual approval is inferred from
-this sequencing decision. The stop-coding/PLAN boundary remains effective; no new prototype,
-application code, Card or deployment is commissioned. Existing business work in separately
-commissioned lanes is not re-scoped by this design priority.
+this sequencing decision. The shared UI PLAN boundary remains effective. Only the separately commissioned SO pilot above
+may implement its approved slice; no merge/deployment or other module rollout follows. Existing
+business work in separately commissioned lanes is not re-scoped by this design priority.
 
 ### Documentation-only clarification and review freeze — owner instruction 2026-10-01
 
 **RULING / EFFECTIVE NOW:** stop coding, including local review-page changes. The current commission
 is to clarify the existing UI/UX authorities and align the module planners. No application code,
-new prototype code, Cards, deploy or live writes are authorised by it. UI MASTER is the single
+new prototype code, Cards, deploy or live writes in this UI PLAN thread are authorised by it.
+The separately approved SO register pilot is the sole later scoped exception described above;
+Warehouse and Purchasing remain design-only. UI MASTER is the single
 shared authority; there is no separate UX-kit document. 01 owns numeric tokens, 02 component
 contracts, 03 full page/interaction composition, COPY the actual user-facing vocabulary, module
 MASTERs the business rules. This is one design system with several responsibilities, not separate
