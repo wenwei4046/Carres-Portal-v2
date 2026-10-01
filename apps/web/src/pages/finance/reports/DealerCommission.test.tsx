@@ -4,7 +4,7 @@
  * engine's `N of M rows` only exist on that path, so asserting them is what
  * fails if the page goes back to hand-rolled chrome.
  */
-import { fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -46,13 +46,17 @@ beforeEach(() => {
   localStorage.clear();
 });
 
+function renderAt(url = "/") {
+  render(
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <MemoryRouter initialEntries={[url]}><DealerCommission /></MemoryRouter>
+    </QueryClientProvider>,
+  );
+}
+
 describe("Dealer commission", () => {
   it("reports the month through the Register shell", async () => {
-    render(
-      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-        <MemoryRouter><DealerCommission /></MemoryRouter>
-      </QueryClientProvider>,
-    );
+    renderAt();
 
     await screen.findByText("Ace Furniture");
     expect(screen.getByText("RM 50.00")).toBeTruthy();
@@ -64,24 +68,35 @@ describe("Dealer commission", () => {
     // The scope sits in the register's toolbar, so it is inside the grid frame.
     expect(screen.getByTestId("grid-footer")).toBeTruthy();
     expect(screen.getByText("Showroom")).toBeTruthy();
+    // The settings live on their own views: no settings card under the report.
+    expect(screen.getByTestId("dealer-commission-switch")).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "Commission rates" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Renovation quotas" })).toBeNull();
   });
 
-  it("opens the quota form for the dealer whose Quota left reads No quota", async () => {
-    render(
-      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-        <MemoryRouter><DealerCommission /></MemoryRouter>
-      </QueryClientProvider>,
-    );
+  it("shows one settings card per view", async () => {
+    renderAt("/?view=rates");
+    await screen.findByRole("heading", { name: "Commission rates" });
+    expect(screen.queryByRole("heading", { name: "Renovation quotas" })).toBeNull();
+    expect(screen.queryByTestId("dealer-commission-summary")).toBeNull();
+    cleanup();
+
+    renderAt("/?view=quotas");
+    await screen.findByRole("heading", { name: "Renovation quotas" });
+    expect(screen.queryByRole("heading", { name: "Commission rates" })).toBeNull();
+  });
+
+  it("opens the quota form on the quotas view for the dealer whose Quota left reads No quota", async () => {
+    renderAt();
 
     await screen.findByText("Ace Furniture");
-    // Both cards still draw under the register.
-    expect(screen.getByRole("heading", { name: "Commission rates" })).toBeTruthy();
-    expect(screen.getByRole("heading", { name: "Renovation quotas" })).toBeTruthy();
-
     // Rebate this month stays plain words; only Quota left is the way in.
     fireEvent.click(screen.getByRole("button", { name: "No quota" }));
     const dialog = await screen.findByRole("dialog");
     expect(dialog).toHaveTextContent("Renovation quota");
     expect(dialog).toHaveTextContent("Ace Furniture");
+    // The page moved to the quotas view underneath the form (hidden while the form is open).
+    expect(screen.getByRole("heading", { name: "Renovation quotas", hidden: true })).toBeTruthy();
+    expect(screen.queryByTestId("dealer-commission-summary")).toBeNull();
   });
 });
