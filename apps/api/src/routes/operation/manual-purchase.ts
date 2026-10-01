@@ -12,7 +12,6 @@ import {
   poSupplierDeliveryDateOf,
   type PoDatePromise,
   PURCHASING_REFUSAL_CODES,
-  catalogCostBlocksIssue,
   purchasingRefusal,
   purchasingSuppliersOnly,
   railItemLabel,
@@ -669,7 +668,7 @@ manualPurchaseRouter.get("/", requireOperation, async (c) => {
       .order("name"),
     sb
       .from("suppliers")
-      .select("id, name, kind, address, whatsapp_group_url, contact_email, contact"),
+      .select("id, name, kind, address, whatsapp_group_url, po_send_channel, contact_email, contact"),
     sb.from("app_users").select("id, name, email"),
     forCaseIds.length > 0
       ? sb
@@ -854,6 +853,7 @@ manualPurchaseRouter.get("/", requireOperation, async (c) => {
         address: (r.address as string | null) ?? null,
         whatsappGroupUrl: (r.whatsapp_group_url as string | null) ?? null,
         contactEmail: (r.contact_email as string | null) ?? null,
+        poSendChannel: (r.po_send_channel as string | null) ?? null,
         contact: (r.contact as string | null) ?? null,
       };
     }),
@@ -2500,9 +2500,9 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
   /* ⭐ THE SETTINGS THE PO's OWN DELIVERY DATE IS COMPUTED FROM (owner
      correction 2026-09-22). Read ONCE for the whole batch, through the one
      loader every purchasing surface uses — a second reader of the same numbers
-     is how two screens came to disagree about a 13-day supplier. A failed read
-     is not a guessed date: the POs are then born with none, and the paper says
-     `Not recorded`. */
+     is how two screens came to disagree about a 13-day supplier. A missing
+     furniture production value blocks issue by name; a failed read never
+     creates a document with a guessed date. */
   let settings: LoadedPurchasingSettings | null = null;
   try {
     settings = await loadPurchasingSettings(sb);
@@ -2552,12 +2552,11 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
        treatment. Recording the price later is Finance's own act, not a
        re-issue. A price that IS recorded keeps every existing rule, including
        the free-of-charge reason. */
-    /* Catalog is the commercial authority for this normal purchase. The
-       creation RPC rechecks the same value inside the transaction. ONE cost
-       rule with SO Batch (`catalogCostBlocksIssue`): only a recorded price
-       that is not positive refuses. */
-    if (catalogCostBlocksIssue(cat.cost)) {
-      return refuse(c, 422, "cost_required", { sku: l.sku as string });
+    if (["mattress", "bedframe", "sofa"].includes(cat.category) &&
+        !settings?.productionDays.some((p) => p.supplierId === cat.supplierId && p.category === cat.category)) {
+      return refuse(c, 422, "production_days_required", {
+        sku: l.sku as string, supplier: supplierNameById.get(cat.supplierId) ?? null,
+      });
     }
     /* 0443 · named before the transaction, not as a rolled-back batch. */
     if (cat.stockIdentityMode == null) {
@@ -2650,10 +2649,8 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
          promise — a request raised for a showroom two months out used to put
          that far date on the factory's paper as if the factory had agreed it.
  
-         A supplier × category with no recorded production number yields NULL:
-         the PO is born with no delivery date and prints `Not recorded`,
-         because an unknown date is recorded as unknown (P1) — never today's
-         planning guess, and never the requester's wish. */
+         A missing furniture production number was refused above. Other categories
+         retain their own lead-time model; no furniture default is invented. */
       eta_date: settings == null ? null : poDeliveryDateOf(settings, {
         supplierId: first.supplierId,
         category: first.category,
@@ -2669,9 +2666,8 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
            for "price not recorded"; `normal` would claim a number nobody
            recorded and `free_of_charge` would claim a decision nobody made. */
         const cost = catalog.get(l.sku as string)!.cost;
-        // A recorded non-positive price was refused above; what is left is a
-        // positive price or the honest absence of one.
-        const priced = cost != null;
+        // Do not turn an invalid Catalog value into a free-of-charge decision.
+        const priced = cost != null && Number.isFinite(cost) && cost > 0;
         return {
           sku: l.sku,
           qty: l.issueQty,
@@ -2734,13 +2730,14 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
   if (issuedSupplierIds.length > 0) {
     const { data: doorRows } = await sb
       .from("suppliers")
-      .select("id, name, whatsapp_group_url, contact_email, contact")
+      .select("id, name, whatsapp_group_url, po_send_channel, contact_email, contact")
       .in("id", issuedSupplierIds);
     for (const row of (doorRows ?? []) as Record<string, unknown>[]) {
       doorsBySupplier.set(row.id as string, {
         name: (row.name as string | null) ?? null,
         whatsappGroupUrl: (row.whatsapp_group_url as string | null) ?? null,
         contactEmail: (row.contact_email as string | null) ?? null,
+        poSendChannel: (row.po_send_channel as string | null) ?? null,
         contact: (row.contact as string | null) ?? null,
       });
     }
@@ -2768,6 +2765,7 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
         destination: destNameById.get((po?.destination_id as string) ?? "") ?? null,
         whatsappGroupUrl: doors?.whatsappGroupUrl ?? null,
         contactEmail: doors?.contactEmail ?? null,
+        poSendChannel: doors?.poSendChannel ?? null,
         contact: doors?.contact ?? null,
       };
     }),

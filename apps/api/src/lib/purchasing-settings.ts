@@ -115,7 +115,7 @@ export async function loadPurchasingSettings(
       .from("product_skus")
       .select("supplier_id, product_models!inner(category)")
       .not("supplier_id", "is", null),
-    sb.from("suppliers").select("id, name, kind, cat_covered, terms_days, address, return_address"),
+    sb.from("suppliers").select("id, name, kind, cat_covered, terms_days, address, return_address, whatsapp_group_url, po_send_channel, contact_email"),
     sb.from("purchasing_production_days").select("supplier_id, category, working_days"),
     sb
       .from("purchasing_supplier_settings")
@@ -180,7 +180,7 @@ export async function loadPurchasingSettings(
 
   const nameById = new Map<string, string>();
   const termsById = new Map<string, number | null>();
-  const addressById = new Map<string, { address: string | null; returnAddress: string | null }>();
+  const addressById = new Map<string, { address: string | null; returnAddress: string | null; whatsappGroupUrl: string | null; contactEmail: string | null; poSendChannel: string | null }>();
   const factoryPickupSupplierIds: string[] = [];
   /* 0477 — Finance's other creditors (a landlord, an advertiser) share the
      table. They make nothing, so they never get a Settings row, even if a
@@ -192,6 +192,9 @@ export async function loadPurchasingSettings(
     addressById.set(row.id as string, {
       address: (row.address as string | null) ?? null,
       returnAddress: (row.return_address as string | null) ?? null,
+      whatsappGroupUrl: (row.whatsapp_group_url as string | null) ?? null,
+      contactEmail: (row.contact_email as string | null) ?? null,
+      poSendChannel: (row.po_send_channel as string | null) ?? null,
     });
     if (row.kind === "factory_pickup") factoryPickupSupplierIds.push(row.id as string);
     if (isOtherCreditor(row)) otherCreditorIds.add(row.id as string);
@@ -207,6 +210,9 @@ export async function loadPurchasingSettings(
       termsDays: termsById.get(id) ?? null,
       address: addressById.get(id)?.address ?? null,
       returnAddress: addressById.get(id)?.returnAddress ?? null,
+      whatsappGroupUrl: addressById.get(id)?.whatsappGroupUrl ?? null,
+      contactEmail: addressById.get(id)?.contactEmail ?? null,
+      poSendChannel: addressById.get(id)?.poSendChannel ?? null,
     }))
     .sort((a, b) => a.name.localeCompare(b.name));
 

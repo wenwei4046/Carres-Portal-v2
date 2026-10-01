@@ -118,16 +118,10 @@ export const PURCHASE_DEMAND_STATES: readonly PurchaseDemandState[] = [
   "no_pickup_partner",
 ] as const;
 
-/**
- * ⭐ ONE COST RULE FOR THE ROW AND THE ISSUE DOOR (owner instruction
- * 2026-09-23, 0573). A Catalog price that is NOT RECORDED never stops the
- * order: the PO line is born with no commercial claim. Only a price that IS
- * recorded but is not positive is a Catalog mistake, and it refuses by name
- * (`cost_required`). SO Batch selectability and `/to-order/issue` both ask
- * this function, so the row can never refuse what the door would accept.
- */
-export function catalogCostBlocksIssue(cost: number | null | undefined): boolean {
-  return cost != null && !(cost > 0);
+/** Price resolution belongs to commercial approval, never operational eligibility.
+ * Owner ruling 2026-10-01. Retained as the shared row/door contract. */
+export function catalogCostBlocksIssue(_cost: number | null | undefined): boolean {
+  return false;
 }
 
 export function isPurchaseDemandTimingState(v: unknown): v is PurchaseDemandTimingState {

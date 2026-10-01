@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  catalogCostBlocksIssue,
   PURCHASE_DEMAND_STATES,
   PURCHASE_DEMAND_TIMING_STATES,
   PURCHASE_DEMAND_WORDS,
@@ -818,5 +819,11 @@ describe("purchaseDemandSafetyDaysLeft — the margin the timing state is made o
       if (state === "safety_days_full") expect(left).toBe(base.safetyDays);
       if (state === "can_order_early") expect(left).toBeGreaterThan(base.safetyDays);
     }
+  });
+});
+
+ describe("operational price independence", () => {
+  it.each([null, undefined, 0, -1, 100])("price %s never blocks selection", (cost) => {
+    expect(catalogCostBlocksIssue(cost)).toBe(false);
   });
 });

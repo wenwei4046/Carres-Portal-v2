@@ -103,6 +103,9 @@ export interface PurchasingSupplierRow {
   /** 0609/0611 — the Purchase Return `Return To` (Purchasing §9.6). Null =
    *  not recorded, and Issue Purchase Return refuses. Never the `address`. */
   returnAddress?: string | null;
+  whatsappGroupUrl?: string | null;
+  contactEmail?: string | null;
+  poSendChannel?: string | null;
 }
 
 /** One edit: who, when, and what it was before. */
@@ -472,6 +475,9 @@ export const purchasingSettingsResponseSchema = z.object({
       /** 0611 · the two supplier addresses. Optional for an older Worker. */
       address: z.string().nullable().optional(),
       returnAddress: z.string().nullable().optional(),
+      whatsappGroupUrl: z.string().nullable().optional(),
+      contactEmail: z.string().nullable().optional(),
+      poSendChannel: z.string().nullable().optional(),
       /** 0585 · the supplier's own earlier last PO time (`HH:MM`); null =
        *  the standard PO windows. Optional for an older Worker. */
       poCutoff: z.string().nullable().optional(),
@@ -773,3 +779,17 @@ export function poWindowsHistoryLabel(raw: string): string {
   const two = clockWordOf(second);
   return state === "on" && two ? `${one} and ${two}` : `${one}, second window off`;
 }
+
+/** One contact field per save; the other channel is preserved. */
+export const purchasingSetSupplierChannelInput = z.object({
+  supplierId: z.string().uuid(),
+  kind: z.enum(["whatsappGroupUrl", "contactEmail", "poSendChannel"]),
+  text: z.string().trim().max(500),
+}).strict().superRefine((value, ctx) => {
+  if (!value.text) return;
+  const valid = value.kind === "poSendChannel" ? ["email", "whatsapp"].includes(value.text) : value.kind === "contactEmail"
+    ? z.string().email().safeParse(value.text).success
+    : /^https:\/\/chat\.whatsapp\.com\/[A-Za-z0-9]+(?:\?[^\s]*)?$/.test(value.text);
+  if (!valid) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["text"], message: "Invalid value" });
+});
+export type PurchasingSetSupplierChannelInput = z.infer<typeof purchasingSetSupplierChannelInput>;

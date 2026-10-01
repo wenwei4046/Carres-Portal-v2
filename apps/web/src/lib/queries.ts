@@ -235,6 +235,7 @@ import {
   type PurchasingSetProductionDaysInput,
   type PurchasingSetSupplierTermsDaysInput,
   type PurchasingSetSupplierAddressInput,
+  type PurchasingSetSupplierChannelInput,
   type PurchasingSetWorkWeekInput,
   type PurchasingUpdateDestinationInput,
   type PurchasingSetSupplierCollectionInput,
@@ -2638,6 +2639,7 @@ export interface SupplierRow {
   whatsapp_group_url: string | null;
   /** The mailto: door's address (0313 — the ONE email column). */
   contact_email?: string | null;
+  po_send_channel?: string | null;
 }
 export interface SuppliersListResponse {
   suppliers: SupplierRow[];
@@ -5168,6 +5170,7 @@ export interface ManualPurchaseRegisterPayload {
     address?: string | null;
     whatsappGroupUrl?: string | null;
     contactEmail?: string | null;
+    poSendChannel?: string | null;
     contact?: string | null;
   }>;
   users: Array<{ id: string; name: string | null }>;
@@ -5315,6 +5318,7 @@ export function useIssuePurchaseRequests() {
           destination: string | null;
           whatsappGroupUrl?: string | null;
           contactEmail?: string | null;
+          poSendChannel?: string | null;
           contact?: string | null;
         }>;
       }>(
@@ -12462,4 +12466,8 @@ export function useSaveWorkActivitySettings() {
     onSuccess: (data) => client.setQueryData(qk.operation.workActivitySettings(), data),
     onError: () => { void client.invalidateQueries({ queryKey: qk.operation.workActivitySettings() }); },
   });
+}
+
+export function useSetSupplierChannel() {
+  return usePurchasingSettingsMutation<PurchasingSetSupplierChannelInput>("/supplier-channel");
 }

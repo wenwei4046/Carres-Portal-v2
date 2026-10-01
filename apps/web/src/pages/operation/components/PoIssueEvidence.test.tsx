@@ -182,11 +182,11 @@ describe("persisted evidence survives a reload", () => {
 });
 
 describe("the form opens on the supplier's RECORDED channel (Jess's send lines, 2026-09-25)", () => {
-  it("an email-only supplier opens on Email with its address — the Work line says Click Email", async () => {
+  it.each([false, true])("email default prefills its address with a saved WhatsApp group: %s", async (hasGroup) => {
     apiFetch.mockResolvedValue({ ok: true });
     render(
       <PoIssueEvidence
-        po={{ ...PO, whatsappGroupUrl: null, contact: null, contactEmail: "buy@hooka.my" }}
+        po={{ ...PO, whatsappGroupUrl: hasGroup ? "https://chat.whatsapp.com/KeepHistory" : null, contact: null, contactEmail: "buy@hooka.my", poSendChannel: "email" }}
         version={1}
         evidence={[]}
         doors={DOORS}

@@ -1735,18 +1735,19 @@ describe("the retired door's laws, re-asked of the batch door", () => {
     expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
   });
 
-  it("⛔ a RECORDED zero is not an absence — it stops the batch rather than becoming RM0", async () => {
+  it.each([0, -1])("a Catalog price issue (%s) permits issue without approving a price", async (cost) => {
     const tables = TABLES();
     (tables.product_skus.data as Record<string, unknown>[]).forEach((r) => {
-      if (r.sku === "5539-CNR") r.cost = 0;
+      if (r.sku === "5539-CNR") r.cost = cost;
     });
     const { sb, demands } = await ready(tables);
     const res = await postBatch({ selections: allTo(demands, KLANG) });
-    expect(res.status).toBe(422);
-    const body = (await res.json()) as { code?: string; sku?: string };
-    expect(body.code).toBe("cost_required");
-    expect(body.sku).toBe("5539-CNR");
-    expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
+    expect(res.status).toBe(200);
+    const lines = (batchArgs(sb) as unknown as { lines: Record<string, unknown>[] }[]).flatMap((po) => po.lines);
+    expect(lines.find((l) => l.sku === "5539-CNR")).toMatchObject({
+      cost: null, cost_source: null, commercial_treatment: null, expected_catalog_cost: null,
+    });
+    expect((tables.product_skus.data as Record<string, unknown>[]).find((r) => r.sku === "5539-CNR")?.cost).toBe(cost);
   });
 
   it("the whole batch stops — a priced document is not quietly issued alone", async () => {

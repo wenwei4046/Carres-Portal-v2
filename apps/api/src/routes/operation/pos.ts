@@ -1548,7 +1548,7 @@ operationPosRouter.get("/:id/issue-context", requireOperation, async (c) => {
   if (!po) return c.json({ message: "PO not found" }, 404);
   if (po.status === "cancelled") return c.json({ message: "Cancelled POs cannot be printed" }, 422);
   const [supplier, destination] = await Promise.all([
-    sb.from("suppliers").select("name, whatsapp_group_url, contact_email, contact")
+    sb.from("suppliers").select("name, whatsapp_group_url, po_send_channel, contact_email, contact")
       .eq("id", po.supplier_id).maybeSingle(),
     sb.from("purchasing_destinations").select("name")
       .eq("id", po.destination_id).maybeSingle(),
@@ -1563,6 +1563,7 @@ operationPosRouter.get("/:id/issue-context", requireOperation, async (c) => {
     destination: destination.data?.name ?? null,
     whatsappGroupUrl: supplier.data?.whatsapp_group_url ?? null,
     contactEmail: supplier.data?.contact_email ?? null,
+    poSendChannel: supplier.data?.po_send_channel ?? null,
     contact: supplier.data?.contact ?? null,
   });
 });

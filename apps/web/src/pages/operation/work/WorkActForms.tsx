@@ -82,6 +82,7 @@ export function SendPoForm({ poId, documentNo, supplierName, onDone, onCancel }:
     destination: destinations.find((d) => d.id === found.destination_id)?.name ?? null,
     whatsappGroupUrl: supplier?.whatsapp_group_url ?? null,
     contactEmail: supplier?.contact_email ?? null,
+    poSendChannel: supplier?.po_send_channel ?? null,
     contact: supplier?.contact ?? null,
   };
   return (

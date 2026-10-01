@@ -58,8 +58,10 @@ export function poSendChannelOf(doors: {
   whatsappGroupUrl?: string | null;
   contact?: string | null;
   contactEmail?: string | null;
+  poSendChannel?: string | null;
 } | null | undefined): PoSendChannel {
   if (!doors) return null;
+  if (doors.poSendChannel === "email" && doors.contactEmail?.trim()) return "email";
   if (doors.whatsappGroupUrl?.trim() || (doors.contact ?? "").replace(/\D/g, "")) return "whatsapp";
   if (doors.contactEmail?.trim()) return "email";
   return null;
@@ -264,6 +266,7 @@ export interface PoWindowSupplierDoors {
   whatsapp_group_url?: string | null;
   contact?: string | null;
   contact_email?: string | null;
+  po_send_channel?: string | null;
 }
 
 /**
@@ -308,6 +311,7 @@ export function poWindowWorkFromSoBatch(
         whatsappGroupUrl: door.whatsapp_group_url ?? null,
         contact: door.contact ?? null,
         contactEmail: door.contact_email ?? null,
+        poSendChannel: door.po_send_channel ?? null,
       } : null);
     },
     ...(opts.keepClosed ? { keepClosed: true } : {}),
