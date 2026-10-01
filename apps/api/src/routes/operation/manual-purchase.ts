@@ -2724,6 +2724,7 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
       name: string | null;
       whatsappGroupUrl: string | null;
       contactEmail: string | null;
+      poSendChannel: string | null;
       contact: string | null;
     }
   >();
