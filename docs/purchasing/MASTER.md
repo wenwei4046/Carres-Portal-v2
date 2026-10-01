@@ -800,10 +800,12 @@ the top of the form because one Supplier DO normally covers the delivery; each l
 quantity it covers. Exact-unit lines split by quantity only; Receiving verifies which Units arrive.
 The PO's `PO {n}-Day Delivery Date` (register column `PO Delivery Date`; `n` = the Settings value
 recorded on that PO at issue, never later Settings) never changes; every answer is append-only
-History with evidence, and the newest answer per line is the line's `Supplier Confirmed Delivery
-Date`. A supplier date answer creates no PO revision and no resend; changing quantity, goods or
+History with evidence; the newest explicit delivery-date answer per line governs its
+`Supplier Confirmed Delivery Date`. A supply-recovery estimate or inability-to-supply fact never
+replaces that delivery promise. A supplier date answer creates no PO revision and no resend; changing quantity, goods or
 Deliver To is a PO change (new version), not an answer. Goods that arrive early without notice need
-no answer — Receiving records them. A supplier that cannot supply is a PO exception, not an answer.
+no answer — Receiving records them. Record inability to supply through the same answer entrance
+under §5.8.2; its consequence is a supply exception, not a delivery-date answer.
 Each batch derives its own day-before occurrence.
 
 **PRODUCTION RECORD 2026-09-26 (Blueprint segments 1–2).** Migration
@@ -1067,6 +1069,77 @@ actors when colleagues help, and expose the Finance continuation without leaking
 Operation. Evidence and the current receipt check are required; approver absence does not block
 an evidenced ordinary no-fee cancellation. This approved rule does not commission application
 implementation or expand the separate PO-placement unblock BUILD scope.
+
+
+### 5.8.2 Supplier cannot supply — source-owned decisions
+
+**OWNER RULING 2026-10-01 — APPROVED / LOCKED TARGET / NOT BUILT.** Reuse the existing
+`Record supplier answer` form and shared evidence uploader; add `Cannot supply`, not a second
+supplier-response form or a SKU-substitution engine. The shipped date-answer implementation in
+§5.7 is evidence of the existing entrance, not proof this exception capability is built.
+
+**Record facts first.** An authorised supplier-answer recorder identifies the affected PO goods,
+quantity and source allocations, records a reason and traceable screenshot/email/PDF evidence,
+and may record an estimated supply-recovery date and a supplier-suggested Catalog alternative.
+Reasons are `Model out of stock`, `Fabric out of stock`, `Discontinued` and `Other` (explain Other).
+An alternative is a suggestion only: recording it changes no SKU, demand, PO, Unit or approval.
+Recording `Cannot supply` does not automatically cancel anything. A recovery estimate never
+updates `Supplier Confirmed Delivery Date`; only an explicit delivery commitment goes through the
+existing date-answer flow. Unknown recovery dates remain unknown and do not remove follow-up.
+
+**Retain coverage, expose risk.** While the source decision or cancellation is pending, retain the
+existing PO coverage so ordinary buying cannot duplicate it. Show the supply risk and the exact
+unresolved source action in the PO, affected SO Order Route and shared Work. A retained quantity
+must not be presented as assurance of normal delivery. Use the shared Work Engine and existing
+source writers, not a parallel status engine or duplicate source-edit form.
+
+| Affected source | Waiting fact | Follow-up and decision boundary |
+|---|---|---|
+| Customer SO | `Waiting for customer decision` | SO PIC obtains the customer's wait/change/cancel decision. Orders owns amendment submission, approval and application. A submitted or rejected amendment changes no live requirement. |
+| Manual Purchase | `Waiting for requester decision` | Requester proposes the response; authorised colleagues may assist under existing permissions. Changing already-approved goods requires a linked new request through the existing approval flow. No requester gains approval or self-approval rights. |
+| Showroom display | `Waiting for showroom decision` | Follow the Display Request's existing negotiating Sales, agreement and approval boundaries (§9.13). Operation may record supplied facts on behalf of Sales; this does not grant commercial approval. A purchased display retains its Manual Purchase approval path. |
+| Missing or unverified source | `Waiting for Purchasing decision` | Purchasing Approver handles the source-integrity exception first. Name the missing historical evidence; never guess a source, create an independent unsourced purchase or bypass approval. |
+
+Purchasing Approver is resolved through Staff & Duties; Jess is the current approver. No Manager
+position is required or invented. Hiring a manager grants no approval rights automatically; any
+future authority change requires explicit owner authorisation. Source-owned approvals such as
+Orders approvals retain their own existing rules. Work assignment is accountability, not a
+requirement that only the assigned employee may record authorised work; preserve actual actors.
+
+**One decision per affected source quantity.** Use the authoritative source allocations and exact
+Unit reservations, not SKU matching or one chosen customer representing a combined PO line. A
+customer's decision affects only that source's quantity; other customers and Manual Purchase
+allocations remain intact. Missing or ambiguous allocation is an explicit exception, not guessed
+permission to cancel the whole line.
+
+**After a decision.**
+- **Wait:** preserve the exception and its follow-up. Record a recovery estimate as an estimate;
+  update delivery-date facts only after the supplier actually commits to delivery.
+- **Change:** apply the owning source's approved change first. Handle the old supplier commitment
+  under §5.8.1; buy the newly authorised requirement through SO Batch or Manual Purchase's existing
+  issue flow on a new PO. Never replace SKU on the original PO or rewrite old documents/Units.
+- **Manual replacement:** link the new request to the old request. The approved replacement must
+  explicitly stop procurement of the superseded old demand scope while retaining its history;
+  approval of new goods cannot leave both old and new requirements purchasable. Cancelling the old
+  PO alone is insufficient because §5.1 would restore any still-valid old need. A pending/rejected
+  replacement grants no new purchasing authority. The old supplier commitment remains separately
+  governed until its cancellation is effective.
+- **Cancel:** source cancellation must actually take effect through its owner. Purchasing then
+  settles only the affected supplier commitment through §5.8.1; source approval never silently
+  reduces a PO, voids received goods or settles money.
+- **Choose the cancellation path from evidence:** an explicit supplier inability to supply the
+  exact affected quantity can use §5.8.1's supplier-initiated path, subject to its exception gates.
+  Otherwise use the Carres-requested path and obtain supplier agreement. An Orders amendment does
+  not force every cancellation into one path, and a bare `Cannot supply` selection is not itself
+  completed cancellation evidence.
+
+**Intentional boundary and acceptance.** Retain original PO/SKU/Unit lineage, source decisions,
+actual actors and evidence. Different customers on one PO line may wait/change/cancel independently.
+Neither a pending supplier answer nor a pending amendment creates duplicate buying. An approved
+Manual replacement cannot resurrect the superseded old requirement. The supplier's preference for
+the same PO number is recorded for research, not permission for Purchasing to edit SKU. Operation
+has no cost/price controls; existing commercial and Finance boundaries remain. This ruling is not
+part of the PO-placement unblock BUILD and is not a whole-module PLAN completion declaration.
 
 ---
 
