@@ -117,9 +117,12 @@ describe("Finance Settings — the money accounts", () => {
     show();
     expect(screen.getByTestId("finance-settings-destination-header")).toHaveTextContent("Finance Settings");
     await screen.findByText("Public Bank");
-    expect(screen.getByText("Online payment")).toBeInTheDocument();
-    expect(screen.getAllByText("Bank transfer")).toHaveLength(2);
+    expect(screen.getByText("Card and online holding")).toBeInTheDocument();
+    expect(screen.getAllByText("Bank account")).toHaveLength(2);
     expect(screen.getByText("Not active")).toBeInTheDocument();
+    /* The kind has its own word, not a pay method's (YH, 1 Oct 2026). */
+    expect(screen.queryByText("Online payment")).not.toBeInTheDocument();
+    expect(screen.queryByText("Bank transfer")).not.toBeInTheDocument();
   });
 
   it("adds a bank: the name and the kind, never a code", async () => {
@@ -135,14 +138,15 @@ describe("Finance Settings — the money accounts", () => {
     expect(writes()[0]).toEqual({ key: "POST /", body: { name: "CIMB", kind: "BANK" } });
   });
 
-  it("adds a holding account when the kind is Online payment", async () => {
+  it("adds a holding account when the kind is Card and online holding", async () => {
     show();
     await screen.findByText("Public Bank");
     fireEvent.click(screen.getByRole("button", { name: "Add a money account" }));
     const dialog = await screen.findByRole("dialog");
     fireEvent.change(within(dialog).getByLabelText(/Name/), { target: { value: "Stripe" } });
     fireEvent.keyDown(within(dialog).getByRole("combobox", { name: /Kind/ }), { key: "Enter" });
-    fireEvent.click(await screen.findByRole("option", { name: "Online payment" }));
+    expect(screen.getAllByRole("option").map((o) => o.textContent)).toEqual(["Bank account", "Card and online holding"]);
+    fireEvent.click(await screen.findByRole("option", { name: "Card and online holding" }));
     fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
     await waitFor(() => expect(writes()).toHaveLength(1));
     expect(writes()[0]).toEqual({ key: "POST /", body: { name: "Stripe", kind: "HOLDING" } });
@@ -345,6 +349,9 @@ describe("Finance Settings — card payout banks (0541)", () => {
     expect(row).toHaveTextContent("1131 · GHL · Dealer → 1121 · Public Bank");
     fireEvent.click(row);
     const dialog = await screen.findByRole("dialog");
+    /* The holding side wears the kind's word, not "Card account". */
+    expect(within(dialog).getByRole("combobox", { name: /Card and online holding/ })).toBeInTheDocument();
+    expect(within(dialog).queryByText("Card account")).not.toBeInTheDocument();
     fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
     await waitFor(() => expect(writes()).toHaveLength(1));
     expect(writes()[0]).toEqual({ key: "POST /card-routes", body: { holding_code: "1131", channel: "dealer", bank_code: "1121" } });
