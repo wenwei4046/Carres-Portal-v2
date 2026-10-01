@@ -1473,3 +1473,16 @@ div:first-child > .columnsMenuGroup {
   .rootReference[data-presentation-tools] [data-kit="checkbox"] { position: relative; }
   .rootReference[data-presentation-tools] [data-kit="checkbox"]::after { content: ""; position: absolute; inset: -12px; }
 }
+
+/* SO template correction: summary left, one right-aligned tools cluster. */
+.rootReference[data-presentation-tools] .toolbar:not(.selectionBar) { height: 41px; min-height: 41px; padding: 4px 12px; }
+.rootReference[data-presentation-tools] .toolbar > .searchResponsiveBox { order: 2; margin-left: auto; }
+.rootReference[data-presentation-tools] .toolbar > span { order: 0; }
+.rootReference[data-presentation-tools] .toolbar > [data-kit],
+.rootReference[data-presentation-tools] .toolbar > div:has(> [data-kit="tabs"]) { order: 3; }
+.pageTools { order: 4; flex: none; }
+.rootReference[data-presentation-tools] .toolbar > div:has(> [data-kit="tabs"]) { flex: none; }
+@media (max-width: 767px) { .rootReference[data-presentation-tools] .toolbar:not(.selectionBar) { height: 49px; min-height: 49px; } }
+@media (max-width: 767px) {
+ .rootReference[data-presentation-tools][data-row-height="32"] .td { height: 40px; }
+}

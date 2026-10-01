@@ -486,7 +486,7 @@ export type DataGridProps<T> = {
    * 2026-09-26: 8 + 18 + 2 + 14 + 8 + 1px rule), for a register whose cells
    * carry a document over its goods identity (Supplier Claims, §9.5).
    */
-  rowHeight?: 38 | 40 | 51 | 72;
+  rowHeight?: 32 | 38 | 40 | 51 | 72;
   /** show "Drag a column header here to group by that column" banner */
   groupBanner?: boolean;
   emptyMessage?: string;
@@ -3190,7 +3190,7 @@ function DataGridInner<T>({
         </div>
         {!isLoading && errorState == null && toolbarSummary?.(sortedRows)}
         {isReference && toolbarEnd}
-        {presentationTools && <div className="ml-auto shrink-0">
+        {presentationTools && <div className={styles.pageTools}>
           <DropdownMenu label="Page tools" trigger={<Button ref={pageToolsRef} iconOnly icon="overflow" aria-label="Page tools" />}
             items={[
               { key: "export", label: "Export", icon: "download", disabled: sortedRows.length === 0, onSelect: () => {

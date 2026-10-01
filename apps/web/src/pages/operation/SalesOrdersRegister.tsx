@@ -670,7 +670,7 @@ function GoodsSummary({ row, onOpen, compact = false }: { row: RegisterRow; onOp
   const extra = Math.max(0, (row.o.order_lines?.length ?? 0) - 1);
   const suffix = extra ? ` + ${extra} more` : "";
   const first = suffix && row.items.endsWith(suffix) ? row.items.slice(0, -suffix.length) : row.items;
-  return <button type="button" className={`flex min-h-10 w-full min-w-0 items-center gap-1 text-left text-body hover:text-kit-blue-11 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9 ${compact ? "-my-px" : ""}`}
+  return <button type="button" className={`flex min-h-10 md:min-h-8 w-full min-w-0 items-center gap-1 text-left text-body hover:text-kit-blue-11 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9 ${compact ? "-my-px" : ""}`}
     aria-label={`Items · SO-${row.so}`} title={row.items} onClick={(event) => { event.stopPropagation(); onOpen(row); }}>
     <span className="min-w-0 truncate">{first}</span>{extra > 0 && <span className="shrink-0 font-medium">+{extra}</span>}
   </button>;
@@ -1059,24 +1059,15 @@ export default function SalesOrdersRegister() {
 
   const rail = (
     <FilterRail
+      className="so-template-rail"
       testId="sales-orders-rail"
       ariaLabel="Sales Orders filters"
       onHide={hideRail}
       header={(
-        /* Two views of the same orders: a tab bar, not a collapsible group.
-           Edge to edge on the rail's own divider, so there is ONE line and the
-           active underline sits on it (the bar's line overlays the region's). */
-        <div className="-mx-3 -mb-[13px] -mt-3 pl-2 pr-11 [&_[data-kit=tab]]:whitespace-nowrap">
-          <Tabs
-            fill
-            label="Sales Orders view"
-            value={view}
+        <div className="so-rail-navigation">
+          <Tabs fill orientation="vertical" label="Sales Orders view" value={view}
             onValueChange={(next) => chooseView(next === "monthly" ? "monthly" : "list")}
-            tabs={[
-              { value: "list", label: "Order list" },
-              { value: "monthly", label: "Monthly demand" },
-            ]}
-          />
+            tabs={[{ value: "list", label: "Order list", icon: "order" }, { value: "monthly", label: "Monthly demand", icon: "date" }]} />
         </div>
       )}
     >
@@ -1152,6 +1143,19 @@ export default function SalesOrdersRegister() {
         </>
       ) : (
         <>
+          <FilterRailGroup title="Delivery" icon="goods" defaultOpen groupKey="Delivery compact">
+            <FilterRailRow testId="sales-orders-rail-delivery-all" label="All" resets active={!listDelivery} count={isLoading || isError ? undefined : facetCount("delivery", null)} onClick={() => setParam("delivery", null)} />
+            {REGISTER_DELIVERY_CONDITIONS.map((c) => (
+              <FilterRailRow
+                key={c.key}
+                label={c.label}
+                count={isLoading || isError ? undefined : facetCount("delivery", c.key)}
+                active={listDelivery === c.key}
+                testId={`sales-orders-rail-delivery-${c.key}`}
+                onClick={() => toggleParam("delivery", c.key)}
+              />
+            ))}
+          </FilterRailGroup>
           <FilterRailGroup title="Sales Location" icon="people">
             <FilterRailSelect
               label="Sales Location"
@@ -1186,19 +1190,6 @@ export default function SalesOrdersRegister() {
               testId="sales-orders-rail-city"
               allLabel="All cities"
             />
-          </FilterRailGroup>
-          <FilterRailGroup title="Delivery" icon="goods">
-            <FilterRailRow testId="sales-orders-rail-delivery-all" label="All" resets active={!listDelivery} count={isLoading || isError ? undefined : facetCount("delivery", null)} onClick={() => setParam("delivery", null)} />
-            {REGISTER_DELIVERY_CONDITIONS.map((c) => (
-              <FilterRailRow
-                key={c.key}
-                label={c.label}
-                count={isLoading || isError ? undefined : facetCount("delivery", c.key)}
-                active={listDelivery === c.key}
-                testId={`sales-orders-rail-delivery-${c.key}`}
-                onClick={() => toggleParam("delivery", c.key)}
-              />
-            ))}
           </FilterRailGroup>
           <FilterRailGroup title="Obligations" icon="money">
             {registerFactsQ.data?.failed.obligations || registerFactsQ.isError ? (
@@ -1291,7 +1282,7 @@ export default function SalesOrdersRegister() {
             sessionKey={`${storageKey}.${registerSession}`}
             presentationTools
             searchScope="Search sales orders by SO number, customer or imported reference"
-            toolbarSummary={(visible) => <span className="shrink-0 text-meta tabular-nums text-kit-slate-11" title={`${visible.length} sales orders`}>{visible.length}</span>}
+            toolbarSummary={(visible) => <span className="shrink-0 text-meta tabular-nums text-kit-slate-11" title={`${visible.length} sales orders`} aria-label={`${visible.length} sales orders`}><span className="hidden md:inline">{visible.length} sales orders</span><span className="md:hidden">{visible.length}</span></span>}
             presentationKey={cards ? "cards" : "table"}
             toolbarEnd={<Tabs label="Sales Orders view" value={cards ? "cards" : "table"}
               onValueChange={(next) => setParam("view", next === "cards" ? "cards" : null)}
@@ -1365,7 +1356,7 @@ export default function SalesOrdersRegister() {
             /* ⭐ The one-line listing row is 40px, adopted on this page only
                (ui MASTER §6.0 rule 5, owner ruling 2026-09-21). Text stays
                13/18 with 8px padding; the engine default (38px) is untouched. */
-            rowHeight={40}
+            rowHeight={32}
             /* ⭐ Proceed Date · SO Doc Date · SO No lead and cannot be hidden
                or moved (owner ruling 2026-09-21). At a canvas ≥768px the
                engine pins SO Doc Date · SO No and Proceed Date scrolls under

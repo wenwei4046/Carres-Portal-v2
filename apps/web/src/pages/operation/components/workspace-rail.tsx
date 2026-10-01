@@ -129,18 +129,6 @@ function railStorageKey(railKey: string | null, groupKey: string): string | null
   return railKey ? `carres.filterRail.${railKey}.${groupKey}` : null;
 }
 
-/* A group opens only when the operator opened it (international facet
-   panels: Shopify, Linear, SAP Fiori — headers first, one click to see a
-   group's choices). The chosen value always shows on the header. */
-function readGroupOpen(key: string | null): boolean {
-  if (!key) return false;
-  try {
-    return localStorage.getItem(key) === "1";
-  } catch {
-    return false;
-  }
-}
-
 /** Reports a control's chosen label to its group heading while it is chosen. */
 function useReportChosen(label: string | null) {
   const group = useContext(GroupContext);
@@ -280,6 +268,7 @@ export function FilterRailGroup({
   children,
   chosen,
   groupKey,
+  defaultOpen = false,
 }: {
   title: string;
   icon: IconName;
@@ -287,10 +276,11 @@ export function FilterRailGroup({
   chosen?: string | null;
   /** Stable storage name when the title is not (defaults to the title). */
   groupKey?: string;
+  defaultOpen?: boolean;
 }) {
   const { railKey } = useContext(RailContext);
   const storageKey = railStorageKey(railKey, groupKey ?? title);
-  const [open, setOpenState] = useState(() => readGroupOpen(storageKey));
+  const [open, setOpenState] = useState(() => { try { const saved = storageKey ? localStorage.getItem(storageKey) : null; return saved == null ? defaultOpen : saved === "1"; } catch { return defaultOpen; } });
   const [reported, setReported] = useState<ReadonlyArray<readonly [string, string]>>([]);
   const report = useCallback((id: string, label: string | null) => {
     setReported((prev) => {

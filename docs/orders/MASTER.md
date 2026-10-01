@@ -670,17 +670,17 @@ operating model above is unchanged; this fixes how it is drawn and where every n
 
 - **Same destination, one rail.** `Sales Orders` keeps Row 1 and Row 2 (Search · Export · Columns;
   no create button — owner 2026-09-27). A 240px `FilterRail` (the Warehouse/Delivery grammar) carries a FIXED
-  top region with the kit `Tabs` bar `Order list` · `Monthly demand` (owner ruling 2026-09-28: a tab bar, not a collapsible group; every group closed until clicked, no description under a title); the scrolling region shows only
+  top region with the kit `Tabs` views `Order list` · `Monthly demand` (owner correction 2026-10-01: stacked 36px navigation rows with icons; Delivery first and initially expanded in Order list; remaining groups initially closed, chosen values remain visible); the scrolling region shows only
   the chosen view's groups. In `Monthly demand`, Search and Columns hide (the matrix's columns are
   months) and Export produces the matrix.
-- **Order list groups:** `Sales Location` (`All sales locations`) · `Customer Delivery
+- **Order list groups (Delivery appears first, remaining groups preserve these controls):** `Sales Location` (`All sales locations`) · `Customer Delivery
   Location` (two selects) · `Delivery` (`All` · `Not delivered` · `Partially delivered` · `Fully delivered`) · `Obligations`
   (`All` · `Outstanding obligations` · `No action required`) · `Service Cases` (`All` · `Has open
   cases` · `Closed cases only` · `No cases`). **Monthly demand groups:** `Period` (`Starting month`
   select · `Months` select `1 · 2 · 3 · 4 · 5 · 6`, default 6 — owner 2026-09-26; the resolved window printed beneath: `Oct 2026 – Mar 2027`) ·
   `Sales Location` · `Customer Delivery Location` · `Product category`. No `Clear filters` control in the rail (owner instruction); a chosen row is unchosen by
   pressing it again.
-- **The rail is the shared rail, unchanged — OWNER CORRECTION 2026-09-26 (Jess: "left rail is icon +
+- **The rail uses the shared controls (SO pilot composition superseded by the 2026-10-01 correction below) — OWNER CORRECTION 2026-09-26 (Jess: "left rail is icon +
   title", "not like other pages?").** Every group is single-choice like every other Portal rail
   (icon + 13px/600 title, 36px rows, chosen value in blue at the right, press again to unchoose);
   `Sales Location` is one select (a search box waits for a kit admission); there is NO multi-select
@@ -6896,3 +6896,15 @@ the normal discoverable doors already governed for Edit, output or View Flow.
 | ~~**D9**~~ | ✅ **FIXED 2026-08-08** — `lineClass` answers `unknown` where it used to answer `acc`, and `acc` is now earned by an accessory word instead of by elimination. **20 orders that could never fail a stock check → 0**, with **zero** lines re-classified into anything else. Two follow-ups named and left open on purpose: delete the `lineCategory` display fold, and name the sixteen SKUs alongside migration 0148. See the D9 block above |
 | ~~**D10**~~ | ✅ **RETIRED 2026-08-28, on the owner's explicit instruction** (red line 5 — the files were not deleted until asked for by name). **Half of it was already done:** `OperationOrders.tsx`, the 450-line kanban, no longer exists. What survived was a dead ISLAND the audit never named — `OrderColumn.tsx` had zero importers and `OrderCard.tsx` was imported only by `OrderColumn`, both orphaned when the kanban went. `OrderCustomerCard` was not a file at all: an exported component inside `OrderDetailDrawer.tsx` whose only importer was its own test. Its comment promised *"the Edit affordance only shows for status 'place'"* and the component carried no such check — unreachable, and fail-safe at the server (`update_order` 422s on a non-Place order), so no data was ever at risk. **Deleting it revealed more dead code, which is the point:** `CompactField` was its private helper and went with it, and two imports went stale. `GuaranteeCoverStrip` was NOT deleted — only the drawer's import of it; `PosOrderDetail.tsx` renders it. Precedent: the Cancel SO closeout deleted `CancelOrderDialog` for this exact shape. | fixed |
 | ~~**D11**~~ | ✅ **FIXED 2026-08-28 — two controls, two handles.** `receive-po-<id>` named BOTH the primary `Check in` button and the always-available `Direct receive →` escape hatch, so a test could only tell two different affordances apart by their WORDS. The hatch is now `direct-receive-<id>`; the primary keeps `receive-po-<id>`. **It stayed open for a boundary reason, not a technical one** — `OhanaSofaTab.test.tsx` recorded it as *REPORTED, NOT FIXED* because *"renaming one reaches the component, and the S2 card rules components DO NOT TOUCH"*; that note is corrected in the same change. The suite that previously had to accept *either* control now asserts the hatch is present **and the primary is not**, which is the fact the shared handle could never express. Procurement suites 43 pass. | fixed |
+
+### Sales Order representative UI correction — owner-approved 2026-10-01
+
+Scope: the existing register pilot only; no merge, deployment or other-module rollout authorised.
+Summary/count on the left; Search (280 × 32 desktop), Table/Cards and Page tools together on the right.
+The shared rail remains 240px; neutral slate-2 background, blue-3/blue-11 only for selected rows;
+stacked view rows 36px, filter options 32px desktop and minimum 40px touch. Delivery is first and
+initially expanded; all five existing filters survive. Main desktop rows 32px, header 36px,
+Inter body 13/18, horizontal cell padding 8px. Goods summary retains its existing read-only drawer.
+These replace the old SO 40px row and horizontal view composition for this pilot. Other modules
+retain their existing rules until visual acceptance of the representative template. Local runtime
+verification and owner visual acceptance are separate; production remains unchanged.

@@ -512,3 +512,18 @@
   font-feature-settings: "zero" 0;
   font-variant-numeric: lining-nums tabular-nums;
 }
+
+/* Owner-approved SO representative template, 2026-10-01. Existing tokens only. */
+.so-template-rail { background: theme('colors.kit.slate.2'); }
+.so-template-rail [data-testid='sales-orders-rail-fixed'] { padding: 8px 12px; }
+.so-rail-navigation [data-kit='tabs'] { flex-direction: column; align-items: stretch; gap: 4px; border: 0; padding-right: 28px; }
+.so-rail-navigation [data-kit='tab'] { height: 36px; justify-content: flex-start; padding: 0 8px; border-radius: 6px; font-weight: 500; }
+.so-rail-navigation [data-kit='tab'][data-state='active'] { background: theme('colors.kit.blue.3'); color: theme('colors.kit.blue.11'); font-weight: 600; }
+.so-rail-navigation [data-kit='tab-indicator'] { display: none; }
+.so-template-rail [data-rail-group] { border-top: 0; padding: 4px 0; }
+.so-template-rail [data-rail-group] > button { min-height: 36px; padding-top: 6px; padding-bottom: 6px; }
+.so-template-rail [data-rail-group] > div > button { min-height: 32px; padding-top: 7px; padding-bottom: 7px; }
+.so-template-rail [data-rail-group] > div > button[aria-pressed='true'] { background: theme('colors.kit.blue.3'); color: theme('colors.kit.blue.11'); }
+@media (max-width: 767px) {
+ .so-template-rail [data-kit='tab'], .so-template-rail [data-rail-group] button { min-height: 40px; }
+}

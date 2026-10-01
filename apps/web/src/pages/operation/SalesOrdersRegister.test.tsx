@@ -696,13 +696,12 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     ).toHaveLength(0);
   });
 
-  /* ⭐ THE ONE-LINE LISTING ROW IS 40px ON THIS PAGE ONLY (ui MASTER §6.0 rule 5,
-     owner ruling 2026-09-21). The engine default stays 38px for everyone else. */
-  it("sets its own 40px row through the engine rowHeight, never a page stylesheet", () => {
+  /* SO representative correction 2026-10-01: desktop32, touch40. */
+  it("sets its own 32px row through the engine rowHeight, never a page stylesheet", () => {
     mount();
     const grid = document.querySelector("[data-row-height]") as HTMLElement;
-    expect(grid).toHaveAttribute("data-row-height", "40");
-    expect(grid.style.getPropertyValue("--grid-row-h")).toBe("40px");
+    expect(grid).toHaveAttribute("data-row-height", "32");
+    expect(grid.style.getPropertyValue("--grid-row-h")).toBe("32px");
   });
 
   it("says No PO yet · No DO yet, muted, when neither document exists", () => {

@@ -453,3 +453,16 @@ Review demonstrations may have scenario controls, but those belong outside the o
 must not dominate the review. Jess's current presentation preference is NEW page only; baseline
 comparison remains internal evidence. A rejected or withdrawn mock is never a template merely
 because it imports shared components. Do not display an isolated centre as a verified full shell.
+
+### SO representative correction — 2026-10-01, approved scoped pilot
+
+This pilot overrides its earlier composition; it does not roll out to other pages.
+Count/summary left; Search 280×32 desktop + Table/Cards + 32×32 Page tools aligned as one right
+cluster. Toolbar content height 40px plus 1px divider, no blank reserved row. Touch controls 40px
+and toolbar 48px plus divider. Rail 240px, existing slate-2 neutral background, selected blue-3
+fill/blue-11 text; nav 36px with 16px icons, groups 36px, options 32px desktop/40px touch.
+Stack the two existing views; Delivery first initially open, other groups initially closed with
+chosen value visible. Desktop main rows 32px, header 36px/600, Inter 13/18, cell horizontal pad 8px;
+mobile rows preserve 40px targets. Cards use the same tools/filter engine. Existing components
+receive these scoped composition capabilities; no alternative kit or new palette.
+Status: local implementation; owner visual acceptance, remote checks and deployment not implied.
