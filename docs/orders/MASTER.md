@@ -1217,11 +1217,15 @@ opens Your changes → review Before/After and impact, enter Reason for change �
 takes effect where required → each owning module handles its part`. The review uses the shared Modal
 at submission, not a panel inserted above SO info during typing. Cancel closes the review and preserves
 the draft; reason and customer-agreement gates remain unchanged.
-1. **Submitting changes nothing.** While editing, a removed line is struck through and can be restored.
-   After `Submit amendment request` the current order and its official PDF stay exactly as they were;
-   the new version takes effect only on `Approve and apply`. `Reject` leaves the order unchanged.
-2. **Approval does not "reduce the PO".** Cancelling an SO item after approval hands the supplier
-   commitment to Purchasing, which settles it with the supplier; goods already made, shipped or received
+1. **Effectiveness follows the 2026-10-01 staff-amendment ruling below.** While editing, a removed
+   line is struck through and can be restored. An ordinary change with no issued PO covering the
+   changed line takes effect on submission with evidence. Where supplier confirmation or Sales
+   Approver is required, the effective order/PDF remains unchanged until those gates pass. Reject
+   leaves it unchanged. The former universal `Approve and apply` target is superseded; it remains
+   a description of the current built 0564 gate only.
+2. **An effective amendment does not "reduce the PO".** Where an issued PO covers the changed
+   line, PO Duty first records supplier feasibility under the 2026-10-01 ruling. Purchasing then
+   settles the separate PO change with the supplier; goods already made, shipped or received
    are never cancelled as if never ordered. The original PO, Unit IDs and history are never rewritten
    automatically.
 3. **The reason, the before/after and the impact are shown before submitting** — which item, what
@@ -1372,7 +1376,9 @@ being the Staff-correction case, whose reference must name a revision of this or
 API or the screen**, which is how "a manager's statement or checkbox … is not sufficient" is made
 structural rather than a matter of discipline.
 
-SUBMIT is unchanged — the request is still written while the evidence is incomplete. REJECT is
+**Built 0564 behaviour (not the new ordinary-amendment target):** SUBMIT writes the request
+while evidence is incomplete. The 2026-10-01 staff-amendment target requires evidence before
+effectiveness, including ordinary application on submission. REJECT is
 unchanged — refusing a change needs no customer agreement. APPROVE is refused
 (`customer_agreement_required`) until a basis is recorded, and refused again
 (`customer_agreement_stale`) when the recorded basis no longer fingerprints the terms being applied,
@@ -2630,12 +2636,14 @@ whole-page submission or the rule against silently saving part of a draft.
 - Staff submit one amendment with the reason and Before/After. The system shows its review
   destinations before submission and resolves the responsible people through the governed
   Staff & Duties mechanism. Never hard-code a name, let the requester arbitrarily choose the
-  approver, or treat a department label as a person's identity. Existing approval rights remain
-  required; this ruling grants no new permission or self-approval right.
-- A product-only amendment routes to the applicable approval Duty. A customer-requested-date-only
-  amendment stays in the Sales Order governed change path and routes to the applicable approval
-  Duty; it does not wait for an unrelated Purchasing review. This ruling does not assign all
-  commercial or price decisions to Purchasing.
+  approver, or treat a department label as a person's identity. Where approval is required under
+  the later staff-amendment ruling, its role qualification remains required. Submission eligibility
+  and self-approval remain undecided; no permission is inferred from an assignment.
+- Product amendments follow the later **Staff amendments and Sales Approver** ruling below:
+  ordinary changes do not require owner approval; issued-PO coverage requires supplier confirmation.
+  Requested Delivery Date routing remains an explicit open decision; it stays in the SO change
+  path and does not wait for an unrelated Purchasing review. No blanket Purchasing commercial
+  approval is granted.
 - Where a submission contains dependent changes, the relevant reviews may proceed in parallel,
   but the linked changes take effect together only after all required approvals. Example:
   “change the bed only if it can arrive on Friday” must never become an approved bed change
@@ -2662,48 +2670,64 @@ production operation, Card, complete field-to-Duty matrix, or production-verific
 created by this entry. Existing implementation still classifies mixed drafts as a whole;
 scoped multi-review routing remains target work, not a shipped capability.
 
-#### Sales Approver — OWNER-APPROVED 2026-10-01 / TARGET NOT BUILT
+#### Staff amendments and Sales Approver — OWNER-APPROVED 2026-10-01 / TARGET NOT BUILT
 
-The earlier pasted approval matrix is **WITHDRAWN / NOT A PROPOSAL OF RECORD**. This owner
-ruling supersedes it; do not infer authority from any row in that matrix. **Sales Approver**
-replaces the earlier proposed name SO Approver; there is one Duty, not two.
+**This ruling REPLACES both earlier pastes:** the approval matrix and the “Sales Approver
+approves every amendment” ruling. Neither remains a ruling or proposal of record. There is one
+Duty, **Sales Approver**; the earlier name SO Approver is retired.
 
-Jess approved a dedicated **Sales Approver** Duty (approves Sales Order amendment requests),
-assigned through the existing **Settings → Staff & Duties**. This is a scoped PLAN decision,
-not approval of the entire Sales Order blueprint or a BUILD commission.
+**OWNER-REPORTED OPERATING REALITY (Jess, 2026-10-01):** staff decide and make ordinary order
+changes themselves; Jess does not approve those changes. This is the owner's account of actual
+operations, not a newly observed production-system test. The built Principal-only gate in
+`0564_the_amendment_carries_the_whole_change_and_the_customers_agreement.sql` does not match
+that operating model. The code remains unchanged; the following is the approved target.
 
-- The target shared catalogue is `packages/shared/src/workspace-duties-catalogue.ts`, using
-  the existing Principal-qualified pattern (`roles: ["principal"]`). This PLAN does not edit it.
-- The holder AND any dated cover must be active **Principal** people. Assigning an ordinary
-  employee to this Duty must not grant them Principal or SO approval rights. Changing the
-  eligible person uses the governed assignment mechanism, not a hard-coded name or a local list.
-- The intended initial holder is **Jess**. This records the approved target only: no live
-  assignment, bootstrap, permission change or migration is performed by this PLAN entry.
-- Target SO approval resolves the responsible person through this Duty while retaining the
-  existing Principal qualification, decision reason, customer-agreement evidence and other
-  applicable amendment gates. An unheld Duty or unavailable eligible cover remains explicit;
-  do not fall back to any Principal, an Operation employee or an arbitrary requester choice.
-- The existing implementation still uses the Principal-role gate in
-  `0564_the_amendment_carries_the_whole_change_and_the_customers_agreement.sql`;
-  the shared Duty catalogue does not yet contain Sales Approver. **APPROVED TARGET / NOT BUILT**
-  is not evidence that resolution, assignment or production behaviour has changed.
-- **One submission = one amendment request = one final decision/outcome.** The system routes
-  the required approvals automatically; this does not mean there can be only one reviewer.
-  Linked changes take effect together only after all required approvals and the existing 0564
-  customer-agreement evidence gate. Reviewers resolve through Staff & Duties, never hard-coded
-  names. Delivery arrangements never overwrite the customer's Requested Delivery Date.
-- **NOT DECIDED; each requires its own owner decision:** self-approval of one's own request;
-  approval rights for other Duties/actors (PO Duty, Delivery Charge Approver, order PIC, HR);
-  cancellation after Proceed; folding the salesperson/dealer/location request (0329) into the
-  amendment; whether ordinary address fields join floor/lift/stairs as amendment-only after
-  Proceed. The PO Duty pre-effectiveness supplier-confirmation question remains open; do not
-  infer approval from the earlier withdrawn A/B discussion or matrix.
-- PO Duty and Purchasing Approver are not substitutes for this commercial Duty. Delivery Charge
-  Approver's existence alone does not extend its mandate to every SO charge amendment. Existing
-  PIC-first ordinary Delivery work and cross-module write ownership remain unchanged.
+1. **Ordinary SO amendments do not need owner approval.** Staff submit once: one amendment
+   request and one final decision/outcome. Preserve the existing 0564 customer-agreement evidence
+   gate (signed document, customer confirmation reference or original agreement, with its governed
+   evidence/reference rules). No evidence-free application is authorised.
+2. **Route from the changed line's actual PO coverage**, not another line's PO:
+   - No issued PO covers the changed line: an ordinary amendment takes effect on submission
+     with the required evidence, subject to the expressly undecided scopes below.
+   - An issued PO covers the changed line: **PO Duty must first record the supplier's answer
+     that the change can be made**. Only then may it take effect. If the supplier has not answered
+     or the supplier date is unknown, it waits; it never takes effect by default.
+   - This is supplier-feasibility confirmation, not blanket commercial approval for PO Duty.
+     The original PO is never rewritten automatically. Purchasing settles the PO change with
+     the supplier and retains its own documents and actual-actor evidence.
+3. **Only these exceptions require Sales Approver before effectiveness:** a price decrease
+   (Carres collects less from the customer); a refund to the customer; cancelling a whole SO
+   after Proceed. Required supplier confirmation and customer evidence are not bypassed by this
+   approval. Refund execution remains with the owning money workflow; this is not a second
+   refund writer or automatic payout. The cancellation approval requirement is now decided;
+   this entry is not evidence that a complete post-Proceed cancellation implementation exists.
+4. **Sales Approver** is a new target Duty in
+   `packages/shared/src/workspace-duties-catalogue.ts`, with the existing qualification pattern
+   `roles: ["principal"]`. Holder and any cover must be active Principal people, assigned only
+   through **Settings → Staff & Duties**. Resolve people through the shared mechanism, never a
+   hard-coded name or a module roster. An unresolved required approval cannot silently pass.
+   This PLAN adds the word to COPY-STANDARD but does not modify catalogue code or live assignments.
+5. Keep who submitted, Before/After, reason, customer evidence, who confirmed and when. Linked
+   changes take effect together only when all applicable confirmations/approvals and evidence
+   gates are satisfied, never as independently effective department fragments. Delivery
+   arrangements never overwrite the customer's Requested Delivery Date.
 
-The exact UI name **Sales Approver** is admitted in COPY-STANDARD. Workspace MASTER owns its
-assignment/cover contract; this MASTER owns the SO decision. No implementation Card is authored.
+**Accepted trade-off:** no second person checks an ordinary product change before it applies;
+its audit record identifies who changed what. Supplier confirmation remains necessary where an
+issued PO covers the affected line. This does not grant every staff member submission permission.
+
+**NOT DECIDED — each requires its own owner decision:** who may submit (any Operation staff or
+only the order PIC); Requested Delivery Date rules including supplier timing and logistics
+re-booking; delivery fee/service changes and the existing Delivery Charge Approver's scope;
+salesperson/dealer/sales-location changes and whether the 0329 lane folds into the amendment;
+Sales Approver self-approval. Ordinary-address amendment restrictions after Proceed were not
+resolved by this ruling either; do not infer them from the floor/lift/stairs rule.
+
+This is a scoped PLAN ruling, not approval of the whole module blueprint, implementation Cards,
+BUILD, a migration or production changes. Workspace owns assignment/cover; Orders owns amendment
+policy. Current implementation notes elsewhere describe the built 0564 behaviour, not a competing
+approved target. Neither the earlier all-Principal target nor the withdrawn matrix may be used
+as implementation authority.
 
 - **Delivery-date changes belong to the whole-page draft**, not a competing date-only form.
   Preserve customer-request date, reason, Before/After, actor/time and historical document truth.

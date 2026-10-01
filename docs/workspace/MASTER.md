@@ -303,19 +303,26 @@ runs only when the Duty has no assignment history; it created no cover. Until a 
 person exists, Jess has no eligible cover: her approvals wait while she is away.
 
 **Sales Approver — OWNER-APPROVED 2026-10-01 / TARGET NOT BUILT.** Orders MASTER
-§ “Sales Approver” admits one dedicated SO commercial-approval Duty, UI name **Sales Approver**
-(COPY-STANDARD). Its holder and dated cover must both be active Principal people. The intended
-initial holder is Jess; this PLAN records no live assignment or bootstrap. Resolve through the
-existing Staff & Duties/Shared Duty Resolver and governed assignment history, never a module
-roster, hard-coded name, automatic ordinary-Operation rotation or fallback to any Principal.
-Missing eligible assignment/cover stays visible and must not bypass approval. Assignment does
-not confer Principal powers. The current catalogue and SO SQL role gate are unchanged and this
-Duty is not built. Self-approval, other departments' approval rights and post-Proceed cancellation
-are expressly outside this approval; purchasing pre-effectiveness signatures remain undecided.
-The earlier pasted approval matrix is withdrawn, not a proposal of record. Orders MASTER also
-keeps attribution-lane consolidation and ordinary-address amendment restrictions undecided.
-Do not copy Purchasing Approver's separate own-request rule or bootstrap into this Duty as an
-assumed owner decision. Orders owns the amendment policy; Workspace owns assignment and cover.
+§ “Staff amendments and Sales Approver” replaces the earlier all-amendments approval ruling and
+withdrawn matrix. Ordinary SO amendments need no owner approval. Sales Approver is required before
+price decreases, customer refunds and whole-SO cancellation after Proceed take effect. Holder and
+any cover must be active Principal people, assigned only through Settings → Staff & Duties and
+resolved through the shared mechanism; no hard-coded person, local roster or expanded role rights.
+A required approval cannot pass when its eligible assignment is unresolved. The catalogue and
+live assignments are unchanged by this PLAN. This Duty is NOT BUILT.
+
+For an ordinary amendment whose changed line is covered by an issued PO, PO Duty records the
+supplier's confirmation that the change can be made before it takes effect. No supplier answer or
+an unknown supplier date means waiting, not automatic effectiveness. This does not make PO Duty
+a general commercial approver. Purchasing still owns the PO change. No issued PO covering that
+line means ordinary application on submission with the required customer evidence. The accepted
+trade-off is no second-person check on ordinary product changes; retain the actual submitter and
+confirmation actors. Linked changes remain one effective outcome.
+
+Who may submit (all Operation versus PIC), Requested Delivery Date routing, fee/service approval,
+0329 attribution changes/consolidation and Sales Approver self-approval remain undecided. Do not
+copy Purchasing Approver's own-request rule or bootstrap into this Duty as an assumed decision.
+The existing PIC-first ordinary Delivery ownership remains unchanged.
 
 **`Finance Approver` (`finance_approver`) takes Finance users only.** Its holder and cover pickers
 list active Finance users. The API reads them through the definer function `workspace_duty_staff`,
