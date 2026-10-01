@@ -319,6 +319,11 @@ toOrderRouter.post("/issue-batch", requireOperation, async (c) => {
     return c.json({ error: "invalid_body", code: "invalid_param" }, 400);
   }
   const { selections, documentDecisions } = parsed.data;
+  // Legacy commercial declarations are not an Operation price-editing entrance.
+  if (c.var.auth.role === "operation" && documentDecisions.some((document) =>
+    document.lineDecisions.some((line) => line.treatment === "free_of_charge" || line.costSource === "hand_entered"))) {
+    return refuse(c, 403, "not_commercial_approver");
+  }
 
   /* ── 1 · WHO ────────────────────────────────────────────────────────────
    * The application and SQL both ask the governed capability. Duty/cover is

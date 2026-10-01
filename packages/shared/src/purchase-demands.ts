@@ -313,26 +313,8 @@ export interface PurchaseDemandRow {
   issueRef: { proposalKey: string; buildKey: string } | null;
   /** The structured Work contract. `null` when nothing is owed on this line. */
   action: SoBatchPurchaseAction | null;
-  /**
-   * THE CATALOG COST PER SKU, so the 50/50 can ask for the one it does not have
-   * (Card §5.2). `unitCost: null` is the whole point: a SKU Catalog has no price
-   * for cannot be issued until the operator states a Transaction Cost or marks
-   * it Free of Charge with a reason. A `0` here would be a price nobody set.
-   *
-   * It is the CATALOG's number, carried for display and for the unchanged-cost
-   * comparison. The server re-reads it at issue and refuses a stale one.
-   */
-  /**
-   * ⭐ THE PARTS INSIDE THIS BUYING LINE — one entry per SKU.
-   *
-   * A row is one BUILD, and a build can be a matched set: a sofa is one row and
-   * three module codes. The row itself can only name the set, so this is where
-   * the modules live and the issue authority can validate their Catalog cost.
-   *
-   * It was called `costs` and carried only the price, so the expand had no
-   * quantity to print and re-stated the row's own numbers instead. One list,
-   * three facts (Law D): what it is, how many, what Catalog charges.
-   */
+  /** Goods making up this buying line. Operation receives null unitCost;
+   * Catalog prices are re-read privately by the server when issuing. */
   parts: Array<{ sku: string; qty: number; unitCost: number | null }>;
   /**
    * Whether this supplier's goods are collected from the factory. The
