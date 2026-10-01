@@ -659,17 +659,14 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
           issueRef: state === "no_cost" || state === "no_stock_identity"
             ? null
             : { proposalKey: proposal.key, buildKey: build.key },
-          /* The CATALOG's price per SKU, carried so the 50/50 can ask for the
-             one it does not have. `null` is load-bearing: a SKU with no price
-             cannot be issued until somebody states a cost or marks it Free of
-             Charge, and a `0` here would be a price nobody set. */
+          // Operation receives goods facts only; server-side issue still reads Catalog.
           /* The build's own lines — the modules a matched set is made of. The
              quantity rides with them, so the expand can list the parts instead
              of re-stating the row's numbers. */
           parts: build.lines.map((l) => ({
             sku: l.sku,
             qty: l.qty,
-            unitCost: catalog.get(l.sku)?.cost ?? null,
+            unitCost: c.var.auth.role === "operation" ? null : catalog.get(l.sku)?.cost ?? null,
           })),
           supplierKind: supplierKinds.get(proposal.supplierId) ?? "own_logistics",
           supplierCollection: collectionBySupplier.get(proposal.supplierId) ?? null,
@@ -739,7 +736,7 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
          offer an act that cannot succeed. */
       goodsMustArrive: null,
       issueRef: null,
-      parts: [{ sku: line.sku, qty: line.qty, unitCost: catalog.get(line.sku)?.cost ?? null }],
+      parts: [{ sku: line.sku, qty: line.qty, unitCost: c.var.auth.role === "operation" ? null : catalog.get(line.sku)?.cost ?? null }],
       supplierKind: line.supplierId
         ? (supplierKinds.get(line.supplierId) ?? "own_logistics")
         : null,

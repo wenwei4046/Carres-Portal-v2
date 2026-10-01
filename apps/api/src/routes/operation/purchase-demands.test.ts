@@ -780,6 +780,16 @@ describe("the guard, and the promise not to write", () => {
  * destinations a buy may be sent to.
  */
 describe("the buying facts SO Batch Purchase needs", () => {
+  it("does not disclose Catalog costs to Operation while preserving goods and quantities", async () => {
+    const { rows } = await rowsOf(TABLES());
+    expect(rows.length).toBeGreaterThan(0);
+    for (const row of rows) for (const part of row.parts) {
+      expect(part.unitCost).toBeNull();
+      expect(part.sku).toBeTruthy();
+      expect(part.qty).toBeGreaterThan(0);
+    }
+  });
+
   it("⭐ ONE COST RULE: an unrecorded Catalog cost stays buyable, like the issue door", async () => {
     const t = TABLES() as unknown as Record<string, { data: unknown; error: unknown }>;
     const sku = (t.product_skus.data as Record<string, unknown>[]).find(
