@@ -863,6 +863,19 @@ export async function loadToOrder(
    * the line it answers is netted below exactly like a Ready Stock binding.
    * A failed read refuses the response rather than cover a line twice.
    */
+  const lineage = await readLineageByLine(sb, orderIds);
+  // Source commitment and its own reserved Units are one coverage binding.
+  // Keep only Units above that commitment in the stock projection; the register
+  // retains the complete PO lineage. Consume one budget across Unit statuses.
+  const sourceBudget = new Map(lineage?.bindings);
+  const linkedIncomingByLine = new Map<string, number>();
+  const linkedStockByLine = new Map<string, number>();
+  const independentUnits = (lineId: string, poLine: string | null, qty: number) => {
+    const key = `${lineId}::${poLine}`;
+    const overlap = poLine ? Math.min(qty, sourceBudget.get(key) ?? 0) : 0;
+    if (overlap) sourceBudget.set(key, (sourceBudget.get(key) ?? 0) - overlap);
+    return qty - overlap;
+  };
   const boundIncomingByPoLine = new Map<string, number>();
   const boundIncomingByLine = new Map<string, Map<string, number>>();
   {
@@ -885,6 +898,9 @@ export async function loadToOrder(
       const lineId = r.reserved_order_line_id as string;
       const poNo = (r.po_no as string | null) ?? "";
       const per = boundIncomingByLine.get(lineId) ?? new Map<string, number>();
+      const independent = independentUnits(lineId, poLine, n);
+      const linkKey = `${lineId}::${poNo}`;
+      linkedIncomingByLine.set(linkKey, (linkedIncomingByLine.get(linkKey) ?? 0) + n - independent);
       per.set(poNo, (per.get(poNo) ?? 0) + n);
       boundIncomingByLine.set(lineId, per);
     }
@@ -992,7 +1008,7 @@ export async function loadToOrder(
   try {
     const { data: boundRows, error: boundErr } = await sb
       .from("ops_stock_items")
-      .select("id, unit_code, qty, status, reserved_order_line_id")
+      .select("id, unit_code, qty, status, po_line_id, reserved_order_line_id")
       .not("reserved_order_line_id", "is", null)
       .in("status", ["reserved", "sold"]);
     if (boundErr) throw new Error(boundErr.message);
@@ -1003,7 +1019,10 @@ export async function loadToOrder(
          Stock; it is netted by the PO binding above. The SQL narrows it; this
          keeps the split true under a permissive read. */
       if (r.status != null && r.status !== "reserved" && r.status !== "sold") continue;
-      boundByLine.set(lineId, (boundByLine.get(lineId) ?? 0) + Math.max(1, Number(r.qty ?? 1)));
+      const independent = independentUnits(lineId, (r.po_line_id as string | null) ?? null, Math.max(1, Number(r.qty ?? 1)));
+      const qty = Math.max(1, Number(r.qty ?? 1));
+      linkedStockByLine.set(lineId, (linkedStockByLine.get(lineId) ?? 0) + qty - independent);
+      boundByLine.set(lineId, (boundByLine.get(lineId) ?? 0) + qty);
       boundUnitIds.add(r.id as string);
       const code = (r.unit_code as string | null) ?? null;
       if (code) boundUnitCodesByLine.set(lineId, [...(boundUnitCodesByLine.get(lineId) ?? []), code]);
@@ -1133,13 +1152,16 @@ export async function loadToOrder(
        included — a Sales Order the stock fully covers must still be able to
        explain itself on the permanent Register. */
     if (!l.readyStock) {
+      const independentPoReserved = poReserved
+        .map((r) => ({ ...r, qty: Math.max(0, r.qty - (linkedIncomingByLine.get(`${l.lineId}::${r.poId}`) ?? 0)) }))
+        .filter((r) => r.qty > 0);
       soLines.push({
         lineId: l.lineId,
         orderId: l.orderId,
         sku: l.sku,
         qty: l.qty + (l.takenFromStock ?? 0) + poTake,
-        stockTaken: l.takenFromStock ?? 0,
-        ...(poReserved.length > 0 ? { poReserved } : {}),
+        stockTaken: Math.max(0, (l.takenFromStock ?? 0) - (linkedStockByLine.get(l.lineId) ?? 0)),
+        ...(independentPoReserved.length > 0 ? { poReserved: independentPoReserved } : {}),
         modelName: l.modelName,
         variant: l.variant,
         category: l.category,
@@ -1202,7 +1224,7 @@ export async function loadToOrder(
       ),
       registerFacts: { lines: registerLines, ordersById: registerOrders, soLines },
       poFreeByKey: await readPoFreeByKey(sb),
-      lineageByLine: await readLineageByLine(sb, orderIds),
+      lineageByLine: lineage?.totals,
     },
   };
 }
@@ -1214,12 +1236,13 @@ export async function loadToOrder(
 async function readLineageByLine(
   sb: ReturnType<typeof userClient>,
   orderIds: readonly string[],
-): Promise<Map<string, number> | undefined> {
+): Promise<{ totals: Map<string, number>; bindings: Map<string, number> } | undefined> {
   const out = new Map<string, number>();
+  const bindings = new Map<string, number>();
   for (const batch of chunk([...orderIds])) {
     const { data, error } = await sb
       .from("po_line_sources")
-      .select("order_line_id, qty, purchase_orders!inner(status)")
+      .select("order_line_id, po_line_id, qty, purchase_orders!inner(status)")
       .in("order_id", batch)
       .neq("purchase_orders.status", "cancelled");
     if (error) {
@@ -1231,10 +1254,15 @@ async function readLineageByLine(
       if (po?.status === "cancelled") continue;
       const id = r.order_line_id as string | null;
       if (!id) continue;
-      out.set(id, (out.get(id) ?? 0) + Math.max(0, Number(r.qty ?? 0)));
+      const qty = Math.max(0, Number(r.qty ?? 0));
+      out.set(id, (out.get(id) ?? 0) + qty);
+      if (r.po_line_id) {
+        const key = `${id}::${r.po_line_id}`;
+        bindings.set(key, (bindings.get(key) ?? 0) + qty);
+      }
     }
   }
-  return out;
+  return { totals: out, bindings };
 }
 
 /**

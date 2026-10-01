@@ -1779,6 +1779,45 @@ tracked by that PR and the canonical deployment probes; this does not certify th
   API route removed). A line's Deliver To moves only through `Change Deliver To` (0610), which keeps
   Units and Sales Order lineage and mints a version.
 
+**PLACEMENT RETRY ACCEPTANCE — BUILD, 2026-10-01.** Controlled ordinary-person SQL
+acceptance exposed a duplicate SO issue: two calls carrying the same exact source each minted a
+PO. The authenticated API normally rechecks before calling SQL, but concurrent callers can share
+that earlier read. Migration 0631 (APPLIED 2026-10-01, tracker `20261001062406`) checks the complete batch against the existing
+`so_line_remaining_requirement` after the issue lock and exact Order/line locks, before numbering.
+Repeated references share one source cap; distinct same-SKU source lines and legitimate partial
+quantities retain separate lineage. That same remainder counts a reserved Unit and its linked PO
+line once. Unsent/non-cancelled commitment still covers; anonymous incoming stock is not reserved
+by inference. The existing changed-buying-line refusal returns staff to selection. Test and
+production evidence must remain separate; this is not a claim that a real PO was sent.
+Twelve local SQL cases passed, including two concurrent ordinary issuers (one success, one refusal),
+three-unit SO/MPR document and actor checks, legitimate 1+2 buys, duplicate source aggregation,
+separate same-SKU lines and linked-Unit deduplication. The authenticated API maps the atomic refusal
+to the existing changed-buying-line instruction (209 API/SQL tests); 258 real-component journey
+checks passed with simulated transport/PDF readiness. A production rolled-back negative control
+refused excessive source quantity before numbering and left the PO count unchanged. Applied source
+MD5 `8efc838e3f7fdc78d23059fff0354cba`; issue/remainder bodies matched the locally tested functions.
+No live supplier message or purchase was created. The Register read also nets a linked Unit
+and its own PO source once (six projection cases: incoming/reserved/sold, excess Units,
+separate PO-line binding and cancelled commitment); the buying calculation retains its existing
+Unit netting, and a legitimate one-of-three partial source still offers two to buy. Issue-versus-new-Stock-reservation concurrency was then reproduced: Stock checked the remainder
+before waiting on the Order, and could retain that stale answer. Migration 0633 (APPLIED 2026-10-01, tracker `20261001064254`) gives the existing draw/reserve/use-PO/save/release doors one internal source-lock helper,
+Order then exact line before PO-line/Unit locks; eligibility and ownership do not change.
+Twelve controlled SQL cases now pass, including that independent-connection race, legitimate
+reserve → partial buy → release → final buy and explicit incoming-PO reservation with preserved
+Unit IDs. The 0633 production probe rolled back all five body patches and the internal helper;
+its negative control refused direct authenticated helper access. Exact committed file MD5
+`b71e5e603b66adc6ab2bd0276abdfd6b` matches the tracker, and all six production function
+bodies match the tested local functions. This is bounded placement integrity work; Receiving lifecycle is not certified by it.
+
+**Reusable presentation evidence (placement scope).** Both issue lanes use
+`so-batch/SoBatchIssueWorkspace.tsx` (Review), kit `Block` / `SalesOrderWorkspace.Fact`,
+kit `PdfPreview` + the same PO renderer, and `components/PoIssueEvidence.tsx` for the
+current-version send record and History. Both registers use the shared `DataGrid`; their
+source/selection/approval composition differs by business purpose. MPR create/detail keeps its
+existing approval and source/history facts, not a copied supplier page. Real-component review and
+result screenshots use controlled local payloads at 1280×720; they are composition evidence,
+not a production-authenticated issue journey. No Houzs code or new kit component was introduced.
+
 **RESERVE GOODS ALREADY ON A PO — OWNER RULING, APPROVED / LOCKED 2026-09-28 (Jess, "yes"). MERGED (#1723); migration 0600 APPLIED 2026-09-28 (tracker `20260928102149`).**
 Measured on production `b5e959d6`: SO-1358 (Ohana Fenrir King, qty 1) printed five
 contradicting facts on one row — `Need PO` · `Already on a PO` · `Not ordered yet` · `No purchase
