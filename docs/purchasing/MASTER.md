@@ -555,8 +555,9 @@ Supplier work week
 Add Supplier
 ```
 
-`Product Categories` is a multi-select of the three governed Purchasing production categories:
-`Mattress` · `Bedframe` · `Sofa`. It is never a free-text category creator. Every selected category
+`Product Categories` is a multi-select of the governed Purchasing production categories:
+`Mattress` · `Bedframe` · `Sofa`, with accessory-category coverage required by the 2026-10-01
+production-day ruling in §11. It is never a free-text category creator. Every selected category
 requires its own `Production Days`; one generic supplier lead time is forbidden. For this setup
 door, the selected categories are the authority for which Supplier × Category Production Days rows
 must exist; the form does not wait for a SKU to be linked before those values can be stored.
@@ -1438,13 +1439,12 @@ rather than an identity to invent. The 0442 apply classified 225 SKUs `exact_uni
 0443's preflight restored exactly the 39 `po_mint` Units the retired 0366 destination trigger had
 voided — identities already printed on supplier paper — and invented none.
 
-🟡 **THE QUANTITY MODE IS UNREACHABLE UNTIL SETTINGS CARRY ACCESSORY PRODUCTION DAYS.** Every
-`quantity` SKU is an accessory, and `purchasing_production_days` holds only Hookka/bedframe,
-Nice Future/mattress, Ohana/bedframe and Ohana/sofa. Manual Purchase therefore refuses an
-accessory line by name before the Catalog mode is ever consulted, so no PO can carry a quantity
-line and neither the `—` column state nor a quantity receive can be walked. The law is built and
-probed; the block is configuration. **Fix:** Purchasing Settings gains production days for each
-supplier's accessory category. The number is a real supplier lead time and belongs to Jess.
+**ACCESSORY PRODUCTION DAYS — APPROVED TARGET, configuration application not verified.** The
+prior measured four-row production-day configuration could block quantity-mode accessory buying.
+It is historical evidence, not a current live count. The owner has now supplied accessory lead
+time: 7 working days (§11, 2026-10-01). Populate missing applicable Supplier × Category settings
+through the governed audited door; no further owner lead-time question is needed. Verify current
+configuration and the quantity-mode journey before claiming the block resolved.
 
 Legacy showroom stock receives a Unit ID during opening count with supplier, ownership, model,
 location, existing serial/label and photo evidence. Until the physical label is attached, the Unit
@@ -6799,6 +6799,21 @@ Settings lives under the global header gear and requires authorised roles. It in
 - outside-readable PDF templates and permitted external notes;
 - claim/return/repair outcome permissions;
 - customer-privacy exclusion from supplier documents.
+
+**PRODUCTION-DAY VALUES — OWNER CONFIRMED 2026-10-01, APPROVED / LOCKED.** Mattress: **7 working
+days**; Bedframe: **7 working days**; Sofa: **14 working days**; accessories (including pillows and
+protectors): **7 working days**. The owner reconfirmed the first three as earlier supplied values
+and set accessories to 7. Apply these values to missing applicable Supplier × Category settings,
+using the existing supplier-working-calendar calculation, not calendar days or added transit.
+Do not silently replace an existing explicit supplier-specific value. The live set of missing
+rows must be rechecked by the commissioned BUILD; recording this ruling does not claim any
+production data has been changed. Do not ask the owner to supply these values again.
+
+Supplier WhatsApp group/email maintenance is an approved §11 capability, not an owner data-entry
+omission. Verify its actual delivery state in BUILD. Resolve a PO's address from its governed
+Deliver To identity: a supplier address may be reused only where that destination genuinely is
+that supplier location. Do not substitute the factory address for a different delivery destination.
+A genuinely unknown destination address remains named as missing; never fabricate it.
 
 Every setting change has actor, time, old value, new value and effective date. It never silently
 rewrites an issued document or historical Unit.
