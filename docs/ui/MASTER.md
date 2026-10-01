@@ -464,6 +464,34 @@ not another status engine. Final full-flow posting, conflict resolution, storage
 proof require the separately commissioned BUILD/DELIVERY lane and controlled integration validation.
 No PLAN completion claim follows from the local fixture results.
 
+### Concrete reference: Houzs Service Case detail card composition
+
+**OWNER-SELECTED REFERENCE / ADAPTATION NOT YET APPROVED, 2026-10-01.** Jess selected the
+visible composition at `https://erp.houzscentury.com/assr/1564` and specifically identified fonts,
+pills, icons and clear sections. The supplied screenshot shows a case at Pickup / Return,
+Step 4 / 7. This is visual evidence at the shown viewport, not proof of the case transition,
+backend result, current live status or exact CSS dimensions. Do not read pixel values from the
+scaled screenshot or treat this stage sequence as Carres business law.
+
+| Visible reference feature | Why it is understandable | Carres composition rule / boundary |
+|---|---|---|
+| Object type above a prominent case number; customer/current stage/source refs below | First glance identifies the record and its context | Preserve identity → supporting facts hierarchy. Use governed type roles and record-specific facts. Houzs serif identity is a reference choice, not an approved new Carres font. |
+| Main/secondary actions grouped near identity | The employee can find the applicable action without scanning every section | Keep the owning object's governed action positions. Do not copy Archive/Close Case into Warehouse or make unavailable actions look permitted. |
+| Workflow in its own full-width region; completed/current/future steps differentiated with text, marks and emphasis | Separates progress from the detail fields; current position can be located quickly | Use only when a genuine governed sequence benefits the task. Read canonical stage/Work facts; no decorative step engine, manual stage bypass, or false serial order for parallel work. |
+| Status pill beside the relevant stage; completion checkmarks and current-step emphasis | Compact state remains attached to the thing it describes | Pill = state, not an action. Text must identify meaning without colour alone. Carres state vocabulary and semantic colours remain authoritative. |
+| One horizontal facts group: Status, Priority, SLA, Resolution, Lead time | Related summary facts can be compared without opening the detailed cards | Admit only meaningful, source-owned facts for the object; no copied SLA/priority fields merely to fill five slots. Never duplicate competing calculations. |
+| Separate Issue / Product Info / Customer cards, each with an icon and labelled content | One card answers one question; icons help scanning and labels explain meaning | Reuse Block chrome and approved Icon meanings. Preserve semantic grouping, consistent header rhythm and internal label/value hierarchy. Do not create one card per field. |
+| Darker/stronger main facts and quieter supporting labels/text | Readers can distinguish the value from its explanation | Existing text roles and contrast rules apply. Important values must not use disabled/placeholder colour. Exact reference-to-token comparison remains pending measurement. |
+| Regular alignment, inner spacing, card gaps, background/surface separation | Groups remain distinct without dense borders around every sentence | Use 01 token values and one common composition recipe. No ad hoc per-module spacing or imported palette. Multi-column adaptation must account for long text, actual shell width and narrow stacking. |
+
+**Design output this reference requires:** map the whole relationship above to one Carres object,
+identify which facts/sections/actions survive and which are inapplicable, specify the real shared
+components and all interaction states, then obtain whole-page review. A plain stack of Block
+components is not evidence that the reference composition was copied. A source-owned read-only
+fact is not automatically a disabled form field. Card hierarchy, spacing, density, field grouping
+and action discoverability must be assessed together. This reference is available as guidance now;
+its adoption is neither blocked by having existing components nor automatically verified by them.
+
 ### Documentation-only clarification and review freeze — owner instruction 2026-10-01
 
 **RULING / EFFECTIVE NOW:** stop coding, including local review-page changes. The current commission
