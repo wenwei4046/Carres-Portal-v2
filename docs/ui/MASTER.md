@@ -24,48 +24,134 @@
 
 ## Reuse-first shared page templates — owner ruling 2026-10-01
 
-**RULING / APPROVED DIRECTION / TEMPLATE SELECTION, IMPLEMENTATION AND OPERATOR VALIDATION
-PENDING.** Preserve working Carres pages and components. Copy or adapt from Houzs only the
-capabilities or interactions Carres actually lacks, and integrate them into the one existing
-shared template/kit. The owner does not authorise a wholesale page replacement, a new kit or a
-portal-wide rewrite to make Carres resemble Houzs. Existing inconsistency calls for targeted
-adoption of Carres's shared components, not replacement of working behaviour.
+**RULING / APPROVED DIRECTION AND DOCUMENTATION COMMISSION.** One Carres kit serves every
+module. Preserve working pages and components; copy/adapt only an evidenced missing capability
+from Houzs. The owner requested this explicit contract in the existing UI MASTER, not another
+kit or a new planning guide. Application changes, implementation Cards, deployment and external
+cutover remain outside this PLAN commission. **ADOPTION AND FULL OPERATOR VALIDATION PENDING**:
+a written contract is not proof that all pages comply.
 
-- Keep **one existing Carres kit**. First map the needed capability to the existing kit and
-  source-owned workflow. Use that implementation where it exists. Only an evidenced gap leads
-  to selecting a Houzs reference for the missing part; retain Carres token values, COPY-STANDARD, navigation,
-  permissions, Unit/quantity semantics and source-owned actions. Recolouring foreign components
-  alone is not kit adoption. Do not introduce a parallel Houzs component library.
-- Every adopting page names its common template and its justified business differences. Reuse
-  the shared Shell/Register/Object Detail grammar and the approved field-operation direction
-  below. Operational schedules remain a justified workspace, not a forced table. Common
-  structure does not require identical columns or identical physical steps.
-- Select the concrete reference before describing a missing part as ready to copy: record the
-  Carres gap, repository commit, page/file, retained interactions, necessary Carres adaptations and available runtime
-  evidence in this MASTER or the owning module's existing authority. Do not leave the builder
-  only the instruction "copy Houzs" or create another template guide.
-- A missing shared capability is resolved through the **existing kit admission** process and
-  its `/ui` example, never a page-local lookalike. Use an existing equivalent where available;
-  the finding that pages differ is not proof that a new component is necessary.
-- Review changed page states and the affected business journey against the existing shared
-  template, plus the selected reference for the adopted part. Preserve working surrounding
-  behaviour; this is not a mandate to redesign unrelated pages. A visually similar default screen, passing component tests or a merged PR alone
-  cannot establish consistent UI or successful operator delivery. Preserve failure, retry,
-  permissions, long-content and narrow-screen behaviour as well as the normal path.
+### One source and explicit template selection
 
-**Evidence boundary.** Warehouse inspected Houzs commit
-`ecce2e9676acc555efa8b2c30e78052b2ab54749`, including
-`frontend/src/pages/scm-v2/Inventory.tsx` and `StockTakeDetail.tsx`, related backend rules and
-test files. This is reference-code evidence, not observed current 2990 behaviour, a frozen
-portal-wide replacement selection, or verified source-copy permission. Rights, dependencies,
-security and compatibility remain to be checked for any proposed source-code copying.
+Use the following actual sources. Paths below are relative to `apps/web/src/`. Existing
+module-specific business rules and explicit presentation exceptions remain binding; identical
+visual grammar never means identical fields, permissions or lifecycle.
 
-**Approval boundary.** This direction does not approve all findings in the Warehouse review,
-override an explicit module-specific owner ruling without resolving the conflict, or authorise
-application code, Cards, deployment or external cutover in the PLAN chat. It does remove the
-assumption that every page may freely choose a different shell or interaction merely because
-its individual components already exist. Concrete template choices and ordinary compatible
-implementation details are the planner/builder's work, not a serial questionnaire for Jess.
+| Surface / job | Actual shared source and inspected adopter | Required composition and behaviour | Allowed module differences |
+|---|---|---|---|
+| Module shell | `pages/operation/components/ModuleHeader.tsx`; current Sales Orders / Inbound | Existing navigation and shared destination header/global tools; page actions in the governed toolbar. No page-local replacement navigation, second title or decorative summary strip. | Governed destination name and content; current UI §6.0 owns header details. |
+| Register | `components/register/DataGrid.tsx`, `register-field-widths`; `SalesOrdersRegister.tsx`, `WarehouseInbound.tsx` under `pages/operation/` | Shared search/column/filter/selection mechanics; explicit identity and action doors; governed widths/pinning and return context. Empty, loading, denied and failed reads are distinct. | Source population, business columns/order, approved exceptions, authorised actions and selection capability. |
+| Filter rail | `pages/operation/components/workspace-rail.tsx`: FilterRail, FilterRailGroup, FilterRailRow | Preserve the existing rail. Applied conditions, rows, quantity summary and export describe the same scope; record counts and goods quantities are labelled separately. Keep governed Site tabs where present. A narrow-screen filter surface retains the same conditions. | Admitted filter dimensions and governed base population; contextual facet counts follow the current shared filter law. |
+| Goods expansion | `pages/operation/components/GoodsMiniTable.tsx`; SalesOrdersRegister `ExpandedLines`; WarehouseInbound `InboundExpansion` | A structured read-only child table, real headings, aligned values and exact identity links. Expand has one job: goods and their relevant quantity/evidence detail. Never replace it with concatenated prose or a second editing form. | Source-owned receiving/loading results and approved line selection. Prove component capability before extending it; do not force Sales columns onto receipt facts. |
+| Object detail | `pages/operation/SalesOrderWorkspace.tsx`, `purchase-orders/PurchaseOrdersPage.tsx`, `WarehouseUnitDetail.tsx`; shared `components/kit/Block.tsx`, DocumentTable, TotalsSummary | Use the existing approved object composition: identity, current authorised actions, grouped facts, source documents/evidence and actual history. Use shared Block chrome and table/totals treatment. The object's MASTER owns placement and business meaning. | Business groups, appropriate action placement and source-owned facts. A Unit is not a sales commercial record. |
+| Edit / review | Existing source-owned forms and review surfaces; `components/kit/FieldFrame.tsx`, Input, Select, DatePicker, PdfPreview | Pre-filled known facts, grouped necessary inputs, field errors plus a discoverable blocked-save reason; preserve input on failure. Current-version preview, authorised save and clear saved/unsaved result. | Required fields, approved document preview arrangement and actual business validation. |
+| Field operation | `pages/operation/components/ReceivingWorkspace.tsx`, PoReceivingView; `WarehouseOutboundWork.tsx` Loading workspace | Preserve the one receiving/loading write door. Clear source identity, goods/Units, physical checks, evidence, next action and residual work. Return to the same list context. Warehouse submission is not posted GRN; loaded is not driver-confirmed. | Physical steps and source contracts, never a second stock or approval engine. |
+| Preview / confirmation | `components/kit/PdfPreview.tsx`, SavedEvidenceViewer, DialogFrame, Modal, Drawer | Use the existing admitted container for its purpose; correct version and evidence permissions, close/back behaviour and focus return. A preview is not a competing editable detail. | Evidence/file type and bounded confirmation content. Do not migrate all details to drawers because a reference uses one. |
+| Work / ownership | Shared Work source/resolver plus `components/kit/Block.tsx`, RouteStop, ChecklistRow, QuietRouteRow | Render resolved responsibility and source action; current UI law uses Assigned to and Completed by. Completion comes from the owning business result. Authorised help retains the actual performer. | Source, governed dates and actions; no page-local rota, substitute resolver or fake Mark done. |
+
+**Do not select by filename alone.** The inspected `components/kit/DetailShell.tsx` contains
+OrderActionTrack and a fixed four-fact identity contract. It is not evidence of an unrestricted
+cross-module detail template. Use the current approved object grammar and actual adopters above;
+do not impose that older order model on unrelated objects. Existing generic DataTable uses are
+not automatically wrong, but `docs/02-components.md`'s global-only DataTable wording cannot override
+this MASTER's governed Register/DataGrid rules. Fix documentation scope, not working registrations.
+
+### Typography and colour usage
+
+**RESOLVED FROM EXISTING AUTHORITY:** `docs/01-design-tokens.md` owns the numerical values;
+`components/kit/tokens.ts` and the configured classes implement them. No page chooses a new palette,
+font scale, border, radius or spacing to resemble a screenshot. Current page/card/body/meta roles
+remain 24/15/13/12 with the existing title, label and scoped Work-control roles. English uses the
+configured Inter chain; mixed CJK uses the existing CJK handling. Codes and numeric columns use
+the current code/numeric treatment, not an arbitrary second font per page.
+
+**FIELD TYPOGRAPHY — PROPOSAL / NOT LAW / NOT BUILT:** measured Houzs Loading List uses a
+16px document identity, 14px goods text and 12px supporting text. Evaluate that bounded field-card
+hierarchy against Carres's current 15/13/12 with the same realistic content and viewport. Do not
+apply it portal-wide or expand the Work-only control token to authorise it. Acceptance requires
+better identity/product recognition without obscuring quantities/actions or excessive scrolling;
+otherwise retain or revise the proposal. The owner's request to document the kit does not silently
+approve a token-value change or make an unshown comparison validated.
+
+**Colour mapping — retain the governed Carres semantic palette:** canvas/surface separate the
+page from white cards; primary text is slate-12 and supporting text slate-11. Important facts do
+not use disabled/placeholder colour. Blue remains the governed action/link/selection treatment;
+hover and persistent selection are distinguishable. Success, warning and error use their existing
+semantic pairs with explanatory text. A status label follows its actual business meaning: a
+confirmed document is not automatically a completed physical job. The Houzs light-fill/dark-text
+pill is a reference interaction, not permission to copy its green/brass palette, label vocabulary
+or status mapping. Icons, text and state meaning remain readable without colour alone.
+
+### Houzs selection and copy boundary
+
+Reference fixed at `ecce2e9676acc555efa8b2c30e78052b2ab54749` in
+`Houzs-Century/Houzs-ERP`. Relevant source inventory is not one importable library:
+`frontend/tailwind.config.js`, `frontend/src/index.css`,
+`frontend/src/vendor/design-system/tokens.css`; vendor Button/IconButton/PriceTag; separate
+`frontend/src/components/` Button/DataTable/Layout/DetailLayout; and
+`frontend/src/vendor/scm/components/` form/dialog/evidence components. Duplicate button families
+have different sizes. Importing all of them would create competing kit definitions.
+
+| Inspected reference | Decision and retained lesson | Required adaptation / evidence status |
+|---|---|---|
+| `frontend/src/pages/scm-v2/LoadingList.tsx` | REUSE CANDIDATE for identity-first card grouping, goods/quantity alignment and a distinct action door. Goods are shown directly; this is not the Carres goods expander. | Compose with Carres components only where needed; preserve Unit, receipt and driver facts. No generic exported LoadingCard was found in that file. |
+| `frontend/src/components/DataTable.tsx` | KEEP existing Carres DataGrid capabilities; study only a demonstrated missing interaction. | No replacement table engine justified. Source existence does not prove runtime parity. |
+| `frontend/src/pages/scm-v2/GoodsReceivedListV2.tsx` | Reference for line breakdown and contextual detail access. | Preserve existing Carres full detail/receiving doors unless a scoped benefit is demonstrated; no automatic drawer conversion. |
+| Vendor SCM FormCard / SaveProblemsList / SaveBlockedIndicator | REUSE CANDIDATE for understandable grouped input and actionable save feedback. | Map current FieldFrame and workflow errors first; no proven missing foundational engine. |
+| DocFilesCard / PhotoGallery / MediaLightbox | KEEP existing Carres evidence viewers; assess only an actual unsupported capability. | File permissions, actual Unit association, source/version and media behaviour must survive. |
+| PendingTasksReminder / PresencePanel / WorkspaceTabs | Reference evidence only; reject as replacement for Carres Work/Duties. | Pending reminders, online people and page tabs do not prove compatible task assignment or cover. |
+
+Live read-only Loading List observations establish visible grouping and computed styles at the
+observed viewport, not its deployment SHA or successful business writes. Houzs tests were not run;
+current 2990 parity is unknown. Source-code rights, dependencies, data semantics, security and
+compatibility are not fully verified: **no source-code item here is COPY REQUIRED**. Pattern reuse,
+existing Carres component reuse, reference source copying and business-workflow adoption are
+separate decisions. No unverified time-saving estimate is a reason to replace working behaviour.
+
+### Required samples and acceptance contract
+
+Each adopting scope identifies **template → exact real component → approved real exemplar →
+permitted differences → preserved behaviours → acceptance evidence**. “Follow UI kit” or “copy
+Houzs” alone is insufficient. A business field adapter is not a new kit; a missing shared control
+or template capability follows existing kit admission and is implemented once with its `/ui`
+example. Do not create a page-local lookalike while waiting for that admission.
+
+| Sample/state | Required result |
+|---|---|
+| Normal and expanded | Correct identity, aligned actual goods and quantities; expansion has the stated single job. |
+| Long names, many lines, multiple open records | Complete values remain discoverable; names do not collide with quantities; no short-fixture-only visual claim. |
+| Search/filter/summary/export | One authorised scope; record counts and quantity meanings explicit; clearing and return context correct. |
+| Loading / empty / error / permission / missing setup | Distinct truthful states and appropriate next action; failure is never reported as zero stock or no work. |
+| Editing / failed save / stale data / retry | Input and evidence preserved where valid; conflict explained; no duplicate or partial business result concealed. |
+| Partial / complete | Result matches source facts; remaining work visible; actual actors and historical evidence retained. |
+| Narrow screen / keyboard / zoom | Identity and action remain accessible; same business scope; focus/close/return behaviour works. |
+
+A standard sample uses actual Carres components at a stated viewport, with traceable sample data.
+Show the existing page and the bounded change; do not repaint the surrounding shell. Review both
+actual component reuse and rendered interaction. Existing style checks cover only part of this:
+passing tests or a screenshot alone does not prove operator success. Do not add duplicated tests
+merely to mirror a trivial change; evidence must fit the behaviour being changed.
+
+### Current status and document ownership
+
+**IMPLEMENTED IN INSPECTED CODE / NOT A WHOLE-KIT VERIFICATION:** ModuleHeader, DataGrid,
+FilterRail, GoodsMiniTable, Block, DocumentTable, TotalsSummary and the listed form/viewer components
+exist with real adopters. Their presence does not certify every page's usage. Receiving's per-Unit
+claim-photo support versus a line-level string-array form, and Unit Current work reading only
+Issues, are measured workflow-integration gaps, not evidence that a new uploader or Work engine
+is needed.
+
+**PENDING:** reconcile stale DataTable scope and pending-admission prose against actual adopters;
+complete real composed template samples and relevant state/viewport/operator evidence. Do not
+claim these are delivered because this section is saved. Keep the existing document split:
+this MASTER owns contracts and exceptions; 01 owns values; 02 owns component API/use/state;
+03 owns composition/examples; module MASTERs own business semantics; `/ui` shows actual examples.
+Coordinate existing shared-document ownership rather than open competing PRs or another guide.
+
+**REJECTED SAMPLE:** the standalone `warehouse-ui-preview.html` hand-written shell/filter card,
+blue summary box and concatenated goods expansion were rejected by the owner and withdrawn.
+Neither its screenshots nor its code is an approved template or build input. Preserve that
+rejection boundary; no application implementation was authorised by this documentation update.
 
 **Workspace destination label — owner ruling 2026-09-29 / BUILT; production verification pending.**
 The main-menu link to `/operation?tab=work` reads `Workspace`, matching the page heading.
