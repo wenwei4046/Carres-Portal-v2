@@ -24,6 +24,25 @@
 
 ## Reuse-first shared page templates — owner ruling 2026-10-01
 
+### Register toolbar — owner-approved target, 2026-10-01
+
+**APPROVED TARGET / NOT BUILT.** Jess approved the Sales planner's fixed far-right overflow
+recommendation. Search, current filter summary and Table/Cards (where supported/admitted) remain
+visible. Secondary supported page tools, including Export and Columns, move into the far-right
+`⋯` menu. Wrap/reset appear only where actually supported. Menu entries have icon and text; they
+are page tools, never order amendment/cancellation writers. Keep governed creation and selection
+ownership; this ruling does not invent actions or remove any export/permission semantics.
+
+The canonical trigger measurements are in 01 §7.2. On narrow screens put secondary tools into
+overflow first to preserve a single row and visible primary controls; do not silently hide an
+active filter or query. Preserve an accessible trigger name, keyboard menu use and focus return.
+If primary content still cannot fit, report the measured gap rather than shrink type or invent a
+second layout. Existing toolbar height stays in force: the earlier 48px candidate is **NOT
+APPROVED**. No new pill dimensions, 32px table rows or rail relocation are admitted here.
+
+Sales is the first pilot; other module adoption needs its own verification and existing lane
+boundary. Documentation approval is not proof of implementation or permission to merge/deploy.
+
 **Numeric contract, 2026-10-01:** [01 §§7–8](../01-design-tokens.md#7--canonical-component-measurements--scoped-not-one-size-for-every-surface)
 contains self-contained Carres values, source/target/status and the Sales-first acceptance boundary.
 Old generic sizing assumptions are replaced by scoped shared recipes. Actual font loading remains
@@ -2768,27 +2787,16 @@ page-owned control may enter this row — ever.** Not create, not Scan, not Expo
 Search, not View, not filters, not selection state. **No search box on this row:** `Jump to…` is the
 search that belongs to every page, and a second box here would be a second global search.
 
-**ROW 2 · WORK TOOLBAR, 45px, one row, never scrolls sideways.** Left = the one primary create
-action, written in full (`⊕ New Sales Order`) — it is the page's only blue. Right = how the operator
-looks at this page: Search · `Export ▾` · Columns. Nothing else lives here.
+**ROW 2 · WORK TOOLBAR.** Keep the existing scoped height in 01 §7.4. The current
+owner-approved presentation is the Register toolbar ruling above: search, current filter summary
+and admitted Table/Cards remain visible, secondary supported tools live in the fixed far-right
+`⋯` menu. Governed create/selection actions retain their business ownership. This replaces the
+old always-visible icon-only Export/Columns arrangement; existing deployments may lag.
 
-- **Register Search — owner ruling R4, 2026-09-16 (overwrites the icon-only rule for every
-  Register; adoption is staged).** The TOOLBAR's available width chooses, never a device label:
-  with room, a readable search box carrying its governed placeholder; narrow, a search icon that
-  opens the box with the caret inside. An active query keeps the box and its `Clear search` control
-  visible at every width, so a narrowed listing never looks like the whole listing. `Esc` clears
-  and closes the transient box. Selection still replaces the toolbar in place (`Clear` · owner ·
-  primary action first). Engine capability: `DataGrid searchPresentation="responsive"`. **Adopted
-  on SO Batch Purchase first (PR #1395); every other Register keeps its current icon search until
-  its own toolbar is migrated and walked — never with a page-local search component.**
-- **Columns is icon-only** (`▥`). Its hover/accessible name is `Columns`.
-- **Export is icon-only too** (`⤓`) — owner ruling 2026-08-15, correcting this section's first
-  draft, which reserved icon-only for view controls and kept the word on the verb. The right side
-  of Row 2 is a row of icons; one word inside it reads as an exception. It carries **no caret**
-  either (owner ruling, same day): Gmail's toolbar icons open menus without one, and a caret bolted
-  to a bare icon reads as a split button that was never split. Its hover/accessible name is
-  `Export`, and the menu offers **Excel · PDF · Print**
-  — three outputs, one door, never scattered across `…` or separate permanent buttons.
+- Search uses its admitted shared control and preserves active query/clear access. Do not create
+  a page-local search component. Narrow layouts overflow secondary tools first.
+- Export and Columns entries have icon plus text. Export retains existing supported outputs,
+  permission checks and selected-vs-filtered scope; this ruling changes placement, not capability.
 - **Selection changes WHAT `Export ▾` can produce, not just how many.** With no selection the
   outputs describe the LIST: Excel · PDF · Print. With rows ticked the same space also offers the
   DOCUMENTS those rows own — `Print {n} sales orders` — assembled server-side under RLS, one
@@ -2881,7 +2889,7 @@ fourth Register on this template, and the first with a LEFT FILTER RAIL beside i
   `qty > 1` record can never be reserved (migration 0366), so a single number would either hide 893
   real pieces or promise 893 that no Sales Order can name. When a Register's one summary number
   would answer two different questions, it prints both and names them.
-- **Row 2 is unchanged** — Search · Export · Columns, no page-owned control in Row 1. The superseded
+- **Row 2 uses the shared Register toolbar target** — visible search/filter summary and admitted view control, secondary tools in `⋯`; no page-owned control in Row 1. The superseded
   On hand page put its search box and an `Import sheet` button in the destination header, which §6.7
   forbids by name; the replacement does not.
 - **There is no create button.** A Unit is born when a purchase order or consignment order is

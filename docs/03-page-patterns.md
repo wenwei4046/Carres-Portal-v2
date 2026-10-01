@@ -116,7 +116,7 @@ Existing portal navigation | Shared module header/global tools | Existing Quick 
 
 - Global navigation changes destination. The factual rail narrows the same record population;
   Site remains a tab where the module has ruled it, including Inbound. Neither creates local Work.
-- Keep existing shared toolbar order and permitted actions under UI MASTER §6.0. A selection
+- Apply UI MASTER’s owner-approved2026-10-01 Register toolbar target: visible search, current filter summary and admitted Table/Cards; supported secondary page tools in fixed far-right `⋯`. Use 01 §7.2 dimensions. Existing toolbar height remains;48px is not approved. A selection
   action states the selected scope; no hidden rows silently join a destructive/batch operation.
 - Use DataGrid, content-led column recipes and governed defaults. Main identity, important facts
   and task door must be readable at the measured shell width. Do not shrink type to force columns.

@@ -83,6 +83,16 @@ tables. Those follow content-led widths, governed row recipes and contained scro
 
 ---
 
+## Register toolbar overflow
+
+**APPROVED TARGET / NOT BUILT — 2026-10-01.** Use the existing admitted shared menu/control
+family; do not build a page-local toolbar or new menu engine. Search/current filter summary and
+admitted Table/Cards stay visible. Fixed far-right `⋯` holds supported secondary page tools
+(Export, Columns; Wrap/reset only if supported). Entries use icon plus text; order writers do
+not belong here. Trigger dimensions live only in 01 §7.2. Retain keyboard naming, menu navigation,
+focus return and scoped selection/export rules. Narrow layouts overflow secondary tools first.
+This governs Register adoption; the batch GridToolbar below retains its distinct selection job.
+
 ## GridToolbar
 
 **Purpose.** The one row above a grid: how to narrow it, what is selected, and
