@@ -5,6 +5,7 @@ import type { PaymentRegisterRow } from "@carres/shared/payment-register";
 import type { InvoiceRegisterRow } from "@carres/shared/payment-invoice-register";
 import { soRemaining } from "@carres/shared/payment-invoice-register";
 import EmptyState from "@/components/kit/EmptyState";
+import ModuleHeader from "@/pages/operation/components/ModuleHeader";
 import Select from "@/components/kit/Select";
 import { SectionCard } from "@/components/SectionPanel";
 import { useQuery } from "@tanstack/react-query";
@@ -204,20 +205,22 @@ export default function FinancePaymentReport() {
     XLSX.writeFile(wb, `Payment report ${month ?? "all"}.xlsx`);
   };
 
+  // The same header as Card charges and Dealer commission: the bell and the
+  // browser tab name stay on this report too.
+  const header = <ModuleHeader destinationHeader testId="payment-report-header" word="Payment"
+    docTitle="Payment · Carres" />;
   if (paymentsQ.isError || invoicesQ.isError) {
-    return <div className="p-6"><EmptyState
+    return <div className="flex h-full min-h-0 flex-col">{header}<div className="p-6"><EmptyState
       title="This report could not be opened"
       detail="Try again."
-    /></div>;
+    /></div></div>;
   }
   const loading = paymentsQ.isLoading || invoicesQ.isLoading;
 
-  return <div className="p-6 max-w-[1100px] mx-auto" data-testid="payment-report">
-    <header className="mb-4 flex flex-wrap items-end justify-between gap-3">
-      <div>
-        <div className="text-label uppercase tracking-[0.12em] text-base-500">Reports · Payment</div>
-        <h1 className="text-xl font-semibold">Payment</h1>
-      </div>
+  return <div className="flex h-full min-h-0 flex-col" data-testid="payment-report">
+    {header}
+    <div className="min-h-0 flex-1 overflow-auto p-6"><div className="max-w-[1100px] mx-auto">
+    <div className="mb-4 flex flex-wrap items-end justify-end gap-3">
       <div className="flex items-end gap-2">
         <button className="btn-secondary" onClick={exportExcel} disabled={loading}
           data-testid="report-export">Export Excel</button>
@@ -230,7 +233,7 @@ export default function FinancePaymentReport() {
           options={months.map((m) => ({ value: m, label: fmtMonth(m) }))} />
       </div>
       </div>
-    </header>
+    </div>
 
     {loading ? <p className="text-body text-base-500">Loading…</p> : <div className="space-y-4">
 
@@ -336,5 +339,6 @@ export default function FinancePaymentReport() {
       </div></SectionCard>
 
     </div>}
+    </div></div>
   </div>;
 }
