@@ -148,6 +148,78 @@ compatibility are not fully verified: **no source-code item here is COPY REQUIRE
 existing Carres component reuse, reference source copying and business-workflow adoption are
 separate decisions. No unverified time-saving estimate is a reason to replace working behaviour.
 
+### Houzs top-to-bottom UI coverage and measured examples — 2026-10-01
+
+**FACT / REFERENCE AUDIT; CARRES ADAPTATIONS BELOW ARE PROPOSAL / NOT LAW / NOT BUILT.**
+This is an audit coverage map derived from the inspected reference sources, not a claim that
+Houzs publishes this checklist or has a single uniform UI kit. Source paths below are relative
+to `frontend/src/` at the reference commit above. Directory inventory is not behaviour validation.
+Existing Carres authority remains binding; proposed gaps do not authorise page-local components.
+The design-system skill is used to separate tokens, components, patterns and interaction states.
+
+#### Why the two owner-selected surfaces read differently
+
+Read-only computed-style measurement on the live `/assr` table at **914 CSS px** width:
+header 11.5px/600, 14.375px line-height, 8px vertical / 12px horizontal padding (outer selection
+cell has a 20px left inset); header height 34.375px. Body cells 13px/400, 16.25px line-height,
+6px vertical / 12px horizontal padding; sampled ordinary rows 29.5px high. The actual document-ID
+child span is **12px/500**, not the body's inherited 13px/400. White and pale alternate rows,
+subtle horizontal dividers and a darker header separate the reading bands. Fixed column widths
+and a horizontal scroll surface keep columns from crushing each other. These are observed
+samples, not universal fixed heights: wrapping, controls and secondary lines can increase height.
+Source: `components/DataTable.tsx`, including `cellPad`, `headPad`, header/body rendering and
+column-width resolution. At the default 603px viewport the inspected page showed a wrap/card
+representation; it must not be certified as the same desktop table shrunk to a phone.
+
+Read-only live Overview `Needs you` measurement reported **1280 CSS px** width: white card,
+20px internal padding, 12px radius; heading 15px/700 with 22.5px line-height; record identity
+13.5px/600 with 20.25px line-height; supporting line 11.5px/400 with 17.25px line-height.
+A sampled two-line action row is 57.5px high, with 10px top/bottom padding and 12px gap between
+its dot, text group and badge. The status badge is 9px/700, 2px vertical / 6px horizontal padding.
+Source: `pages/Overview.tsx` and `components/Badge.tsx`; source card padding is responsive
+16px then 20px. The screenshot marker's blue border is an annotation, not product selection.
+These live observations are not linked to a verified deployment SHA; the reference source commit
+and runtime observations remain separate evidence.
+
+**Recommendation:** preserve the distinction between a dense comparison register and a task feed.
+Borrow hierarchy, consistent alignment and purposeful whitespace, not every foreign pixel value.
+A record's identity leads; supporting context is subordinate; state and action stay findable.
+Do not use 9px badges, 700 weight or a 12px radius as implicit Carres approvals. Carres's existing
+weight/radius/text roles remain authoritative pending an explicit reviewed token change. The
+Overview uses truncation; full party/reason discovery and keyboard use need validation before
+adopting that behaviour. The selected screenshots also show floating controls/update banners near
+content: obstruction must be checked, not copied as desirable chrome.
+
+| Coverage ID / surface | Houzs evidence / useful lesson | Existing Carres / proposed treatment | Still required before adopted/verified |
+|---|---|---|---|
+| UI-01 Semantic colours | `tailwind.config.js`, `index.css`, vendor tokens: canvas, surface, ink, functional accent, status pairs | KEEP Carres palette; improve evidenced contrast only through governed values | Rendered default/hover/selected/disabled/error pairs; current contrast proposals remain pending |
+| UI-02 Typography | Overview vs DataTable vs LoadingList use distinct hierarchy; measured examples above | KEEP roles; bounded field-card typography proposal only; no portal-wide enlargement | Same realistic content comparison, CJK, numbers, long identifiers, zoom |
+| UI-03 Spacing / border / elevation | Overview card padding versus table cell padding intentionally differs | KEEP token scale; specify card, row, section and toolbar composition separately | Approved full-page sample, nested sections, content density; no copied foreign radius |
+| UI-04 Shell / navigation | Sidebar, TopNavbar, WorkspaceTabs and mobile navigation | KEEP Carres shell, Work/Quick Rail and module ownership; REJECT imported foreign navigation | Active destination, small-screen access, content and overlay clearance |
+| UI-05 Page heading / toolbar | Layout/PageHeader and service register separate identity, search and tools | KEEP ModuleHeader + governed register toolbar; no decorative duplicate heading | Primary action, filter/selection state, narrow wrapping |
+| UI-06 Search / filters / scope | DataTable search-scope hint, column filters, ColumnsDrawer | KEEP DataGrid + FilterRail; borrow only a demonstrated missing interaction | Scope matches summaries/export, clear/reset, saved state, permission population |
+| UI-07 Dense register | Measured `/assr`; aligned widths, calm rows, stronger identity, light dividers | IMPROVE composition within DataGrid if comparison proves a deficit; no engine replacement | Column-by-column mapping, actual long data, hover/selection/focus, numeric alignment |
+| UI-08 Columns / sorting / wrapping / paging | DataTable width/reorder/freeze/wrap/paging code and visible controls | KEEP existing equivalents; missing behaviour is REUSE CANDIDATE after capability mapping | Persistence, sort/filter combinations, keyboard access; source tests not run |
+| UI-09 Row expansion / goods | LoadingList always shows goods; GoodsReceivedListV2 has breakdown; not one universal expander | KEEP GoodsMiniTable and source-owned warehouse facts; no prose-packed expansion | One expansion purpose, identity links, quantity meaning, many lines |
+| UI-10 Task feed card | Overview `Needs you`: heading/count, two-line item, small state badge | ADAPT hierarchy using existing Work/Block patterns; no new job source | Full context access, actual assignee/actor, deep link, failure distinct from no work |
+| UI-11 Summary / selectable cards | Overview KPI ribbon; service stage funnel visible in live page | Use summaries only when they help operation; selectable filters retain scoped truth | Distinguish static metric from filter/action; selected state, counts and keyboard |
+| UI-12 Object detail / section card | DetailLayout, ResizableDetailDrawer; SCM FormCard | KEEP approved Carres object grammar and Block; no blanket drawer migration | Identity, current action, grouped facts, long content, evidence and history |
+| UI-13 Forms / grouped fields | FormCard shares SalesOrderNew stylesheet; FormGrid documented 4/2/1 columns; FormField label/hint | KEEP FieldFrame and admitted inputs; adapt grouping, not supplier/sales assumptions | Required/read-only/error states, address wrapping, help, input preservation |
+| UI-14 Buttons / icons / badges | Separate main and vendor Button families; Badge soft/solid/outline, 9/10.5px sizes | KEEP one Carres family; REJECT importing parallel families and tiny badges | All states, icon labels, keyboard focus, destructive meaning and contrast |
+| UI-15 Save feedback / blocked action | SaveProblemsList aggregates line/field problems; SaveBlockedIndicator | Map existing validation first; ADAPT understandable all-problem feedback where missing | Actual API error contract, locate field, retain input, retry, stale record |
+| UI-16 Dialog / drawer / confirmation | DetailLayout/drawer and SCM Modal family | KEEP Carres Modal/DialogFrame/Drawer for admitted purposes | Focus containment/return, Escape, unsaved close, scroll, permission errors |
+| UI-17 Files / photos / documents | DocFilesCard, MediaLightbox and evidence components | KEEP DocumentTable/PdfPreview/SavedEvidenceViewer; no duplicate uploader | Unit/source association, version, rights, failed upload, preview/download access |
+| UI-18 Loading / empty / failure | EmptyState, Skeleton; Overview explicitly distinguishes failed inbox read from zero tasks | KEEP truthful shared states; adapt missing composition | No results vs no access vs failed read, recovery action and preserved filters |
+| UI-19 Small screens / keyboard | DataTable wrap representation observed; form grid source breakpoints | ADAPT responsive presentation without changing business scope | Tab order, visible focus, touch controls, zoom, horizontal scroll and overlay clearance |
+| UI-20 Ownership / history / completion | Reminder/presence/tabs are insufficient proof of job ownership | KEEP Carres Work/Duties, business audit and actual actor; reference workflow REJECT if incompatible | Source action completion, authorised cover, partial work, history and return context |
+
+**Coverage status:** shared-source inventory and the measured examples above are available.
+This is not an exhaustive runtime verification of every Houzs component, theme, permission or
+state. Rows with only source evidence remain source-inspected; states listed in the last column
+are acceptance gaps, not invented defects. No Houzs tests were executed. No source-code reuse
+has cleared rights/dependencies/security/data compatibility. The three Carres adopters must
+share these presentation contracts while preserving their different operating tasks.
+
 ### Required samples and acceptance contract
 
 Each adopting scope identifies **template → exact real component → approved real exemplar →
