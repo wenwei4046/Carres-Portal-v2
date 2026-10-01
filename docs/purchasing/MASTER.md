@@ -1098,7 +1098,7 @@ source writers, not a parallel status engine or duplicate source-edit form.
 | Customer SO | `Waiting for customer decision` | SO PIC obtains the customer's wait/change/cancel decision. Orders owns amendment submission, approval and application. A submitted or rejected amendment changes no live requirement. |
 | Manual Purchase | `Waiting for requester decision` | Requester proposes the response; authorised colleagues may assist under existing permissions. Changing already-approved goods requires a linked new request through the existing approval flow. No requester gains approval or self-approval rights. |
 | Showroom display | `Waiting for showroom decision` | Follow the Display Request's existing negotiating Sales, agreement and approval boundaries (§9.13). Operation may record supplied facts on behalf of Sales; this does not grant commercial approval. A purchased display retains its Manual Purchase approval path. |
-| Missing or unverified source | `Waiting for Purchasing decision` | Purchasing Approver handles the source-integrity exception first. Name the missing historical evidence; never guess a source, create an independent unsourced purchase or bypass approval. |
+| Legitimately purchased PO quantity not yet allocated to an order/source requirement | `Waiting for Purchasing decision` | Purchasing Approver (currently Jess) may choose only to wait or cancel that quantity under §5.8.1. There is no recipient authorising replacement goods; buying different goods requires a normal Manual Purchase request and approval. This is unallocated quantity on a sourced PO, never authority to create a blank or unsourced PO. |
 
 Purchasing Approver is resolved through Staff & Duties; Jess is the current approver. No Manager
 position is required or invented. Hiring a manager grants no approval rights automatically; any
@@ -1109,8 +1109,11 @@ requirement that only the assigned employee may record authorised work; preserve
 **One decision per affected source quantity.** Use the authoritative source allocations and exact
 Unit reservations, not SKU matching or one chosen customer representing a combined PO line. A
 customer's decision affects only that source's quantity; other customers and Manual Purchase
-allocations remain intact. Missing or ambiguous allocation is an explicit exception, not guessed
-permission to cancel the whole line.
+allocations remain intact. Confirmed unallocated quantity is distinct from missing source history. If source history cannot
+be established, show `Source unknown`; never guess that the quantity is unallocated or authorise
+whole-line cancellation from that absence. Preserve the original procurement provenance; a blank
+independent PO remains forbidden. The wait/cancel-only rule for confirmed unallocated quantity
+never permits swapping its SKU or treating it as a new approved requirement.
 
 **After a decision.**
 - **Wait:** preserve the exception and its follow-up. Record a recovery estimate as an estimate;
