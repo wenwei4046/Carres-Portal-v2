@@ -7,23 +7,17 @@ control types, special schedules and business behavior; no page-local appearance
 
 
 Status: **APPROVED / LOCKED — OWNER REVIEW COMPLETE 2026-08-29; Supplier Claims stock-claim boundary and Problems UX owner-approved 2026-09-14**
-Lane: **PLAN COMPLETE for the 2026-08-29 blueprint · PLAN / DESIGN IN PROGRESS 2026-09-25 (page-by-page UI review)**
+Lane: **PLAN — consolidated completion scope, 2026-10-01. Existing approved business rules
+remain binding; source-code findings are evidence, not proof of production completion.**
 
-**RESUME HERE — handoff 2026-09-25 (office desktop → MacBook chat).** Owner approved, all on `main`:
-flows 1–5 (§5.6.1 PO windows · §5.7 per-item supplier answer + evidence + reasons + any-person
-recording · §5.4 `Change Deliver To` build boundary · §9.5 Claim reply recording · §9.6 Purchase
-Return creation door) and **page 1 — the PO object page composition (§9.3)**. Workspace §5.10/§6.1
-mirror every flow. **Pending owner `yes`:** flow 6 (Receiving/Stock → Claim; proposed in chat,
-not persisted). **Next, in order, one page at a time, UI-kit geometry and exact words, owner
-agreement before any Card:** page 2 SO Batch Purchase (window-scoped entry, pre-tick, toolbar) ·
-page 3 Supplier Claim record · page 4 Purchase Return document + send · page 5 Settings →
-Purchasing · page 6 Work right-panel Purchasing cards (Workspace template) · page 7 Stock Unit
-Detail `Report a problem` (Stock lane). Cards are authored only after the owner agrees every
-page; recommended Card order A Settings · B shared send ledger · C PO window Work + SO Batch ·
-D per-item answer + day-before Work · E Change Deliver To (BUILT 2026-09-29, 0610) · F Claim reply → decision → PRTN.
-Restart prompt: `Purchasing — PLAN / DESIGN, page-by-page UI review. Read CLAUDE.md, this
-RESUME block, UI MASTER §4.1/§6.7–6.10, tokens; continue at the next unapproved page; persist
-each owner-approved page to this MASTER + COPY + Workspace before moving on.`
+**CURRENT HANDOFF — 2026-10-01.** Retain the existing architecture and working pages. Complete the
+module against §§5–14 and the consolidated defect/acceptance map in §2.4. Do not restart the
+Blueprint or ask the owner to approve every page in sequence. The four exception rulings,
+staff-help boundaries, supplier channels and MP/pillow replenishment facts remain approved.
+The whole-page recommendation and supplied code-audit defects are one completion scope; the
+research report is supporting evidence, never a second MASTER. Only genuinely unresolved business
+changes require owner decisions. This PLAN update does not commission additional application work.
+The separately commissioned PO-placement BUILD retains its own delivery and verification boundary.
 
 This file is the only canonical Purchasing Blueprint. It owns Purchasing and the governed
 Purchasing → Receiving seam. Receiving owns its physical-receipt workspace and GRN facts under
@@ -129,6 +123,55 @@ where they act · what proves completion · who supervises · what consequence f
 and `Team Work` project these module actions; they never store a second completion or expose manual
 `Done`. These actions appear in owner-resolved `My Work` / `Team Work`; a module Register rail does
 not copy them into a second local work panel.
+
+---
+
+
+### 2.4 Consolidated completion and acceptance boundaries — 2026-10-01
+
+**OWNER-ACCEPTED DIRECTION: retain, repair and complete; no module rewrite.** The operator/page
+Blueprint remains §§4–14. The following integrates the supplied defect audit with that Blueprint.
+Baseline of the reported code defects: `45f43e96b`. These findings must be rechecked against the
+current implementation before changes; runtime reproduction remains owed unless separately cited.
+Do not call a workflow READY merely because a route, component or test exists.
+
+| Reported break | Required business outcome / owner boundary |
+|---|---|
+| Proceeded SO can return to Place despite PO/Unit commitments (0500 unproceed_order) | Block that bypass where PO lineage or reserved/PO-bound Units exist; preserve Orders' governed amendment/cancellation and Purchasing's Rule 4. |
+| Manual Purchase issue Work ends on numbering | End the relevant sending obligation only with current-version confirmed-sent evidence; preserve separate approval/creation states and all source quantities. |
+| Extra goods only counted in receipt JSON | Record real controlled/unavailable custody and source-linked problem handling. Exact-unit and quantity-mode goods keep their respective identity rules; no invented demand, payable, or Unit IDs for counted goods. Receiving/Stock own physical evidence. |
+| Claim close route has no usable UI / insufficient completion guard | Make the governed close action reachable and check §9.5 outcome/evidence; a supplier answer alone does not certify completion. |
+| Claim-held goods have no reachable authorised resolution | Expose the owning goods-result action with evidence/permission; physical release and Claim paper closure may occur independently. No unconditional make-available button. |
+| Replacement loses PO/source linkage | Carry exact obligation and reservation lineage and resolve the outstanding quantity once; distinguish replacement of accepted goods from fulfilment of unaccepted goods. |
+| Supplier return stops at pickup | Link Return to the Stock-owned outbound handover surface; exact goods and actual pickup proof change custody, not document creation. Complete the concrete surface review before delivery. |
+| Repair return stops at inspection | Stock owns Record inspection; RO links to it. Returned is not inspected; passing inspection/disposition controls availability. Existing repair implementation is incomplete, not merely awaiting a smoke test. |
+| Blocked SO demand has no Work destination | Surface named blocked lines and the exact owning setup door on the PO-window Work; do not create a second task store. |
+| Legacy whole-PO cancellation bypass | Trace current callers and close unsafe paths; converge on §5.8.1 evidence, source, reservation, partial-receipt and version guards while retaining history. |
+
+Additional completion requirements: balance-date follow-up; source-required-arrival risk; MPR and
+stock-allocation Work completion; shared approval assignment/actual actor; Calendar reading the same
+supplier-arrival authority without conflating original, promised and work dates; accurate PO Delivery
+Date copy; supplier setup links; existing purchasing_settings_gate for payment terms (no invented
+Manager role); central report/export access; verified retirement of obsolete writers and shell;
+exact record links; cancellation quantity in the single balance read; and outstanding send actions
+remaining reachable after goods completion/cancellation. Preserve current and historical PDFs.
+
+**Dependency order, not Cards or a new BUILD commission:** integrity → problem journeys → the
+four exception rules and remaining supplier-channel work → remaining Work/date coverage → remaining
+copy/links/reports/settings permissions → remaining Showroom completion. Necessary permissions,
+copy and Work ship with their business capability, never postponed so a slice remains unusable.
+Already delivered work is reused. Showroom continues §§9.8–9.13; it does not restart approved rules.
+Outstanding Showroom Finance contracts/composition stay NOT LAW until their existing closure gate
+is met. No supplier-login disablement or external cutover is included.
+
+**Evidence and acceptance:** the complete supporting research is
+[Purchasing Houzs review](../research/purchasing-houzs-review.md), including source provenance and
+unverified supplied findings. Every completed capability needs an authenticated controlled business
+journey, correct downstream quantities/identities, documents, actor history, permission and retry
+behaviour. Unit tests and deployment versions do not replace that evidence. Never create unintended
+supplier commitments or external messages for testing. The placement BUILD's 2026-10-01 completion
+report states deployment/tests/settings checks succeeded but no real PO was created or supplier
+message sent; do not promote that report to a full live issue-to-send journey.
 
 ---
 
@@ -6933,7 +6976,7 @@ built or production-verified.
 | Requester | create Manual Purchase and supply missing request facts | issue PO or mark ordered merely because they requested it |
 | Purchasing Approver (an active Principal person; today Jess) | approve/reject governed internal buy and commercial exceptions | decide a Manual Purchase they raised; replace receiving/PO evidence |
 | Normal PO Duty / dated cover | owns the daily work; issue/revise supplier documents; record promises/claims through the one door | approve unauthorised price; post stock or supplier payment |
-| Any active Operation person (owner rulings 2026-09-25 / 2026-09-29) | issue and record current-version PO sending without holding Duty; record supplier answers with evidence; actual actor is stored separately from normal owner and cover | approve their own Manual Purchase; revise or cancel a PO; `Change Deliver To`; authorise a claim outcome; become the duty holder by acting |
+| Any active Operation person (owner rulings 2026-09-25 / 2026-09-29 / 2026-10-01) | issue and record current-version PO sending without holding Duty; record supplier answers and ordinary §5.8.1 cancellation with its required evidence; actual actor is stored separately from normal owner and cover | approve their own Manual Purchase; infer general revision/Deliver To or commercial approval rights from staff-help; bypass §5.8.1 cancellation conditions; authorise a claim outcome without its separate permission; become the duty holder by acting |
 | Operations Superuser (`operation@carres.com` by its flag; Jess as a principal person — never the shared `principal@` login) | use the same governed operational doors when available, including PO issuance; actual actor remains separate from normal duty/cover | impersonate duty, create a second PO/receipt writer or bypass approval/commercial gates |
 | Normal GRN Duty / dated cover | owns daily Receiving work; count, inspect, attach Supplier DO/evidence and finish source receipt | change PO price/quantity or ownership agreement |
 | Stock / Warehouse | label, locate, move, reserve and prove physical custody | issue/cancel supplier commitments |
@@ -7005,20 +7048,15 @@ The final Carres model rejects:
 
 ## 16 · PLAN completion gate
 
-| Gate | Result |
-|---|---|
-| ERP PLAN CHAT START PROTOCOL re-read | PASS |
-| Current authority and conflicts audited | PASS |
-| Manual / demand / PO Owner Decision Gate | **RESOLVED FROM AUTHORITY** |
-| Purchasing → Receiving owner seam reconciled 2026-08-29 | **PASS — no implementation/migration authorised** |
-| Current Carres challenged | PASS |
-| 2990 purchasing/consignment domain mined top-to-toe | PASS |
-| Mature ERP/WMS/logistics references reconciled | PASS |
-| Navigation and all 11 pages owner reviewed | PASS |
-| Daily journey, registers, detail, actions and exceptions defined | PASS |
-| Work, Quick Rail, Calendar, Settings, Reports and permissions defined | PASS |
-| External boundaries and cross-module ownership defined | PASS |
-| Superseded page model rejected from final truth | PASS |
-| Final truth persisted to canonical MASTER | PASS |
+The historical 2026-08-29 approval is not a blanket completion certificate for subsequent domain
+expansion. Current approved rules and existing page architecture remain in this MASTER. The
+2026-10-01 consolidated completion scope is §2.4; measured and reported defects retain their
+verification limits. Remaining Showroom composition and Finance contract closure are stated in
+§9.13, not silently approved by a scope acknowledgement.
 
-**PLAN MISSION COMPLETE**
+No renewed per-page business interview is required. Complete ordinary research/design work against
+existing authority, reconcile any genuine cross-module conflict, then present only the unresolved
+business choice if one remains. Do not declare the expanded module PLAN MISSION COMPLETE or issue
+new READY FOR CARD scopes until the remaining target truth is complete, reviewed and persisted.
+PLAN does not implement application code or extend the existing BUILD commission. Production
+completion is separately proved through authenticated business journeys and downstream evidence.
