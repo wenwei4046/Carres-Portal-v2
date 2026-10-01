@@ -4207,13 +4207,16 @@ this file keeps its meaning; a word with a second meaning says so here.
 | Form | `Money account` | The form's heading when one account is opened. Same word as the Invoice doors block. |
 | | `Name` · `Kind` · `Active` · `Save` · `Cancel` | The form. `Kind` shows only when adding; `Active` only when an account is opened. |
 | Columns | `Account` · `Name` · `Kind` · `Status` | The account's code, its name, its kind, and whether it is in use. |
-| Kinds | `Cash` · `Bank transfer` · `Online payment` | **Second meaning.** These are payment method words (the Supplier bills and Invoice doors blocks). Here they are also the `Kind` of a money account: the cash account, a bank, or the holding account of a card or online payment company. This `Kind` is not the Trial Balance kind (`Asset` and the rest). Adding offers only `Bank transfer` and `Online payment`; the cash account is already on the list. |
+| Kind | **`Cash`** | The cash account, which is already on the list; adding never offers it. |
+| Kind | **`Bank account`** | A real bank account. Paid from and Received into both take it. |
+| Kind | **`Card and online holding`** | Where card and online money waits until the card payout moves it to a bank. Received into takes it; a voucher's Paid from never does, and a card payout pays out of it. Also the holding field's label on Card payout banks. |
+| | | These are the `Kind` of a money account, words of their own. They are not the pay method words `Bank transfer` and `Online payment`, and not the Trial Balance kind (`Asset` and the rest). Adding offers only `Bank account` and `Card and online holding`. |
 | Status | `Active` · `Not active` | **Second meaning.** In the Other debtors block they say whether a party can be chosen. Here they say whether the account is in use. A `Not active` account is not offered in any Paid from or Received into picker. |
 | Failed read | `The accounts could not be loaded. Try again.` · `Try again` | Reused from the Supplier advances block. |
 | Refusals (database, 0512) | `The money accounts are for Finance.` · `Only Finance changes the money accounts.` | Who may read the list, and who may change it. |
 | | `Type the account name.` · `Keep the name to 60 characters.` · `Choose the kind: a bank, or an online payment company.` | The form's checks. The API and the database say the same sentence. |
 | | `A money account named {name} is already on the list.` | Two accounts cannot share a name. |
-| | `Codes 1121 to 1129 are all used. Take an account out of use, or ask for a new range.` (a holding account: `1131 to 1139`) | The database picks the code, and every code for that kind is taken. |
+| | `Every number under {code} {name} is used. Type a number for the new account.` | Since 0577. A new bank or holding account goes under the chart's money accounts heading, both kinds alike, and takes the smallest free number that follows the heading's own (NNN-K000 under NNN-0000, HH01 to HH99 under HH00), or the number Finance types. The 0512 sentence with fixed ranges for each kind is gone. |
 | | `That money account is not on the list.` | No account has that code. The API says it too, for a code that is not four digits. |
 | | `{code} {name} is not at RM 0.00 in the ledger. It stays in use until it is.` | Taking an account out of use while the ledger still holds money in it. |
 | Refusal (database, Staff & Duties, 0514) | `the Finance Approver must be an active Finance user` | Database log text only (detail `invalid_holder` / `invalid_cover`). The page prints `{name} cannot be assigned to Finance Approver. Choose an eligible active staff member.` or `{name} cannot be assigned to Finance Approver. Choose an eligible active staff member.` (workspace/MASTER.md §4.4.1). |
@@ -4423,7 +4426,7 @@ Money moves gain two kinds (0537). Nothing below is approved yet.
 New words on Finance Settings, Money moves and Settings → Payment (migration 0541):
 
 - `Card payout banks` (section heading, Finance Settings) · `Add a card payout bank` (button) · `Card payout bank` (form title)
-- `Card account` · `Machine at` · `Pays out to` (field labels) · `Showroom` · `Dealer` (Machine at choices)
+- `Card and online holding` · `Machine at` · `Pays out to` (field labels; the first is the kind word from Finance Settings, which replaced `Card account` on 1 Oct 2026) · `Showroom` · `Dealer` (Machine at choices)
 - `Online payment · Stripe checkout` (the Stripe row on Settings → Payment → Payment methods; `POS card` and `Online payment` are already approved)
 - Refusals: `Choose a card account that is in use.` · `Choose a bank that is in use.` · `Choose showroom or dealer.` · `Choose the card account.` · `Choose the bank.`
 
