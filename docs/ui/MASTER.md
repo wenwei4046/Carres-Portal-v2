@@ -361,6 +361,27 @@ failed-save and completion states. Verify focus/keyboard and narrow-screen acces
 lineage, quantities, responsible actor and cross-module destination. Separate simulated fixtures
 from live observations and tests actually executed. A CSS comparison alone never passes.
 
+**Purchasing fit review — PROPOSAL / NOT LAW, 2026-10-01:** the Purchasing Plan chat
+reviewed this contract at `0545ae76e` against its module authority and found all five roles
+applicable. It proposes four missing cross-module behavioural contracts, not four new components:
+
+| Proposed common rule | Concrete acceptance example | Ownership / evidence boundary |
+|---|---|---|
+| Linked-record sections distinguish loading, error, empty, present and permission-denied | A failed receipt reader says it failed and offers retry; it does not say there are no receipts. Links retain exact record IDs. | Existing section components first; actual adopter behaviour requires runtime proof. |
+| Current version, last sent version and goods completion remain separate facts | A current V2 with no outstanding goods still exposes its outstanding send obligation; sent V1 remains an immutable document. | PO document/Work authority decides the action. Never infer complete from a single badge. |
+| Blocker summary points to exact row/field and preserves draft/focus | A split-quantity or missing-evidence error identifies its source line; fixing it does not clear other answers. | Module validation is the single source. Shared renderer parity remains UNVERIFIED. |
+| Scoped source/Unit evidence remains traceable | Same-model SO and MPR lines retain distinct source references; damaged Unit evidence links the receipt and claim rather than matching by SKU. | No duplicated source allocation, receipt or claim writer. |
+
+The proposed Purchasing example uses one sent PO with distinct SO/MPR sourced lines, records a
+supplier split answer, then accepts two goods and records one damaged Unit against an SO line
+ordered for three. Pending Delivery Qty remains one; damage is not accepted fulfilment. A
+separately labelled approved-target example cancels that outstanding one, yielding Order 3 /
+Received 2 / Cancelled 1 / Pending 0 while current V2 still needs sending and the claim may remain
+open. These are synthetic review scenarios, not observed live records or executed transactions.
+Purchasing owns validation against its latest law and its completed page sample. The local PO4014
+fixture does not yet demonstrate these scenarios. Desktop document placement is retained pending
+measurement; an answer form does not introduce a second issue/review workspace.
+
 **Explicit remaining limits:** no complete Houzs conflict/permission/retry matrix; no verified
 Houzs responsibility engine copy; no all-module whole-page approval; no approved new token values.
 Local review artifacts are not production-ready implementations or portable repo exemplars.
