@@ -6897,30 +6897,32 @@ the normal discoverable doors already governed for Edit, output or View Flow.
 | ~~**D10**~~ | ✅ **RETIRED 2026-08-28, on the owner's explicit instruction** (red line 5 — the files were not deleted until asked for by name). **Half of it was already done:** `OperationOrders.tsx`, the 450-line kanban, no longer exists. What survived was a dead ISLAND the audit never named — `OrderColumn.tsx` had zero importers and `OrderCard.tsx` was imported only by `OrderColumn`, both orphaned when the kanban went. `OrderCustomerCard` was not a file at all: an exported component inside `OrderDetailDrawer.tsx` whose only importer was its own test. Its comment promised *"the Edit affordance only shows for status 'place'"* and the component carried no such check — unreachable, and fail-safe at the server (`update_order` 422s on a non-Place order), so no data was ever at risk. **Deleting it revealed more dead code, which is the point:** `CompactField` was its private helper and went with it, and two imports went stale. `GuaranteeCoverStrip` was NOT deleted — only the drawer's import of it; `PosOrderDetail.tsx` renders it. Precedent: the Cancel SO closeout deleted `CancelOrderDialog` for this exact shape. | fixed |
 | ~~**D11**~~ | ✅ **FIXED 2026-08-28 — two controls, two handles.** `receive-po-<id>` named BOTH the primary `Check in` button and the always-available `Direct receive →` escape hatch, so a test could only tell two different affordances apart by their WORDS. The hatch is now `direct-receive-<id>`; the primary keeps `receive-po-<id>`. **It stayed open for a boundary reason, not a technical one** — `OhanaSofaTab.test.tsx` recorded it as *REPORTED, NOT FIXED* because *"renaming one reaches the component, and the S2 card rules components DO NOT TOUCH"*; that note is corrected in the same change. The suite that previously had to accept *either* control now asserts the hatch is present **and the primary is not**, which is the fact the shared handle could never express. Procurement suites 43 pass. | fixed |
 
-### Sales Order representative UI correction — owner-approved 2026-10-01
+### Sales Order accepted shared UI template — owner-approved 2026-10-01
 
-Scope: the existing register pilot only; no merge, deployment or other-module rollout authorised.
-Summary/count on the left; Search (220 × 32 desktop), Table/Cards and Page tools together on the right.
-The shared rail remains 240px; neutral slate-2 background, blue-3/blue-11 only for selected rows;
-stacked view rows 36px, filter options 32px desktop and minimum 40px touch. Delivery is first and
-initially expanded; all five existing filters survive. Main desktop rows 32px, header 36px,
-Inter body 12/18 in this pilot, horizontal cell padding 8px. Goods summary retains its existing read-only drawer.
-These replace the old SO 40px row and horizontal view composition for this pilot. Other modules
-retain their existing rules until visual acceptance of the representative template. Local runtime
-verification and owner visual acceptance are separate; production remains unchanged.
+Jess accepted the rendered Sales Orders pilot and authorised the dedicated BUILD controller
+through tests, merge, deployment and authenticated production verification. The shared
+composition and numeric recipes live in UI MASTER “Confirmed shared template” and the kit;
+this module owns the following business-specific application. Production proof remains owed.
 
-Owner follow-up 2026-10-01: retain the blue interaction theme. The approved C2 rail uses slate-2 canvas, white framed groups, slate-3 headings and slate-6 borders; the work canvas uses kit.canvas and the grid stays white. No red selection theme. Location multi-selection uses compact text buttons with aria-pressed and blue selected backgrounds, never visible checkbox controls. Delivery remains single-choice. Order-list Sales Location, State and City combine OR inside their group and AND across groups; city selections outside a newly selected state set are removed. Monthly demand keeps its existing single-choice filters. These are implemented locally; visual acceptance and production deployment remain outstanding.
+- Order list rail: Order summary (Sales orders, Total payable, Paid to date, Balance due), then
+  Customer Requested Delivery Date shortcuts. Both open initially. Aggregates follow the SAME
+  filtered loaded result as Table/Cards, with explicit loaded-population and missing-money scope.
+  Payment, Delivery and Stock Status filters live in columns; no duplicate rail or case filter.
+  Monthly demand retains its own governed single-choice filters and views.
+- Row click and Cards View open read-only quick view. Dark SO/customer header carries status,
+  Print, Open full page and Close; no footer. Grey SO info starts with customer Phone/Email,
+  then sales attribution/dates/Dealer. Delivery, Items, Payment and Related documents are white
+  Block cards. No separate duplicate customer card. Source failures and absences stay explicit.
+- Full page opens read-only until deliberate Edit. Fixed white identity header and slate-2 tabs
+  sit above one scrolling left form and independent right PDF. Back preserves register context.
+- Items has five columns Item, Qty, Unit (RM), Disc (RM), Amount (RM). Name, code and config share
+  Item; no sequence/code columns. Money units appear in column headers; Total payable retains its
+  currency. Natural rows, no separate vertical Items scroller, category Quantity footer, no empty
+  Services line. Preserve all commercial/edit/protected-line rules. PDF keeps its printed columns.
+- Stock Status remains unknown: associated reserved/sold Units cannot prove an exact-line latest
+  posted non-void receipt. The unsafe classification is excluded until the Stock-owned source
+  projection proves those facts. No receipt facts are fabricated.
 
-Owner preview follow-up, 2026-10-01: Service Cases removed from register rail; legacy cases query values no longer narrow rows. State/City use compact controls which expand within their white rail card and scroll internally, without visible checkboxes or external popovers. Delivery Location title is shortened. SO number uses slate text; row click and Cards View open a read-only quick summary, with one open icon leading to the existing full detail page. Row action menu removed. Summary includes order facts, customer/delivery, internally scrolling items and payment totals. Existing detail page remains sectioned and read-only until Edit. Local preview PDF is fixture-backed. Available in pilot for review, not deployed or globally adopted; stock readiness and specific Attention categories remain unimplemented.
-
-**Owner correction 2026-10-01 — local Sales Orders pilot rail:** Order list uses Order summary (Sales orders, Total payable, Paid to date, Balance due) followed by Customer Requested Delivery Date shortcuts. Payment, Delivery and Stock Status use shared table columns and header filters, with no duplicate rail groups. Summary follows the grid filtered result and describes loaded orders only when the permitted total exceeds loaded records. Missing money remains explicitly unconfirmed; no fabricated issue counters. Owner accepted the shared template and authorised BUILD through tests and production delivery on 2026-10-01; verification remains outstanding.
-
-**Owner confirmation 2026-10-01 — object scrolling and quick view:** On desktop the entire left order form scrolls as one pane; Items grows naturally with its rows, without its own vertical height cap or vertical scroll box. The document preview scrolls independently. Header and object tabs stay outside the scrolling panes. Items wraps descriptions; horizontal overflow is retained only when columns cannot fit. Quick view retains the kit Block cards, grey SO info and white remaining sections, dark identity header and no footer; the flat borderless override is removed.
-
-**Owner correction 2026-10-01 — quick-view contact details:** Customer name stays in the dark identity header; Customer Phone and Email sit in the FIRST row of SO info, before Sales Location, Salesperson, dates and Dealer, so they cannot be mistaken for Dealer contact details. Remove the separate Customer card and duplicate Full name field in quick view. The full object form keeps its own editable customer section.
-
-**Owner-approved local Items composition 2026-10-01:** Five columns Item, Qty, Unit (RM), Disc (RM), Amount (RM). Item holds product/service name, its code and configuration; no separate sequence or code column. Keep all commercial values and editing/protected-line behavior. Rows grow naturally inside the whole left pane; no independent vertical Items scrolling. PDF retains its own printed columns.
-
-**Owner-approved object header 2026-10-01:** Identity/actions row stays white; navigation row uses slate-2 with slate-5 top divider. Active navigation remains semibold black with blue underline. Both rows remain in the fixed flex header, outside the independently scrolling form/document panes. Shared sidebar expanded lockup mark size36 (about40% above26); collapsed mark28. Preserve aspect ratios and collapse-button clearance.
-
-Stock Status delivery boundary: associated reserved/sold Units do not establish exact-line latest posted receipt evidence. The pilot explicitly returns unknown rather than classifying receipt outcomes until the Stock-owned projection proves posted/non-void receipt, latest outcome and exact line provenance. No receipt facts are fabricated.
+Delivery evidence: source is PR #1838, branch `codex/so-register-pilot`, preserved from cecc97e2b.
+Local targeted checks and rendered fixture walks are evidence only; CI, deployment revision and
+real authenticated production proof are tracked before this section can claim delivered status.

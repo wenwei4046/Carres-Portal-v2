@@ -95,7 +95,7 @@ the Sales-first Register template, not automatic replacement of every search var
 
 ## Register toolbar overflow
 
-**APPROVED TARGET / NOT BUILT — 2026-10-01.** Use the existing admitted shared menu/control
+**OWNER ACCEPTED TEMPLATE / production verification pending — 2026-10-01.** Use the existing admitted shared menu/control
 family; do not build a page-local toolbar or new menu engine. Search/current filter summary and
 admitted Table/Cards stay visible. Fixed far-right `⋯` holds supported secondary page tools
 (Export, Columns; Wrap/reset only if supported). Entries use icon plus text; order writers do
@@ -471,7 +471,7 @@ when actionable), invalid, busy, failed/retry, keyboard focus and narrow/long-co
 where applicable. Mark non-applicable states with a reason; do not manufacture states for coverage.
 Keep source evidence distinct from tests executed and runtime observations.
 
-**SO goods-side inspection adoption — APPROVED TARGET / NOT BUILT, 2026-10-01:** inspect the
+**SO goods-side inspection adoption — BUILT / production verification pending, 2026-10-01:** inspect the
 existing Drawer/DialogFrame plus compatible goods renderer for the owner-admitted compact goods
 summary door. The line count is not goods quantity. One read-only source, named region, keyboard
 activation, close/focus return and narrow behaviour are required. Component presence is not proof

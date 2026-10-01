@@ -3306,26 +3306,19 @@ Use COPY's accepted `Received Qty` versus `Physical arrived Qty` distinction. Th
 is not authority to redesign Manual Purchase, replace its PO with a GRN, or mark
 a PDF production-verified. Screen blue heading styles do not recolour printed PDFs.
 
-### SO representative correction — 2026-10-01, approved scoped pilot
+### Accepted SO representative measurements — 2026-10-01
 
-This pilot overrides its earlier composition; it does not roll out to other pages.
-Count/summary left; Search 280×32 desktop + Table/Cards + 32×32 Page tools aligned as one right
-cluster. Toolbar content height 40px plus 1px divider, no blank reserved row. Touch controls 40px
-and toolbar 48px plus divider. Rail 240px, existing slate-2 neutral background, selected blue-3
-fill/blue-11 text; nav 36px with 16px icons, groups 36px, options 32px desktop/40px touch.
-Stack the two existing views; Delivery first initially open, other groups initially closed with
-chosen value visible. Desktop main rows 32px, header 36px/600, Inter 13/18, cell horizontal pad 8px;
-mobile rows preserve 40px targets. Cards use the same tools/filter engine. Existing components
-receive these scoped composition capabilities; no alternative kit or new palette.
-Status: local implementation; owner visual acceptance, remote checks and deployment not implied.
-
-SO representative correction: Table/Cards uses the shared Tabs segmented variant, not underlined stage tabs. Outer32px (1px border +2px padding +26px option), radius6; option13/18, padding10 horizontal, selected blue-3/blue-11/600. Touch outer40px. Table body stays Inter13/18; compactness comes from32px rows, not smaller body text.
-
-SO preview comparison, owner authorised 2026-10-01: register table body12px/18 replaces13px in this scoped preview; row32, header11/600/36, search/buttons/rail13 unchanged. Browser computed styles verified body12/header11/search13 and rendered row32. This is authorised for comparison, not accepted as a portal-wide font standard; no deployment.
-
-Owner-selected SO rail B, 2026-10-01: white global navigation and Quick Rail remain; filter rail slate-2 with slate-3 heading fills (slate-4 hover), heading radius4 and36px height; groups gap8 (4px each side). Expanded option font12/18,32px desktop40px touch, inset24px including8px control padding. Work canvas slate-2, table/cards white. Existing blue selected states survive. This supersedes the plain/unfilled SO group heading composition; local pilot only, no other-module rollout or deployment.
-
-Owner correction 2026-10-01: C2 replaces B for the scoped SO rail. Each group is a white card,1px slate-6 border,radius6,gap8; slate-3 heading and white expanded body, header/body divider only while open. Existing heading36/13/600,option32/12/18,touch40,chosen-value and single-choice rules retained. No shadow; no toolbar-gap or scrollbar change included in this ruling.
+The rendered pilot is owner accepted; BUILD through tests and deployment is authorised.
+Count/summary left; Search220×32 desktop + Table/Cards +32×32 Page tools aligned right.
+Toolbar40px desktop, touch controls40px. Rail240px; slate-2 canvas, white cards with
+slate-6 border/radius6/gap8; slate-3 headings36px and white expanded bodies. Chosen values
+remain visible when closed. SO Order list uses aggregate summary and requested-date shortcuts,
+both initially open; Monthly demand retains its governed filters and stacked view navigation.
+Rows32px desktop, body12/18, header11/600/36, horizontal cell padding8; touch targets40px.
+Table/Cards uses shared segmented Tabs: outer32px, border1/padding2/option26, radius6;
+option13/18, horizontal padding10, selected blue-3/blue-11/600; outer40px touch.
+Existing tokens and shared primitives own this template. Other-module adoption preserves its
+business facts and governed placement; acceptance does not claim all pages are migrated.
 
 ### Shared listing order — owner ruling 2026-10-01
 
