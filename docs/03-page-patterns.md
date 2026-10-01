@@ -16,6 +16,8 @@ This file describes the common patterns; it is not a second reference selection 
 to redesign each page independently. The current listing contract is UI MASTER §6.0; its detailed
 Register/Object Detail rules govern where an older example below differs.
 
+**Self-contained Carres measurements:** [01 §§7–8](01-design-tokens.md#7--canonical-component-measurements--scoped-not-one-size-for-every-surface) owns the scoped numeric recipes, source/target/status matrix and unresolved conflicts. Use it with these component/pattern contracts. Reference screenshots do not supply missing numbers; proposed sizes do not override approved sizes.
+
 **One purpose per page and one obvious primary next action for the current task.**
 Secondary authorised actions remain discoverable. Existing UI MASTER/module-specific action
 placement wins; this does not impose a new button location. Business logic belongs to modules,

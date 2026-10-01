@@ -14,6 +14,8 @@ colour, typography, radius, spacing, elevation or size.
 
 Source: `apps/web/src/components/kit/`. Live at **`/ui`**.
 
+**Self-contained Carres measurements:** [01 §§7–8](01-design-tokens.md#7--canonical-component-measurements--scoped-not-one-size-for-every-surface) owns the scoped numeric recipes, source/target/status matrix and unresolved conflicts. Use it with these component/pattern contracts. Reference screenshots do not supply missing numbers; proposed sizes do not override approved sizes.
+
 ---
 
 ## Component standard

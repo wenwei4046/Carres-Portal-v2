@@ -24,6 +24,12 @@
 
 ## Reuse-first shared page templates — owner ruling 2026-10-01
 
+**Numeric contract, 2026-10-01:** [01 §§7–8](../01-design-tokens.md#7--canonical-component-measurements--scoped-not-one-size-for-every-surface)
+contains self-contained Carres values, source/target/status and the Sales-first acceptance boundary.
+Old generic sizing assumptions are replaced by scoped shared recipes. Actual font loading remains
+unverified here. Source table-header weight drift and small touch targets are recorded as gaps;
+new dense rows and responsive Cards geometry remain proposals, not silently approved tokens.
+
 **RULING / APPROVED DIRECTION AND DOCUMENTATION COMMISSION.** One Carres kit serves every
 module. **Houzs-first complete visual templates, then tune for Carres** is the owner's current
 presentation direction. Use coherent reference page families and their related hierarchy, density,
@@ -1127,11 +1133,10 @@ DetailShell · DialogFrame · FieldFrame · GridToolbar · SectionHeader
 **⭐ THE CENTRED SURFACE'S WIDTH TABLE — closed at three, and every value carries its
 measurement (2026-09-11, adding the third).**
 
-| `width` | Config key | Value | The measurement that produced it |
-|---|---|---|---|
-| *(omitted)* | `max-w-modal` | 512px | The default: a question, a short form, a confirmation |
-| `"wide"` | `max-w-modal-wide` | 600px | P19, 2026-08-05 — a surface carrying a LINE LIST rather than a question |
-| `"viewer"` | `max-w-modal-viewer` | 880px | 2026-09-11 — a surface whose binding constraint is a PICTURE's height, not a column of text. The dialog caps at `85vh`; its chrome (header, footer, the caption line) takes 136px, leaving 629px of image. A 4:3 delivery photo 629px tall is 839px wide, so 880px shows it whole with 9px of headroom either side. Below this the photo is letterboxed and the operator zooms to read a door number |
+The canonical values and named config keys are in [01 §8.2](../01-design-tokens.md#82-modal-and-admitted-goods-side-inspection).
+The default serves a question/short form, `wide` serves a line list, and `viewer` serves a picture.
+The viewer's original 2026-09-11 measurement used the dialog height cap and image aspect ratio;
+that rationale does not admit caller-selected widths.
 
 **A FOURTH WIDTH IS A DECISION FOR THIS TABLE, NOT FOR A CALLER.** `width` stays a union of
 literals with no number and no `style`, so what a page can express is one of these three. A page
@@ -3104,19 +3109,12 @@ must converge; approval of this contract does not claim the three pages are alre
 production-verified. Other Registers inherit the shared padding, typography and sticky-header
 behaviour, not Purchasing business fields or page-specific colours.
 
-| Geometry | Shared value / behaviour |
-|---|---|
-| Cell horizontal padding | 8px per side; adjacent content separated by 16px plus divider |
-| Dividers / connector | 1px |
-| Header | 36px minimum, two 14px lines; 4px vertical padding; 11px/600 |
-| Single-line parent row | 38px minimum, existing density law |
-| Two-line goods / Unit rows | 51px, shared across the same table (owner 2026-09-26); grow together only if content requires |
-| Main / secondary type | 13px / 18px line height; 11px / 14px secondary |
-| Standard control | 32px minimum; checkbox 16px, vertically centred |
-| Toolbar / footer | 45px / 32px minimum |
-| Expansion | 12px above, 16px below; begins after the parent's control gutter |
-| Sticky header | Each Register keeps its header inside its own scrolling viewport; on a grouped listing it is group-local per §6.10, and the groups share one width/visibility/sort/resize set |
-| Pinned identity | Date + number at canvas >=768px; number only below; headers and cells scroll together |
+The canonical numeric recipes and source/target conflicts are in
+[01 §§7.2–7.4](../01-design-tokens.md#74-register-and-goods-tables).
+Each Register keeps its sticky header inside its own scrolling viewport; grouped listings use
+§6.10 group-local headers with one width/visibility/sort/resize set. Pinned identity is date +
+number at canvas ≥768px and number only below; headers and cells scroll together. Expansion begins
+after the parent's control gutter. Field widths retain the content-measurement registry below.
 
 **THE FIELD-WIDTH REGISTRY — ONE NUMBER PER FIELD (owner instruction 2026-09-18).**
 
