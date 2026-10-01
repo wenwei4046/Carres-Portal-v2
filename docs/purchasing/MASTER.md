@@ -316,7 +316,7 @@ retype it.
 
 ### 5.3 One PO issue authority
 
-**OPERATIONAL PERMISSION — OWNER RULING 2026-09-29 · BUILT ON UNMERGED PR #1827 (migration 0627 NOT APPLIED, measured 2026-10-01).** Every active
+**OPERATIONAL PERMISSION — OWNER RULING 2026-09-29 · MERGED / PRODUCTION-VERIFIED 2026-10-01 (PRs #1827 / #1832, migration 0627 APPLIED).** Every active
 Operation staff person, including a joining-month newcomer, may perform ordinary PO work and issue
 and confirm-send a PO without holding PO Duty or cover. The first-month restriction affects
 allocation to PO Duty, not permission to place/issue PO. Existing approved-demand, document,
@@ -332,7 +332,7 @@ Operations Superuser (its flag). Other shared logins (`is_person = false`) are n
 issue (0592). The shared owner login `principal@carres.com` executes no duty (owner ruling
 2026-09-18).
 
-**IMPLEMENTATION ON PR #1827 (0627; not production proof).** `purchasing_actor_may_issue(user)` = Operations Superuser **or** an
+**PRODUCTION IMPLEMENTATION (0627, verified 2026-10-01).** `purchasing_actor_may_issue(user)` = Operations Superuser **or** an
 active, person `operation` account. It is asked by SO Batch Purchase, Manual Purchase, the API issue
 routes, the creation authority `purchasing_issue_pos_batch` and the evidence door
 `purchasing_confirm_po_sent`. `purchasing_po_actor()` no longer reads `ops_po_duty` /
@@ -1700,16 +1700,31 @@ Module Register rails remain factual filters and do not copy central Work action
 
 ### 9.1 SO Batch Purchase
 
-**PO PLACEMENT UNBLOCK — LOCAL BUILD / DELIVERY IN PROGRESS, 2026-10-01.** PR #1827 supplies
-ordinary-person issue permission and non-price blocker checks. Its 0627 migration is NOT APPLIED
-and the authenticated issue → PDF → recorded-send acceptance for both lanes is still owed.
-The follow-up reuses that committed implementation and the approved planning branch; it does not
-claim deployment. Read-only production measurement still finds the legacy 0311 grant executable.
+**PO PLACEMENT UNBLOCK — CORE PRODUCTION-VERIFIED, 2026-10-01.** PRs #1827 / #1832
+merged at `45f43e96b92305583fa176a17d5222152dc5eb9a`. CI `36816676966` passed 13,745
+tests; deployment `36817768266` succeeded and all five canonical ERP/POS/Pages/API probes
+converged to that commit. Migrations 0627 and 0628 were applied from their exact committed
+source through the governed migration door (trackers `20261001050011` / `20261001050021`),
+with source and function-body hash readback. Production permission readback permits both active
+Operation people (2/2); legacy unversioned destination mutation is no longer executable.
+
+Local transactional integration proved both SO Batch and approved Manual Purchase issue → actual
+PDF payload/render → recorded sending, with ordinary staff as actual actor, normal Duty/cover
+separate, and self-approval refused. Fixtures rolled back. These are local lifecycle proofs,
+not a claim that real production POs were issued or sent: no real purchase or supplier message was
+created for verification. Production Settings writes and audit readback are recorded in §11.
+
+PR #1833 closes the final API confidentiality check: Operation receives no Catalog unit cost in
+purchase-demand parts and cannot submit hand-entered/free-of-charge commercial instructions.
+Its focused regression suite passed 190 tests. Supplier-channel saves also refresh cached supplier
+and Work data so the next send action uses the saved choice immediately. Its delivery status is
+tracked by that PR and the canonical deployment probes; this does not certify the whole module.
+
 - **Price is not an operational gate** (owner ruling 2026-10-01). Missing or non-positive Catalog
   costs do not block row selection or ordinary issue. A non-positive value is never silently treated
   as an authorised free-of-charge decision: ordinary issue uses the existing price-absent line shape,
   leaving Catalog unchanged. Positive prices retain their governed source. Formal commercial
-  decisions remain separate. This follow-up is local code, not production-verified behavior.
+  decisions remain separate. This behavior is included in the verified core deployment.
 - **Blockers named before Issue, never after the PO exists.** A SKU whose Catalog `Stock identity` is
   `Not set` reads `Stock identity not set` with `Fix in Catalog` (row state `no_stock_identity`); a
   SKU not in Catalog reads `SKU not found`; missing production days read `Production days not set`.
@@ -1717,7 +1732,7 @@ claim deployment. Read-only production measurement still finds the legacy 0311 g
   (`destination_address_missing`), because the PO document cannot print it and the PO number would
   otherwise be spent on an unprintable PO. The door codes `sku_not_in_catalog` and
   `catalog_identity_mode_missing` answer in the approved two lines.
-- **The unversioned 0311 line-destination door is revoked by the pending 0627 migration** (`purchasing_set_line_destination`, its
+- **The unversioned 0311 line-destination door is revoked by applied migration 0627** (`purchasing_set_line_destination`, its
   API route removed). A line's Deliver To moves only through `Change Deliver To` (0610), which keeps
   Units and Sales Order lineage and mints a version.
 
@@ -6816,6 +6831,20 @@ Settings lives under the global header gear and requires authorised roles. It in
 - outside-readable PDF templates and permitted external notes;
 - claim/return/repair outcome permissions;
 - customer-privacy exclusion from supplier documents.
+
+**SUPPLIER COMMUNICATION — BUILT / PRODUCTION-VERIFIED 2026-10-01.** The existing Settings
+authority governs separate Email, WhatsApp group and preferred Channel saves through migration
+0628; each changed field records old/new, actual actor and time. Anonymous and unauthorised
+Operation writes are refused. Live Settings saves and database readback confirm Hookka Industries
+and Ohana use `hookka.manufacturing@gmail.com` and default to Email; Nice Future uses
+`farithazelam@gmail.com` with its existing WhatsApp behavior preserved. Four changes were saved
+by the authenticated shared `principal` account, not Jess personally. Existing groups, historical
+recipients and supplier access were not changed. No email or WhatsApp message was sent.
+
+Hookka's fixed Deliver To is the existing HOUZS destination, with NETS collection and a populated
+warehouse address. Its supplier factory address is not a substitute destination. Ohana's actual
+fixed destination still has no address and correctly remains a named issue blocker; no address was
+invented or copied from Hookka.
 
 **PRODUCTION-DAY VALUES — OWNER CONFIRMED 2026-10-01, APPROVED / LOCKED.** Mattress: **7 working
 days**; Bedframe: **7 working days**; Sofa: **14 working days**. Apply these values to missing
