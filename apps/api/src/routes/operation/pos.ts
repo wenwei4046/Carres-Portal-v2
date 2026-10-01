@@ -19,7 +19,6 @@ import {
   recordSendInput,
   revisePoInput,
   setMessageTemplateInput,
-  setLineDestinationInput,
   setLineOpsRemarkInput,
   changePoDeliverToInput,
   warehouseReceiptTotals,
@@ -1549,7 +1548,7 @@ operationPosRouter.get("/:id/issue-context", requireOperation, async (c) => {
   if (!po) return c.json({ message: "PO not found" }, 404);
   if (po.status === "cancelled") return c.json({ message: "Cancelled POs cannot be printed" }, 422);
   const [supplier, destination] = await Promise.all([
-    sb.from("suppliers").select("name, whatsapp_group_url, contact_email, contact")
+    sb.from("suppliers").select("name, whatsapp_group_url, po_send_channel, contact_email, contact")
       .eq("id", po.supplier_id).maybeSingle(),
     sb.from("purchasing_destinations").select("name")
       .eq("id", po.destination_id).maybeSingle(),
@@ -1564,6 +1563,7 @@ operationPosRouter.get("/:id/issue-context", requireOperation, async (c) => {
     destination: destination.data?.name ?? null,
     whatsappGroupUrl: supplier.data?.whatsapp_group_url ?? null,
     contactEmail: supplier.data?.contact_email ?? null,
+    poSendChannel: supplier.data?.po_send_channel ?? null,
     contact: supplier.data?.contact ?? null,
   });
 });
@@ -2543,24 +2543,11 @@ operationPosRouter.put("/message-template", requireOperation, async (c) => {
   return c.json({ ok: true, result: data });
 });
 
-// ----- POST /lines/:lineId/destination · /ops-remark -----
-// Where each LINE goes (Jess, 2026-08-02 — 0311). Purchasing's only per-line
-// job: ten to Klang, one to AL. A whole line moves here; a PART of a line
-// moves through /:id/change-deliver-to (0610), which carries its Units and
-// Sales Order lineage and mints the next version. The ops
-// remark is internal and, by 0311's own sanity check, can never print.
-operationPosRouter.post("/lines/:lineId/destination", requireOperation, async (c) => {
-  const parsed = await parseJsonBody(c, setLineDestinationInput);
-  if (!parsed.ok) return c.json(parsed.body, parsed.status);
-  const sb = userClient(c.env, c.var.auth.jwt);
-  const { data, error } = await sb.rpc("purchasing_set_line_destination", {
-    p_line_id: c.req.param("lineId"),
-    p_destination_id: parsed.data.destinationId,
-  });
-  if (error) return mapSupplierCallError(c, error);
-  return c.json({ ok: true, result: data });
-});
-
+// ----- POST /lines/:lineId/ops-remark -----
+// The ops remark is internal and, by 0311's own sanity check, can never print.
+// A line's Deliver To moves only through /:id/change-deliver-to (0610), which
+// carries its Units and Sales Order lineage and mints the next version; the
+// unversioned 0311 line-destination door is revoked (0627).
 operationPosRouter.post("/lines/:lineId/ops-remark", requireOperation, async (c) => {
   const parsed = await parseJsonBody(c, setLineOpsRemarkInput);
   if (!parsed.ok) return c.json(parsed.body, parsed.status);

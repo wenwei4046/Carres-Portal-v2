@@ -359,6 +359,17 @@ function makeSb(tables: Record<string, { data: unknown; error: unknown }>) {
     if (table === "app_users") {
       return usersBuilder((tables.app_users?.data as { id: string }[]) ?? []);
     }
+    /* A configured Catalog row always carries its Stock identity (0442); a
+       fixture that wants `Not set` writes `stock_identity_mode: null`. */
+    if (table === "product_skus") {
+      const t = tables.product_skus ?? { data: [], error: null };
+      return builder(table, {
+        ...t,
+        data: Array.isArray(t.data)
+          ? (t.data as Record<string, unknown>[]).map((r) => ({ stock_identity_mode: "unit", ...r }))
+          : t.data,
+      });
+    }
     return builder(table, tables[table] ?? { data: [], error: null });
   });
   const rpc = vi.fn(async (fn: string) => {
@@ -769,7 +780,7 @@ describe("the guard, and the promise not to write", () => {
  * destinations a buy may be sent to.
  */
 describe("the buying facts SO Batch Purchase needs", () => {
-  it("blocks a missing Catalog cost before Issue review", async () => {
+  it("⭐ ONE COST RULE: an unrecorded Catalog cost stays buyable, like the issue door", async () => {
     const t = TABLES() as unknown as Record<string, { data: unknown; error: unknown }>;
     const sku = (t.product_skus.data as Record<string, unknown>[]).find(
       (r) => r.sku === "B1201S-K",
@@ -778,7 +789,35 @@ describe("the buying facts SO Batch Purchase needs", () => {
 
     const { rows } = await rowsOf(t);
     const row = bySku(rows, "B1201S-K")!;
-    expect(row.state).toBe("no_cost");
+    /* `/to-order/issue` issues it with no commercial claim (0573), so the row
+       may not refuse it. */
+    expect(row.state).not.toBe("no_cost");
+    expect(row.issueRef).not.toBeNull();
+  });
+
+  it.each([0, -1])("keeps a non-positive Catalog cost buyable without accepting its price: %s", async (cost) => {
+    const t = TABLES() as unknown as Record<string, { data: unknown; error: unknown }>;
+    const sku = (t.product_skus.data as Record<string, unknown>[]).find(
+      (r) => r.sku === "B1201S-K",
+    )!;
+    sku.cost = cost;
+
+    const { rows } = await rowsOf(t);
+    const row = bySku(rows, "B1201S-K")!;
+    expect(row.state).not.toBe("no_cost");
+    expect(row.issueRef).not.toBeNull();
+  });
+
+  it("names a SKU whose Stock identity is Not set before Issue (0443)", async () => {
+    const t = TABLES() as unknown as Record<string, { data: unknown; error: unknown }>;
+    const sku = (t.product_skus.data as Record<string, unknown>[]).find(
+      (r) => r.sku === "B1201S-K",
+    )!;
+    sku.stock_identity_mode = null;
+
+    const { rows } = await rowsOf(t);
+    const row = bySku(rows, "B1201S-K")!;
+    expect(row.state).toBe("no_stock_identity");
     expect(row.issueRef).toBeNull();
   });
 

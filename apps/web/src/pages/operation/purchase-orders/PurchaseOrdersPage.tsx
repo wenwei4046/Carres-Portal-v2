@@ -1487,6 +1487,7 @@ function PurchaseOrderObject({
                     destination: row.deliverTo,
                     whatsappGroupUrl: row.supplier?.whatsapp_group_url ?? null,
                     contactEmail: row.supplier?.contact_email ?? null,
+                    poSendChannel: row.supplier?.po_send_channel ?? null,
                     contact: row.supplier?.contact ?? null,
                   }}
                   version={po.version ?? 1}
@@ -1499,6 +1500,7 @@ function PurchaseOrderObject({
                     destination: row.deliverTo,
                     whatsappGroupUrl: row.supplier?.whatsapp_group_url ?? null,
                     contactEmail: row.supplier?.contact_email ?? null,
+                    poSendChannel: row.supplier?.po_send_channel ?? null,
                     contact: row.supplier?.contact ?? null,
                   }, messageTemplate)}
                   onOpened={(channel) => recordOpen.mutate({ channel })}

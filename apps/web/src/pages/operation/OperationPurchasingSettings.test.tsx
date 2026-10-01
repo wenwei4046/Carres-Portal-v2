@@ -24,6 +24,7 @@ const setSupplierCollection = vi.fn();
 const setPoWindows = vi.fn();
 const setCutoff = vi.fn();
 const setAddress = vi.fn();
+const setChannel = vi.fn();
 
 function mutation(mutateAsync: ReturnType<typeof vi.fn>) {
   return { mutateAsync, isPending: false, isError: false, error: null };
@@ -44,6 +45,7 @@ vi.mock("@/lib/queries", async () => {
     useSetPurchasingPoWindows: () => mutation(setPoWindows),
     useSetSupplierPoCutoff: () => mutation(setCutoff),
     useSetSupplierAddress: () => mutation(setAddress),
+    useSetSupplierChannel: () => mutation(setChannel),
   };
 });
 
@@ -662,5 +664,26 @@ describe("Supplier addresses (0611, Purchasing §9.6 Return To)", () => {
     const row = screen.getByTestId(`address-row-${OHANA}`);
     expect(within(row).getByLabelText("Return address")).toBeDisabled();
     expect(screen.queryByTestId(`supplier-address-save-${OHANA}`)).not.toBeInTheDocument();
+  });
+});
+
+describe("Supplier channels", () => {
+  it("saves an email independently of the WhatsApp group", async () => {
+    setChannel.mockReset().mockResolvedValue({});
+    settingsQuery.mockReturnValue({ data: settings({ suppliers: [{ id: OHANA, name: "Ohana", categories: ["bedframe"], offDays: [0], contactEmail: null, whatsappGroupUrl: "https://chat.whatsapp.com/AbC" }] }), isLoading: false, error: null });
+    render(wrap(<OperationPurchasingSettings />));
+    const section = screen.getByTestId("supplier-channel-settings");
+    const email = within(section).getByLabelText("Email");
+    fireEvent.change(email, { target: { value: "orders@example.com" } });
+    fireEvent.submit(email.closest("form")!);
+    await waitFor(() => expect(setChannel).toHaveBeenCalledWith({ supplierId: OHANA, kind: "contactEmail", text: "orders@example.com" }));
+    expect(within(section).getByLabelText("WhatsApp group")).toHaveValue("https://chat.whatsapp.com/AbC");
+  });
+  it("does not offer saving to a viewer", () => {
+    settingsQuery.mockReturnValue({ data: settings({ canEdit: false }), isLoading: false, error: null });
+    render(wrap(<OperationPurchasingSettings />));
+    const section = screen.getByTestId("supplier-channel-settings");
+    expect(within(section).queryByRole("button", { name: "Save" })).toBeNull();
+    for (const input of within(section).getAllByRole("textbox")) expect(input).toBeDisabled();
   });
 });

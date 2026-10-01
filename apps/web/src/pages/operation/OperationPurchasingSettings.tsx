@@ -26,6 +26,7 @@ import {
   useSetProductionDays,
   useSetSupplierTermsDays,
   useSetSupplierAddress,
+  useSetSupplierChannel,
   useSetPurchasingNumber,
   useSetPurchasingPoDays,
   useSetPurchasingPoWindows,
@@ -34,6 +35,7 @@ import {
   useSetPurchasingSupplierCollection,
   useUpdatePurchasingDestination,
 } from "@/lib/queries";
+import Select from "@/components/kit/Select";
 import Input from "@/components/kit/Input";
 import Textarea from "@/components/kit/Textarea";
 import Button from "@/components/kit/Button";
@@ -285,6 +287,8 @@ export default function OperationPurchasingSettings({
   const setProduction = useSetProductionDays();
   const setTerms = useSetSupplierTermsDays();
   const setAddress = useSetSupplierAddress();
+  const setChannel = useSetSupplierChannel();
+  const [channelDraft, setChannelDraft] = useState<Record<string, string>>({});
   const setWorkWeek = useSetSupplierWorkWeek();
   const createDestination = useCreatePurchasingDestination();
   const updateDestination = useUpdatePurchasingDestination();
@@ -891,6 +895,53 @@ export default function OperationPurchasingSettings({
               </div>
             ))}
           </div>
+          </Block>
+        </div>
+
+        <div className="mb-8 max-w-[860px]" data-testid="supplier-channel-settings">
+          <Block title="Communication">
+            {data.suppliers.map((supplier) => (
+              <div key={supplier.id} className="py-3 border-b border-base-100 last:border-b-0">
+                <div className="mb-2 text-body font-semibold text-base-900">{supplier.name}</div>
+                <div className="grid grid-cols-1 gap-3 min-[820px]:grid-cols-2">
+                  {(["whatsappGroupUrl", "contactEmail", "poSendChannel"] as const).map((kind) => {
+                    const key = `${supplier.id}:${kind}`;
+                    const saved = supplier[kind] ?? "";
+                    const draft = channelDraft[key] ?? saved;
+                    return (
+                      <form key={kind} className="flex flex-col gap-2" onSubmit={(event) => {
+                        event.preventDefault();
+                        if (!canEdit || setChannel.isPending) return;
+                        void setChannel.mutateAsync({ supplierId: supplier.id, kind, text: draft })
+                          .then(() => {
+                            setChannelDraft((current) => {
+                              const next = { ...current };
+                              delete next[key];
+                              return next;
+                            });
+                            toast.success("Saved");
+                          }).catch(fail);
+                      }}>
+                        {kind === "poSendChannel" ? <Select id={`supplier-${kind}-${supplier.id}`}
+                          label="Channel" value={draft || undefined} placeholder="Not recorded"
+                          disabled={!canEdit || setChannel.isPending}
+                          options={[{ value: "email", label: "Email" }, { value: "whatsapp", label: "WhatsApp" }]}
+                          onValueChange={(value) => setChannelDraft((current) => ({ ...current, [key]: value }))} /> :
+                        <Input id={`supplier-${kind}-${supplier.id}`}
+                          label={kind === "contactEmail" ? "Email" : "WhatsApp group"}
+                          type={kind === "contactEmail" ? "email" : "url"}
+                          maxLength={500} value={draft} disabled={!canEdit || setChannel.isPending}
+                          onChange={(event) => setChannelDraft((current) => ({ ...current, [key]: event.target.value }))} />}
+
+                        <ChangeLine settings={data} settingKey={kind === "contactEmail" ? "supplier_contact_email" : kind === "poSendChannel" ? "supplier_po_send_channel" : "supplier_whatsapp_group_url"} supplierId={supplier.id} />
+                        {canEdit && <div><Button type="submit" variant="primary" loading={setChannel.isPending}
+                          disabled={draft.trim() === saved.trim()}>Save</Button></div>}
+                      </form>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
           </Block>
         </div>
 

@@ -106,6 +106,10 @@ export type CatalogFact = {
   variantKind: string | null;
   category: string | undefined;
   modelName: string | null;
+  /** 0442 · Catalog's `Stock identity` (`unit` · `quantity`). `null` is
+   *  `Not set`: the official PO door (0443) refuses it, so the Register names
+   *  it before Issue. */
+  stockIdentityMode: string | null;
 };
 
 /**
@@ -579,7 +583,7 @@ export async function loadToOrder(
   const { data: skuRows, error: skuErr } = await sb
     .from("product_skus")
     .select(
-      "sku, supplier_id, cost, variant, variant_kind, product_models!inner(category, name)",
+      "sku, supplier_id, cost, variant, variant_kind, stock_identity_mode, product_models!inner(category, name)",
     );
   if (skuErr) {
     const m = mapPgError(skuErr);
@@ -594,6 +598,7 @@ export async function loadToOrder(
       variantKind: (row.variant_kind as string | null) ?? null,
       category: (pm?.category as string | undefined) ?? undefined,
       modelName: (pm?.name as string | null) ?? null,
+      stockIdentityMode: (row.stock_identity_mode as string | null | undefined) ?? null,
     });
   }
 

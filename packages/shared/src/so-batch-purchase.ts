@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { isOnePoPerOrder } from "./to-order";
+import { purchasingRefusalLine } from "./purchasing-refusals";
 import type { ProductCategory } from "./db-types";
 import type { IsoDate } from "./working-days";
 import type { PurchaseOrderRegisterFacts } from "./purchase-order-register";
@@ -109,7 +110,7 @@ export const SO_BATCH_PURCHASE_WORDS = {
   groupNoPurchaseNeeded: "No purchase needed",
   noMatch: "No Sales Orders match these filters",
   footerUnitOne: "Sales Order",
-  issueNeedsPoDuty: "Only PO Duty can issue this PO",
+  issueNeedsPoDuty: "Only Operation staff can issue this PO",
   colCustomer: "Customer",
   /**
    * ⭐ THE SHARED PURCHASING DICTIONARY'S OWN HEADS — owner ruling 2026-09-18
@@ -1223,6 +1224,16 @@ export function validateAllocations(
     if (!dest.active) {
       return { ok: false, message: `${dest.name} is closed. Choose another Deliver To.` };
     }
+    /* Named on the row BEFORE Issue: the issue door refuses a Deliver To with
+       no address, because the PO it would create could never be printed.
+       `undefined` is an older payload that did not carry the address, never
+       read as missing. */
+    if (dest.address !== undefined && (dest.address ?? "").trim() === "") {
+      return {
+        ok: false,
+        message: purchasingRefusalLine("destination_address_missing", { destination: dest.name }),
+      };
+    }
     if (!Number.isInteger(a.qty) || a.qty <= 0) {
       return { ok: false, message: `${dest.name} needs a whole number above zero.` };
     }
@@ -1753,6 +1764,7 @@ export const SO_BATCH_STATUS_DOOR: Partial<Record<PurchaseDemandState, SoBatchSt
   no_sku: "catalog",
   no_supplier: "catalog",
   no_cost: "catalog",
+  no_stock_identity: "catalog",
   no_production_days: "settings",
   no_pickup_partner: "settings",
 };

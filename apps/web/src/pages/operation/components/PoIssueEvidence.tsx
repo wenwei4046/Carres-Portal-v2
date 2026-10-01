@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { purchasingRefusal } from "@carres/shared";
+import { purchasingRefusal, poSendChannelOf } from "@carres/shared";
 import { apiFetch } from "@/lib/api";
 import { fmtDate } from "@/lib/fmt-date";
 import { renderPoPdf } from "@/lib/pdf/render";
@@ -63,6 +63,7 @@ export interface IssuedPo {
   /** The supplier's own doors, as `issue-batch` returns them (closure §7). */
   whatsappGroupUrl?: string | null;
   contactEmail?: string | null;
+  poSendChannel?: string | null;
   contact?: string | null;
 }
 
@@ -201,9 +202,7 @@ export default function PoIssueEvidence({
      `Click Email, send …` for an email-only supplier, so the form must not
      open on an empty WhatsApp recipient (Jess's send lines, 2026-09-25). */
   const [channel, setChannel] = useState<SendChannel>(() =>
-    !po.whatsappGroupUrl?.trim() && !(po.contact ?? "").replace(/\D/g, "") && po.contactEmail?.trim()
-      ? "email"
-      : "whatsapp",
+    poSendChannelOf(po) ?? "whatsapp",
   );
   /* `null` until the person types: the recipient then prefills from the
      Supplier Master record for the chosen channel (group link or chat number

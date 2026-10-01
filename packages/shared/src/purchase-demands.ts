@@ -90,6 +90,8 @@ export type PurchaseDemandBlockerState =
   | "no_sku"
   | "no_supplier"
   | "no_cost"
+  /** 0443 · Catalog has not set the SKU's Stock identity (Unit ID or Quantity). */
+  | "no_stock_identity"
   | "no_production_days"
   /** The supplier is collected from the factory and no collector is set. */
   | "no_pickup_partner";
@@ -111,9 +113,16 @@ export const PURCHASE_DEMAND_STATES: readonly PurchaseDemandState[] = [
   "no_sku",
   "no_supplier",
   "no_cost",
+  "no_stock_identity",
   "no_production_days",
   "no_pickup_partner",
 ] as const;
+
+/** Price resolution belongs to commercial approval, never operational eligibility.
+ * Owner ruling 2026-10-01. Retained as the shared row/door contract. */
+export function catalogCostBlocksIssue(_cost: number | null | undefined): boolean {
+  return false;
+}
 
 export function isPurchaseDemandTimingState(v: unknown): v is PurchaseDemandTimingState {
   return (
@@ -146,6 +155,7 @@ export function purchaseDemandStateWords(
     no_sku: "SKU not found",
     no_supplier: "Supplier not assigned",
     no_cost: "Catalog cost is missing",
+    no_stock_identity: "Stock identity not set",
     no_production_days: "Production days not set",
     no_pickup_partner: "Collection is not configured",
   };
@@ -186,6 +196,7 @@ export const PURCHASE_DEMAND_OWNER_DUTY: Record<PurchaseDemandState, string | nu
   no_sku: "PO duty",
   no_supplier: "PO duty",
   no_cost: "PO duty",
+  no_stock_identity: "PO duty",
   no_production_days: "Purchasing Settings",
   no_pickup_partner: "Purchasing Settings",
 };
@@ -394,6 +405,7 @@ const ACTION_OWNER_RULE: Record<PurchaseDemandState, string> = {
   no_sku: "Catalog/Master Data through Current PO Duty",
   no_supplier: "Current PO Duty",
   no_cost: "Catalog/Master Data through Current PO Duty",
+  no_stock_identity: "Catalog/Master Data through Current PO Duty",
   no_production_days: "Purchasing Settings authority",
   no_pickup_partner: "Purchasing Settings authority",
 };
@@ -414,6 +426,7 @@ const ACTION_COMPLETION_FACT: Record<PurchaseDemandState, string> = {
   no_sku: "Approved SKU exists",
   no_supplier: "Approved supplier relationship exists",
   no_cost: "Approved Catalog cost exists",
+  no_stock_identity: "Catalog Stock identity exists",
   no_production_days: "Governed supplier/category days exist",
   no_pickup_partner: "Governed supplier collection rule exists",
 };
@@ -654,6 +667,8 @@ export function purchaseDemandHelpLine(row: {
       return `Check the supplier for ${row.item}`;
     case "no_cost":
       return `Set the cost of ${row.item} in Catalog`;
+    case "no_stock_identity":
+      return `Set the stock identity (Unit ID or Quantity) for ${row.item} in Catalog before issuing a PO`;
     case "no_production_days":
       return `Add production days for ${row.supplier ?? "the supplier"} · ${
         row.category ? categoryLabel(row.category) : "the category"
@@ -846,6 +861,7 @@ export const purchaseDemandStateSchema = z.enum([
   "no_sku",
   "no_supplier",
   "no_cost",
+  "no_stock_identity",
   "no_production_days",
   "no_pickup_partner",
 ]);

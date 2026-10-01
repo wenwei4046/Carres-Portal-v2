@@ -25,7 +25,7 @@ vi.mock("../../lib/purchasing-settings", () => ({
     logisticsCallWorkingDays: 1,
     poDays: [1, 3, 5],
     suppliers: [],
-    productionDays: [],
+    productionDays: [{ supplierId: "bbbbbbbb-0000-0000-0000-000000000001", category: "sofa", workingDays: 14 }],
     lastChanges: [],
   }),
 }));
@@ -96,7 +96,15 @@ const LINES = [
  *  resolves to the canned result for its table. */
 function tableStub(result: unknown, opts?: { filterInBy?: string }) {
   const q: Record<string, unknown> = {};
-  let rows = result;
+  /* A configured Catalog row (it has `product_models`) always carries its
+     Stock identity (0442); a fixture that wants `Not set` writes `null`. */
+  let rows = Array.isArray(result)
+    ? (result as Record<string, unknown>[]).map((r) =>
+        r && typeof r === "object" && "sku" in r && "product_models" in r
+          ? { stock_identity_mode: "unit", ...r }
+          : r,
+      )
+    : result;
   const chain = () => q;
   for (const m of ["select", "eq", "order", "limit", "not", "gt", "is", "maybeSingle"]) {
     q[m] = vi.fn(chain);
@@ -269,12 +277,7 @@ describe("POST /purchasing/requests/issue — the reason rides to the authority"
     }
   });
 
-  it("no production number, no PO date — and the purchase order is still raised", async () => {
-    /* The PO's own delivery date rests on the Settings production number. With
-       none recorded the document is born with NO date and the paper prints the
-       governed absence; a guessed date would be read downstream as a
-       measurement (P1's law). The goods matter more than the estimate, so the
-       order still goes out. */
+  it("missing production number names the blocker before issuing", async () => {
     const rpc = vi.fn().mockResolvedValue({ data: { po_ids: ["PO-9001"] }, error: null });
     vi.mocked(loadPurchasingSettings).mockResolvedValueOnce({
       ...CARD06_SETTINGS,
@@ -284,9 +287,9 @@ describe("POST /purchasing/requests/issue — the reason rides to the authority"
       { requestIds: [REQ_A, REQ_B], together: true, expectedCosts: REVIEWED },
       rpc,
     );
-    expect(res.status).toBe(200);
-    const pos = rpc.mock.calls[0][1].p_pos as Array<Record<string, unknown>>;
-    expect(pos.every((po) => po.eta_date === null)).toBe(true);
+    expect(res.status).toBe(422);
+    expect(JSON.stringify(await res.json())).toContain("production_days_required");
+    expect(rpc).not.toHaveBeenCalled();
   });
 
   it("answers with the issued documents in the shape the shared review reads", async () => {
@@ -391,7 +394,7 @@ describe("closure §2 · Catalog is the manual lane's normal price authority", (
     expect(res.status).toBe(403);
     const body = (await res.json()) as { code?: string; message?: string; action?: string };
     expect(body.code).toBe("not_po_duty");
-    expect(body.message).toBe("You do not hold PO duty today.");
+    expect(body.message).toBe("Only Operation staff may issue a purchase order.");
     expect(body.action?.length).toBeGreaterThan(0);
   });
 });

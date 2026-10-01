@@ -37,7 +37,7 @@ operationSuppliersRouter.get("/", async (c) => {
        (Ohana still carries `hookka` from 0032). A client deriving slugs from
        NAMES would let "Hookka" through and be refused server-side — the exact
        dead end this list exists to prevent. */
-    .select("id, name, slug, kind, cat_covered, lead_time, contact, contact_email, whatsapp_group_url")
+    .select("id, name, slug, kind, cat_covered, lead_time, contact, contact_email, whatsapp_group_url, po_send_channel")
     .order("name", { ascending: true });
   if (error) return fail(c, error);
   /* 0477 — Finance's other creditors (a landlord, an advertiser) share this

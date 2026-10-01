@@ -779,6 +779,19 @@ describe("validateAllocations — the arrangement must add back to the server's 
     ).toEqual({ ok: true });
   });
 
+  it("names a Deliver To with no address on the row, before Issue", () => {
+    const noAddress = { ...KLANG, address: null };
+    const v = validateAllocations(
+      r,
+      [{ destinationId: KLANG.id, qty: 11 }],
+      [noAddress, ...DESTINATIONS.filter((d) => d.id !== KLANG.id)],
+    );
+    expect(v).toEqual({
+      ok: false,
+      message: `${KLANG.name} has no address on file. Ask Purchasing to add the address of ${KLANG.name} in Settings.`,
+    });
+  });
+
   it("refuses a short total and says both numbers", () => {
     const v = validateAllocations(r, [{ destinationId: KLANG.id, qty: 10 }], DESTINATIONS);
     expect(v.ok).toBe(false);

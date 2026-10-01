@@ -7,6 +7,7 @@ import {
   poWindowFor,
   poWindowKeyOf,
   productionWorkingDaysFor,
+  catalogCostBlocksIssue,
   purchaseDemandBlockerOf,
   purchaseDemandQuantities,
   purchaseDemandTimingOf,
@@ -550,10 +551,17 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
         /* THE ENGINE'S OWN ARRIVAL DATE. `stockReady` IS `arriveBy` — the day
            the goods must be at Carres for this customer promise to hold. */
         const goodsMustArrive = row.stockReady;
-        const catalogCostMissing = build.lines.some((l) => {
-          const cost = catalog.get(l.sku)?.cost ?? null;
-          return cost == null || cost <= 0;
-        });
+        /* ONE RULE WITH THE ISSUE DOOR (`catalogCostBlocksIssue`): an
+           unrecorded price is bought without a commercial claim (0573); only a
+           recorded price that is not positive blocks the row. */
+        const catalogCostMissing = build.lines.some((l) =>
+          catalogCostBlocksIssue(catalog.get(l.sku)?.cost ?? null),
+        );
+        /* 0443 · the official PO door refuses a SKU whose Stock identity is
+           `Not set`, so the row names it before the operator presses Issue. */
+        const stockIdentityMissing = build.lines.some(
+          (l) => (catalog.get(l.sku)?.stockIdentityMode ?? null) == null,
+        );
         /* A carried build has its SKU, supplier and production days by
            construction — the read refuses the others line by line into
            `registerFacts` below. The one blocker it can still carry is the
@@ -588,6 +596,8 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
         const state: PurchaseDemandState =
           row.delivery == null
             ? "no_customer_date"
+            : stockIdentityMissing
+              ? "no_stock_identity"
             : catalogCostMissing
               ? "no_cost"
             : pickupPartnerMissing
@@ -646,7 +656,7 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
           /* A CARRIED build can be issued, so it carries the reference the
              issue endpoint recomputes against. A refused line below cannot,
              and says so by having none. */
-          issueRef: state === "no_cost"
+          issueRef: state === "no_cost" || state === "no_stock_identity"
             ? null
             : { proposalKey: proposal.key, buildKey: build.key },
           /* The CATALOG's price per SKU, carried so the 50/50 can ask for the

@@ -398,3 +398,42 @@ describe("Purchasing Settings — Supplier addresses (0611)", () => {
     expect(rpc).not.toHaveBeenCalled();
   });
 });
+
+describe("Supplier channels", () => {
+  it.each([
+    ["contactEmail", "contact_email", "supplier@example.com"],
+    ["whatsappGroupUrl", "whatsapp_group_url", "https://chat.whatsapp.com/AbC123"],
+    ["poSendChannel", "po_send_channel", "email"],
+    ["contactEmail", "contact_email", ""],
+  ])("saves only %s through the audited door", async (kind, p_kind, text) => {
+    const rpc = vi.fn().mockResolvedValue({ data: null, error: null });
+    vi.mocked(userClient).mockReturnValue({ rpc } as never);
+    const res = await testApp().request("/settings/supplier-channel", {
+      method: "PUT", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ supplierId: SUPPLIER_ID, kind, text }),
+    });
+    expect(res.status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("purchasing_set_supplier_channel", { p_supplier_id: SUPPLIER_ID, p_kind, p_text: text });
+  });
+  it("refuses malformed channels before writing", async () => {
+    const rpc = vi.fn();
+    vi.mocked(userClient).mockReturnValue({ rpc } as never);
+    for (const [kind, text] of [["contactEmail", "not-email"], ["whatsappGroupUrl", "https://evil.test/group"], ["address", "somewhere"]]) {
+      const res = await testApp().request("/settings/supplier-channel", {
+        method: "PUT", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ supplierId: SUPPLIER_ID, kind, text }),
+      });
+      expect(res.status).toBe(422);
+    }
+    expect(rpc).not.toHaveBeenCalled();
+  });
+  it("preserves a database permission refusal", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: null, error: { code: "42501", message: "forbidden" } });
+    vi.mocked(userClient).mockReturnValue({ rpc } as never);
+    const res = await testApp({ role: "operation", email: "person@example.com" }).request("/settings/supplier-channel", {
+      method: "PUT", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ supplierId: SUPPLIER_ID, kind: "contactEmail", text: "supplier@example.com" }),
+    });
+    expect(res.ok).toBe(false);
+  });
+});

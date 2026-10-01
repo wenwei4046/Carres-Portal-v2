@@ -379,17 +379,25 @@ toOrderRouter.post("/issue-batch", requireOperation, async (c) => {
   /* ── 4 · the destinations, read once ────────────────────────────────────── */
   const destRes = await sb
     .from("purchasing_destinations")
-    .select("id, name, is_default, active");
+    .select("id, name, is_default, active, address, warehouse_id, warehouses(address)");
   if (destRes.error) return fail(c, destRes.error);
   const destById = new Map(
-    ((destRes.data ?? []) as Record<string, unknown>[]).map((d) => [
-      d.id as string,
-      {
-        id: d.id as string,
-        name: (d.name as string) ?? "",
-        active: d.active !== false,
-      },
-    ]),
+    ((destRes.data ?? []) as Record<string, unknown>[]).map((d) => {
+      /* The SAME address the PO document prints (`purchasing_po_document`):
+         a warehouse Deliver To reads its warehouse, any other its own. */
+      const wh = d.warehouses as { address?: string | null } | { address?: string | null }[] | null;
+      const whAddress = Array.isArray(wh) ? wh[0]?.address : wh?.address;
+      const address = d.warehouse_id != null ? whAddress ?? null : (d.address as string | null) ?? null;
+      return [
+        d.id as string,
+        {
+          id: d.id as string,
+          name: (d.name as string) ?? "",
+          active: d.active !== false,
+          hasAddress: typeof address === "string" && address.trim() !== "",
+        },
+      ];
+    }),
   );
 
   /* ── 5 · every refusal, before a single document is composed ────────────── */
@@ -430,6 +438,13 @@ toOrderRouter.post("/issue-batch", requireOperation, async (c) => {
       if (!dest) return refuse(c, 422, "unknown_destination");
       if (!dest.active) {
         return refuse(c, 422, "inactive_destination", { destination: dest.name });
+      }
+      /* ⭐ NAMED BEFORE THE PO EXISTS. The PO document refuses a Deliver To
+         with no address (`destination_address_missing`), but only when the
+         PDF is drawn — after the PO was issued and its number spent. The
+         door now refuses first, so no unprintable PO is ever created. */
+      if (!dest.hasAddress) {
+        return refuse(c, 422, "destination_address_missing", { destination: dest.name });
       }
       total += a.qty;
       allocations.push({
@@ -635,30 +650,18 @@ toOrderRouter.post("/issue-batch", requireOperation, async (c) => {
         qty: src.qty,
       }));
       const liveCost = res.data.catalog.get(line.sku)?.cost ?? null;
+      /* 0443 · the creation door refuses this inside the transaction; named
+         here first so the operator reads the SKU, not a rolled-back batch. */
+      if ((res.data.catalog.get(line.sku)?.stockIdentityMode ?? null) == null) {
+        return refuse(c, 422, "catalog_identity_mode_missing", { sku: line.sku });
+      }
       /* Issue review is not a cost-maintenance screen. With no legacy
          exception declaration, Catalog is the only commercial input; SQL
          rechecks the same live value inside the creation transaction. */
       if (!d) {
-        const facts = { sku: line.sku, supplier: group.proposal.supplierName ?? null };
-        /**
-         * ⭐ PRICE NOT RECORDED DOES NOT STOP THE ORDER — owner instruction
-         * 2026-09-23, the same ruling Manual Purchase shipped under 0573, and
-         * the gap MASTER §9.2 named on this lane.
-         *
-         * A SKU Carres has never been quoted for is issued carrying NO
-         * commercial claim: no cost, no cost source, no treatment. That is the
-         * one shape `purchase_order_lines`' own CHECK keeps for an absence, and
-         * the door's `v_price_not_recorded` verdict skips the cost-source gate
-         * and the approval engine for exactly that line — so it neither needs
-         * nor spends an approval.
-         *
-         * ⛔ AND AN ABSENCE IS NOT A ZERO. A price that IS recorded but is not
-         * positive is a Catalog mistake, not an unknown, and it keeps refusing
-         * by name: filling it with RM0 would put a number nobody agreed on a
-         * supplier's paper. Free of charge remains its own declared decision
-         * with its own reason.
-         */
-        if (liveCost == null) {
+        // A non-positive Catalog value is not an authorised free-of-charge
+        // decision. Continue without making a commercial claim; preserve Catalog.
+        if (liveCost == null || !Number.isFinite(liveCost) || liveCost <= 0) {
           lines.push({
             sku: line.sku,
             qty: line.qty,
@@ -671,7 +674,6 @@ toOrderRouter.post("/issue-batch", requireOperation, async (c) => {
           });
           continue;
         }
-        if (liveCost <= 0) return refuse(c, 422, "cost_required", facts);
         lines.push({
           sku: line.sku,
           qty: line.qty,
@@ -850,17 +852,18 @@ toOrderRouter.post("/issue-batch", requireOperation, async (c) => {
   const supplierIds = [...new Set(created.map((x) => x.supplierId))];
   const doorsBySupplier = new Map<
     string,
-    { whatsappGroupUrl: string | null; contactEmail: string | null; contact: string | null }
+    { whatsappGroupUrl: string | null; contactEmail: string | null; poSendChannel: string | null; contact: string | null }
   >();
   if (supplierIds.length > 0) {
     const { data: sups } = await sb
       .from("suppliers")
-      .select("id, whatsapp_group_url, contact_email, contact")
+      .select("id, whatsapp_group_url, po_send_channel, contact_email, contact")
       .in("id", supplierIds);
     for (const r of (sups ?? []) as Record<string, unknown>[]) {
       doorsBySupplier.set(r.id as string, {
         whatsappGroupUrl: (r.whatsapp_group_url as string | null) ?? null,
         contactEmail: (r.contact_email as string | null) ?? null,
+        poSendChannel: (r.po_send_channel as string | null) ?? null,
         contact: (r.contact as string | null) ?? null,
       });
     }
@@ -881,6 +884,7 @@ toOrderRouter.post("/issue-batch", requireOperation, async (c) => {
         destination: destById.get(created[i]!.destinationId)?.name ?? null,
         whatsappGroupUrl: doors?.whatsappGroupUrl ?? null,
         contactEmail: doors?.contactEmail ?? null,
+        poSendChannel: doors?.poSendChannel ?? null,
         contact: doors?.contact ?? null,
       };
     }),
