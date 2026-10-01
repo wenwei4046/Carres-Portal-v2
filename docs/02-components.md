@@ -503,3 +503,5 @@ The owner-accepted numeric recipe is governed by [UI MASTER, Confirmed shared te
 Use existing DataGrid, FilterRail, Block, Drawer/DialogFrame, Button, Icon, Tooltip and Badge components under [UI MASTER, Confirmed shared template](ui/MASTER.md#confirmed-shared-template--owner-acceptance-2026-10-01). This acceptance creates no second kit. Square return controls use canonical back icon and kit neutral-control geometry; pills remain status badges. Shared /ui examples and adoption tests are required by the authorised BUILD controller before claiming kit convergence.
 
 Accepted quick-view composition: existing Drawer `variant="quick-view"` owns the dark header and header actions; Block `tone="muted"` supplies the quiet identity section. `/ui` renders these same primitives. Close uses the canonical 32px desktop / 40px touch target. No page-local replacement drawer or card is admitted.
+
+The shared Tabs segmented presentation example uses canonical Table/Cards icons with visible words,16px inheriting colour; accessible names remain Table/Cards. This is the owner-approved2026-10-01 presentation amendment.

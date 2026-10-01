@@ -1,12 +1,26 @@
 # STOCK / WAREHOUSE — MASTER
 
-**Reuse first, copy only missing parts — owner ruling 2026-10-01:** follow the
-[canonical shared-template ruling](../ui/MASTER.md#reuse-first-shared-page-templates--owner-ruling-2026-10-01).
-Keep working Carres pages and components. Use Houzs only for evidenced missing capabilities or
-interactions, integrated into the one existing kit/template; no wholesale Warehouse page rewrite.
-Preserve Unit facts, five destinations, source ownership and explicit owner rulings.
-Concrete reference selection for gaps and operator validation remain pending. This direction
-does not approve the whole new Warehouse audit/Blueprint or authorise BUILD in the PLAN chat.
+**Shared-template adoption — owner acceptance2026-10-01 / Warehouse adoption not verified:**
+follow UI MASTER **“Confirmed shared template — owner acceptance2026-10-01”**, integrated by
+[PR1838](https://github.com/wenwei4046/Carres-Portal-v2/pull/1838), main `c926e3f76`. Read the current
+canonical UI MASTER; its accepted composition is resolved owner truth. The one canonical UI MASTER owns the visual
+contract; this module does not duplicate its dimensions or create another kit.
+
+The accepted composition may improve existing confusing Warehouse presentation as well as fill
+missing capabilities. Preserve useful behaviour, Unit/source facts, five destinations, permission
+and write ownership. Warehouse rail summaries/date shortcuts use its own authoritative stock and
+physical-work facts; do not copy Sales monetary summaries, Item commercial columns or customer
+section order into Warehouse. Register Table/Cards must describe the same filtered population.
+Receiving/issue evidence alone establishes physical stock movement; allocation is not receipt.
+Unknown, failed and missing evidence must stay explicit. Current receiving/loading write doors and
+formal completion rules survive presentation changes.
+
+The dedicated **UI Template — BUILD Test Deploy** controller
+(`01a0f7c6-6fed-7282-9f2a-94e8bc94b065`) owns shared-template integration, tests and authorised
+deployment. This Warehouse chat remains PLAN; it does not duplicate that rollout or alter the
+controller's worktree. Accepted UI composition is not production proof or completion of the whole
+Warehouse audit/Blueprint. Warehouse-specific adoption requires its own operator/permission/data
+verification under the controller and the module's authorised scope.
 
 **Shared field-operation UI:** follow [the canonical UI MASTER ruling](../ui/MASTER.md#shared-field-operation-ui--owner-ruling-2026-09-29) (approved direction; implementation and operator validation pending).
 

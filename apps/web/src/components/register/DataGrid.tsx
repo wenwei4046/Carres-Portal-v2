@@ -53,10 +53,11 @@ import {
   useRef,
   useState,
 } from "react";
-import { Search, Columns3, RotateCcw, Filter, Download, ChevronDown, ChevronRight, Printer, X, Check, ArrowDown, ArrowUp } from "lucide-react";
+import { Search, Columns3, RotateCcw, Filter, ChevronDown, ChevronRight, X, Check, ArrowDown, ArrowUp } from "lucide-react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { appTodayIso } from "@/lib/fmt-date";
 import Button from "@/components/kit/Button";
+import Icon from "@/components/kit/Icon";
 import DropdownMenu from "@/components/kit/DropdownMenu";
 import Popover from "@/components/kit/Popover";
 import Tooltip from "@/components/kit/Tooltip";
@@ -3048,7 +3049,7 @@ function DataGridInner<T>({
             type="button"
             aria-label="Export"
             title="Export"
-            className={`${styles.toolbarPill} ${isReference && !labelledToolbar ? styles.toolbarPillIconCaret : ""} ${outputMenuOpen ? styles.toolbarPillOn : ""}`}
+            className={`${styles.toolbarPill} ${outputMenuOpen ? styles.toolbarPillOn : ""}`}
             onClick={() => setOutputMenuOpen((open) => {
               const next = !open;
               if (next && outputBtnRef.current) {
@@ -3061,13 +3062,9 @@ function DataGridInner<T>({
             aria-haspopup="menu"
             aria-expanded={outputMenuOpen}
           >
-            <Download size={14} strokeWidth={1.75} aria-hidden />
-            {(!isReference || labelledToolbar) && (
-              <>
-                <span>Export</span>
-                <ChevronDown size={12} strokeWidth={2} aria-hidden />
-              </>
-            )}
+            <Icon name="download" />
+            <span>Export</span>
+            <ChevronDown size={12} strokeWidth={2} aria-hidden />
           </button>}
           {outputMenuOpen && (
             <div
@@ -3334,7 +3331,7 @@ function DataGridInner<T>({
                 void exportRows(selectedOrIndeterminateVisibleRows);
               }}
             >
-              <Download size={14} strokeWidth={1.75} aria-hidden />
+              <Icon name="download" />
               <span>Export Excel ({selectedOrIndeterminateVisibleRows.length})</span>
             </button>
           )}
@@ -3355,7 +3352,7 @@ function DataGridInner<T>({
                 {/* A printer on `Assign logistics` would be a lie about what
                     the button does. Only an OUTPUT keeps the printer glyph. */}
                 {a.kind === "write" ? null : (
-                  <Printer size={14} strokeWidth={1.75} aria-hidden />
+                  <Icon name="print" />
                 )}
                 <span>{a.label(selectedOrIndeterminateVisibleRows.length)}</span>
               </button>

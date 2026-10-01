@@ -34,12 +34,12 @@ const VARIANT: Record<Variant, string> = {
   ghost: "bg-transparent text-kit-slate-11 border border-transparent hover:bg-kit-slate-3",
 };
 
-/** 32px is the live control height every form row already aligns to; 24px is
+/** Default controls are32px desktop/40px touch under the accepted template;24px is
  *  the dense band. Both are heights, not spacing — Q1 does not reach them.
  *  `touch` is the Work party-card button (owner density ruling 2026-09-25):
  *  36px from 768px, 40px below, where a finger presses it. */
 const SIZE: Record<Size, string> = {
-  md: "h-8 px-3 gap-2",
+  md: "h-10 px-3 gap-2 min-[768px]:h-8",
   sm: "h-6 px-2 gap-1",
   touch: "h-10 px-3 gap-1.5 min-[768px]:h-9",
 };
@@ -102,6 +102,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
         `${VARIANT[variant]} ${iconOnly ? "h-10 w-10 p-0 min-[768px]:h-8 min-[768px]:w-8" : SIZE[size]}`
       }
       {...rest}
+      title={rest.title ?? (iconOnly ? rest["aria-label"] : undefined)}
     >
       {loading ? (
         <Loading size={ICON_SIZE[size]} />

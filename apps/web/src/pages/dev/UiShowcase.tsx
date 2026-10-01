@@ -244,6 +244,7 @@ export default function UiShowcase() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [carrier, setCarrier] = useState<string | undefined>(undefined);
   const [tab, setTab] = useState("to-order");
+  const [registerView, setRegisterView] = useState("table");
   const [ordersTab, setOrdersTab] = useState("open");
   const [picked, setPicked] = useState(true);
   const [some, setSome] = useState<boolean | "indeterminate">("indeterminate");
@@ -779,7 +780,7 @@ export default function UiShowcase() {
             open={drawerOpen}
             onOpenChange={setDrawerOpen}
             title="SO-1256 · Tan Wei Ming"
-            headerActions={<><Button variant="ghost" iconOnly icon="print" aria-label="Print" /><Button variant="ghost" iconOnly icon="open" aria-label="Open full page" /></>}
+            headerActions={<><Button variant="ghost" icon="print">Print</Button><Button variant="ghost" iconOnly icon="open" aria-label="Open full page" /></>}
           >
             <div className="flex flex-col gap-4" data-testid="sales-order-quick-view">
               <Block title="SO info" tone="muted">
@@ -888,6 +889,7 @@ export default function UiShowcase() {
           <Card>
             <div className="flex flex-col gap-4">
               <Tabs label="Purchasing" tabs={MODULE_TABS} value={tab} onValueChange={setTab} />
+              <Tabs variant="segmented" label="Register presentation" value={registerView} onValueChange={setRegisterView} tabs={[{ value: "table", label: "Table", icon: "table" }, { value: "cards", label: "Cards", icon: "cards" }]} />
               <p className="text-meta text-kit-slate-11">
                 A count is a `Badge`, never a coloured pill — a badge that could be red would be a
                 status wearing a different name. Tabs with nothing to count show no number at all.

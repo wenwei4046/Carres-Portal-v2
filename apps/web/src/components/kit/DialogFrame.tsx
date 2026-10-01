@@ -189,6 +189,7 @@ export default function DialogFrame({
             <div className="flex items-center gap-2">{headerActions}
             <Dialog.Close
               aria-label="Close"
+              title="Close"
               data-kit="dialog-close"
               className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-control text-kit-slate-11 hover:bg-kit-slate-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9 md:h-8 md:w-8"
             >

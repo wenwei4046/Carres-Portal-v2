@@ -6779,11 +6779,12 @@ this module owns the following business-specific application. Production proof r
 
 - Order list rail: Order summary (Sales orders, Total payable, Paid to date, Balance due), then
   Customer Requested Delivery Date shortcuts. Both open initially. Aggregates follow the SAME
-  filtered loaded result as Table/Cards, with explicit loaded-population and missing-money scope.
+  filtered loaded result as Table/Cards. The redundant “Current filtered list” paragraph and spacing are removed by owner amendment; incomplete loaded scope remains a summary tooltip and register count, and missing-money warnings remain visible.
   Payment, Delivery and Stock Status filters live in columns; no duplicate rail or case filter.
   Monthly demand retains its own governed single-choice filters and views.
+- Table/Cards selectors use shared kit icon16 plus visible Table/Cards text, including the selected-record toolbar (owner amendment2026-10-01). Both use the same result/filter engine.
 - Row click and Cards View open read-only quick view. Dark SO/customer header carries status,
-  Print, Open full page and Close; no footer. Grey SO info starts with customer Phone/Email,
+  Print icon plus word, Open full page and Close; no footer. Grey SO info starts with customer Phone/Email,
   then sales attribution/dates/Dealer. Delivery, Items, Payment and Related documents are white
   Block cards. No separate duplicate customer card. Source failures and absences stay explicit.
 - Full page opens read-only until deliberate Edit. Fixed white identity header and slate-2 tabs
