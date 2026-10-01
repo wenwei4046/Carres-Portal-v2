@@ -3,10 +3,11 @@
  * owed or posted (CLAUDE.md §7); a payout still goes through a payment voucher.
  *
  * One read of `dealer_commission_source(month)`; every figure is the shared
- * `dealerCommissionReport` (Law D). Below the report, side by side, Finance
- * keeps the rates: the default commission rate, products with their own rate,
- * and each dealer's renovation quota. A dealer with no quota opens the quota
- * form from its own `Quota left` cell.
+ * `dealerCommissionReport` (Law D). Finance keeps the rates on two sibling
+ * views of the same page, picked from the toolbar switch: `?view=rates` (the
+ * default commission rate and products with their own rate) and
+ * `?view=quotas` (each dealer's renovation quota). A dealer with no quota
+ * opens the quota form, on the quotas view, from its own `Quota left` cell.
  *
  * Frame: `ModuleHeader` + `<ListPageShell register>` + the Register engine, the
  * shape every other Finance register draws (Trial Balance, Unpaid by Supplier,
@@ -16,6 +17,7 @@
  * carry `exportValue` so the money leaves as numbers.
  */
 import { useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { dealerCommissionReport, type DcReportRow, type DcSource } from "@carres/shared/dealer-commission";
 import Button from "@/components/kit/Button";
@@ -25,6 +27,7 @@ import Select from "@/components/kit/Select";
 import { FieldError } from "@/components/kit/FieldFrame";
 import ListPageShell from "@/components/ListPageShell";
 import { SectionCard } from "@/components/SectionPanel";
+import { SegmentedLinks } from "@/components/Segmented";
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
 import ModuleHeader from "@/pages/operation/components/ModuleHeader";
 import { apiFetch } from "@/lib/api";
@@ -35,6 +38,7 @@ import { LoadFailed } from "../other-money-in/parts";
 const BASE = "/api/finance/dealer-commission";
 const ALL = "all";
 type QuotaDraft = { dealerId: string; quota: string; rebateRate: string; startsOn: string };
+type View = "report" | "rates" | "quotas";
 
 /** This month and the 23 before it, newest first (YYYY-MM). */
 function lastMonths(): string[] {
@@ -47,6 +51,9 @@ function lastMonths(): string[] {
 
 export default function DealerCommission() {
   const months = useMemo(lastMonths, []);
+  const [params, setParams] = useSearchParams();
+  const v = params.get("view");
+  const view: View = v === "rates" || v === "quotas" ? v : "report";
   const [month, setMonth] = useState(months[0]);
   const [dealerId, setDealerId] = useState(ALL);
   const [outletId, setOutletId] = useState(ALL);
@@ -74,18 +81,22 @@ export default function DealerCommission() {
       // No quota yet: the words open the quota form with this dealer chosen.
       accessor: (r) => (r.quotaLeft === null
         ? <button type="button" className="hover:underline"
-            onClick={() => setQuota({ dealerId: r.dealerId, quota: "", rebateRate: "5", startsOn: months[0] })}>No quota</button>
+            onClick={() => { setQuota({ dealerId: r.dealerId, quota: "", rebateRate: "5", startsOn: months[0] }); setParams({ view: "quotas" }); }}>No quota</button>
         : rm(r.quotaLeft)) },
-  ], [months]);
+  ], [months, setParams]);
 
   return <div className="flex h-full min-h-0 flex-col" data-testid="dealer-commission">
     <ModuleHeader destinationHeader testId="dealer-commission-header" word="Dealer commission" docTitle="Dealer commission · Carres" />
     {q.isError ? <LoadFailed what="The report" onRetry={() => void q.refetch()} /> :
+    view !== "report" ? <ListPageShell register toolbar={<Views current={view} />}>
+      {src && <div className="min-h-0 overflow-y-auto"><Settings view={view} src={src} quota={quota} setQuota={setQuota} /></div>}
+    </ListPageShell> :
     <ListPageShell register>
       <DataGrid rows={rows} columns={columns} rowKey={(r) => r.dealerId} storageKey="carres.finance.dealer-commission.v1"
         appearance="reference" exportName={`Dealer commission ${month}`} groupBanner={false} stickyIdentity
         isLoading={!q.isSuccess} wrapToolbar
         toolbarStart={<div className="flex flex-wrap items-end gap-2">
+          <Views current="report" />
           <div className="w-[180px]"><Select id="dc-month" label="Month" value={month} onValueChange={setMonth}
             options={months.map((m) => ({ value: m, label: fmtMonth(m) }))} /></div>
           <div className="w-[220px]"><Select id="dc-dealer" label="Dealer" value={dealerId}
@@ -97,12 +108,22 @@ export default function DealerCommission() {
         statusSummary={(visible) => <span data-testid="dealer-commission-summary">
           {visible.length} of {rows.length} rows · Commission is earned only on money collected. The rebate is the dealer's whole collections, whatever showroom is picked.
         </span>} />
-      {src && <div className="mt-6 min-h-0 overflow-y-auto grid grid-cols-1 gap-6 md:grid-cols-2"><Rates src={src} quota={quota} setQuota={setQuota} /></div>}
     </ListPageShell>}
   </div>;
 }
 
-function Rates({ src, quota, setQuota }: { src: DcSource; quota: QuotaDraft | null; setQuota: (q: QuotaDraft | null) => void }) {
+/** The report and its two settings views, on the app's one segmented link switch. */
+function Views({ current }: { current: View }) {
+  const views = [
+    { value: "report", to: "/finance/reports/dealer-commission", label: "Dealer commission" },
+    { value: "rates", to: "/finance/reports/dealer-commission?view=rates", label: "Commission rates" },
+    { value: "quotas", to: "/finance/reports/dealer-commission?view=quotas", label: "Renovation quotas" },
+  ] as const;
+  return <SegmentedLinks options={views} value={current} ariaLabel="Dealer commission" testId="dealer-commission-switch" />;
+}
+
+/** One settings card per view; the two modals and the one save are shared. */
+function Settings({ view, src, quota, setQuota }: { view: "rates" | "quotas"; src: DcSource; quota: QuotaDraft | null; setQuota: (q: QuotaDraft | null) => void }) {
   const qc = useQueryClient();
   const save = useMutation({
     mutationFn: (v: { path: string; method: "PUT" | "DELETE"; body?: unknown }) =>
@@ -121,7 +142,7 @@ function Rates({ src, quota, setQuota }: { src: DcSource; quota: QuotaDraft | nu
   const close = () => { setProduct(null); setQuota(null); setRefusal(null); };
 
   return <>
-    <SectionCard><div className="p-3 flex flex-col gap-3">
+    {view === "rates" && <SectionCard><div className="p-3 flex flex-col gap-3">
       <h2 className="text-strong">Commission rates</h2>
       <div className="flex items-end gap-2">
         <div className="w-[180px]"><Input id="dc-default-rate" type="number" label="Default rate (%)" min={0} max={100}
@@ -135,9 +156,9 @@ function Rates({ src, quota, setQuota }: { src: DcSource; quota: QuotaDraft | nu
           <Button size="sm" variant="ghost" onClick={() => send(`/rates/${r.modelId}`, "DELETE")}>Remove</Button></span>
       </div>)}
       <div><Button size="sm" icon="add" onClick={() => setProduct({ modelId: "", rate: "20" })}>Add a product rate</Button></div>
-    </div></SectionCard>
+    </div></SectionCard>}
 
-    <SectionCard><div className="p-3 flex flex-col gap-3">
+    {view === "quotas" && <SectionCard><div className="p-3 flex flex-col gap-3">
       <h2 className="text-strong">Renovation quotas</h2>
       {src.quotas.map((q) => <div key={q.dealerId} className="flex items-center justify-between gap-3 border-b border-base-200 py-1">
         <span className="text-body">{dealerName(q.dealerId)}</span>
@@ -145,7 +166,7 @@ function Rates({ src, quota, setQuota }: { src: DcSource; quota: QuotaDraft | nu
           <Button size="sm" onClick={() => setQuota({ dealerId: q.dealerId, quota: String(q.quota), rebateRate: String(q.rebateRate), startsOn: q.startsOn.slice(0, 7) })}>Edit</Button></span>
       </div>)}
       <div><Button size="sm" icon="add" onClick={() => setQuota({ dealerId: "", quota: "", rebateRate: "5", startsOn: months[0] })}>Add a renovation quota</Button></div>
-    </div></SectionCard>
+    </div></SectionCard>}
 
     {product && <Modal open onOpenChange={(o) => { if (!o) close(); }} title="Product rate"
       footer={<><Button variant="ghost" onClick={close}>Cancel</Button>
