@@ -164,6 +164,16 @@ window.fetch = async (input, init) => {
   if (/\/api\/operation\/purchase\/demands/.test(url)) {
     return new Response(JSON.stringify(demandPurchase), { status: 200, headers: { "content-type": "application/json" } });
   }
+  const pdfOrderId = /\/api\/orders\/([^/]+)\/sales-order-data/.exec(path)?.[1];
+  const pdfOrder = orders.find(o=>o.id===pdfOrderId);
+  if (pdfOrder) {
+    const total=pdfOrder.order_lines.reduce((sum,line)=>sum+line.qty*line.unit_price,0);
+    return new Response(JSON.stringify({so_number:`SO-${pdfOrder.so}`, issue_date:pdfOrder.placed_at,order_id:pdfOrder.id,order_code:`SO-${pdfOrder.so}`,status_label:"Confirmed",channel:"showroom",
+      customer:{name:pdfOrder.customer_name,address:`${pdfOrder.customer_address_city}, ${pdfOrder.customer_address_state}`,phone:pdfOrder.customer_phone},
+      dealer:{name:pdfOrder.dealers.name,contact:null,address:null,outlet_name:pdfOrder.outlets?.name??null,outlet_address:null,salesperson_name:pdfOrder.salespersons.name,salesperson_phone:null},
+      delivery:{date:pdfOrder.delivery_date,floor:null,has_lift:null},proceed_date:pdfOrder.proceeded_at,
+      lines:pdfOrder.order_lines.map(line=>({sku:line.sku,description:line.sku==="CODY-SK"?"AKEMI IMMORTAL MATTRESS":"Latex Pillow",qty:line.qty,unit_price:line.unit_price,line_total:line.qty*line.unit_price,attrs:line.attrs,category:line.attrs.category})),addons:[],payments:[],subtotal:total,total,paid:pdfOrder.paid,balance_due:total-pdfOrder.paid,currency:"MYR",signed:false}),{status:200,headers:{"content-type":"application/json"}});
+  }
   const detailId = /\/api\/operation\/orders\/([^/?]+)/.exec(path)?.[1];
   const detail = orders.find(o => o.id === detailId);
   const json = (body: unknown) => new Response(JSON.stringify(body), { status: 200, headers: { "content-type": "application/json" } });

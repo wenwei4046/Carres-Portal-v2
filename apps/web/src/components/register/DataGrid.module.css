@@ -1454,9 +1454,9 @@ div:first-child > .columnsMenuGroup {
 .rootReference[data-presentation-tools] .searchResponsiveIcon { display: none; }
 .rootReference[data-presentation-tools] .searchResponsiveBox {
   display: inline-flex;
-  flex: 0 1 280px;
-  width: 280px;
-  max-width: 280px;
+  flex: 0 1 220px;
+  width: 220px;
+  max-width: 220px;
   min-width: 0;
   height: 32px;
   border-radius: 6px;
@@ -1491,3 +1491,26 @@ div:first-child > .columnsMenuGroup {
 .rootReference[data-presentation-tools][data-row-height="32"] .td { font-size: var(--fs-12); }
 .rootReference[data-presentation-tools][data-row-height="32"] .td .overflowText { font-size: inherit; }
 .rootReference[data-presentation-tools][data-row-height="32"] .td :global(.text-body) { font-size: inherit; line-height: 18px; }
+
+/* Scoped whole-page spacing correction. Absent conditions still take no space. */
+.rootReference[data-presentation-tools] .conditionBar { min-height: 36px; padding: 6px 12px; margin-bottom: 8px; font-size: var(--fs-12); }
+.rootReference[data-presentation-tools] .conditionChip { min-height: 24px; font-size: var(--fs-12); }
+.rootReference[data-presentation-tools] .conditionChipRemove { min-width: 24px; min-height: 24px; }
+.rootReference[data-presentation-tools] .toolbar:not(.selectionBar) { height: 40px; min-height: 40px; margin-bottom: 0; }
+.rootReference[data-presentation-tools] .scroll { scrollbar-width: thin; scrollbar-color: theme("colors.kit.slate.9") theme("colors.kit.slate.3"); }
+.rootReference[data-presentation-tools] .scroll::-webkit-scrollbar { width: 8px; height: 8px; }
+.rootReference[data-presentation-tools] .scroll::-webkit-scrollbar-thumb { background: theme("colors.kit.slate.9"); border-radius: 4px; }
+.rootReference[data-presentation-tools] .scroll::-webkit-scrollbar-track { background: theme("colors.kit.slate.3"); }
+
+.rootReference[data-presentation-tools] .toolbar { border-bottom: 0; }
+
+.rootReference[data-presentation-tools] .conditionClear { color: var(--fg-muted); }
+
+/* Shared listing template: filters, tools, results in DOM/keyboard order. */
+.root .conditionBar { min-height: 36px; padding: 6px 12px; border-bottom: 0; margin-bottom: 8px; }
+.root .conditionChip { min-height: 24px; }
+.root .conditionChipRemove { min-width: 24px; min-height: 24px; }
+.root .conditionClear { color: var(--fg-muted); }
+.root .toolbar { border-bottom: 0; }
+.rootReference .toolbar:not(.selectionBar) { height: 40px; min-height: 40px; margin-bottom: 0; }
+.rootReference.rootLabelledToolbar .toolbar { height: auto; }

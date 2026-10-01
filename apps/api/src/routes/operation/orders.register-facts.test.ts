@@ -84,6 +84,7 @@ describe("GET /api/operation/orders/register-facts", () => {
         order(3),                     // paid, not delivered
       ],
       ops_stock_items: [unit(1, "sold", 1), unit(2, "sold", 2), unit(3, "reserved", 3)],
+      receiving_unit_results: [{ id: "r1", stock_item_id: "u1", outcome: "received" }, { id: "r2", stock_item_id: "u2", outcome: "received_with_issue" }],
       service_cases: [
         { id: "c1", order_id: id(2), status: { is_closed: false } },
         { id: "c2", order_id: id(3), status: { is_closed: true } },
@@ -92,9 +93,9 @@ describe("GET /api/operation/orders/register-facts", () => {
     const res = await read();
     expect(res.status).toBe(200);
     const body = (await res.json()) as { facts: Record<string, unknown>; failed: unknown };
-    expect(body.facts[id(1)]).toEqual({ obligations: "none", cases: "none" });
-    expect(body.facts[id(2)]).toEqual({ obligations: "outstanding", cases: "open" });
-    expect(body.facts[id(3)]).toEqual({ obligations: "outstanding", cases: "closed" });
+    expect(body.facts[id(1)]).toEqual({ obligations: "none", cases: "none", stock: { MS12: "received" } });
+    expect(body.facts[id(2)]).toEqual({ obligations: "outstanding", cases: "open", stock: { MS12: "issue" } });
+    expect(body.facts[id(3)]).toEqual({ obligations: "outstanding", cases: "closed", stock: { MS12: "unknown" } });
     expect(body.failed).toEqual({ obligations: false, cases: false });
   });
 
@@ -102,7 +103,7 @@ describe("GET /api/operation/orders/register-facts", () => {
     mockSb({ orders: [order(1)], ops_stock_items: [unit(1, "sold", 1)] }, ["service_cases", "order_refunds"]);
     const res = await read();
     const body = (await res.json()) as { facts: Record<string, unknown>; failed: unknown };
-    expect(body.facts[id(1)]).toEqual({ obligations: null, cases: null });
+    expect(body.facts[id(1)]).toEqual({ obligations: null, cases: null, stock: { MS12: "unknown" } });
     expect(body.failed).toEqual({ obligations: true, cases: true });
   });
 

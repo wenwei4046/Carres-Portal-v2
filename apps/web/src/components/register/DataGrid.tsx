@@ -2801,6 +2801,106 @@ function DataGridInner<T>({
         if (row?.dataset.rowKey) setActiveRowKey(row.dataset.rowKey);
       } : undefined}
     >
+      {/* ⭐ THE ACTIVE CONDITION BAR (owner ruling 2026-09-11) - every live
+          narrowing in ONE line, whoever applied it, each removable on its own
+          and all of them under one `Clear filters`. Renders nothing when
+          nothing is narrowed, and nothing at all for a grid whose page hands
+          in no conditions and carries no column filter. */}
+      {(() => {
+        const columnChips = [
+          ...Object.entries(filters)
+            .filter(([, v]) => v.length > 0)
+            .map(([key, values]) => ({
+              key: `col:${key}`,
+              label: `${columns.find((c) => c.key === key)?.label ?? key}: ${values.join(", ")}`,
+              onClear: () =>
+                setFilters((prev) => {
+                  const next = { ...prev };
+                  delete next[key];
+                  return next;
+                }),
+            })),
+          ...Object.keys(dateFilters).map((key) => ({
+            key: `date:${key}`,
+            label: `${columns.find((c) => c.key === key)?.label ?? key}: ${dateFilters[key]}`,
+            onClear: () =>
+              setDateFilters((prev) => {
+                const next = { ...prev };
+                delete next[key];
+                return next;
+              }),
+          })),
+          ...Object.keys(dateRangeFilters).map((key) => ({
+            key: `range:${key}`,
+            label: `${columns.find((c) => c.key === key)?.label ?? key}: ${dateRangeFilters[key]?.from ?? ""} - ${dateRangeFilters[key]?.to ?? ""}`,
+            onClear: () =>
+              setDateRangeFilters((prev) => {
+                const next = { ...prev };
+                delete next[key];
+                return next;
+              }),
+          })),
+          ...Object.keys(numberFilters).map((key) => ({
+            key: `num:${key}`,
+            label: columns.find((c) => c.key === key)?.label ?? key,
+            onClear: () =>
+              setNumberFilters((prev) => {
+                const next = { ...prev };
+                delete next[key];
+                return next;
+              }),
+          })),
+        ];
+        /* Listing Standard 2026-09-16: with the governed Register search, an
+           active query IS a condition — listed here and cleared by the same
+           `Clear filters` (which also returns a server search to the whole
+           population through `onSearchChange`). */
+        const searchChips = searchPresentation === "responsive" && search.trim() !== ""
+          ? [{ key: "search", label: `Search: ${search.trim()}`, onClear: () => setSearch("") }]
+          : [];
+        const chips = [...searchChips, ...(activeConditions ?? []), ...columnChips];
+        if (chips.length === 0) return null;
+        return (
+          <div className={styles.conditionBar} data-testid="active-conditions">
+
+            {chips.map((chip) => (
+              <span key={chip.key} className={styles.conditionChip}>
+                <span className={styles.conditionChipText} title={chip.label}>
+                  {chip.label}
+                </span>
+                <button
+                  type="button"
+                  className={styles.conditionChipRemove}
+                  aria-label={`Remove ${chip.label}`}
+                  title={`Remove ${chip.label}`}
+                  onClick={chip.onClear}
+                >
+                  <X size={12} strokeWidth={2} aria-hidden />
+                </button>
+              </span>
+            ))}
+            {!noMatchShowing && (
+            <button
+              type="button"
+              className={styles.conditionClear}
+              data-testid="clear-filters"
+              onClick={() => {
+                if (searchPresentation === "responsive") setSearch("");
+                setFilters({});
+                setDateFilters({});
+                setNumberFilters({});
+                setDateRangeFilters({});
+                onClearConditions?.();
+              }}
+            >
+              Clear all
+            </button>
+            )}
+          </div>
+        );
+      })()}
+
+
       {/* Toolbar — search LEFT (REGISTER LAW 2: always left, compact ~200px;
           2990 kept it right — that is the one composition change the laws
           mandate), then the caller's actions, then Export + Columns pinned
@@ -3198,6 +3298,7 @@ function DataGridInner<T>({
                 if (r) setOutputMenuPos({ top: r.bottom + 4, right: window.innerWidth - r.right });
                 requestAnimationFrame(() => { setOutputMenuOpen(true); requestAnimationFrame(() => document.querySelector<HTMLElement>('[data-testid="register-output-menu"] button')?.focus()); });
               } },
+              ...(outputActions ?? []).map((action, index) => ({ key: `output-${index}`, label: action.label, onSelect: action.onClick })),
               { key: "columns", label: "Columns", icon: "settings", onSelect: () => {
                 const r = pageToolsRef.current?.getBoundingClientRect();
                 if (r) setColumnsMenuPos({ top: r.bottom + 4, right: window.innerWidth - r.right });
@@ -3272,104 +3373,6 @@ function DataGridInner<T>({
         </div>
       )}
 
-      {/* ⭐ THE ACTIVE CONDITION BAR (owner ruling 2026-09-11) - every live
-          narrowing in ONE line, whoever applied it, each removable on its own
-          and all of them under one `Clear filters`. Renders nothing when
-          nothing is narrowed, and nothing at all for a grid whose page hands
-          in no conditions and carries no column filter. */}
-      {(() => {
-        const columnChips = [
-          ...Object.entries(filters)
-            .filter(([, v]) => v.length > 0)
-            .map(([key, values]) => ({
-              key: `col:${key}`,
-              label: `${columns.find((c) => c.key === key)?.label ?? key}: ${values.join(", ")}`,
-              onClear: () =>
-                setFilters((prev) => {
-                  const next = { ...prev };
-                  delete next[key];
-                  return next;
-                }),
-            })),
-          ...Object.keys(dateFilters).map((key) => ({
-            key: `date:${key}`,
-            label: `${columns.find((c) => c.key === key)?.label ?? key}: ${dateFilters[key]}`,
-            onClear: () =>
-              setDateFilters((prev) => {
-                const next = { ...prev };
-                delete next[key];
-                return next;
-              }),
-          })),
-          ...Object.keys(dateRangeFilters).map((key) => ({
-            key: `range:${key}`,
-            label: `${columns.find((c) => c.key === key)?.label ?? key}: ${dateRangeFilters[key]?.from ?? ""} - ${dateRangeFilters[key]?.to ?? ""}`,
-            onClear: () =>
-              setDateRangeFilters((prev) => {
-                const next = { ...prev };
-                delete next[key];
-                return next;
-              }),
-          })),
-          ...Object.keys(numberFilters).map((key) => ({
-            key: `num:${key}`,
-            label: columns.find((c) => c.key === key)?.label ?? key,
-            onClear: () =>
-              setNumberFilters((prev) => {
-                const next = { ...prev };
-                delete next[key];
-                return next;
-              }),
-          })),
-        ];
-        /* Listing Standard 2026-09-16: with the governed Register search, an
-           active query IS a condition — listed here and cleared by the same
-           `Clear filters` (which also returns a server search to the whole
-           population through `onSearchChange`). */
-        const searchChips = searchPresentation === "responsive" && search.trim() !== ""
-          ? [{ key: "search", label: `Search: ${search.trim()}`, onClear: () => setSearch("") }]
-          : [];
-        const chips = [...searchChips, ...(activeConditions ?? []), ...columnChips];
-        if (chips.length === 0) return null;
-        return (
-          <div className={styles.conditionBar} data-testid="active-conditions">
-            <span className={styles.conditionBarLabel}>Showing only:</span>
-            {chips.map((chip) => (
-              <span key={chip.key} className={styles.conditionChip}>
-                <span className={styles.conditionChipText} title={chip.label}>
-                  {chip.label}
-                </span>
-                <button
-                  type="button"
-                  className={styles.conditionChipRemove}
-                  aria-label={`Remove ${chip.label}`}
-                  title={`Remove ${chip.label}`}
-                  onClick={chip.onClear}
-                >
-                  <X size={12} strokeWidth={2} aria-hidden />
-                </button>
-              </span>
-            ))}
-            {!noMatchShowing && (
-            <button
-              type="button"
-              className={styles.conditionClear}
-              data-testid="clear-filters"
-              onClick={() => {
-                if (searchPresentation === "responsive") setSearch("");
-                setFilters({});
-                setDateFilters({});
-                setNumberFilters({});
-                setDateRangeFilters({});
-                onClearConditions?.();
-              }}
-            >
-              Clear filters
-            </button>
-            )}
-          </div>
-        );
-      })()}
 
       {/* Group-by zone */}
       {groupBanner && (

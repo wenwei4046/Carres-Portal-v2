@@ -317,7 +317,7 @@ operationOrdersRouter.get("/", requireOperation, async (c) => {
       // of. Voided DOs are NOT filtered here - the delivery register does not
       // filter them either, and this column must not start counting differently
       // from the surface it links to.
-      "id, so, status, operation_stage, warehouse_id, customer_name, customer_phone, customer_address, customer_email, customer_billing, customer_billing_same, customer_emergency, customer_address_line1, customer_address_line2, customer_address_city, customer_address_state, customer_address_postcode, building_type:entry_data->fields->>building_type, customer_race, customer_gender, customer_birthday, delivery_floor, delivery_has_lift, delivery_stair_items, channel, placed_at, proceeded_at, delivery_date, delivery_date_tbd, proceed_date, source_system, source_ref, ops_assigned_logistic, delivery_partner_id, delivery_stops, request_for_delivery_at, partner_accepted_at, partner_rejected_at, partner_rejected_reason, do_number, do_file_path, do_uploaded_at, invoice_no, invoiced_at, payment_method, installment_months, dispatched_at, delivered_at, outlet_id, salesperson_id, dealer_id, paid, dealers(name), outlets(name), salespersons(name), delivery_partners!orders_delivery_partner_id_fkey(id, name), order_lines(id, sku, qty, unit_price, attrs, source_po), order_addons(addon_key, qty, unit_price), ops_delivery_orders(do_number), order_supplier_threads(id, supplier_id, category, operation_stage, po_id, delivery_partner_id, delivery_partners(id, name), confirm_delivery_date, request_for_delivery_at, partner_accepted_at, partner_rejected_at, purchase_orders(placed_at)), order_finance_exceptions(status), order_delivery_payment_approvals(status), ops_sofa_loans(status, item_id, loan_note_no, ops_stock_items(unit_code, identity_scope)), order_annotations(content, tag, created_at), ops_order_control(customer_request, action_for_logistic, carres_remark, warehouse_remark, logistic_eta, balance, payment_status, storage_from, storage_fee_override, storage_fee_msbf, storage_fee_sof, storage_paid, storage_collected_at, storage_waiver_status, called_customer, line_etas, line_stock_status, assigned_staff, booking_stage, confirmed_date, confirmed_time_slot, delivery_photos, booking_groups, delay_decision, delay_decision_eta, delay_decision_at, delay_detected_at, delay_detected_eta)",
+      "id, so, status, operation_stage, warehouse_id, customer_name, customer_phone, customer_address, customer_email, customer_billing, customer_billing_same, customer_emergency, customer_address_line1, customer_address_line2, customer_address_city, customer_address_state, customer_address_postcode, building_type:entry_data->fields->>building_type, customer_race, customer_gender, customer_birthday, delivery_floor, delivery_has_lift, delivery_stair_items, channel, placed_at, proceeded_at, delivery_date, delivery_date_tbd, proceed_date, source_system, source_ref, ops_assigned_logistic, delivery_partner_id, delivery_stops, request_for_delivery_at, partner_accepted_at, partner_rejected_at, partner_rejected_reason, do_number, do_file_path, do_uploaded_at, invoice_no, invoiced_at, payment_method, installment_months, dispatched_at, delivered_at, outlet_id, salesperson_id, dealer_id, paid, dealers(name), outlets(name), salespersons(name), delivery_partners!orders_delivery_partner_id_fkey(id, name), order_lines(id, sku, qty, unit_price, attrs, source_po), order_addons(addon_key, qty, unit_price), ops_delivery_orders(do_number), order_supplier_threads(id, supplier_id, category, operation_stage, po_id, delivery_partner_id, delivery_partners(id, name), confirm_delivery_date, request_for_delivery_at, partner_accepted_at, partner_rejected_at, purchase_orders(placed_at)), order_finance_exceptions(status), order_delivery_payment_approvals(status), ops_sofa_loans(status, item_id, loan_note_no, ops_stock_items(unit_code, identity_scope)), order_annotations(content, tag, created_at), ops_order_control(line_received, customer_request, action_for_logistic, carres_remark, warehouse_remark, logistic_eta, balance, payment_status, storage_from, storage_fee_override, storage_fee_msbf, storage_fee_sof, storage_paid, storage_collected_at, storage_waiver_status, called_customer, line_etas, line_stock_status, assigned_staff, booking_stage, confirmed_date, confirmed_time_slot, delivery_photos, booking_groups, delay_decision, delay_decision_eta, delay_decision_at, delay_detected_at, delay_detected_eta)",
     )
     ;
 
@@ -858,6 +858,14 @@ operationOrdersRouter.get("/register-facts", requireOperation, async (c) => {
     ),
   ]);
 
+  const stockUnits = [...(reserved ?? []), ...(sold ?? [])];
+  const receiptOutcomes = await readAll<{ stock_item_id: string; outcome: string }>(
+    b => sb.from("receiving_unit_results").select("id, stock_item_id, outcome").in("stock_item_id", b),
+    [...new Set(stockUnits.map(u => u.id))],
+  );
+  const outcomesByUnit = new Map<string, string[]>();
+  for (const result of receiptOutcomes ?? []) outcomesByUnit.set(result.stock_item_id, [...(outcomesByUnit.get(result.stock_item_id) ?? []), result.outcome]);
+
   const byOrder = <T,>(rows: T[] | null, key: (r: T) => string | null | undefined) => {
     const map = new Map<string, T[]>();
     for (const r of rows ?? []) {
@@ -882,7 +890,7 @@ operationOrdersRouter.get("/register-facts", requireOperation, async (c) => {
     : new Map<string, string>();
   const asOf = todayIsoMYT();
 
-  const facts: Record<string, { obligations: "outstanding" | "none" | null; cases: "open" | "closed" | "none" | null }> = {};
+  const facts: Record<string, { obligations: "outstanding" | "none" | null; cases: "open" | "closed" | "none" | null; stock?: Record<string, string> }> = {};
   for (const o of orders) {
     const obligations = completionReadable
       ? completionOfOrder({
@@ -911,7 +919,18 @@ operationOrdersRouter.get("/register-facts", requireOperation, async (c) => {
               ? "closed"
               : null;
     }
-    facts[o.id] = { obligations, cases: caseFact };
+    const stock: Record<string, string> = {};
+    const required = new Map<string, number>();
+    for (const line of o.order_lines ?? []) required.set(line.sku, (required.get(line.sku) ?? 0) + Number(line.qty));
+    for (const [sku, qty] of required) {
+      const mine = (unitsBy.get(o.id) ?? []).filter(u => u.sku === sku);
+      const answers = mine.map(u => outcomesByUnit.get(u.id) ?? []);
+      const issue = answers.some(a => a.some(v => v === "received_with_issue"));
+      const confirmed = mine.reduce((n, u, i) => n + (answers[i]!.includes("received") ? Number(u.qty) || 1 : 0), 0);
+      const known = mine.length > 0 && answers.every(a => a.length === 1);
+      stock[sku] = !receiptOutcomes || !reserved || !sold ? "unknown" : issue ? "issue" : confirmed >= qty ? "received" : confirmed > 0 ? "partial" : known ? "pending" : "unknown";
+    }
+    facts[o.id] = { obligations, cases: caseFact, stock };
   }
   return c.json({ facts, failed: { obligations: !completionReadable, cases: cases === null } });
 });

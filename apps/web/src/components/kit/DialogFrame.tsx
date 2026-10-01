@@ -91,6 +91,7 @@ export default function DialogFrame({
   onOpenChange,
   title,
   description,
+  headerActions,
   footer,
   kind,
   width,
@@ -103,6 +104,7 @@ export default function DialogFrame({
   /** Required. A surface that takes the screen must say what it is. */
   title: string;
   description?: string;
+  headerActions?: ReactNode;
   /** The actions. One `primary` — §3.4 bans two blue actions in one block. */
   footer?: ReactNode;
   /** The `data-kit` value, so a test can tell a modal from a drawer. */
@@ -181,13 +183,14 @@ export default function DialogFrame({
                 </Dialog.Description>
               )}
             </div>
+            <div className="flex items-center gap-2">{headerActions}
             <Dialog.Close
               aria-label="Close"
               data-kit="dialog-close"
               className="rounded-control p-1 text-kit-slate-11 hover:bg-kit-slate-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9"
             >
               <Icon name="close" size={16} />
-            </Dialog.Close>
+            </Dialog.Close></div>
           </header>
 
           <div className="flex-1 overflow-y-auto p-4">{children}</div>

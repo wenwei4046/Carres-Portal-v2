@@ -24,6 +24,7 @@ export default function Drawer({
   onOpenChange,
   title,
   description,
+  headerActions,
   footer,
   children,
 }: {
@@ -31,6 +32,7 @@ export default function Drawer({
   onOpenChange: (open: boolean) => void;
   title: string;
   description?: string;
+  headerActions?: ReactNode;
   footer?: ReactNode;
   children: ReactNode;
 }) {
@@ -42,6 +44,7 @@ export default function Drawer({
       onOpenChange={onOpenChange}
       title={title}
       description={description}
+      headerActions={headerActions}
       footer={footer}
     >
       {children}

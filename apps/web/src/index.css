@@ -539,9 +539,30 @@
 .so-template-rail [data-rail-group] > button:hover { background: theme('colors.kit.slate.4'); }
 .so-template-rail [data-rail-group] > div { padding-left: 16px; }
 .so-template-rail [data-rail-group] > div > button { font-size: 12px; line-height: 18px; }
-[data-testid='register-column']:has([data-presentation-tools]) { background: theme('colors.kit.slate.2'); }
+[data-testid='register-column']:has([data-presentation-tools]) { background: theme('colors.kit.canvas'); }
 /* Owner-selected C2 replaces B's unframed groups in the SO pilot. */
 .so-template-rail [data-rail-group] { margin: 4px 0; padding: 0; border: 1px solid theme('colors.kit.slate.6'); border-radius: 6px; background: white; }
 .so-template-rail [data-rail-group] > button { width: 100%; border-radius: 5px; }
 .so-template-rail [data-rail-group] > button[aria-expanded='true'] { border-radius: 5px 5px 0 0; border-bottom: 1px solid theme('colors.kit.slate.6'); }
 .so-template-rail [data-rail-group] > div { margin-top: 0; padding: 4px 8px 4px 16px; }
+
+/* SO representative surface hierarchy: blue selection is unchanged. */
+.so-template-rail { border-right-color: theme('colors.kit.slate.6'); }
+.so-template-rail [data-rail-group] button[aria-pressed='true'] { background: theme('colors.kit.blue.3'); color: theme('colors.kit.blue.11'); }
+@media (max-width: 767px) {
+ .so-template-rail [data-rail-group] button { min-height: 40px; }
+}
+
+/* Sales Order summary leaves the existing 64px utility rail visible. */
+@media (min-width: 768px) {
+  [data-kit='drawer']:has([data-testid='sales-order-quick-view']) { right: 4rem; }
+}
+
+/* Sales-order quick view: owner-approved dark identity bar. */
+[data-kit='drawer']:has([data-testid='sales-order-quick-view']) > header { background: theme("colors.kit.slate.12"); color: white; }
+[data-kit='drawer']:has([data-testid='sales-order-quick-view']) > header h2,
+[data-kit='drawer']:has([data-testid='sales-order-quick-view']) > header button { color: white; }
+
+[data-testid='sales-order-quick-view'] dt { font-size: var(--fs-12); color: theme("colors.kit.slate.11"); }
+[data-testid='sales-order-quick-view'] dd { font-weight: 600; margin-top: 4px; }
+[data-testid='sales-order-quick-view'] > section:first-child { background: theme("colors.kit.slate.3"); }

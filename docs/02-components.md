@@ -508,3 +508,7 @@ receive these scoped composition capabilities; no alternative kit or new palette
 Status: local implementation; owner visual acceptance, remote checks and deployment not implied.
 
 SO representative correction: Table/Cards uses the shared Tabs segmented variant, not underlined stage tabs. Outer32px (1px border +2px padding +26px option), radius6; option13/18, padding10 horizontal, selected blue-3/blue-11/600. Touch outer40px. Table body stays Inter13/18; compactness comes from32px rows, not smaller body text.
+
+### Accepted template composition — 2026-10-01
+
+Use existing DataGrid, FilterRail, Block, Drawer/DialogFrame, Button, Icon, Tooltip and Badge components under [UI MASTER, Confirmed shared template](ui/MASTER.md#confirmed-shared-template--owner-acceptance-2026-10-01). This acceptance creates no second kit. Square return controls use canonical back icon and kit neutral-control geometry; pills remain status badges. Shared /ui examples and adoption tests are required by the authorised BUILD controller before claiming kit convergence.

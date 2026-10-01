@@ -56,11 +56,10 @@ import {
 } from "@carres/shared";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
-import { useQueryClient, type QueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import {
   DataGrid,
   type DataGridColumn,
-  type DataGridContextMenuItem,
 } from "@/components/register/DataGrid";
 import Drawer from "@/components/kit/Drawer";
 import Block from "@/components/kit/Block";
@@ -73,17 +72,18 @@ import SalesOrderReadFailure from "./SalesOrderReadFailure";
 import Popover from "@/components/kit/Popover";
 import { apiFetch, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { renderCombinedSalesOrderPdf, renderSalesOrderPdf } from "@/lib/pdf/render";
+import { renderCombinedSalesOrderPdf } from "@/lib/pdf/render";
 import type { SalesOrderTemplateData } from "@/lib/pdf/types";
 import { appTodayIso, fmtMonth } from "@/lib/fmt-date";
 import {
   useCatalog,
   useMonthlyDemandFacts,
   useSalesOrderRegisterFacts,
+  useOrderPayments,
+  useOrderServiceCases,
   useOperationOrders,
   useSalesOrderExpansion,
 } from "@/lib/queries";
-import CancelSalesOrderDialog from "./CancelSalesOrderDialog";
 import DestinationHeader from "./DestinationHeader";
 import ConnectedSections, { CONNECT_AT_TABLE_HEADER } from "./components/ConnectedSections";
 import GoodsMiniTable, { UnitEvidence, goodsCategoryOf, type GoodsMiniLine } from "./components/GoodsMiniTable";
@@ -172,6 +172,7 @@ function toGridColumn(
   role: string | null,
   navigate: (path: string) => void,
   inspectGoods: (row: RegisterRow) => void,
+  inspectOrder: (row: RegisterRow) => void,
 ): DataGridColumn<RegisterRow> {
   const base: DataGridColumn<RegisterRow> = {
     key: f.key,
@@ -219,10 +220,10 @@ function toGridColumn(
       accessor: (r) => (
         <button
           type="button"
-          className="font-medium text-kit-blue-11 underline-offset-2 hover:underline"
+          className="font-medium text-kit-slate-12 underline-offset-2 hover:underline"
           onClick={(event) => {
             event.stopPropagation();
-            navigate(`/operation/orders/so/${r.id}`);
+            inspectOrder(r);
           }}
         >
           SO-{r.so}
@@ -406,13 +407,43 @@ function useNarrowCanvas(): [(node: HTMLDivElement | null) => void, boolean] {
 const MONTHLY_PARAMS = ["start", "months", "dealer", "state", "city", "category"] as const;
 /* The Order list's own rail (Orders MASTER §Left rail, owner approved
    2026-09-22). Read-only FACT filters: none is a status or a work queue. */
-/* No Date group (Jess, 2026-09-28): a date is narrowed on its own column's ▽
-   (Today · This week · This month · From/To), so the rail carries no second
-   date filter and no field picker. */
-const LIST_PARAMS = ["dealer", "state", "city", "delivery", "obligations", "cases", "requested"] as const;
+/* Requested delivery presets approved by the owner on 2026-10-01. */
+const LIST_PARAMS = ["dealer", "state", "city", "delivery", "completion", "obligations", "cases", "requested", "payment", "stock"] as const;
+const STOCK_STATUSES = [
+  { key: "pending", label: "Awaiting receipt" },
+  { key: "partial", label: "Partially received" },
+  { key: "received", label: "Fully received" },
+  { key: "issue", label: "Received with issue" },
+  { key: "unknown", label: "Receipt unconfirmed" },
+] as const;
+function stockStatusOf(row: RegisterRow, sku?: string): string {
+  const facts = row.stockFacts;
+  const keys = [...new Set((row.o.order_lines ?? []).filter(line => !sku || line.sku === sku).map(line => line.sku))];
+  const values = keys.map(key => facts?.[key] ?? "unknown");
+  if (!values.length) return "unknown";
+  if (values.includes("issue")) return "issue";
+  if (values.includes("unknown")) return "unknown";
+  if (values.every(v => v === "received")) return "received";
+  if (values.some(v => v === "received" || v === "partial")) return "partial";
+  return "pending";
+}
+
+const PAYMENT_STATUSES = [
+  { key: "unpaid", label: "Unpaid" },
+  { key: "partial", label: "Partially paid" },
+  { key: "paid", label: "Paid in full" },
+  { key: "unknown", label: "Amount unconfirmed" },
+] as const;
+function paymentStatusOf(row: RegisterRow): string {
+  if (row.balance.kind === "settled") return "paid";
+  if (row.balance.kind !== "amount" || row.total.kind !== "amount") return "unknown";
+  if (row.balance.value <= 0) return "paid";
+  return row.paid.kind === "amount" && row.paid.value > 0 ? "partial" : "unpaid";
+}
+
 const LIST_OBLIGATIONS = [
-  { key: "outstanding", label: "Outstanding obligations" },
-  { key: "none", label: "No action required" },
+  { key: "outstanding", label: "In progress" },
+  { key: "none", label: "Completed" },
 ] as const;
 type ListObligations = (typeof LIST_OBLIGATIONS)[number]["key"];
 const LIST_CASES = [
@@ -425,8 +456,6 @@ const registerSelections = new Map<string, Set<string>>();
 // Return context belongs to this application session, never another query/auth lifetime.
 const registerClients = new WeakMap<QueryClient, number>();
 let nextRegisterClient = 0;
-const distinctWords = (values: Iterable<string | null | undefined>) =>
-  [...new Set([...values].map((v) => v?.trim() ?? "").filter(Boolean))].sort((a, b) => a.localeCompare(b));
 const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
 const DEFAULT_MONTHS = 6;
 
@@ -437,24 +466,56 @@ function shiftMonth(month: string, by: number): string {
 }
 
 /** The Order list narrowed by a month door: one month, or beyond a window edge. */
-type RequestedNarrowing = { kind: "month" | "before" | "after"; month: string };
+type RequestedNarrowing = { kind: "month" | "before" | "after" | "range" | "overdue" | "unconfirmed"; month: string };
 
 function requestedNarrowingOf(value: string | null): RequestedNarrowing | null {
   if (!value) return null;
+  if (value === "overdue" || value === "unconfirmed") return { kind: value, month: "" };
+  if (/^range:\d{4}-\d{2}-\d{2}:\d{4}-\d{2}-\d{2}$/.test(value)) {
+    const [, from, to] = value.split(":");
+    if (from! <= to! && [from, to].every(d => !Number.isNaN(Date.parse(d!)))) return { kind: "range", month: `${from}:${to}` };
+    return null;
+  }
   const match = /^(?:(before|after):)?(\d{4}-(?:0[1-9]|1[0-2]))$/.exec(value);
   if (!match) return null;
   return { kind: (match[1] as "before" | "after" | undefined) ?? "month", month: match[2]! };
 }
 
 function requestedNarrowingWord(n: RequestedNarrowing): string {
+  if (n.kind === "overdue") return "Overdue";
+  if (n.kind === "unconfirmed") return "Date not confirmed";
+  if (n.kind === "range") return n.month.split(":").map(d => fmtDate(d)).join(" – ");
   const month = fmtMonth(n.month);
   return n.kind === "before" ? `Before ${month}` : n.kind === "after" ? `After ${month}` : month;
 }
 
-function inRequestedNarrowing(iso: string | null, n: RequestedNarrowing): boolean {
+function inRequestedNarrowing(iso: string | null, n: RequestedNarrowing, fullyDelivered = false): boolean {
+  if (n.kind === "unconfirmed") return !iso;
+  if (n.kind === "overdue") return Boolean(iso && iso.slice(0, 10) < todayMYT() && !fullyDelivered);
+  if (n.kind === "range") { const [from, to] = n.month.split(":"); return Boolean(iso && iso.slice(0, 10) >= from! && iso.slice(0, 10) <= to!); }
   const month = iso?.slice(0, 7) ?? "";
   if (!MONTH_RE.test(month)) return false;
   return n.kind === "before" ? month < n.month : n.kind === "after" ? month > n.month : month === n.month;
+}
+
+function todayMYT(): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kuala_Lumpur", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+}
+function requestedPresets() {
+  const today = todayMYT();
+  const date = new Date(`${today}T00:00:00Z`);
+  const offset = (date.getUTCDay() + 6) % 7;
+  const day = (by: number) => { const d = new Date(date); d.setUTCDate(d.getUTCDate() + by); return d.toISOString().slice(0, 10); };
+  const month = today.slice(0, 7);
+  const end = new Date(`${shiftMonth(month, 3)}-01T00:00:00Z`); end.setUTCDate(0);
+  return [
+    { label: "Overdue", value: "overdue" },
+    { label: "This week", value: `range:${day(-offset)}:${day(6-offset)}` },
+    { label: "Next week", value: `range:${day(7-offset)}:${day(13-offset)}` },
+    { label: "This month", value: month },
+    { label: "Next month", value: shiftMonth(month, 1) },
+    { label: "Next two months", value: `range:${shiftMonth(month, 1)}-01:${end.toISOString().slice(0,10)}` },
+  ];
 }
 
 /** Whether the work area is narrower than the width below which the rail floats. */
@@ -479,7 +540,23 @@ function RailFieldWords({ label }: { label: string }) {
   return <p className="px-2 pt-1 text-meta text-kit-slate-11">{label}</p>;
 }
 
-function ExpandedLines({ row, inspection = false }: { row: RegisterRow; inspection?: boolean }) {
+function RelatedDocuments({ row }: { row: RegisterRow }) {
+  const navigate = useNavigate();
+  const payments = useOrderPayments(row.id);
+  const cases = useOrderServiceCases(row.id);
+  const refunds = useQuery({ queryKey: ["operation", "orders", row.id, "refunds"], queryFn: () => apiFetch<{ refunds: Array<{ id: string; status: string }> }>(`/api/operation/orders/${row.id}/refunds`) });
+  const link = (label: string, path: string) => <button key={label} type="button" className="text-left text-kit-blue-11 hover:underline" onClick={() => navigate(path)}>{label}</button>;
+  return <Block title="Related documents"><dl className="grid grid-cols-2 gap-3 text-body">
+    <div><dt>PO No</dt><dd className="flex flex-col">{row.poNumbers.length ? row.poNumbers.map(no => link(no, `/operation/procurement?po=${encodeURIComponent(no)}`)) : "No PO yet"}</dd></div>
+    <div><dt>DO No</dt><dd className="flex flex-col">{row.deliveryOrders.length ? row.deliveryOrders.map(doc => link(doc.do_number, `/operation/delivery-orders/${encodeURIComponent(doc.do_number)}`)) : "No DO yet"}</dd></div>
+    <div><dt>Invoice No</dt><dd>{row.o.invoice_no || "Not recorded"}</dd></div>
+    <div><dt>Receipt No</dt><dd className="flex flex-col">{payments.isError ? "Unable to read receipts" : !payments.data ? "Loading…" : payments.data.payments.filter(p => p.receipt_no).map(p => <span key={p.id}>{p.receipt_no}{p.voided_at ? " · Voided" : ""}</span>).length ? payments.data.payments.filter(p => p.receipt_no).map(p => <span key={p.id}>{p.receipt_no}{p.voided_at ? " · Voided" : ""}</span>) : "No receipt yet"}</dd></div>
+    <div><dt>Refund</dt><dd>{refunds.isError ? "Unable to read refunds" : !refunds.data ? "Loading…" : refunds.data.refunds.length ? refunds.data.refunds.map(r => <div key={r.id}>Refund · {r.status} · No document number recorded</div>) : "No refund"}</dd></div>
+    <div><dt>Service Case No</dt><dd className="flex flex-col">{cases.isError ? "Unable to read service cases" : !cases.data ? "Loading…" : cases.data.items.length ? cases.data.items.map(c => link(`${c.caseNo} · ${c.statusLabel ?? (c.statusIsClosed ? "Closed" : "Open")}`, `/operation?tab=service-notes&case=${encodeURIComponent(c.id)}`)) : "No service case"}</dd></div>
+  </dl></Block>;
+}
+
+function ExpandedLines({ row, inspection = false, compact = false }: { row: RegisterRow; inspection?: boolean; compact?: boolean }) {
   const lines = row.o.order_lines ?? [];
   const addons = row.o.order_addons ?? [];
   const expansion = useSalesOrderExpansion(row.o.id);
@@ -585,6 +662,14 @@ function ExpandedLines({ row, inspection = false }: { row: RegisterRow; inspecti
       selectable: false,
     })),
   ];
+  if (compact) return <div className="max-h-64 overflow-auto"><table className="w-full text-body" aria-label={`Items on SO-${row.so}`}>
+    <thead className="sticky top-0 bg-kit-slate-3 text-label text-kit-slate-11"><tr><th className="p-2 text-left">Item</th><th className="p-2 text-right">Qty</th><th className="p-2 text-right">Amount</th><th className="p-2 text-left">Stock Status</th></tr></thead>
+    <tbody>{miniLines.map((line, index) => {
+      const source = index < lines.length ? lines[index] : addons[index - lines.length];
+      const stock = line.selectable === false ? "—" : STOCK_STATUSES.find(status => status.key === stockStatusOf(row, line.sku))!.label;
+      return <tr key={line.key} className="border-b border-kit-slate-5"><td className="p-2">{line.item}{line.itemDetail && <div className="text-meta text-kit-slate-11">{line.itemDetail}</div>}</td><td className="p-2 text-right">{line.qty}</td><td className="p-2 text-right whitespace-nowrap">{source.unit_price == null ? "Not recorded" : <Money value={Number(source.unit_price) * line.qty} />}</td><td className="p-2"><span className="rounded-full bg-kit-slate-3 px-2 py-1 text-meta text-kit-slate-11" title="Recorded warehouse receipt for this order">{stock}</span></td></tr>;
+    })}</tbody>
+  </table></div>;
   if (inspection) return <div className="space-y-3" data-testid="goods-side-inspection">
     {expansion.isError && <Button variant="ghost" size="sm" onClick={() => void expansion.refetch()}>Retry</Button>}
     {miniLines.map((line) => <Block key={line.key} title={line.item} note={`Qty ${line.qty}`}>
@@ -651,20 +736,7 @@ async function printSalesOrders(rows: Array<{ id: string; so: number }>): Promis
   }
 }
 
-async function openSalesOrderPdf(orderId: string, so: number): Promise<void> {
-  try {
-    const data = await apiFetch<SalesOrderTemplateData>(
-      `/api/orders/${orderId}/sales-order-data`,
-    );
-    const blob = await renderSalesOrderPdf(data);
-    const url = URL.createObjectURL(blob);
-    window.open(url, "_blank");
-    setTimeout(() => URL.revokeObjectURL(url), 60_000);
-  } catch (e) {
-    const msg = e instanceof ApiError ? e.message : String(e);
-    toast.error(`Sales Order SO-${so} PDF failed: ${msg}`);
-  }
-}
+
 
 function GoodsSummary({ row, onOpen, compact = false }: { row: RegisterRow; onOpen: (row: RegisterRow) => void; compact?: boolean }) {
   const extra = Math.max(0, (row.o.order_lines?.length ?? 0) - 1);
@@ -802,19 +874,18 @@ export default function SalesOrdersRegister() {
     [navigate],
   );
   const requested = view === "list" ? requestedNarrowingOf(urlParams.get("requested")) : null;
+  const [requestedRange, setRequestedRange] = useState<[string, string]>(["", ""]);
   /* The Order list's rail facts, read only in that view. */
-  const listDealer = monthly ? null : urlParams.get("dealer");
-  const listState = monthly ? null : urlParams.get("state");
-  const listCity = monthly ? null : urlParams.get("city");
+  const listDealer = useMemo(() => monthly ? [] : urlParams.getAll("dealer"), [monthly, urlParams]);
+  const listState = useMemo(() => monthly ? [] : urlParams.getAll("state"), [monthly, urlParams]);
+  const listCity = useMemo(() => monthly ? [] : urlParams.getAll("city"), [monthly, urlParams]);
   const listDelivery: RegisterDeliveryCondition | null = monthly
     ? null
     : REGISTER_DELIVERY_CONDITIONS.find((c) => c.key === urlParams.get("delivery"))?.key ?? null;
-  const listObligations: ListObligations | null = monthly
-    ? null
-    : LIST_OBLIGATIONS.find((o) => o.key === urlParams.get("obligations"))?.key ?? null;
-  const listCases: ListCases | null = monthly
-    ? null
-    : LIST_CASES.find((o) => o.key === urlParams.get("cases"))?.key ?? null;
+  const listStock = monthly ? null : STOCK_STATUSES.find(p => p.key === urlParams.get("stock"))?.key ?? null;
+  const listPayment = monthly ? null : PAYMENT_STATUSES.find(p => p.key === urlParams.get("payment"))?.key ?? null;
+  const listObligations: ListObligations | null = null;
+  const listCases: ListCases | null = null;
   /* Obligations and cases are the SERVER's facts (the object page's completion
      and Service's own statuses); the list never guesses them. */
   const registerFactsQ = useSalesOrderRegisterFacts(!monthly);
@@ -828,15 +899,7 @@ export default function SalesOrdersRegister() {
       }),
     [writeParams],
   );
-  const chooseListState = useCallback(
-    (next: string | null) =>
-      writeParams((params) => {
-        if (next) params.set("state", next);
-        else params.delete("state");
-        params.delete("city");
-      }),
-    [writeParams],
-  );
+
 
   const [selected, setSelected] = useState<Set<string>>(() => registerSelections.get(registerSession) ?? new Set());
   const selectionSession = useRef(registerSession);
@@ -846,11 +909,6 @@ export default function SalesOrdersRegister() {
       setSelected(registerSelections.get(registerSession) ?? new Set());
     } else registerSelections.set(registerSession, selected);
   }, [registerSession, selected]);
-  const [facetIds, setFacetIds] = useState<string[]>([]);
-  const receiveFacets = useCallback((next: RegisterRow[]) => {
-    const ids = next.map(row => row.id);
-    setFacetIds(previous => previous.length === ids.length && previous.every((id, i) => id === ids[i]) ? previous : ids);
-  }, []);
   /* FIX 1 — SERVER SEARCH. The engine emits its debounced trimmed term and
      the SAME words go to the API (`?search=`), so a match beyond the loaded
      page is found on the server, not missed in the browser. The engine still
@@ -861,7 +919,7 @@ export default function SalesOrdersRegister() {
   /* The register still writes nothing itself. `Cancel SO` opens the ONE
      governed cancellation door and that door owns the act — the row is only
      naming which Sales Order the dialog is about. */
-  const [cancelTarget, setCancelTarget] = useState<{ id: string; so: number } | null>(null);
+
 
   /* ⭐ POPULATION — owner ruling 2026-09-21: only orders Sales has handed to
      Operation. A `Placed` order is not on this Register, so the server is
@@ -895,10 +953,20 @@ export default function SalesOrdersRegister() {
            page served beside an OLDER Worker still shows no rental. */
         .filter((o) => !isRental(o))
         .map((o) =>
-          buildRegisterRow(o, o.ops_delivery_orders ?? [], (sku) => catalogNames.get(skuKey(sku))?.name),
+          ({ ...buildRegisterRow(o, o.ops_delivery_orders ?? [], (sku) => catalogNames.get(skuKey(sku))?.name), stockFacts: registerFacts?.[o.id]?.stock }),
         ),
-    [data, catalogNames],
+    [data, catalogNames, registerFacts],
   );
+
+  const chooseListValues = useCallback((key: string, values: string[]) => writeParams(params => {
+    params.delete(key); values.forEach(value => params.append(key,value));
+    if (key === "state") {
+      const allowed = new Set(all.filter(r=>!values.length || values.includes(r.o.customer_address_state?.trim() ?? "")).map(r=>r.o.customer_address_city?.trim()));
+      const cities=params.getAll("city").filter(city=>allowed.has(city));
+      params.delete("city"); cities.forEach(city=>params.append("city",city));
+    }
+  }),[writeParams,all]);
+  const chooseListState = useCallback((next:string|null)=>chooseListValues("state",next?[next]:[]),[chooseListValues]);
 
   /* The scope is the register's population; the engine's search and ▽s narrow
      WITHIN it. Newest first — the engine applies its own sort on top when a
@@ -907,12 +975,12 @@ export default function SalesOrdersRegister() {
     () =>
       [...all]
         /* A month door's narrowing, on the customer's requested date. */
-        .filter((r) => !requested || inRequestedNarrowing(r.customerDelivery, requested))
+        .filter((r) => !requested || inRequestedNarrowing(r.customerDelivery, requested, registerDeliveryConditionOf(r.o.order_lines ?? [], r.o.allocated_units ?? []) === "fully_delivered"))
         /* The Order list rail: read-only facts, each answered by its owner's
            one arithmetic. */
-        .filter((r) => !listDealer || salesLocationOf(r.o) === listDealer)
-        .filter((r) => !listState || r.o.customer_address_state?.trim() === listState)
-        .filter((r) => !listCity || r.o.customer_address_city?.trim() === listCity)
+        .filter((r) => !listDealer.length || listDealer.includes(salesLocationOf(r.o)))
+        .filter((r) => !listState.length || listState.includes(r.o.customer_address_state?.trim() ?? ""))
+        .filter((r) => !listCity.length || listCity.includes(r.o.customer_address_city?.trim() ?? ""))
         .filter(
           (r) =>
             !listDelivery ||
@@ -921,38 +989,33 @@ export default function SalesOrdersRegister() {
         /* An unknown fact matches no chosen value: never classified. */
         .filter((r) => !listObligations || registerFacts?.[r.id]?.obligations === listObligations)
         .filter((r) => !listCases || registerFacts?.[r.id]?.cases === listCases)
+        .filter(r => !listPayment || paymentStatusOf(r) === listPayment)
+        .filter(r => !listStock || stockStatusOf(r) === listStock)
         .sort((a, b) => (b.proceeded ?? "").localeCompare(a.proceeded ?? "")),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [all, requested?.kind, requested?.month, listDealer, listState, listCity, listDelivery, listObligations, listCases, registerFacts],
+    [all, requested?.kind, requested?.month, listDealer, listState, listCity, listDelivery, listObligations, listCases, listPayment, listStock, registerFacts],
   );
-  const facetCount = (group: "delivery" | "obligations" | "cases", value: string | null) => all.filter((r) => facetIds.includes(r.id)).filter((r) =>
-    (!requested || inRequestedNarrowing(r.customerDelivery, requested)) &&
-    (!listDealer || salesLocationOf(r.o) === listDealer) &&
-    (!listState || r.o.customer_address_state?.trim() === listState) &&
-    (!listCity || r.o.customer_address_city?.trim() === listCity) &&
-    (!(group === "delivery" ? value : listDelivery) || registerDeliveryConditionOf(r.o.order_lines ?? [], r.o.allocated_units ?? []) === (group === "delivery" ? value : listDelivery)) &&
-    (!(group === "obligations" ? value : listObligations) || registerFacts?.[r.id]?.obligations === (group === "obligations" ? value : listObligations)) &&
-    (!(group === "cases" ? value : listCases) || registerFacts?.[r.id]?.cases === (group === "cases" ? value : listCases))
-  ).length;
   const activeConditions = useMemo(() => {
     const list = [
+      listStock && { key: "stock", label: `Stock Status: ${STOCK_STATUSES.find(p => p.key === listStock)!.label}`, onClear: () => setParam("stock", null) },
+      listPayment && { key: "payment", label: `Payment Status: ${PAYMENT_STATUSES.find(p => p.key === listPayment)!.label}`, onClear: () => setParam("payment", null) },
       requested && {
         key: "requested",
         label: `Customer Requested Delivery Date: ${requestedNarrowingWord(requested)}`,
         onClear: () => setParam("requested", null),
       },
-      listDealer && { key: "dealer", label: `Sales Location: ${listDealer}`, onClear: () => setParam("dealer", null) },
-      listState && { key: "state", label: `State: ${listState}`, onClear: () => chooseListState(null) },
-      listCity && { key: "city", label: `City: ${listCity}`, onClear: () => setParam("city", null) },
+      listDealer.length > 0 && { key: "dealer", label: `Sales Location: ${listDealer.join(", ")}`, onClear: () => setParam("dealer", null) },
+      listState.length > 0 && { key: "state", label: `State: ${listState.join(", ")}`, onClear: () => chooseListState(null) },
+      listCity.length > 0 && { key: "city", label: `City: ${listCity.join(", ")}`, onClear: () => setParam("city", null) },
       listDelivery && {
         key: "delivery",
         label: REGISTER_DELIVERY_CONDITIONS.find((c) => c.key === listDelivery)!.label,
         onClear: () => setParam("delivery", null),
       },
       listObligations && {
-        key: "obligations",
+        key: "completion",
         label: LIST_OBLIGATIONS.find((o) => o.key === listObligations)!.label,
-        onClear: () => setParam("obligations", null),
+        onClear: () => setParam("completion", null),
       },
       listCases && {
         key: "cases",
@@ -962,7 +1025,7 @@ export default function SalesOrdersRegister() {
     ].filter((c): c is { key: string; label: string; onClear: () => void } => Boolean(c));
     return list.length > 0 ? list : undefined;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [requested?.kind, requested?.month, setParam, chooseListState, listDealer, listState, listCity, listDelivery, listObligations, listCases]);
+  }, [requested?.kind, requested?.month, setParam, chooseListState, listDealer, listState, listCity, listDelivery, listObligations, listCases, listPayment, listStock]);
   /* `{n} of {m}` — `m` is the SERVER's count of the Sales Orders this user may
      read (rentals excluded, search not applied), carried on every list answer,
      so a search answered before any unsearched load still has it and a created
@@ -973,8 +1036,17 @@ export default function SalesOrdersRegister() {
      for Finance/Principal); the chooser opens every column either way.
      Memoized per role so the engine's memo actually hits; the layout store is
      per-role so one machine's Finance login does not restyle Operations'. */
+  const [filteredSummaryRows, setFilteredSummaryRows] = useState<RegisterRow[] | null>(null);
+  const receiveSummaryRows = useCallback((next: RegisterRow[]) => setFilteredSummaryRows(previous => previous && previous.length === next.length && previous.every((row, index) => row.id === next[index].id && JSON.stringify([row.total, row.paid, row.balance]) === JSON.stringify([next[index].total, next[index].paid, next[index].balance])) ? previous : next), []);
+  const summaryRows = filteredSummaryRows ?? rows;
+  const [quickOrder, setQuickOrder] = useState<RegisterRow | null>(null);
   const columns = useMemo(
-    () => REGISTER_FIELDS.map((f) => toGridColumn(f, role, navigate, setGoodsTarget)),
+    () => [
+      { key: "stock_status", label: "Stock Status", width: REGISTER_FIELDS.find(f => f.key === "salesperson")!.width, group: "Operation" as const, on: true as const, text: (r: RegisterRow) => STOCK_STATUSES.find(status => status.key === stockStatusOf(r))!.label },
+      ...REGISTER_FIELDS.filter(f => f.key !== "delivery_location"),
+      { key: "category", label: "Category", width: REGISTER_FIELDS.find(f => f.key === "items")!.width, group: "Items" as const, on: true as const, text: (r: RegisterRow) => [...new Set((r.o.order_lines ?? []).map(goodsCategoryOf))].join(" · ") || "Not recorded" },
+      { key: "payment_status", label: "Payment Status", width: REGISTER_FIELDS.find(f => f.key === "salesperson")!.width, group: "Operation" as const, on: true as const, text: (r: RegisterRow) => PAYMENT_STATUSES.find(status => status.key === paymentStatusOf(r))!.label },
+    ].map((f) => toGridColumn(f, role, navigate, setGoodsTarget, setQuickOrder)),
     [navigate, role],
   );
   /* The version resets a SUPERSEDED default. v2 dropped Stage A's nine
@@ -1019,33 +1091,6 @@ export default function SalesOrdersRegister() {
 
   /* Right-click document actions. Copy opens the authoritative create form as
      a draft; the register still writes nothing. */
-  const contextMenu = useCallback(
-    (r: RegisterRow): DataGridContextMenuItem[] => [
-      /* REGISTER CLOSE-OUT — owner ruling 2026-09-26: `Edit · View · Print ·
-         ─ Cancel SO`, and nothing of Delivery's. */
-      { label: "Edit", onClick: () => openWorkspace(r) },
-      { label: "View", onClick: () => openWorkspace(r) },
-      /* ONE ACT, ONE NAME (YH, 2026-08-28). `Preview PDF` sat here calling
-         `openSalesOrderPdf(r.id, r.so)` — byte-identical to the line below
-         it. Two menu rows, one behaviour, so the reader was asked to choose
-         between names that could not differ. The MASTER's locked menu had
-         meant them as separate acts (a preview door and a document output);
-         the implementation never built the first. Retiring the duplicate
-         label loses no capability. If Carres later wants a real preview act,
-         it is a BUILD, not a restoration of this line. The word is `Print`
-         (owner ruling 2026-09-26) — the Export menu already says it. */
-      { label: "Print", onClick: () => void openSalesOrderPdf(r.id, r.so) },
-      /* The MASTER's locked menu ends with the one destructive entry, alone
-         below a divider so it is never reached by a slipped click. */
-      { divider: true },
-      {
-        label: "Cancel SO",
-        danger: true,
-        onClick: () => setCancelTarget({ id: r.id, so: r.so }),
-      },
-    ],
-    [navigate, openWorkspace],
-  );
 
   const expandable = useMemo(
     () => ({
@@ -1143,88 +1188,30 @@ export default function SalesOrdersRegister() {
         </>
       ) : (
         <>
-          <FilterRailGroup title="Delivery" icon="goods" defaultOpen groupKey="Delivery compact">
-            <FilterRailRow testId="sales-orders-rail-delivery-all" label="All" resets active={!listDelivery} count={isLoading || isError ? undefined : facetCount("delivery", null)} onClick={() => setParam("delivery", null)} />
-            {REGISTER_DELIVERY_CONDITIONS.map((c) => (
-              <FilterRailRow
-                key={c.key}
-                label={c.label}
-                count={isLoading || isError ? undefined : facetCount("delivery", c.key)}
-                active={listDelivery === c.key}
-                testId={`sales-orders-rail-delivery-${c.key}`}
-                onClick={() => toggleParam("delivery", c.key)}
-              />
-            ))}
+          <FilterRailGroup title="Order summary" icon="money" defaultOpen>
+            <dl className="space-y-3 px-2 py-2" data-testid="sales-orders-summary">
+              <div><dt className="text-meta text-kit-slate-11">Sales orders</dt><dd className="text-title">{isLoading ? "Loading" : isError ? "Unavailable" : summaryRows.length}</dd></div>
+              {(["total", "paid", "balance"] as const).map((key, index) => {
+                const missing = summaryRows.filter(row => row[key].kind !== "amount" && row[key].kind !== "settled").length;
+                const value = summaryRows.reduce((sum, row) => sum + ((() => { const amount = row[key]; return amount.kind === "amount" ? amount.value : 0; })()), 0);
+                return <div key={key}><dt className="text-meta text-kit-slate-11">{["Total payable", "Paid to date", "Balance due"][index]}</dt><dd className="text-strong">{isLoading ? "Loading" : isError ? "Unavailable" : <Money value={value} />}</dd>{!isLoading && !isError && missing > 0 && <p className="text-meta text-kit-slate-11">{missing} orders without a confirmed amount</p>}</div>;
+              })}
+            </dl>
+            <p className="px-2 pb-2 text-meta text-kit-slate-11">Current filtered list{population != null && population > all.length ? " · Loaded orders only" : ""}</p>
           </FilterRailGroup>
-          <FilterRailGroup title="Sales Location" icon="people">
-            <FilterRailSelect
-              label="Sales Location"
-              value={listDealer}
-              options={distinctWords([...all.map((r) => salesLocationOf(r.o)), listDealer]).map((name) => ({ value: name, label: name }))}
-              onChange={(next) => setParam("dealer", next)}
-              testId="sales-orders-rail-dealer"
-              allLabel="All sales locations"
-            />
+          <FilterRailGroup title="Customer Requested Delivery Date" icon="date" defaultOpen>
+            <FilterRailRow testId="requested-all" label="All dates" resets active={!requested} onClick={() => setParam("requested", null)} />
+            {requestedPresets().map(option => <FilterRailRow key={option.label} testId={`requested-${option.label}`} label={option.label} active={urlParams.get("requested") === option.value} onClick={() => toggleParam("requested", option.value)} />)}
+            <label className="block px-2 pt-2 text-meta text-kit-slate-11">Select month
+              <input aria-label="Requested delivery month" type="month" className="mt-1 h-8 w-full rounded-md border border-kit-slate-6 bg-white px-2 text-body text-kit-slate-12" value={requested?.kind === "month" ? requested.month : ""} onChange={event => setParam("requested", event.target.value || null)} />
+            </label>
+            <details className="px-2 py-2 text-meta text-kit-slate-11"><summary className="cursor-pointer">Custom range</summary>
+              {(["From", "To"] as const).map((label, i) => <label key={label} className="mt-1 block">{label}<input aria-label={`Requested delivery ${label.toLowerCase()}`} type="date" className="mt-1 h-8 w-full rounded-md border border-kit-slate-6 bg-white px-2 text-body text-kit-slate-12" value={requestedRange[i]} onChange={event => { const values: [string, string] = [...requestedRange]; values[i] = event.target.value; setRequestedRange(values); if (values[0] && values[1] && values[0] <= values[1]) setParam("requested", `range:${values[0]}:${values[1]}`); }} /></label>)}
+            </details>
           </FilterRailGroup>
-          <FilterRailGroup title="Customer Delivery Location" icon="delivery">
-            <RailFieldWords label="State" />
-            <FilterRailSelect
-              label="State"
-              value={listState}
-              options={distinctWords([...all.map((r) => r.o.customer_address_state), listState]).map((name) => ({ value: name, label: name }))}
-              onChange={chooseListState}
-              testId="sales-orders-rail-state"
-              allLabel="All states"
-            />
-            <RailFieldWords label="City" />
-            <FilterRailSelect
-              label="City"
-              value={listCity}
-              options={distinctWords([
-                ...all
-                  .filter((r) => !listState || r.o.customer_address_state?.trim() === listState)
-                  .map((r) => r.o.customer_address_city),
-                listCity,
-              ]).map((name) => ({ value: name, label: name }))}
-              onChange={(next) => setParam("city", next)}
-              testId="sales-orders-rail-city"
-              allLabel="All cities"
-            />
-          </FilterRailGroup>
-          <FilterRailGroup title="Obligations" icon="money">
-            {registerFactsQ.data?.failed.obligations || registerFactsQ.isError ? (
-              <p className="px-2 text-meta text-kit-slate-11" data-testid="sales-orders-rail-obligations-unread">
-                Could not read what the orders still owe.
-              </p>
-            ) : null}
-            {LIST_OBLIGATIONS.map((o) => (
-              <FilterRailRow
-                key={o.key}
-                label={o.label}
-                count={isLoading || isError || registerFactsQ.isError || registerFactsQ.data?.failed.obligations ? undefined : facetCount("obligations", o.key)}
-                active={listObligations === o.key}
-                testId={`sales-orders-rail-obligations-${o.key}`}
-                onClick={() => toggleParam("obligations", o.key)}
-              />
-            ))}
-          </FilterRailGroup>
-          <FilterRailGroup title="Service Cases" icon="message">
-            {registerFactsQ.data?.failed.cases || registerFactsQ.isError ? (
-              <p className="px-2 text-meta text-kit-slate-11" data-testid="sales-orders-rail-cases-unread">
-                Could not read the Service Cases.
-              </p>
-            ) : null}
-            {LIST_CASES.map((o) => (
-              <FilterRailRow
-                key={o.key}
-                label={o.label}
-                count={isLoading || isError || registerFactsQ.isError || registerFactsQ.data?.failed.cases ? undefined : facetCount("cases", o.key)}
-                active={listCases === o.key}
-                testId={`sales-orders-rail-cases-${o.key}`}
-                onClick={() => toggleParam("cases", o.key)}
-              />
-            ))}
-          </FilterRailGroup>
+
+
+
         </>
       )}
     </FilterRail>
@@ -1233,24 +1220,35 @@ export default function SalesOrdersRegister() {
   return (
     <div className="flex h-full min-h-0 flex-col">
       <DestinationHeader />
+      {quickOrder && <Drawer open onOpenChange={(open) => { if (!open) setQuickOrder(null); }} title={`SO-${quickOrder.so} · ${quickOrder.customer}`} headerActions={<><span className="rounded-full bg-kit-blue-3 px-2 py-1 text-meta text-kit-blue-11">{REGISTER_DELIVERY_CONDITIONS.find(c => c.key === registerDeliveryConditionOf(quickOrder.o.order_lines ?? [], quickOrder.o.allocated_units ?? []))?.label ?? "Not recorded"}</span><Button iconOnly icon="print" variant="ghost" aria-label="Print sales order" onClick={() => void printSalesOrders([quickOrder])} /><Button iconOnly icon="open" variant="ghost" aria-label="Open full page" onClick={() => openWorkspace(quickOrder)} /></>}>
+        <div className="flex flex-col gap-3" data-testid="sales-order-quick-view">
+          <Block title="SO info"><dl className="grid grid-cols-2 gap-3 text-body">
+            <div><dt className="text-label text-kit-slate-11">Phone</dt><dd>{quickOrder.o.customer_phone || "Not given"}</dd></div>
+            <div><dt>Email</dt><dd className="break-words">{quickOrder.o.customer_email || "Not given"}</dd></div>
+            <div><dt className="text-label text-kit-slate-11">Sales Location</dt><dd>{salesLocationOf(quickOrder.o)}</dd></div>
+            <div><dt className="text-label text-kit-slate-11">Salesperson</dt><dd>{quickOrder.o.salespersons?.name ?? "Not recorded"}</dd></div>
+            <div><dt className="text-label text-kit-slate-11">SO Doc Date</dt><dd>{fmtDate(quickOrder.ordered)}</dd></div>
+            <div><dt>Proceed Date</dt><dd>{quickOrder.proceeded ? fmtDate(quickOrder.proceeded) : "Not recorded"}</dd></div><div className="col-span-2"><dt>Dealer</dt><dd>{quickOrder.o.dealers?.name || "Not recorded"}</dd></div>
+          </dl></Block>
+          <Block title="Delivery"><dl className="grid grid-cols-2 gap-3 text-body">
+            <div><dt className="text-label text-kit-slate-11">Customer Requested Delivery Date</dt><dd>{quickOrder.customerDelivery ? fmtDate(quickOrder.customerDelivery) : "Not recorded"}</dd></div>
+            <div className="col-span-2"><dt className="text-label text-kit-slate-11">Delivery Location</dt><dd>{quickOrder.o.customer_address || quickOrder.deliveryLocation}</dd></div><div><dt>Floor</dt><dd>{quickOrder.o.delivery_floor ?? "Not recorded"}</dd></div><div><dt>Lift</dt><dd>{quickOrder.o.delivery_has_lift == null ? "Not recorded" : quickOrder.o.delivery_has_lift ? "Yes" : "No"}</dd></div><div><dt>Stair carry items</dt><dd>{quickOrder.o.delivery_stair_items ?? "Not recorded"}</dd></div>
+          </dl></Block>
+          <Block title="Items"><div className="min-w-0 overflow-x-auto"><ExpandedLines row={quickOrder} compact /></div></Block>
+          <Block title="Payment"><dl className="flex flex-col gap-3 text-body">
+            <div className="flex justify-between"><dt>Total payable</dt><dd>{moneyCell(quickOrder.total)}</dd></div>
+            <div className="flex justify-between"><dt>Paid to date</dt><dd>{moneyCell(quickOrder.paid)}</dd></div>
+            <div className="flex justify-between font-semibold"><dt>Balance due</dt><dd>{moneyCell(quickOrder.balance)}</dd></div>
+            <div className="flex justify-between"><dt>Payment Status</dt><dd>{PAYMENT_STATUSES.find(p => p.key === paymentStatusOf(quickOrder))!.label}</dd></div>
+          </dl></Block>
+          <RelatedDocuments row={quickOrder} />
+        </div>
+      </Drawer>}
       {goodsTarget && <Drawer open onOpenChange={(open) => { if (!open) setGoodsTarget(null); }} title={`SO-${goodsTarget.so} · Items`}>
         <div className="min-w-0 max-w-full overflow-x-auto"><ExpandedLines row={goodsTarget} inspection /></div>
       </Drawer>}
 
-      {cancelTarget && (
-        <CancelSalesOrderDialog
-          orderId={cancelTarget.id}
-          so={cancelTarget.so}
-          open
-          onOpenChange={(next) => {
-            if (!next) setCancelTarget(null);
-          }}
-          onCancelled={() => {
-            setCancelTarget(null);
-            void refetch();
-          }}
-        />
-      )}
+
 
       {/* The rail runs from the header to the bottom, beside the chosen view.
           Below 896px of work area it floats over the content; hidden, it
@@ -1299,13 +1297,15 @@ export default function SalesOrdersRegister() {
                   return <div key={row.id} data-row-key={row.id} tabIndex={-1} className="min-w-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9" data-testid={`sales-order-card-${row.so}`}>
                     <Block title={`SO-${row.so}`} headerSlot={<div className="flex items-center gap-3">
                       <Checkbox id={`card-select-${row.id}`} ariaLabel={`Select SO-${row.so}`} checked={selected.has(row.id)} onCheckedChange={() => toggleRow(row.id)} />
-                      <Button size="touch" variant="ghost" onClick={() => openWorkspace(row)}>View</Button>
+                      <Button size="touch" variant="ghost" onClick={() => setQuickOrder(row)}>View</Button>
                     </div>}>
                       <dl className="grid min-w-0 grid-cols-2 gap-3 text-body">
                         <div className="col-span-2"><dt className="text-label text-kit-slate-11">Customer</dt><dd className="break-words">{row.customer}</dd></div>
                         <div><dt className="text-label text-kit-slate-11">Customer Requested Delivery Date</dt><dd>{row.customerDelivery ? fmtDate(row.customerDelivery) : ""}</dd></div>
                         <div className="col-span-2 order-last"><dt className="text-label text-kit-slate-11">Items</dt><dd className="min-w-0"><GoodsSummary row={row} onOpen={setGoodsTarget} /></dd></div>
                         <div><dt className="text-label text-kit-slate-11">Delivery</dt><dd>Unavailable</dd></div>
+                        <div><dt className="text-label text-kit-slate-11">Total payable</dt><dd>{moneyCell(row.total)}</dd></div>
+                        <div><dt className="text-label text-kit-slate-11">Balance due</dt><dd>{moneyCell(row.balance)}</dd></div>
                       </dl>
                     </Block>
                   </div>;
@@ -1329,7 +1329,7 @@ export default function SalesOrdersRegister() {
             }
             rows={rows}
             facetRows={all}
-            onFacetRowsChange={receiveFacets}
+            onFilteredRowsChange={receiveSummaryRows}
             columns={columns}
             activeConditions={activeConditions}
             onClearConditions={() => writeParams((params) => { for (const key of LIST_PARAMS) params.delete(key); params.delete("search"); })}
@@ -1378,16 +1378,17 @@ export default function SalesOrdersRegister() {
               "Delivery",
               "Operation",
             ]}
+            onRowClick={setQuickOrder}
             onRowDoubleClick={onRowDoubleClick}
             onSearchChange={searchChanged}
-            contextMenu={contextMenu}
+            contextMenu={undefined}
             expandable={expandable}
             selectable={{
               selectedKeys: selected,
               onToggle: toggleRow,
               onToggleAll: toggleAll,
             }}
-            outputActions={[{ label: "Print", onClick: () => window.print() }]}
+            outputActions={[{ label: "Print sales orders", onClick: () => { const picked = rows.filter(row => selected.has(row.id)); if (!picked.length) { toast.error("Select sales orders to print"); return; } void printSalesOrders(picked); } }]}
             selectionActions={[
               {
                 label: (n) => `Print ${n} sales order${n === 1 ? "" : "s"}`,

@@ -875,8 +875,8 @@ export default function PortalSidebar({ drawer = false }: {
             <img
               src="/carres-logo.png"
               alt="Carres"
-              width={26}
-              height={26}
+              width={28}
+              height={28}
               className="block object-contain"
             />
           </Link>
@@ -892,7 +892,7 @@ export default function PortalSidebar({ drawer = false }: {
       ) : (
         <div className="px-[22px] pb-[18px] flex items-center justify-between gap-2">
           <Link to={homeHref} title="Home" className="block text-left min-w-0">
-            <CarresLockup showPortal={false} />
+            <CarresLockup showPortal={false} size={36} />
           </Link>
           <button
             onClick={toggleCollapse}

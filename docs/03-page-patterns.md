@@ -22,7 +22,7 @@ Register/Object Detail rules govern where an older example below differs.
 Carres semantic colours. Do not introduce the withdrawn warm-grey hex proposal or literal Houzs
 palette. Compact search dimensions in01§7.2 and the fixed far-right secondary-tools menu are
 APPROVED TARGETS awaiting actual pilot acceptance. Visible toolbar content is count/filter summary,
-search, admitted Table/Cards and `⋯`. Left rail changes remain unapproved. Reference styling does not change business actions.
+search, admitted Table/Cards and `⋯`. The accepted 2026-10-01 Sales Orders rail composition and shared adoption boundaries are recorded in UI MASTER, Confirmed shared template. Reference styling does not change business actions.
 
 **One purpose per page and one obvious primary next action for the current task.**
 Secondary authorised actions remain discoverable. Existing UI MASTER/module-specific action
@@ -466,3 +466,5 @@ chosen value visible. Desktop main rows 32px, header 36px/600, Inter 13/18, cell
 mobile rows preserve 40px targets. Cards use the same tools/filter engine. Existing components
 receive these scoped composition capabilities; no alternative kit or new palette.
 Status: local implementation; owner visual acceptance, remote checks and deployment not implied.
+
+The owner-accepted 2026-10-01 register/object pattern is governed by [UI MASTER, Confirmed shared template](ui/MASTER.md#confirmed-shared-template--owner-acceptance-2026-10-01). Reuse its geometry and shared components; business summaries and status facts remain module-owned.

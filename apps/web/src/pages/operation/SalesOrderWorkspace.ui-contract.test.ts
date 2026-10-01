@@ -703,7 +703,7 @@ describe("Sales Order object template contract", () => {
   });
 
   it("keeps the items table on the document's own columns, and protects a gift line", () => {
-    for (const column of ["#", "Item Code", "Description", "Qty", "Unit (RM)", "Disc (RM)", "Amount (RM)", "TOTAL PAYABLE"])
+    for (const column of ["Item", "Qty", "Unit (RM)", "Disc (RM)", "Amount (RM)", "TOTAL PAYABLE"])
       expect(workspace, `${column} left the draft table`).toContain(column);
     expect(workspace).toContain("const protectedLine = (l: DraftLine) =>");
     expect(workspace).toContain("Free item. It follows the item it came with");
@@ -808,7 +808,7 @@ describe("Sales Order object template contract", () => {
     /* ⭐ THE DOCUMENT'S OWN COLUMNS, AND ONLY THOSE (ruling 2026-09-21): the
        page keeps the SO document's table so staff can check page against paper
        column by column. */
-    for (const label of ["#", "Item Code", "Description", "Qty", "Unit (RM)", "Disc (RM)", "Amount (RM)"]) {
+    for (const label of ["Item", "Qty", "Unit (RM)", "Disc (RM)", "Amount (RM)"]) {
       expect(workspace).toContain(`>${label}</th>`);
     }
     /* ⛔ THE CROSS-MODULE FACTS ARE NOT DELETED — they are read where they are
@@ -1373,7 +1373,7 @@ describe("Sales Order object page — one form grammar", () => {
     expect(goods).toContain("{fmtMoney(a.qty * a.unit_price)}");
     /* ⭐ THE RULED COLUMNS ARE THE DOCUMENT'S OWN (owner ruling 2026-09-21),
        and they are the SAME seven in View and in Edit. */
-    for (const label of ["#", "Item Code", "Description", "Qty", "Unit (RM)", "Disc (RM)", "Amount (RM)"]) {
+    for (const label of ["Item", "Qty", "Unit (RM)", "Disc (RM)", "Amount (RM)"]) {
       expect(goods).toContain(`>${label}</th>`);
     }
   });

@@ -1,6 +1,8 @@
 import { useEffect, type ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, ClipboardList } from "lucide-react";
+import { ClipboardList } from "lucide-react";
+import Icon from "../../components/kit/Icon";
+import Tooltip from "../../components/kit/Tooltip";
 import { TopBarIcons } from "./components/GlobalTopBar";
 
 /** One object identity: return path, document number, customer, navigation,
@@ -45,14 +47,14 @@ export default function SalesOrderTabs({
           icons; row 2 is the identity and the actions. From 768px it is the
           one row it always was. */}
       <div className="flex flex-wrap items-center gap-x-3 px-4 md:h-11 md:flex-nowrap md:px-6">
-        <Link
+        <Tooltip content={`Back to ${backLabel}`}><Link
           to={backTo}
-          className="order-1 inline-flex h-11 shrink-0 items-center gap-1.5 text-body text-base-600 hover:text-kit-blue-11 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9 md:order-none md:h-full"
+          className="order-1 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-control border border-kit-slate-5 bg-white text-kit-slate-12 hover:bg-kit-slate-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9 md:order-none md:h-8 md:w-8"
           aria-label={backLabel}
           onClick={onBack}
         >
-          <ArrowLeft size={14} /> {backLabel}
-        </Link>
+          <Icon name="back" size={16} />
+        </Link></Tooltip>
         <span className="hidden h-4 w-px bg-base-200 md:block" aria-hidden="true" />
         {/* ⭐ IDENTITY SURVIVES NARROW WIDTH — owner ruling 2026-08-15 (Chai).
             The SO number is the identity and never shrinks; the CUSTOMER is
@@ -92,7 +94,7 @@ export default function SalesOrderTabs({
         </div>
         <span className="order-2 basis-full md:hidden" data-testid="object-header-break" aria-hidden="true" />
       </div>
-      {navigation && <div className="flex h-9 items-stretch overflow-x-auto px-4 md:px-6" data-testid="object-navigation">{navigation}</div>}
+      {navigation && <div className="flex h-9 items-stretch overflow-x-auto border-t border-kit-slate-5 bg-kit-slate-2 px-4 md:px-6" data-testid="object-navigation">{navigation}</div>}
     </header>
   );
 }

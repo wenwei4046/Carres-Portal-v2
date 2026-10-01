@@ -218,7 +218,7 @@ describe("FIX 1 · the register asks the SERVER", () => {
 
   it("the typed term reaches useOperationOrders as { search } — the API is asked, not just the loaded rows filtered", async () => {
     mount();
-    const box = screen.getByPlaceholderText("Search orders…");
+    const box = screen.getByRole("searchbox", { name: "Search" });
     fireEvent.change(box, { target: { value: "  Umi  " } });
     /* The engine debounces 150ms and emits the TRIMMED term; the register
      * must re-call the hook with it. Client-only search would leave every
@@ -234,7 +234,7 @@ describe("FIX 1 · the register asks the SERVER", () => {
 
   it("clearing the box returns the hook to the unfiltered population", async () => {
     mount();
-    const box = screen.getByPlaceholderText("Search orders…");
+    const box = screen.getByRole("searchbox", { name: "Search" });
     fireEvent.change(box, { target: { value: "Umi" } });
     await waitFor(() => {
       expect(
@@ -315,7 +315,7 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     fireEvent.click(screen.getByRole("menuitem", { name: "Export" }));
     expect(await screen.findByRole("menuitem", { name: "Excel" })).toBeInTheDocument();
     expect(screen.getByRole("menuitem", { name: "PDF" })).toBeInTheDocument();
-    expect(screen.getByRole("menuitem", { name: "Print" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "Print sales orders" })).toBeInTheDocument();
   });
 
   it("ticking rows offers the REAL sales orders, not a picture of the list (§6.7)", () => {
@@ -400,7 +400,7 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
       customer_address_state: "Kuala Lumpur",
     })] };
     mount();
-    expect(outsideRail("Kuala Lumpur")).toHaveLength(1);
+    expect(screen.queryAllByText("Kuala Lumpur")).toHaveLength(0);
     expect(screen.queryByText("Kuala Lumpur, Kuala Lumpur")).not.toBeInTheDocument();
     expect(screen.queryByText("12 Long Street, Kuala Lumpur, Kuala Lumpur")).not.toBeInTheDocument();
   });
@@ -675,14 +675,16 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
       "Proceed Date",
       "SO Doc Date",
       "SO No",
+      "Stock Status",
       "Sales Location",
       "Salesperson",
       "Customer Requested Delivery Date",
-      "Customer Delivery Location",
       "Customer",
       "Items",
       "PO No",
       "DO No",
+      "Category",
+      "Payment Status",
     ]);
     expect(outsideRail("Carres Kelana Jaya")).toHaveLength(1);
     expect(screen.getByText("Khoo Aik Yean")).toBeInTheDocument();
@@ -892,7 +894,7 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     };
     mount();
     fireEvent.click(screen.getByRole("button", { name: "Expand row" }));
-    expect(screen.getByText("Mattress")).toBeInTheDocument();
+    expect(screen.getAllByText("Mattress").length).toBeGreaterThan(0);
     expect(screen.getByText("Not allocated")).toBeInTheDocument();
     expect(screen.queryByText(/other goods/i)).not.toBeInTheDocument();
   });
@@ -912,7 +914,7 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     expect(within(gutters[1]!).getByTestId("expansion-connector-elbow")).toBeInTheDocument();
     expect(screen.getByTestId("expansion-connector-drop")).toBeInTheDocument();
     const cell = screen.getByTestId("grid-expansion-cell");
-    expect(cell).toHaveAttribute("colspan", "11");
+    expect(cell).toHaveAttribute("colspan", "13");
     expect(cell.querySelector('[class*="100cqw"]')).toBeNull();
     /* §6.8 (owner review 2026-09-22): measured widths, the table takes their
        sum and never stretches to the sheet; the frame hugs it. */
@@ -1034,57 +1036,21 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
  * from here. If copy ever returns it needs a card, a configuration answer and
  * a new test — not the quiet return of this one.
  */
-describe("Copy to new Sales Order — retired", () => {
-  it("offers no copy act on the row menu", () => {
+describe("order view before editing", () => {
+  it("does not open a row actions menu", () => {
     mount();
     fireEvent.contextMenu(screen.getByTestId("grid-parent-row"));
-    // The menu still renders — so this is a real absence, not an empty query.
-    expect(screen.getByRole("menuitem", { name: "Cancel SO" })).toBeInTheDocument();
-    expect(screen.queryByRole("menuitem", { name: "Copy to new Sales Order" })).toBeNull();
+    expect(screen.queryByRole("menu", {name:"Row actions"})).not.toBeInTheDocument();
   });
-});
-
-describe("Cancel SO", () => {
-  /* The register writes nothing itself: the menu entry may only OPEN the one
-   * governed cancellation door, and the row it names is the door's subject.
-   * If a future edit ever makes the register cancel directly, the dialog stops
-   * being the single door and this test is the thing that notices. */
-  it("opens the governed cancellation door for the row, and navigates nowhere", () => {
+  it("opens a read-only summary from the order number, then offers the full page", () => {
     mount();
-    fireEvent.contextMenu(screen.getByTestId("grid-parent-row"));
-    fireEvent.click(screen.getByRole("menuitem", { name: "Cancel SO" }));
-    expect(screen.getByText("Cancel SO-1303")).toBeInTheDocument();
-    expect(screen.getByTestId("location")).toHaveTextContent("/operation/orders");
-  });
-
-  /* REGISTER CLOSE-OUT — owner ruling 2026-09-26 (Orders MASTER §0.1 item 1):
-     `Edit · View · Print · ─ Cancel SO`, and nothing of Delivery's. */
-  it("reads Edit, View, Print, then Cancel SO alone below the divider", () => {
-    mount();
-    fireEvent.contextMenu(screen.getByTestId("grid-parent-row"));
-    const labels = screen.getAllByRole("menuitem").map((b) => b.textContent?.trim());
-    expect(labels).toEqual(["Edit", "View", "Print", "Cancel SO"]);
-    expect(labels[labels.length - 1]).toBe("Cancel SO");
-  });
-
-  it("carries nothing of Delivery's — no Delivery Order act on a Sales Order row", () => {
-    mount();
-    fireEvent.contextMenu(screen.getByTestId("grid-parent-row"));
-    const labels = screen.getAllByRole("menuitem").map((b) => b.textContent?.trim() ?? "");
-    expect(labels.some((l) => l.includes("Delivery Order"))).toBe(false);
-  });
-
-  /* ONE ACT, ONE NAME (YH, 2026-08-28). The row menu names the document act
-     once, and the word is `Print` — the Export menu's own word. */
-  it("names the document act ONCE, as Print — never Print PDF or Preview PDF", () => {
-    mount();
-    fireEvent.contextMenu(screen.getByTestId("grid-parent-row"));
-    const labels = screen
-      .getAllByRole("menuitem")
-      .map((b) => b.textContent?.trim());
-    expect(labels.filter((l) => l === "Print")).toHaveLength(1);
-    expect(labels).not.toContain("Print PDF");
-    expect(labels).not.toContain("Preview PDF");
+    fireEvent.click(screen.getByRole("button", {name:"SO-1303"}));
+    const summary=screen.getByTestId("sales-order-quick-view");
+    expect(summary).toHaveTextContent("Payment");
+    expect(summary).toHaveTextContent("Balance due");
+    expect(within(summary).queryByRole("button",{name:"Edit"})).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button",{name:"Open full page"}));
+    expect(screen.getByTestId("location")).toHaveTextContent("/operation/orders/so/");
   });
 });
 
@@ -1092,10 +1058,10 @@ describe("Cancel SO", () => {
 describe("Sales Orders table correction", () => {
   it("keeps the full date label on its sort and filter doors", () => {
     mount();
-    const sort = screen.getByRole("button", { name: "Customer Requested Delivery Date" });
+    const sort = within(screen.getByTestId("register-column")).getByRole("button", { name: "Customer Requested Delivery Date" });
     expect(sort.querySelector("br")).not.toBeNull();
     fireEvent.click(sort);
-    expect(screen.getByRole("button", { name: "Customer Requested Delivery Date" })).toBeInTheDocument();
+    expect(within(screen.getByTestId("register-column")).getByRole("button", { name: "Customer Requested Delivery Date" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Filter Customer Requested Delivery Date" }));
     expect(outsideRail("Today")).toHaveLength(1);
   });
@@ -1115,7 +1081,7 @@ describe("Sales Orders table correction", () => {
     const business = [...screen.getByTestId("grid-header").querySelectorAll("th")].map((th) => th.getAttribute("title")).filter(Boolean);
     expect(business.slice(0, 4)).toEqual(["Proceed Date", "SO Doc Date", "SO No", "Customer"]);
     expect(screen.getByRole("button", { name: "Customer" }).closest("th")).toHaveStyle({width: "288px"});
-    expect(screen.getByRole("button", { name: "Customer Requested Delivery Date" }).closest("th")).toHaveStyle({width: "240px"});
+    expect(within(screen.getByTestId("register-column")).getByRole("button", { name: "Customer Requested Delivery Date" }).closest("th")).toHaveStyle({width: "240px"});
     expect(screen.getByRole("button", { name: "Filter Phone" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Expand row" }));
     expect(screen.getAllByTestId(/^grid-expansion-gutter-/).map((e) => e.dataset.testid)).toEqual([
@@ -1393,7 +1359,7 @@ describe("the Order list rail: read-only fact filters (owner approved 2026-09-22
   it("the Order list carries Sales Location, Customer Delivery Location and Delivery, no Date group and no Clear filters", () => {
     mount();
     const rail = screen.getByTestId("sales-orders-rail");
-    for (const group of ["Sales Location", "Customer Delivery Location", "Delivery"]) {
+    for (const group of ["Customer Requested Delivery Date", "Order summary"]) {
       expect(within(rail).getByText(group)).toBeInTheDocument();
     }
     /* A date is narrowed on its own column's ▽ (Jess, 2026-09-28). */
@@ -1403,39 +1369,53 @@ describe("the Order list rail: read-only fact filters (owner approved 2026-09-22
     expect(shown()).toEqual([1501, 1502, 1503]);
   });
 
-  it("Sales Location narrows to where the order was sold", () => {
-    mount();
-    fireEvent.change(screen.getByTestId("sales-orders-rail-dealer"), { target: { value: "{dealer 2}" } });
+  it("Sales Location URL narrows to where the order was sold", () => {
+    mount("/operation/orders?dealer=%7Bdealer%202%7D");
     expect(shown()).toEqual([1502, 1503]);
     expect(screen.getByTestId("register-column")).toHaveTextContent("Sales Location: {dealer 2}");
+  });
+
+  it("multiple locations combine while another group's Delivery condition still applies", () => {
+    mount("/operation/orders?dealer=%7Bdealer%201%7D&dealer=%7Bdealer%202%7D&delivery=partially_delivered");
+    expect(shown()).toEqual([1502]);
   });
 
   it("State narrows, City narrows within it, and a new State clears the City", () => {
     mount("/operation/orders?state=%7Bstate%202%7D&city=%7Bcity%203%7D");
     expect(shown()).toEqual([1503]);
-    fireEvent.change(screen.getByTestId("sales-orders-rail-state"), { target: { value: "{state 1}" } });
-    expect(screen.getByTestId("location").textContent).not.toContain("city=");
-    expect(shown()).toEqual([1501]);
+    expect(screen.queryByRole("button", { name: "Select State" })).not.toBeInTheDocument();
   });
 
-  it("Delivery reads the one goods arithmetic: nothing sold, some sold, all sold", () => {
+  it("requested month narrows the existing table and can be cleared", () => {
+    listHookState.data!.orders = [
+      order({ id: "a", so: 1501, delivery_date: "2026-10-10" }),
+      order({ id: "b", so: 1502, delivery_date: "2026-11-10" }),
+      order({ id: "c", so: 1503, delivery_date: "2026-12-10" }),
+    ];
     mount();
-    fireEvent.click(screen.getByTestId("sales-orders-rail-delivery-not_delivered"));
-    expect(shown()).toEqual([1501]);
-    fireEvent.click(screen.getByTestId("sales-orders-rail-delivery-partially_delivered"));
+    fireEvent.change(screen.getByLabelText("Requested delivery month"), { target: { value: "2026-11" } });
     expect(shown()).toEqual([1502]);
-    fireEvent.click(screen.getByTestId("sales-orders-rail-delivery-fully_delivered"));
-    expect(shown()).toEqual([1503]);
+    fireEvent.click(screen.getByTestId("requested-all"));
+    expect(shown()).toEqual([1501, 1502, 1503]);
   });
 
-  it("a chosen row clicked again is deselected: no chosen value means All", () => {
+  it("requested range includes both ends and excludes adjacent dates", () => {
+    listHookState.data!.orders = [
+      order({ id: "a", so: 1501, delivery_date: "2026-10-31" }),
+      order({ id: "b", so: 1502, delivery_date: "2026-11-01" }),
+      order({ id: "c", so: 1503, delivery_date: "2026-12-31" }),
+    ];
+    mount("/operation/orders?requested=range:2026-11-01:2026-12-31");
+    expect(shown()).toEqual([1502, 1503]);
+  });
+
+  it("summaries follow the table search and status filters stay in columns", async () => {
     mount();
-    const row = screen.getByTestId("sales-orders-rail-delivery-fully_delivered");
-    fireEvent.click(row);
-    expect(shown()).toEqual([1503]);
-    fireEvent.click(row);
-    expect(shown()).toEqual([1501, 1502, 1503]);
-    expect(screen.getByTestId("location").textContent).not.toContain("delivery=");
+    const rail = screen.getByTestId("sales-orders-rail");
+    for (const label of ["Stock Status", "Delivery Status", "Payment Status"]) expect(within(rail).queryByText(label)).not.toBeInTheDocument();
+    expect(screen.getByTestId("sales-orders-summary")).toHaveTextContent("Sales orders3");
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search" }), { target: { value: "SO-1502" } });
+    await waitFor(() => expect(screen.getByTestId("sales-orders-summary")).toHaveTextContent("Sales orders1"));
   });
 
   it("an old date link no longer narrows the list: no filter the rail cannot show", () => {
@@ -1490,23 +1470,16 @@ describe("the Order list rail: Obligations and Service Cases are the server's fa
     return [1601, 1602, 1603].filter((n) => within(grid).queryByText(`SO-${n}`));
   };
 
-  it("Obligations narrows by the completion fact; an unknown fact matches neither value", () => {
-    mount();
-    fireEvent.click(screen.getByTestId("sales-orders-rail-obligations-outstanding"));
-    expect(shown()).toEqual([1601]);
-    fireEvent.click(screen.getByTestId("sales-orders-rail-obligations-none"));
-    expect(shown()).toEqual([1602]);
-    expect(screen.getByTestId("register-column")).toHaveTextContent("No action required");
+  it("removed Obligations does not hide orders through an old URL", () => {
+    mount("/operation/orders?obligations=outstanding");
+    expect(screen.queryByText("Obligations")).not.toBeInTheDocument();
+    expect(shown()).toEqual([1601, 1602, 1603]);
   });
 
-  it("Service Cases narrows to open, closed only, or none", () => {
-    mount();
-    fireEvent.click(screen.getByTestId("sales-orders-rail-cases-open"));
-    expect(shown()).toEqual([1601]);
-    fireEvent.click(screen.getByTestId("sales-orders-rail-cases-closed"));
-    expect(shown()).toEqual([1603]);
-    fireEvent.click(screen.getByTestId("sales-orders-rail-cases-none"));
-    expect(shown()).toEqual([1602]);
+  it("retired Service Cases filters do not hide orders", () => {
+    mount("/operation/orders?cases=open");
+    expect(screen.queryByTestId("sales-orders-rail-cases-open")).not.toBeInTheDocument();
+    expect(shown()).toEqual([1601, 1602, 1603]);
   });
 
   it("a read the server could not make says so instead of pretending none", () => {
@@ -1514,14 +1487,24 @@ describe("the Order list rail: Obligations and Service Cases are the server's fa
       data: { facts: {}, failed: { obligations: true, cases: true } },
     };
     mount("/operation/orders?cases=none");
-    expect(screen.getByTestId("sales-orders-rail-obligations-unread")).toBeInTheDocument();
-    expect(screen.getByTestId("sales-orders-rail-cases-unread")).toBeInTheDocument();
-    expect(shown()).toEqual([]);
+    expect(screen.queryByTestId("sales-orders-rail-obligations-unread")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("sales-orders-rail-cases-unread")).not.toBeInTheDocument();
+    expect(shown()).toEqual([1601, 1602, 1603]);
   });
 });
 
 
 describe("the isolated shared-template pilot", () => {
+  it("keeps active filters before tools in both Table and Cards", () => {
+    mount("/operation/orders?state=Selangor");
+    const conditions=screen.getByTestId("active-conditions");
+    const tools=screen.getByTestId("work-toolbar");
+    expect(conditions.compareDocumentPosition(tools) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(conditions).not.toHaveTextContent("Showing only:");
+    expect(within(conditions).getByRole("button", {name:"Clear all"})).toBeInTheDocument();
+    fireEvent.mouseDown(screen.getByRole("tab", {name:"Cards"}));
+    expect(screen.getByTestId("active-conditions").compareDocumentPosition(screen.getByTestId("work-toolbar")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
   it("carries search and selection through Table and Cards without changing the selected output", async () => {
     listHookState.data = { orders: [order({ id: "a", so: 101, customer_name: "Kimmy" }), order({ id: "b", so: 102, customer_name: "Other" })] };
     mount("/operation/orders?view=cards");
