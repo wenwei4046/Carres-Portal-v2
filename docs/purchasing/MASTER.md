@@ -316,7 +316,7 @@ retype it.
 
 ### 5.3 One PO issue authority
 
-**OPERATIONAL PERMISSION — OWNER RULING 2026-09-29 · BUILT (migration 0627).** Every active
+**OPERATIONAL PERMISSION — OWNER RULING 2026-09-29 · BUILT ON UNMERGED PR #1827 (migration 0627 NOT APPLIED, measured 2026-10-01).** Every active
 Operation staff person, including a joining-month newcomer, may perform ordinary PO work and issue
 and confirm-send a PO without holding PO Duty or cover. The first-month restriction affects
 allocation to PO Duty, not permission to place/issue PO. Existing approved-demand, document,
@@ -332,7 +332,7 @@ Operations Superuser (its flag). Other shared logins (`is_person = false`) are n
 issue (0592). The shared owner login `principal@carres.com` executes no duty (owner ruling
 2026-09-18).
 
-**HOW IT IS ENFORCED (0627).** `purchasing_actor_may_issue(user)` = Operations Superuser **or** an
+**IMPLEMENTATION ON PR #1827 (0627; not production proof).** `purchasing_actor_may_issue(user)` = Operations Superuser **or** an
 active, person `operation` account. It is asked by SO Batch Purchase, Manual Purchase, the API issue
 routes, the creation authority `purchasing_issue_pos_batch` and the evidence door
 `purchasing_confirm_po_sent`. `purchasing_po_actor()` no longer reads `ops_po_duty` /
@@ -1701,11 +1701,16 @@ Module Register rails remain factual filters and do not copy central Work action
 
 ### 9.1 SO Batch Purchase
 
-**PO PLACEMENT UNBLOCK — BUILT 2026-10-01 (migration 0627), applies to SO Batch and Manual Purchase.**
-- **One cost rule** (`catalogCostBlocksIssue`, shared by the row and both issue doors): a Catalog cost
-  that is NOT RECORDED never blocks; the PO line is born with no commercial claim (0573). Only a
-  recorded cost that is not positive blocks the row (`Catalog cost is missing`) and refuses at Issue
-  (`cost_required`). Before this, SO Batch refused every unpriced line that the door would accept.
+**PO PLACEMENT UNBLOCK — LOCAL BUILD / DELIVERY IN PROGRESS, 2026-10-01.** PR #1827 supplies
+ordinary-person issue permission and non-price blocker checks. Its 0627 migration is NOT APPLIED
+and the authenticated issue → PDF → recorded-send acceptance for both lanes is still owed.
+The follow-up reuses that committed implementation and the approved planning branch; it does not
+claim deployment. Read-only production measurement still finds the legacy 0311 grant executable.
+- **Price is not an operational gate** (owner ruling 2026-10-01). Missing or non-positive Catalog
+  costs do not block row selection or ordinary issue. A non-positive value is never silently treated
+  as an authorised free-of-charge decision: ordinary issue uses the existing price-absent line shape,
+  leaving Catalog unchanged. Positive prices retain their governed source. Formal commercial
+  decisions remain separate. This follow-up is local code, not production-verified behavior.
 - **Blockers named before Issue, never after the PO exists.** A SKU whose Catalog `Stock identity` is
   `Not set` reads `Stock identity not set` with `Fix in Catalog` (row state `no_stock_identity`); a
   SKU not in Catalog reads `SKU not found`; missing production days read `Production days not set`.
@@ -1713,7 +1718,7 @@ Module Register rails remain factual filters and do not copy central Work action
   (`destination_address_missing`), because the PO document cannot print it and the PO number would
   otherwise be spent on an unprintable PO. The door codes `sku_not_in_catalog` and
   `catalog_identity_mode_missing` answer in the approved two lines.
-- **The unversioned 0311 line-destination door is revoked** (`purchasing_set_line_destination`, its
+- **The unversioned 0311 line-destination door is revoked by the pending 0627 migration** (`purchasing_set_line_destination`, its
   API route removed). A line's Deliver To moves only through `Change Deliver To` (0610), which keeps
   Units and Sales Order lineage and mints a version.
 
@@ -1881,9 +1886,8 @@ what remains unordered, when each order should be placed, which product category
 supplier and delivery region — with every label fully readable. It does not repeat central Work or
 expose Sales/Catalog actions to Operation. Six sections, in this exact order:
 
-An unavailable row explains its own blocker inside that Sales Order's framed expansion. Missing
-Catalog cost therefore reads `Catalog cost is missing` plus `Set the cost of {item} in Catalog` on
-the affected order; it never returns as a `WORK TO DO` rail panel or as an editor in Issue review.
+An unavailable row explains its non-price blocker inside that Sales Order's framed expansion.
+Price resolution never disables ordinary selection or becomes an Operation cost editor.
 
 ```text
 ORDER TIMING
@@ -6820,8 +6824,12 @@ days**; Bedframe: **7 working days**; Sofa: **14 working days**. Apply these val
 applicable Supplier × Category settings,
 using the existing supplier-working-calendar calculation, not calendar days or added transit.
 Do not silently replace an existing explicit supplier-specific value. The live set of missing
-rows must be rechecked by the commissioned BUILD; recording this ruling does not claim any
-production data has been changed. Do not ask the owner to supply these values again.
+rows were rechecked on 2026-10-01. The authorised Purchasing Settings door populated seven
+missing rows: Armani, Dorsettloft, Hookka Industries and Todern sofa = 14; Laveo, NB Furniture
+and Rennes bedframe = 7. All prior values stayed unchanged. Readback verified all eleven
+Supplier × Category rows and seven old-NULL/new-value history entries. The actual authenticated
+settings actor was the shared `principal` account, not Jess personally. No accessory default was
+written. Do not ask the owner to supply these values again.
 
 **MP / PILLOW — OWNER CORRECTION 2026-10-01, APPROVED / LOCKED.** MP/protectors and pillows
 are ready stock at the warehouse, not goods requiring a standard 7-working-day production wait.
@@ -6898,7 +6906,7 @@ built or production-verified.
 | Requester | create Manual Purchase and supply missing request facts | issue PO or mark ordered merely because they requested it |
 | Purchasing Approver (an active Principal person; today Jess) | approve/reject governed internal buy and commercial exceptions | decide a Manual Purchase they raised; replace receiving/PO evidence |
 | Normal PO Duty / dated cover | owns the daily work; issue/revise supplier documents; record promises/claims through the one door | approve unauthorised price; post stock or supplier payment |
-| Any active Operation person (owner ruling 2026-09-25) | record a supplier's answer on a PO or a supplier's reply on a Claim, with evidence; the recorder is stored as actual actor | issue, revise or cancel a PO; `Change Deliver To`; authorise a claim outcome; become the duty holder by recording |
+| Any active Operation person (owner rulings 2026-09-25 / 2026-09-29) | issue and record current-version PO sending without holding Duty; record supplier answers with evidence; actual actor is stored separately from normal owner and cover | approve their own Manual Purchase; revise or cancel a PO; `Change Deliver To`; authorise a claim outcome; become the duty holder by acting |
 | Operations Superuser (`operation@carres.com` by its flag; Jess as a principal person — never the shared `principal@` login) | use the same governed operational doors when available, including PO issuance; actual actor remains separate from normal duty/cover | impersonate duty, create a second PO/receipt writer or bypass approval/commercial gates |
 | Normal GRN Duty / dated cover | owns daily Receiving work; count, inspect, attach Supplier DO/evidence and finish source receipt | change PO price/quantity or ownership agreement |
 | Stock / Warehouse | label, locate, move, reserve and prove physical custody | issue/cancel supplier commitments |
@@ -6912,6 +6920,23 @@ No Purchasing object has one universal owner. Each action resolves owner and cov
 ---
 
 ## 14 · External integration boundaries
+
+**OWNER CONFIRMED 2026-10-01 — supplier PO channels, APPROVED / LOCKED.**
+Hookka Industries and Ohana receive PO email at **hookka.manufacturing@gmail.com**.
+Keep their separate Supplier identities; sharing a recipient never merges their POs or history.
+Default both to the existing `Open email` action. Hookka currently receives all POs by email.
+Nice Future's confirmed contact email is **farithazelam@gmail.com**; retain its current channel
+and access arrangements. A possible end to Nice Future supply after Subscription launches is
+future context, not a present cutover instruction. Historical recipients remain as recorded.
+Opening email is never sent evidence; the current-version confirmation remains required.
+
+A future Hookka/Ohana API must use canonical PO, supplier and evidence records and needs separate
+owner authorisation. No API replacement, external contact or supplier login/access change is
+commissioned by the placement unblock. **PROPOSAL / NOT LAW:** consider supplier portal retirement
+only after a specific owner decision and a cutover/usage check. The suggested retirement of
+`nicefuture@carres.com` and `hookka@gmail.com` is not approved; reported September last-action dates
+do not prove current non-use. Falsifier: current portal dependency or a need to preserve supplier
+access defeats retirement until the dependency is resolved.
 
 - WhatsApp/email: supplier-facing PDF/questions are sent outside; the Portal records version,
   recipient, channel, actor and time. Opening the app is not proof of sending or chasing. A chase
