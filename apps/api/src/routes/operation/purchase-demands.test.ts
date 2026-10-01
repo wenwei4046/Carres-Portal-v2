@@ -780,6 +780,16 @@ describe("the guard, and the promise not to write", () => {
  * destinations a buy may be sent to.
  */
 describe("the buying facts SO Batch Purchase needs", () => {
+  it("does not disclose Catalog costs to Operation while preserving goods and quantities", async () => {
+    const { rows } = await rowsOf(TABLES());
+    expect(rows.length).toBeGreaterThan(0);
+    for (const row of rows) for (const part of row.parts) {
+      expect(part.unitCost).toBeNull();
+      expect(part.sku).toBeTruthy();
+      expect(part.qty).toBeGreaterThan(0);
+    }
+  });
+
   it("⭐ ONE COST RULE: an unrecorded Catalog cost stays buyable, like the issue door", async () => {
     const t = TABLES() as unknown as Record<string, { data: unknown; error: unknown }>;
     const sku = (t.product_skus.data as Record<string, unknown>[]).find(
@@ -1619,6 +1629,29 @@ describe("0600 · RESERVE GOODS ALREADY ON A PO (owner ruling 2026-09-28)", () =
     const lined = bySku(exact.rows, "COV-K")!;
     expect(lined.poolOnly).toBeUndefined();
     expect(isSelectableForOrder(lined, "blank")).toBe(false);
+  });
+
+  it.each([
+    { status: "incoming", qty: 1, poLine: "pol-2051", poStatus: "open", remaining: 2 },
+    { status: "reserved", qty: 1, poLine: "pol-2051", poStatus: "open", remaining: 2 },
+    { status: "sold", qty: 1, poLine: "pol-2051", poStatus: "open", remaining: 2 },
+    { status: "incoming", qty: 2, poLine: "pol-2051", poStatus: "open", remaining: 1 },
+    { status: "reserved", qty: 1, poLine: "other-po-line", poStatus: "open", remaining: 1 },
+    { status: "reserved", qty: 1, poLine: "pol-2051", poStatus: "cancelled", remaining: 2 },
+  ])("counts source coverage once: $status / $qty / $poLine / $poStatus", async ({ status, qty, poLine, poStatus, remaining }) => {
+    const t = TABLES() as Record<string, { data: unknown; error: unknown }>;
+    t.purchase_orders = { data: [{ id: "PO-2051", status: poStatus, version: 1 }], error: null };
+    t.po_line_sources = { data: [{ id: "s1", po_id: "PO-2051", po_line_id: "pol-2051", order_id: "o4", order_line_id: "l7", qty: 1, purchase_orders: { status: poStatus } }], error: null };
+    t.ops_stock_items = { data: [{ id: "u1", unit_code: "U1-123-456", qty, status, po_no: "PO-2051", po_line_id: poLine, reserved_order_line_id: "l7" }], error: null };
+    // A received partial PO no longer contributes to the anonymous pool.
+    t.purchase_order_lines = { data: [{ id: "pol-2051", po_id: "PO-2051", sku: "COV-K", qty: 1, received_qty: status === "incoming" ? 0 : 1, purchase_orders: { status: poStatus } }], error: null };
+    const { body } = await rowsOf(t);
+    expect(l7(body).qty).toBe(3);
+    expect(l7(body).pos).toHaveLength(poStatus === "cancelled" ? 0 : 1);
+    expect(soBatchOrderLineOutstandingQty(l7(body))).toBe(remaining);
+    if (poStatus === "open" && poLine === "pol-2051" && qty === 1) {
+      expect(bySku(body.rows, "COV-K")?.toBuy).toBe(2);
+    }
   });
 
   it("a Unit reserved on its PO covers exactly its line, is not Ready Stock, and leaves the pool", async () => {

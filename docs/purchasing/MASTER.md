@@ -21,23 +21,17 @@ control types, special schedules and business behavior; no page-local appearance
 
 
 Status: **APPROVED / LOCKED — OWNER REVIEW COMPLETE 2026-08-29; Supplier Claims stock-claim boundary and Problems UX owner-approved 2026-09-14**
-Lane: **PLAN COMPLETE for the 2026-08-29 blueprint · PLAN / DESIGN IN PROGRESS 2026-09-25 (page-by-page UI review)**
+Lane: **PLAN — consolidated completion scope, 2026-10-01. Existing approved business rules
+remain binding; source-code findings are evidence, not proof of production completion.**
 
-**RESUME HERE — handoff 2026-09-25 (office desktop → MacBook chat).** Owner approved, all on `main`:
-flows 1–5 (§5.6.1 PO windows · §5.7 per-item supplier answer + evidence + reasons + any-person
-recording · §5.4 `Change Deliver To` build boundary · §9.5 Claim reply recording · §9.6 Purchase
-Return creation door) and **page 1 — the PO object page composition (§9.3)**. Workspace §5.10/§6.1
-mirror every flow. **Pending owner `yes`:** flow 6 (Receiving/Stock → Claim; proposed in chat,
-not persisted). **Next, in order, one page at a time, UI-kit geometry and exact words, owner
-agreement before any Card:** page 2 SO Batch Purchase (window-scoped entry, pre-tick, toolbar) ·
-page 3 Supplier Claim record · page 4 Purchase Return document + send · page 5 Settings →
-Purchasing · page 6 Work right-panel Purchasing cards (Workspace template) · page 7 Stock Unit
-Detail `Report a problem` (Stock lane). Cards are authored only after the owner agrees every
-page; recommended Card order A Settings · B shared send ledger · C PO window Work + SO Batch ·
-D per-item answer + day-before Work · E Change Deliver To (BUILT 2026-09-29, 0610) · F Claim reply → decision → PRTN.
-Restart prompt: `Purchasing — PLAN / DESIGN, page-by-page UI review. Read CLAUDE.md, this
-RESUME block, UI MASTER §4.1/§6.7–6.10, tokens; continue at the next unapproved page; persist
-each owner-approved page to this MASTER + COPY + Workspace before moving on.`
+**CURRENT HANDOFF — 2026-10-01.** Retain the existing architecture and working pages. Complete the
+module against §§5–14 and the consolidated defect/acceptance map in §2.4. Do not restart the
+Blueprint or ask the owner to approve every page in sequence. The four exception rulings,
+staff-help boundaries, supplier channels and MP/pillow replenishment facts remain approved.
+The whole-page recommendation and supplied code-audit defects are one completion scope; the
+research report is supporting evidence, never a second MASTER. Only genuinely unresolved business
+changes require owner decisions. This PLAN update does not commission additional application work.
+The separately commissioned PO-placement BUILD retains its own delivery and verification boundary.
 
 This file is the only canonical Purchasing Blueprint. It owns Purchasing and the governed
 Purchasing → Receiving seam. Receiving owns its physical-receipt workspace and GRN facts under
@@ -143,6 +137,55 @@ where they act · what proves completion · who supervises · what consequence f
 and `Team Work` project these module actions; they never store a second completion or expose manual
 `Done`. These actions appear in owner-resolved `My Work` / `Team Work`; a module Register rail does
 not copy them into a second local work panel.
+
+---
+
+
+### 2.4 Consolidated completion and acceptance boundaries — 2026-10-01
+
+**OWNER-ACCEPTED DIRECTION: retain, repair and complete; no module rewrite.** The operator/page
+Blueprint remains §§4–14. The following integrates the supplied defect audit with that Blueprint.
+Baseline of the reported code defects: `45f43e96b`. These findings must be rechecked against the
+current implementation before changes; runtime reproduction remains owed unless separately cited.
+Do not call a workflow READY merely because a route, component or test exists.
+
+| Reported break | Required business outcome / owner boundary |
+|---|---|
+| Proceeded SO can return to Place despite PO/Unit commitments (0500 unproceed_order) | Block that bypass where PO lineage or reserved/PO-bound Units exist; preserve Orders' governed amendment/cancellation and Purchasing's Rule 4. |
+| Manual Purchase issue Work ends on numbering | End the relevant sending obligation only with current-version confirmed-sent evidence; preserve separate approval/creation states and all source quantities. |
+| Extra goods only counted in receipt JSON | Record real controlled/unavailable custody and source-linked problem handling. Exact-unit and quantity-mode goods keep their respective identity rules; no invented demand, payable, or Unit IDs for counted goods. Receiving/Stock own physical evidence. |
+| Claim close route has no usable UI / insufficient completion guard | Make the governed close action reachable and check §9.5 outcome/evidence; a supplier answer alone does not certify completion. |
+| Claim-held goods have no reachable authorised resolution | Expose the owning goods-result action with evidence/permission; physical release and Claim paper closure may occur independently. No unconditional make-available button. |
+| Replacement loses PO/source linkage | Carry exact obligation and reservation lineage and resolve the outstanding quantity once; distinguish replacement of accepted goods from fulfilment of unaccepted goods. |
+| Supplier return stops at pickup | Link Return to the Stock-owned outbound handover surface; exact goods and actual pickup proof change custody, not document creation. Complete the concrete surface review before delivery. |
+| Repair return stops at inspection | Stock owns Record inspection; RO links to it. Returned is not inspected; passing inspection/disposition controls availability. Existing repair implementation is incomplete, not merely awaiting a smoke test. |
+| Blocked SO demand has no Work destination | Surface named blocked lines and the exact owning setup door on the PO-window Work; do not create a second task store. |
+| Legacy whole-PO cancellation bypass | Trace current callers and close unsafe paths; converge on §5.8.1 evidence, source, reservation, partial-receipt and version guards while retaining history. |
+
+Additional completion requirements: balance-date follow-up; source-required-arrival risk; MPR and
+stock-allocation Work completion; shared approval assignment/actual actor; Calendar reading the same
+supplier-arrival authority without conflating original, promised and work dates; accurate PO Delivery
+Date copy; supplier setup links; existing purchasing_settings_gate for payment terms (no invented
+Manager role); central report/export access; verified retirement of obsolete writers and shell;
+exact record links; cancellation quantity in the single balance read; and outstanding send actions
+remaining reachable after goods completion/cancellation. Preserve current and historical PDFs.
+
+**Dependency order, not Cards or a new BUILD commission:** integrity → problem journeys → the
+four exception rules and remaining supplier-channel work → remaining Work/date coverage → remaining
+copy/links/reports/settings permissions → remaining Showroom completion. Necessary permissions,
+copy and Work ship with their business capability, never postponed so a slice remains unusable.
+Already delivered work is reused. Showroom continues §§9.8–9.13; it does not restart approved rules.
+Outstanding Showroom Finance contracts/composition stay NOT LAW until their existing closure gate
+is met. No supplier-login disablement or external cutover is included.
+
+**Evidence and acceptance:** the complete supporting research is
+[Purchasing Houzs review](../research/purchasing-houzs-review.md), including source provenance and
+unverified supplied findings. Every completed capability needs an authenticated controlled business
+journey, correct downstream quantities/identities, documents, actor history, permission and retry
+behaviour. Unit tests and deployment versions do not replace that evidence. Never create unintended
+supplier commitments or external messages for testing. The placement BUILD's 2026-10-01 completion
+report states deployment/tests/settings checks succeeded but no real PO was created or supplier
+message sent; do not promote that report to a full live issue-to-send journey.
 
 ---
 
@@ -330,7 +373,7 @@ retype it.
 
 ### 5.3 One PO issue authority
 
-**OPERATIONAL PERMISSION — OWNER RULING 2026-09-29 · BUILT ON UNMERGED PR #1827 (migration 0627 NOT APPLIED, measured 2026-10-01).** Every active
+**OPERATIONAL PERMISSION — OWNER RULING 2026-09-29 · MERGED / PRODUCTION-VERIFIED 2026-10-01 (PRs #1827 / #1832, migration 0627 APPLIED).** Every active
 Operation staff person, including a joining-month newcomer, may perform ordinary PO work and issue
 and confirm-send a PO without holding PO Duty or cover. The first-month restriction affects
 allocation to PO Duty, not permission to place/issue PO. Existing approved-demand, document,
@@ -346,7 +389,7 @@ Operations Superuser (its flag). Other shared logins (`is_person = false`) are n
 issue (0592). The shared owner login `principal@carres.com` executes no duty (owner ruling
 2026-09-18).
 
-**IMPLEMENTATION ON PR #1827 (0627; not production proof).** `purchasing_actor_may_issue(user)` = Operations Superuser **or** an
+**PRODUCTION IMPLEMENTATION (0627, verified 2026-10-01).** `purchasing_actor_may_issue(user)` = Operations Superuser **or** an
 active, person `operation` account. It is asked by SO Batch Purchase, Manual Purchase, the API issue
 routes, the creation authority `purchasing_issue_pos_batch` and the evidence door
 `purchasing_confirm_po_sent`. `purchasing_po_actor()` no longer reads `ops_po_duty` /
@@ -1714,16 +1757,31 @@ Module Register rails remain factual filters and do not copy central Work action
 
 ### 9.1 SO Batch Purchase
 
-**PO PLACEMENT UNBLOCK — LOCAL BUILD / DELIVERY IN PROGRESS, 2026-10-01.** PR #1827 supplies
-ordinary-person issue permission and non-price blocker checks. Its 0627 migration is NOT APPLIED
-and the authenticated issue → PDF → recorded-send acceptance for both lanes is still owed.
-The follow-up reuses that committed implementation and the approved planning branch; it does not
-claim deployment. Read-only production measurement still finds the legacy 0311 grant executable.
+**PO PLACEMENT UNBLOCK — CORE PRODUCTION-VERIFIED, 2026-10-01.** PRs #1827 / #1832
+merged at `45f43e96b92305583fa176a17d5222152dc5eb9a`. CI `36816676966` passed 13,745
+tests; deployment `36817768266` succeeded and all five canonical ERP/POS/Pages/API probes
+converged to that commit. Migrations 0627 and 0628 were applied from their exact committed
+source through the governed migration door (trackers `20261001050011` / `20261001050021`),
+with source and function-body hash readback. Production permission readback permits both active
+Operation people (2/2); legacy unversioned destination mutation is no longer executable.
+
+Local transactional integration proved both SO Batch and approved Manual Purchase issue → actual
+PDF payload/render → recorded sending, with ordinary staff as actual actor, normal Duty/cover
+separate, and self-approval refused. Fixtures rolled back. These are local lifecycle proofs,
+not a claim that real production POs were issued or sent: no real purchase or supplier message was
+created for verification. Production Settings writes and audit readback are recorded in §11.
+
+PR #1833 closes the final API confidentiality check: Operation receives no Catalog unit cost in
+purchase-demand parts and cannot submit hand-entered/free-of-charge commercial instructions.
+Its focused regression suite passed 190 tests. Supplier-channel saves also refresh cached supplier
+and Work data so the next send action uses the saved choice immediately. Its delivery status is
+tracked by that PR and the canonical deployment probes; this does not certify the whole module.
+
 - **Price is not an operational gate** (owner ruling 2026-10-01). Missing or non-positive Catalog
   costs do not block row selection or ordinary issue. A non-positive value is never silently treated
   as an authorised free-of-charge decision: ordinary issue uses the existing price-absent line shape,
   leaving Catalog unchanged. Positive prices retain their governed source. Formal commercial
-  decisions remain separate. This follow-up is local code, not production-verified behavior.
+  decisions remain separate. This behavior is included in the verified core deployment.
 - **Blockers named before Issue, never after the PO exists.** A SKU whose Catalog `Stock identity` is
   `Not set` reads `Stock identity not set` with `Fix in Catalog` (row state `no_stock_identity`); a
   SKU not in Catalog reads `SKU not found`; missing production days read `Production days not set`.
@@ -1731,9 +1789,48 @@ claim deployment. Read-only production measurement still finds the legacy 0311 g
   (`destination_address_missing`), because the PO document cannot print it and the PO number would
   otherwise be spent on an unprintable PO. The door codes `sku_not_in_catalog` and
   `catalog_identity_mode_missing` answer in the approved two lines.
-- **The unversioned 0311 line-destination door is revoked by the pending 0627 migration** (`purchasing_set_line_destination`, its
+- **The unversioned 0311 line-destination door is revoked by applied migration 0627** (`purchasing_set_line_destination`, its
   API route removed). A line's Deliver To moves only through `Change Deliver To` (0610), which keeps
   Units and Sales Order lineage and mints a version.
+
+**PLACEMENT RETRY ACCEPTANCE — BUILD, 2026-10-01.** Controlled ordinary-person SQL
+acceptance exposed a duplicate SO issue: two calls carrying the same exact source each minted a
+PO. The authenticated API normally rechecks before calling SQL, but concurrent callers can share
+that earlier read. Migration 0631 (APPLIED 2026-10-01, tracker `20261001062406`) checks the complete batch against the existing
+`so_line_remaining_requirement` after the issue lock and exact Order/line locks, before numbering.
+Repeated references share one source cap; distinct same-SKU source lines and legitimate partial
+quantities retain separate lineage. That same remainder counts a reserved Unit and its linked PO
+line once. Unsent/non-cancelled commitment still covers; anonymous incoming stock is not reserved
+by inference. The existing changed-buying-line refusal returns staff to selection. Test and
+production evidence must remain separate; this is not a claim that a real PO was sent.
+Twelve local SQL cases passed, including two concurrent ordinary issuers (one success, one refusal),
+three-unit SO/MPR document and actor checks, legitimate 1+2 buys, duplicate source aggregation,
+separate same-SKU lines and linked-Unit deduplication. The authenticated API maps the atomic refusal
+to the existing changed-buying-line instruction (209 API/SQL tests); 258 real-component journey
+checks passed with simulated transport/PDF readiness. A production rolled-back negative control
+refused excessive source quantity before numbering and left the PO count unchanged. Applied source
+MD5 `8efc838e3f7fdc78d23059fff0354cba`; issue/remainder bodies matched the locally tested functions.
+No live supplier message or purchase was created. The Register read also nets a linked Unit
+and its own PO source once (six projection cases: incoming/reserved/sold, excess Units,
+separate PO-line binding and cancelled commitment); the buying calculation retains its existing
+Unit netting, and a legitimate one-of-three partial source still offers two to buy. Issue-versus-new-Stock-reservation concurrency was then reproduced: Stock checked the remainder
+before waiting on the Order, and could retain that stale answer. Migration 0633 (APPLIED 2026-10-01, tracker `20261001064254`) gives the existing draw/reserve/use-PO/save/release doors one internal source-lock helper,
+Order then exact line before PO-line/Unit locks; eligibility and ownership do not change.
+Twelve controlled SQL cases now pass, including that independent-connection race, legitimate
+reserve → partial buy → release → final buy and explicit incoming-PO reservation with preserved
+Unit IDs. The 0633 production probe rolled back all five body patches and the internal helper;
+its negative control refused direct authenticated helper access. Exact committed file MD5
+`b71e5e603b66adc6ab2bd0276abdfd6b` matches the tracker, and all six production function
+bodies match the tested local functions. This is bounded placement integrity work; Receiving lifecycle is not certified by it.
+
+**Reusable presentation evidence (placement scope).** Both issue lanes use
+`so-batch/SoBatchIssueWorkspace.tsx` (Review), kit `Block` / `SalesOrderWorkspace.Fact`,
+kit `PdfPreview` + the same PO renderer, and `components/PoIssueEvidence.tsx` for the
+current-version send record and History. Both registers use the shared `DataGrid`; their
+source/selection/approval composition differs by business purpose. MPR create/detail keeps its
+existing approval and source/history facts, not a copied supplier page. Real-component review and
+result screenshots use controlled local payloads at 1280×720; they are composition evidence,
+not a production-authenticated issue journey. No Houzs code or new kit component was introduced.
 
 **RESERVE GOODS ALREADY ON A PO — OWNER RULING, APPROVED / LOCKED 2026-09-28 (Jess, "yes"). MERGED (#1723); migration 0600 APPLIED 2026-09-28 (tracker `20260928102149`).**
 Measured on production `b5e959d6`: SO-1358 (Ohana Fenrir King, qty 1) printed five
@@ -6831,6 +6928,20 @@ Settings lives under the global header gear and requires authorised roles. It in
 - claim/return/repair outcome permissions;
 - customer-privacy exclusion from supplier documents.
 
+**SUPPLIER COMMUNICATION — BUILT / PRODUCTION-VERIFIED 2026-10-01.** The existing Settings
+authority governs separate Email, WhatsApp group and preferred Channel saves through migration
+0628; each changed field records old/new, actual actor and time. Anonymous and unauthorised
+Operation writes are refused. Live Settings saves and database readback confirm Hookka Industries
+and Ohana use `hookka.manufacturing@gmail.com` and default to Email; Nice Future uses
+`farithazelam@gmail.com` with its existing WhatsApp behavior preserved. Four changes were saved
+by the authenticated shared `principal` account, not Jess personally. Existing groups, historical
+recipients and supplier access were not changed. No email or WhatsApp message was sent.
+
+Hookka's fixed Deliver To is the existing HOUZS destination, with NETS collection and a populated
+warehouse address. Its supplier factory address is not a substitute destination. Ohana's actual
+fixed destination still has no address and correctly remains a named issue blocker; no address was
+invented or copied from Hookka.
+
 **PRODUCTION-DAY VALUES — OWNER CONFIRMED 2026-10-01, APPROVED / LOCKED.** Mattress: **7 working
 days**; Bedframe: **7 working days**; Sofa: **14 working days**. Apply these values to missing
 applicable Supplier × Category settings,
@@ -6918,7 +7029,7 @@ built or production-verified.
 | Requester | create Manual Purchase and supply missing request facts | issue PO or mark ordered merely because they requested it |
 | Purchasing Approver (an active Principal person; today Jess) | approve/reject governed internal buy and commercial exceptions | decide a Manual Purchase they raised; replace receiving/PO evidence |
 | Normal PO Duty / dated cover | owns the daily work; issue/revise supplier documents; record promises/claims through the one door | approve unauthorised price; post stock or supplier payment |
-| Any active Operation person (owner rulings 2026-09-25 / 2026-09-29) | issue and record current-version PO sending without holding Duty; record supplier answers with evidence; actual actor is stored separately from normal owner and cover | approve their own Manual Purchase; revise or cancel a PO; `Change Deliver To`; authorise a claim outcome; become the duty holder by acting |
+| Any active Operation person (owner rulings 2026-09-25 / 2026-09-29 / 2026-10-01) | issue and record current-version PO sending without holding Duty; record supplier answers and ordinary §5.8.1 cancellation with its required evidence; actual actor is stored separately from normal owner and cover | approve their own Manual Purchase; infer general revision/Deliver To or commercial approval rights from staff-help; bypass §5.8.1 cancellation conditions; authorise a claim outcome without its separate permission; become the duty holder by acting |
 | Operations Superuser (`operation@carres.com` by its flag; Jess as a principal person — never the shared `principal@` login) | use the same governed operational doors when available, including PO issuance; actual actor remains separate from normal duty/cover | impersonate duty, create a second PO/receipt writer or bypass approval/commercial gates |
 | Normal GRN Duty / dated cover | owns daily Receiving work; count, inspect, attach Supplier DO/evidence and finish source receipt | change PO price/quantity or ownership agreement |
 | Stock / Warehouse | label, locate, move, reserve and prove physical custody | issue/cancel supplier commitments |
@@ -6990,20 +7101,15 @@ The final Carres model rejects:
 
 ## 16 · PLAN completion gate
 
-| Gate | Result |
-|---|---|
-| ERP PLAN CHAT START PROTOCOL re-read | PASS |
-| Current authority and conflicts audited | PASS |
-| Manual / demand / PO Owner Decision Gate | **RESOLVED FROM AUTHORITY** |
-| Purchasing → Receiving owner seam reconciled 2026-08-29 | **PASS — no implementation/migration authorised** |
-| Current Carres challenged | PASS |
-| 2990 purchasing/consignment domain mined top-to-toe | PASS |
-| Mature ERP/WMS/logistics references reconciled | PASS |
-| Navigation and all 11 pages owner reviewed | PASS |
-| Daily journey, registers, detail, actions and exceptions defined | PASS |
-| Work, Quick Rail, Calendar, Settings, Reports and permissions defined | PASS |
-| External boundaries and cross-module ownership defined | PASS |
-| Superseded page model rejected from final truth | PASS |
-| Final truth persisted to canonical MASTER | PASS |
+The historical 2026-08-29 approval is not a blanket completion certificate for subsequent domain
+expansion. Current approved rules and existing page architecture remain in this MASTER. The
+2026-10-01 consolidated completion scope is §2.4; measured and reported defects retain their
+verification limits. Remaining Showroom composition and Finance contract closure are stated in
+§9.13, not silently approved by a scope acknowledgement.
 
-**PLAN MISSION COMPLETE**
+No renewed per-page business interview is required. Complete ordinary research/design work against
+existing authority, reconcile any genuine cross-module conflict, then present only the unresolved
+business choice if one remains. Do not declare the expanded module PLAN MISSION COMPLETE or issue
+new READY FOR CARD scopes until the remaining target truth is complete, reviewed and persisted.
+PLAN does not implement application code or extend the existing BUILD commission. Production
+completion is separately proved through authenticated business journeys and downstream evidence.

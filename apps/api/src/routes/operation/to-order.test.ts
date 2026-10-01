@@ -1186,6 +1186,21 @@ describe("POST …/to-order/issue-batch — one door, one transaction", () => {
     expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(1);
   });
 
+  it("an authenticated ordinary caller sees the locked-source refusal after a stale read", async()=>{
+    const sb=makeSb(TABLES());
+    const demands=await readyDemands(sb);
+    const original=sb.rpc.getMockImplementation()!;
+    sb.rpc.mockImplementation(async (fn,args)=>fn === "purchasing_issue_pos_batch"
+      ? {data:null,error:{code:"P0001",message:"Source requirement changed",details:"unknown_demand"}} as never
+      : original(fn,args));
+    const res=await postBatch({selections:allTo(demands,KLANG)});
+    expect(res.status).toBe(422);
+    const body=await res.json() as Record<string,unknown>;
+    expect(body).toMatchObject({code:"unknown_demand"});
+    expect(JSON.stringify(body)).toContain("Go back to buying and tick the lines again.");
+    expect(body).not.toHaveProperty("pos");
+  });
+
   it("derives Catalog cost and the fixed collection partner from governed data", async () => {
     const tables = TABLES();
     (tables.suppliers.data as Record<string, unknown>[])[0]!.kind = "factory_pickup";
@@ -1611,7 +1626,7 @@ describe("the commercial laws still hold on the batch door", () => {
       documentDecisions: decisionsForAll(demands, KLANG, { orderId: "o1", procurementPartnerId: null, lineDecisions: [
             { sku: "5539-CNR", treatment: "free_of_charge", reason: "Supplier replacement" },
           ] }),
-    });
+    }, "principal");
     expect(res.status).toBe(200);
     const batch = sb.rpcCalls.find((c) => c.fn === "purchasing_issue_pos_batch")!;
     const pos = batch.args.p_pos as { lines: Record<string, unknown>[] }[];
@@ -1769,7 +1784,7 @@ describe("the retired door's laws, re-asked of the batch door", () => {
       documentDecisions: decisionsForAll(demands, KLANG, { orderId: "o1", procurementPartnerId: null, lineDecisions: [
             { sku: "5539-CNR", treatment: "normal", unitCost: 1234, costSource: "hand_entered" },
           ] }),
-    });
+    }, "principal");
     expect(res.status).toBe(200);
     const line = (batchArgs(sb) as unknown as { lines: Record<string, unknown>[] }[])
       .flatMap((p) => p.lines)
@@ -2224,7 +2239,7 @@ describe("closure §2 · commercial authority", () => {
           },
         ],
       }),
-    });
+    }, "principal");
     expect(res.status).toBe(200);
     const pos = sb.rpcCalls.find((c) => c.fn === "purchasing_issue_pos_batch")!.args
       .p_pos as { lines: Record<string, unknown>[] }[];
@@ -2249,7 +2264,7 @@ describe("closure §2 · commercial authority", () => {
           { sku: "5539-CNR", treatment: "free_of_charge", reason: "Replacement for a claim" },
         ],
       }),
-    });
+    }, "principal");
     expect(res.status).toBe(200);
     const pos = sb.rpcCalls.find((c) => c.fn === "purchasing_issue_pos_batch")!.args
       .p_pos as { lines: Record<string, unknown>[] }[];
@@ -2526,5 +2541,22 @@ describe("Card 02-C · a `place` order is refused at every door", () => {
     const body = (await res.json()) as { code?: string };
     expect(body.code).toBe("unknown_demand");
     expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
+  });
+});
+
+
+describe("Operation cannot edit commercial terms through legacy issue inputs", () => {
+  it.each([
+    { sku: "5539-CNR", treatment: "normal", unitCost: 1234, costSource: "hand_entered" },
+    { sku: "5539-CNR", treatment: "free_of_charge", reason: "Supplier replacement" },
+  ])("refuses $treatment before a PO or approval is consumed", async (line) => {
+    const sb = makeSb(TABLES());
+    const demands = await readyDemands(sb);
+    sb.rpcCalls.length = 0;
+    const res = await postBatch({ selections: allTo(demands, KLANG),
+      documentDecisions: decisionsForAll(demands, KLANG, { orderId: "o1", procurementPartnerId: null, lineDecisions: [line] }),
+    });
+    expect(res.status).toBe(403);
+    expect(sb.rpcCalls.some(call => call.fn === "purchasing_issue_pos_batch")).toBe(false);
   });
 });

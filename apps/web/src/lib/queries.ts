@@ -5662,6 +5662,10 @@ function usePurchasingSettingsMutation<TInput>(path: string) {
       }),
     onSuccess: (data) => {
       qc.setQueryData(qk.operation.purchasingSettings(), data);
+      if (path === "/supplier-channel") {
+        void qc.invalidateQueries({ queryKey: qk.operation.suppliers() });
+        void qc.invalidateQueries({ queryKey: qk.operation.work() });
+      }
       void qc.invalidateQueries({ queryKey: qk.operation.purchaseToday() });
       void qc.invalidateQueries({ queryKey: qk.catalog() });
     },
