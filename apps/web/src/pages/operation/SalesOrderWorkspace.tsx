@@ -46,7 +46,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "./purchase-orders/purchase-order-detail.css";
 import "./sales-order-detail-theme.css";
-import { Plus, Printer, Trash2, X } from "lucide-react";
+import { Plus, Trash2, X } from "lucide-react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import * as pdfjs from "pdfjs-dist";
@@ -84,6 +84,7 @@ import {
   type SalesOrderRouteMap as SalesOrderRouteModel,
 } from "@carres/shared";
 import Button from "@/components/kit/Button";
+import Icon from "@/components/kit/Icon";
 import Checkbox from "@/components/kit/Checkbox";
 import DatePicker from "@/components/kit/DatePicker";
 import { getCities, getPostcodes, MY_STATES } from "@/data/malaysia-postcodes";
@@ -2449,20 +2450,19 @@ function SalesOrderWorkspaceBody() {
       )}
       {!editing && (
         <Button
-          size="sm"
+          size="md"
+          icon="print"
           variant="ghost"
           disabled={!printData}
           onClick={() => void openPrint()}
           data-testid="workspace-print"
           aria-label={mode === "oldrev" ? "Print this version" : "Print"}
         >
-          {/* Below 480px `Print` is its icon; the word stays for a reader. */}
-          <Printer size={14} aria-hidden="true" />
-          <span className="max-[479px]:sr-only">{mode === "oldrev" ? "Print this version" : "Print ▾"}</span>
+          <span>{mode === "oldrev" ? "Print this version" : "Print ▾"}</span>
         </Button>
       )}
       {canEditOrder && !editing && (
-        <Button size="sm" variant="primary" onClick={() => startEdit(baseline)} data-testid="workspace-edit">
+        <Button size="md" icon="edit" variant="primary" onClick={() => startEdit(baseline)} data-testid="workspace-edit">
           Edit
         </Button>
       )}
@@ -2471,7 +2471,7 @@ function SalesOrderWorkspaceBody() {
           {/* `⋮` LAST, ICON ONLY — owner ruling (Jess, 2026-09-21); its accessible
               name and tooltip are `More actions`. The retired `Propose a change to
               the customer` door is gone: the whole-page Edit carries that change. */}
-          <summary className="btn-ghost cursor-pointer list-none px-2 text-body max-md:inline-grid max-md:h-10 max-md:w-10 max-md:place-items-center max-md:px-0" aria-label="More actions" title="More actions">⋮</summary>
+          <summary className="btn-ghost cursor-pointer list-none px-2 text-body max-md:inline-grid max-md:h-10 max-md:w-10 max-md:place-items-center max-md:px-0" aria-label="More actions" title="More actions"><Icon name="overflow" /></summary>
           <div className="absolute right-0 top-full z-20 mt-1 w-56 rounded-control border border-kit-slate-5 bg-white p-1 shadow-lg">
             <button
               type="button"

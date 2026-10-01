@@ -65,6 +65,7 @@ import {
   SlidersHorizontal,
   Sofa,
   Trash2,
+  Table2,
   Truck,
   User,
   Users,
@@ -134,6 +135,9 @@ const GLYPH = {
   noDate: CalendarOff,
   /** The ERP modules as one group — the Work rail's `Module` heading. */
   modules: LayoutGrid,
+  /** Register presentation choices — owner-approved icon plus visible word. */
+  table: Table2,
+  cards: LayoutGrid,
   note: Lightbulb,
   activity: ScrollText,
   // The three made-to-order categories (Loo, 2026-07-31 — the To Order rail's
