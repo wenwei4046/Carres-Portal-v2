@@ -565,4 +565,4 @@
 
 [data-testid='sales-order-quick-view'] dt { font-size: var(--fs-12); color: theme("colors.kit.slate.11"); }
 [data-testid='sales-order-quick-view'] dd { font-weight: 600; margin-top: 4px; }
-
+[data-kit="drawer"][data-variant="quick-view"] > header button:hover { background: theme("colors.kit.slate.11"); }

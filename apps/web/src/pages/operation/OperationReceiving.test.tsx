@@ -774,7 +774,7 @@ describe("OperationReceiving — the formal GRN Register", () => {
     );
     expect(screen.getByText("Category: Mattress")).toBeInTheDocument();
     expect(screen.getByText("Supplier: Nice Future")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /clear filters/i }));
+    fireEvent.click(screen.getByRole("button", { name: /clear all/i }));
     await waitFor(() =>
       expect(screen.getAllByText("GRN-20260830-7777").length).toBeGreaterThan(0),
     );
