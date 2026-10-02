@@ -424,3 +424,20 @@ Reports 按授权 company/site/source/action 查 current display 与 last verifi
 - **旧flow遗漏：** opening核实、partialmodule、returnfromrepair、多round、Dealer多地点外部move、cancelafterpickup、concurrency/attachmentexportscope；已在§§4–13逐项给完整目标。
 
 **CURRENT MISSION：** 完整独立Showroom再审核推荐已写成一稿，等待owner整体验证／纠正。已批准局部不重问；新建议不是law。**RECOMMENDED NEXT STEP：** 审阅§1及§14的整套经营模型，明确批准或纠正后立即在原owningauthorities持久化并commit；此PLAN在完成该步以前不闭合，之后也不自动转BUILD。
+
+
+## Owner-review clarification · 新购是否搬旧货与列表 UI（PROPOSAL / NOT LAW）
+
+权威：Purchasing §9.8 已允许 new display placement 不选 outgoing Unit；replacement/removal 才选确切现有商品。新购不是必须一进一出。新增货与旧货实际移出分别完成，不能以新订单成立推定旧货已移走。
+
+推荐入口：同一 Showroom 下两个用途明确的视图：当前展示品、订单与申请记录（名称为解释性草稿，正式屏幕用词须按 COPY 收口）。公司／地点按授权范围显示；已知地点自动带入，不默认所有地点权限。
+
+新购表单：商品／数量／需要日期，随后问是否需要同时移走现有展示品。无需移走则直接继续；需要移走则从当前展示品选确切商品，记录去哪里／为何移走、需要搬出日期与是否必须先搬出才能送新货。未知目的地由Operation核实，不默认退回Supplier、退款或批准回购。Dealer已购货的移动须先明确接受方／安排／费用；自营货按原Stock及Supplier ownership路径。新购仍沿适用订单规则，相关搬出用同一来源关联实际执行，不重复建空申请。
+
+订单与申请列表：一个提交／订单来源一行，显示编号、日期、地点、购买或服务性质、商品摘要、当前对外状态、需要／确认日期、待本方行动；搜索／筛选沿Register模板。购买显示正常订单事实，服务显示处理进度，不把统一列表当成统一状态机。相关旧货搬出在该记录详情呈现，不生成第二条人工提交记录；关联正式订单／Case／移动记录各由原模块拥有。
+
+详情：购买部分沿Order Detail语法；选了搬旧货才显示旧货与安排区。维修从原商品发起，带入来源和证据，显示方案／费用接受／安排／结果。对外不列每个内部步骤。内部Operation看到具体依赖与下一行动。
+
+当前展示品：只按真实到场／搬出／返还证据更新。部分交接逐件记录；新货到了而旧货未走仍有未完成搬出，不能整单假完成。旧货已移走而新货未到，当前展示如实显示缺口。申请历史持续可查，不当作现场库存。
+
+经营取舍：多一个是否搬旧货的条件问题，换取提前发现空间／取送依赖；无旧货时不要求空填。推翻条件：走查新增、先出后进、先入后出、部分移动仍需重复填商品地点，或订单状态直接改变现场数量，则需改稿。
