@@ -498,6 +498,13 @@ export default function WarehouseStockRegister({ showroom = false }: { showroom?
       {selectedUnit && (
         <WarehouseUnitDetail
           unitCode={selectedUnit}
+          backTo={(() => {
+            const next = new URLSearchParams(params);
+            next.delete("unit");
+            next.set("tab", showroom ? "showroom" : "stock-onhand");
+            return `/operation?${next}`;
+          })()}
+          backLabel={showroom ? "Showroom Display" : "Inventory"}
           onBack={() => {
             const next = new URLSearchParams(params);
             next.delete("unit");
