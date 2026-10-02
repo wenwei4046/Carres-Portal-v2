@@ -1635,6 +1635,13 @@ describe("confirmed optional listing grouping", () => {
     expect(screen.getByTestId('grid-parent-row')).toBeInTheDocument();
     expect(screen.getByTestId('grid-footer')).toHaveTextContent('1 sales order');
   });
+  it('None remains flat even when an older personal layout had column grouping', () => {
+    window.localStorage.setItem('carres.salesOrders.register.v6.anon', JSON.stringify({ order: [], hidden: [], widths: {}, groupBy: ['customer'], sort: null }));
+    mount();
+    expect(screen.getByTestId('grid-header')).toBeInTheDocument();
+    expect(screen.getByTestId('grid-parent-row')).toBeInTheDocument();
+    expect(screen.queryByText('Customer: Kimmy')).not.toBeInTheDocument();
+  });
   it('keeps the count in the footer without duplicating it in the toolbar', () => {
     mount();
     expect(screen.getByTestId('grid-footer')).toHaveTextContent('1 sales order');

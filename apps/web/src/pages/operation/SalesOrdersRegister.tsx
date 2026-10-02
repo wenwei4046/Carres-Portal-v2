@@ -1292,6 +1292,7 @@ export default function SalesOrdersRegister() {
             appearance="reference"
             sessionKey={`${storageKey}.${registerSession}`}
             presentationTools
+            allowColumnGrouping={false}
             pageToolsItems={[
               { key: "group-none", label: `Group by: None${!urlParams.get("group") ? " ✓" : ""}`, separatorBefore: true, onSelect: () => setParam("group", null) },
               ...(["delivery", "stock", "payment"] as const).map(group => ({

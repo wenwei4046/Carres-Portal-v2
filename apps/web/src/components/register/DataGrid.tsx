@@ -249,6 +249,8 @@ export type DataGridProps<T> = {
       the operator's own grouping is never overridden. Omitted = no grouping,
       exactly as before. */
   initialGroupBy?: string[];
+  /** Governed page grouping replaces free column grouping, including older saved layouts. */
+  allowColumnGrouping?: boolean;
   /** Told the column sort whenever it changes, and once on load with the
       saved one; null when nothing is sorted. The Trial Balance prints its
       headings only while nothing is sorted. Pass a stable function. */
@@ -747,6 +749,7 @@ function DataGridInner<T>({
   columns,
   storageKey,
   initialGroupBy,
+  allowColumnGrouping = true,
   onSortChange,
   onGroupByChange,
   countsInGroup,
@@ -832,7 +835,8 @@ function DataGridInner<T>({
     [expandedRows, toggleExpand],
   );
   const [layout, setLayoutRaw] = useState<Layout>(() => {
-    const saved = readLayout(storageKey);
+    const stored = readLayout(storageKey);
+    const saved = allowColumnGrouping ? stored : { ...stored, groupBy: [] };
     // `readLayout` hands back DEFAULT_LAYOUT itself only when nothing is saved.
     return saved === DEFAULT_LAYOUT && initialGroupBy?.length
       ? { ...DEFAULT_LAYOUT, groupBy: [...initialGroupBy] }
@@ -1752,7 +1756,7 @@ function DataGridInner<T>({
     const sourceKey = e.dataTransfer.getData("text/x-datagrid-col");
     if (!sourceKey) return;
     const col = columns.find((c) => c.key === sourceKey);
-    if (!col || col.groupable === false) return;
+    if (!allowColumnGrouping || !col || col.groupable === false) return;
     setLayout((l) =>
       l.groupBy.includes(sourceKey) ? l : { ...l, groupBy: [...l.groupBy, sourceKey] },
     );
@@ -3616,7 +3620,7 @@ function DataGridInner<T>({
               >
                 Auto-fit width
               </button>
-              {col?.groupable !== false && (
+              {allowColumnGrouping && col?.groupable !== false && (
                 <button
                   className={styles.ctxItem}
                   onClick={() => {
