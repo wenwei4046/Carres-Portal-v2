@@ -152,7 +152,10 @@ describe("GET /api/operation/pos", () => {
     const ordersIn = vi.fn(() => paged(orderRows));
     const ordersSelect = vi.fn(() => ({ in: ordersIn }));
 
-    const skusIn = vi.fn(() => paged(skuRows));
+    const skusIn = vi.fn(() => {
+      const result = Promise.resolve({ data: skuRows, error: null });
+      return { ...paged(skuRows), then: result.then.bind(result) };
+    });
     const skusSelect = vi.fn(() => ({ in: skusIn }));
 
     // 0311's destination registry rides the list so the per-line picker has
@@ -566,7 +569,7 @@ describe("GET /api/operation/pos", () => {
         { so: 4001, delivery_date: "2026-09-20", customer_name: "Ah Hock" },
         { so: 4002, delivery_date: "2026-09-05", customer_name: "Mei Ling" },
       ],
-      [{ sku: "MAT-K-001", variant: "King", product_models: { name: "Cody" } }],
+      [{ sku: "MAT-K-001", variant: "King", product_models: { name: "Cody", category: "Bedframe" } }],
     );
     const jwt = await makeJwt("operation");
     const res = await app.fetch(
@@ -581,7 +584,7 @@ describe("GET /api/operation/pos", () => {
         customer_delivery: string | null;
         eta_revised: boolean;
         orders: { so: number; customer_name: string }[];
-        purchase_order_lines: { id: string; model_name: string | null; size: string | null }[];
+        purchase_order_lines: { id: string; model_name: string | null; size: string | null; category: string | null }[];
       }[];
     };
     expect(ordersIn).toHaveBeenCalledWith("so", expect.arrayContaining([4001, 4002]));
@@ -597,6 +600,8 @@ describe("GET /api/operation/pos", () => {
     const lineA = po.purchase_order_lines.find((l) => l.id === "line-a");
     const lineB = po.purchase_order_lines.find((l) => l.id === "line-b");
     expect(lineA?.model_name).toBe("Cody");
+    expect(lineA?.category).toBe("Bedframe");
+    expect(lineB?.category).toBeNull();
     expect(lineA?.size).toBe("King");
     // A SKU the catalog does not know stays honest: null, never an invention.
     expect(lineB?.model_name).toBeNull();
