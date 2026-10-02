@@ -1062,6 +1062,8 @@ export default function PurchaseOrdersPage() {
           ) : null}
             <DataGrid<RegisterRow>
               appearance="reference"
+              presentationTools
+              toolbarSummary={(visible) => <span className="shrink-0 text-meta tabular-nums text-kit-slate-11">{visible.length} purchase orders</span>}
               palette="slate"
               searchPresentation="responsive"
               rows={visibleRows}
