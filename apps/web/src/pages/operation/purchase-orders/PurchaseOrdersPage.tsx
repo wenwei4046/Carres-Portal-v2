@@ -1429,7 +1429,7 @@ function PurchaseOrderQuickView({ row, destinations, onClose, onOpenFull, onChan
           doors={doorsForIssuedPo(issuedPo, messageTemplate)}
           onOpened={(channel) => recordOpen.mutate({ channel })} onConfirmed={onChanged} />
       </Block>}
-      <CurrentAction row={row} owner={owner} onIssue={!row.facts.currentSend && row.facts.operationStatus !== "Cancelled" ? onOpenFull : null} />
+      <CurrentAction row={row} owner={owner} onIssue={null} />
       <Block title="Supplier reply">
         <SupplierReplySection key={`${row.id}:${row.facts.version}`} poId={row.id}
           version={row.facts.version} officialDeliveryDate={row.po.official_delivery_date ?? null}

@@ -3649,13 +3649,23 @@ sideways under the pinned `PO Date · PO No` (`PO No` alone below 768px) rather 
 column. **Owed:** the same measurement signed in on production, where JetBrains Mono renders
 document numbers wider than the fixture font.
 
-**PO OPENING AND OBJECT COMPOSITION — OWNER RULING 2026-10-02 · APPROVED TARGET / NOT BUILT.**
+**PO OPENING AND OBJECT COMPOSITION — OWNER RULING 2026-10-02 · APPROVED TARGET / BUILD IN PROGRESS.**
 Jess's annotated deployed Sales Order quick panel is the presentation reference. Clicking a PO
 number opens the shared right-side quick panel, retaining the register behind it. Its header
 shows `{PO-YYMMDD-RRRR-Vn} · {Supplier}`, the current state, and the shared Print, Open full page
 and Close icon controls. The goods expansion remains a separate register control.
 
 The quick panel has two tabs: **`PO info`** and **`Communication`**.
+
+**Measured local implementation, 2026-10-02:** the real PO Register number now opens the shared
+quick-view Drawer, keeping the Register behind it. PO info uses shared plain facts and governed
+goods rows. Communication reuses `PoIssueEvidence` and `SupplierReplySection`, including actual
+current-version send evidence, recorded supplier channels and the existing reply writer. Save
+refreshes the Register facts; no separate discussion store or invented history is introduced.
+Open full page reaches the existing formal object. Cancelled POs have no sending controls.
+This is local build evidence, not production closure. Header Print and the complete Receiving/
+Claims connected doors remain approved target gaps; production verification is still required.
+
 
 - **PO info:** read-only supplier, Supplier Deliver To, PO Doc Date, original PO Delivery Date,
   current-version sending fact, Items with source/Unit and quantity progress, and connected
