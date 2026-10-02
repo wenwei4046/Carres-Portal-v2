@@ -110,7 +110,10 @@ view. When a related stock claim exists, the Case shows a read-only link to its 
 are purchased from Carres; this is not consignment. Dirt, display wear, damage or a product
 problem may be reported as a service request through the same Service Case intake, from the
 original order/item when available. Preserve Dealer company, authorised showroom location,
-actual reporter, affected goods, description, photos and requested help. Missing source evidence
+actual reporter, affected goods, description and requested help. Dealer identifies the product
+in the request form and uploads photos and video when needed to explain its condition or the
+requested work (owner clarification 2026-10-02). Video is not mandatory for every request.
+Missing source evidence
 uses the existing later-linking intake rather than blocking the report or inventing an order.
 
 Operation assesses the evidence and entitlement, distinguishes product fault from dirt, wear
@@ -130,6 +133,18 @@ may be linked read-only under §1; Dealer does not repeat its report for Purchas
 
 This ruling approves Dealer display-service coverage only, not the complete Showroom/Dealer
 Blueprint, final portal labels, blanket free service or unconditional exchange/return policy.
+
+**PROPOSAL / NOT LAW — first handling deadline, 2026-10-02.** Operation starts handling and
+provides a substantive first response within two working days of submission: assesses available
+evidence, asks for the specific missing facts, or gives the proposed next action. Opening or
+automatically acknowledging a request alone does not satisfy this response. It is not a promise
+to complete repair, transport or exchange within two days. Calculate the deadline from actual
+submission using the governed Carres working calendar, retain submission time and due date, and
+route overdue first-response work to the responsible owner/cover. Later execution dates are
+confirmed according to the remedy/provider and shown on the same record. Owner approval is
+still required for this new service-level commitment. Falsifier: operator review shows the
+two-day response promise cannot be met under the actual roster/calendar, or the visible wording
+is mistaken for a two-day completion guarantee; revise the commitment before implementation.
 
 ### Customer collection and replacement arrangement
 
