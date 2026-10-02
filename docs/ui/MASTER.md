@@ -3386,7 +3386,10 @@ unrelated Route/Monthly previews and unapproved master gaps are excluded.
 
 ### Optional register grouping — owner confirmed 2026-10-02
 
-APPROVED TARGET / BUILT IN LOCAL SO PREVIEW / NOT DEPLOYED. The complete existing register,
+BUILT AND MERGED 2026-10-02 in PR #1850, source `2fbc2b62ffcc23c23e869f236c976ee1a3102638`.
+Production release and five-surface revision proof: [Deploy production run 36984977880](https://github.com/wenwei4046/Carres-Portal-v2/actions/runs/36984977880).
+Authenticated rendered evidence is recorded by the dedicated delivery controller; successful
+release alone does not imply full cross-module template adoption. The complete existing register,
 not a separate reduced mock, owns grouping. Default None. Existing shared Page tools (⋯) offers
 Group by: None, Delivery Status, Stock Status, Payment Status for Sales Orders. Exactly one
 selected grouping; other modules expose only their governed meaningful grouping fields.
@@ -3397,11 +3400,11 @@ selected grouping; other modules expose only their governed meaningful grouping 
   groups. Rows retain solid status pills. Hidden status columns may still supply grouping. Cards use the same group headings/collapse and result state; no physical-goods delivery condition belongs in Not applicable rather than disappearing.
 - None restores one ordinary table. Grouping never duplicates an SO across several sections or
   calculates a new overall status. Counts reflect current results, not an unfiltered population.
-- Choice must remain stable while operating the listing; local SO preview encodes `group` in
+- Choice must remain stable while operating the listing; the delivered SO register encodes `group` in
   route parameters. Browser/account persistence beyond URL is not claimed implemented.
 - Do not invent a second rail control or page-local grouping engine. Existing DataGrid gained
-  optional `pageToolsItems` to compose commands into its existing shared menu. Scope and tests
-  must be isolated before release; no deployment is inferred from this owner acceptance.
+  optional `pageToolsItems` to compose commands into its existing shared menu. PR #1850 isolates
+  the delivered listing and tests from unfinished Route/Customer/Monthly preview work.
 
 ### Complete-template adoption contract — clarified 2026-10-02
 
