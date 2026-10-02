@@ -7224,3 +7224,17 @@ body MD5 `e90653050c4a4157a043132dfd9fe0db` match the Git file/body; grants and 
 counts remain unchanged. No customer reversal, supplier message or Stock reassignment persisted.
 PR checks, repository merge and dependent deployment convergence remain owed.
 
+
+**PO-window sending after receipt — BUILD IN PROGRESS, 2026-10-02.** The measured shared
+window adapter treated a received PO as already sent, contradicting §5.6 and §2.4. It now reads
+only current-version confirmed-sent evidence. A window with no demand left but an unsent
+completed PO retains the same occurrence and embedded send area; goods status remains Received.
+The API projection acceptance covers received V2 without its current mark, the current send action
+and disappearance only after that mark exists. No quantity, receipt, supplier channel or ledger
+identity changes. Full checks and production acceptance remain owed.
+The existing PO-window panel already reads this shared adapter and keeps its existing send door.
+49 API projection, eight shared window and three panel tests pass. Restoring the receipt shortcut
+makes the new received/current-version journey fail (negative control). Read-only production
+inventory found the four Completed POs PO-2052, PO-2054, PO-SMOKE-C and PO-SMOKE-W have no exact
+SO source lineage; no window membership is invented to create a live demonstration. This limits
+production acceptance until a real source-linked received PO exists; preserve every original fact.

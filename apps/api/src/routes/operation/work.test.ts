@@ -1244,11 +1244,18 @@ describe("the PO window card — one occurrence per window, never one per Sales 
     expect(item!.tone).toBe("warning");
   });
 
-  it("a received PO needs no sending, so its window owes nothing", () => {
-    expect(projectPoWindowWork({
-      read: read([], [{ poId: "PO250925-4827", status: "received", supplierId: "ohana", supplierName: "Ohana", destinationId: null, officialDeliveryDate: null, sentCurrentVersion: false, version: 1, poWindow: "2026-09-25T11:30" }]),
+  it("goods completion keeps the window's current sending obligation open until confirmed", () => {
+    const received = { poId: "PO250925-4827", status: "received", supplierId: "ohana", supplierName: "Ohana", destinationId: null, officialDeliveryDate: null, sentCurrentVersion: false, version: 2, poWindow: "2026-09-25T11:30" };
+    const project = (sentCurrentVersion: boolean) => projectPoWindowWork({
+      read: read([], [{ ...received, sentCurrentVersion }]),
       suppliers, poDuty, today: "2026-09-25", now: "2026-09-25T04:00:00.000Z",
-    })).toEqual([]);
+    });
+    const [item] = project(false);
+    expect(item?.problem).toBe("1 PO issued · 1 not sent yet");
+    expect(item?.action).toBe("Click WhatsApp, send PO250925-4827(2) to Ohana");
+    expect(item?.interaction).toMatchObject({ mode: "embedded", componentKey: "purchasing.po_issue_evidence" });
+    expect(project(true)).toEqual([]);
+    expect(received.status).toBe("received");
   });
 
   it("unreadable window settings fail the Purchasing source instead of showing an empty day", () => {
