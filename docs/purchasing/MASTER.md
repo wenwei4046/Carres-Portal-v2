@@ -7244,6 +7244,9 @@ The existing API already returns the governed 422 refusal, so this SQL has no de
 application writer or interface change awaiting deployment.
 
 
+**PO Listing shared toolbar adoption — BUILD IN PROGRESS, 2026-10-02.** Owner requests the deployed Sales Orders Listing grammar for PO. Purchase Orders uses the same DataGrid presentation-tools door: visible current result count and search, with supported Export and Columns in the far-right Page tools overflow. Existing PO grouping, filters, columns, source links, goods expansion and exports remain. This toolbar change does not claim Cards, selection, exception-fact completeness or full Purchasing completion; production acceptance is pending.
+
+
 **PO-window sending after receipt — BUILD IN PROGRESS, 2026-10-02.** The measured shared
 window adapter treated a received PO as already sent, contradicting §5.6 and §2.4. It now reads
 only current-version confirmed-sent evidence. A window with no demand left but an unsent
