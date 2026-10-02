@@ -1081,6 +1081,8 @@ export default function PurchaseOrdersPage() {
             <DataGrid<RegisterRow>
               appearance="reference"
               presentationTools
+              labelledToolbar
+              rowHeight={32}
               presentationKey={cards ? "cards" : "table"}
               toolbarEnd={presentationTabs}
               selectionPrimary={presentationTabs}
