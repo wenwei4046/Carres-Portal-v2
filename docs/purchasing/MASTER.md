@@ -3473,7 +3473,12 @@ number on desktop, number only on narrow screens. **UI MASTER §6.10 owns this**
 grouped listing page; this section neither restates its mechanics nor varies them.
 
 **Rail — owner-approved 2026-10-01 / APPROVED TARGET, NOT BUILT.** Preserve the
-supplier-follow-up purpose and adopt the confirmed shared template. The complete rail is:
+supplier-follow-up purpose and adopt the confirmed shared template. **Owner correction 2026-10-02:**
+remove the visible `Filters` heading. The local preview uses the deployed Sales Order vertical
+`Order list` navigation grammar. **PROPOSAL / NOT LAW:** retain only Order list here; Monthly
+demand remains Sales Order/demand planning rather than duplicating it inside issued POs.
+Falsifier: a measured PO-owned monthly operating job that the existing demand-planning surface
+cannot serve. The complete monitor rail is:
 
 | Group | Filters |
 |---|---|
