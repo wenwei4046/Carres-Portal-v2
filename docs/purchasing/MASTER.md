@@ -7160,3 +7160,16 @@ including the existing special overdue/undated row semantics. Filters collapse/r
 shared rail control on narrow screens. No new demand writer or Sales Order edit is added.
 Expanded monthly filtering and other approved register controls remain separate delivery work;
 this entry is implementation evidence, not authenticated production acceptance.
+
+**Committed Sales Order reversal — owner-approved database guard, 2026-10-02; BUILD IN PROGRESS.**
+Jess approved the concrete prevention check after its plain-language explanation: an SO with
+exact PO source lineage, legacy PO SO references, an exact reserved-line Unit binding, an active
+SO reference binding or a sold-order Unit binding cannot return directly to Place. It uses the
+existing `wrong_stage` refusal and existing Orders amendment/cancellation flow; no Purchasing or
+Stock fact is deleted or reassigned. An uncommitted SO retains its existing reversal and audit.
+Migration 0634 keeps the existing role/dealer gate, shared Order lock, grants and private writer.
+Local full-chain acceptance covers all five independent commitments, the uncommitted positive
+case, a released/free reference, permission refusals, a controlled guard-removal negative case
+and a concurrent source reservation committed while reversal waits. Production rollback probe,
+exact-file apply/hash reconciliation and delivery acceptance remain owed; no online mutation
+is claimed by these local results.
