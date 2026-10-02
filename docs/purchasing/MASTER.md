@@ -6013,6 +6013,12 @@ transaction, not proof of a Dealer-company display purchasing capability. Whole-
 approval, account provisioning, cutover and application delivery remain outside this ruling.
 
 
+**Current-goods build evidence — 2026-10-02, branch only.** The Showroom current-goods
+reader and exact-goods transfer handoff are implemented; Stock §3 records their measured
+boundary and remaining targets. This is not completion of the approved three-view journey,
+new purchase/service intake, account cutover or timing Settings. Existing Purchasing display
+documents and commercial approval rules remain unchanged.
+
 ### Showroom page and request journey — OWNER-APPROVED / LOCKED 2026-10-02
 
 Approved presentation/operating target, not application delivery proof. One authorised Showroom

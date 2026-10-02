@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -121,6 +121,7 @@ function useOptions(
   caseId: string | null = null,
   search = "",
   ro: string | null = null,
+  selectedIds: readonly string[] = [],
 ) {
   const p = new URLSearchParams();
   if (claim) p.set("claim", claim);
@@ -128,8 +129,9 @@ function useOptions(
   // 0602: a repair pickup offers only its Repair Order's own Units.
   if (ro) p.set("ro", ro);
   if (search) p.set("q", search);
+  selectedIds.forEach((id) => p.append("unit", id));
   return useQuery({
-    queryKey: ["arrival-options", claim, caseId, search, ro],
+    queryKey: ["arrival-options", claim, caseId, search, ro, selectedIds],
     queryFn: () =>
       apiFetch<Options>(`/api/operation/arrival-sources/options?${p}`),
   });
@@ -143,7 +145,9 @@ function CreateArrival() {
     // 0602: `Hand {n} Units to {Supplier}` on a Repair Order opens here.
     ro = params.get("ro");
   const [search, setSearch] = useState("");
-  const q = useOptions(claim, caseId, search, ro);
+  const initialIds = useMemo(() => params.getAll("unit"), [params]);
+  const q = useOptions(claim, caseId, search, ro, initialIds);
+  const [prefilled, setPrefilled] = useState(false);
   const [selected, setSelected] = useState<Unit[]>([]);
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
@@ -160,6 +164,18 @@ function CreateArrival() {
   const [passedConditions, setPassedConditions] = useState<string[]>([]);
   const [error, setError] = useState("");
   const [key] = useState(() => crypto.randomUUID());
+  useEffect(() => {
+    if (prefilled || !q.data || !initialIds.length) return;
+    const initial = q.data.units.filter((unit) => initialIds.includes(unit.id));
+    if (initial.length !== new Set(initialIds).size) {
+      setError("Stock could not be loaded");
+      return;
+    }
+    setSelected(initial);
+    const sites = new Set(initial.map((unit) => unit.warehouse_id));
+    if (sites.size === 1) setFrom(initial[0].warehouse_id);
+    setPrefilled(true);
+  }, [q.data, initialIds, prefilled]);
   const save = useMutation({
     mutationFn: (input: unknown) =>
       apiFetch<ArrivalSource>("/api/operation/arrival-sources", {
@@ -180,7 +196,7 @@ function CreateArrival() {
             ? `/operation?tab=claims&claim=${claim}`
             : caseId
               ? `/operation?tab=service-notes&case=${caseId}`
-              : "/operation?tab=stock-onhand"
+              : params.get("source") === "showroom" ? "/operation?tab=showroom" : "/operation?tab=stock-onhand"
         }
         className="text-kit-blue-11"
       >

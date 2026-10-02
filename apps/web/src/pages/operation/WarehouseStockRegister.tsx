@@ -110,17 +110,17 @@ function SoCell({ u }: { u: StockRegisterUnit }) {
   );
 }
 
-export default function WarehouseStockRegister() {
+export default function WarehouseStockRegister({ showroom = false }: { showroom?: boolean } = {}) {
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const selectedUnit = params.get("unit");
   const unitHref = (code: string) => {
     const next = new URLSearchParams(params);
-    next.set("tab", "stock-onhand");
+    next.set("tab", showroom ? "showroom" : "stock-onhand");
     next.set("unit", code);
     return `/operation?${next}`;
   };
-  const { data, isLoading, isError, error, refetch } = useStockRegister();
+  const { data, isLoading, isError, error, refetch } = useStockRegister(showroom ? "PJ Showroom" : undefined);
   const [railOpen, setRailOpen] = useState(true);
   const requestedView = params.get("view");
   const view: InventoryView =
@@ -137,7 +137,7 @@ export default function WarehouseStockRegister() {
 
   function setView(next: InventoryView) {
     const updated = new URLSearchParams(params);
-    updated.set("tab", "stock-onhand");
+    updated.set("tab", showroom ? "showroom" : "stock-onhand");
     updated.delete("history");
     updated.delete("status");
     if (next === "all") updated.delete("view");
@@ -146,7 +146,7 @@ export default function WarehouseStockRegister() {
   }
   function setStatus(next: InventoryStatus) {
     const updated = new URLSearchParams(params);
-    updated.set("tab", "stock-onhand");
+    updated.set("tab", showroom ? "showroom" : "stock-onhand");
     updated.delete("view");
     updated.delete("history");
     if (status === next) updated.delete("status");
@@ -171,9 +171,16 @@ export default function WarehouseStockRegister() {
   );
 
   const [search, setSearch] = useState("");
+  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const [gridRevision, setGridRevision] = useState(0);
   const now = useMemo(() => new Date(), []);
-  const allUnits = useMemo(() => data?.units ?? [], [data]);
+  const allUnits = useMemo(() => {
+    const units = data?.units ?? [];
+    // Showroom is a scoped reader of the owning register, never opening stock.
+    // Actual Site identity decides presence; display condition/purchase purpose
+    // cannot put goods still in Klang into a showroom's current list.
+    return showroom ? units.filter((unit) => unit.siteName === "PJ Showroom") : units;
+  }, [data, showroom]);
 
   function setRail(key: "ownership" | "category" | "site", value: string | null) {
     const next = new URLSearchParams(params);
@@ -183,7 +190,7 @@ export default function WarehouseStockRegister() {
   }
 
   function clearAll() {
-    setParams(new URLSearchParams({ tab: "stock-onhand" }), { replace: true });
+    setParams(new URLSearchParams({ tab: showroom ? "showroom" : "stock-onhand" }), { replace: true });
     setSearch("");
     setGridRevision((revision) => revision + 1);
   }
@@ -470,7 +477,7 @@ export default function WarehouseStockRegister() {
       dateColumn("lastEventAt", "Last moved", { defaultHidden: true, chooserGroup: "Dates", absent: "Not moved yet" }),
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [navigate, params],
+    [navigate, params, showroom],
   );
 
   const filtered = isRailFiltered({ ...sel, query: search }) || !!status || view !== "all";
@@ -493,8 +500,8 @@ export default function WarehouseStockRegister() {
         {!selectedUnit && (
           <ModuleHeader
             testId="stock-register-destination-header"
-            word="Inventory"
-            docTitle="Inventory · Warehouse — Carres"
+            word={showroom ? "Showroom Display" : "Inventory"}
+            docTitle={showroom ? "Showroom Display · Carres" : "Inventory · Warehouse — Carres"}
             right={
               <Link className="text-kit-blue-11 text-body" to="/operation?tab=arrival-source&kind=transfer">
                 Request Transfer
@@ -610,8 +617,36 @@ export default function WarehouseStockRegister() {
                 appearance="reference"
                 rows={rows}
                 columns={columns}
-                storageKey="carres.warehouse.inventory.v5"
+                storageKey={showroom ? "carres.showroom.inventory.v1" : "carres.warehouse.inventory.v5"}
                 rowKey={(u) => u.id}
+                selectable={showroom ? {
+                  selectedKeys,
+                  onToggle: (key) => setSelectedKeys((previous) => {
+                    const next = new Set(previous);
+                    if (next.has(key)) next.delete(key); else next.add(key);
+                    return next;
+                  }),
+                  onToggleAll: (keys, all) => setSelectedKeys((previous) => {
+                    const next = new Set(previous);
+                    keys.forEach((key) => { if (all) next.delete(key); else next.add(key); });
+                    return next;
+                  }),
+                  isSelectable: (row) => {
+                    const unit = row as StockRegisterUnit;
+                    return unit.identityScope !== "quantity" && unit.qty === 1 && isHeldUnit(unit);
+                  },
+                } : undefined}
+                selectionActions={showroom ? [{
+                  label: () => "Request Transfer",
+                  kind: "write",
+                  visible: (count) => count <= 100,
+                  onClick: (selected) => {
+                    const units = selected as StockRegisterUnit[];
+                    const query = new URLSearchParams({ tab: "arrival-source", kind: "transfer", source: "showroom" });
+                    units.forEach((unit) => query.append("unit", unit.id));
+                    navigate(`/operation?${query}`);
+                  },
+                }] : undefined}
                 exportName="Inventory"
                 searchPlaceholder="Unit ID, item, SO No, PO No or supplier…"
                 isLoading={isLoading || !data}

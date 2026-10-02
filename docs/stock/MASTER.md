@@ -163,6 +163,19 @@ Showroom view; no duplicate showroom stock ledger. Dealer-owned goods remain out
 Carres-controlled inventory boundary. This ruling approves the source/presentation boundary,
 not application implementation or a claim that every physical count has been verified.
 
+**Showroom current-goods delivery — BUILT ON BRANCH 2026-10-02; production verification
+pending.** Internal Operation/Principal `?tab=showroom` reuses the existing Stock Register and
+Unit detail, with an owning-register Site query and a retained PJ base scope through clearing
+filters, search/export and browser navigation. Exact held goods can be selected for the existing
+`Request Transfer` source workflow: explicit IDs are read before the picker's 100-row cap, the
+original Site/pieces are carried forward, and unresolved pieces are not guessed. No stock writer,
+RLS policy, second ledger or physical movement-on-submit was added. Counted goods are readable
+without a Unit ID and are not offered to the exact-Unit transfer action. Internal access retains
+its current role/JWT/RLS boundary; this does not open the internal register to Dealer logins.
+Remaining approved targets: full orders/requests view and source-linked service/purchase intake,
+location mapping/authorised Showroom access, grouped product view, timing Settings and global
+actual movement history. These are not claimed delivered by the current-goods slice.
+
 **Showroom presentation closure — OWNER-APPROVED 2026-10-02.** Purchasing §9.8 owns the
 approved Showroom page/request journey. Stock supplies current Carres-controlled location goods,
 exact identities/counts and actual movement history; only evidenced physical events change it.
