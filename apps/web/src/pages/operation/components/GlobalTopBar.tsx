@@ -173,9 +173,9 @@ export function TopBarIcons() {
           title="Alerts"
           aria-haspopup="menu"
           aria-expanded={open === "alerts"}
-          className="relative p-2 rounded-md text-base-500 hover:text-base-900 hover:bg-hovertint transition-colors"
+          className="relative flex items-center justify-center h-10 w-10 min-[768px]:h-8 min-[768px]:w-8 rounded-md text-base-500 hover:text-base-900 hover:bg-hovertint transition-colors"
         >
-          <Bell size={18} />
+          <Bell size={16} aria-hidden />
           {alerts.total > 0 && (
             <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-[16px] px-1 rounded-full bg-danger text-white text-label font-semibold leading-[16px] text-center">
               {alerts.total > 99 ? "99+" : alerts.total}
@@ -237,9 +237,9 @@ export function TopBarIcons() {
           title="Help"
           aria-haspopup="menu"
           aria-expanded={open === "help"}
-          className="flex items-center gap-1.5 p-2 rounded-md text-base-500 hover:text-base-900 hover:bg-hovertint transition-colors"
+          className="flex items-center justify-center h-10 w-10 min-[768px]:h-8 min-[768px]:w-8 rounded-md text-base-500 hover:text-base-900 hover:bg-hovertint transition-colors"
         >
-          <HelpCircle size={18} />
+          <HelpCircle size={16} aria-hidden />
         </button>
         {open === "help" && (
           <div className="absolute right-0 top-full mt-1 z-40 w-56 bg-card text-card-foreground border border-base-200 rounded-lg shadow-lg py-1">
@@ -327,9 +327,9 @@ export function TopBarIcons() {
           title="Settings"
           aria-haspopup="menu"
           aria-expanded={open === "settings"}
-          className="flex items-center gap-1.5 p-2 rounded-md text-base-500 hover:text-base-900 hover:bg-hovertint transition-colors"
+          className="flex items-center justify-center h-10 w-10 min-[768px]:h-8 min-[768px]:w-8 rounded-md text-base-500 hover:text-base-900 hover:bg-hovertint transition-colors"
         >
-          <Settings size={18} />
+          <Settings size={16} aria-hidden />
         </button>
         {open === "settings" && (
           <div

@@ -104,6 +104,77 @@ rekeys the complaint, pictures, video, item or history.
 `Purchasing → Supplier Claims` is Purchasing's independent stock-claim Register, not a Case work
 view. When a related stock claim exists, the Case shows a read-only link to its progress.
 
+**Showroom journey closure — OWNER-APPROVED 2026-10-02.** The approved page/request journey
+is in Purchasing §9.8. Existing-goods service carries source identity/location/evidence into the
+same Case; the Showroom request view reads meaningful progress, proposal/fee acceptance,
+arrangements and outcome. New purchases follow normal order rules, without a duplicate Service
+progress workflow. Actual return/custody facts remain with their physical owners. The proposed
+5/7/3-day checkpoints and blanket Dealer 14-day promise were not approved by this page ruling.
+
+### Dealer purchased display service — OWNER-RULED 2026-10-02
+
+**APPROVED TARGET / NOT BUILT.** Dealer goods, including display bedframes and mattresses,
+are purchased from Carres; this is not consignment. Dirt, display wear, damage or a product
+problem may be reported as a service request through the same Service Case intake, from the
+original order/item when available. Preserve Dealer company, authorised showroom location,
+actual reporter, affected goods, description and requested help. Dealer identifies the product
+in the request form and uploads photos and video when needed to explain its condition or the
+requested work (owner clarification 2026-10-02). Video is not mandatory for every request.
+Missing source evidence
+uses the existing later-linking intake rather than blocking the report or inventing an order.
+
+Operation assesses the evidence and entitlement, distinguishes product fault from dirt, wear
+or other damage, and coordinates the confirmed remedy: cleaning, repair, parts, collection and
+return, or a commercially authorised replacement. A request does not itself approve the remedy
+or establish free warranty coverage. Record whether the service is free or charged, the amount
+and responsible payer; obtain Dealer acceptance of a charged proposal before execution.
+Execution must identify the responsible provider and respect existing Service/Delivery boundaries;
+this ruling does not establish a Carres on-site inspection or technician service.
+
+Dealer and Operation communicate, add evidence, confirm arrangements and view progress on the
+same Case. Record actual responder, arrangements, collection/return facts, outcome evidence and
+Dealer acknowledgement; unresolved outcomes remain open for follow-up. Department Work links
+to this record and does not duplicate the request. Existing stock, custody and money documents
+remain with their owning modules. A related independently sourced Purchasing Supplier Claim
+may be linked read-only under §1; Dealer does not repeat its report for Purchasing.
+
+**Display fulfilment and visible progress — OWNER-RULED 2026-10-02.** When the confirmed
+display request/remedy requires newly produced goods, use the normal applicable product
+production lead time as for Sales Orders; the first-response deadline is not a production or
+delivery promise. Operation may arrange earlier delivery when the goods and lawful release
+conditions permit, subject to the receiving location's availability and existing Delivery gates.
+This does not shorten a supplier's production commitment by assumption or override commercial,
+payment, stock or custody authority.
+
+Separate service-progress follow-up applies to repair and other non-new-purchase assistance.
+A new display purchase follows the applicable Sales Order rules and normal order communication,
+not a second Service progress workflow (owner clarification 2026-10-02). If a remedy includes a
+new purchase, its order execution remains with the order owner; the original service outcome
+still requires its own evidence. Dealer does not need every internal fulfilment step. New-display timing defaults and manual
+request adjustments follow Purchasing §9.8; they do not change repair response or completion
+promises. Operation can publish meaningful Dealer-visible progress on the same source-linked request: stock ready,
+scheduling in progress, and the confirmed sending/delivery arrangement with its date. Published
+progress reads the owning Stock/Delivery facts and records the publishing actor/time; a click
+must not fabricate readiness or a physical dispatch. Keep the requested date, estimated date,
+confirmed dispatch/delivery dates and actual handover distinct. Actual dispatch requires its
+real evidence. If an arrangement changes, show the current arrangement and preserve the prior
+version/history; Dealer does not re-submit the request to see the update. Screen labels remain
+subject to COPY admission. This cross-module handoff does not make Service the owner of a new
+display purchase or of Stock/Delivery execution.
+
+This ruling approves Dealer display-service coverage only, not the complete Showroom/Dealer
+Blueprint, final portal labels, blanket free service or unconditional exchange/return policy.
+
+**APPROVED TARGET / NOT BUILT — first handling deadline, owner 2026-10-02.** Operation starts handling and
+provides a substantive first response within two working days of submission: assesses available
+evidence, asks for the specific missing facts, or gives the proposed next action. Opening or
+automatically acknowledging a request alone does not satisfy this response. It is not a promise
+to complete repair, transport or exchange within two days. Calculate the deadline from actual
+submission using the governed Carres working calendar, retain submission time and due date, and
+route overdue first-response work to the responsible owner/cover. Later execution dates are
+confirmed according to the remedy/provider and shown on the same record. This is an approved
+first-response commitment, not a two-day completion guarantee.
+
 ### Customer collection and replacement arrangement
 
 **APPROVED / NOT BUILT — Blueprint completion, Jess 2026-09-18.** Service owns

@@ -436,6 +436,7 @@ export default function OperationApp() {
              screen — the same defect Manual Purchase and Delivery Work each
              shipped with, measured live on the CARD 01 walk. */
           tab !== "stock-onhand" &&
+          tab !== "showroom" &&
           tab !== "stock-plan" &&
           tab !== "movements" &&
           /* WAREHOUSE — Monitor, Inbound and Outbound draw their own
@@ -661,6 +662,7 @@ export default function OperationApp() {
             {/* CARD-2026-08-20-stock-register: the Stock Register replaces the
                 On hand surface. Same `?tab=` address, new page. */}
             {tab === "stock-onhand" && <WarehouseStockRegister />}
+            {tab === "showroom" && <WarehouseStockRegister showroom />}
             {/* WAREHOUSE (owner ruling 2026-09-14) — Arrival Schedule and
                 Pickup Schedule are two independent dated boards; Inbound and
                 Outbound are their own rail + Register work pages. */}

@@ -1445,24 +1445,13 @@ none by law); an exact-unit line with no IDs after issue is an integrity failure
 IDs missing on this line — do not send this PO`, never an ordinary empty state. The official PO
 PDF heads the same column `UNIT ID` and prints the same line-bound IDs
 (`docs/pdf/PO-PDF-STANDARD.md`). The main Purchase Orders register stays one row per PO and
-carries no Unit ID column. Current supplier capability requires one simple extra line on its own
-package label:
-
-```text
-CARRES UNIT ID: U1-000-001
-```
-
-No supplier physical-Unit label, QR, barcode or Carres label template is required now. Carres
-Operations attaches the same text Unit ID to the physical sofa at the showroom. Future suppliers
-may attach the physical label and future QR/barcode may encode the same permanent machine value;
-neither upgrade may renumber the Unit.
-
-**Physical identity after unpacking — OPEN, owner statement 2026-09-25.** Suppliers write the Unit
-ID on the packaging only; once the packaging is removed the piece cannot be told from its twins. A
-Carres sticker for the product is a future idea with **no solution yet** for bedframes and sofas,
-which have no place to stick one. Consequence for every build: no rule, screen or check may depend
-on a physical label existing on the product; identity between unpacking and labelling is a known
-gap, stated, not hidden.
+carries no Unit ID column. The receiver applies and verifies labels under Stock §3's
+2026-09-25 warehouse-label ruling; suppliers are not required to label. Printing or replacing a
+label carries the same issued identity and never allocates another Unit. Supplier printing may
+later carry that same ID, with receiving verification. The approved warehouse label/scan target
+is not proof that every older unpacked piece already bears a physical label. Existing unlabelled
+goods must be matched to their recorded identity before applying a label; unresolved source or
+piece identity enters the governed evidence/problem process rather than being guessed.
 
 **MEASURED IN PRODUCTION, 2026-09-08.** `PO-20260908-2503` was issued through the real Manual
 Purchase screens and its Unit `U1-000-082` was written in the same transaction — both rows carry
@@ -5948,6 +5937,29 @@ Stock §12.9).
 
 ### 9.8 Display Requests
 
+**COMPANY / SHOWROOM LOCATION AND CONSIGNMENT SCOPE — OWNER-APPROVED / LOCKED;
+Jess, 2026-10-02.** A company may have multiple showroom locations. The showroom using the
+Portal enters work for its identified, authorised location; company, location and actual
+recorder stay distinct. Known company/location facts come from the authorised source and are
+carried into the same request Operation continues. Staff do not re-enter those facts for a
+second Operation request. Location access does not imply access to every company location;
+this ruling does not prescribe shared accounts or replace individual actor/proxy audit.
+
+Consignment display applies to Carres' own showrooms only. They may hold supplier-owned display
+goods or purchased Carres-owned goods, with the §7.7 display-only sales boundary unchanged.
+Dealers buy goods from Carres; their showroom locations do not receive consignment under this
+operating model. A Dealer purchase belongs to the Sales/commercial source, never an internal
+Manual Purchase, Stock Transfer or supplier consignment display placement solely because its
+destination is a showroom. A company having several locations changes destination and access
+scope, not the commercial nature of the transaction. No Dealer credit or new payment/ownership
+transition rule is inferred from this clarification.
+
+The same-request handoff and these channel/location boundaries are approved. The independent
+module, proposed broader request name, final menu, six-reference-document naming/placement and
+external Dealer permissions remain pending whole-Blueprint review. This is PLAN truth, not
+application delivery or authority to change existing Unit ownership, provision accounts or
+switch external channels. ERP Architecture §2.1 holds the cross-module seam.
+
 **SHOWROOM HANDOFF — APPROVED TARGET / NOT BUILT; Jess, 2026-09-28.** Sales negotiates
 with the supplier about the display goods, price and conditions; Operation does not negotiate or
 set the price. This internal record hands that arrangement to Operation for documentation and
@@ -5969,13 +5981,30 @@ automatic acknowledgement is insufficient. Missing facts are requested explicitl
 first-response work remains with the responsible owner/cover. This is a response deadline,
 not a repair, production or delivery completion promise.
 
-Newly produced display goods use their normal product production lead time, as for Sales
-Orders. Operation may arrange earlier delivery when goods, existing release/approval conditions
-and the receiving location's availability permit. Dealer/showroom-visible progress may be
-published from the real owning Stock/Delivery facts: preparing, stock ready, scheduling, confirmed
-sending/delivery dates and actual dispatch. Keep requested, estimated, confirmed and actual
-dates distinct. Record publishing actor/time and changes/history; clicking Publish neither
-manufactures stock readiness nor proves physical dispatch. Screen wording requires COPY admission.
+**DISPLAY ORDER TIMING AND MANUAL SETTINGS — OWNER-APPROVED / LOCKED;
+Jess, 2026-10-02; APPROVED TARGET / NOT BUILT.** Dealer new-display purchases follow the same applicable Sales Order rules, including
+order timing, commercial approvals and fulfilment/release conditions; they do not acquire a
+separate service-progress workflow merely because the goods are for display. Normal order
+communication remains with its owning order workflow. Separate service-progress follow-up
+applies to repair or other non-new-purchase assistance (owner clarification 2026-10-02). The authorised staff must be able to
+maintain display-order timing defaults through the governed Settings workspace and manually
+adjust the individual request's required date/priority when needed, including earlier showroom
+placement to support sales. Reuse existing Sales Order/Purchasing product and supplier timing
+facts; do not create conflicting copies of supplier production days. The exact Settings fields,
+permission mapping and screen wording remain Blueprint design work, not approved new labels.
+
+Operation executes against the agreed deadline and may arrange earlier fulfilment when goods,
+existing approvals/release gates and the receiving location permit. A manually earlier required
+date is a planning request, not proof that the supplier or delivery party has committed to it.
+Keep requested, estimated, confirmed and actual dates distinct; retain timing changes, reason,
+actor/time and prior values. Adjusting one request must not silently change all future orders.
+
+Dealer/showroom sees the relevant order goods, agreed lead time/confirmed delivery arrangement,
+required customer actions and material date changes. Every internal execution step need not be
+exposed. Meaningful progress may be published from the real owning Stock/Delivery facts;
+publishing must not manufacture readiness or prove physical dispatch. Internal execution and
+deadline follow-up remain with their existing owners. The two-working-day substantive response
+rule remains separate from production/delivery completion and from repair assessment.
 
 This shared communication and service-level rule does not merge business ownership: Carres
 buying still follows Manual Purchase/PO approvals, supplier consignment follows its existing
@@ -5984,6 +6013,56 @@ service problems follow their proper Service/Stock/Claim owner. Dealer goods rem
 not consignment. The existing Dealer-account customer Sales Order is a terminal-customer
 transaction, not proof of a Dealer-company display purchasing capability. Whole-Blueprint
 approval, account provisioning, cutover and application delivery remain outside this ruling.
+
+
+**Current-goods build evidence — 2026-10-02, branch only.** The Showroom current-goods
+reader and exact-goods transfer handoff are implemented; Stock §3 records their measured
+boundary and remaining targets. This is not completion of the approved three-view journey,
+new purchase/service intake, account cutover or timing Settings. Existing Purchasing display
+documents and commercial approval rules remain unchanged.
+
+### Showroom page and request journey — OWNER-APPROVED / LOCKED 2026-10-02
+
+Approved presentation/operating target, not application delivery proof. One authorised Showroom
+entry provides current goods, orders/requests and actual inbound/outbound history using the
+shared Register/Object Detail grammar. Screen labels remain subject to governed COPY admission.
+The current-goods view reads the owning location-scoped records: PJ uses existing Warehouse
+Stock, not a second opening ledger. Group identical products by quantity and expose exact Unit
+IDs for selecting a particular piece; Catalog-counted goods remain quantity-based. Dealer-owned
+goods remain outside Carres inventory and require their company/location-scoped asset facts.
+
+Buying new goods starts without selecting old goods and follows the applicable normal order
+rules. The requester may additionally select exact outgoing goods and record movement intent,
+destination needs and whether removal must precede arrival. Adding goods never requires a
+one-in/one-out exchange. Buying pillows/protectors or other Catalog goods is available without
+an existing-display selection; the intended buyer, use and receiving location decide the source
+workflow and whether actual receipt belongs in the Showroom view.
+
+Repair, cleaning, removal and replacement start from the existing goods, carrying product,
+location, identity and evidence forward. Operation continues the same source-linked record;
+related purchase/service/movement documents remain with their owning modules rather than
+requiring a second blank submission. Replacement can link outgoing goods to a new purchase;
+new purchase execution still uses normal order rules. Unknown destination, acceptance or fees
+must be resolved, never presumed to approve return, refund or buyback.
+
+The orders/requests view provides submission identity/date, location, purchase/service nature,
+goods summary, relevant state, requested/confirmed arrangement and required requester action.
+Purchase detail shows normal commercial/fulfilment facts and outgoing-goods arrangements only
+when relevant; service detail shows evidence, progress, proposal, fees/acceptance, arrangements
+and outcome. Operation sees responsible owner, next action and deadline through governed Work.
+External readers need meaningful arrangements/actions/changes, not every internal step.
+
+Only actual, evidenced receipt/removal/return updates current goods and movement history.
+Submission, approval or published progress does not move inventory. Partial handovers update
+only completed quantities/identities; unfinished related movement remains visible. Repair retains
+identity, custody and service history; a physical replacement has its own governed identity.
+Existing IDs are verified and reused for labels, never reminted; printing/scanning follows Stock §3.
+
+This approval covers the page/journey above. It does not approve the proposed 5/7/3-day service
+checkpoints, blanket Dealer 14-day entitlement, external cutover or application implementation.
+Existing commercial, payment, ownership, entitlement, permission and physical-evidence gates
+remain applicable. Sales negotiation, Purchasing commitments, Stock truth, Service remedies,
+Delivery execution and Finance facts retain their current write owners.
 
 **Purpose / source:** record a Carres-owned showroom's new display placement, replacement, removal or change and connect
 it to the existing goods and the agreed supplier arrangement. For a replacement/removal, choose the

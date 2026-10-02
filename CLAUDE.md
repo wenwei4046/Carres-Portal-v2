@@ -23,7 +23,7 @@ number, the party and the date already worked out, and one obvious button.
 ---
 
 **Mandatory UI cold-start:** before any listing/UI proposal or build, read `docs/ui/MASTER.md`
-§6.7–6.10, the owning module's listing section, and its `docs/COPY-STANDARD.md` entries.
+§6.0, §6.7–6.10 and Complete-template adoption contract, the canonical token/component/pattern files, the owning module listing section and COPY entries. Reuse the kit and complete the contract’s full-page checks before delivery.
 Approved goods/Ready Stock flows: Purchasing §9.1 SO Batch and §9.2 Manual Purchase (Jess
 2026-09-18, both BUILT 2026-09-18 — the authenticated production walk is owed for both, and
 Manual Purchase's migrations 0545–0547 + 0549 are APPLIED 2026-09-20 and only the authenticated walk
@@ -108,6 +108,7 @@ still requires delivery/production proof. A proposal never becomes authority thr
 | Stock / Warehouse | `docs/stock/MASTER.md` | **LOCKED** | Measured Stock implementation and explicit approved gaps in that MASTER |
 | Delivery | `docs/delivery/MASTER.md` | **APPROVED / LOCKED** | §2.1 assignment timing (2026-09-29) and §6 actual-date/time precision (2026-09-30) are APPROVED TARGET / NOT BUILT: assignment opens early with a configurable cut-off; actual delivery date required, exact time optional and never guessed. Preserve the approved operating model; implementation may lag |
 | Payment / Money In | `docs/payment/MASTER.md` | **APPROVED / LOCKED** | Its approved-target/not-built convergence work; Payment remains customer money only |
+| Showroom / Dealer — page and request journey | `docs/purchasing/MASTER.md` §9.8; `docs/stock/MASTER.md` §3; `docs/service/MASTER.md` §1.1 | **APPROVED TARGET / NOT BUILT — owner 2026-10-02** | Current location goods from owning Warehouse/asset facts; orders/requests and actual movement history; normal new-purchase rules with optional outgoing goods; existing-item service; meaningful external facts, internal Work ownership. PJ database has 36 IDs, not a physical-audit claim. Receiver-applied labels; counted goods have no Unit ID. No approved 5/7/3 service timetable or blanket Dealer14day guarantee. |
 | Service Cases | `docs/service/MASTER.md` | **APPROVED / LOCKED** | Implement the approved 2026-08-14 Case/playbook rulings; no new business interview |
 | Guarantee / Service Package | `docs/guarantee/MASTER.md` | **APPROVED / LOCKED** | Preserve shipped entitlement baseline; implement the dated policy/playbook rulings |
 | Rental / Subscription | `docs/rental/MASTER.md`; cross-module pointer `docs/ERP-ARCHITECTURE.md` §6.3 | **Existing Rental law LOCKED; scoped new owner targets APPROVED / NOT BUILT; remaining design PROPOSAL / NOT LAW** | Read §4 and §§5.6, 5.8–5.9 for advance supply, Diglant holding, NETS Klang Valley, regional logistics evidence and service lifecycle. All connected Portal tasks must preserve these boundaries; do not infer full-blueprint or build approval. |

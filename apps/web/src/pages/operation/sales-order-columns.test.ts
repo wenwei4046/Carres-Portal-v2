@@ -162,7 +162,9 @@ describe("the default row is the owner's ELEVEN, in the owner's order (2026-09-2
     expect(MUTED_ABSENCES.has(NO_DO_YET)).toBe(true);
     expect(MUTED_ABSENCES.has(NO_DATE_YET)).toBe(false);
     expect(MUTED_ABSENCES.has(NOT_IN_CATALOG)).toBe(true);
-    expect(MUTED_ABSENCES.size).toBe(4);
+    expect(MUTED_ABSENCES.has("No amendment")).toBe(true);
+    expect(MUTED_ABSENCES.has("Receipt not recorded")).toBe(true);
+    expect(MUTED_ABSENCES.size).toBe(6);
   });
 
   it("every width is a registry entry — the catalog types no pixel number", () => {
@@ -437,5 +439,20 @@ describe("Requested Delivery Date — ONE arithmetic, ONE spelling", () => {
       expect(requestedDeliveryText({ iso: null, tbd: true })).not.toBe(banned);
       expect(requestedDeliveryText({ iso: null, tbd: false })).not.toBe(banned);
     }
+  });
+});
+
+
+describe("linked document identity", () => {
+  const text = (key: string, over: Partial<operationOrderListRow>) => REGISTER_FIELDS.find(f => f.key === key)!.text(buildRegisterRow(order(over)));
+  it("distinguishes genuinely absent amendments from unread/unnumbered ones", () => {
+    expect(text("amendment_no", { amendment_documents: [] })).toBe("No amendment");
+    expect(text("amendment_no", {})).toBe("Unavailable");
+    expect(text("amendment_no", { amendment_documents: [{ id: "internal-uuid" }] })).toBe("Not recorded");
+  });
+  it("deduplicates direct and allocated receipts while retaining all numbers", () => {
+    expect(text("receipt_no", { receipt_documents: [{ id: "p1", receipt_no: "RC-1" }], allocated_receipts: [{ order_payments: { id: "p1", receipt_no: "RC-1" } }, { order_payments: { id: "p2", receipt_no: "RC-2" } }] })).toBe("RC-1 · RC-2");
+    expect(text("receipt_no", { receipt_documents: [] })).toBe("Receipt not recorded");
+    expect(text("receipt_no", {})).toBe("Unavailable");
   });
 });

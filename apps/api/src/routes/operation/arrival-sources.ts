@@ -13,6 +13,9 @@ import type { AppEnv } from "../../types";
 const router = new Hono<AppEnv>();
 const idSchema = z.string().uuid();
 router.get("/options", requireOperation, async (c) => {
+  const selected = c.req.queries("unit") ?? [];
+  if (!z.array(idSchema).max(100).safeParse(selected).success)
+    return c.json({ message: "Invalid source" }, 422);
   const sb = userClient(c.env, c.var.auth.jwt);
   let q = sb
     .from("ops_stock_items")
@@ -22,6 +25,7 @@ router.get("/options", requireOperation, async (c) => {
     .eq("qty", 1)
     .order("unit_code")
     .limit(100);
+  if (selected.length) q = q.in("id", selected);
   let caseEvidence: Array<{
     path: string;
     slot: string;

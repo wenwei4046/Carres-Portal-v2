@@ -154,6 +154,35 @@ is a Warehouse Settings fact about the Site, never a value on a Unit. NETS is no
 replaceable modules each have a Unit ID; pure shipping packages are children of their Unit.
 Missing required modules, components or packages prevents Ready stock eligibility.
 
+**PJ SHOWROOM EXISTING LIST — OWNER-RULED 2026-10-02; approved presentation target.**
+The Showroom page must directly read its existing Warehouse/Stock location-scoped list, rather
+than require staff to recreate opening display records. PJ Showroom staff see the goods already
+recorded at PJ and select those same identities when requesting repair, cleaning, replacement
+or movement. Actual movement evidence updates the owning Stock facts and therefore the same
+Showroom view; no duplicate showroom stock ledger. Dealer-owned goods remain outside this
+Carres-controlled inventory boundary. This ruling approves the source/presentation boundary,
+not application implementation or a claim that every physical count has been verified.
+
+**Showroom current-goods delivery — BUILT ON BRANCH 2026-10-02; production verification
+pending.** Internal Operation/Principal `?tab=showroom` reuses the existing Stock Register and
+Unit detail, with an owning-register Site query and a retained PJ base scope through clearing
+filters, search/export and browser navigation. Exact held goods can be selected for the existing
+`Request Transfer` source workflow: explicit IDs are read before the picker's 100-row cap, the
+original Site/pieces are carried forward, and unresolved pieces are not guessed. No stock writer,
+RLS policy, second ledger or physical movement-on-submit was added. Counted goods are readable
+without a Unit ID and are not offered to the exact-Unit transfer action. Internal access retains
+its current role/JWT/RLS boundary; this does not open the internal register to Dealer logins.
+Remaining approved targets: full orders/requests view and source-linked service/purchase intake,
+location mapping/authorised Showroom access, grouped product view, timing Settings and global
+actual movement history. These are not claimed delivered by the current-goods slice.
+
+**Showroom presentation closure — OWNER-APPROVED 2026-10-02.** Purchasing §9.8 owns the
+approved Showroom page/request journey. Stock supplies current Carres-controlled location goods,
+exact identities/counts and actual movement history; only evidenced physical events change it.
+Grouped products expose exact IDs where applicable, while counted goods retain quantities.
+Related outgoing requests remain visible without pretending the goods have already left.
+Dealer customer assets do not enter the Carres stock balance. UI delivery awaits BUILD.
+
 ## 4 · Availability, reservation and replenishment
 
 The Unit register is authority. Every quantity is derived from identifiable Units; no rollup,
@@ -1313,7 +1342,7 @@ surface and are not deleted by the card above:
 - **Problems & evidence:** maintain only observable reason choices and their minimum scan/photo/
   receiver/factual-note evidence. Quarantine, Hold, Claim, write-off, compensation or replacement
   are downstream outcomes and cannot become observer reasons.
-- **Unit ID:** maintain format, governed product scope, supplier-label requirement, duplicate
+- **Unit ID:** maintain format, governed product scope, receiver-applied/verified labels, duplicate
   prevention, replacement-label rule and never-reuse law. Settings cannot rename an existing Unit;
   label error enters `Report a problem`.
 - **Permissions & approvals:** capability follows role/duty, never a hard-coded email. NETS
@@ -1475,6 +1504,22 @@ facts to verify Supplier Invoice.
 
 ### 12.3 Ready Stock, Sales Order reservation and manually purchased goods
 
+**CARRES-OWNED SHOWROOM ENTRY — OWNER-APPROVED / LOCKED, Jess 2026-10-02;
+APPROVED TARGET / NOT BUILT.** The unified Showroom business entry gives Carres-owned showroom
+staff a Ready Stock page for urgent customer Sales Orders. Read the same live eligible stock
+authority used by Sales/Inventory; do not create a showroom stock ledger or separate reservation.
+Show product/model, actual configuration and condition, eligible quantity/exact identity as
+applicable, Warehouse/Stock Location and governed earliest handover information. Product,
+configuration and location filters help staff find suitable goods. Use the existing governed
+Ready Stock presentation and `Choose Ready Unit` action into the customer SO flow, preserving
+authority and exact identity; opening/browsing does not reserve stock or promise delivery.
+Reservation revalidates eligibility atomically so another order cannot take the same Unit.
+Pending receipts, supplier-owned display, another SO's reserved goods and goods failing any
+existing issue/repair/transfer/condition/ownership check do not enter this view. Stock ready is
+not delivery ready: receiving availability, transport and commercial/release gates still govern
+the confirmed date. Counted goods retain Catalog's existing identity mode, not invented Unit IDs.
+This access ruling covers Carres-owned showrooms only; Dealer HQ-stock access remains unapproved.
+
 **CURRENT CARRES →** legacy `Free`, Ready Stock, no SO No and Manual Purchase can be mistaken for
 the same fact; Ready Stock can appear as both a purchase plan and physical availability, and Sales
 and Operations may read different lists.
@@ -1498,17 +1543,24 @@ authorised `Make available for sale` and the same eligibility validation. Sales 
 Unit`; successful selection atomically binds the exact Unit to the SO. A governed SO release returns
 it to Ready Stock only if it remains eligible.
 
-**OPERATOR JOURNEY →** Sales opens `Sales → Ready Stock`, searches product/SKU/configuration/Site,
-reads exact Unit, holder, condition and earliest handover, then chooses the Unit and SO line.
-Operations opens `Inventory → Ready Stock`, reads the same Unit IDs plus physical/source facts,
-uses `Make available for sale` where permitted or `Report a problem`; Operations cannot substitute
-or release the SO promise.
+**OPERATOR JOURNEY → APPROVED TARGET / NOT BUILT (placement, 2026-10-02).** Carres-owned
+showroom staff open `Showroom → Ready Stock`, search product/SKU/configuration/Stock Location,
+and read available product imagery, configuration, condition, eligible quantity/exact identity
+under Catalog's identity mode and evidence-backed earliest handover. Browsing does not reserve.
+`Choose Ready Unit` continues the original customer Sales Order and its specific line; Sales
+revalidates and reserves the exact eligible Unit atomically. No customer order is recreated here.
+Warehouse/Operations opens `Warehouse → Inventory` and its `Ready Stock` view for the same stock
+facts, receipt/inspection/location/control evidence and permitted stock actions. It is not a new
+top-level Warehouse destination. Operations cannot substitute or release the Sales Order promise;
+Operation/Delivery confirms delivery under existing transport and commercial/release gates.
 
 **UI / PAGE / OBJECT PLACEMENT →** the Inventory rail contains `Reserved for Sales Orders · Ready
 Stock · Showroom Display · Service Case · Needs checking`. Operations Ready Stock defaults to `Unit
 ID · Product · Who has it · Site · Condition · PO No · PO date · Received date · Days available ·
-Earliest handover · Work`. Sales uses a permission-reduced projection of the same Units. Unit Detail
-shows Stock use, eligibility, reserved SO, source purchase category and PO/Receiving history.
+Earliest handover · Work`. Carres-owned `Showroom → Ready Stock` uses the sales-facing,
+permission-reduced projection of the same eligible stock authority. This does not grant Dealer
+HQ-stock visibility. Unit Detail shows Stock use, eligibility, reserved SO, source purchase
+category and PO/Receiving history.
 
 **CROSS-MODULE CONNECTION →** Purchasing owns purchase category/PO; Receiving proves receipt;
 Stock owns physical eligibility and `Make available for sale`; Sales Order owns choose/bind/release/

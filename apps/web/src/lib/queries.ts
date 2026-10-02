@@ -2901,6 +2901,13 @@ export interface operationOrderListRow {
    *  the field undefined, and the register reads that as "not carried" rather
    *  than as "none exist". */
   ops_delivery_orders?: { do_number: string }[];
+  /** Source-owned document ledgers, including receipts allocated to this SO. */
+  invoice_documents?: { id: string; invoice_no: string | null }[];
+  receipt_documents?: { id: string; receipt_no: string | null }[];
+  allocated_receipts?: { order_payments: { id: string; receipt_no: string | null } | null }[];
+  /** Existing amendments have no governed document-number field. */
+  amendment_documents?: { id: string }[];
+
   /** Blueprint card §7 (2026-08-16) — the two composed Work facts: an OPEN
    *  Finance exception (0355) and a loan still out (0209/0217). Optional so an
    *  older Worker that does not select them raises nothing (UNKNOWN never
@@ -7369,10 +7376,10 @@ export interface StockRegisterPayload {
   total: number;
 }
 
-export function useStockRegister() {
+export function useStockRegister(siteName?: string) {
   return useQuery<StockRegisterPayload, ApiError>({
-    queryKey: ["operation", "stock-register"],
-    queryFn: () => apiFetch<StockRegisterPayload>("/api/ops/stock/register"),
+    queryKey: siteName ? ["operation", "stock-register", siteName] : ["operation", "stock-register"],
+    queryFn: () => apiFetch<StockRegisterPayload>(`/api/ops/stock/register${siteName ? `?site=${encodeURIComponent(siteName)}` : ""}`),
     staleTime: 30_000,
   });
 }
