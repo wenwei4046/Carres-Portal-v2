@@ -1462,7 +1462,7 @@ div:first-child > .columnsMenuGroup {
   border-radius: 6px;
   padding: 0 8px;
 }
-.rootReference[data-presentation-tools] .searchInput { min-width: 0; font-size: var(--fs-13); line-height: 18px; text-overflow: ellipsis; }
+.rootReference[data-presentation-tools] .searchInput { min-width: 0; font-size: var(--fs-12); line-height: 18px; text-overflow: ellipsis; }
 .rootReference[data-presentation-tools] .searchResponsiveBox > svg { width: 16px; height: 16px; flex: none; }
 @media (max-width: 767px) {
   .rootReference[data-presentation-tools] .searchResponsiveBox { height: 40px; }

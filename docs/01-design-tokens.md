@@ -360,18 +360,18 @@ Houzs measurements remain provenance in UI MASTER, never the instruction for Car
 
 | Item | Current Carres value / source | Exact recommended target | Status / evidence |
 |---|---|---|---|
-| Sales main row | `SalesOrdersRegister.tsx` explicitly `rowHeight=40` | KEEP40 | Approved Sales baseline; do not replace with generic engine38 |
+| Sales main row | `SalesOrdersRegister.tsx` explicitly `rowHeight=32` | Accepted SO-derived32px desktop,12/18 text | Owner accepted2026-10-01; UI MASTER Confirmed shared template supersedes the older40px Sales recipe |
 | Generic reference / Purchasing parent | `register/DataGrid.module.css` baseline38; UI MASTER Shared Purchasing geometry minimum38 | KEEP38 in that scope | Approved scoped exception; not a Sales size |
 | Two-line goods | UI MASTER owner ruling2026-09-26:51; name13/18 plus secondary11/14 | KEEP51 across the same goods table; grow consistently when required by admitted content | Approved shared baseline; not a licence to clip meaningful quantities |
 | Reference table header | CSS height36, horizontal8, line14, size11, **weight700**; UI MASTER says600 | Target36 minimum,11/600/14; horizontal8, up to two lines with vertical4 | REAL GAP: weight700 source contradicts governed600; no code changed here |
 | Checkbox | Shared Purchasing geometry:16×16, vertically centred | KEEP16 visible control; apply touch hit-target requirement separately | Approved geometry; icon size is not hit-target size |
 | Cell inset / rules | Reference DataGrid horizontal8, vertical0; goods family ordinarily8 per side; separator1 | KEEP by row recipe; apply §5.1 separator conditions | Source inspected; do not add padding that silently grows the governed row |
 | Goods header exception | `GoodsMiniTable.tsx`: normal horizontal8/vertical6; Purchasing layout explicitly40 high | KEEP existing scoped Purchasing40 header pending joined-table alignment review | Implemented/source inspected; not universal36 claim |
-| Toolbar / footer | Reference DataGrid45 toolbar (vertical6/horizontal12); footer32 (horizontal12); labelled toolbar wraps with auto height | KEEP respective variants; footer remains outside row scroll | Source inspected; actual overflow still requires page verification |
+| Toolbar / footer | Reference DataGrid45 toolbar (vertical6/horizontal12); footer32 (horizontal12); labelled toolbar wraps with auto height | Accepted SO-derived desktop40px toolbar; other scoped variants retained; footer remains outside row scroll | Source inspected; actual overflow still requires page verification |
 | Expansion | Shared Purchasing target top12/bottom16; DataGrid generic nonflush inset12 vertically; flush0 | Preserve named adopter recipe; converge discrepancies only in approved scope | REAL GAP where an adopter claims Purchasing geometry but uses generic inset; not universal spacing override |
 | Column widths | Governed field-width registry + UI MASTER content measurements; sort/filter controls require space | Keep registry widths and page-specific approved roles; do not divide screen equally | Width depends on fact, not table width; personal column state survives |
 | Scroll | DataGrid owns table viewport; content width may exceed available canvas | KEEP bounded horizontal/vertical scroll and admitted pinned identity | No promise all14 columns fit one page; no shrinking text to force fit |
-| Denser Sales candidate | Existing Sales40 / goods51 | **PROPOSAL ONLY:** main32, header36; goods51 retained | Sales planner's candidate, not owner-approved. Needs Inter/long content/control fit and 200% zoom review |
+| Accepted Sales density | Sales32 / goods51 | **OWNER ACCEPTED:** main32, header36; goods51 retained | Confirmed shared template; verify Inter/long content/control fit and 200% zoom review |
 
 ## 8 · Composition, overlays and responsive measurements
 

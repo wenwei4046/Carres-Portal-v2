@@ -108,6 +108,7 @@ import {
   NO_DO_YET,
   NO_PO_YET,
   NOT_IN_CATALOG,
+  NOT_RECORDED,
   REGISTER_FIELDS,
   salesLocationOf,
   type RegisterField,
@@ -246,7 +247,7 @@ function toGridColumn(
             navigate(`/operation/procurement?po=${encodeURIComponent(r.poNumbers[0]!)}`);
           }}>{r.poNumbers[0]}</button>
         ) : (
-          <Popover label="Purchase Orders" trigger={<Button variant="ghost" size="sm">{r.poNumbers.length} Purchase Orders</Button>}>
+          <Popover label="Purchase Orders" trigger={<Button variant="ghost" size="sm" onClick={event => event.stopPropagation()}>{r.poNumbers.length} Purchase Orders</Button>}>
           <div className="flex flex-col gap-2">
             {r.poNumbers.map((po) => (
               <button
@@ -266,12 +267,25 @@ function toGridColumn(
         ),
     };
   }
+  if (f.key === "receipt_no" || f.key === "invoice_no") {
+    return { ...base, accessor: (r) => {
+      const docs = f.key === "receipt_no"
+        ? r.receipts?.map(p => ({ id: p.id, number: p.receipt_no, url: `/finance/payments?payment=${encodeURIComponent(p.id)}` }))
+        : r.invoices?.map(i => ({ id: i.id, number: i.invoice_no, url: `/finance/monitor?invoice=${encodeURIComponent(i.id)}` }));
+      if (docs === undefined) return absenceAware(f.text(r));
+      const legacyInvoice = f.key === "invoice_no" && r.o.invoice_no && !docs.some(d => d.number === r.o.invoice_no) ? r.o.invoice_no : null;
+      if (!docs.length) return absenceAware(legacyInvoice || f.text(r));
+      const links = docs.map(d => d.number ? <button key={d.id} type="button" className="font-medium text-kit-blue-11 underline-offset-2 hover:underline" onClick={event => { event.stopPropagation(); navigate(d.url); }}>{d.number}</button> : <span key={d.id}>{NOT_RECORDED}</span>);
+      if (docs.length === 1 && !legacyInvoice) return links[0];
+      return <Popover label={f.label} trigger={<Button variant="ghost" size="sm" onClick={event => event.stopPropagation()}>{docs[0]?.number || NOT_RECORDED} +{docs.length - 1 + (legacyInvoice ? 1 : 0)}</Button>}><div className="flex flex-col gap-2">{links}{legacyInvoice && <span>{legacyInvoice}</span>}</div></Popover>;
+    } };
+  }
   if (f.key === "do_number") {
     return {
       ...base,
       /* The SO-to-DO relationship comes from the Delivery document ledger,
          never the one-number mirror on `orders`. One document opens its
-         object; many open Delivery's register filtered to this SO. */
+         object; many expose every exact document door in a menu. */
       accessor: (r) => {
         if (r.deliveryOrders.length === 0) {
           return absenceAware(NO_DO_YET);
@@ -293,18 +307,7 @@ function toGridColumn(
             </button>
           );
         }
-        return (
-          <button
-            type="button"
-            className="font-medium text-kit-blue-11 underline-offset-2 hover:underline"
-            onClick={(event) => {
-              event.stopPropagation();
-              navigate(`/operation/delivery-orders?order=${encodeURIComponent(r.id)}`);
-            }}
-          >
-            {r.deliveryOrders.length} Delivery Orders
-          </button>
-        );
+        return <Popover label="Delivery Orders" trigger={<Button variant="ghost" size="sm" onClick={event => event.stopPropagation()}>{r.deliveryOrders.length} Delivery Orders</Button>}><div className="flex flex-col gap-2">{r.deliveryOrders.map(d => <button key={d.do_number} type="button" className="font-medium text-kit-blue-11 underline-offset-2 hover:underline" onClick={event => { event.stopPropagation(); navigate(`/operation/delivery-orders/${encodeURIComponent(d.do_number)}`); }}>{d.do_number}</button>)}</div></Popover>;
       },
     };
   }
@@ -1123,7 +1126,7 @@ export default function SalesOrdersRegister() {
         <div className="so-rail-navigation">
           <Tabs fill orientation="vertical" label="Sales Orders view" value={view}
             onValueChange={(next) => chooseView(next === "monthly" ? "monthly" : "list")}
-            tabs={[{ value: "list", label: "Order list", icon: "order" }, { value: "monthly", label: "Monthly demand", icon: "date" }]} />
+            tabs={[{ value: "list", label: "Listing", icon: "order" }, { value: "monthly", label: "Monthly demand", icon: "date" }]} />
         </div>
       )}
     >
@@ -1289,8 +1292,23 @@ export default function SalesOrdersRegister() {
             appearance="reference"
             sessionKey={`${storageKey}.${registerSession}`}
             presentationTools
-            searchScope="Search sales orders by SO number, customer or imported reference"
-            toolbarSummary={(visible) => <span className="shrink-0 text-meta tabular-nums text-kit-slate-11" title={`${visible.length} sales orders`} aria-label={`${visible.length} sales orders`}><span className="hidden md:inline">{visible.length} sales orders</span><span className="md:hidden">{visible.length}</span></span>}
+            allowColumnGrouping={false}
+            pageToolsItems={[
+              { key: "group-none", label: `Group by: None${!urlParams.get("group") ? " ✓" : ""}`, separatorBefore: true, onSelect: () => setParam("group", null) },
+              ...(["delivery", "stock", "payment"] as const).map(group => ({
+                key: `group-${group}`, label: `Group by: ${group === "delivery" ? "Delivery Status" : group === "stock" ? "Stock Status" : "Payment Status"}${urlParams.get("group") === group ? " ✓" : ""}`,
+                onSelect: () => setParam("group", group),
+              })),
+            ]}
+            fixedGroups={urlParams.get("group") === "delivery" ? {
+              groups: [...REGISTER_DELIVERY_CONDITIONS, { key: "not_applicable", label: "Not applicable" }],
+              groupOf: row => registerDeliveryConditionOf(row.o.order_lines ?? [], row.o.allocated_units ?? []) ?? "not_applicable",
+            } : urlParams.get("group") === "stock" ? {
+              groups: STOCK_STATUSES.map(c => ({ key: c.key, label: c.label })), groupOf: stockStatusOf,
+            } : urlParams.get("group") === "payment" ? {
+              groups: PAYMENT_STATUSES.map(c => ({ key: c.key, label: c.label })), groupOf: paymentStatusOf,
+            } : undefined}
+            searchScope="Search sales orders by SO number, customer, imported reference or linked document number"
             presentationKey={cards ? "cards" : "table"}
             toolbarEnd={<Tabs variant="segmented" label="Sales Orders view" value={cards ? "cards" : "table"}
               onValueChange={(next) => setParam("view", next === "cards" ? "cards" : null)}
@@ -1363,9 +1381,7 @@ export default function SalesOrdersRegister() {
             emptyMessage={rows.length === 0 && !serverSearch ? "No sales orders yet" : "No sales orders match these filters"}
             noMatchMessage="No sales orders match these filters"
             groupBanner={false}
-            /* ⭐ The one-line listing row is 40px, adopted on this page only
-               (ui MASTER §6.0 rule 5, owner ruling 2026-09-21). Text stays
-               13/18 with 8px padding; the engine default (38px) is untouched. */
+            /* Accepted shared template:32px desktop row,12/18 text; generic defaults stay scoped. */
             rowHeight={32}
             /* ⭐ Proceed Date · SO Doc Date · SO No lead and cannot be hidden
                or moved (owner ruling 2026-09-21). At a canvas ≥768px the

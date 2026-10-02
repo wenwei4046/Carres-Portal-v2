@@ -787,10 +787,37 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     };
     mount();
     fireEvent.click(screen.getByRole("button", { name: "2 Delivery Orders" }));
-    expect(screen.getByTestId("location")).toHaveTextContent(
-      "/operation/delivery-orders?order=00000000-0000-0000-0000-00000000cafe",
-    );
-    expect(screen.queryByText("DO-200826-1234")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "DO-200826-1234" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "DO-210826-5678" }));
+    expect(screen.getByTestId("location")).toHaveTextContent("/operation/delivery-orders/DO-210826-5678");
+  });
+
+  it.each(["RC-SECOND", "INV-SECOND", "DO-SECOND"])("searches hidden linked number %s", async (term) => {
+    listHookState.data = { orders: [order({
+      receipt_documents: [{ id: "p1", receipt_no: "RC-FIRST" }],
+      allocated_receipts: [{ order_payments: { id: "p2", receipt_no: "RC-SECOND" } }],
+      invoice_documents: [{ id: "i1", invoice_no: "INV-FIRST" }, { id: "i2", invoice_no: "INV-SECOND" }],
+      ops_delivery_orders: [{ do_number: "DO-FIRST" }, { do_number: "DO-SECOND" }],
+    })] };
+    mount();
+    fireEvent.change(screen.getByRole("searchbox"), { target: { value: term } });
+    await waitFor(() => expect(useOperationOrdersSpy.mock.calls.some(call => (call[0] as { search?: string })?.search === term)).toBe(true));
+    await waitFor(() => expect(screen.getByTestId("grid-footer")).toHaveTextContent("1 sales order"));
+    expect(screen.getByRole("button", { name: "SO-1303" })).toBeInTheDocument();
+  });
+
+  it("optional receipt and invoice columns open exact ledger objects", async () => {
+    listHookState.data = { orders: [order({ receipt_documents: [{ id: "p-exact", receipt_no: "RC-EXACT" }], invoice_documents: [{ id: "i-exact", invoice_no: "INV-EXACT" }] })] };
+    mount();
+    fireEvent.keyDown(screen.getByRole("button", { name: "Page tools" }), { key: "Enter" });
+    fireEvent.click(screen.getByRole("menuitem", { name: "Columns" }));
+    fireEvent.click(await screen.findByRole("checkbox", { name: "Receipt No" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Invoice No" }));
+    fireEvent.keyDown(screen.getByRole("checkbox", { name: "Invoice No" }), { key: "Escape" });
+    fireEvent.click(screen.getByRole("button", { name: "RC-EXACT" }));
+    expect(screen.getByTestId("location")).toHaveTextContent("/finance/payments?payment=p-exact");
+    fireEvent.click(screen.getByRole("button", { name: "INV-EXACT" }));
+    expect(screen.getByTestId("location")).toHaveTextContent("/finance/monitor?invoice=i-exact");
   });
 
   it("shows only the customer name in the default cell while retaining phone search context", () => {
@@ -1266,7 +1293,7 @@ describe("the Sales Orders rail and its two views", () => {
     mount();
     const rail = screen.getByTestId("sales-orders-rail");
     /* Two views of the same orders: a tab bar, not a collapsible group (owner ruling 2026-09-28). */
-    expect(within(rail).getByRole("tab", { name: "Order list" })).toBeInTheDocument();
+    expect(within(rail).getByRole("tab", { name: "Listing" })).toBeInTheDocument();
     expect(within(rail).getByRole("tab", { name: "Monthly demand" })).toBeInTheDocument();
     expect(within(rail).queryByText("View")).not.toBeInTheDocument();
     expect(within(rail).queryByText(/Clear filters/i)).not.toBeInTheDocument();
@@ -1274,7 +1301,7 @@ describe("the Sales Orders rail and its two views", () => {
 
   it("opens on the Order list, which does not read Monthly demand", () => {
     mount();
-    expect(screen.getByRole("tab", { name: "Order list" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tab", { name: "Listing" })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByTestId("register-column")).toBeInTheDocument();
     expect(useMonthlyDemandFactsSpy).toHaveBeenLastCalledWith(false);
   });
@@ -1309,7 +1336,7 @@ describe("the Sales Orders rail and its two views", () => {
 
   it("Monthly demand's filters never carry into the Order list", () => {
     mount("/operation/orders?view=monthly&dealer=%7Bdealer%201%7D&months=3");
-    fireEvent.mouseDown(screen.getByRole("tab", { name: "Order list" }));
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "Listing" }));
     const at = screen.getByTestId("location").textContent ?? "";
     expect(at).not.toContain("view=");
     expect(at).not.toContain("dealer=");
@@ -1567,5 +1594,57 @@ describe("approved solid SO status presentation", () => {
     check(drawer, String(stockLabel), String(stockTone));
     check(drawer, String(paymentLabel), String(paymentTone));
     check(drawer, String(deliveryLabel), String(deliveryTone));
+  });
+});
+
+
+describe("confirmed optional listing grouping", () => {
+  it.each([['delivery', 'Not delivered'], ['stock', 'Receipt unconfirmed'], ['payment', 'Partially paid']])("groups by %s, collapses without changing totals and restores None", async (key, label) => {
+    mount(`/operation/orders?group=${key}`);
+    const group = await screen.findByRole('button', { name: `${label} 1` });
+    expect(group).toHaveAttribute('aria-expanded', 'true');
+    fireEvent.click(group);
+    expect(group).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByTestId('grid-parent-row')).not.toBeInTheDocument();
+    expect(screen.getByTestId('grid-footer')).toHaveTextContent('1 sales order');
+    fireEvent.click(group);
+    expect(screen.getByTestId('grid-parent-row')).toBeInTheDocument();
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Page tools' }), { key: 'Enter' });
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Group by: None' }));
+    expect(screen.queryByTestId(`grid-group-toggle-${key}`)).not.toBeInTheDocument();
+    expect(screen.getByTestId('grid-header')).toBeInTheDocument();
+    expect(screen.getByTestId('location')).not.toHaveTextContent('group=');
+  });
+  it('shares grouping and collapse between Table and Cards without changing the summary', async () => {
+    mount('/operation/orders?group=payment');
+    fireEvent.click(await screen.findByRole('button', { name: 'Partially paid 1' }));
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Cards' }));
+    expect(screen.getByRole('button', { name: 'Partially paid 1' })).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByTestId('sales-order-card-1303')).not.toBeInTheDocument();
+    expect(screen.getByTestId('grid-footer')).toHaveTextContent('1 sales order');
+    fireEvent.click(screen.getByRole('button', { name: 'Partially paid 1' }));
+    expect(screen.getByTestId('sales-order-card-1303')).toBeInTheDocument();
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Table' }));
+    expect(screen.getByRole('button', { name: 'Partially paid 1' })).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByTestId('grid-parent-row')).toBeInTheDocument();
+  });
+  it('does not lose orders with no physical goods when grouping delivery', async () => {
+    listHookState.data = { orders: [order({ order_lines: [] })] };
+    mount('/operation/orders?group=delivery');
+    expect(await screen.findByRole('button', { name: 'Not applicable 1' })).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByTestId('grid-parent-row')).toBeInTheDocument();
+    expect(screen.getByTestId('grid-footer')).toHaveTextContent('1 sales order');
+  });
+  it('None remains flat even when an older personal layout had column grouping', () => {
+    window.localStorage.setItem('carres.salesOrders.register.v6.anon', JSON.stringify({ order: [], hidden: [], widths: {}, groupBy: ['customer'], sort: null }));
+    mount();
+    expect(screen.getByTestId('grid-header')).toBeInTheDocument();
+    expect(screen.getByTestId('grid-parent-row')).toBeInTheDocument();
+    expect(screen.queryByText('Customer: Kimmy')).not.toBeInTheDocument();
+  });
+  it('keeps the count in the footer without duplicating it in the toolbar', () => {
+    mount();
+    expect(screen.getByTestId('grid-footer')).toHaveTextContent('1 sales order');
+    expect(screen.queryByLabelText('1 sales orders')).not.toBeInTheDocument();
   });
 });
