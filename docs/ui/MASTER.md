@@ -1390,7 +1390,7 @@ went wrong → reason two. Neither → it is a section in the scroll, not a tab.
 **the document the other party will actually receive**, redrawn as the left half is typed — which
 is the only way an operator can see what a supplier will read without printing it.
 ```
-SPLITS       PO · Consignment Order · Consignment Return · Consignment Sale Notice ·
+SPLITS       PO · Consignment Order · Consignment Return ·
                Purchase Return · Repair Order · Supplier Claim · Goods Receipt (GRN)
 NEVER        Display Request
 EXCEPTION    Manual Purchase create / returned-request edit: internal MPR preview

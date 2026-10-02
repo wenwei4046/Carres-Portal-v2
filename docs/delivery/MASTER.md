@@ -543,9 +543,10 @@ evidence creates the `Upload delivery proof` work, whose row names `Upload deliv
 `Upload signed DO` (owner ruling 2026-09-25; the paper's full name stays `Signed Delivery Order` in
 prose and on the document); completing or reviewing proof never renames the result.
 
-For each exact delivered Unit, Delivery emits one idempotent success fact. If Stock says that Unit
-was `Supplier Consignment`, Purchasing automatically creates the Consignment Sale Notice for that
-supplier × Delivery Visit. Failed or refused goods create no notice.
+For each eligible exact delivered Unit, Delivery emits one idempotent success fact.
+Supplier-owned display goods are not eligible for customer sale (Jess, 2026-10-02; Purchasing
+§7.7). Their showroom movements and supplier returns preserve ownership and physical handover
+truth; they do not generate a Consignment Sale Notice.
 
 **RESULT SCOPE — CARRIED-FORWARD OWNER RULINGS, CONVERGED 2026-09-30 / TARGET; END-TO-END
 IMPLEMENTATION NOT VERIFIED.** Expected exact Units come from this DO's frozen goods scope; Operation

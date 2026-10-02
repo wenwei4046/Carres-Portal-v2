@@ -88,12 +88,11 @@ describe("the approved hierarchy", () => {
       "Display Requests",
       "Consignment Orders",
       "Consignment Returns",
-      "Consignment Sale Notices",
     ]);
   });
 
-  it("is exactly eleven pages", () => {
-    expect(purchasing).toHaveLength(11);
+  it("is exactly ten pages", () => {
+    expect(purchasing).toHaveLength(10);
   });
 
   it("no row carries a hairline — Reports are central, not a Purchasing row", () => {
@@ -179,13 +178,12 @@ describe("the live destinations keep their exact current addresses", () => {
     expect(navItemHref(operation, item as PortalNavItem)).toBe("/operation?tab=purchase");
   });
 
-  it("the four still-planned pages are non-controls — no route may be invented for them", () => {
+  it("the three still-planned pages are non-controls — no route may be invented for them", () => {
     const soon = purchasing.filter((i) => i.soon);
     expect(soon.map(label)).toEqual([
       "Display Requests",
       "Consignment Orders",
       "Consignment Returns",
-      "Consignment Sale Notices",
     ]);
     for (const item of soon) {
       expect(item.path, item.key).toBeUndefined();

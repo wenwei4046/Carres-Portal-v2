@@ -83,8 +83,9 @@ identities and write no completion. Module filter rails do not copy those action
 ---
 
 **SHOWROOM DOCUMENT PURPOSE — APPROVED TARGET / NOT BUILT, Jess 2026-09-29.**
-Purchasing exposes Display Requests, Consignment Orders, Consignment Returns and Consignment Sale
-Notices. Staff record one arrangement; the system pre-fills the order to obtain supplier-owned
+Purchasing exposes Display Requests, Consignment Orders and Consignment Returns. Supplier-owned
+display is not sold; no supplier sale notice is required (Jess, 2026-10-02). Staff record one
+arrangement; the system pre-fills the order to obtain supplier-owned
 goods and/or return to hand goods back. Keep these names and roles distinct. Do not merge them
 into Consignment Note or add another manual acknowledgement document. A same-supplier swap sends
 one combined instruction while receipt and return retain separate actual evidence. Receiving owns
@@ -341,8 +342,7 @@ SUPPLY CHAIN
 │   └── SHOWROOM
 │       ├── Display Requests
 │       ├── Consignment Orders
-│       ├── Consignment Returns
-│       └── Consignment Sale Notices
+│       └── Consignment Returns
 ├── Warehouse
 │   ├── Arrival Schedule
 │   ├── Pickup Schedule
@@ -579,8 +579,7 @@ each supplier call the things they sell us?"*, derived from the catalog and neve
 
 **ACTIONS**
 - Issue/revise a purchase order · ask the supplier for an actual date · ask about a dated late
-  delivery or balance · govern supplier claims/returns/repairs · issue consignment orders/returns/
-  sale notices · cancel an outstanding demand · set the engine numbers.
+  delivery or balance · govern supplier claims/returns/repairs · issue consignment orders/returns · cancel an outstanding demand · set the engine numbers.
 
 **SUMMARISES** — the customer's promised date and the customer's name (to know what is urgent
 and who is waiting) · free stock (to suggest, never to consume).

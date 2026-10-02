@@ -7130,3 +7130,13 @@ business choice if one remains. Do not declare the expanded module PLAN MISSION 
 new READY FOR CARD scopes until the remaining target truth is complete, reviewed and persisted.
 PLAN does not implement application code or extend the existing BUILD commission. Production
 completion is separately proved through authenticated business journeys and downstream evidence.
+
+
+**Continuous delivery acceptance — 2026-10-02, BUILD IN PROGRESS.** Approved planning from this
+owner session is consolidated on origin/main without changing proposal labels. Current-version
+send work must remain reachable after goods completion: Sending filter includes a received PO
+whose current version lacks evidence, and its object opens the existing PDF/send form. The PO
+remains in Completed goods; no sending evidence is fabricated. Cancelled-PO sending remains an
+explicit separate gap because the current PDF and confirm-sent SQL reject cancelled documents.
+The full nine-filter rail, quick Communication/full preview, Amendments, Monthly demand and other
+§2.4 completion work are not claimed delivered by this bounded sending slice.

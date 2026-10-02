@@ -169,10 +169,10 @@ page or integration maintains another available quantity.
 | issue, inspection, repair, missing component or other control | Not available |
 | customer accepted or lifecycle ended | Delivered / history |
 
-Successful customer delivery of an exact `Supplier Consignment` Unit emits the authoritative sold
-event Purchasing uses to create a Consignment Sale Notice. Stock records the ownership/history
-consequence once; it does not issue the notice, create supplier payable or settle money. A failed or
-refused delivery emits no sale event.
+Supplier-owned display Units are not eligible for customer sale (Jess, 2026-10-02;
+Purchasing §7.7). Stock preserves exact ownership and custody; it emits no supplier sale-notice
+obligation. Purchased Carres-owned goods follow ordinary sales and delivery. This rule does not
+permit automatic historical ownership conversion or production data backfill.
 
 **Diglant Subscription supply handling — OWNER-APPROVED TARGET / NOT BUILT, 2026-09-22.**
 Rental §5.6 owns the programme's five-case operating matrix. Completed goods held at Diglant and

@@ -401,7 +401,6 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       { key: "display-requests", label: "Display Requests", icon: Store, soon: true, section: "Purchasing", pageGroup: "purchasing-showroom" },
       { key: "consignment-orders", label: "Consignment Orders", icon: ArrowDownLeft, soon: true, section: "Purchasing", pageGroup: "purchasing-showroom" },
       { key: "consignment-returns", label: "Consignment Returns", icon: Undo2, soon: true, section: "Purchasing", pageGroup: "purchasing-showroom" },
-      { key: "consignment-sale-notices", label: "Consignment Sale Notices", icon: ScrollText, soon: true, section: "Purchasing", pageGroup: "purchasing-showroom" },
 
       // Delivery (T11, Jess 2026-07-27) — **the ONE new menu item in the whole
       // build plan**; every other line upgrades an existing door, and its place
