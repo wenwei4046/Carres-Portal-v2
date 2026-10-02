@@ -229,7 +229,7 @@ Primary references: [Dynamics purchase requisitions](https://learn.microsoft.com
 | SO buying | Staff rely on Sales messages and personal memory | 2990 computes SO/MRP need and groups supplier lines | **ADAPT + IMPROVE** | SO uncovered quantity becomes demand; stock/PO coverage reduces it; ready lines batch by supplier | Open dated work, fix named blockers, set/split `Supplier Deliver To`, issue | `SO Batch Purchase` Register + row inspector + issue surface | Sales Order source; Stock coverage; Delivery required-arrival date |
 | Non-SO buying | Requests are informal and may omit the business reason | Mature requisition separates internal approval from external PO | **ADAPT** | Staff create a Manual Purchase Request; approval produces demand; rejection ends it | Select purpose, goods, quantity, date and destination; system routes approval | `Manual Purchase Request` Register and object; no separate request page | Catalog, Stock planning, approved Display Request, Finance approval boundary |
 | Purchase demand | Staff may confuse “need” with a document to send | 2990 recomputes need; mature ERP keeps requisition/demand separate from PO | **KEEP + RELOCATE** | One hidden canonical line record stores required, covered, ordered and remaining quantity | Staff see demand facts through the correct work door; never create/send a demand document | No sidebar page; read in SO Batch, Manual Purchase, PO and Order Route | Source object creates/reduces/cancels demand; PO allocation covers it |
-| Purchase Order | PDF/WhatsApp means the real order; changes can be lost | 2990 retains line balance, version and documents | **KEEP + IMPROVE** | Current PO Duty checks, sends the actual PDF, records channel/time; later changes create a version | Use 50/50 check/preview; send; record supplier promise or exception | `Purchase Orders` Register; full-width view; 50/50 only while issuing/editing | Demand, supplier, Goods Receipt, Stock, Finance read-only |
+| Purchase Order | PDF/WhatsApp means the real order; changes can be lost | 2990 retains line balance, version and documents | **KEEP + IMPROVE** | Current PO Duty checks, sends the actual PDF, records channel/time; later changes create a version | Use 50/50 check/preview; send; record supplier promise or exception | `Purchase Orders` Register; PO info/Communication quick panel; full PO information/edit + PDF at 50/50 | Demand, supplier, Goods Receipt, Stock, Finance read-only |
 | Physical receipt / GRN | Supplier DO and Carres GRN can be confused; counts may hide damaged/wrong/extra goods | Mature ERP separates supplier delivery evidence, physical receipt and payable invoice | **ADAPT + IMPROVE** | Receiving starts from the PO/CO, records the supplier DO and physical counts, then Carres creates the numbered GRN once | Open the exact source, record Order/Received/Damaged/Wrong/Pending facts and evidence, finish once | Receiving-owned workspace and GRN record; no second receipt door | PO/CO source; Stock receives only valid goods; Supplier Claim consequence; no AP for consignment |
 | Supplier problem | Receipt differences and later defects can be mixed | Source-linked claim/return flows preserve evidence | **IMPROVE** | Receiving records damaged/wrong/extra separately without reducing pending delivery or making stock available and reports a source-linked Purchasing claim; later discovery on a Stock Unit/receipt opens a Purchasing stock claim directly | Check source, evidence, supplier response and authorised outcome | `Supplier Claims` Register; claim object and optional supplier claim pack | Purchasing claim authority; GRN/Unit evidence; related customer Service Case read-only; Finance credit read-only |
 | Purchase return | Staff may create a return because goods look wrong | 2990 can derive a return from GRN but also permits blank return | **ADAPT / REJECT blank create** | Only an approved claim/outcome creates a return; issue document; collection proof moves custody | Send return, obtain collection date, scan exact Units, record handover | `Purchase Returns` Register; formal object; 50/50 while issuing/revising | Claim source; Stock custody; Finance credit consequence |
@@ -3617,75 +3617,52 @@ sideways under the pinned `PO Date · PO No` (`PO No` alone below 768px) rather 
 column. **Owed:** the same measurement signed in on production, where JetBrains Mono renders
 document numbers wider than the fixture font.
 
-**PO OBJECT PAGE COMPOSITION — OWNER-APPROVED (Jess, 2026-09-25) · BUILT 2026-09-29.** The page a PO
-number opens. It follows UI MASTER §4.1 (Object Header → one scroll; tabs only `Document ·
-Revisions · History · Order Route`; viewing never splits, `Edit` does) and shares the Portal shell
-(sidebar + content + right rail); it has no local filter rail. Measured on `main` before this
-ruling: the reply form was one date per PO, the send area appeared only in issue/edit mode, no
-"what to do now" block existed, `Status` and `PO Version` split one state across two facts, the
-PDF sat in a right pane during viewing, and `Change Deliver To` had no door (built 2026-09-29, §5.4).
+**PO OPENING AND OBJECT COMPOSITION — OWNER RULING 2026-10-02 · APPROVED TARGET / NOT BUILT.**
+Jess's annotated deployed Sales Order quick panel is the presentation reference. Clicking a PO
+number opens the shared right-side quick panel, retaining the register behind it. Its header
+shows `{PO-YYMMDD-RRRR-Vn} · {Supplier}`, the current state, and the shared Print, Open full page
+and Close icon controls. The goods expansion remains a separate register control.
 
-```text
-Object Header · 50px   ← Purchase Orders   PO260925-4827(1) · Ohana   {state word}
-                       [Download PDF] [Edit ▾]  ‹ i of n ›     Document · Revisions · History · Order Route
-CURRENT ACTION         [avatar] fact line (15/600) · action line (11 slate-11)
-                       [Copy message] [Open WhatsApp group]      [ONE primary button]
-Purchase order         Supplier · Supplier Deliver To · Source · PO Doc Date · PO {n}-Day Delivery Date ·
-                       Sent (PO sent to supplier · channel · time · actor / Sending not confirmed)
-Items            Item · Qty · Deliver To · Unit ID · Supplier Confirmed Delivery Date (per batch)
-Receiving              connected GRNs, read-only doors
-Claims and returns     connected records, read-only doors
-Document               the current version's PDF, full width, last
-```
+The quick panel has two tabs: **`PO info`** and **`Communication`**.
 
-- **One primary button, and it is the Work sentence.** `CURRENT ACTION` prints the same fact/action
-  lines the Work card prints (§8.3, Workspace §5.10) and hosts the one governed act for the PO's
-  state: `Sending not confirmed` → `PoIssueEvidence`; day-before → `Record supplier answer`;
-  date passed → `Ask {Supplier} when the goods will arrive`; short receipt → `Ask {Supplier} for the
-  balance delivery date`. Waiting with nothing due prints `Nothing to do until {date}` and no
-  button. `Completed` / `Cancelled` hide the block. Recording buttons are open to any Operation
-  person (§5.7); issue/edit buttons follow §5.3 and say `Only Operation staff can issue POs` otherwise.
-- **State lives in the header**, next to `number · party`, in the §5.8 vocabulary; the `Status`
-  and `PO Version` facts are retired from the fact grid; the version is the number's `(n)` and the
-  send record is the `Sent` fact.
-- **`Edit ▾`** holds `Revise quantity or Deliver To` · `Change Deliver To` (§5.4) · `Cancel goods not received` (§5.8.1) last (destructive). Each opens the 50/50 edit split; `Record supplier answer` opens the
-  560px right panel of §5.7 instead.
-- **Geometry (tokens only):** header 50px, title `text-page`, state `text-body` slate-11; view strip
-  36px with a 2px blue-9 underline; blocks white, 1px slate-5, `rounded-card`, 16px padding, 24px
-  between blocks; fact grid two columns of 40px rows (label `text-label` slate-11, value
-  `text-body`), one column ≤820; goods table §6.8 two-line 54px rows; buttons md 32px, exactly one
-  blue-9; focus ring 2px; touch ≥40px.
-- **Widths:** 1440 content ≤1280, goods table fits; 1180 goods table scrolls under a pinned `Item`;
-  820 single-column facts, header actions on a second row, panel full width; 743 view strip
-  scrolls; 390 everything single column, `‹ i of n ›` inside `⋮`, 40px full-width primary, PDF
-  becomes `Open PDF`.
-- **Words:** all existing (§5.8, COPY Purchasing dictionary) plus `Nothing to do until {date}` and
-  the menu item `Revise quantity or Deliver To`.
+- **PO info:** read-only supplier, Supplier Deliver To, PO Doc Date, original PO Delivery Date,
+  current-version sending fact, Items with source/Unit and quantity progress, and connected
+  Receiving and Claims/returns doors. Use the deployed SO quick-panel card/fact grammar, with PO
+  content and ownership. Missing values remain explicit.
+- **Communication:** the current owner/cover and next action, prepared supplier message and
+  recorded-channel controls, current-version sending confirmation, and the existing inline
+  supplier-answer table with evidence and dated history. Staff can finish the relevant sending
+  or reply job here. Dates, split promises, inability and price answers follow §§5.7–5.8; ordinary
+  cancellation and commercial exceptions retain §5.8.1 permissions and guards. Opening/copying a
+  message is not sending, and recording an answer does not automatically revise the PO.
 
-**BUILT 2026-09-29 (Jess "back to purchasing"; top-to-toe of the PO page).** Viewing is one column:
-`Current action` → `Purchase order` (facts `Supplier` · `Supplier Deliver To` · `PO Doc Date` ·
-`PO Delivery Date` · `Sent`, with `Supplier reply` inside) → `Items` (the kit DocumentTable) →
-`Receiving` → `Claims and returns` → `Document` (the current version's PDF, full width, last). The
-header reads `{PO No}({n}) · {Supplier}` with the state word once; `Status`, `PO Version` and the
-per-PO `Supplier Confirmed Delivery Date` facts are gone (the confirmed dates are per line in
-`Supplier reply`). Header actions are `Download PDF` and `Edit ▾` → `Revise quantity or Deliver To`;
-`Issue current PDF` is the one primary button inside `Current action`. The Work sentence for an
-unsent PO now says `Send {PO No}({n}) to {Supplier}` (the 2026-09-25 send line). **Deliberate
-differences from the sketch above:** `Source` stays removed (owner 2026-09-26); `Supplier reply`
-stays inside `Purchase order` (§5.7, owner 2026-09-26); the fact keeps `PO Delivery Date` because the
-PO read carries no working-day count (the PDF prints `PO {n}-Day`); `Edit ▾` has no `Change Deliver
-To` or cancellation item because neither door exists yet; with no action and no expected
-date the block reads `Nothing to do now`. The page's own raw-hex table band and line colours were
-removed; the tables are the kit's.
+Purchasing and Workspace use the **same PO-owned communication form, readers and write doors**.
+Workspace opens it with the relevant PO/action context; completion updates the same source facts
+and the derived Work obligation. It does not create a second message log, supplier-answer form,
+status, assignment engine or PO writer. Preserve actor separately from duty holder/cover, exact
+line/batch/current-version scope, dirty guards, evidence and failed-save recovery.
 
-**Journey:** open prepared issue → validate authority/price/Units/destination → send PDF → record
-outbound fact → record the supplier's confirmation or changed date → monitor receipt balance.
-**Object/placement:** full-width view; 50/50 check/preview for issue/change; Document, Revisions,
-History, Order Route. The formal PO detail, issue, revision and PDF workflows are unchanged by the
-2026-09-18 listing work, and no Finance functionality was added.
+**Open full page** leads to the formal **50/50 PO information/edit and document-preview page**:
+left is PO information and its authorised editing controls; right is the current PDF, or the
+clearly marked proposed PDF while editing. Opening the page does not save a change or mint a
+version. Revisions, History and Order Route remain reachable; historical PDFs/send/reply evidence
+stay on their original versions. Quantity/Deliver To/cancellation edits use the existing approved
+flows and permissions, with explicit review and confirmation. Supplier communication stays in its
+communication surface rather than becoming document editing. On narrow screens the same content
+stacks, preserving both information and document access and the shared touch/focus rules.
+
+This replaces the former PO-number-to-single-column-full-page journey and its PDF-last viewing
+composition. It changes presentation and action access, not PO business ownership, quantities,
+versioning, commercial approval or external sending authority. The complete-preview review gate
+above still applies; the current local preview has not yet been rebuilt or verified against this
+new composition.
+
+**Journey:** Register → PO quick panel → inspect PO info or complete Communication; Open full page
+→ check/edit against the PDF → review/confirm a lawful revision → send the current version through
+Communication. Workspace enters the same Communication action directly.
 **Exceptions:** supplier fabric/model unavailable, delayed/split promise, quantity change,
-overdelivery, price change, cancellation and post-send destination change.
-**Connections:** demand, supplier, GRN, Stock, claims, Finance read-only.
+overdelivery, price change, cancellation and post-send destination change retain their owning law.
+**Connections:** demand, supplier, GRN, Stock, claims and Finance retain their existing ownership.
 
 
 ### 9.4 Receiving / GRN — owner instruction 2026-09-04 + owner correction 2026-09-06, PRODUCTION-VERIFIED

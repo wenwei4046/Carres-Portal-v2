@@ -2215,6 +2215,11 @@ the same name (Purchase Orders rail uses `Confirm tomorrow's supplier delivery`)
 <a id="purchasing-ui-dictionary"></a>
 ### Purchasing UI dictionary — APPROVED (Jess, 2026-09-18) · BUILT on SO Batch Purchase 2026-09-18
 
+**PO panel tabs — owner ruling 2026-10-02, APPROVED TARGET / NOT BUILT:** `PO info` ·
+`Communication`. Clicking the PO number opens this shared quick panel. `Open full page` opens
+the 50/50 PO information/edit and PDF surface; communication is shared with Workspace through
+the same PO-owned action form. Purchasing MASTER §9.3 owns the composition and business guards.
+
 This is the single naming reference for SO Batch Purchase, Manual Purchase, Purchase Orders and
 Receiving, including the same facts in details and exports. Every future task reads this section
 and Purchasing MASTER §9.1–§9.4 before changing these surfaces. Exact column orders live there;
