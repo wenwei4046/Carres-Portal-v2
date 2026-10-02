@@ -7249,7 +7249,19 @@ The existing API already returns the governed 422 refusal, so this SQL has no de
 application writer or interface change awaiting deployment.
 
 
-**PO Listing shared toolbar adoption — BUILD IN PROGRESS, 2026-10-02.** Owner requests the deployed Sales Orders Listing grammar for PO. Purchase Orders uses the same DataGrid presentation-tools door: visible current result count and search, with supported Export and Columns in the far-right Page tools overflow. Existing PO grouping, filters, columns, source links, goods expansion and exports remain. This toolbar change does not claim Cards, selection, exception-fact completeness or full Purchasing completion; production acceptance is pending.
+**PO Listing shared toolbar adoption — PRODUCTION-VERIFIED bounded journey, 2026-10-02.**
+PR1851 passed full CI run `36982055145` and merged as `59bd9827d4e60564d055509d281724f4888f65f4`.
+Its unneeded intermediate deployment run `36983507021` was cancelled during checks, before any
+production write, after PR1852 had merged. Both changes shipped through successful production
+run `36983987334` at `9078a14000d3b2cef7742314287ce82283d37954`; all five canonical surfaces
+independently converged (`/tmp/purchasing-production-1852-final.log`). Authenticated Principal
+acceptance showed 63 purchase orders, with Export/Columns in the shared Page tools overflow.
+Columns opened the existing eleven-column chooser; Export opened Excel/PDF options. Searching
+`PO-SMOKE-W` showed one result in both Table and Cards. No layout or column setting was saved,
+no export file was downloaded, and no business writer was exercised. Existing PO grouping,
+filters, source links and goods expansion remain. This bounded toolbar acceptance is not full
+Purchasing completion or full nine-facet/exception-fact acceptance. Screenshot:
+`/tmp/purchasing-page-tools-production.jpg`.
 
 
 **PO-window sending after receipt — DEPLOYED; real received-window journey UNVERIFIED, 2026-10-02.** The measured shared
@@ -7270,4 +7282,25 @@ inventory found the four Completed POs PO-2052, PO-2054, PO-SMOKE-C and PO-SMOKE
 SO source lineage; no window membership is invented to create a live demonstration. This limits
 production acceptance until a real source-linked received PO exists; preserve every original fact.
 
-**PO Listing Table/Cards and selection adoption — APPROVED TARGET / BUILD IN PROGRESS, 2026-10-02.** Jess explicitly directs following the current deployed Sales Orders UI/UX. PO reuses its shared segmented Table/Cards controls, Block card geometry and checkbox selection model; the same filtered PO facts feed both presentations and selections survive switching. View opens the existing PO object. This presentation adoption does not invent bulk commercial actions or claim missing supplier-exception facts. Local journey tests passed; production verification remains pending.
+**PO Listing Table/Cards and selection adoption — PRODUCTION-VERIFIED bounded journey; object-return correction BUILT / RELEASE OWED, 2026-10-02.**
+Jess explicitly directs following the current deployed Sales Orders UI/UX. PO reuses shared
+segmented Table/Cards controls, Block, Checkbox, Button and DataGrid selection. PR1852 passed
+full CI run `36982655629` (13m38s), merged after PR1851, and shipped at
+`9078a14000d3b2cef7742314287ce82283d37954` through successful run `36983987334`.
+Authenticated acceptance: search `PO-SMOKE-W` produced one of 63 POs; Cards showed that exact
+PO's real supplier, destination, date, version/send fact and goods. Ticking it in Cards then
+returning to Table retained the selection and filtered result. Clear removed the tick; the
+shared Select all rows and its deselection respectively added and removed the current PO.
+Cards View opened the actual Completed PO-SMOKE-W V1 object, including its 2 ordered / 2
+received / 0 pending quantities. No source, receipt, stock or supplier fact was written.
+Removing selection persistence on disk made the journey test fail; restoration passed.
+Screenshot: `/tmp/purchasing-card-view-production.jpg`.
+
+The same production walk found View → Back resetting Cards and search to an unfiltered Table.
+The bounded correction reuses DataGrid's existing `sessionKey` memory and preserves the listing's
+query before opening an object. Back restores that query and the existing selected-row state;
+a direct object link with no in-session listing origin keeps the ordinary Table fallback.
+It introduces no second search/filter engine, component or business writer. The new object-return
+journey fails on the delivered predecessor and passes with the correction; 49 PO-page tests
+plus the existing shared presentation test pass. Release and authenticated return/search
+acceptance remain owed. No full nine-facet or supplier-exception completeness is claimed.

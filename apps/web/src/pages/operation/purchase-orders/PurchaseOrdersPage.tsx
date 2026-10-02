@@ -441,6 +441,7 @@ export default function PurchaseOrdersPage() {
   const monthly = params.get("view") === "monthly";
   const cards = params.get("view") === "cards";
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
+  const listingReturnParams = useRef<string | null>(null);
   const toggleRow = (id: string) => setSelectedKeys((previous) => {
     const next = new Set(previous);
     if (next.has(id)) next.delete(id); else next.add(id);
@@ -597,7 +598,10 @@ export default function PurchaseOrdersPage() {
         destinations={destinations}
         activeDestinations={activeDestinations}
         onBack={() => {
+          const returnParams = listingReturnParams.current;
+          listingReturnParams.current = null;
           setParams((current) => {
+            if (returnParams !== null) return new URLSearchParams(returnParams);
             const next = new URLSearchParams(current);
             next.delete("po");
             next.delete("view");
@@ -635,6 +639,7 @@ export default function PurchaseOrdersPage() {
     ...(filter.deliverTo ? [{ key: "deliverTo", label: `Supplier Deliver To: ${filter.deliverTo}`, onClear: () => setFilter((f) => ({ ...f, deliverTo: null })) }] : []),
   ];
   const openObject = (row: RegisterRow, view?: ObjectView) => {
+    listingReturnParams.current = params.toString();
     setParams((current) => {
       const next = new URLSearchParams(current);
       next.set("po", row.id);
@@ -1080,6 +1085,7 @@ export default function PurchaseOrdersPage() {
             <DataGrid<RegisterRow>
               appearance="reference"
               presentationTools
+              sessionKey="carres.purchaseOrders.register.v2"
               presentationKey={cards ? "cards" : "table"}
               toolbarEnd={presentationTabs}
               selectionPrimary={presentationTabs}

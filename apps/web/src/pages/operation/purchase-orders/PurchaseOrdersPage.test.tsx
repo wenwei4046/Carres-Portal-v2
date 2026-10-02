@@ -331,6 +331,17 @@ describe("Purchase Orders Register", () => {
     expect(screen.getByRole("checkbox", { name: "Select PO-20260828-4827" })).toBeChecked();
   });
 
+  it("returns from a card's PO object to the original Cards view and selection", () => {
+    renderPage("/operation/procurement?view=cards");
+    fireEvent.click(screen.getByRole("checkbox", { name: "Select PO-20260828-4827" }));
+    const card = screen.getByRole("checkbox", { name: "Select PO-20260828-4827" }).closest("[data-row-key]") as HTMLElement;
+    fireEvent.click(within(card).getByRole("button", { name: "View" }));
+    expect(screen.getByTestId("purchase-order-object")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Back to Purchase Orders" }));
+    expect(screen.getByTestId("purchase-orders-cards")).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "Select PO-20260828-4827" })).toBeChecked();
+  });
+
   it("opens the shared source-demand view and returns to the PO listing", () => {
     renderPage();
     fireEvent.mouseDown(screen.getByRole("tab", { name: "Monthly demand" }), { button: 0, ctrlKey: false });
