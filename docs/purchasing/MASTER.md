@@ -5952,7 +5952,37 @@ execution. Recording negotiated terms does not bypass existing commercial or Man
 approval. Detailed action assignment and new screen wording remain under
 review; this ruling does not approve the complete Showroom Blueprint or application build.
 
-**Purpose / source:** record a new display placement, replacement, removal or change and connect
+**SHARED SHOWROOM REQUEST RESPONSE AND PROGRESS — OWNER-APPROVED / LOCKED;
+Jess, 2026-10-02.** Carres-owned showroom display requests use the same request communication
+standard agreed for Dealer display assistance. The authorised showroom supplies the product,
+location, requested action and explanation, with photos/video where needed; existing goods and
+known location/source facts are selected or carried forward, not retyped. Operation continues
+the same source-linked request, replies, requests missing evidence and publishes progress there.
+There is no second Operation request or parallel status ledger.
+
+Operation starts handling and gives a substantive first response within two working days of
+submission, calculated using the governed Carres working calendar. Opening the request or an
+automatic acknowledgement is insufficient. Missing facts are requested explicitly; overdue
+first-response work remains with the responsible owner/cover. This is a response deadline,
+not a repair, production or delivery completion promise.
+
+Newly produced display goods use their normal product production lead time, as for Sales
+Orders. Operation may arrange earlier delivery when goods, existing release/approval conditions
+and the receiving location's availability permit. Dealer/showroom-visible progress may be
+published from the real owning Stock/Delivery facts: preparing, stock ready, scheduling, confirmed
+sending/delivery dates and actual dispatch. Keep requested, estimated, confirmed and actual
+dates distinct. Record publishing actor/time and changes/history; clicking Publish neither
+manufactures stock readiness nor proves physical dispatch. Screen wording requires COPY admission.
+
+This shared communication and service-level rule does not merge business ownership: Carres
+buying still follows Manual Purchase/PO approvals, supplier consignment follows its existing
+display-only order/return rules, internal controlled-site moves follow Stock Transfer, and
+service problems follow their proper Service/Stock/Claim owner. Dealer goods remain purchased,
+not consignment. The existing Dealer-account customer Sales Order is a terminal-customer
+transaction, not proof of a Dealer-company display purchasing capability. Whole-Blueprint
+approval, account provisioning, cutover and application delivery remain outside this ruling.
+
+**Purpose / source:** record a Carres-owned showroom's new display placement, replacement, removal or change and connect
 it to the existing goods and the agreed supplier arrangement. For a replacement/removal, choose the
 showroom (PJ Showroom exists today), then select the exact existing display Units from Stock.
 Bring forward Unit ID, model, supplier, current location, ownership and stock state; do not ask
@@ -7132,12 +7162,17 @@ PLAN does not implement application code or extend the existing BUILD commission
 completion is separately proved through authenticated business journeys and downstream evidence.
 
 
-**Continuous delivery acceptance — 2026-10-02, BUILD IN PROGRESS.** Approved planning from this
+**Continuous delivery acceptance — 2026-10-02, bounded sending slice PRODUCTION-VERIFIED.** Approved planning from this
 owner session is consolidated on origin/main without changing proposal labels. Current-version
 send work must remain reachable after goods completion: Sending filter includes a received PO
 whose current version lacks evidence, and its object opens the existing PDF/send form. The PO
 remains in Completed goods; no sending evidence is fabricated. Cancelled-PO sending remains an
 explicit separate gap because the current PDF and confirm-sent SQL reject cancelled documents.
+Authenticated read-only acceptance on production commit `44c7473c0`: Sending includes 59 POs
+(55 awaiting goods plus four Completed goods without a current send mark). PO-SMOKE-W remains
+Completed and opens its rendered current PDF beside the existing send form. Both Pages projects,
+both canonical hosts and the API Worker converged to that SHA. No supplier message or send mark
+was written. Screenshot: `/tmp/purchasing-completed-po-send-production.png`.
 The full nine-filter rail, quick Communication/full preview, Amendments, Monthly demand and other
 §2.4 completion work are not claimed delivered by this bounded sending slice.
 
@@ -7151,3 +7186,11 @@ including the existing special overdue/undated row semantics. Filters collapse/r
 shared rail control on narrow screens. No new demand writer or Sales Order edit is added.
 Expanded monthly filtering and other approved register controls remain separate delivery work;
 this entry is implementation evidence, not authenticated production acceptance.
+
+
+**Fixed PO condition row — BUILD IN PROGRESS (2026-10-02).** The existing shared DataGrid gains
+an opt-in fixed 36px condition slot used by Purchase Orders only. The slot remains empty when
+unfiltered; active chips and Clear all occupy it without moving listing tools or table results.
+Multiple chips scroll horizontally with their remove controls retained. No other register adopts
+this opt-in. The completed PO's action fact uses the governed `Sending not confirmed`; absence of
+a mark is never presented as proof the PDF was not sent. Production geometry remains owed.
