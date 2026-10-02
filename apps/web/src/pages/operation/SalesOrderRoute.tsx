@@ -917,16 +917,49 @@ export default function SalesOrderRoute({
         </section>
       )}
 
+        <div className="flex shrink-0 items-center justify-end" data-testid="route-controls">
+        <div className="flex overflow-hidden rounded-control border border-kit-slate-5 bg-white">
+          <button
+            type="button"
+            onClick={() => zoom(-1)}
+            data-testid="route-zoom-out"
+            aria-label="Zoom out"
+            className="grid h-7 w-7 place-items-center text-base-600 hover:bg-kit-slate-3"
+          >
+            <Minus size={14} aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            onClick={() => zoom(1)}
+            data-testid="route-zoom-in"
+            aria-label="Zoom in"
+            className="grid h-7 w-7 place-items-center border-l border-kit-slate-5 text-base-600 hover:bg-kit-slate-3"
+          >
+            <Plus size={14} aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            onClick={() => fit(true)}
+            data-testid="route-fit"
+            aria-label="Fit the whole route"
+            className="grid h-7 w-7 place-items-center border-l border-kit-slate-5 text-base-600 hover:bg-kit-slate-3"
+          >
+            <Maximize2 size={14} aria-hidden="true" />
+          </button>
+        </div>
+        </div>
+
       <div
         data-testid="route-canvas"
         className="relative flex h-[calc(100vh-260px)] min-h-[420px] flex-col overflow-hidden rounded-card border border-kit-slate-5 bg-kit-slate-3"
       >
-      {/* The map draws only ABOVE the control strip, so `− + ⛶` (bottom-left,
-          always visible) never sits on top of a node (Jess, SO-1365 check). */}
+      {/* Controls sit outside the viewport so they never cover a route node. */}
       <div
         ref={frame}
         data-testid="route-viewport"
-        className="relative min-h-0 flex-1 overflow-hidden"
+        tabIndex={0}
+        aria-label="Order Route"
+        className="relative min-h-0 flex-1 overflow-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9"
         onPointerDown={(e) => {
           if ((e.target as HTMLElement).closest("[data-testid^='route-node-']")) return;
           drag.current = { x: e.clientX, y: e.clientY, tx: view.tx, ty: view.ty };
@@ -944,6 +977,11 @@ export default function SalesOrderRoute({
           drag.current = null;
         }}
       >
+        <div data-testid="route-scroll-extent" aria-hidden="true" style={{
+          width: Math.max(0, view.tx) + map.width * view.scale,
+          height: Math.max(0, view.ty) + map.height * view.scale,
+          pointerEvents: "none",
+        }} />
         <div
           data-testid="route-surface"
           className="absolute left-0 top-0 origin-top-left motion-safe:transition-transform motion-safe:duration-150"
@@ -986,39 +1024,7 @@ export default function SalesOrderRoute({
         </div>
       </div>
 
-        {/* `− + ⛶`, bottom-left, always visible and keyboard-operable, on the
-            canvas's own control strip. */}
-        <div className="flex h-11 shrink-0 items-center border-t border-kit-slate-5 bg-white px-3" data-testid="route-controls">
-        <div className="flex overflow-hidden rounded-control border border-kit-slate-5 bg-white">
-          <button
-            type="button"
-            onClick={() => zoom(-1)}
-            data-testid="route-zoom-out"
-            aria-label="Zoom out"
-            className="grid h-7 w-7 place-items-center text-base-600 hover:bg-kit-slate-3"
-          >
-            <Minus size={14} aria-hidden="true" />
-          </button>
-          <button
-            type="button"
-            onClick={() => zoom(1)}
-            data-testid="route-zoom-in"
-            aria-label="Zoom in"
-            className="grid h-7 w-7 place-items-center border-l border-kit-slate-5 text-base-600 hover:bg-kit-slate-3"
-          >
-            <Plus size={14} aria-hidden="true" />
-          </button>
-          <button
-            type="button"
-            onClick={() => fit(true)}
-            data-testid="route-fit"
-            aria-label="Fit the whole route"
-            className="grid h-7 w-7 place-items-center border-l border-kit-slate-5 text-base-600 hover:bg-kit-slate-3"
-          >
-            <Maximize2 size={14} aria-hidden="true" />
-          </button>
-        </div>
-        </div>
+
       </div>
     </div>
   );

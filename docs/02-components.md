@@ -513,3 +513,9 @@ Use the complete existing component recipes, including focus/touch/state behavio
 result feedback reuses the governed Toast; do not add a duplicate result banner or new feedback
 component. Persistent source failures, business blockers and field errors retain their existing
 owned presentation.
+
+SO Order summary recipe (owner2026-10-02): four compact rows, label left/value right;
+Sales orders · Total payable · Paid to date · Balance due all remain visible. Reuse existing
+FilterRailGroup, Money and typography; count uses text-strong, values right/tabular/no-wrap,
+8px row gap. Conditional missing-amount notices span the row. Filtering/calculation ownership
+and loaded-scope tooltip/count stay unchanged; other modules derive aggregates from their own facts.

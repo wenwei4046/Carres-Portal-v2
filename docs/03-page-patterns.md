@@ -465,3 +465,9 @@ Table/Cards labels and rail words remain visible. Shared quick-view Print is ico
 full-object Print keeps its word/menu. Reuse the complete kit composition and existing Toast for
 ordinary result feedback; do not add an extra result banner. Existing persistent reports/source
 errors/business blockers and inline validation keep their governed purpose.
+
+SO Order summary recipe (owner2026-10-02): four compact rows, label left/value right;
+Sales orders · Total payable · Paid to date · Balance due all remain visible. Reuse existing
+FilterRailGroup, Money and typography; count uses text-strong, values right/tabular/no-wrap,
+8px row gap. Conditional missing-amount notices span the row. Filtering/calculation ownership
+and loaded-scope tooltip/count stay unchanged; other modules derive aggregates from their own facts.

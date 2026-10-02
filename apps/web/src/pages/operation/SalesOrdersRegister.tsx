@@ -1190,12 +1190,12 @@ export default function SalesOrdersRegister() {
       ) : (
         <>
           <FilterRailGroup title="Order summary" icon="money" defaultOpen>
-            <dl className="space-y-3 px-2 py-2" data-testid="sales-orders-summary" title={population != null && population > all.length ? "Loaded orders only" : undefined}>
-              <div><dt className="text-meta text-kit-slate-11">Sales orders</dt><dd className="text-title">{isLoading ? "Loading" : isError ? "Unavailable" : summaryRows.length}</dd></div>
+            <dl className="space-y-2 px-2 py-2" data-testid="sales-orders-summary" title={population != null && population > all.length ? "Loaded orders only" : undefined}>
+              <div className="grid grid-cols-[1fr_auto] items-center gap-x-2"><dt className="text-meta text-kit-slate-11">Sales orders</dt><dd className="text-strong text-right tabular-nums">{isLoading ? "Loading" : isError ? "Unavailable" : summaryRows.length}</dd></div>
               {(["total", "paid", "balance"] as const).map((key, index) => {
                 const missing = summaryRows.filter(row => row[key].kind !== "amount" && row[key].kind !== "settled").length;
                 const value = summaryRows.reduce((sum, row) => sum + ((() => { const amount = row[key]; return amount.kind === "amount" ? amount.value : 0; })()), 0);
-                return <div key={key}><dt className="text-meta text-kit-slate-11">{["Total payable", "Paid to date", "Balance due"][index]}</dt><dd className="text-strong">{isLoading ? "Loading" : isError ? "Unavailable" : <Money value={value} />}</dd>{!isLoading && !isError && missing > 0 && <p className="text-meta text-kit-slate-11">{missing} orders without a confirmed amount</p>}</div>;
+                return <div key={key} className="grid grid-cols-[1fr_auto] items-center gap-x-2"><dt className="text-meta text-kit-slate-11">{["Total payable", "Paid to date", "Balance due"][index]}</dt><dd className="text-strong text-right whitespace-nowrap tabular-nums">{isLoading ? "Loading" : isError ? "Unavailable" : <Money value={value} />}</dd>{!isLoading && !isError && missing > 0 && <p className="col-span-2 text-meta text-kit-slate-11">{missing} orders without a confirmed amount</p>}</div>;
               })}
             </dl>
           </FilterRailGroup>

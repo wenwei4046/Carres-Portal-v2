@@ -1749,7 +1749,7 @@ change one and a connector stops short of its node.
 ### The canvas
 
 **One surface, never a stack.** White node cards joined by connector lines on a single pannable,
-zoomable canvas. `− + ⛶` sit bottom-left and are always visible and keyboard-operable. Nodes keep
+zoomable canvas. `− + ⛶` sit above and outside the canvas, always visible and keyboard-operable (owner correction2026-10-02). The viewport scrolls to the full transformed route extent so its bottom is reachable; this does not change route facts, resolver or node-card design. Nodes keep
 their full anatomy at every width — there is no stacked fallback and no reflow. The Object Header
 already names `Order Route` and `SO-number · Customer`; the canvas never repeats either identity.
 
@@ -6783,7 +6783,9 @@ composition and numeric recipes live in UI MASTER “Confirmed shared template�
 this module owns the following business-specific application. Delivered evidence is below.
 
 - Order list rail: Order summary (Sales orders, Total payable, Paid to date, Balance due), then
-  Customer Requested Delivery Date shortcuts. Both open initially. Aggregates follow the SAME
+  Customer Requested Delivery Date shortcuts. Both open initially. Order summary is four compact
+  label-left/value-right rows, all visible (owner2026-10-02): count uses text-strong; money values
+  right-align, keep tabular digits and do not wrap; missing-amount notices span the row only when needed. Aggregates follow the SAME
   filtered loaded result as Table/Cards. The redundant “Current filtered list” paragraph and spacing are removed by owner amendment; incomplete loaded scope remains a summary tooltip and register count, and missing-money warnings remain visible.
   Payment, Delivery and Stock Status filters live in columns; no duplicate rail or case filter.
   Monthly demand retains its own governed single-choice filters and views.
