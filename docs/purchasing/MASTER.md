@@ -3474,11 +3474,13 @@ grouped listing page; this section neither restates its mechanics nor varies the
 
 **Rail — owner-approved 2026-10-01 / APPROVED TARGET, NOT BUILT.** Preserve the
 supplier-follow-up purpose and adopt the confirmed shared template. **Owner correction 2026-10-02:**
-remove the visible `Filters` heading. The local preview uses the deployed Sales Order vertical
-`Order list` navigation grammar. **PROPOSAL / NOT LAW:** retain only Order list here; Monthly
-demand remains Sales Order/demand planning rather than duplicating it inside issued POs.
-Falsifier: a measured PO-owned monthly operating job that the existing demand-planning surface
-cannot serve. The complete monitor rail is:
+remove the visible `Filters` heading and follow the annotated deployed Sales Order vertical
+navigation with both **`Order list`** and **`Monthly demand`**, including its shared icons,
+spacing and selected-tab presentation. Order list retains the approved PO monitor content.
+The local Monthly demand preview reuses the existing Sales Order monthly-demand reader and
+presentation with explicitly fictional source demand; this is not production integration proof.
+Preserve source-owned demand and SO Batch to-buy facts rather than deriving customer demand
+from issued PO quantities. Full production adoption and source connections remain unbuilt. The complete monitor rail is:
 
 | Group | Filters |
 |---|---|
