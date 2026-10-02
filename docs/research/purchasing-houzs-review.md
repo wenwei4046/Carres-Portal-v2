@@ -425,3 +425,16 @@ quantities, documents, actual actor, permissions, failure/retry and completion. 
 success alone is insufficient. No unauthorised external message or live supplier commitment is
 created for a test. Supplier-account shutdown remains outside approved scope. This combined scope
 is the final recommendation for owner review; approving it must be explicit before expanded BUILD.
+
+
+### Amendment discoverability — measured 2026-10-02
+
+FACT: read-only Houzs /scm/po-amendments rendered a separate revision inbox, with Status,
+Created, PO No., Amendment No., Source, Requested by and Approver columns. Search explicitly
+covers PO number, amendment number and requester, bounded to 500 loaded rows. Live examples
+included PO-origin HC-PO-010083/A1 and source-SO-origin HC-SO-011014/A1, each linked to a PO.
+Source docs/modules/purchase-order-amendment.md in /tmp/houzs-purchasing-plan-20261001 describes
+requested/approved/rejected requests and snapshots plus PO revision bump on apply. Route comment
+states this is Houzs-native, with no 2990 mirror/dispatch. The available Desktop/2990s checkout
+did not establish a corresponding PO-amendment listing; do not attribute the Houzs design to2990.
+No request was raised, approved or rejected in this inspection.
