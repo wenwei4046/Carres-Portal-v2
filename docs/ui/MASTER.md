@@ -3460,3 +3460,60 @@ Shared token radii: control6px, card10px. `text-strong` is15px/22px, weight600.
 | Rail filter group | Margin4px vertical; border1px slate-6; radius6px; white body | Slate-3 header, slate-4 hover; expanded header bottom divider1px; header minimum36px/phone40px |
 | Rail group body/rows | Body padding4px top/bottom,8px right,16px left; rows minimum32px, padding7px vertical; text12/18 | Phone minimum40px; chosen rows blue-3/blue-11; long text may increase height rather than clip |
 | Table/Cards segmented switch | Shared CSS: outer padding2px/gap2px/border1px/radius6px; tab height26px desktop /34px phone, padding10px horizontal, radius4px, text13/18 | Selected600 blue-11 on blue-3; both labels and16px icons remain visible; surrounding hit targets must retain accepted touch behavior |
+
+### Remaining kit gaps — explicit, not permission to improvise
+
+- The rail's accepted complete visual recipe still includes `.so-template-rail` and SO-specific
+  navigation/test selectors. Primitive FilterRail imports alone do not deliver that composition.
+  Shared extraction/admission is needed before claiming plug-in reuse across every module.
+- `SalesOrderTabs` and Workspace `FullFact` still carry page-owned composition/naming. They are
+  inspected references, not proof of a complete generic Object template API.
+- Whole Register/Quick-view/Object example coverage on `/ui`, including all responsive and failure
+  states, must be audited. Component examples alone are not complete-page evidence.
+- No source-based dimension in this section should be called a freshly rendered measurement.
+  Visual validation remains owed for other-module adoption; Route/Monthly composition is owned by Orders MASTER and its separate delivery lane.
+
+Do not assume every control is icon-only: global utility triggers and quick-view Print are;
+Table/Cards and full-object Print retain words. Status pills retain text. Column width, drawer width,
+field height, gaps and rail width must resolve to the actual admitted shared source/token; copy the
+complete recipe rather than guessing from an image. Before changing a missing shared dimension,
+record the measured source and route the gap to the kit owner.
+
+**Copy composition, not screenshots or isolated imports.** Start with these source recipes:
+
+| Surface | Existing implementation to inspect | What must carry across |
+|---|---|---|
+| Register | `apps/web/src/pages/operation/SalesOrdersRegister.tsx` | Shared Portal shell and right rail; DataGrid toolbar, search, selection, Table/Cards, column controls and filter chips |
+| Local filter rail | Register `.so-template-rail` composition and `useFilterRailOpen` | Measure available content canvas, not browser width; threshold896; collapsed44px Show filters; narrow open overlay, backdrop, Escape and restored selection |
+| Object header | `apps/web/src/pages/operation/SalesOrderTabs.tsx` | White identity/actions, quiet tab row, divider, selected black600/blue underline, fixed header and responsive action wrapping |
+| Quick view | Register Drawer `variant="quick-view"` plus shared Block | Dark identity/status/actions, compact facts, full-object door, accessible icon actions, scrolling body and no footer |
+| Object facts/items | `apps/web/src/pages/operation/SalesOrderWorkspace.tsx` | Shared field framing, readable hierarchy, protected edit state, natural Items height and separate document-preview scroll |
+| Shared primitives | `apps/web/src/components/kit` and `/ui` | Exact supported props, tokens, hover/focus/disabled/loading states and keyboard/touch behavior |
+
+SO source files are composition references, not permission to copy SO business fields or financial
+calculations. Use actual shared exports. If a reusable capability exists only inside an SO page,
+ask the kit owner to extract/admit it once; do not fork it into another module. A prototype adapter
+must be labelled local/sample and cannot be described as shared-kit support or working production.
+
+**Every adopting chat must finish this acceptance checklist before saying aligned:**
+
+- Name the owning module, exact source recipe and shared components used; identify any local adapter.
+- Preserve that module's governed columns, quantities, statuses, permissions and write ownership.
+- Show a complete working preview, not a cropped header. Check desktop and390px phone, plus the
+  available-canvas896px rail boundary with global navigation expanded/collapsed.
+- Check rail open/closed, backdrop/Escape, search, selection, column filters and Table/Cards where
+  admitted; retain the same result and filter state when changing presentation.
+- Check quick view and full-object door, long identities, missing/error/loading/empty states,
+  keyboard focus, icon accessible names and40px touch controls.
+- Check the bottom of long content is reachable, headers remain fixed, and horizontal table overflow
+  stays in its intended pane. No footer or floating controls may cover facts or actions.
+- Provide the preview URL, visual evidence and relevant test results. State remaining gaps explicitly.
+  Passing tests, importing kit primitives or another chat's approval is not whole-page visual proof.
+
+The module chat owns implementation and reports in its own chat. The kit owner owns shared gaps;
+the BUILD controller owns release verification. Send the same canonical section link and specific
+mismatch to other chats, rather than a new prose standard. Approval, built, deployed and visually
+verified are separate claims; include scope and evidence for each.
+
+**Scope boundary:** the accepted shell/register/object/quick-view recipe is confirmed. Order Route compact-card redesign and Monthly Demand planning composition are governed separately by Orders MASTER; their current local work is not a universal kit pattern or part of this listing release. No complete2990 comparison is claimed.
+The master contract being documented does not mean every module has migrated or been verified.
