@@ -131,6 +131,24 @@ to this record and does not duplicate the request. Existing stock, custody and m
 remain with their owning modules. A related independently sourced Purchasing Supplier Claim
 may be linked read-only under §1; Dealer does not repeat its report for Purchasing.
 
+**Display fulfilment and visible progress — OWNER-RULED 2026-10-02.** When the confirmed
+display request/remedy requires newly produced goods, use the normal applicable product
+production lead time as for Sales Orders; the first-response deadline is not a production or
+delivery promise. Operation may arrange earlier delivery when the goods and lawful release
+conditions permit, subject to the receiving location's availability and existing Delivery gates.
+This does not shorten a supplier's production commitment by assumption or override commercial,
+payment, stock or custody authority.
+
+Operation can publish Dealer-visible progress on the same source-linked request: stock ready,
+scheduling in progress, and the confirmed sending/delivery arrangement with its date. Published
+progress reads the owning Stock/Delivery facts and records the publishing actor/time; a click
+must not fabricate readiness or a physical dispatch. Keep the requested date, estimated date,
+confirmed dispatch/delivery dates and actual handover distinct. Actual dispatch requires its
+real evidence. If an arrangement changes, show the current arrangement and preserve the prior
+version/history; Dealer does not re-submit the request to see the update. Screen labels remain
+subject to COPY admission. This cross-module handoff does not make Service the owner of a new
+display purchase or of Stock/Delivery execution.
+
 This ruling approves Dealer display-service coverage only, not the complete Showroom/Dealer
 Blueprint, final portal labels, blanket free service or unconditional exchange/return policy.
 
