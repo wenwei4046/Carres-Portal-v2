@@ -273,7 +273,8 @@ export interface PoWindowSupplierDoors {
  * The window model over the SO Batch read — the Work feed, its completion
  * probe and the Work right panel all run THIS, so "which demand and which POs
  * a window holds" has one answer (Law D). Only rows SO Batch may actually
- * buy (`isSelectableForBuying`) are demand; a received PO needs no sending.
+ * buy (`isSelectableForBuying`) are demand. Goods receipt never supplies current-version
+ * confirmed-sent evidence; the sending obligation remains independently open.
  */
 export function poWindowWorkFromSoBatch(
   read: {
@@ -301,7 +302,7 @@ export function poWindowWorkFromSoBatch(
       version: po.version ?? 1,
       supplierId: po.supplierId,
       supplierName: po.supplierName,
-      sentCurrentVersion: po.sentCurrentVersion || po.status === "received",
+      sentCurrentVersion: po.sentCurrentVersion,
       poWindow: po.poWindow ?? null,
       orderId: reg.orderId,
     }))),
