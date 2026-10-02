@@ -3,11 +3,11 @@
 > **The only UI-architecture document.** Overwritten when re-ruled; never versioned.
 > **Start with `AGENTS.md` and the ERP PLAN CHAT START PROTOCOL; this is the shared UI authority.**
 >
-> **THE TOKEN VALUES ARE NOT HERE AND NEVER WILL BE.** They live in three standards that are
-> the vocabulary itself, and this file links to them rather than copying them:
+> **Canonical token definitions live in the three standards below.** The source-audited template
+> measurements in this MASTER are implementation references, not independently editable tokens:
 > [`../01-design-tokens.md`](../01-design-tokens.md) (spacing · colour · typography · icons) ·
 > [`../02-components.md`](../02-components.md) · [`../03-page-patterns.md`](../03-page-patterns.md).
-> **Open one only when you need a value. A number in two files is a number that drifts.**
+> **Change canonical tokens/components first; refresh template measurements in the same change.**
 
 | I am working on | Read |
 |---|---|
@@ -38,12 +38,10 @@ variant or recolour actions merely because their verb sounds destructive.
 **APPROVED TARGET — compact search, owner follow-up2026-10-01.** Canonical dimensions are in
 01§7.2. Placeholder is `Search orders…`; an accessible hint describes only the actual supported
 search fields. Do not advertise phone or universal server search without implementation proof.
-Visible toolbar content is count/filter summary, search, admitted Table/Cards and far-right `⋯`.
-The search and right-toolbar design are settled for this scope; actual pilot acceptance remains
-pending. Existing Carres neutral canvas, white surfaces, dark/mid neutral text, light neutral
+Visible SO toolbar content is search, admitted Table/Cards and far-right `⋯`; count and quantity remain in the footer.
+The search and right-toolbar design are settled for this scope; accepted geometry and bounded delivery evidence are governed by Confirmed shared template below. Existing Carres neutral canvas, white surfaces, dark/mid neutral text, light neutral
 header/hover/borders, blue primary/selection/focus and red error/destructive-condition roles remain;
-no palette token changes. Left rail/location relocation,32px main rows and a generic full-order
-drawer remain unapproved. No automatic global adoption, merge or deployment is authorised.
+no palette token changes. The accepted SO rail,32px main rows and read-only quick view are governed by Confirmed shared template; this does not admit a generic editing drawer. No automatic global adoption, merge or deployment is authorised.
 
 
 ### Register toolbar — owner-approved target, 2026-10-01
@@ -60,7 +58,7 @@ overflow first to preserve a single row and visible primary controls; do not sil
 active filter or query. Preserve an accessible trigger name, keyboard menu use and focus return.
 If primary content still cannot fit, report the measured gap rather than shrink type or invent a
 second layout. Existing toolbar height stays in force: the earlier 48px candidate is **NOT
-APPROVED**. No new pill dimensions, 32px table rows or rail relocation are admitted here.
+APPROVED**. Current dimensions and rail composition are governed by Confirmed shared template below.
 
 Sales is the first pilot; other module adoption needs its own verification and existing lane
 boundary. Documentation approval is not proof of implementation or permission to merge/deploy.
@@ -69,7 +67,7 @@ boundary. Documentation approval is not proof of implementation or permission to
 contains self-contained Carres values, source/target/status and the Sales-first acceptance boundary.
 Old generic sizing assumptions are replaced by scoped shared recipes. Actual font loading remains
 unverified here. Source table-header weight drift and small touch targets are recorded as gaps;
-new dense rows and responsive Cards geometry remain proposals, not silently approved tokens.
+accepted Sales density and Cards composition follow Confirmed shared template; other adoption still requires verification.
 
 **RULING / APPROVED DIRECTION AND DOCUMENTATION COMMISSION.** One Carres kit serves every
 module. **Houzs-first complete visual templates, then tune for Carres** is the owner's current
@@ -2483,7 +2481,7 @@ breathing gap
 # §6.0 · LISTING TEMPLATE — every Portal listing · OWNER RULINGS 2026-09-21 (Jess)
 
 **Read this first for any listing.** It is the one-page current truth; the sections below it are the
-detailed record and lose to this page wherever they disagree. The reference page is the Sales Orders
+detailed record. The later Confirmed shared template and Complete-template adoption contract govern the accepted SO-derived recipe and supersede older conflicts here. The reference page is the Sales Orders
 Register (orders MASTER §0.1). Status: APPROVED; adoption is per page and is not proof of build.
 
 ```
@@ -2506,8 +2504,8 @@ Register (orders MASTER §0.1). Status: APPROVED; adoption is per page and is no
             A document not made yet: No PO yet · No DO yet
             Loading · Could not be loaded + Try again · empty — never mixed
 4  WIDTH    Only from REGISTER_FIELD_WIDTH. A missing field is added there
-5  ROW      A one-line listing row is 40px (aligned with SO Batch Purchase)
-            Text 13px / 18px line (text-body) · 11px top and bottom
+5  ROW      Accepted SO-derived template: desktop row32px, text12px /18px
+            Other unadopted listings keep their scoped recipe until verified
             8px left and right in every cell · 1px lines between cells
             Header 36px, 11px/600 (text-label) · footer 32px · 8px gaps
             Second fact in a cell (where approved): 11px grey (slate-11)
@@ -2522,8 +2520,9 @@ Register (orders MASTER §0.1). Status: APPROVED; adoption is per page and is no
             never a letter; its direction is spoken to a screen reader
 7  EXPAND   ▸ opens a child table · 1px line from ▸ to a bordered child box
             Item = product name on line 1, configuration on line 2
-8  GROUPS   Only where the module MASTER approves them. Sales Orders: flat
-9  FILTER   Active conditions shown · one Clear filters · footer {n} of {m}
+8  GROUPS   Only where the module MASTER approves them. Sales Orders: None
+            by default, optional Delivery / Stock / Payment Status in Page tools
+9  FILTER   Active chips above toolbar · neutral Clear all · footer {n} of {m}
 10 SELECT   Ticking replaces the toolbar; no buttons inside rows
 11 PHONE    The document number is visible on first screen; the table
             scrolls itself; the page never scrolls sideways
@@ -2537,7 +2536,7 @@ table styling. A fifth table does not exist until it joins the kit.
 
 | # | Where | Component | Recipe (locked numbers) |
 |---|---|---|---|
-| 1 | a Register / listing | `DataGrid` (kit) | header 36px slate-3 11/600 · 40px one-line rows · 8px insets · column separators by column count (tokens §5.1) · hover slate-3, selection blue-3 · 32px footer |
+| 1 | a Register / listing | `DataGrid` (kit) | header 36px slate-3 11/600 · accepted SO-derived32px rows (other scoped recipes preserved) · 8px insets · column separators by column count (tokens §5.1) · hover slate-3, selection blue-3 · 32px footer |
 | 2 | a row's goods expansion | `GoodsMiniTable` (kit) | header 27px · 51px two-line rows · four-sided frame · §6.9 connector |
 | 3 | a document table inside a card (SO `Items`, `Payment` rows, PO lines) | `DocumentTable` — **admit to the kit** (today `components/so-document-table.ts`, page-local) | header 11/500 slate-11 over a 1px slate-5 line · 13px rows, 8px cell insets, 1px slate-5 line beneath each · NO vertical lines · amounts right, tabular · only the closing total 600 |
 | 4 | a totals block (`Goods` · `Services` · `Total payable` · `Paid to date` · `Balance due`) | `TotalsSummary` — **admit to the kit** | the tail of recipe 3: two columns, label slate-11 left, amount slate-12 right tabular · 13px · 8px insets · 1px slate-5 line between rows · **NO outer frame, no boxes per cell** (owner 2026-09-27 — Shopify / Stripe / Xero shape; the 2026-09-22 "full-width bordered" frame is retired) · only `Total payable` and `Balance due` 600 · a missing value is a word (`No price yet`), never a dash · page and PDF draw the same block from the one arithmetic |
@@ -2559,10 +2558,7 @@ their own length with no gap, so Work's four Communication tabs stay on one row 
 `FilterRailRow tone="workspace"` (14/400 rows with the count on the right; the chosen row is the
 `blue-3` wash with the 3px blue edge; `indent` for a record row under its module row).
 
-**Row height ruling (Jess, 2026-09-21).** 40px is the target for a one-line listing. It is adopted PAGE BY
-PAGE through the page's own `rowHeight={40}`; the engine default (`--grid-row-h`, 38px) is NOT changed, so
-no other page moves until its own round. First adopter: Sales Orders (Card 12, NOT BUILT). The four pages
-named in rule 5 keep their own approved row design.
+**Current row recipe.** The accepted SO-derived template uses desktop32px rows and12/18 text. Other listings retain their approved scoped recipe until their adoption round. Historical40px Sales evidence is superseded by the Confirmed shared template; the generic engine38px default is not globally changed.
 
 # §6.7 · THE REGISTER SHELL — OWNER RULING 2026-08-15 (Jess) · APPROVED / LOCKED
 
@@ -2985,13 +2981,13 @@ and keeps stock/issue lifecycle verification separate.
   was in the shared destination header and is fixed there — see §6.7 below.
 
 **THE SHARED TWO-LINE LISTING ROW IS 51px — owner ruling 2026-09-26 (Jess: *"I like the current row
-height"*), overwriting the 2026-09-18 mockup number 54px.** A one-line listing row stays 40px (§6.0
+height"*), overwriting the 2026-09-18 mockup number 54px.** An accepted SO-derived one-line listing row is32px (§6.0
 rule 5). A row whose Item cell carries two lines — product name 13px/18 over configuration 11px/14,
 the configuration on ONE line ending in `…` — is 8 + 18 + 2 + 14 + 8 = 50px plus its 1px rule:
 **51px, measured on the Sales Orders goods expansion at 1440 (PR #1518) and kept.** Every row of a
 two-line goods table is that height, a line with no configuration keeping the empty 14px second
 line, so rows never differ. It is the goods-row geometry, not a portal-wide replacement: single-line
-registers keep 40px, and the per-page exceptions keep their own approved heights (Payment Monitor
+unadopted registers keep their scoped recipe, and per-page exceptions keep their own approved heights (Payment Monitor
 72px). A required party, number, document or date is never ellipsised to protect the height.
 
 **ONE CELL MAY CARRY A DOCUMENT AND THE EXACT GOODS IT NAMES — NEVER TWO DOCUMENTS.** The stock
@@ -3321,7 +3317,7 @@ business facts and governed placement; acceptance does not claim all pages are m
 
 ### Shared listing order — owner ruling 2026-10-01
 
-All listing pages follow **active filter chips → toolbar → table header/results**. Table and Cards share the same controls and order. This supersedes earlier instructions placing active conditions below the toolbar. The filter row is absent when there are no filters by default. Purchasing's owner-approved fixed placement (2026-10-02, Purchasing MASTER §9.3) opts into DataGrid `reserveConditionRow`: one 36px row remains when empty; multiple chips scroll horizontally, retaining all remove and Clear all controls without shifting the toolbar or results. Other registers retain their existing behaviour. Otherwise min-height36px, chips24px,6px vertical/12px horizontal padding,8px gap before the toolbar. No "Showing only" prefix. Each chip retains its accessible remove button; neutral slate-11 "Clear all" follows the chips, without a border or destructive red. The desktop toolbar is40px; record count left, search and Table/Cards and more tools right, directly above results. No divider between filters and toolbar. Narrow layouts may wrap controls and increase height to preserve accessibility. Shared DataGrid owns DOM/keyboard order; page-specific copies are not permitted. Existing pages using other listing engines still require migration; this ruling is not proof they are all deployed.
+All listing pages follow **active filter chips → toolbar → table header/results**. Table and Cards share the same controls and order. This supersedes earlier instructions placing active conditions below the toolbar. The filter row is absent when there are no filters by default. Purchasing's owner-approved fixed placement (2026-10-02, Purchasing MASTER §9.3) opts into DataGrid `reserveConditionRow`: one 36px row remains when empty; multiple chips scroll horizontally, retaining all remove and Clear all controls without shifting the toolbar or results. Other registers retain their existing behaviour. Otherwise min-height36px, chips24px,6px vertical/12px horizontal padding,8px gap before the toolbar. No "Showing only" prefix. Each chip retains its accessible remove button; neutral slate-11 "Clear all" follows the chips, without a border or destructive red. The desktop toolbar is40px; search and Table/Cards and more tools right; SO count and quantity remain only in the footer and governed rail summary, directly above results. No divider between filters and toolbar. Narrow layouts may wrap controls and increase height to preserve accessibility. Shared DataGrid owns DOM/keyboard order; page-specific copies are not permitted. Existing pages using other listing engines still require migration; this ruling is not proof they are all deployed.
 
 
 ## Confirmed shared template — owner acceptance 2026-10-01
@@ -3368,7 +3364,7 @@ its long PO identity fits the same390px recipe. Focused follow-up checks:117 pas
 
 ### Solid status pills — owner confirmed 2026-10-02
 
-APPROVED TARGET / deployment authorised. Status text is white on a solid semantic-colour pill,
+DEPLOYED / PRODUCTION-VERIFIED — PR1842, SHA `68d133c439e3ed8e1409db7a157c1b20e7a3c6c4`,2026-10-02. Status text is white on a solid semantic-colour pill,
 without a circular mark or decorative icon. This replaces the previously proposed pale-fill
 status presentation. Shared StatusPill owns the appearance; neutral Badge counts are unaffected.
 Use canonical dark-enough token fills with readable white text, not the mock's hard-coded hex.
@@ -3387,3 +3383,80 @@ statuses preserve their existing business meaning; do not remap unrelated Work a
 or neutral counts. Verify token contrast, desktop/phone geometry and register/quick-view parity.
 Application change is authorised only for this status presentation and its shared recipe/examples;
 unrelated Route/Monthly previews and unapproved master gaps are excluded.
+
+### Optional register grouping — owner confirmed 2026-10-02
+
+APPROVED TARGET / BUILT IN LOCAL SO PREVIEW / NOT DEPLOYED. The complete existing register,
+not a separate reduced mock, owns grouping. Default None. Existing shared Page tools (⋯) offers
+Group by: None, Delivery Status, Stock Status, Payment Status for Sales Orders. Exactly one
+selected grouping; other modules expose only their governed meaningful grouping fields.
+
+- Reuse DataGrid group-local section headings and columns. Each heading shows status name and
+  filtered SO count, supports collapse, and each open group repeats the same column header.
+- One shared toolbar, search, column chooser, widths, filters, selection and export across all
+  groups. Rows retain solid status pills. Hidden status columns may still supply grouping.
+- None restores one ordinary table. Grouping never duplicates an SO across several sections or
+  calculates a new overall status. Counts reflect current results, not an unfiltered population.
+- Choice must remain stable while operating the listing; local SO preview encodes `group` in
+  route parameters. Browser/account persistence beyond URL is not claimed implemented.
+- Do not invent a second rail control or page-local grouping engine. Existing DataGrid gained
+  optional `pageToolsItems` to compose commands into its existing shared menu. Scope and tests
+  must be isolated before release; no deployment is inferred from this owner acceptance.
+
+### Complete-template adoption contract — clarified 2026-10-02
+
+This section is the single cross-chat handoff. Read it together with §6.0 and §§6.7–6.10,
+`01-design-tokens.md`, `02-components.md`, `03-page-patterns.md`, the owning module MASTER and
+its COPY entries. Do not create another kit guide. The confirmed rules immediately above govern
+presentation; dated delivery evidence below describes what was verified at that time, not a
+permission to restore superseded words or geometry.
+
+**Measurement lookup for the accepted SO-derived template.** These accepted values supersede
+older conflicting generic register density values for this template. Sizes not listed here come
+from the linked token/component source; absence is not permission to invent a number. Module-owned
+column widths remain content-measured and retain their documented exceptions.
+
+| Element | Accepted measurement / behavior |
+|---|---|
+| Register search | Desktop220px wide ×32px high; responsive width follows shared DataGrid |
+| Desktop results | Row32px; body12px /18px line height; header11px, weight600, height36px; horizontal cell padding8px |
+| Register toolbar | Desktop40px; responsive wrapping may increase height |
+| Active filters | Minimum36px row; chips24px; padding6px vertical /12px horizontal; gap8px before toolbar; omitted when empty |
+| Canonical action/control icons |16px; use kit Icon registry and supported sizes, not independently drawn glyphs |
+| Back/Close controls |32px desktop /40px touch; canonical neutral control geometry |
+| Local rail breakpoint |896px available content canvas, after shell rails; not viewport width |
+| Collapsed local rail |44px Show filters control; full open composition uses source `.so-template-rail` |
+| SO summary |Four visible rows;8px row gap; label left, value right, tabular/no-wrap; conditional source notices |
+| Object tab selection/divider |Weight600 black, blue underline;1px slate-5 divider; white identity row /slate-2 tab row |
+| Quick-view facts |Labels12px; values weight600; use Drawer/Block source for width, padding and responsive stacking |
+| Carres official mark |Expanded36px, collapsed28px; preserve original asset proportions |
+
+### Detailed composition measurements — source audit 2026-10-02
+
+The values below were inspected in current implementation source, not newly measured screenshots.
+Use them with the acceptance checklist; source inspection does not prove every module renders them.
+Shared token radii: control6px, card10px. `text-strong` is15px/22px, weight600.
+
+| Surface / element | Exact source recipe | Design and responsive rule |
+|---|---|---|
+| Block card | `kit/Block.tsx`: horizontal padding16px, vertical12px; border1px; radius10px | White default, slate-3 muted identity; black15/22/600 heading; slate-5 border/divider |
+| Block heading | Bottom padding8px; header horizontal gap12px /vertical4px; body margin-top12px | Header wraps; read-only navigation may use headerSlot; writing actions stay with their facts |
+| Quick-view drawer | `kit/DialogFrame.tsx` + Tailwind `max-w-drawer`: width100%, maximum560px, full height | At desktop>=768 right offset64px preserves right rail; below768 uses side-frame right0 |
+| Drawer header/body | Header padding16px horizontal /12px vertical; title/actions gap16px; actions gap8px; body padding16px | Quick view dark slate-12/white; title truncates with full tooltip; below768 header wraps into identity/actions rows with8px gap |
+| Quick-view content | Register composition: cards gap12px; fact grid2columns, gap12px; labels12px, value600, value margin-top4px | Contact facts first; no duplicate customer card; no footer; body owns vertical scrolling |
+| Button default | `kit/Button.tsx`: desktop>=768 height32px; phone40px; horizontal padding12px; gap8px; icon16px | Shared primary/secondary/ghost variants; no local className/style overrides |
+| Icon-only button | Desktop32×32px; below76840×40px; padding0 | Tooltip and accessible name required; icon alone never removes keyboard access |
+| Button specialised sizes | `sm`: height24px, padding8px, gap4px; `touch`: desktop36px/phone40px, padding12px, gap6px; sm/touch icon14px | Supported API variants only; small size is not the default for phone actions |
+| FieldFrame | Label/control vertical gap4px | Shared label, required/error/hint semantics; do not hand-roll field wrappers |
+| Single-line field | `kit/field-recipe.ts`: height32px, horizontal padding8px, border1px, radius6px | White/rest slate-5; focus blue-9 ring2px; disabled slate-3/slate-9; error border red-9 |
+| Read-only framed fact | Workspace FullFact: minimum32px, padding8px horizontal /4px vertical, natural wrapping | Read-only is not disabled editing; automatic fact may use slate-3; preserve module ownership |
+| Multi-line field | Padding8px horizontal /4px vertical; natural content height | Same control skin; do not force all multiline facts to32px |
+| Toolbar field | Height36px at>=768,40px below; padding12px; text14/20 | Use supported toolbar shape, distinct from compact register search |
+| Object identity/actions row | `SalesOrderTabs.tsx`: desktop44px; horizontal padding24px at>=768 /16px below; gap12px | Fixed outside content scroll; shared CSS wraps at available container<=1023px; wrapped row height is natural, not a fixed44px |
+| Object tab row | Height36px, horizontal padding24px desktop /16px below768; top divider1px slate-5 | Slate-2 surface; horizontal overflow belongs to tab row; selected600 black with blue underline |
+| Object panes (SO reference) | Workspace form minimum660px, PDF minimum320px | Available host>=1320: equal halves;980–1319:660px form plus remainder PDF; below980: stack form then PDF; these are SO source values, not universal module pane minimums |
+| Object pane padding/gaps | Each pane16px padding; quick-view/card fact gaps12px | Side-by-side panes scroll independently; stacked view uses outer natural scroll; Items has no nested vertical scroll |
+| Rail fixed navigation | `index.css`: padding8px vertical /12px horizontal; stacked tabs gap4px; tabs height36px, horizontal padding8px, radius6px | SO accepted stacked views; selected blue-3/blue-11/600; below768 minimum40px targets |
+| Rail filter group | Margin4px vertical; border1px slate-6; radius6px; white body | Slate-3 header, slate-4 hover; expanded header bottom divider1px; header minimum36px/phone40px |
+| Rail group body/rows | Body padding4px top/bottom,8px right,16px left; rows minimum32px, padding7px vertical; text12/18 | Phone minimum40px; chosen rows blue-3/blue-11; long text may increase height rather than clip |
+| Table/Cards segmented switch | Shared CSS: outer padding2px/gap2px/border1px/radius6px; tab height26px desktop /34px phone, padding10px horizontal, radius4px, text13/18 | Selected600 blue-11 on blue-3; both labels and16px icons remain visible; surrounding hit targets must retain accepted touch behavior |

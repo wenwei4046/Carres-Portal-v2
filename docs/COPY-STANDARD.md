@@ -4934,3 +4934,7 @@ Filter labels: `Confirm PO sent to supplier` · `Confirm tomorrow's supplier del
 `Waiting for supplier to agree` · `Open supplier claims`.
 These label factual PO filters with distinct-PO counts, not new workflow states. Actions and
 predicates stay with Purchasing MASTER §9.3 and their source owners. A missing count is never 0.
+
+### Sales Order linked documents and grouping — owner confirmed2026-10-02
+
+Use `Amendment No`, not `Amendment status`. Genuine absence is `No amendment`, without a link; unnumbered recorded amendments use `Not recorded`, unread source `Unavailable`. Never print an internal UUID as a document number. Related columns: `PO No`, `DO No`, `Invoice No`, `Receipt No`; genuine receipt absence `Receipt not recorded`. Page tools: `Group by: None`, `Group by: Delivery Status`, `Group by: Stock Status`, `Group by: Payment Status`.

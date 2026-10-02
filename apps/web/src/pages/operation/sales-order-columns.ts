@@ -169,7 +169,7 @@ export function salesLocationOf(o: {
  * absence — it is the head of a governed two-line action, and §0.1 already
  * rules how it paints.
  */
-export const MUTED_ABSENCES: ReadonlySet<string> = new Set([NOT_RECORDED, NO_PO_YET, NO_DO_YET, NOT_IN_CATALOG]);
+export const MUTED_ABSENCES: ReadonlySet<string> = new Set([NOT_RECORDED, NO_PO_YET, NO_DO_YET, NOT_IN_CATALOG, "No amendment", "Receipt not recorded"]);
 
 /** One register row: the order, plus every fact already resolved to a string. */
 export interface RegisterRow {
@@ -199,6 +199,8 @@ export interface RegisterRow {
      dot-separated schema dump COPY-STANDARD bans. Parsed ONCE here, at the
      row, for the same reason `customer` is cased once here. */
   emergency: { name: string; phone: string; relationship: string };
+  receipts: { id: string; receipt_no: string | null }[] | undefined;
+  invoices: { id: string; invoice_no: string | null }[] | undefined;
   needle: string;
   phoneDigits: string;
 }
@@ -239,6 +241,10 @@ export function buildRegisterRow(
     paid: { kind: "amount", value: money.paid },
     balance: outstandingState(money),
     emergency: parseEmergencyContact(o.customer_emergency),
+    receipts: o.receipt_documents === undefined && o.allocated_receipts === undefined ? undefined : [...new Map([
+      ...(o.receipt_documents ?? []), ...(o.allocated_receipts ?? []).flatMap(a => a.order_payments ? [a.order_payments] : []),
+    ].map(p => [p.id, p])).values()],
+    invoices: o.invoice_documents,
     needle: searchHaystack(o),
     phoneDigits: digits(phone),
   };
@@ -346,7 +352,7 @@ export const REGISTER_FIELDS: readonly RegisterField[] = [
         ? NO_DO_YET
         : r.deliveryOrders.length === 1
           ? r.deliveryOrders[0]!.do_number
-          : `${r.deliveryOrders.length} Delivery Orders` },
+          : r.deliveryOrders.map(d => d.do_number).join(" · ") },
 
   /* ── OPTIONAL — hidden by default, openable from Columns ────────────────── */
   { key: "delivery_status", label: "Delivery Status", width: W.placeWord, group: "Delivery",
@@ -384,7 +390,11 @@ export const REGISTER_FIELDS: readonly RegisterField[] = [
   { key: "source_ref", label: "Customer reference", width: W.reference, group: "Document",
     text: (r) => (r.o.source_ref ?? []).filter(Boolean).join(" · ") || NOT_RECORDED },
   { key: "invoice_no", label: "Invoice No", width: W.reference, group: "Document",
-    text: (r) => r.o.invoice_no || NOT_RECORDED },
+    text: (r) => [...new Set([...(r.invoices ?? []).map(i => i.invoice_no).filter(Boolean), r.o.invoice_no].filter(Boolean))].join(" · ") || (r.invoices === undefined ? "Unavailable" : NOT_RECORDED) },
+  { key: "receipt_no", label: "Receipt No", width: W.documentNo, group: "Document",
+    text: (r) => r.receipts === undefined ? "Unavailable" : r.receipts.map(p => p.receipt_no || NOT_RECORDED).join(" · ") || "Receipt not recorded" },
+  { key: "amendment_no", label: "Amendment No", width: W.documentNo, group: "Document",
+    text: (r) => r.o.amendment_documents === undefined ? "Unavailable" : r.o.amendment_documents.length ? NOT_RECORDED : "No amendment" },
 
   /* ── CUSTOMER — the customer's own facts (BUILD-QUEUE "STRUCTURED ADDRESS":
      raw fallback + the five structured parts + Building Type) ─────────────── */

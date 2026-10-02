@@ -9,6 +9,9 @@ vi.mock("../../lib/supabase", () => ({
 }));
 
 import { userClient } from "../../lib/supabase";
+vi.mock("../../lib/sales-order-document-search", () => ({ findSalesOrderDocuments: vi.fn(async () => ({ orderIds: [] as string[], soNumbers: [] as number[] })) }));
+import { findSalesOrderDocuments } from "../../lib/sales-order-document-search";
+
 
 // The Work Completed writer (0584) observes this door from a middleware and is
 // proven in lib/sales-order-work-completion*.test.ts; here it passes through,
@@ -38,6 +41,7 @@ async function makeJwt(role: string) {
 beforeEach(() => {
   useTestJwks();
   vi.mocked(userClient).mockReset();
+  vi.mocked(findSalesOrderDocuments).mockResolvedValue({ orderIds: [], soNumbers: [] });
 });
 
 afterAll(() => _setJwksForTesting(null));
@@ -70,13 +74,35 @@ describe("GET /api/operation/orders", () => {
     const is = vi.fn().mockReturnThis();
     const order = vi.fn().mockReturnThis();
     const limit = vi.fn().mockResolvedValue({ data: rows, error: null });
-    const select = vi.fn(() => ({ in: inFn, eq, ilike, or, not, is, order, limit }));
+    const select = vi.fn((_fields?: string) => ({ in: inFn, eq, ilike, or, not, is, order, limit }));
     vi.mocked(userClient).mockReturnValue({
       from: vi.fn(() => ({ select })),
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any);
-    return { eq, inFn, ilike, or, not, is, order, limit };
+    return { select, eq, inFn, ilike, or, not, is, order, limit };
   }
+
+  it("reads invoice, receipt allocation and amendment lineage from their source ledgers", async () => {
+    const { select } = mockOrdersList([ORDER_ROW]);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(new Request("http://t/api/operation/orders", { headers: { Authorization: `Bearer ${jwt}` } }), env);
+    expect(res.status).toBe(200);
+    const fields = String(select.mock.calls[0]?.[0]);
+    expect(fields).toContain("invoice_documents:invoices(id,invoice_no)");
+    expect(fields).toContain("receipt_documents:order_payments(id,receipt_no)");
+    expect(fields).toContain("allocated_receipts:payment_allocations(order_payments(id,receipt_no))");
+    expect(fields).toContain("amendment_documents:sales_order_amendments(id)");
+  });
+
+  it("searches linked identities before the register cap, retaining normal order scope", async () => {
+    const { or } = mockOrdersList([ORDER_ROW]);
+    vi.mocked(findSalesOrderDocuments).mockResolvedValue({ orderIds: [ORDER_ROW.id], soNumbers: [4001, 4002] });
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(new Request("http://t/api/operation/orders?stage=proceeded&search=RC-123", { headers: { Authorization: `Bearer ${jwt}` } }), env);
+    expect(res.status).toBe(200);
+    expect(or.mock.calls.some(([value]) => value.includes(`id.in.(${ORDER_ROW.id})`) && value.includes("so.in.(4001,4002)"))).toBe(true);
+    expect(findSalesOrderDocuments).toHaveBeenCalledWith(expect.anything(), "RC-123");
+  });
 
   it("returns orders for operation with default 'all' stage and 'all' channel", async () => {
     const { inFn, order, limit } = mockOrdersList([ORDER_ROW]);
@@ -378,13 +404,15 @@ describe("GET /api/operation/orders", () => {
       expect(body.orders[1]?.po_numbers).toEqual([]);
     });
 
-    it("a PO with no lines contributes nothing", async () => {
+    it("a PO with no lines retains its document number without claiming goods coverage", async () => {
       mockWithPos(
         [{ ...ORDER_ROW, so: 1206 }],
         [{ id: "PO-EMPTY", so: null, so_refs: [1206] }],
         [],
       );
-      expect((await get()).orders[0]?.po_skus).toEqual([]);
+      const body = await get();
+      expect(body.orders[0]?.po_skus).toEqual([]);
+      expect(body.orders[0]?.po_numbers).toEqual(["PO-EMPTY"]);
     });
 
     it("ONE batched query for the whole page — never one per order", async () => {

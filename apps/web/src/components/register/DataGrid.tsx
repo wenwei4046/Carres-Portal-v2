@@ -228,6 +228,8 @@ export type DataGridProps<T> = {
   rows: T[];
   /** Opt-in shared-template toolbar and numeric recipe for the first adopter. */
   presentationTools?: boolean;
+  /** Module-owned presentation commands in the existing shared tools menu. */
+  pageToolsItems?: React.ComponentProps<typeof DropdownMenu>["items"];
   toolbarSummary?: (rows: T[]) => ReactNode;
   searchScope?: string;
   /** Alternate presentation consumes this engine's exact sorted/filter result. */
@@ -762,7 +764,7 @@ function DataGridInner<T>({
   onFilteredRowsChange,
   onSearchChange,
   initialSearch = "",
-  renderResults, presentationTools = false, toolbarSummary, searchScope, facetRows, onFacetRowsChange, sessionKey, presentationKey = "table",
+  renderResults, presentationTools = false, pageToolsItems, toolbarSummary, searchScope, facetRows, onFacetRowsChange, sessionKey, presentationKey = "table",
   appearance = "default",
   palette,
   headerTone,
@@ -3299,6 +3301,7 @@ function DataGridInner<T>({
                 requestAnimationFrame(() => { setOutputMenuOpen(true); requestAnimationFrame(() => document.querySelector<HTMLElement>('[data-testid="register-output-menu"] button')?.focus()); });
               } },
               ...(outputActions ?? []).map((action, index) => ({ key: `output-${index}`, label: action.label, onSelect: action.onClick })),
+              ...(pageToolsItems ?? []),
               { key: "columns", label: "Columns", icon: "settings", onSelect: () => {
                 const r = pageToolsRef.current?.getBoundingClientRect();
                 if (r) setColumnsMenuPos({ top: r.bottom + 4, right: window.innerWidth - r.right });
