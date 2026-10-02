@@ -290,6 +290,8 @@ beforeEach(() => {
   );
   queryData.pos[0]!.purchase_order_lines[0]!.destination_id = "destination-1";
   queryData.pos[0]!.purchase_order_lines[0]!.identity_mode = null;
+  Object.assign(queryData.pos[0]!, { status: "open" });
+  queryData.pos[0]!.purchase_order_lines[0]!.received_qty = 1;
   queryData.pos[0]!.eta_date = "2026-09-10";
   queryData.pos[0]!.official_delivery_date = "2026-09-10";
   queryData.pos[0]!.sends[0]!.po_version = 1;
@@ -345,10 +347,22 @@ describe("Purchase Orders Register", () => {
     marked.unmount();
   });
 
+  it("receiving all goods does not hide the current-version send action", () => {
+    Object.assign(queryData.pos[0]!, { status: "received" });
+    queryData.pos[0]!.purchase_order_lines[0]!.received_qty = 3;
+    renderPage();
+    fireEvent.click(screen.getByTestId("po-filter-pdf_not_sent"));
+    expect(screen.getByTestId("grid-row-PO-20260828-4827")).toHaveAttribute("data-group", "completed");
+    fireEvent.doubleClick(screen.getByTestId("grid-row-PO-20260828-4827"));
+    expect(screen.getByTestId("po-object-work")).toHaveTextContent("Send");
+    fireEvent.click(screen.getByTestId("po-object-primary"));
+    expect(screen.getByTestId("po-document-split")).toBeInTheDocument();
+  });
+
   it("the rail is Supplier reply · Receiving · Supplier · Supplier Deliver To, with complete labels and its four kit icons", () => {
     renderPage();
     const railEl = screen.getByTestId("po-filter-rail");
-    const headings = ["Supplier reply", "Receiving", "Supplier", "Supplier Deliver To"];
+    const headings = ["Sending", "Supplier reply", "Receiving", "Supplier", "Supplier Deliver To"];
     for (const heading of headings) expect(within(railEl).getByText(heading)).toBeInTheDocument();
     for (const gone of ["All purchase orders", "PDF not sent", "Version changed", "DOCUMENT STATE", "Completed", "Cancelled", "Clear filters", "Supplier has not confirmed the PO date"]) {
       expect(railEl).not.toHaveTextContent(gone);

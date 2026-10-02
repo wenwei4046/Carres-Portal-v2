@@ -117,7 +117,7 @@ describe("Purchase Order Register authority", () => {
     });
   });
 
-  it("completed and cancelled documents do not create supplier work", () => {
+  it("completed goods retain sending work while cancelled documents retain their separate guard", () => {
     const completed = purchaseOrderRegisterFacts({
       ...base,
       status: "received",
@@ -127,23 +127,22 @@ describe("Purchase Order Register authority", () => {
 
     expect(completed.operationStatus).toBe("Completed");
     expect(completed.filters).toContain("completed");
-    expect(purchaseOrderWork(base, completed)).toBeNull();
+    expect(purchaseOrderWork(base, completed)?.action).toContain("Send");
     expect(cancelled.operationStatus).toBe("Cancelled");
     expect(purchaseOrderWork(base, cancelled)).toBeNull();
   });
 
   it("a completed PO without sending evidence leaves work but never fabricates a send", () => {
     /* Correction card §5 — receiving completion and sending evidence are two
-       facts. Completed goods close the send WORK (no PDF is owed), while the
-       Sent to Supplier fact stays an honest `Not sent`. */
+       facts. Completed goods do not close outstanding send work. */
     const facts = purchaseOrderRegisterFacts({
       ...base,
       status: "received",
       lines: [{ qty: 3, receivedQty: 3 }],
       sends: [],
     }, "2026-08-28");
-    expect(facts.filters).toEqual(["completed"]);
-    expect(facts.filters).not.toContain("pdf_not_sent");
+    expect(facts.filters).toEqual(["pdf_not_sent", "completed"]);
+    expect(purchaseOrderWork(base, facts)?.action).toContain("Send");
     expect(facts.sentToSupplier).toBe("Sending not confirmed");
   });
 

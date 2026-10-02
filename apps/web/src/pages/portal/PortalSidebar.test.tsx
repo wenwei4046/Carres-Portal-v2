@@ -778,7 +778,6 @@ describe("PortalSidebar — the Purchasing map", () => {
       "Display Requests",
       "Consignment Orders",
       "Consignment Returns",
-      "Consignment Sale Notices",
     ]);
   });
 
@@ -885,7 +884,6 @@ describe("PortalSidebar — the Purchasing map", () => {
       "display-requests",
       "consignment-orders",
       "consignment-returns",
-      "consignment-sale-notices",
     ]) {
       const row = child(key);
       expect(row.tagName, key).toBe("SPAN");

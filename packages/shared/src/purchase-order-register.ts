@@ -157,8 +157,8 @@ export function purchaseOrderRegisterFacts(
     !cancelled && (input.status === "received" || (quantitiesKnown && ordered > 0 && open === 0));
   const filters: PurchaseOrderRegisterFilter[] = [];
 
-  if (!cancelled && !completed && !currentSend) filters.push("pdf_not_sent");
-  if (!cancelled && !completed && version > 1 && supplierVersion !== version) {
+  if (!cancelled && !currentSend) filters.push("pdf_not_sent");
+  if (!cancelled && version > 1 && supplierVersion !== version) {
     filters.push("supplier_update_required");
   }
   /* SUPPLIER REPLY facets: only a current version marked as sent with goods
@@ -248,7 +248,7 @@ export function purchaseOrderWork(
   input: PurchaseOrderRegisterInput,
   facts: PurchaseOrderRegisterFacts,
 ): PurchaseOrderWorkCopy | null {
-  if (facts.operationStatus === "Completed" || facts.operationStatus === "Cancelled") return null;
+  if (facts.operationStatus === "Cancelled") return null;
   /* ⭐ ISSUED IS NOT SENT, AND THE LINE SAYS SEND (owner 2026-09-25, the PO
      window send line; Purchasing §5.6.1 · COPY). The PO already exists, so
      `Issue …` told the operator to do what was done. The Work card, the PO

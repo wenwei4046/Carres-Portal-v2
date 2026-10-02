@@ -99,6 +99,7 @@ import { personInitials } from "@/lib/staff-avatar";
 type RailRow = { key: PurchaseOrderRegisterFilter; label: string };
 
 const RAIL_GROUPS: Array<{ heading: string; icon: IconName; rows: RailRow[] }> = [
+  { heading: "Sending", icon: "goods", rows: [{ key: "pdf_not_sent", label: "Confirm PO sent to supplier" }] },
   {
     heading: "Supplier reply",
     icon: "message",
@@ -1355,7 +1356,7 @@ function PurchaseOrderObject({
   const auditQ = useOperationPoAudit(row.id);
   const recordOpen = useRecordSend(row.id);
   const po = row.po;
-  const issueNeeded = row.facts.currentSend == null && po.status === "open";
+  const issueNeeded = row.facts.currentSend == null && po.status !== "cancelled";
 
   return (
     <div className="po-detail-style flex h-full min-h-0 flex-col bg-kit-canvas" data-testid="purchase-order-object">
@@ -1633,11 +1634,12 @@ function PurchaseOrderObject({
  * button for the PO's state. `Sending not confirmed` opens the one send area
  * (`PoIssueEvidence`); the supplier-answer door lives in `Supplier reply` below
  * and is not drawn twice. Waiting with nothing due says `Nothing to do until
- * {date}`; a completed or cancelled PO has no block.
+ * {date}`; goods completion hides the block only when current sending is confirmed.
+ * Cancelled documents retain the separate governed send/PDF restriction.
  */
 function CurrentAction({ row, owner, onIssue }: { row: RegisterRow; owner: { userId: string; name: string | null } | null; onIssue: (() => void) | null }) {
   const state = row.facts.operationStatus;
-  if (state === "Completed" || state === "Cancelled") return null;
+  if (state === "Cancelled" || (state === "Completed" && !onIssue)) return null;
   const fact = row.work?.problem ?? (onIssue ? "The PO PDF has not been sent" : null);
   const action = row.work?.action ?? (onIssue ? `Send ${poDocumentNumberOf(row.id, row.facts.version)} to ${row.supplierName}` : null);
   const nextArrival = row.answerSummary.date ?? row.po.official_delivery_date ?? null;
