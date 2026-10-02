@@ -7269,3 +7269,5 @@ makes the new received/current-version journey fail (negative control). Read-onl
 inventory found the four Completed POs PO-2052, PO-2054, PO-SMOKE-C and PO-SMOKE-W have no exact
 SO source lineage; no window membership is invented to create a live demonstration. This limits
 production acceptance until a real source-linked received PO exists; preserve every original fact.
+
+**PO Listing Table/Cards and selection adoption — APPROVED TARGET / BUILD IN PROGRESS, 2026-10-02.** Jess explicitly directs following the current deployed Sales Orders UI/UX. PO reuses its shared segmented Table/Cards controls, Block card geometry and checkbox selection model; the same filtered PO facts feed both presentations and selections survive switching. View opens the existing PO object. This presentation adoption does not invent bulk commercial actions or claim missing supplier-exception facts. Local journey tests passed; production verification remains pending.
