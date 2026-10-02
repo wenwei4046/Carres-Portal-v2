@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { purchasingRefusal, poSendChannelOf } from "@carres/shared";
 import { apiFetch } from "@/lib/api";
+import { queryClient } from "@/lib/query-client";
 import { fmtDate } from "@/lib/fmt-date";
 import { renderPoPdf } from "@/lib/pdf/render";
 import type { PoTemplateData } from "@/lib/pdf/types";
@@ -140,6 +141,12 @@ export function confirmedSendFor(
   return (
     evidence.find((e) => e.kind === "confirmed_sent" && (e.po_version ?? 0) === version) ?? null
   );
+}
+
+function refreshPurchasingReads() {
+  void queryClient.invalidateQueries({ queryKey: ["operation", "pos"] });
+  void queryClient.invalidateQueries({ queryKey: ["operation", "work"] });
+  void queryClient.invalidateQueries({ queryKey: ["operation", "purchase", "today"] });
 }
 
 function sendActorContext(evidence: PoSendEvidence): string {
@@ -297,6 +304,7 @@ export default function PoIssueEvidence({
         method: "POST",
         body: JSON.stringify({ channel, recipient: recipient.trim(), poVersion: version }),
       });
+      refreshPurchasingReads();
       onConfirmed();
     } catch (e) {
       /* ⭐ THE TWO LINES, WHEREVER THEY COME FROM (closure §9). The API sends
@@ -339,6 +347,7 @@ export default function PoIssueEvidence({
           method: "POST",
           body: JSON.stringify({ channel: chosen.value, recipient: chosen.recipient, poVersion: version }),
         });
+        refreshPurchasingReads();
         onConfirmed();
       } catch (e) {
         const body = (e as { body?: { message?: string; action?: string; code?: string } }).body;

@@ -3663,7 +3663,9 @@ The quick panel has two tabs: **`PO info`** and **`Communication`**.
 quick-view Drawer, keeping the Register behind it. PO info uses shared plain facts and governed
 goods rows. Communication reuses `PoIssueEvidence` and `SupplierReplySection`, including actual
 current-version send evidence, recorded supplier channels and the existing reply writer. Save
-refreshes the Register facts; no separate discussion store or invented history is introduced.
+refreshes the Register facts. Successful confirmation through the shared sending area also
+invalidates PO, derived Work and PO-window reads in both shared layouts; refusal refreshes none.
+No separate discussion store or invented history is introduced.
 Open full page reaches the existing formal object. Cancelled POs have no sending controls.
 This is local build evidence, not production closure. Header Print and the complete Receiving/
 Claims connected doors remain approved target gaps; production verification is still required.

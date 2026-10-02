@@ -715,6 +715,15 @@ describe("Purchase Orders Register", () => {
     expect(screen.getByRole("heading", { name: /PO-20260828-4827/ })).toBeInTheDocument();
   });
 
+  it("keeps cancelled PO communication read-only without sending controls", () => {
+    renderPage();
+    fireEvent.click(screen.getByRole("button", { name: "PO-LEGACY", exact: true }));
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "Communication" }), { button: 0, ctrlKey: false });
+    fireEvent.click(screen.getByRole("tab", { name: "Communication" }));
+    expect(screen.queryByTestId("po-issue-evidence")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Record supplier answer", exact: true })).not.toBeInTheDocument();
+  });
+
   it("uses the existing PO sending and supplier reply controls in the communication tab", () => {
     renderPage();
     fireEvent.click(screen.getByRole("button", { name: "PO-20260828-4827" }));
