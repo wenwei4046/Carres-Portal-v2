@@ -104,6 +104,33 @@ rekeys the complaint, pictures, video, item or history.
 `Purchasing → Supplier Claims` is Purchasing's independent stock-claim Register, not a Case work
 view. When a related stock claim exists, the Case shows a read-only link to its progress.
 
+### Dealer purchased display service — OWNER-RULED 2026-10-02
+
+**APPROVED TARGET / NOT BUILT.** Dealer goods, including display bedframes and mattresses,
+are purchased from Carres; this is not consignment. Dirt, display wear, damage or a product
+problem may be reported as a service request through the same Service Case intake, from the
+original order/item when available. Preserve Dealer company, authorised showroom location,
+actual reporter, affected goods, description, photos and requested help. Missing source evidence
+uses the existing later-linking intake rather than blocking the report or inventing an order.
+
+Operation assesses the evidence and entitlement, distinguishes product fault from dirt, wear
+or other damage, and coordinates the confirmed remedy: cleaning, repair, parts, collection and
+return, or a commercially authorised replacement. A request does not itself approve the remedy
+or establish free warranty coverage. Record whether the service is free or charged, the amount
+and responsible payer; obtain Dealer acceptance of a charged proposal before execution.
+Execution must identify the responsible provider and respect existing Service/Delivery boundaries;
+this ruling does not establish a Carres on-site inspection or technician service.
+
+Dealer and Operation communicate, add evidence, confirm arrangements and view progress on the
+same Case. Record actual responder, arrangements, collection/return facts, outcome evidence and
+Dealer acknowledgement; unresolved outcomes remain open for follow-up. Department Work links
+to this record and does not duplicate the request. Existing stock, custody and money documents
+remain with their owning modules. A related independently sourced Purchasing Supplier Claim
+may be linked read-only under §1; Dealer does not repeat its report for Purchasing.
+
+This ruling approves Dealer display-service coverage only, not the complete Showroom/Dealer
+Blueprint, final portal labels, blanket free service or unconditional exchange/return policy.
+
 ### Customer collection and replacement arrangement
 
 **APPROVED / NOT BUILT — Blueprint completion, Jess 2026-09-18.** Service owns
