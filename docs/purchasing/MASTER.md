@@ -7185,7 +7185,14 @@ or arrived goods use `Confirm PO sent to supplier` and open the existing unsent 
 The same `confirm-sent` door probes the request occurrence before and after its write and
 records Completed only when every linked current version is sent and no demand remains.
 Approval, ordered quantities, receipt facts and ownership are unchanged. No SQL migration
-or external message is included. Production and authenticated acceptance remain owed.
+or external message is included. Production commit `73e0a12dd0f475ddb02d7cdb21c725916a133bac`
+converged across all five hosts. Authenticated Team Work / Missed search `MPR` showed
+MPR-20260904-9488 with `Confirm PO sent to supplier`, `Sending not confirmed` and the correct
+current-version completion condition. Its linked PO-20260904-9834 has no current sent mark.
+However the action opened retired `/operation?tab=pos`, which leaves an empty shell: this
+journey is NOT production-complete. BUILD now uses canonical `/operation/procurement?po=`;
+release and successful object-open acceptance remain owed. No supplier message or sent mark
+was written. Evidence: `/tmp/purchasing-manual-send-work-production.png`.
 
 **Monthly demand adoption — PRODUCTION-VERIFIED bounded journey, 2026-10-02.** Purchase Orders reuses the existing
 SalesOrderMonthlyDemand component, useMonthlyDemandFacts reader and monthlyDemandOf arithmetic.
