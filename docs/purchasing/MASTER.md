@@ -85,9 +85,10 @@ receipt posted, or stock mutated for this audit.
 | Repair / showroom documents | Repair Orders, Display Requests, Consignment Orders, Consignment Returns and Sale Notices remained Coming soon. | §9.7–9.11 are not production-built by virtue of their approved blueprint. |
 | Master data | Supplied company CSV read; Carres Klang warehouse address and NETS company address are distinct authorities. | Apply only through an existing authorised update door, preserving IDs and history; no People record creation. No company update claimed yet. |
 
-The governed Supabase `apply_migration` / SQL probe tools are unavailable in this BUILD
-session. Database-dependent work cannot be called applied or production-proven; do not replace
-the required migration path with a service credential or an unrelated write door.
+The governed Supabase tools are available to the 2026-10-02 continuous build. Database changes
+still require the reviewed SQL approval and probe/apply path in ENGINEERING §5. No database
+change is claimed applied merely from a local test; never substitute a service credential or
+an unrelated write door.
 
 ### 2.2 Ruling — RESOLVED FROM AUTHORITY
 
