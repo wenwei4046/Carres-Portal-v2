@@ -313,7 +313,7 @@ export default function JumpTo() {
         title={`Jump to… (${hint})`}
         aria-keyshortcuts="Meta+K Control+K"
         data-testid="jump-to-trigger"
-        className="flex items-center justify-center h-8 w-8 rounded-md text-base-500 hover:text-base-900 hover:bg-hovertint transition-colors"
+        className="flex items-center justify-center h-10 w-10 min-[768px]:h-8 min-[768px]:w-8 rounded-md text-base-500 hover:text-base-900 hover:bg-hovertint transition-colors"
       >
         <Icon name="jump" size={16} />
       </button>

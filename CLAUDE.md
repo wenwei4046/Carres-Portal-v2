@@ -23,7 +23,7 @@ number, the party and the date already worked out, and one obvious button.
 ---
 
 **Mandatory UI cold-start:** before any listing/UI proposal or build, read `docs/ui/MASTER.md`
-§6.7–6.10, the owning module's listing section, and its `docs/COPY-STANDARD.md` entries.
+§6.0, §6.7–6.10 and Complete-template adoption contract, the canonical token/component/pattern files, the owning module listing section and COPY entries. Reuse the kit and complete the contract’s full-page checks before delivery.
 Approved goods/Ready Stock flows: Purchasing §9.1 SO Batch and §9.2 Manual Purchase (Jess
 2026-09-18, both BUILT 2026-09-18 — the authenticated production walk is owed for both, and
 Manual Purchase's migrations 0545–0547 + 0549 are APPLIED 2026-09-20 and only the authenticated walk

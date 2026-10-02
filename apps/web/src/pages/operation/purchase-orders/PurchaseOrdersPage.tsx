@@ -48,6 +48,8 @@ import { usePdfCanvases } from "@/lib/pdf/use-pdf-canvases";
    sister pages read as two apps (YH, 2026-09-04). */
 import Block from "@/components/kit/Block";
 import Tabs from "@/components/kit/Tabs";
+import Checkbox from "@/components/kit/Checkbox";
+import Button from "@/components/kit/Button";
 import SalesOrderMonthlyDemand from "../SalesOrderMonthlyDemand";
 import DropdownMenu from "@/components/kit/DropdownMenu";
 import Popover from "@/components/kit/Popover";
@@ -437,6 +439,21 @@ export default function PurchaseOrdersPage() {
   const [receiptsFor, setReceiptsFor] = useState<RegisterRow | null>(null);
   const today = todayMYT();
   const monthly = params.get("view") === "monthly";
+  const cards = params.get("view") === "cards";
+  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
+  const toggleRow = (id: string) => setSelectedKeys((previous) => {
+    const next = new Set(previous);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
+  const changePresentation = (value: string) => setParams((previous) => {
+    const next = new URLSearchParams(previous);
+    if (value === "cards") next.set("view", "cards"); else next.delete("view");
+    return next;
+  });
+  const presentationTabs = <Tabs variant="segmented" label="Purchase Orders display" value={cards ? "cards" : "table"}
+    onValueChange={changePresentation}
+    tabs={[{ value: "table", label: "Table", icon: "table" }, { value: "cards", label: "Cards", icon: "cards" }]} />;
   const demandQ = useMonthlyDemandFacts(monthly);
   const focusMonth = today.slice(0, 7);
   const demandView = useMemo(() => demandQ.data ? monthlyDemandOf({
@@ -1062,6 +1079,34 @@ export default function PurchaseOrdersPage() {
           ) : null}
             <DataGrid<RegisterRow>
               appearance="reference"
+              presentationTools
+              presentationKey={cards ? "cards" : "table"}
+              toolbarEnd={presentationTabs}
+              selectionPrimary={presentationTabs}
+              selectable={{ selectedKeys, onToggle: toggleRow,
+                onToggleAll: (keys, allSelected) => setSelectedKeys((previous) => {
+                  const next = new Set(previous);
+                  const remove = allSelected;
+                  for (const key of keys) { if (remove) next.delete(key); else next.add(key); }
+                  return next;
+                }) }}
+              renderResults={cards ? (visible) => <div className="grid grid-cols-1 gap-3 p-3 md:grid-cols-2 2xl:grid-cols-3" data-testid="purchase-orders-cards">
+                {visible.map((row) => <div key={row.id} data-row-key={row.id} tabIndex={-1}>
+                  <Block title={row.id} headerSlot={<div className="flex items-center gap-3">
+                    <Checkbox id={`card-select-${row.id}`} ariaLabel={`Select ${row.id}`} checked={selectedKeys.has(row.id)} onCheckedChange={() => toggleRow(row.id)} />
+                    <Button size="touch" variant="ghost" onClick={() => openObject(row)}>View</Button>
+                  </div>}>
+                    <dl className="grid min-w-0 grid-cols-2 gap-3 text-body">
+                      <div><dt className="text-label text-kit-slate-11">Supplier</dt><dd>{row.supplierName}</dd></div>
+                      <div><dt className="text-label text-kit-slate-11">PO Doc Date</dt><dd>{row.poDate ? fmtDate(row.poDate) : "Not recorded"}</dd></div>
+                      <div><dt className="text-label text-kit-slate-11">Supplier Deliver To</dt><dd>{row.deliverTo}</dd></div>
+                      <div><dt className="text-label text-kit-slate-11">PO Version</dt><dd>PO V{row.facts.version} · {versionLine(row)}</dd></div>
+                      <div className="col-span-2"><dt className="text-label text-kit-slate-11">Items</dt><dd className="break-words">{itemsSummary(row.items)}</dd></div>
+                    </dl>
+                  </Block>
+                </div>)}
+              </div> : undefined}
+              toolbarSummary={(visible) => <span className="shrink-0 text-meta tabular-nums text-kit-slate-11">{visible.length} purchase orders</span>}
               palette="slate"
               searchPresentation="responsive"
               rows={visibleRows}

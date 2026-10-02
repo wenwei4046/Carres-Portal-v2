@@ -228,6 +228,8 @@ export type DataGridProps<T> = {
   rows: T[];
   /** Opt-in shared-template toolbar and numeric recipe for the first adopter. */
   presentationTools?: boolean;
+  /** Module-owned presentation commands in the existing shared tools menu. */
+  pageToolsItems?: React.ComponentProps<typeof DropdownMenu>["items"];
   toolbarSummary?: (rows: T[]) => ReactNode;
   searchScope?: string;
   /** Alternate presentation consumes this engine's exact sorted/filter result. */
@@ -247,6 +249,8 @@ export type DataGridProps<T> = {
       the operator's own grouping is never overridden. Omitted = no grouping,
       exactly as before. */
   initialGroupBy?: string[];
+  /** Governed page grouping replaces free column grouping, including older saved layouts. */
+  allowColumnGrouping?: boolean;
   /** Told the column sort whenever it changes, and once on load with the
       saved one; null when nothing is sorted. The Trial Balance prints its
       headings only while nothing is sorted. Pass a stable function. */
@@ -745,6 +749,7 @@ function DataGridInner<T>({
   columns,
   storageKey,
   initialGroupBy,
+  allowColumnGrouping = true,
   onSortChange,
   onGroupByChange,
   countsInGroup,
@@ -762,7 +767,7 @@ function DataGridInner<T>({
   onFilteredRowsChange,
   onSearchChange,
   initialSearch = "",
-  renderResults, presentationTools = false, toolbarSummary, searchScope, facetRows, onFacetRowsChange, sessionKey, presentationKey = "table",
+  renderResults, presentationTools = false, pageToolsItems, toolbarSummary, searchScope, facetRows, onFacetRowsChange, sessionKey, presentationKey = "table",
   appearance = "default",
   palette,
   headerTone,
@@ -830,7 +835,8 @@ function DataGridInner<T>({
     [expandedRows, toggleExpand],
   );
   const [layout, setLayoutRaw] = useState<Layout>(() => {
-    const saved = readLayout(storageKey);
+    const stored = readLayout(storageKey);
+    const saved = allowColumnGrouping ? stored : { ...stored, groupBy: [] };
     // `readLayout` hands back DEFAULT_LAYOUT itself only when nothing is saved.
     return saved === DEFAULT_LAYOUT && initialGroupBy?.length
       ? { ...DEFAULT_LAYOUT, groupBy: [...initialGroupBy] }
@@ -1750,7 +1756,7 @@ function DataGridInner<T>({
     const sourceKey = e.dataTransfer.getData("text/x-datagrid-col");
     if (!sourceKey) return;
     const col = columns.find((c) => c.key === sourceKey);
-    if (!col || col.groupable === false) return;
+    if (!allowColumnGrouping || !col || col.groupable === false) return;
     setLayout((l) =>
       l.groupBy.includes(sourceKey) ? l : { ...l, groupBy: [...l.groupBy, sourceKey] },
     );
@@ -3299,6 +3305,7 @@ function DataGridInner<T>({
                 requestAnimationFrame(() => { setOutputMenuOpen(true); requestAnimationFrame(() => document.querySelector<HTMLElement>('[data-testid="register-output-menu"] button')?.focus()); });
               } },
               ...(outputActions ?? []).map((action, index) => ({ key: `output-${index}`, label: action.label, onSelect: action.onClick })),
+              ...(pageToolsItems ?? []),
               { key: "columns", label: "Columns", icon: "settings", onSelect: () => {
                 const r = pageToolsRef.current?.getBoundingClientRect();
                 if (r) setColumnsMenuPos({ top: r.bottom + 4, right: window.innerWidth - r.right });
@@ -3413,7 +3420,19 @@ function DataGridInner<T>({
         data-testid={isReference ? "grid-scroll" : undefined}
       >
         {renderResults && !isLoading && errorState == null && sortedRows.length > 0
-          ? renderResults(sortedRows, rowExpansionApi)
+          ? groupLocalHeaders
+            ? groupSections.map(section => (
+              <section key={section.group.path} data-testid={`grid-card-section-${section.group.path}`}>
+                <table className={`${styles.table} ${styles.tableGrouped}`}>
+                  <thead>{renderGridRow(section.group, section.index)}</thead>
+                </table>
+                {!section.group.collapsed && renderResults(
+                  section.rows.flatMap(item => item.kind === "row" ? [item.row] : []),
+                  rowExpansionApi,
+                )}
+              </section>
+            ))
+            : renderResults(sortedRows, rowExpansionApi)
           : <>
         {/* ⭐ NO HEADER ABOVE ALL GROUPS — owner ruling, Jess 2026-09-18.
             This SUPERSEDES the single global header.
@@ -3601,7 +3620,7 @@ function DataGridInner<T>({
               >
                 Auto-fit width
               </button>
-              {col?.groupable !== false && (
+              {allowColumnGrouping && col?.groupable !== false && (
                 <button
                   className={styles.ctxItem}
                   onClick={() => {

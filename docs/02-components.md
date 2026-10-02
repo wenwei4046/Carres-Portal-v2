@@ -525,3 +525,7 @@ and loaded-scope tooltip/count stay unchanged; other modules derive aggregates f
 StatusPill renders white status text on solid semantic-colour fill, without circular/decorative
 icons. See UI MASTER “Solid status pills” for meanings and rollout scope. Reuse shared tokens;
 neutral Badge counts and action-tone surfaces keep their existing recipes.
+
+### Accepted Register composition
+
+DataGrid `pageToolsItems` composes module-owned presentation commands into the existing Page tools menu. It does not create another toolbar or filtering engine. Governed `fixedGroups` retain one width/sort/filter/selection/export state and group-local headers; None restores the flat grid. The confirmed geometry, adoption checks and bounded production evidence live in [UI MASTER’s Complete-template adoption contract](ui/MASTER.md#complete-template-adoption-contract--clarified-2026-10-02).

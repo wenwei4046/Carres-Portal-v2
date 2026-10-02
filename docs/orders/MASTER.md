@@ -6823,3 +6823,33 @@ Awaiting receipt / Not delivered / Unpaid / Receipt unconfirmed / Amount unconfi
 Received with issue is amber. Red requires an actual late/blocking condition, never unpaid alone.
 Existing source calculations, full labels, filter/search/sort/export and permissions are preserved.
 Related-document discovery and unrelated Route/Monthly previews are excluded from this release.
+
+### Related-document discovery in Listing — owner approved 2026-10-02
+
+APPROVED TARGET / NOT BUILT. Column settings expose Amendment No, PO No, DO No, Invoice No
+and Receipt No. Existing PO/DO fields remain; add missing document fields without duplicating
+status filters. Amendment status is explicitly rejected for this request. Search matches linked
+document numbers and returns their owning SO, even when those columns are hidden. Each recorded
+number opens its exact authorised document. Multiple related documents retain complete search
+coverage and expose the full list; no fabricated IDs or inferred lineage.
+
+If no amendment exists, print `No amendment` without a link. Distinguish a document with no
+recorded number, loading and a failed read from genuine absence. Amendment numbering must use
+existing authoritative document identity; an internal UUID or SO revision is not automatically
+an Amendment No. Receipt and invoice links preserve Payments ownership and permissions.
+
+Implementation authorised by owner here; this does not resume unrelated UI/template work or
+authorise a new production deployment. Verify API lineage, hidden-column search and exact doors.
+
+### Optional Listing grouping — owner confirmed 2026-10-02
+
+Default None; existing ⋯ tools offers None / Delivery Status / Stock Status / Payment Status.
+Use one grouping at a time, section title + filtered SO count + collapse, shared column headers
+and one toolbar/search/selection/export engine. Row status pills remain. Reuse UI MASTER
+“Optional register grouping”. Complete 72-order local pilot contains this change, not production.
+Document discovery stays governed by the earlier related-document section; Amendment No, not
+Amendment status. Existing unnumbered amendments are Not recorded, confirmed none No amendment,
+and failed source Unavailable. Independent Amendment No allocation remains an authority gap.
+
+
+Owner correction2026-10-02: toolbar omits the duplicate SO count; footer keeps filtered SO count and quantity. Listing uses COPY-STANDARD’s `Listing` tab word.
