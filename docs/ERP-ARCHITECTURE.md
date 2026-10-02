@@ -324,10 +324,23 @@ Multiple locations do not turn a Dealer purchase into an internal Stock Transfer
 consignment placement. Location alone never determines Unit ownership.
 
 Showroom and Operation continue the same source request, retaining company, location, actor
-and connected documents without re-entry. This ruling establishes the company/location and
-channel semantics only. It does not approve an independent Showroom & Dealer module, a new
-request name, final navigation, external Dealer access design, Dealer credit, the whole pending
-Blueprint or application implementation. Purchasing §9.8 owns the display-specific handoff.
+and connected documents without re-entry. **Showroom is an approved unified business entry,
+with Carres-owned showroom and Dealer showroom scopes (Jess, 2026-10-02).** Each company may
+have multiple locations; the signed-in actor sees only authorised company/location scope.
+Both scopes use the same product/action/evidence request grammar, two-working-day substantive
+first response and source-linked progress communication (Purchasing §9.8; Service §1.1).
+The common entry does not replace existing customer-order sales channels or merge Purchasing,
+Service, Delivery, Stock and commercial write ownership. Final unapproved screen wording,
+external access mechanics, Dealer-company purchase transaction model, Dealer credit, the whole
+pending Blueprint and application implementation are not approved by this placement ruling.
+
+**Carres-owned Showroom → Ready Stock — APPROVED TARGET / NOT BUILT, Jess 2026-10-02.**
+Showroom staff have a Ready Stock page to find eligible Warehouse stock for urgent customer
+Sales Orders. It is another entry into Stock's shared eligible-Unit view, not another stock
+register, inventory balance or reservation engine. Stock MASTER §12.3 owns eligibility and the
+Sales-owned exact-Unit reservation; warehouse stock presence alone does not prove availability.
+This ruling grants the Carres-owned showroom entry only; it does not grant Dealer visibility
+of HQ inventory or add a Warehouse top-level Ready Stock destination.
 
 **A page is named after the operator's primary responsibility.** Usually that is a business
 object; sometimes it is an accepted ERP operation (`Receiving`); cross-cutting system pages

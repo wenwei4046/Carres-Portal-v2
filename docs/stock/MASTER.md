@@ -1475,6 +1475,22 @@ facts to verify Supplier Invoice.
 
 ### 12.3 Ready Stock, Sales Order reservation and manually purchased goods
 
+**CARRES-OWNED SHOWROOM ENTRY — OWNER-APPROVED / LOCKED, Jess 2026-10-02;
+APPROVED TARGET / NOT BUILT.** The unified Showroom business entry gives Carres-owned showroom
+staff a Ready Stock page for urgent customer Sales Orders. Read the same live eligible stock
+authority used by Sales/Inventory; do not create a showroom stock ledger or separate reservation.
+Show product/model, actual configuration and condition, eligible quantity/exact identity as
+applicable, Warehouse/Stock Location and governed earliest handover information. Product,
+configuration and location filters help staff find suitable goods. Use the existing governed
+Ready Stock presentation and `Choose Ready Unit` action into the customer SO flow, preserving
+authority and exact identity; opening/browsing does not reserve stock or promise delivery.
+Reservation revalidates eligibility atomically so another order cannot take the same Unit.
+Pending receipts, supplier-owned display, another SO's reserved goods and goods failing any
+existing issue/repair/transfer/condition/ownership check do not enter this view. Stock ready is
+not delivery ready: receiving availability, transport and commercial/release gates still govern
+the confirmed date. Counted goods retain Catalog's existing identity mode, not invented Unit IDs.
+This access ruling covers Carres-owned showrooms only; Dealer HQ-stock access remains unapproved.
+
 **CURRENT CARRES →** legacy `Free`, Ready Stock, no SO No and Manual Purchase can be mistaken for
 the same fact; Ready Stock can appear as both a purchase plan and physical availability, and Sales
 and Operations may read different lists.
