@@ -3504,6 +3504,11 @@ PO Doc Date uses the shared table-header month/date-range filter; it is distinct
 follow-up. Selected conditions and shared Clear all are above the table, not an additional rail
 reset control. **Owner placement correction 2026-10-02:** Search, Table/Cards and page tools
 stay together above the listing; messages and selected-condition chips appear above this toolbar.
+**Owner clarification 2026-10-02:** reserve a fixed message/condition row even when empty, above
+the fixed listing-tools row. Adding/clearing conditions must not shift the toolbar or table.
+Local preview uses the existing 36px condition-row token with horizontal overflow for multiple
+chips. Browser measurement confirmed the Search top remained 114px with no filter and with one
+active filter in the inspected 1146px viewport. This is local proof, not shared-kit deployment.
 **Local preview recommendation / NOT LAW:** omit the duplicate toolbar PO count, retaining the
 filtered PO count and quantity totals in the footer. Keep selected-row count separate because it
 identifies action scope.
