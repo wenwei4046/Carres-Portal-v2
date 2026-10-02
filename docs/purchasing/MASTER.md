@@ -5990,13 +5990,27 @@ automatic acknowledgement is insufficient. Missing facts are requested explicitl
 first-response work remains with the responsible owner/cover. This is a response deadline,
 not a repair, production or delivery completion promise.
 
-Newly produced display goods use their normal product production lead time, as for Sales
-Orders. Operation may arrange earlier delivery when goods, existing release/approval conditions
-and the receiving location's availability permit. Dealer/showroom-visible progress may be
-published from the real owning Stock/Delivery facts: preparing, stock ready, scheduling, confirmed
-sending/delivery dates and actual dispatch. Keep requested, estimated, confirmed and actual
-dates distinct. Record publishing actor/time and changes/history; clicking Publish neither
-manufactures stock readiness nor proves physical dispatch. Screen wording requires COPY admission.
+**DISPLAY ORDER TIMING AND MANUAL SETTINGS — OWNER-APPROVED / LOCKED;
+Jess, 2026-10-02; APPROVED TARGET / NOT BUILT.** Dealer new-display purchases use the
+same applicable product lead-time basis as Sales Orders. The authorised staff must be able to
+maintain display-order timing defaults through the governed Settings workspace and manually
+adjust the individual request's required date/priority when needed, including earlier showroom
+placement to support sales. Reuse existing Sales Order/Purchasing product and supplier timing
+facts; do not create conflicting copies of supplier production days. The exact Settings fields,
+permission mapping and screen wording remain Blueprint design work, not approved new labels.
+
+Operation executes against the agreed deadline and may arrange earlier fulfilment when goods,
+existing approvals/release gates and the receiving location permit. A manually earlier required
+date is a planning request, not proof that the supplier or delivery party has committed to it.
+Keep requested, estimated, confirmed and actual dates distinct; retain timing changes, reason,
+actor/time and prior values. Adjusting one request must not silently change all future orders.
+
+Dealer/showroom sees the relevant order goods, agreed lead time/confirmed delivery arrangement,
+required customer actions and material date changes. Every internal execution step need not be
+exposed. Meaningful progress may be published from the real owning Stock/Delivery facts;
+publishing must not manufacture readiness or prove physical dispatch. Internal execution and
+deadline follow-up remain with their existing owners. The two-working-day substantive response
+rule remains separate from production/delivery completion and from repair assessment.
 
 This shared communication and service-level rule does not merge business ownership: Carres
 buying still follows Manual Purchase/PO approvals, supplier consignment follows its existing

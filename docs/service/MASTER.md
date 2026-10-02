@@ -139,7 +139,9 @@ conditions permit, subject to the receiving location's availability and existing
 This does not shorten a supplier's production commitment by assumption or override commercial,
 payment, stock or custody authority.
 
-Operation can publish Dealer-visible progress on the same source-linked request: stock ready,
+Dealer does not need every internal fulfilment step. New-display timing defaults and manual
+request adjustments follow Purchasing §9.8; they do not change repair response or completion
+promises. Operation can publish meaningful Dealer-visible progress on the same source-linked request: stock ready,
 scheduling in progress, and the confirmed sending/delivery arrangement with its date. Published
 progress reads the owning Stock/Delivery facts and records the publishing actor/time; a click
 must not fabricate readiness or a physical dispatch. Keep the requested date, estimated date,
