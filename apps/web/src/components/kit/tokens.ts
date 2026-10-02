@@ -79,6 +79,15 @@ export const TONE_CLASS: Record<OrderActionTone, string> = {
   neutral: "bg-kit-slate-3 text-kit-slate-11",
 };
 
+/** Solid status presentation; action and toast surfaces retain TONE_CLASS. */
+export const STATUS_PILL_CLASS: Record<OrderActionTone, string> = {
+  danger: "bg-kit-red-11 text-white",
+  warning: "bg-kit-amber-11 text-white",
+  info: "bg-kit-blue-11 text-white",
+  success: "bg-kit-green-11 text-white",
+  neutral: "bg-kit-slate-11 text-white",
+};
+
 /** Every tone, in the order §3.6 lists them — used by `/ui` and by tests. */
 export const TONES: readonly OrderActionTone[] = ["danger", "warning", "info", "success", "neutral"];
 

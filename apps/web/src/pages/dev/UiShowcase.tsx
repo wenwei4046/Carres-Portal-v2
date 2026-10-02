@@ -177,7 +177,7 @@ const DEMO_COLUMNS: Column<DemoRow>[] = [
     label: "Status",
     width: 20,
     cell: () => (
-      <StatusPill tone="warning" icon="waiting">
+      <StatusPill tone="warning">
         Waiting
       </StatusPill>
     ),
@@ -594,23 +594,23 @@ export default function UiShowcase() {
                     </StatusPill>
                   ))}
                 </Sample>
-                <Sample label="with a status glyph">
-                  <StatusPill tone="success" icon="ready">
+                <Sample label="solid status text without decorative icons">
+                  <StatusPill tone="success">
                     Ready
                   </StatusPill>
-                  <StatusPill tone="warning" icon="waiting">
+                  <StatusPill tone="warning">
                     Waiting
                   </StatusPill>
-                  <StatusPill tone="danger" icon="late">
+                  <StatusPill tone="danger">
                     Late
                   </StatusPill>
-                  <StatusPill tone="neutral" icon="on-hold">
+                  <StatusPill tone="neutral">
                     On hold
                   </StatusPill>
                 </Sample>
                 <Sample label="long text — truncates inside its cell, never wraps the row">
                   <div className="w-48">
-                    <StatusPill tone="warning" icon="waiting">
+                    <StatusPill tone="warning">
                       {LONG}
                     </StatusPill>
                   </div>

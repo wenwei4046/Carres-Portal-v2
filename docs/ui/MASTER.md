@@ -2489,7 +2489,7 @@ Register (orders MASTER §0.1). Status: APPROVED; adoption is per page and is no
 ```
 0  KIT      ONE kit, every page (owner ruling 2026-09-27). A card / panel / block
             title is `text-strong` 15/600 slate-12 — BLACK BOLD, never blue, never a
-            band; blue is the primary button, links and selection only. No dash as a
+            band; blue is the primary button, links, selection and partial-progress status pills. No dash as a
             value anywhere. A page that differs is a defect, not a style.
 1  PAGE     Header 50px: page name + Jump to · alerts · help · settings only
             Toolbar: the module's create button ONLY where the module is the
@@ -3365,3 +3365,25 @@ selected labels600 and blue indicators; SO390 proof showed title356px, header95p
 40px actions visible without page overflow. Purchasing's read-only prototype reviewer confirmed
 its long PO identity fits the same390px recipe. Focused follow-up checks:117 passed plus
 29 kit/module-tab checks. The full-object header reuses its existing two-row layout when available content width is <=1023px (including shell rails), preserving identity/actions/global tools. Back accessible name matches its destination tooltip. This is shared template reuse, not Purchasing or Warehouse completion.
+
+### Solid status pills — owner confirmed 2026-10-02
+
+APPROVED TARGET / deployment authorised. Status text is white on a solid semantic-colour pill,
+without a circular mark or decorative icon. This replaces the previously proposed pale-fill
+status presentation. Shared StatusPill owns the appearance; neutral Badge counts are unaffected.
+Use canonical dark-enough token fills with readable white text, not the mock's hard-coded hex.
+
+| Meaning | Tone | Sales Order labels |
+|---|---|---|
+| Complete | Green | Fully received, Fully delivered, Paid in full |
+| Partial progress | Blue | Partially received, Partially delivered, Partially paid |
+| Waiting / not started | Neutral grey | Awaiting receipt, Not delivered, Unpaid |
+| Issue | Amber | Received with issue |
+| Unknown / unconfirmed | Neutral grey | Receipt unconfirmed, Amount unconfirmed |
+
+Keep full accessible status text, filter/sort/search/export strings and source calculations.
+Red requires a proven late/blocking condition; unpaid alone does not qualify. Shared module
+statuses preserve their existing business meaning; do not remap unrelated Work action tones
+or neutral counts. Verify token contrast, desktop/phone geometry and register/quick-view parity.
+Application change is authorised only for this status presentation and its shared recipe/examples;
+unrelated Route/Monthly previews and unapproved master gaps are excluded.

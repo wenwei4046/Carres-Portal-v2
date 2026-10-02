@@ -506,10 +506,10 @@ function MonitorCard({ card }: { card: DeliveryMonitorCard }) {
             </div>
           </Popover>
           <span title={line.receivedQty == null ? MONITOR_COPY.receiptUnknown : `${MONITOR_COPY.receivedQty} ${line.receivedQty}/${line.qty}`}>
-            {line.receivedQty == null ? <StatusPill tone="neutral"><Icon name="help" size={14} title={MONITOR_COPY.receiptUnknown} /></StatusPill>
-              : line.receivedQty === 0 ? <StatusPill tone="neutral" icon="waiting"><span className="sr-only">{MONITOR_COPY.receivedQty} 0/{line.qty}</span></StatusPill>
-              : line.receivedQty >= line.qty ? <StatusPill tone="success" icon="ready"><span className="sr-only">{MONITOR_COPY.receivedQty} {line.receivedQty}/{line.qty}</span></StatusPill>
-              : <StatusPill tone="warning" icon="waiting">{line.receivedQty}/{line.qty}</StatusPill>}
+            {line.receivedQty == null ? <StatusPill tone="neutral">{MONITOR_COPY.receiptUnknown}</StatusPill>
+              : line.receivedQty === 0 ? <StatusPill tone="neutral">{MONITOR_COPY.receivedQty} 0/{line.qty}</StatusPill>
+              : line.receivedQty >= line.qty ? <StatusPill tone="success">{MONITOR_COPY.receivedQty} {line.receivedQty}/{line.qty}</StatusPill>
+              : <StatusPill tone="warning">{line.receivedQty}/{line.qty}</StatusPill>}
           </span>
         </div>)}
       </div>

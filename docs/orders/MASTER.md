@@ -6813,3 +6813,13 @@ five Items columns, protected lines, rendered PDF and Back restoring search/view
 UI MASTER “Confirmed shared template” owns the full bounded evidence and shared reuse follow-up.
 Print invocation showed no observed error; its separate viewer was not observable, so physical
 printing/viewer completion remains unverified. No business-data writes or migration were performed.
+
+### Solid SO status pills — owner confirmed 2026-10-02
+
+APPROVED / implementation authorised. Listing and quick view use the shared StatusPill recipe:
+white text, solid canonical semantic fill, no decorative icons. Fully received / Fully delivered /
+Paid in full are green; Partially received / Partially delivered / Partially paid are blue;
+Awaiting receipt / Not delivered / Unpaid / Receipt unconfirmed / Amount unconfirmed are grey;
+Received with issue is amber. Red requires an actual late/blocking condition, never unpaid alone.
+Existing source calculations, full labels, filter/search/sort/export and permissions are preserved.
+Related-document discovery and unrelated Route/Monthly previews are excluded from this release.
