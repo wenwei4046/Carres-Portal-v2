@@ -4177,8 +4177,8 @@ on the record's Result section, the ONE supplier-side decision and Authorised Ou
 Repair` / `Plan Supplier replacement` / `Issue Purchase Return` doors; the missing fact names itself
 (`Authorised Outcome` · `Units` · `PO Duty`). **Slice C3 — the per-Unit read-only row expansion —
 MERGED (#1802) with migration 0614 APPLIED 2026-09-29 (tracker `20260929151311`)** (see "Row expansion" below for what it does and its one limit).
-**Still APPROVED TARGET / NOT BUILT:** Stock-Unit intake, Split/Cancel/Reopen, the claim pack PDF and
-the two Settings rows (0606, Settings lane). **0607 snapshots `claim_reply_waiting_days` /
+**Still APPROVED TARGET / NOT BUILT:** Stock-Unit intake, Split/Cancel/Reopen and the claim pack PDF. The two supplier-reply Settings rows are already built through 0606
+in the Settings lane (see the current timing ruling below). **0607 snapshots `claim_reply_waiting_days` /
 `claim_escalation_extra_days` onto the claim when the ask is recorded** (read by name, 2 and 2 when
 the columns are absent); `Reply expected` and escalation read that snapshot, so a later Settings
 change never moves an asked claim's dates. An ask recorded before 0607 reads 2 and 2.
@@ -7218,7 +7218,7 @@ collapsed, two chips occupied a 374px viewport with 429px horizontal content; cl
 the row 36px and table y=187. Temporary viewport and filters were reset. Screenshot:
 `/tmp/purchasing-fixed-header-production.png`. No business fact was written.
 
-**Committed Sales Order reversal — owner-approved database guard, 2026-10-02; DATABASE PRODUCTION-VERIFIED, repository delivery in progress.**
+**Committed Sales Order reversal — PRODUCTION-VERIFIED bounded journey, 2026-10-02.**
 Jess approved the concrete prevention check after its plain-language explanation: an SO with
 exact PO source lineage, legacy PO SO references, an exact reserved-line Unit binding, an active
 SO reference binding or a sold-order Unit binding cannot return directly to Place. It uses the
@@ -7229,7 +7229,7 @@ Local full-chain acceptance covers all five independent commitments, the uncommi
 case, a released/free reference, permission refusals, a controlled guard-removal negative case
 and a concurrent source reservation committed while reversal waits. The production rolled-back DO
 probe passed the uncommitted positive, five independent bindings and an original-door negative
-control. Triggers stayed enabled; no number was allocated. Original function hash, ACL, 110 Orders,
+control. Triggers stayed enabled; no SO, PO or Unit number was allocated. Original function hash, ACL, 110 Orders,
 473 Units and 72 source links were unchanged afterward. The exact committed file was applied
 through apply_migration as `0634_unproceed_preserves_purchase_and_stock_commitments`, tracker
 version `20261002065657`. Tracker file MD5 `5f017ef8230ece70b84889c1dfa1eceb` and live function
@@ -7237,7 +7237,23 @@ body MD5 `e90653050c4a4157a043132dfd9fe0db` match the Git file/body; grants and 
 counts remain unchanged. No customer reversal, supplier message or Stock reassignment persisted.
 The applied live guard independently passed the same positive and five binding checks in
 a rolled-back post-apply probe. PR1847 passed full CI (13m40s) and merged as
-`44dba269e91d6be34d0d0ec8b09378b02145237d`; the deployment workflow remains in progress.
+`44dba269e91d6be34d0d0ec8b09378b02145237d`; the deployment workflow succeeded and all five
+hosts converged to that SHA. The applied body/file fingerprints were rechecked afterward and
+exactly one tracker entry remains.
 The existing API already returns the governed 422 refusal, so this SQL has no dependent
 application writer or interface change awaiting deployment.
 
+
+**PO-window sending after receipt — BUILD IN PROGRESS, 2026-10-02.** The measured shared
+window adapter treated a received PO as already sent, contradicting §5.6 and §2.4. It now reads
+only current-version confirmed-sent evidence. A window with no demand left but an unsent
+completed PO retains the same occurrence and embedded send area; goods status remains Received.
+The API projection acceptance covers received V2 without its current mark, the current send action
+and disappearance only after that mark exists. No quantity, receipt, supplier channel or ledger
+identity changes. Full checks and production acceptance remain owed.
+The existing PO-window panel already reads this shared adapter and keeps its existing send door.
+49 API projection, eight shared window and three panel tests pass. Restoring the receipt shortcut
+makes the new received/current-version journey fail (negative control). Read-only production
+inventory found the four Completed POs PO-2052, PO-2054, PO-SMOKE-C and PO-SMOKE-W have no exact
+SO source lineage; no window membership is invented to create a live demonstration. This limits
+production acceptance until a real source-linked received PO exists; preserve every original fact.
