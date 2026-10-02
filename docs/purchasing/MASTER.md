@@ -5991,8 +5991,11 @@ first-response work remains with the responsible owner/cover. This is a response
 not a repair, production or delivery completion promise.
 
 **DISPLAY ORDER TIMING AND MANUAL SETTINGS — OWNER-APPROVED / LOCKED;
-Jess, 2026-10-02; APPROVED TARGET / NOT BUILT.** Dealer new-display purchases use the
-same applicable product lead-time basis as Sales Orders. The authorised staff must be able to
+Jess, 2026-10-02; APPROVED TARGET / NOT BUILT.** Dealer new-display purchases follow the same applicable Sales Order rules, including
+order timing, commercial approvals and fulfilment/release conditions; they do not acquire a
+separate service-progress workflow merely because the goods are for display. Normal order
+communication remains with its owning order workflow. Separate service-progress follow-up
+applies to repair or other non-new-purchase assistance (owner clarification 2026-10-02). The authorised staff must be able to
 maintain display-order timing defaults through the governed Settings workspace and manually
 adjust the individual request's required date/priority when needed, including earlier showroom
 placement to support sales. Reuse existing Sales Order/Purchasing product and supplier timing

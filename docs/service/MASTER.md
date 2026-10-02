@@ -139,7 +139,11 @@ conditions permit, subject to the receiving location's availability and existing
 This does not shorten a supplier's production commitment by assumption or override commercial,
 payment, stock or custody authority.
 
-Dealer does not need every internal fulfilment step. New-display timing defaults and manual
+Separate service-progress follow-up applies to repair and other non-new-purchase assistance.
+A new display purchase follows the applicable Sales Order rules and normal order communication,
+not a second Service progress workflow (owner clarification 2026-10-02). If a remedy includes a
+new purchase, its order execution remains with the order owner; the original service outcome
+still requires its own evidence. Dealer does not need every internal fulfilment step. New-display timing defaults and manual
 request adjustments follow Purchasing §9.8; they do not change repair response or completion
 promises. Operation can publish meaningful Dealer-visible progress on the same source-linked request: stock ready,
 scheduling in progress, and the confirmed sending/delivery arrangement with its date. Published

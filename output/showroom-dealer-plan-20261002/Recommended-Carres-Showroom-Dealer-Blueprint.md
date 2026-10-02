@@ -111,7 +111,9 @@ Jess要求像 Sales Order／Purchasing 一样提供可维护的时间设置，�
 
 **RECOMMENDATION / NOT LAW（设置细节）：** 在同一 governed Settings workspace 的 Showroom 范围维护展示订单时间默认值；原请求上调整需要日期及优先程度。具体字段、权限与 COPY 名称待完整 Blueprint 审核；没有批准修改通用两日服务回应期限。
 
-### 两日回应、五日检查、七日方案／进度：完整 SOP 建议
+**OWNER RULING — 2026-10-02 最新边界：** 下新购display订单遵循适用Sales Order规则和正常订单沟通，不另加Service进度流程。只有维修等非新购服务才需要另外的服务进度。若服务结果包含新购买，购买部分仍按订单规则执行，原服务结果以自己的证据完成。新增5／7／3日数值尚未批准，不能套到购买订单。
+
+### 两日回应、五日检查、七日方案／进度：非新购服务 SOP 建议
 
 **FACT，owner clarification/question 2026-10-02：** Dealer 新购 display 的生产周期与 Sales Order 相同，条件允许就提前交付；维修及其他服务要向 supplier／Sales 核实是否承保、怎样处理，不可能以两工作日作为完成承诺。Jess提出核实可能需要5–7工作日，并要求国际参考及SOP建议。这个提问不是批准新的5–7日规则。
 
@@ -128,7 +130,7 @@ Jess要求像 Sales Order／Purchasing 一样提供可维护的时间设置，�
 
 **方案确认目标：** 资料足够的普通服务以5–7工作日完成核实并提供方案为内部目标；**对外可控硬承诺是最迟第7日给方案或明确进度，不是供应商必须完成确认**。Dealer缺证据也要在第2日说清具体缺项，保留等待对方时间与总年龄；第7日沟通仍需要发生。复杂／安全／严重损坏须立即依据原Service/Issue紧急规则升级，不等第5日。跨公司外部contact仍由获授权实际operation执行，本PLAN不发任何消息。
 
-**新display购买与服务分开：** 新购买采用正常Sales产品leadtime，Operation两日内检查需求、来源／配置及商业缺口；goods/release/收货条件成立可以早送，不额外人为等到第5或第7日。上述5/7核实检查点用于待provider／coverage／方案决定的service请求，不成为所有新订单的新生产周期。dealer/showroom两种范围沿同一回应／沟通语法。
+**新display购买与服务分开（OWNER-RULED）：** 新购买按适用Sales Order规则及原订单进度执行；goods/release/收货条件成立可以早送，不额外人为等待第5或第7日，不再加一套服务更新期限。上述新增5／7／3日建议仅供维修等非新购服务审核，仍未批准。既有两日request首次回应保持其原适用范围，不成为Sales Order新增阶段或完成期限。
 
 **既有14工作日Service promise：适用范围核对，不能自动扩大。** 已检查 Service MASTER §1.1 Dealer purchased display service、§4 The deadline，以及 Guarantee MASTER 的交易／产品／条款版本 entitlement 规则。§4规定既有Service报告起14工作日及受控解释／延期；Dealer新增范围则包含 dirt、wear、paid cleaning，并明确同Case intake不等于免费保修。现行authority未明确这些新增Dealer交易是否全部继承14工作日完成承诺，故标为 **REAL GAP / CONTRADICTION：Dealer新增服务的完成期限适用范围待经营裁定**，不能只因使用Service Case而推定消费者承诺全部适用。
 
