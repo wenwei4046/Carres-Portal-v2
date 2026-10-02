@@ -7178,21 +7178,26 @@ The full nine-filter rail, quick Communication/full preview, Amendments, Monthly
 §2.4 completion work are not claimed delivered by this bounded sending slice.
 
 
-**Manual Purchase Work completion — BUILD IN PROGRESS (2026-10-02).** The derived
+**Manual Purchase Work completion — DEPLOYED; object-open journey PRODUCTION-VERIFIED (2026-10-02).** The derived
 request action remains open while authorised demand is uncovered or a linked current PO
 version has no confirmed-sent evidence. Uncovered demand retains `Issue PO`; fully ordered
 or arrived goods use `Confirm PO sent to supplier` and open the existing unsent PO.
 The same `confirm-sent` door probes the request occurrence before and after its write and
 records Completed only when every linked current version is sent and no demand remains.
 Approval, ordered quantities, receipt facts and ownership are unchanged. No SQL migration
-or external message is included. Production commit `73e0a12dd0f475ddb02d7cdb21c725916a133bac`
-converged across all five hosts. Authenticated Team Work / Missed search `MPR` showed
-MPR-20260904-9488 with `Confirm PO sent to supplier`, `Sending not confirmed` and the correct
-current-version completion condition. Its linked PO-20260904-9834 has no current sent mark.
-However the action opened retired `/operation?tab=pos`, which leaves an empty shell: this
-journey is NOT production-complete. BUILD now uses canonical `/operation/procurement?po=`;
-release and successful object-open acceptance remain owed. No supplier message or sent mark
-was written. Evidence: `/tmp/purchasing-manual-send-work-production.png`.
+or external message is included. PR1848 passed CI and merged as
+`547fe08ca16eee21374cbe5a247669ae123906d3`; deployment run `36978740900` succeeded and all
+five canonical surfaces converged to that SHA. Authenticated Principal read-only acceptance
+through Operations → Workspace, Team Work, search `MPR` showed MPR-20260904-9488 with
+`Confirm PO sent to supplier`, `Sending not confirmed` and the current-version completion
+condition. Clicking `Open MPR-20260904-9488` opened the actual PO-20260904-9834 V1 object at
+`/operation/procurement?po=PO-20260904-9834`, with its exact MPR goods-line sources visible.
+`Issue current PDF` opened the existing channel/recipient/confirm-sent form. No empty shell
+remains. Acceptance boundary: this PO's destination address is missing, so its official PDF
+preview refuses to render; address maintenance is the existing Settings door. Do not claim
+PDF rendering or a sent/completion write from this walk. No supplier channel was opened and
+no supplier message, sent mark, receipt or source fact was written. Screenshot:
+`/tmp/purchasing-work-po-open-1848.jpg`.
 
 **Monthly demand adoption — PRODUCTION-VERIFIED bounded journey, 2026-10-02.** Purchase Orders reuses the existing
 SalesOrderMonthlyDemand component, useMonthlyDemandFacts reader and monthlyDemandOf arithmetic.
@@ -7247,13 +7252,17 @@ application writer or interface change awaiting deployment.
 **PO Listing shared toolbar adoption — BUILD IN PROGRESS, 2026-10-02.** Owner requests the deployed Sales Orders Listing grammar for PO. Purchase Orders uses the same DataGrid presentation-tools door: visible current result count and search, with supported Export and Columns in the far-right Page tools overflow. Existing PO grouping, filters, columns, source links, goods expansion and exports remain. This toolbar change does not claim Cards, selection, exception-fact completeness or full Purchasing completion; production acceptance is pending.
 
 
-**PO-window sending after receipt — BUILD IN PROGRESS, 2026-10-02.** The measured shared
+**PO-window sending after receipt — DEPLOYED; real received-window journey UNVERIFIED, 2026-10-02.** The measured shared
 window adapter treated a received PO as already sent, contradicting §5.6 and §2.4. It now reads
 only current-version confirmed-sent evidence. A window with no demand left but an unsent
 completed PO retains the same occurrence and embedded send area; goods status remains Received.
 The API projection acceptance covers received V2 without its current mark, the current send action
 and disappearance only after that mark exists. No quantity, receipt, supplier channel or ledger
-identity changes. Full checks and production acceptance remain owed.
+identity changes. PR1849 passed complete CI run `36978843122` and merged as
+`6d377f03a913d74c78abf0e0c74a7bd78ebf19f6`. Deployment run `36981090221` succeeded;
+all five canonical surfaces independently converged to that SHA
+(`/tmp/purchasing-production-1849.log`). Deployment proof is not a live received-window
+journey; that acceptance remains explicitly unverified.
 The existing PO-window panel already reads this shared adapter and keeps its existing send door.
 49 API projection, eight shared window and three panel tests pass. Restoring the receipt shortcut
 makes the new received/current-version journey fail (negative control). Read-only production

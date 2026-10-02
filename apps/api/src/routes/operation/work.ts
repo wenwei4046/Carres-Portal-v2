@@ -569,9 +569,9 @@ export function projectPurchaseOrderArrivalCheckWork(input: {
  * marked `PO sent to supplier`. The per-Sales-Order `issue_po` and the
  * retired `confirm_ready_date` never reach Work (see `loadOperationWork`).
  *
- * A received PO needs no sending — the goods are already in — so it counts
- * as issued and done. Unreadable window settings are a Purchasing source
- * failure, never an empty buying day.
+ * Goods receipt does not confirm that the current PO version was sent.
+ * Unreadable window settings are a Purchasing source failure, never an
+ * empty buying day.
  */
 /** The window model over the SO Batch read — the feed, the probe and the
  *  completion facts all run THIS, so "which POs a window issued" has one
