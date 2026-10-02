@@ -154,6 +154,7 @@ export const PORTAL_MODULES: ReadonlyArray<PortalModule> = [
    * permission or calculation is merged by the shared parent. */
   { section: "Sales", label: "Sales Orders", icon: ClipboardList },
   { section: "Purchasing", label: "Purchasing", icon: ShoppingBag },
+  { section: "Showroom", label: "Showroom", icon: Store },
   /* THE FOUR-PAGE MAP (CARD-2026-09-04-delivery-01): Monitor → Delivery
    * Orders → Delivery Order → Edit Delivery. The first two are navigation,
    * so Delivery is a module again; the object and the writer stay doors on
