@@ -342,7 +342,7 @@ describe("Showroom reads existing PJ stock", () => {
     fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
     expect(screen.queryByText("U1-000-294")).not.toBeInTheDocument();
     expect(screen.getByText("U1-000-293")).toBeInTheDocument();
-    expect(screen.getByTestId("stock-register-destination-header")).toHaveTextContent("Showroom Display");
+    expect(screen.getByTestId("stock-register-destination-header")).toHaveTextContent("Showroom");
     const headings = screen.getAllByRole("columnheader").map((heading) => heading.textContent);
     expect(headings.findIndex((label) => label?.includes("Item"))).toBeLessThan(headings.findIndex((label) => label?.includes("Unit ID")));
     expect(screen.queryByText(/you can promise/)).not.toBeInTheDocument();

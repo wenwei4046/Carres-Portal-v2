@@ -1090,6 +1090,15 @@ Purchasing MASTER §9.6. `Handover`, `Handover proof`, `Units / Qty`, `Return Do
 `Return No` are superseded as labels on this register, not globally retired custody vocabulary.
 Finance is excluded from this UI. Display approval does not rename stored records or APIs.
 
+### Showroom navigation — owner ruling 2026-10-02
+
+Module/page title: **`Showroom`**, with destinations **`Carres`** and **`Dealer`**.
+Carres means Carres-operated showrooms; Dealer means dealer-operated showrooms.
+These destinations describe the operator, not the ownership of every piece of goods.
+`Showroom Display` is superseded only as this module/page title, not as a purchase-purpose
+or Stock filter label. The existing PJ reader is Carres. Dealer stays `Coming soon` until its
+scoped capability is delivered; it must not open the Carres Stock list.
+
 ### Showroom document names and purposes — owner ruling 2026-10-02
 
 **APPROVED TARGET / NOT BUILT.** Use full names `Display Request`, `Consignment Order`,
