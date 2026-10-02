@@ -7262,3 +7262,5 @@ SO source lineage; no window membership is invented to create a live demonstrati
 production acceptance until a real source-linked received PO exists; preserve every original fact.
 
 **PO Listing Table/Cards and selection adoption — APPROVED TARGET / BUILD IN PROGRESS, 2026-10-02.** Jess explicitly directs following the current deployed Sales Orders UI/UX. PO reuses its shared segmented Table/Cards controls, Block card geometry and checkbox selection model; the same filtered PO facts feed both presentations and selections survive switching. View opens the existing PO object. This presentation adoption does not invent bulk commercial actions or claim missing supplier-exception facts. Local journey tests passed; production verification remains pending.
+
+**PO left rail template — BUILD IN PROGRESS, owner-directed 2026-10-02.** Use the existing Sales Orders `so-template-rail` and `so-rail-navigation` composition for PO: shared group border/header, active rows and vertical Listing/Monthly demand navigation. Preserve Purchasing filter meanings. Local HTML updated; no new component, CSS recipe or token. Production acceptance pending.

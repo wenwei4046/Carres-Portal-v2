@@ -1014,18 +1014,18 @@ export default function PurchaseOrdersPage() {
       <div className="relative flex min-h-0 flex-1 overflow-hidden">
         {railOpen && (
         <FilterRail
-          className="max-md:absolute max-md:inset-y-0 max-md:left-0 max-md:z-30"
+          className="so-template-rail max-md:absolute max-md:inset-y-0 max-md:left-0 max-md:z-30"
           onHide={() => setRailVisible(false)}
           ariaLabel="Purchase order filters"
           testId="po-filter-rail"
-          header={<Tabs fill orientation="vertical" label="Purchase Orders view"
+          header={<div className="so-rail-navigation"><Tabs fill orientation="vertical" label="Purchase Orders view"
             value={monthly ? "monthly" : "list"}
             onValueChange={(value) => setParams((previous) => {
               const next = new URLSearchParams(previous);
               if (value === "monthly") next.set("view", "monthly"); else next.delete("view");
               return next;
             })}
-            tabs={[{ value: "list", label: "Listing", icon: "order" }, { value: "monthly", label: "Monthly demand", icon: "date" }]} />}
+            tabs={[{ value: "list", label: "Listing", icon: "order" }, { value: "monthly", label: "Monthly demand", icon: "date" }]} /></div>}
         >
           {!monthly && <>
           {RAIL_GROUPS.map((group) => (
