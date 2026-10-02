@@ -49,6 +49,8 @@ import { usePdfCanvases } from "@/lib/pdf/use-pdf-canvases";
    sister pages read as two apps (YH, 2026-09-04). */
 import Block from "@/components/kit/Block";
 import Tabs from "@/components/kit/Tabs";
+import Drawer from "@/components/kit/Drawer";
+import StatusPill from "@/components/kit/StatusPill";
 import Checkbox from "@/components/kit/Checkbox";
 import Button from "@/components/kit/Button";
 import SalesOrderMonthlyDemand from "../SalesOrderMonthlyDemand";
@@ -402,6 +404,7 @@ export default function PurchaseOrdersPage() {
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
   const [filter, setFilter] = useState<RailFilter>(RAIL_CLEAR);
+  const [quickPo, setQuickPo] = useState<RegisterRow | null>(null);
   /* The personal saved-layout pilot (ui MASTER §6.7 rule 4). A failed read
      leaves the Columns menu without saved layouts; the register still works. */
   const layoutsQ = useRegisterLayouts("purchase_orders");
@@ -706,7 +709,7 @@ export default function PurchaseOrdersPage() {
         <button
           type="button"
           className="font-mono font-semibold text-kit-blue-11 hover:underline"
-          onClick={(event) => { event.stopPropagation(); openObject(row); }}
+          onClick={(event) => { event.stopPropagation(); setQuickPo(row); }}
         >
           {row.id}
         </button>
@@ -1012,6 +1015,9 @@ export default function PurchaseOrdersPage() {
   return (
     <div ref={canvasRef} className={`${registerStyles.page} flex h-full min-h-0 flex-col`} data-testid="purchase-orders-register">
       <PurchasingTabs />
+      {quickPo && <PurchaseOrderQuickView row={allRows.find((row) => row.id === quickPo.id) ?? quickPo} destinations={destinations} owner={poDutyActor} messageTemplate={posQ.data?.messageTemplate ?? null}
+        onChanged={() => void posQ.refetch()}
+        onClose={() => setQuickPo(null)} onOpenFull={() => { setQuickPo(null); openObject(quickPo); }} />}
       <div className="relative flex min-h-0 flex-1 overflow-hidden">
         {railOpen && (
         <FilterRail
@@ -1397,6 +1403,72 @@ async function downloadOfficialPdf(poId: string): Promise<void> {
 const OBJECT_VIEWS = ["Document", "Revisions", "History", "Order Route"] as const;
 type ObjectView = (typeof OBJECT_VIEWS)[number];
 type DocumentMode = "read" | "issue" | "revise" | "deliverTo";
+
+function PurchaseOrderQuickView({ row, destinations, onClose, onOpenFull, onChanged, owner, messageTemplate }: {
+  row: RegisterRow; destinations: Array<{ id: string; name: string }>;
+  onClose: () => void; onOpenFull: () => void; onChanged: () => void;
+  messageTemplate: string | null;
+  owner: { userId: string; name: string | null } | null;
+}) {
+  const [tab, setTab] = useState("info");
+  const unitsQ = useOperationPoUnits(row.id);
+  const recordOpen = useRecordSend(row.id);
+  const issuedPo = { id: row.id, supplierId: row.po.supplier_id, supplierName: row.supplierName,
+    destinationId: row.po.destination_id ?? "not-recorded", destination: row.deliverTo,
+    whatsappGroupUrl: row.supplier?.whatsapp_group_url ?? null,
+    contactEmail: row.supplier?.contact_email ?? null, poSendChannel: row.supplier?.po_send_channel ?? null,
+    contact: row.supplier?.contact ?? null };
+  return <Drawer variant="quick-view" open onOpenChange={(open) => { if (!open) onClose(); }}
+    title={`${poDocumentNumberOf(row.id, row.facts.version)} · ${row.supplierName}`}
+    headerActions={<><StatusPill tone="neutral">{row.facts.operationStatus ?? row.facts.documentState}</StatusPill><Button iconOnly icon="open" variant="ghost" aria-label="Open full page" onClick={onOpenFull} /></>}>
+    <Tabs label="Purchase Order detail" value={tab} onValueChange={setTab}
+      tabs={[{ value: "info", label: "PO info" }, { value: "communication", label: "Communication" }]} />
+    {tab === "communication" ? <div className="space-y-3 pt-3">
+      {row.facts.operationStatus !== "Cancelled" && <Block title="Communication">
+        <PoIssueEvidence po={issuedPo} version={row.facts.version} evidence={row.po.sends ?? []}
+          doors={doorsForIssuedPo(issuedPo, messageTemplate)}
+          onOpened={(channel) => recordOpen.mutate({ channel })} onConfirmed={onChanged} />
+      </Block>}
+      <CurrentAction row={row} owner={owner} onIssue={!row.facts.currentSend && row.facts.operationStatus !== "Cancelled" ? onOpenFull : null} />
+      <Block title="Supplier reply">
+        <SupplierReplySection key={`${row.id}:${row.facts.version}`} poId={row.id}
+          version={row.facts.version} officialDeliveryDate={row.po.official_delivery_date ?? null}
+          supplierName={row.supplierName}
+          lines={(row.po.purchase_order_lines ?? []).map((line) => ({
+            id: line.id, sku: line.sku,
+            item: [line.model_name, line.size].filter(Boolean).join(" · ") || line.sku,
+            itemDetail: lineConfigBits(line.attrs as Record<string, unknown> | null | undefined).join(" · ") || undefined,
+            qty: Number(line.qty ?? 0), receivedQty: Number(line.received_qty ?? 0),
+            unitIds: (unitsQ.data?.units ?? []).filter((unit) => unit.status !== "voided" && (unit.po_line_id === line.id || (!unit.po_line_id && unit.sku === line.sku))).map((unit) => unit.unit_code),
+          }))}
+          promises={row.po.promises ?? []}
+          canRecord={!unitsQ.isLoading && !unitsQ.isError && !!row.facts.currentSend && row.facts.quantities.open > 0 && row.facts.operationStatus !== "Cancelled"}
+          defaultChannel={row.facts.currentSend?.channel === "email" ? "email" : "whatsapp"}
+          defaultRecipient={row.facts.currentSend?.recipient ?? ""}
+          supplierDo={row.po.do_number || row.po.do_uploaded_at ? { number: row.po.do_number ?? null, uploadedAt: row.po.do_uploaded_at ?? null, file: row.po.do_file_path ?? null } : null}
+          onSaved={onChanged} />
+      </Block>
+    </div> : <div className="space-y-3 pt-3">
+      <Block title="PO info"><dl className="grid grid-cols-2 gap-3">
+        <Fact own={false} framed={false} idPrefix="po-quick-fact" label="Supplier" value={row.supplierName} />
+        <Fact own={false} framed={false} idPrefix="po-quick-fact" label="PO Doc Date" value={row.poDate ? fmtDate(row.poDate) : "Not recorded"} />
+        <Fact own={false} framed={false} idPrefix="po-quick-fact" label="PO Version" value={`PO V${row.facts.version}`} />
+        <Fact own={false} framed={false} idPrefix="po-quick-fact" label="Sending" value={versionLine(row)} />
+      </dl></Block>
+      <Block title="Delivery"><dl className="grid grid-cols-2 gap-3">
+        <Fact own={false} framed={false} idPrefix="po-quick-fact" label="Supplier Deliver To" value={row.deliverTo} />
+        <Fact own={false} framed={false} idPrefix="po-quick-fact" label="PO Delivery Date" value={row.po.official_delivery_date ? fmtDate(row.po.official_delivery_date) : "Not recorded"} />
+        <Fact own={false} framed={false} idPrefix="po-quick-fact" label="Supplier Confirmed Delivery Date" value={row.supplierDate ? fmtDate(row.supplierDate) : "Not confirmed"} />
+      </dl></Block>
+      <Block title="Items"><OrderedGoods row={row} destinations={destinations} /></Block>
+      <Block title="Receiving"><dl className="grid grid-cols-2 gap-3">
+        <Fact own={false} framed={false} idPrefix="po-quick-fact" label="Goods Received Date" value={row.receipts.map((receipt) => receipt.receivedOn ? fmtDate(receipt.receivedOn) : "Not recorded").join(" · ") || "Not recorded"} />
+        <Fact own={false} framed={false} idPrefix="po-quick-fact" label="GRN No" value={row.receipts.map((receipt) => receipt.grnNo).join(" · ") || "Not recorded"} />
+      </dl></Block>
+      <Block title="Related documents">{row.sources.length ? row.sources.map((source) => { const href = sourceHref(source); return href ? <Link key={source.reference} to={href} className="block text-body text-kit-blue-11 hover:underline" onClick={onClose}>{source.reference}</Link> : <p key={source.reference} className="text-body">{source.reference}</p>; }) : <p className="text-body">Not recorded</p>}</Block>
+    </div>}
+  </Drawer>;
+}
 
 function PurchaseOrderObject({
   row,
