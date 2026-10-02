@@ -842,8 +842,7 @@ and what follows, in furniture words.
 The ban was written to stop a DELIVERY being described as split; that meaning stays banned, and
 so does the word anywhere near a trip. But Carres genuinely holds supplier-owned furniture, the
 supplier calls it consignment, the agreement says consignment, and inventing a Carres-only word
-would leave staff translating in both directions. **`Consignment Order` · `Consignment Return` ·
-`Consignment Sale Notice`** are the ruled supplier-document names. A consignment arrival uses the
+would leave staff translating in both directions. **`Consignment Order` · `Consignment Return`** are the ruled supplier-document names. A consignment arrival uses the
 same **`Goods Receipt`** as a purchase arrival while preserving supplier ownership. On a UNIT the fact is spelt
 **`Supplier Consignment`**, against **`Carres Owned`**. The word never describes a delivery.
 
@@ -1091,11 +1090,13 @@ Purchasing MASTER §9.6. `Handover`, `Handover proof`, `Units / Qty`, `Return Do
 `Return No` are superseded as labels on this register, not globally retired custody vocabulary.
 Finance is excluded from this UI. Display approval does not rename stored records or APIs.
 
-### Showroom document names and purposes — owner ruling 2026-09-29
+### Showroom document names and purposes — owner ruling 2026-10-02
 
 **APPROVED TARGET / NOT BUILT.** Use full names `Display Request`, `Consignment Order`,
-`Consignment Return`, `Consignment Sale Notice`; plural destinations use those names in plural.
-Do not use bare DR/CO/CRTN/CSN as explanatory action names. Keep existing number families and
+`Consignment Return`; plural destinations use those names in plural. Supplier-owned goods are
+display-only. Consignment Sale Notices and Consignment Sales are not target destinations (§7.7 of
+Purchasing MASTER). Purchased Carres-owned goods follow ordinary customer sales.
+Do not use bare DR/CO/CRTN as explanatory action names. Keep existing number families and
 historical issued titles/versions. Consignment Order instructs the supplier to provide consignment
 goods; Consignment Return instructs/records goods handed back to the supplier. Neither title means
 physical execution is complete or a payable exists. Purchasing §§9.9–9.10 own these purposes.
@@ -1103,7 +1104,7 @@ physical execution is complete or a payable exists. Purchasing §§9.9–9.10 ow
 Do not replace both titles with Consignment Note or create a third manual document of that name.
 Staff enter one Display Request and use its source-prefilled execution documents. Showroom receipt
 and supplier collection acknowledgement remain evidence on Receiving/handover, not another create
-step. Customer Sales Invoice and Consignment Sale Notice retain their distinct purposes.
+step. Purchased Carres-owned goods use the ordinary Sales Invoice; no supplier sale notice is required.
 
 Supplier PDF titles: `CONSIGNMENT ORDER` and `CONSIGNMENT RETURN`. Goods headings: `COMING IN`
 and `GOING BACK`. Placement uses COMING IN; standalone return uses GOING BACK; a same-supplier
@@ -1146,7 +1147,7 @@ do not create a second business status, work queue or source of truth.
 | BUY pages | `SO Batch Purchase` · `Manual Purchase Request` (owner rename 2026-09-23; was `Manual Purchase`) · `Purchase Orders`. **BUILT 2026-09-23** — the rail row, the page title, the create button, the register's empty/search/footer words, the object's back destination, its loading and failure sentences, the browser title and the shared review's way out all read `Manual Purchase Request`. The screen noun is the REQUEST; the purchase itself is the PO that answers it, and `MPR` was always Manual Purchase **Request**. |
 | RECEIVE pages | `Receiving` |
 | PROBLEMS pages | `Supplier Claims` · `Purchase Returns` · `Repair Orders` |
-| SHOWROOM pages | `Display Requests` · `Consignment Orders` · `Consignment Returns` · `Consignment Sale Notices` |
+| SHOWROOM pages | `Display Requests` · `Consignment Orders` · `Consignment Returns` |
 
 Purchasing has no Home, module-specific Work, Purchase Demands, New Supplier/New SKU request,
 Consignment Overview, Consignment Receipts, Report or Settings sidebar destination. The capability
