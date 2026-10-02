@@ -6021,6 +6021,11 @@ documents and commercial approval rules remain unchanged.
 
 ### Showroom page and request journey — OWNER-APPROVED / LOCKED 2026-10-02
 
+Owner naming correction: the module/page is **Showroom**, with **Carres** and **Dealer**
+destinations. Split by who operates the showroom, retaining separate per-goods ownership facts.
+PJ's existing internal reader belongs to Carres. Dealer capability remains undelivered; naming
+approval does not open Dealer access or make dealer-owned goods Carres Stock.
+
 Approved presentation/operating target, not application delivery proof. One authorised Showroom
 entry provides current goods, orders/requests and actual inbound/outbound history using the
 shared Register/Object Detail grammar. Screen labels remain subject to governed COPY admission.

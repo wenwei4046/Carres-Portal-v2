@@ -504,7 +504,7 @@ export default function WarehouseStockRegister({ showroom = false }: { showroom?
             next.set("tab", showroom ? "showroom" : "stock-onhand");
             return `/operation?${next}`;
           })()}
-          backLabel={showroom ? "Showroom Display" : "Inventory"}
+          backLabel={showroom ? "Showroom" : "Inventory"}
           onBack={() => {
             const next = new URLSearchParams(params);
             next.delete("unit");
@@ -518,8 +518,8 @@ export default function WarehouseStockRegister({ showroom = false }: { showroom?
         {!selectedUnit && (
           <ModuleHeader
             testId="stock-register-destination-header"
-            word={showroom ? "Showroom Display" : "Inventory"}
-            docTitle={showroom ? "Showroom Display · Carres" : "Inventory · Warehouse — Carres"}
+            word={showroom ? "Showroom" : "Inventory"}
+            docTitle={showroom ? "Showroom · Carres" : "Inventory · Warehouse — Carres"}
             right={showroom ? undefined :
               <Link className="text-kit-blue-11 text-body" to="/operation?tab=arrival-source&kind=transfer">
                 Request Transfer
