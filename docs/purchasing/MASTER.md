@@ -7204,3 +7204,23 @@ unfiltered; active chips and Clear all occupy it without moving listing tools or
 Multiple chips scroll horizontally with their remove controls retained. No other register adopts
 this opt-in. The completed PO's action fact uses the governed `Sending not confirmed`; absence of
 a mark is never presented as proof the PDF was not sent. Production geometry remains owed.
+
+**Committed Sales Order reversal — owner-approved database guard, 2026-10-02; DATABASE PRODUCTION-VERIFIED, repository delivery in progress.**
+Jess approved the concrete prevention check after its plain-language explanation: an SO with
+exact PO source lineage, legacy PO SO references, an exact reserved-line Unit binding, an active
+SO reference binding or a sold-order Unit binding cannot return directly to Place. It uses the
+existing `wrong_stage` refusal and existing Orders amendment/cancellation flow; no Purchasing or
+Stock fact is deleted or reassigned. An uncommitted SO retains its existing reversal and audit.
+Migration 0634 keeps the existing role/dealer gate, shared Order lock, grants and private writer.
+Local full-chain acceptance covers all five independent commitments, the uncommitted positive
+case, a released/free reference, permission refusals, a controlled guard-removal negative case
+and a concurrent source reservation committed while reversal waits. The production rolled-back DO
+probe passed the uncommitted positive, five independent bindings and an original-door negative
+control. Triggers stayed enabled; no number was allocated. Original function hash, ACL, 110 Orders,
+473 Units and 72 source links were unchanged afterward. The exact committed file was applied
+through apply_migration as `0634_unproceed_preserves_purchase_and_stock_commitments`, tracker
+version `20261002065657`. Tracker file MD5 `5f017ef8230ece70b84889c1dfa1eceb` and live function
+body MD5 `e90653050c4a4157a043132dfd9fe0db` match the Git file/body; grants and business row
+counts remain unchanged. No customer reversal, supplier message or Stock reassignment persisted.
+PR checks, repository merge and dependent deployment convergence remain owed.
+
