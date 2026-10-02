@@ -1520,12 +1520,12 @@ describe("Showroom operator destinations", () => {
     renderAt("/operation?tab=showroom");
     expect(module_("showroom")).toHaveAttribute("aria-expanded", "true");
     const tree = screen.getByTestId("nav-children-showroom");
-    expect(within(tree).getByRole("link", { name: "Carres", exact: true })).toHaveAttribute("href", "/operation?tab=showroom");
+    expect(within(tree).getByRole("link", { name: /^Carres$/ })).toHaveAttribute("href", "/operation?tab=showroom");
     const dealer = within(tree).getByTestId("nav-child-dealer-showroom");
     expect(dealer).toHaveAttribute("aria-disabled", "true");
     expect(dealer).not.toHaveAttribute("href");
     expect(dealer).toHaveTextContent("Dealer");
     expect(dealer).toHaveTextContent("Coming soon");
-    expect(within(tree).queryByRole("link", { name: "Dealer", exact: true })).not.toBeInTheDocument();
+    expect(within(tree).queryByRole("link", { name: /^Dealer$/ })).not.toBeInTheDocument();
   });
 });
