@@ -4,7 +4,7 @@
  * marked sent; the PO's supplier-reply Work closes on an evidenced answer
  * for its current version.
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { Hono } from "hono";
 import type { OperationWorkItem } from "@carres/shared";
 import type { AppEnv } from "../types";
@@ -13,6 +13,7 @@ import {
   arrivalConfirmationResult,
   poWindowResult,
   manualPurchaseSendResult,
+  poSentWorkCompletion,
   supplierReplyResult,
   type ArrivalConfirmationFacts,
   type PoWindowSendFacts,
@@ -173,5 +174,34 @@ describe("the supplier's answer completes the PO's reply Work, on its current ge
       objectLabel: "PO2609-4827",
       resultReference: "po_supplier_promises=ans-9@v3",
     })]);
+  });
+});
+
+
+describe("the existing PO send door also records Manual Purchase completion", () => {
+  it("uses linked requests and the same request projector, alongside windows", async () => {
+    const work = await import("../routes/operation/work");
+    const recorded: CompletedWrite[] = [];
+    let probes = 0;
+    const spies = [
+      vi.spyOn(work, "poWindowKeysServing").mockResolvedValue([]),
+      vi.spyOn(work, "manualPurchaseRequestsServing").mockResolvedValue(["request-17"]),
+      vi.spyOn(work, "probeManualPurchaseWork").mockImplementation(async (_c, id) =>
+        ++probes === 1 ? [item(id, "manual_purchase.issue_po", "MPR260902-17", "2026-09-03")] : []),
+      vi.spyOn(work, "manualPurchaseSendFacts").mockResolvedValue({ poIds: ["PO1", "PO2"], demandLeft: 0, allSent: true }),
+    ];
+    try {
+      const app = new Hono<AppEnv>();
+      app.use("*", async (c, next) => { c.set("auth", { id: ME } as never); await next(); });
+      app.post("/:id/confirm-sent", poSentWorkCompletion(() => ({
+        recordCompleted: async (_c, write) => { recorded.push(write); },
+        now: () => "2026-09-24T03:00:00.000Z", log: () => {},
+      })), (c) => c.json({ ok: true }));
+      expect((await app.request("/PO2/confirm-sent", { method: "POST" })).status).toBe(200);
+      expect(spies[1]).toHaveBeenCalledWith(expect.anything(), "PO2");
+      expect(recorded).toEqual([expect.objectContaining({
+        objectLabel: "MPR260902-17", actorId: ME, resultReference: "po_sends=PO1,PO2",
+      })]);
+    } finally { spies.forEach((spy) => spy.mockRestore()); }
   });
 });
