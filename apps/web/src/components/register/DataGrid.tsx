@@ -622,6 +622,8 @@ export type DataGridProps<T> = {
    * for (every optional power stays optional).
    */
   activeConditions?: Array<{ key: string; label: string; onClear: () => void }>;
+  /** Reserve the governed 36px condition strip, including when empty. */
+  reserveConditionRow?: boolean;
   /** Called by `Clear filters` after the grid clears its own column filters,
    *  so one click really does clear everything the strip listed. */
   onClearConditions?: () => void;
@@ -795,6 +797,7 @@ function DataGridInner<T>({
   selectable,
   chooserGroupOrder,
   activeConditions,
+  reserveConditionRow = false,
   onClearConditions,
   embedded = false,
 }: DataGridProps<T>) {
@@ -2860,9 +2863,9 @@ function DataGridInner<T>({
           ? [{ key: "search", label: `Search: ${search.trim()}`, onClear: () => setSearch("") }]
           : [];
         const chips = [...searchChips, ...(activeConditions ?? []), ...columnChips];
-        if (chips.length === 0) return null;
+        if (chips.length === 0 && !reserveConditionRow) return null;
         return (
-          <div className={styles.conditionBar} data-testid="active-conditions">
+          <div className={`${styles.conditionBar}${reserveConditionRow ? ` ${styles.conditionBarReserved}` : ""}`} data-testid="active-conditions" aria-hidden={chips.length === 0 || undefined}>
 
             {chips.map((chip) => (
               <span key={chip.key} className={styles.conditionChip}>
@@ -2880,7 +2883,7 @@ function DataGridInner<T>({
                 </button>
               </span>
             ))}
-            {!noMatchShowing && (
+            {chips.length > 0 && !noMatchShowing && (
             <button
               type="button"
               className={styles.conditionClear}

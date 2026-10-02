@@ -649,7 +649,7 @@ describe("Purchase Orders Register", () => {
   it("keeps the work copy in the PO detail, where actions live", () => {
     renderPage("/operation/procurement?po=PO-20260828-4827");
     const work = screen.getByTestId("po-object-work");
-    expect(work).toHaveTextContent("PO-20260828-4827 V2 has not been sent");
+    expect(work).toHaveTextContent("Sending not confirmed");
     /* Owner 2026-09-25 send line: issued is not sent, and the act says Send. */
     expect(work).toHaveTextContent("Send PO-20260828-4827 V2 to Hooka");
     expect(work.querySelector('[data-owner-id="user-duty"]')).toHaveAttribute("data-owner-duty", "PO Duty");

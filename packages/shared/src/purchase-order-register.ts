@@ -256,13 +256,13 @@ export function purchaseOrderWork(
   const docNo = poDocumentNumberOf(input.id, facts.version);
   if (facts.filters.includes("supplier_update_required")) {
     return {
-      problem: `${docNo} has not been sent`,
+      problem: "Sending not confirmed",
       action: `Send ${docNo} to ${input.supplierName}`,
     };
   }
   if (facts.filters.includes("pdf_not_sent")) {
     return {
-      problem: "The PO PDF has not been sent",
+      problem: "Sending not confirmed",
       action: `Send ${docNo} to ${input.supplierName}`,
     };
   }
