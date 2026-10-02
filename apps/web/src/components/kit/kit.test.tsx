@@ -1,3 +1,4 @@
+import { amber, blue, green, red, slate } from "@radix-ui/colors";
 /**
  * Foundation components — the RULES, not the pixels (card D0.5a).
  *
@@ -27,7 +28,7 @@ import Panel from "./Panel";
 import SearchInput from "./SearchInput";
 import StatusPill from "./StatusPill";
 import Textarea from "./Textarea";
-import { TONE_CLASS, TONES, TYPE_TOKENS } from "./tokens";
+import { STATUS_PILL_CLASS, TONE_CLASS, TONES, TYPE_TOKENS } from "./tokens";
 
 /* ───────────────────────────────────────────────────────────────────────────
  * 1 · Component API — a chat cannot restyle a kit component (UI-KIT §0.1)
@@ -73,7 +74,7 @@ describe("closed sets", () => {
     void <Icon name="edit" size={20} />;
     // @ts-expect-error — §3.6 lists a sixth "money" tone; OrderActionTone has five (reported)
     void <StatusPill tone="money">RM 2,000</StatusPill>;
-    // @ts-expect-error — a pill takes a STATUS glyph, not an action one
+    // @ts-expect-error — solid status pills do not accept decorative icons
     void <StatusPill tone="info" icon="add">x</StatusPill>;
     // @ts-expect-error — Badge has no tone: a coloured badge is a status in disguise
     void <Badge tone="danger">3</Badge>;
@@ -191,11 +192,26 @@ describe("Textarea and SearchInput", () => {
 });
 
 describe("StatusPill", () => {
+  it("keeps white text at WCAG AA contrast on every canonical solid fill, without icons", () => {
+    const fills = { danger: red.red11, warning: amber.amber11, info: blue.blue11, success: green.green11, neutral: slate.slate11 };
+    render(<>{TONES.map(tone => <StatusPill key={tone} tone={tone}>{tone}</StatusPill>)}</>);
+    for (const tone of TONES) {
+      const components = fills[tone].slice(1).match(/../g)!.map(value => parseInt(value, 16) / 255)
+        .map(value => value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4);
+      const luminance = components[0]! * 0.2126 + components[1]! * 0.7152 + components[2]! * 0.0722;
+      expect(1.05 / (luminance + 0.05), tone).toBeGreaterThanOrEqual(4.5);
+      const pill = screen.getByText(tone).closest('[data-kit="status-pill"]')!;
+      expect(pill).toHaveClass("text-white");
+      expect(pill.querySelector("svg,[data-icon]")).toBeNull();
+    }
+    expect(TONE_CLASS.warning).toBe("bg-kit-amber-3 text-kit-amber-11");
+  });
+
   it("paints the tone the engine computed and says which one it was", () => {
     render(<StatusPill tone="danger">Late</StatusPill>);
     const pill = screen.getByText("Late").closest('[data-kit="status-pill"]');
     expect(pill).toHaveAttribute("data-tone", "danger");
-    for (const cls of TONE_CLASS.danger.split(" ")) expect(pill).toHaveClass(cls);
+    for (const cls of STATUS_PILL_CLASS.danger.split(" ")) expect(pill).toHaveClass(cls);
   });
 
   it("renders every tone without a page choosing a colour", () => {

@@ -1,3 +1,4 @@
+import StatusPill from "@/components/kit/StatusPill";
 /**
  * SalesOrdersRegister — STAGE 1 (BUILD-QUEUE): the page RUNS THE REGISTER
  * ENGINE, and nothing on it writes to the database.
@@ -184,7 +185,9 @@ function toGridColumn(
     sortable: true,
     defaultHidden: !defaultOnFor(f, role),
     chooserGroup: f.group,
-    accessor: (r) => absenceAware(f.text(r)),
+    accessor: (r) => ["stock_status", "delivery_status", "payment_status"].includes(f.key)
+      ? <StatusPill tone={salesOrderStatusTone(f.text(r))}>{f.text(r)}</StatusPill>
+      : absenceAware(f.text(r)),
     searchValue: (r) => f.text(r),
     filterValue: (r) => f.text(r),
     ...(f.sortBy
@@ -409,6 +412,13 @@ const MONTHLY_PARAMS = ["start", "months", "dealer", "state", "city", "category"
    2026-09-22). Read-only FACT filters: none is a status or a work queue. */
 /* Requested delivery presets approved by the owner on 2026-10-01. */
 const LIST_PARAMS = ["dealer", "state", "city", "delivery", "completion", "obligations", "cases", "requested", "payment", "stock"] as const;
+/** SO receipt, delivery and payment presentation; no business calculations. */
+function salesOrderStatusTone(label: string): "success" | "info" | "warning" | "neutral" {
+  if (["Fully received", "Fully delivered", "Paid in full"].includes(label)) return "success";
+  if (["Partially received", "Partially delivered", "Partially paid"].includes(label)) return "info";
+  return label === "Received with issue" ? "warning" : "neutral";
+}
+
 const STOCK_STATUSES = [
   { key: "pending", label: "Awaiting receipt" },
   { key: "partial", label: "Partially received" },
@@ -667,7 +677,7 @@ function ExpandedLines({ row, inspection = false, compact = false }: { row: Regi
     <tbody>{miniLines.map((line, index) => {
       const source = index < lines.length ? lines[index] : addons[index - lines.length];
       const stock = line.selectable === false ? "Not applicable" : STOCK_STATUSES.find(status => status.key === stockStatusOf(row, line.sku))!.label;
-      return <tr key={line.key} className="border-b border-kit-slate-5"><td className="p-2">{line.item}{line.itemDetail && <div className="text-meta text-kit-slate-11">{line.itemDetail}</div>}</td><td className="p-2 text-right">{line.qty}</td><td className="p-2 text-right whitespace-nowrap">{source.unit_price == null ? "Not recorded" : <Money value={Number(source.unit_price) * line.qty} />}</td><td className="p-2"><span className="rounded-full bg-kit-slate-3 px-2 py-1 text-meta text-kit-slate-11" title="Recorded warehouse receipt for this order">{stock}</span></td></tr>;
+      return <tr key={line.key} className="border-b border-kit-slate-5"><td className="p-2">{line.item}{line.itemDetail && <div className="text-meta text-kit-slate-11">{line.itemDetail}</div>}</td><td className="p-2 text-right">{line.qty}</td><td className="p-2 text-right whitespace-nowrap">{source.unit_price == null ? "Not recorded" : <Money value={Number(source.unit_price) * line.qty} />}</td><td className="p-2"><StatusPill tone={salesOrderStatusTone(stock)}>{stock}</StatusPill></td></tr>;
     })}</tbody>
   </table></div>;
   if (inspection) return <div className="space-y-3" data-testid="goods-side-inspection">
@@ -1220,7 +1230,7 @@ export default function SalesOrdersRegister() {
   return (
     <div className="flex h-full min-h-0 flex-col">
       <DestinationHeader />
-      {quickOrder && <Drawer variant="quick-view" open onOpenChange={(open) => { if (!open) setQuickOrder(null); }} title={`SO-${quickOrder.so} · ${quickOrder.customer}`} headerActions={<><span className="rounded-full bg-kit-blue-3 px-2 py-1 text-meta text-kit-blue-11">{REGISTER_DELIVERY_CONDITIONS.find(c => c.key === registerDeliveryConditionOf(quickOrder.o.order_lines ?? [], quickOrder.o.allocated_units ?? []))?.label ?? "Not recorded"}</span><Button iconOnly icon="print" variant="ghost" aria-label="Print sales order" title="Print sales order" onClick={() => void printSalesOrders([quickOrder])} /><Button iconOnly icon="open" variant="ghost" aria-label="Open full page" onClick={() => openWorkspace(quickOrder)} /></>}>
+      {quickOrder && <Drawer variant="quick-view" open onOpenChange={(open) => { if (!open) setQuickOrder(null); }} title={`SO-${quickOrder.so} · ${quickOrder.customer}`} headerActions={<><StatusPill tone={salesOrderStatusTone(REGISTER_DELIVERY_CONDITIONS.find(c => c.key === registerDeliveryConditionOf(quickOrder.o.order_lines ?? [], quickOrder.o.allocated_units ?? []))?.label ?? "Not recorded")}>{REGISTER_DELIVERY_CONDITIONS.find(c => c.key === registerDeliveryConditionOf(quickOrder.o.order_lines ?? [], quickOrder.o.allocated_units ?? []))?.label ?? "Not recorded"}</StatusPill><Button iconOnly icon="print" variant="ghost" aria-label="Print sales order" title="Print sales order" onClick={() => void printSalesOrders([quickOrder])} /><Button iconOnly icon="open" variant="ghost" aria-label="Open full page" onClick={() => openWorkspace(quickOrder)} /></>}>
         <div className="flex flex-col gap-3" data-testid="sales-order-quick-view">
           <Block title="SO info" tone="muted"><dl className="grid grid-cols-2 gap-3 text-body">
             <div><dt className="text-label text-kit-slate-11">Phone</dt><dd>{quickOrder.o.customer_phone || "Not given"}</dd></div>
@@ -1239,7 +1249,7 @@ export default function SalesOrdersRegister() {
             <div className="flex justify-between"><dt>Total payable</dt><dd>{moneyCell(quickOrder.total)}</dd></div>
             <div className="flex justify-between"><dt>Paid to date</dt><dd>{moneyCell(quickOrder.paid)}</dd></div>
             <div className="flex justify-between font-semibold"><dt>Balance due</dt><dd>{moneyCell(quickOrder.balance)}</dd></div>
-            <div className="flex justify-between"><dt>Payment Status</dt><dd>{PAYMENT_STATUSES.find(p => p.key === paymentStatusOf(quickOrder))!.label}</dd></div>
+            <div className="flex justify-between"><dt>Payment Status</dt><dd><StatusPill tone={salesOrderStatusTone(PAYMENT_STATUSES.find(p => p.key === paymentStatusOf(quickOrder))!.label)}>{PAYMENT_STATUSES.find(p => p.key === paymentStatusOf(quickOrder))!.label}</StatusPill></dd></div>
           </dl></Block>
           <RelatedDocuments row={quickOrder} />
         </div>

@@ -519,3 +519,9 @@ Sales orders · Total payable · Paid to date · Balance due all remain visible.
 FilterRailGroup, Money and typography; count uses text-strong, values right/tabular/no-wrap,
 8px row gap. Conditional missing-amount notices span the row. Filtering/calculation ownership
 and loaded-scope tooltip/count stay unchanged; other modules derive aggregates from their own facts.
+
+### Solid status pills — owner confirmed 2026-10-02
+
+StatusPill renders white status text on solid semantic-colour fill, without circular/decorative
+icons. See UI MASTER “Solid status pills” for meanings and rollout scope. Reuse shared tokens;
+neutral Badge counts and action-tone surfaces keep their existing recipes.

@@ -342,7 +342,7 @@ Houzs measurements remain provenance in UI MASTER, never the instruction for Car
 | Compact Register search | Existing shared search control; scoped owner ruling2026-10-01 | Desktop preferred width220, height32, Inter12/400/18, icon16, radius6/border1; shrink within constrained space without clipping; touch control/hit target≥40 | OWNER ACCEPTED / production verification pending. Applies to the Sales-first Register template, not automatic replacement of every search variant. Icon/text gap retains existing admitted recipe; no new spacing token |
 | Textarea | Same: horizontal pad8, vertical pad4, body13/400/18; content-driven height | KEEP; never invent fixed universal multiline height | Source inspected; form supplies content/rows |
 | Label / hint / error | `kit/FieldFrame.tsx`: label11/500/14; vertical field gap4; hint12/400/16; error13/400/18 with icon/text gap6 | KEEP | Source inspected; message wraps and increases height, never clipped to one line |
-| Status pill / neutral badge | `kit/StatusPill.tsx`, `Badge.tsx`: horizontal pad8, vertical pad4, label11/500/14, full radius; pill icon14/gap4 | KEEP; natural one-line height22, not universal24 | Derived from source, not fresh runtime measurement; long status must remain discoverable |
+| Status pill / neutral badge | `kit/StatusPill.tsx`, `Badge.tsx`: horizontal pad8, vertical pad4, label11/500/14, full radius; solid semantic step11 fill, white text, no icon (owner confirmed 2026-10-02) | KEEP; natural one-line height22, not universal24 | Derived from source, not fresh runtime measurement; long status must remain discoverable |
 
 ### 7.3 Register filter rail
 

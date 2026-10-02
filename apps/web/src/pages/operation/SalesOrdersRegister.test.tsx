@@ -1536,3 +1536,36 @@ describe("the isolated shared-template pilot", () => {
     expect(within(drawer).queryByRole("button", { name: "Edit" })).not.toBeInTheDocument();
   });
 });
+
+
+describe("approved solid SO status presentation", () => {
+  it.each([
+    ["received", "Fully received", "success", 2, "Fully delivered", "success", 100, "Paid in full", "success"],
+    ["partial", "Partially received", "info", 1, "Partially delivered", "info", 40, "Partially paid", "info"],
+    ["pending", "Awaiting receipt", "neutral", 0, "Not delivered", "neutral", 0, "Unpaid", "neutral"],
+    ["issue", "Received with issue", "warning", 0, "Not delivered", "neutral", 0, "Unpaid", "neutral"],
+    ["unknown", "Receipt unconfirmed", "neutral", 0, "Not delivered", "neutral", 0, "Unpaid", "neutral"],
+  ])("keeps %s status meaning and quick-view parity", async (stockKey, stockLabel, stockTone, sold, deliveryLabel, deliveryTone, paid, paymentLabel, paymentTone) => {
+    const source = order({ paid: Number(paid), order_lines: [{ sku: "B1201S-K", qty: 2, unit_price: 50 }], allocated_units: Number(sold) ? [{ sku: "B1201S-K", status: "sold", qty: Number(sold) }] : [] });
+    listHookState.data = { orders: [source] };
+    registerFactsState = { data: { facts: { [source.id]: { stock: { "B1201S-K": stockKey } } }, failed: {} } };
+    mount();
+    const check = (root: HTMLElement, word: string, tone: string) => {
+      const pills = [...root.querySelectorAll('[data-kit="status-pill"]')].filter(node => node.textContent === word);
+      expect(pills.length, word).toBeGreaterThan(0);
+      for (const pill of pills) { expect(pill).toHaveAttribute("data-tone", tone); expect(pill.querySelector("svg,[data-icon]")).toBeNull(); }
+    };
+    fireEvent.keyDown(screen.getByRole("button", { name: "Page tools" }), { key: "Enter" });
+    fireEvent.click(screen.getByRole("menuitem", { name: "Columns" }));
+    fireEvent.click(await screen.findByRole("checkbox", { name: "Delivery Status" }));
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
+    check(screen.getByTestId("grid-parent-row"), String(deliveryLabel), String(deliveryTone));
+    check(screen.getByTestId("grid-parent-row"), String(stockLabel), String(stockTone));
+    check(screen.getByTestId("grid-parent-row"), String(paymentLabel), String(paymentTone));
+    fireEvent.click(screen.getByRole("button", { name: "SO-1303" }));
+    const drawer = screen.getByRole("dialog", { name: "SO-1303 · Kimmy" });
+    check(drawer, String(stockLabel), String(stockTone));
+    check(drawer, String(paymentLabel), String(paymentTone));
+    check(drawer, String(deliveryLabel), String(deliveryTone));
+  });
+});
