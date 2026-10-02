@@ -1514,17 +1514,24 @@ authorised `Make available for sale` and the same eligibility validation. Sales 
 Unit`; successful selection atomically binds the exact Unit to the SO. A governed SO release returns
 it to Ready Stock only if it remains eligible.
 
-**OPERATOR JOURNEY →** Sales opens `Sales → Ready Stock`, searches product/SKU/configuration/Site,
-reads exact Unit, holder, condition and earliest handover, then chooses the Unit and SO line.
-Operations opens `Inventory → Ready Stock`, reads the same Unit IDs plus physical/source facts,
-uses `Make available for sale` where permitted or `Report a problem`; Operations cannot substitute
-or release the SO promise.
+**OPERATOR JOURNEY → APPROVED TARGET / NOT BUILT (placement, 2026-10-02).** Carres-owned
+showroom staff open `Showroom → Ready Stock`, search product/SKU/configuration/Stock Location,
+and read available product imagery, configuration, condition, eligible quantity/exact identity
+under Catalog's identity mode and evidence-backed earliest handover. Browsing does not reserve.
+`Choose Ready Unit` continues the original customer Sales Order and its specific line; Sales
+revalidates and reserves the exact eligible Unit atomically. No customer order is recreated here.
+Warehouse/Operations opens `Warehouse → Inventory` and its `Ready Stock` view for the same stock
+facts, receipt/inspection/location/control evidence and permitted stock actions. It is not a new
+top-level Warehouse destination. Operations cannot substitute or release the Sales Order promise;
+Operation/Delivery confirms delivery under existing transport and commercial/release gates.
 
 **UI / PAGE / OBJECT PLACEMENT →** the Inventory rail contains `Reserved for Sales Orders · Ready
 Stock · Showroom Display · Service Case · Needs checking`. Operations Ready Stock defaults to `Unit
 ID · Product · Who has it · Site · Condition · PO No · PO date · Received date · Days available ·
-Earliest handover · Work`. Sales uses a permission-reduced projection of the same Units. Unit Detail
-shows Stock use, eligibility, reserved SO, source purchase category and PO/Receiving history.
+Earliest handover · Work`. Carres-owned `Showroom → Ready Stock` uses the sales-facing,
+permission-reduced projection of the same eligible stock authority. This does not grant Dealer
+HQ-stock visibility. Unit Detail shows Stock use, eligibility, reserved SO, source purchase
+category and PO/Receiving history.
 
 **CROSS-MODULE CONNECTION →** Purchasing owns purchase category/PO; Receiving proves receipt;
 Stock owns physical eligibility and `Make available for sale`; Sales Order owns choose/bind/release/
