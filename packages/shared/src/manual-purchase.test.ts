@@ -462,36 +462,16 @@ describe("Card 06 §7 · the two Work actions", () => {
     expect(items[0]).toMatchObject({ ownerUserId: null, actingPerson: null, ownerState: "not_assigned" });
   });
 
-  it("an ISSUED PO is a commitment — a missing send confirmation raises no work", () => {
-    /* ⭐ OWNER RULING 2026-09-11. This used to keep `Issue PO` open on a fully
-       ordered request whose purchase orders carried no confirmed-sent row.
-       Measured on production the same day: 62 purchase orders exist and 3
-       carry that evidence — so the rule raised an "Issue PO" task against 59
-       documents that had already been issued, inviting a SECOND purchase
-       order for goods already bought. Copying a PO into WhatsApp is not proof
-       of sending, and the absence of proof is not a reason to buy again. */
-    expect(
-      manualPurchaseWorkItems(
-        input({ status: "ordered", remainingQty: 0, hasPos: true, posAllSent: false }),
-        { approver, poDuty },
-        "2026-09-01",
-      ),
-    ).toEqual([]);
-    expect(
-      manualPurchaseWorkItems(
-        input({ status: "ordered", remainingQty: 0, hasPos: true, posAllSent: true }),
-        { approver, poDuty },
-        "2026-09-01",
-      ),
-    ).toEqual([]);
-    /* The evidence itself is untouched — it is still read, still stored, and
-       still worth showing on the document. It simply may not make work. */
-    const stillOpen = manualPurchaseWorkItems(
-      input({ status: "ready_to_order", remainingQty: 2, hasPos: true, posAllSent: false }),
-      { approver, poDuty },
-      "2026-09-01",
-    );
-    expect(stillOpen.map((i) => i.ruleKey)).toEqual(["manual_purchase.issue_po"]);
+  it("keeps ordered and arrived requests open until their current PO versions are marked sent", () => {
+    for (const status of ["ordered", "arrived"] as const) {
+      const request = input({ status, remainingQty: 0, hasPos: true, posAllSent: false });
+      expect(manualPurchaseWorkItems(request, { approver, poDuty }, "2026-09-01"))
+        .toMatchObject([{ ruleKey: "manual_purchase.issue_po", action: "Confirm PO sent to supplier" }]);
+      expect(manualPurchaseWorkItems({ ...request, posAllSent: true }, { approver, poDuty }, "2026-09-01"))
+        .toEqual([]);
+    }
+    expect(manualPurchaseWorkItems(input({ status: "ordered", remainingQty: 0, hasPos: false }),
+      { approver, poDuty }, "2026-09-01")).toEqual([]);
   });
 
   it("a refused or arrived request carries no work; late counts Office working days", () => {

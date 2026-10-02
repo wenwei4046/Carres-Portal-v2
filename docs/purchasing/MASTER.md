@@ -7140,3 +7140,13 @@ remains in Completed goods; no sending evidence is fabricated. Cancelled-PO send
 explicit separate gap because the current PDF and confirm-sent SQL reject cancelled documents.
 The full nine-filter rail, quick Communication/full preview, Amendments, Monthly demand and other
 §2.4 completion work are not claimed delivered by this bounded sending slice.
+
+
+**Manual Purchase Work completion — BUILD IN PROGRESS (2026-10-02).** The derived
+request action remains open while authorised demand is uncovered or a linked current PO
+version has no confirmed-sent evidence. Uncovered demand retains `Issue PO`; fully ordered
+or arrived goods use `Confirm PO sent to supplier` and open the existing unsent PO.
+The same `confirm-sent` door probes the request occurrence before and after its write and
+records Completed only when every linked current version is sent and no demand remains.
+Approval, ordered quantities, receipt facts and ownership are unchanged. No SQL migration
+or external message is included. Production and authenticated acceptance remain owed.

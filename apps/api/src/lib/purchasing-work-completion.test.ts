@@ -12,6 +12,7 @@ import { withWorkCompletion, type CompletedWrite, type WorkCompletionDeps, type 
 import {
   arrivalConfirmationResult,
   poWindowResult,
+  manualPurchaseSendResult,
   supplierReplyResult,
   type ArrivalConfirmationFacts,
   type PoWindowSendFacts,
@@ -39,6 +40,15 @@ describe("Purchasing completion facts", () => {
     expect(poWindowResult("purchasing.po_window", { poIds: ["PO250925-1"], demandLeft: 2, allSent: true })).toBeNull();
     expect(poWindowResult("purchasing.po_window", { poIds: [], demandLeft: 0, allSent: false })).toBeNull();
     expect(poWindowResult("issue_po", { poIds: ["PO250925-1"], demandLeft: 0, allSent: true })).toBeNull();
+  });
+
+  it("a Manual Purchase closes only when demand is covered and every linked current PO is marked sent", () => {
+    const facts = { poIds: ["PO2", "PO1"], demandLeft: 0, allSent: true };
+    expect(manualPurchaseSendResult("manual_purchase.issue_po", facts)).toBe("po_sends=PO1,PO2");
+    expect(manualPurchaseSendResult("manual_purchase.issue_po", { ...facts, allSent: false })).toBeNull();
+    expect(manualPurchaseSendResult("manual_purchase.issue_po", { ...facts, demandLeft: 1 })).toBeNull();
+    expect(manualPurchaseSendResult("manual_purchase.issue_po", { ...facts, poIds: [] })).toBeNull();
+    expect(manualPurchaseSendResult("manual_purchase.approve", facts)).toBeNull();
   });
 
   it("a passed supplier date closes only on a governed answer to the current version — with its screenshot", () => {
@@ -122,6 +132,22 @@ describe("PO sent to supplier completes the window only when its last PO is sent
       result: poWindowResult,
     };
     expect((await run(spec, [W1], 409)).recorded).toEqual([]);
+  });
+});
+
+describe("Manual Purchase current-version sending completion", () => {
+  it("records the actual sender only after the last linked PO closes the request's occurrence", async () => {
+    let probes = 0;
+    const spec: WorkCompletionSpec<PoWindowSendFacts> = {
+      owner: "Purchasing", rules: ["manual_purchase.issue_po"],
+      probe: async (_c, id) => ++probes === 1
+        ? [item(id, "manual_purchase.issue_po", "MPR260902-17", "2026-09-03")] : [],
+      readFacts: async () => ({ poIds: ["PO2", "PO1"], demandLeft: 0, allSent: true }),
+      result: manualPurchaseSendResult,
+    };
+    expect((await run(spec, ["request-17"])).recorded).toEqual([expect.objectContaining({
+      actorId: ME, objectLabel: "MPR260902-17", actionOn: "2026-09-03", resultReference: "po_sends=PO1,PO2",
+    })]);
   });
 });
 

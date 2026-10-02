@@ -54,16 +54,33 @@ export function poWindowCompletionSpec(): WorkCompletionSpec<PoWindowSendFacts> 
   };
 }
 
+export function manualPurchaseSendResult(ruleKey: string, facts: PoWindowSendFacts): string | null {
+  if (ruleKey !== "manual_purchase.issue_po" || facts.poIds.length === 0 || !facts.allSent || facts.demandLeft > 0) return null;
+  return `po_sends=${[...facts.poIds].sort().join(",")}`;
+}
+
+export function manualPurchaseSendCompletionSpec(): WorkCompletionSpec<PoWindowSendFacts> {
+  return {
+    owner: "Purchasing",
+    rules: ["manual_purchase.issue_po"],
+    probe: async (c, id) => (await import("../routes/operation/work")).probeManualPurchaseWork(c, id),
+    readFacts: async (c, id) => (await import("../routes/operation/work")).manualPurchaseSendFacts(c, id),
+    result: manualPurchaseSendResult,
+  };
+}
+
 /** `PO sent to supplier` — the one act that can close a PO window. The
  *  windows are named BEFORE the write, from the same model the feed runs. */
 export function poSentWorkCompletion(
   deps: () => WorkCompletionDeps = workCompletionDeps,
 ): MiddlewareHandler<AppEnv> {
   return workCompletion({
-    targets: async (c) => [{
-      spec: poWindowCompletionSpec(),
-      objectIds: await (await import("../routes/operation/work")).poWindowKeysServing(c, c.req.param("id") ?? ""),
-    }],
+    targets: async (c) => {
+      const work = await import("../routes/operation/work");
+      const poId = c.req.param("id") ?? "";
+      return [{ spec: poWindowCompletionSpec(), objectIds: await work.poWindowKeysServing(c, poId) },
+        { spec: manualPurchaseSendCompletionSpec(), objectIds: await work.manualPurchaseRequestsServing(c, poId) }];
+    },
   }, deps);
 }
 

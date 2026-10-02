@@ -937,7 +937,7 @@ export function receivingWorkSourceFromModuleFacts(data: {
 
 export function manualPurchaseWorkInputsFromRegister(
   data: ManualPurchaseRegisterSource,
-): Array<ManualPurchaseWorkInput & { recipient: string | null }> {
+): Array<ManualPurchaseWorkInput & { recipient: string | null; poIds: string[]; unsentPoId: string | null }> {
   const destination = new Map(data.destinations.map((row) => [row.id, row.name]));
   const supplier = new Map(data.suppliers.map((row) => [row.id, row.name]));
   const user = new Map(data.users.map((row) => [row.id, row.name]));
@@ -997,6 +997,8 @@ export function manualPurchaseWorkInputsFromRegister(
         0,
       ),
       orderBy: manualPurchaseOrderByOf(live.map((line) => line.order_by)),
+      poIds,
+      unsentPoId: poIds.find((id) => sent.get(id) !== true) ?? null,
       hasPos: poIds.length > 0,
       posAllSent: poIds.length > 0 && poIds.every((id) => sent.get(id) === true),
       recipient: manualPurchaseSupplierSummary(supplierNames),
@@ -1118,7 +1120,7 @@ export function projectSalesOrderWork(input: {
 }
 
 export function projectManualPurchaseWork(input: {
-  requests: readonly (ManualPurchaseWorkInput & { recipient?: string | null })[];
+  requests: readonly (ManualPurchaseWorkInput & { recipient?: string | null; unsentPoId?: string | null })[];
   approver: { userId: string; name: string | null } | null;
   poDuty: WorkspaceDutyResolution | null;
   today: string;
@@ -1143,21 +1145,17 @@ export function projectManualPurchaseWork(input: {
              Ready Stock · Ohana · Ohana` and overflowed the panel's button. */
           label: request.reference ?? request.context,
         },
-        problem: approval ? "Approval required" : "Purchase order required",
+        problem: approval ? "Approval required"
+          : request.remainingQty > 0 ? "Purchase order required" : "Sending not confirmed",
         recipient: request.recipient ?? null,
-        /* ⭐ THE ISSUE ACTION'S RESULT IS AN ISSUED PO (owner ruling
-           2026-09-11). It read "Current PO version sent to supplier" while
-           the rule kept the action open on a fully ordered request with no
-           confirmed-sent row — a confirmation chore. That rule is gone
-           (`manualPurchaseWorkItems`), so the result is the act itself. */
         requiredResult: approval
           ? "Purchase decision recorded"
-          : "Purchase order issued",
-        /* ⭐ THE APPROVER LANDS ON THE APPROVAL SECTION, not at the top of a
-           six-section object they then have to scroll (owner ruling
-           2026-09-11). `Issue PO` has no such section — its act is the
-           Register's selected action — so it opens the object plainly. */
-        destination: `/operation?tab=manual-purchase&mp=${encodeURIComponent(request.requestId)}${approval ? "&section=approval" : ""}`,
+          : "Current PO version marked as sent",
+        // Approval opens its decision; uncovered demand opens the request.
+        // Sending opens the first existing unsent PO, never a second buy.
+        destination: !approval && request.remainingQty === 0 && request.unsentPoId
+          ? `/operation?tab=pos&po=${encodeURIComponent(request.unsentPoId)}`
+          : `/operation?tab=manual-purchase&mp=${encodeURIComponent(request.requestId)}${approval ? "&section=approval" : ""}`,
         today: input.today,
       });
     }),
@@ -2169,6 +2167,36 @@ export async function poWindowKeysServing(c: Context<AppEnv>, poId: string): Pro
   return poWindowsOf(source.read, source.suppliers)
     .filter((w) => w.pos.some((po) => po.poId === poId))
     .map((w) => w.key);
+}
+
+async function readManualPurchaseWorkSource(c: Context<AppEnv>) {
+  const internal = new Hono<AppEnv>();
+  internal.use("*", async (child, next) => {
+    child.set("auth", c.var.auth);
+    await next();
+  });
+  internal.route("/manual-purchase", manualPurchaseRouter);
+  return manualPurchaseWorkInputsFromRegister(
+    await readInternal<ManualPurchaseRegisterSource>(internal, "/manual-purchase", c),
+  );
+}
+
+export async function probeManualPurchaseWork(
+  c: Context<AppEnv>, requestId: string, ledger: WorkLedger = supabaseWorkLedger,
+): Promise<OperationWorkItem[] | null> {
+  const requests = (await readManualPurchaseWorkSource(c)).filter((r) => r.requestId === requestId);
+  const items = projectManualPurchaseWork({ requests, approver: null, poDuty: null, today: todayIsoMYT() });
+  const { currentId } = await readWorkLedger(c, ledger, items.map((item) => item.id));
+  return items.map((item) => ({ ...item, id: currentId.get(item.id) ?? item.id }));
+}
+
+export async function manualPurchaseSendFacts(c: Context<AppEnv>, requestId: string) {
+  const request = (await readManualPurchaseWorkSource(c)).find((r) => r.requestId === requestId);
+  return { poIds: request?.poIds ?? [], demandLeft: request?.remainingQty ?? 0, allSent: request?.posAllSent ?? false };
+}
+
+export async function manualPurchaseRequestsServing(c: Context<AppEnv>, poId: string): Promise<string[]> {
+  return (await readManualPurchaseWorkSource(c)).filter((r) => r.poIds.includes(poId)).map((r) => r.requestId);
 }
 
 /**

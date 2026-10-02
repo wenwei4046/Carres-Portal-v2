@@ -1359,31 +1359,9 @@ export interface ManualPurchaseWorkInput {
   remainingQty: number;
   /** The request's earliest server-derived Order By, or null. */
   orderBy: string | null;
-  /**
-   * Any linked PO at all (real lineage, Card 04 §3.4).
-   *
-   * ⚠️ READ, BUT NO LONGER A REASON TO RAISE WORK — see `posAllSent`.
-   */
+  /** Linked PO lineage; numbering is not completion of sending work. */
   hasPos: boolean;
-  /**
-   * Every linked PO's CURRENT version has confirmed-sent evidence
-   * (`po_sends.kind = 'confirmed_sent'` at `coalesce(version, 1)`).
-   *
-   * ⛔ THIS NO LONGER OPENS `Issue PO` — owner ruling 2026-09-11.
-   *
-   * Card 06 §7 kept the issue action open on a FULLY ORDERED request whose
-   * purchase orders carried no confirmed-sent row. Measured on production
-   * 2026-09-11: 62 purchase orders exist and 3 carry that evidence, so the
-   * rule raised a `Issue PO` task against 59 documents that had already been
-   * issued — and whose only fault was that nobody ticked a confirmation.
-   *
-   * An existing numbered PO IS an existing commitment, evidence or not.
-   * Copying a PO into WhatsApp is not proof of sending, and the absence of
-   * proof is not a reason to issue a second purchase order or to invent a
-   * confirmation chore. The field stays because the evidence itself is real,
-   * is preserved, and is worth showing on the document; it simply may not
-   * manufacture work.
-   */
+  /** Every linked CURRENT version has confirmed-sent evidence. */
   posAllSent: boolean;
 }
 
@@ -1457,11 +1435,10 @@ export function manualPurchaseWorkItems(
       workingDaysLate: late(input.orderBy),
     });
   }
-  /* ⭐ APPROVED REMAINING DEMAND, AND NOTHING ELSE (owner ruling 2026-09-11).
-     Refused / fully-cancelled / ordered / arrived requests carry no issuance
-     work: there is nothing left to buy, and an absent send confirmation is
-     not a reason to say there is. */
-  const issueOpen = input.status === "ready_to_order" && input.remainingQty > 0;
+  const needsPurchase = input.status === "ready_to_order" && input.remainingQty > 0;
+  const needsSending = ["ready_to_order", "ordered", "arrived"].includes(input.status)
+    && input.hasPos && !input.posAllSent;
+  const issueOpen = needsPurchase || needsSending;
   if (issueOpen) {
     const resolution = ctx.poDutyResolution;
     const legacy = ctx.poDuty
@@ -1475,7 +1452,7 @@ export function manualPurchaseWorkItems(
       module: "purchasing",
       soRef: input.context,
       orderId: input.requestId,
-      action: MANUAL_PURCHASE_WORDS.workIssuePo,
+      action: needsPurchase ? MANUAL_PURCHASE_WORDS.workIssuePo : "Confirm PO sent to supplier",
       ownerRule: "po_duty",
       ownerDutyKey: "po_duty",
       normalOwner,
