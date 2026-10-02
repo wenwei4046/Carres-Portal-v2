@@ -87,6 +87,7 @@ const queryData = {
         {
           id: "line-1",
           sku: "MAT-K-001",
+          attrs: null as Record<string, unknown> | null,
           qty: 3,
           received_qty: 1,
           identity_mode: null as "exact_unit" | "quantity" | null,
