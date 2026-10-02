@@ -6013,8 +6013,8 @@ transaction, not proof of a Dealer-company display purchasing capability. Whole-
 approval, account provisioning, cutover and application delivery remain outside this ruling.
 
 
-**Current-goods build evidence — 2026-10-02, branch only.** The Showroom current-goods
-reader and exact-goods transfer handoff are implemented; Stock §3 records their measured
+**Current-goods delivery evidence — PRODUCTION-VERIFIED bounded slice, 2026-10-02.** The Showroom current-goods
+reader and exact-goods transfer handoff are live through PR1853; Stock §3 records their measured
 boundary and remaining targets. This is not completion of the approved three-view journey,
 new purchase/service intake, account cutover or timing Settings. Existing Purchasing display
 documents and commercial approval rules remain unchanged.
