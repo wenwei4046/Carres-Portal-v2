@@ -152,17 +152,15 @@ display purchase or of Stock/Delivery execution.
 This ruling approves Dealer display-service coverage only, not the complete Showroom/Dealer
 Blueprint, final portal labels, blanket free service or unconditional exchange/return policy.
 
-**PROPOSAL / NOT LAW — first handling deadline, 2026-10-02.** Operation starts handling and
+**APPROVED TARGET / NOT BUILT — first handling deadline, owner 2026-10-02.** Operation starts handling and
 provides a substantive first response within two working days of submission: assesses available
 evidence, asks for the specific missing facts, or gives the proposed next action. Opening or
 automatically acknowledging a request alone does not satisfy this response. It is not a promise
 to complete repair, transport or exchange within two days. Calculate the deadline from actual
 submission using the governed Carres working calendar, retain submission time and due date, and
 route overdue first-response work to the responsible owner/cover. Later execution dates are
-confirmed according to the remedy/provider and shown on the same record. Owner approval is
-still required for this new service-level commitment. Falsifier: operator review shows the
-two-day response promise cannot be met under the actual roster/calendar, or the visible wording
-is mistaken for a two-day completion guarantee; revise the commitment before implementation.
+confirmed according to the remedy/provider and shown on the same record. This is an approved
+first-response commitment, not a two-day completion guarantee.
 
 ### Customer collection and replacement arrangement
 
