@@ -3521,6 +3521,19 @@ behaviour; never present sample integrations as working production capabilities.
 to catch remaining template errors one at a time or show intermediate partial fixes as final.
 This review gate does not authorise application implementation or deployment.
 
+**FACT — local design audit, 2026-10-02; NOT whole-preview approval or production proof.**
+The 5438 sample was corrected to the approved ten-filter monitoring rail and shared width/header,
+quick-view and object compositions. Local walks checked exact-Unit destination movement, pending
+unknown-fee cancellation, ordinary evidenced no-fee cancellation, chargeable exception retention,
+version/send guards and a price answer retaining active inability. UI-controller inspection was
+bounded; its earlier rail-summary measurement predates removal of the unapproved overview/date
+rail. Sales Order supplied bounded source feedback, not a completed independent whole-page walk.
+The final-preview gate therefore remains **OPEN**. Local supplier-reply, selection-toolbar and
+owner-export adapters demonstrate a target only; consolidate/admit them through their owning
+shared components before a separately authorised BUILD. New shared-kit completeness wording is
+still a draft with publication held; it supplies no additional approval. Application code and
+production operations were not changed by this design audit.
+
 
 **Expansion — APPROVED / LOCKED, owner confirmation 2026-09-18 · BUILT 2026-09-18; seventh column
 owner-approved 2026-09-25 · BUILT 2026-09-26 (`GoodsMiniTable` PO layout, page-drawn cell from the ONE
