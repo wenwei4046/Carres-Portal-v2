@@ -318,7 +318,7 @@ describe("operation Work response composition", () => {
     });
     expect(items).toHaveLength(1);
     expect(items[0]?.action).toBe("Confirm PO sent to supplier");
-    expect(items[0]?.destination).toBe("/operation?tab=pos&po=PO%20%2F2");
+    expect(items[0]?.destination).toBe("/operation/procurement?po=PO%20%2F2");
     expect(items[0]?.requiredResult).toBe("Current PO version marked as sent");
   });
 

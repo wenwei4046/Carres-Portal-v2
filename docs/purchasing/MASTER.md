@@ -7185,7 +7185,14 @@ or arrived goods use `Confirm PO sent to supplier` and open the existing unsent 
 The same `confirm-sent` door probes the request occurrence before and after its write and
 records Completed only when every linked current version is sent and no demand remains.
 Approval, ordered quantities, receipt facts and ownership are unchanged. No SQL migration
-or external message is included. Production and authenticated acceptance remain owed.
+or external message is included. Production commit `73e0a12dd0f475ddb02d7cdb21c725916a133bac`
+converged across all five hosts. Authenticated Team Work / Missed search `MPR` showed
+MPR-20260904-9488 with `Confirm PO sent to supplier`, `Sending not confirmed` and the correct
+current-version completion condition. Its linked PO-20260904-9834 has no current sent mark.
+However the action opened retired `/operation?tab=pos`, which leaves an empty shell: this
+journey is NOT production-complete. BUILD now uses canonical `/operation/procurement?po=`;
+release and successful object-open acceptance remain owed. No supplier message or sent mark
+was written. Evidence: `/tmp/purchasing-manual-send-work-production.png`.
 
 **Monthly demand adoption — PRODUCTION-VERIFIED bounded journey, 2026-10-02.** Purchase Orders reuses the existing
 SalesOrderMonthlyDemand component, useMonthlyDemandFacts reader and monthlyDemandOf arithmetic.
@@ -7198,12 +7205,18 @@ Expanded monthly filtering and other approved register controls remain separate 
 Production commit `1b7b840951f761686f46b9041d099c4774551001` converged across both Pages projects, both canonical hosts and the API Worker. Authenticated read-only acceptance showed October 2026 Total Qty 11, Not delivered 11 and To buy 5; selecting October opened `/operation/orders?requested=2026-10` with seven matching Sales Orders, then Back restored Monthly demand. At 390px the shared Hide filters/Show filters controls removed and restored the view tabs. Screenshot: `/tmp/purchasing-monthly-demand-production.png`. No customer, purchase or supplier facts were written; export download and expanded month filtering are not claimed verified.
 
 
-**Fixed PO condition row — BUILD IN PROGRESS (2026-10-02).** The existing shared DataGrid gains
+**Fixed PO condition row — PRODUCTION-VERIFIED bounded journey (2026-10-02).** The existing shared DataGrid gains
 an opt-in fixed 36px condition slot used by Purchase Orders only. The slot remains empty when
 unfiltered; active chips and Clear all occupy it without moving listing tools or table results.
 Multiple chips scroll horizontally with their remove controls retained. No other register adopts
 this opt-in. The completed PO's action fact uses the governed `Sending not confirmed`; absence of
-a mark is never presented as proof the PDF was not sent. Production geometry remains owed.
+a mark is never presented as proof the PDF was not sent. Production commit
+`ab74996d2f74e468f31d7876e993d8cc5f745948` converged across all five hosts. Authenticated
+geometry: empty, Search `PO-SMOKE-W`, Search plus Sending, and Clear all retained a 36px
+condition row at y=59, search at y=114 and first table at y=143. At 390px with the rail
+collapsed, two chips occupied a 374px viewport with 429px horizontal content; clearing kept
+the row 36px and table y=187. Temporary viewport and filters were reset. Screenshot:
+`/tmp/purchasing-fixed-header-production.png`. No business fact was written.
 
 **Committed Sales Order reversal — owner-approved database guard, 2026-10-02; DATABASE PRODUCTION-VERIFIED, repository delivery in progress.**
 Jess approved the concrete prevention check after its plain-language explanation: an SO with
@@ -7222,5 +7235,9 @@ through apply_migration as `0634_unproceed_preserves_purchase_and_stock_commitme
 version `20261002065657`. Tracker file MD5 `5f017ef8230ece70b84889c1dfa1eceb` and live function
 body MD5 `e90653050c4a4157a043132dfd9fe0db` match the Git file/body; grants and business row
 counts remain unchanged. No customer reversal, supplier message or Stock reassignment persisted.
-PR checks, repository merge and dependent deployment convergence remain owed.
+The applied live guard independently passed the same positive and five binding checks in
+a rolled-back post-apply probe. PR1847 passed full CI (13m40s) and merged as
+`44dba269e91d6be34d0d0ec8b09378b02145237d`; the deployment workflow remains in progress.
+The existing API already returns the governed 422 refusal, so this SQL has no dependent
+application writer or interface change awaiting deployment.
 

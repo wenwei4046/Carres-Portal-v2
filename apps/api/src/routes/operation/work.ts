@@ -1154,7 +1154,7 @@ export function projectManualPurchaseWork(input: {
         // Approval opens its decision; uncovered demand opens the request.
         // Sending opens the first existing unsent PO, never a second buy.
         destination: !approval && request.remainingQty === 0 && request.unsentPoId
-          ? `/operation?tab=pos&po=${encodeURIComponent(request.unsentPoId)}`
+          ? `/operation/procurement?po=${encodeURIComponent(request.unsentPoId)}`
           : `/operation?tab=manual-purchase&mp=${encodeURIComponent(request.requestId)}${approval ? "&section=approval" : ""}`,
         today: input.today,
       });
