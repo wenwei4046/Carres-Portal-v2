@@ -143,7 +143,7 @@ there yet.
 rendered page at 1440 / 1180 / 820 / 743 / 390: no number box, no enabled control, no label ending in
 `*`, no dash, no `Select` / `Pick a date` placeholder; `Unit (RM)` prints `RM 1,890.00` and `Disc (RM)`
 prints `RM 0.00`. Edit carries no `Delivery date to be confirmed`; a legacy order with no date must
-pick one before it commits (`Delivery date is required. Ask the customer for the date before you save
+pick one before a delivery/commercial or mixed edit commits; a contact-only correction preserves unrelated stored facts (owner fix2026-10-02). The full-edit gate says (`Delivery date is required. Ask the customer for the date before you save
 the order.`). Card titles are black bold (`text-strong` slate-12) under the ONE KIT LAW of 2026-09-27,
 which overwrites the 2026-09-21 "remain blue" ruling on this page.
 **Rules 6 and 7 of THE LOCKED STATE are superseded, not built:** the owner's correction of 2026-09-27
@@ -1193,8 +1193,8 @@ that draw controls. Measured on production 2026-09-25 (`6ed021fac`, SO-1365 / SO
 3. **Edit offers no `Delivery date to be confirmed`.** The checkbox at `:3103-3107` lets an
    amendment return an order to no date, which THE SALES PORTAL ENTRY GATE closed on 2026-08-15
    (`delivery_date_tbd` describes only orders taken before that day). A date changes only into
-   another date. A legacy TBD order keeps its amber `No delivery date` in View; its Edit requires a
-   date before it can commit. The dictionary word survives for History translation only.
+   another date. A legacy TBD order keeps its amber `No delivery date` in View; its delivery/commercial or mixed Edit requires a
+   date before it can commit. Contact-only corrections preserve unchanged delivery facts (owner fix2026-10-02). The dictionary word survives for History translation only.
 4. **`oldrev` carries the same lock as View.** `formLocked` excluded it (`:1496`) and the version
    relied on `fieldset disabled` (`:2951`), so a read-only version rendered disabled `Configure` /
    `Remove`, number inputs, `Select` / `Pick a date` placeholders for absent values and the
@@ -1696,6 +1696,11 @@ read only as implementation history.
   simplified commercial form because 2990 has one.
 - Operation may directly correct safe contact and operational facts. A harmless contact correction
   is not the same as a destination or other change that alters a customer commitment.
+  **Owner-requested fix2026-10-02:** contact-only changes to customer name/phone/email or
+  emergency name/phone/relationship validate the required customer name, then retain unrelated
+  stored delivery date, lead-time, building and service facts. Create and any mixed edit retain
+  full validation. Server classification, revision reason, permissions and approval gates remain
+  authoritative; the contact correction writer receives only changed header keys.
 - Sales owns customer/commercial amendments. Operation may submit/route a customer change request.
   Management may approve/reject when authorised; its own commercial changes use the same governed
   request, evidence and approval gates. Every applied change carries a
@@ -1744,7 +1749,7 @@ change one and a connector stops short of its node.
 ### The canvas
 
 **One surface, never a stack.** White node cards joined by connector lines on a single pannable,
-zoomable canvas. `− + ⛶` sit bottom-left and are always visible and keyboard-operable. Nodes keep
+zoomable canvas. `− + ⛶` sit above and outside the canvas, always visible and keyboard-operable (owner correction2026-10-02). The viewport scrolls to the full transformed route extent so its bottom is reachable; this does not change route facts, resolver or node-card design. Nodes keep
 their full anatomy at every width — there is no stacked fallback and no reflow. The Object Header
 already names `Order Route` and `SO-number · Customer`; the canvas never repeats either identity.
 
@@ -6778,13 +6783,15 @@ composition and numeric recipes live in UI MASTER “Confirmed shared template�
 this module owns the following business-specific application. Delivered evidence is below.
 
 - Order list rail: Order summary (Sales orders, Total payable, Paid to date, Balance due), then
-  Customer Requested Delivery Date shortcuts. Both open initially. Aggregates follow the SAME
+  Customer Requested Delivery Date shortcuts. Both open initially. Order summary is four compact
+  label-left/value-right rows, all visible (owner2026-10-02): count uses text-strong; money values
+  right-align, keep tabular digits and do not wrap; missing-amount notices span the row only when needed. Aggregates follow the SAME
   filtered loaded result as Table/Cards. The redundant “Current filtered list” paragraph and spacing are removed by owner amendment; incomplete loaded scope remains a summary tooltip and register count, and missing-money warnings remain visible.
   Payment, Delivery and Stock Status filters live in columns; no duplicate rail or case filter.
   Monthly demand retains its own governed single-choice filters and views.
 - Table/Cards selectors use shared kit icon16 plus visible Table/Cards text, including the selected-record toolbar (owner amendment2026-10-01). Both use the same result/filter engine.
 - Row click and Cards View open read-only quick view. Dark SO/customer header carries status,
-  Print icon plus word, Open full page and Close; no footer. Grey SO info starts with customer Phone/Email,
+  Print icon-only with tooltip/accessible name, Open full page and Close (owner correction2026-10-02); no footer. Grey SO info starts with customer Phone/Email,
   then sales attribution/dates/Dealer. Delivery, Items, Payment and Related documents are white
   Block cards. No separate duplicate customer card. Source failures and absences stay explicit.
 - Full page opens read-only until deliberate Edit. Fixed white identity header and slate-2 tabs

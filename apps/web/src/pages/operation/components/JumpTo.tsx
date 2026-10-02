@@ -43,7 +43,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Search } from "lucide-react";
+import Icon from "@/components/kit/Icon";
 import { JUMP_DOC_LABEL, type JumpDocumentResult } from "@carres/shared";
 import Modal from "@/components/kit/Modal";
 import SearchInput from "@/components/kit/SearchInput";
@@ -310,20 +310,12 @@ export default function JumpTo() {
         type="button"
         onClick={() => setOpen(true)}
         aria-label="Jump to"
-        /* The word and the hint collapse under `sm` — a 44px header cannot
-         * carry four labelled utilities on a phone, and a keyboard hint is a
-         * lie on a device with no keyboard. `title` keeps the glyph named,
-         * which is exactly how Bell / Help / Settings beside it already read. */
         title={`Jump to… (${hint})`}
         aria-keyshortcuts="Meta+K Control+K"
         data-testid="jump-to-trigger"
-        className="flex items-center gap-1.5 h-7 pl-2 pr-1.5 rounded-md text-base-500 hover:text-base-900 hover:bg-hovertint transition-colors"
+        className="flex items-center justify-center h-8 w-8 rounded-md text-base-500 hover:text-base-900 hover:bg-hovertint transition-colors"
       >
-        <Search size={16} />
-        <span className="hidden sm:inline text-meta">Jump to…</span>
-        <span className="hidden sm:inline text-label text-base-400 border border-base-200 rounded px-1 py-0.5 tabular-nums">
-          {hint}
-        </span>
+        <Icon name="jump" size={16} />
       </button>
 
       <Modal open={open} onOpenChange={(o) => (o ? setOpen(true) : close())} title="Jump to…">

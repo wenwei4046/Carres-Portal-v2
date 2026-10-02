@@ -1190,12 +1190,12 @@ export default function SalesOrdersRegister() {
       ) : (
         <>
           <FilterRailGroup title="Order summary" icon="money" defaultOpen>
-            <dl className="space-y-3 px-2 py-2" data-testid="sales-orders-summary" title={population != null && population > all.length ? "Loaded orders only" : undefined}>
-              <div><dt className="text-meta text-kit-slate-11">Sales orders</dt><dd className="text-title">{isLoading ? "Loading" : isError ? "Unavailable" : summaryRows.length}</dd></div>
+            <dl className="space-y-2 px-2 py-2" data-testid="sales-orders-summary" title={population != null && population > all.length ? "Loaded orders only" : undefined}>
+              <div className="grid grid-cols-[1fr_auto] items-center gap-x-2"><dt className="text-meta text-kit-slate-11">Sales orders</dt><dd className="text-strong text-right tabular-nums">{isLoading ? "Loading" : isError ? "Unavailable" : summaryRows.length}</dd></div>
               {(["total", "paid", "balance"] as const).map((key, index) => {
                 const missing = summaryRows.filter(row => row[key].kind !== "amount" && row[key].kind !== "settled").length;
                 const value = summaryRows.reduce((sum, row) => sum + ((() => { const amount = row[key]; return amount.kind === "amount" ? amount.value : 0; })()), 0);
-                return <div key={key}><dt className="text-meta text-kit-slate-11">{["Total payable", "Paid to date", "Balance due"][index]}</dt><dd className="text-strong">{isLoading ? "Loading" : isError ? "Unavailable" : <Money value={value} />}</dd>{!isLoading && !isError && missing > 0 && <p className="text-meta text-kit-slate-11">{missing} orders without a confirmed amount</p>}</div>;
+                return <div key={key} className="grid grid-cols-[1fr_auto] items-center gap-x-2"><dt className="text-meta text-kit-slate-11">{["Total payable", "Paid to date", "Balance due"][index]}</dt><dd className="text-strong text-right whitespace-nowrap tabular-nums">{isLoading ? "Loading" : isError ? "Unavailable" : <Money value={value} />}</dd>{!isLoading && !isError && missing > 0 && <p className="col-span-2 text-meta text-kit-slate-11">{missing} orders without a confirmed amount</p>}</div>;
               })}
             </dl>
           </FilterRailGroup>
@@ -1220,7 +1220,7 @@ export default function SalesOrdersRegister() {
   return (
     <div className="flex h-full min-h-0 flex-col">
       <DestinationHeader />
-      {quickOrder && <Drawer variant="quick-view" open onOpenChange={(open) => { if (!open) setQuickOrder(null); }} title={`SO-${quickOrder.so} · ${quickOrder.customer}`} headerActions={<><span className="rounded-full bg-kit-blue-3 px-2 py-1 text-meta text-kit-blue-11">{REGISTER_DELIVERY_CONDITIONS.find(c => c.key === registerDeliveryConditionOf(quickOrder.o.order_lines ?? [], quickOrder.o.allocated_units ?? []))?.label ?? "Not recorded"}</span><Button icon="print" variant="ghost" aria-label="Print sales order" onClick={() => void printSalesOrders([quickOrder])}>Print</Button><Button iconOnly icon="open" variant="ghost" aria-label="Open full page" onClick={() => openWorkspace(quickOrder)} /></>}>
+      {quickOrder && <Drawer variant="quick-view" open onOpenChange={(open) => { if (!open) setQuickOrder(null); }} title={`SO-${quickOrder.so} · ${quickOrder.customer}`} headerActions={<><span className="rounded-full bg-kit-blue-3 px-2 py-1 text-meta text-kit-blue-11">{REGISTER_DELIVERY_CONDITIONS.find(c => c.key === registerDeliveryConditionOf(quickOrder.o.order_lines ?? [], quickOrder.o.allocated_units ?? []))?.label ?? "Not recorded"}</span><Button iconOnly icon="print" variant="ghost" aria-label="Print sales order" title="Print sales order" onClick={() => void printSalesOrders([quickOrder])} /><Button iconOnly icon="open" variant="ghost" aria-label="Open full page" onClick={() => openWorkspace(quickOrder)} /></>}>
         <div className="flex flex-col gap-3" data-testid="sales-order-quick-view">
           <Block title="SO info" tone="muted"><dl className="grid grid-cols-2 gap-3 text-body">
             <div><dt className="text-label text-kit-slate-11">Phone</dt><dd>{quickOrder.o.customer_phone || "Not given"}</dd></div>

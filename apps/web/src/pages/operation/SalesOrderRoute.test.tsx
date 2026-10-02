@@ -282,12 +282,12 @@ describe("Order Route — the gate", () => {
     draw();
     /* The only page controls are goods disclosure plus the three zoom controls. */
     const labels = screen.getAllByRole("button").map((b) => b.getAttribute("aria-label"));
-    expect(labels).toEqual([
+    expect(labels.sort()).toEqual([
       "B1201S · King — Customer ordered 3 — Carres ordered 3 from supplier",
       "Zoom out",
       "Zoom in",
       "Fit the whole route",
-    ]);
+    ].sort());
     expect(screen.queryByRole("button", { name: /release/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /approve/i })).not.toBeInTheDocument();
   });
@@ -710,13 +710,15 @@ describe("Order Route — loading holds the canvas geometry (Scope E)", () => {
 });
 
 describe("Order Route — the zoom controls never sit on a node (SO-1365 check)", () => {
-  it("keeps `− + ⛶` bottom-left on the canvas's own strip, outside the drawn map", () => {
+  it("keeps zoom controls above and outside the canvas", () => {
     draw();
     const viewport = screen.getByTestId("route-viewport");
     const strip = screen.getByTestId("route-controls");
+    expect(viewport).toHaveClass("overflow-auto");
+    expect(viewport).toContainElement(screen.getByTestId("route-scroll-extent"));
     expect(viewport).not.toContainElement(screen.getByTestId("route-zoom-in"));
     expect(strip).toContainElement(screen.getByTestId("route-zoom-in"));
-    expect(screen.getByTestId("route-canvas")).toContainElement(strip);
-    expect(strip.compareDocumentPosition(viewport) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
+    expect(screen.getByTestId("route-canvas")).not.toContainElement(strip);
+    expect(strip.compareDocumentPosition(viewport) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });

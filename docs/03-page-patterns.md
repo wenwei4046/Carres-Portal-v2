@@ -457,3 +457,17 @@ because it imports shared components. Do not display an isolated centre as a ver
 ### Accepted Sales Orders template — 2026-10-01
 
 The owner-accepted numeric recipe is governed by [UI MASTER, Confirmed shared template](ui/MASTER.md#confirmed-shared-template--owner-acceptance-2026-10-01): search220×32 desktop, rows32 desktop, body12/18, header11/600/36, touch targets40. Reuse the shared kit; runtime delivery proof is recorded by the BUILD controller.
+
+Owner correction2026-10-02: the shared page/object header global utilities are icon-only at all
+widths. Jump to uses kit `jump`/Command16 with tooltip and shortcut; Help/Settings retain names
+and menu contents through accessibility. Bell keeps its count. Register Search stays a magnifier;
+Table/Cards labels and rail words remain visible. Shared quick-view Print is icon-only, while
+full-object Print keeps its word/menu. Reuse the complete kit composition and existing Toast for
+ordinary result feedback; do not add an extra result banner. Existing persistent reports/source
+errors/business blockers and inline validation keep their governed purpose.
+
+SO Order summary recipe (owner2026-10-02): four compact rows, label left/value right;
+Sales orders · Total payable · Paid to date · Balance due all remain visible. Reuse existing
+FilterRailGroup, Money and typography; count uses text-strong, values right/tabular/no-wrap,
+8px row gap. Conditional missing-amount notices span the row. Filtering/calculation ownership
+and loaded-scope tooltip/count stay unchanged; other modules derive aggregates from their own facts.

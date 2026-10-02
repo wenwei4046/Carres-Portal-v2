@@ -91,7 +91,8 @@ describe("closed sets", () => {
     // +1 = mail, the Email door in Work's Communication (Workspace §5.10
     // BUILD SHEET, Jess 2026-09-28).
     // Table and Cards are admitted by the owner-approved2026-10-01 template amendment.
-    expect(ICON_NAMES).toHaveLength(53);
+    expect(ICON_NAMES).toHaveLength(54);
+    expect(ICON_NAMES).toContain("jump");
     expect(ICON_NAMES).toContain("table");
     expect(ICON_NAMES).toContain("cards");
     expect(ICON_NAMES).toContain("mail");
