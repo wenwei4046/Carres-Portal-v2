@@ -163,8 +163,7 @@ Showroom view; no duplicate showroom stock ledger. Dealer-owned goods remain out
 Carres-controlled inventory boundary. This ruling approves the source/presentation boundary,
 not application implementation or a claim that every physical count has been verified.
 
-**Showroom current-goods delivery — BUILT ON BRANCH 2026-10-02; production verification
-pending.** Internal Operation/Principal `?tab=showroom` reuses the existing Stock Register and
+**Showroom current-goods delivery — PRODUCTION-VERIFIED bounded slice, 2026-10-02.** Internal Operation/Principal `?tab=showroom` reuses the existing Stock Register and
 Unit detail, with an owning-register Site query and a retained PJ base scope through clearing
 filters, search/export and browser navigation. Exact held goods can be selected for the existing
 `Request Transfer` source workflow: explicit IDs are read before the picker's 100-row cap, the
@@ -172,6 +171,17 @@ original Site/pieces are carried forward, and unresolved pieces are not guessed.
 RLS policy, second ledger or physical movement-on-submit was added. Counted goods are readable
 without a Unit ID and are not offered to the exact-Unit transfer action. Internal access retains
 its current role/JWT/RLS boundary; this does not open the internal register to Dealer logins.
+Delivery proof: PR1853, main `223161342fca6bda13bd256800bade08850a723a`; CI and
+production deployment 36988228352 succeeded. Both Pages projects, ERP/POS domains and API
+Worker report that SHA. An authenticated Principal walk read PJ's existing 36 records, opened
+`U1-000-293` with PJ custody, returned through `Back to Showroom Display`, and carried the exact
+existing Unit `44413d0a-807b-4237-87a2-ec53e395852b` into Transfer with `From Site = PJ Showroom`
+and one selected Unit. No transfer was submitted and no stock was moved. Showroom opens with
+Item/Unit ID; its footer counts records without a promise claim. Local desktop/phone evidence
+and 40 Stock/Unit regression checks passed; full CI passed on the released code. This verifies
+record reading/handoff, not physical counting, label attachment or external Showroom access.
+The shared rail's narrow-screen open overlay/backdrop/Escape composition still needs kit-owner
+extraction/adoption; a collapsed phone preview is not complete-template alignment proof.
 Remaining approved targets: full orders/requests view and source-linked service/purchase intake,
 location mapping/authorised Showroom access, grouped product view, timing Settings and global
 actual movement history. These are not claimed delivered by the current-goods slice.
