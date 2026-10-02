@@ -9,6 +9,8 @@ import type { IconName } from "@/components/kit/Icon";
 import { FilterRail, FilterRailGroup, FilterRailRow, FilterRailSelect, ShowFiltersButton, useFilterRailOpen } from "../components/workspace-rail";
 import { ArrowLeft, ChevronDown, Download, FileCheck2, X } from "lucide-react";
 import {
+  monthlyDemandOf,
+  type MonthlyDemandRow,
   demandPurposeLabelOf,
   manualPurchaseSourceLine,
   myHolidaySet,
@@ -45,6 +47,8 @@ import { usePdfCanvases } from "@/lib/pdf/use-pdf-canvases";
    PO document is read against the SO every day; two card grammars on two
    sister pages read as two apps (YH, 2026-09-04). */
 import Block from "@/components/kit/Block";
+import Tabs from "@/components/kit/Tabs";
+import SalesOrderMonthlyDemand from "../SalesOrderMonthlyDemand";
 import DropdownMenu from "@/components/kit/DropdownMenu";
 import Popover from "@/components/kit/Popover";
 import { Fact } from "../SalesOrderWorkspace";
@@ -52,6 +56,7 @@ import { SO_HEAD_ROW, SO_ROW, SO_TABLE, SO_TD, SO_TH } from "../components/so-do
 import TableScroller from "@/components/TableScroller";
 import type { PoTemplateData } from "@/lib/pdf/types";
 import {
+  useMonthlyDemandFacts,
   useOperationPoAudit,
   useOperationPos,
   useOperationPoUnits,
@@ -431,6 +436,19 @@ export default function PurchaseOrdersPage() {
      receipts — not two different collections. */
   const [receiptsFor, setReceiptsFor] = useState<RegisterRow | null>(null);
   const today = todayMYT();
+  const monthly = params.get("view") === "monthly";
+  const demandQ = useMonthlyDemandFacts(monthly);
+  const focusMonth = today.slice(0, 7);
+  const demandView = useMemo(() => demandQ.data ? monthlyDemandOf({
+    orders: demandQ.data.orders, startMonth: focusMonth, months: 6,
+    toBuyByLine: demandQ.data.toBuyByLine, focusMonth,
+  }) : null, [demandQ.data, focusMonth]);
+  const openDemandMonth = (row: MonthlyDemandRow) => {
+    if (!row.month) return;
+    const requested = row.kind === "month" ? row.month : `${row.kind}:${row.month}`;
+    navigate(`/operation/orders?requested=${encodeURIComponent(requested)}`);
+  };
+
 
   const suppliers = useMemo(
     () => new Map((suppliersQ.data?.suppliers ?? []).map((supplier) => [supplier.id, supplier])),
@@ -983,7 +1001,16 @@ export default function PurchaseOrdersPage() {
           onHide={() => setRailVisible(false)}
           ariaLabel="Purchase order filters"
           testId="po-filter-rail"
+          header={<Tabs fill orientation="vertical" label="Purchase Orders view"
+            value={monthly ? "monthly" : "list"}
+            onValueChange={(value) => setParams((previous) => {
+              const next = new URLSearchParams(previous);
+              if (value === "monthly") next.set("view", "monthly"); else next.delete("view");
+              return next;
+            })}
+            tabs={[{ value: "list", label: "Listing", icon: "order" }, { value: "monthly", label: "Monthly demand", icon: "date" }]} />}
         >
+          {!monthly && <>
           {RAIL_GROUPS.map((group) => (
             <FilterRailGroup key={group.heading} title={group.heading} icon={group.icon}>
               {group.rows.map((item) => (
@@ -1018,8 +1045,14 @@ export default function PurchaseOrdersPage() {
               onChange={(deliverTo) => setFilter((f) => ({ ...f, deliverTo }))}
             />
           </FilterRailGroup>
+          </>}
         </FilterRail>
         )}
+        {monthly ? <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+          {!railOpen && <div className="shrink-0 p-2"><ShowFiltersButton onShow={() => setRailVisible(true)} testId="purchase-orders-show-filters" /></div>}
+          <SalesOrderMonthlyDemand view={demandView} focusMonth={focusMonth}
+          onOpenMonth={openDemandMonth} loading={demandQ.isLoading}
+          error={demandQ.isError ? demandQ.error : undefined} onRetry={() => void demandQ.refetch()} /></div> :
         <div className="flex min-h-0 min-w-0 flex-1 flex-col p-2" data-testid="po-register-content">
           {pdfProblem ? (
             <ReadProblem
@@ -1077,7 +1110,7 @@ export default function PurchaseOrdersPage() {
                 </span>
               )}
             />
-        </div>
+        </div>}
       </div>
       {receiptsFor ? (
         <ReceiptsDialog
