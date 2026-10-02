@@ -3416,7 +3416,19 @@ function DataGridInner<T>({
         data-testid={isReference ? "grid-scroll" : undefined}
       >
         {renderResults && !isLoading && errorState == null && sortedRows.length > 0
-          ? renderResults(sortedRows, rowExpansionApi)
+          ? groupLocalHeaders
+            ? groupSections.map(section => (
+              <section key={section.group.path} data-testid={`grid-card-section-${section.group.path}`}>
+                <table className={`${styles.table} ${styles.tableGrouped}`}>
+                  <thead>{renderGridRow(section.group, section.index)}</thead>
+                </table>
+                {!section.group.collapsed && renderResults(
+                  section.rows.flatMap(item => item.kind === "row" ? [item.row] : []),
+                  rowExpansionApi,
+                )}
+              </section>
+            ))
+            : renderResults(sortedRows, rowExpansionApi)
           : <>
         {/* ⭐ NO HEADER ABOVE ALL GROUPS — owner ruling, Jess 2026-09-18.
             This SUPERSEDES the single global header.

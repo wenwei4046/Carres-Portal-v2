@@ -1599,7 +1599,7 @@ describe("approved solid SO status presentation", () => {
 
 
 describe("confirmed optional listing grouping", () => {
-  it.each([['delivery', 'Not delivered'], ['stock', 'Receipt unconfirmed'], ['payment', 'Unpaid']])("groups by %s, collapses without changing totals and restores None", async (key, label) => {
+  it.each([['delivery', 'Not delivered'], ['stock', 'Receipt unconfirmed'], ['payment', 'Partially paid']])("groups by %s, collapses without changing totals and restores None", async (key, label) => {
     mount(`/operation/orders?group=${key}`);
     const group = await screen.findByRole('button', { name: `${label} 1` });
     expect(group).toHaveAttribute('aria-expanded', 'true');
@@ -1614,6 +1614,19 @@ describe("confirmed optional listing grouping", () => {
     expect(screen.queryByTestId(`grid-group-toggle-${key}`)).not.toBeInTheDocument();
     expect(screen.getByTestId('grid-header')).toBeInTheDocument();
     expect(screen.getByTestId('location')).not.toHaveTextContent('group=');
+  });
+  it('shares grouping and collapse between Table and Cards without changing the summary', async () => {
+    mount('/operation/orders?group=payment');
+    fireEvent.click(await screen.findByRole('button', { name: 'Partially paid 1' }));
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Cards' }));
+    expect(screen.getByRole('button', { name: 'Partially paid 1' })).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByTestId('sales-order-card-1303')).not.toBeInTheDocument();
+    expect(screen.getByTestId('grid-footer')).toHaveTextContent('1 sales order');
+    fireEvent.click(screen.getByRole('button', { name: 'Partially paid 1' }));
+    expect(screen.getByTestId('sales-order-card-1303')).toBeInTheDocument();
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Table' }));
+    expect(screen.getByRole('button', { name: 'Partially paid 1' })).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByTestId('grid-parent-row')).toBeInTheDocument();
   });
   it('keeps the count in the footer without duplicating it in the toolbar', () => {
     mount();
