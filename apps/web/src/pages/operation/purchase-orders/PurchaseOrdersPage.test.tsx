@@ -146,7 +146,7 @@ const queryData = {
 };
 
 vi.mock("@/components/register/DataGrid", () => ({
-  DataGrid: ({ rows, columns, onRowDoubleClick, statusSummary, fixedGroups, leadingColumns, personalLayouts, activeConditions, expandable }: any) => (
+  DataGrid: ({ rows, columns, onRowDoubleClick, statusSummary, fixedGroups, leadingColumns, personalLayouts, activeConditions, expandable, toolbarEnd, renderResults }: any) => (
     <div
       data-testid="register-grid"
       data-groups={fixedGroups?.groups.map((g: any) => g.key).join(",")}
@@ -154,6 +154,8 @@ vi.mock("@/components/register/DataGrid", () => ({
       data-leading={leadingColumns ? `${leadingColumns.date},${leadingColumns.identity}` : undefined}
       data-personal-layouts={personalLayouts ? "1" : undefined}
     >
+      {toolbarEnd}
+      {renderResults?.(rows)}
       <div data-testid="register-conditions">{(activeConditions ?? []).map((c: any) => c.label).join(" | ")}</div>
       <div data-testid="register-columns">{columns.filter((c: any) => !c.defaultHidden).map((c: any) => c.label).join(" | ")}</div>
       <div data-testid="register-search-index">{rows.flatMap((row: any) => columns.map((column: any) => column.searchValue?.(row) ?? "")).join(" ")}</div>
@@ -315,6 +317,20 @@ beforeEach(() => {
    the SUPPLIER REPLY / RECEIVING / SUPPLIER / DELIVER TO rail and a footer
    without quantity totals. */
 describe("Purchase Orders Register", () => {
+  it("shows the same PO facts in Cards and preserves selection when returning to Table", () => {
+    renderPage();
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "Cards" }), { button: 0, ctrlKey: false });
+    const cards = screen.getByTestId("purchase-orders-cards");
+    expect(cards).toHaveTextContent("PO-20260828-4827");
+    const choice = within(cards).getByRole("checkbox", { name: "Select PO-20260828-4827" });
+    fireEvent.click(choice);
+    expect(choice).toBeChecked();
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "Table" }), { button: 0, ctrlKey: false });
+    expect(screen.queryByTestId("purchase-orders-cards")).not.toBeInTheDocument();
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "Cards" }), { button: 0, ctrlKey: false });
+    expect(screen.getByRole("checkbox", { name: "Select PO-20260828-4827" })).toBeChecked();
+  });
+
   it("opens the shared source-demand view and returns to the PO listing", () => {
     renderPage();
     fireEvent.mouseDown(screen.getByRole("tab", { name: "Monthly demand" }), { button: 0, ctrlKey: false });
