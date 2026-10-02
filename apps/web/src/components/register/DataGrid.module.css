@@ -1530,3 +1530,16 @@ div:first-child > .columnsMenuGroup {
   }
   .toolbarPill { height: 40px; }
 }
+
+/* Purchasing's approved fixed condition slot: controls never move on filtering. */
+.root .conditionBarReserved {
+  height: 36px;
+  flex: 0 0 36px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+.root .conditionBarReserved > * {
+  flex-shrink: 0;
+  white-space: nowrap;
+}

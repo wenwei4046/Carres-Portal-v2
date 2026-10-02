@@ -1076,6 +1076,7 @@ export default function PurchaseOrdersPage() {
               emptyMessage={allRows.length === 0 ? "No purchase orders yet" : "No purchase orders match these filters"}
               noMatchMessage="No purchase orders match these filters"
               activeConditions={activeConditions}
+              reserveConditionRow
               onClearConditions={() => setFilter(RAIL_CLEAR)}
               leadingColumns={{ date: "po_date", identity: "po" }}
               personalLayouts={personalLayouts}
@@ -1673,7 +1674,7 @@ function PurchaseOrderObject({
 function CurrentAction({ row, owner, onIssue }: { row: RegisterRow; owner: { userId: string; name: string | null } | null; onIssue: (() => void) | null }) {
   const state = row.facts.operationStatus;
   if (state === "Cancelled" || (state === "Completed" && !onIssue)) return null;
-  const fact = row.work?.problem ?? (onIssue ? "The PO PDF has not been sent" : null);
+  const fact = row.work?.problem ?? (onIssue ? "Sending not confirmed" : null);
   const action = row.work?.action ?? (onIssue ? `Send ${poDocumentNumberOf(row.id, row.facts.version)} to ${row.supplierName}` : null);
   const nextArrival = row.answerSummary.date ?? row.po.official_delivery_date ?? null;
   return (

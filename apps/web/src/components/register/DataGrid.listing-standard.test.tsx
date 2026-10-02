@@ -384,3 +384,22 @@ describe("an empty cell is empty", () => {
     expect(max).toHaveAttribute("placeholder", "Max");
   });
 });
+
+
+describe("the opt-in fixed condition row", () => {
+  it("keeps the same slot before filtering and after Clear all without empty controls", () => {
+    mount({ reserveConditionRow: true, searchPresentation: "responsive" });
+    const slot = screen.getByTestId("active-conditions");
+    expect(slot).toHaveClass(styles.conditionBarReserved);
+    expect(screen.queryByRole("button", { name: "Clear all" })).not.toBeInTheDocument();
+    fireEvent.change(screen.getByPlaceholderText("Search…"), { target: { value: "SO-1301" } });
+    expect(screen.getByTestId("active-conditions")).toBe(slot);
+    fireEvent.click(screen.getByRole("button", { name: "Clear all" }));
+    expect(screen.getByTestId("active-conditions")).toBe(slot);
+    expect(slot).toBeEmptyDOMElement();
+  });
+  it("leaves registers without the opt-in free of an empty strip", () => {
+    mount();
+    expect(screen.queryByTestId("active-conditions")).not.toBeInTheDocument();
+  });
+});
