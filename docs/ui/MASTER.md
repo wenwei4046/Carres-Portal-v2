@@ -3394,7 +3394,7 @@ selected grouping; other modules expose only their governed meaningful grouping 
 - Reuse DataGrid group-local section headings and columns. Each heading shows status name and
   filtered SO count, supports collapse, and each open group repeats the same column header.
 - One shared toolbar, search, column chooser, widths, filters, selection and export across all
-  groups. Rows retain solid status pills. Hidden status columns may still supply grouping.
+  groups. Rows retain solid status pills. Hidden status columns may still supply grouping. Cards use the same group headings/collapse and result state; no physical-goods delivery condition belongs in Not applicable rather than disappearing.
 - None restores one ordinary table. Grouping never duplicates an SO across several sections or
   calculates a new overall status. Counts reflect current results, not an unfiltered population.
 - Choice must remain stable while operating the listing; local SO preview encodes `group` in

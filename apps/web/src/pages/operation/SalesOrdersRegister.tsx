@@ -108,6 +108,7 @@ import {
   NO_DO_YET,
   NO_PO_YET,
   NOT_IN_CATALOG,
+  NOT_RECORDED,
   REGISTER_FIELDS,
   salesLocationOf,
   type RegisterField,
@@ -1299,8 +1300,8 @@ export default function SalesOrdersRegister() {
               })),
             ]}
             fixedGroups={urlParams.get("group") === "delivery" ? {
-              groups: REGISTER_DELIVERY_CONDITIONS.map(c => ({ key: c.key, label: c.label })),
-              groupOf: row => registerDeliveryConditionOf(row.o.order_lines ?? [], row.o.allocated_units ?? []),
+              groups: [...REGISTER_DELIVERY_CONDITIONS, { key: "not_applicable", label: "Not applicable" }],
+              groupOf: row => registerDeliveryConditionOf(row.o.order_lines ?? [], row.o.allocated_units ?? []) ?? "not_applicable",
             } : urlParams.get("group") === "stock" ? {
               groups: STOCK_STATUSES.map(c => ({ key: c.key, label: c.label })), groupOf: stockStatusOf,
             } : urlParams.get("group") === "payment" ? {

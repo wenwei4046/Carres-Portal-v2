@@ -1628,6 +1628,13 @@ describe("confirmed optional listing grouping", () => {
     expect(screen.getByRole('button', { name: 'Partially paid 1' })).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getByTestId('grid-parent-row')).toBeInTheDocument();
   });
+  it('does not lose orders with no physical goods when grouping delivery', async () => {
+    listHookState.data = { orders: [order({ order_lines: [] })] };
+    mount('/operation/orders?group=delivery');
+    expect(await screen.findByRole('button', { name: 'Not applicable 1' })).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByTestId('grid-parent-row')).toBeInTheDocument();
+    expect(screen.getByTestId('grid-footer')).toHaveTextContent('1 sales order');
+  });
   it('keeps the count in the footer without duplicating it in the toolbar', () => {
     mount();
     expect(screen.getByTestId('grid-footer')).toHaveTextContent('1 sales order');
