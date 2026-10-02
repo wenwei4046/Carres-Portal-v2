@@ -7304,3 +7304,5 @@ It introduces no second search/filter engine, component or business writer. The 
 journey fails on the delivered predecessor and passes with the correction; 49 PO-page tests
 plus the existing shared presentation test pass. Release and authenticated return/search
 acceptance remain owed. No full nine-facet or supplier-exception completeness is claimed.
+
+**PO left rail template — BUILD IN PROGRESS, owner-directed 2026-10-02.** Use the existing Sales Orders `so-template-rail` and `so-rail-navigation` composition for PO: shared group border/header, active rows and vertical Listing/Monthly demand navigation. Preserve Purchasing filter meanings. Local HTML updated; no new component, CSS recipe or token. Production acceptance pending.
