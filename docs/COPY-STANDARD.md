@@ -2213,6 +2213,11 @@ the same name (Purchase Orders rail uses `Confirm tomorrow's supplier delivery`)
 | Read failure | `Supplier answers could not be loaded` + `Try again` |
 
 <a id="purchasing-ui-dictionary"></a>
+**Shared module list-view label — owner ruling 2026-10-02, APPROVED TARGET / NOT BUILT:**
+Use `Listing` consistently for module list-view navigation. The page title identifies the module;
+do not repeat SO/PO in the tab. This replaces `Order list` as the shared navigation label.
+Other views retain their purpose-specific names, such as `Monthly demand`.
+
 ### Purchasing UI dictionary — APPROVED (Jess, 2026-09-18) · BUILT on SO Batch Purchase 2026-09-18
 
 **PO panel tabs — owner ruling 2026-10-02, APPROVED TARGET / NOT BUILT:** `PO info` ·
