@@ -7244,7 +7244,7 @@ The existing API already returns the governed 422 refusal, so this SQL has no de
 application writer or interface change awaiting deployment.
 
 
-**PO Listing shared toolbar adoption — BUILD IN PROGRESS, 2026-10-02.** Owner requests the deployed Sales Orders Listing grammar for PO. Purchase Orders uses the same DataGrid presentation-tools door: visible current result count and search, with supported Export and Columns in the far-right Page tools overflow. Existing PO grouping, filters, columns, source links, goods expansion and exports remain. This toolbar change does not claim Cards, selection, exception-fact completeness or full Purchasing completion; production acceptance is pending.
+**PO Listing shared toolbar adoption — BUILD IN PROGRESS, 2026-10-02.** Owner requests the deployed Sales Orders Listing grammar for PO. Purchase Orders uses the same DataGrid presentation-tools door: search, with supported Export and Columns in the far-right Page tools overflow. Existing PO grouping, filters, columns, source links, goods expansion and exports remain. This toolbar change does not claim Cards, selection, exception-fact completeness or full Purchasing completion; production acceptance is pending.
 
 
 **PO-window sending after receipt — BUILD IN PROGRESS, 2026-10-02.** The measured shared
@@ -7264,3 +7264,7 @@ production acceptance until a real source-linked received PO exists; preserve ev
 **PO Listing Table/Cards and selection adoption — APPROVED TARGET / BUILD IN PROGRESS, 2026-10-02.** Jess explicitly directs following the current deployed Sales Orders UI/UX. PO reuses its shared segmented Table/Cards controls, Block card geometry and checkbox selection model; the same filtered PO facts feed both presentations and selections survive switching. View opens the existing PO object. This presentation adoption does not invent bulk commercial actions or claim missing supplier-exception facts. Local journey tests passed; production verification remains pending.
 
 **PO left rail template — BUILD IN PROGRESS, owner-directed 2026-10-02.** Use the existing Sales Orders `so-template-rail` and `so-rail-navigation` composition for PO: shared group border/header, active rows and vertical Listing/Monthly demand navigation. Preserve Purchasing filter meanings. Local HTML updated; no new component, CSS recipe or token. Production acceptance pending.
+
+**PO count placement — owner-directed 2026-10-02.** Remove the toolbar PO count. The footer alone states the current filtered PO population against the loaded total. No duplicate count beside Search. Owner subsequently approves per-category ordered quantity in the footer, using actual PO lines and the existing goods classification; no invented money total.
+
+**PO footer category quantities — owner-approved 2026-10-02.** Follow the Sales Orders footer: document count followed by `Qty:` and actual ordered quantity per goods category. Scope is current filtered rows or current selected rows when selected. Use existing line classification; unknown category quantity is named `Not in catalog`, never silently omitted or guessed. Receipt quantity and money are separate facts, not part of this ordered-goods summary. This replaces the former count-only/no-quantity footer ruling. BUILD IN PROGRESS; local HTML first, production verification pending.

@@ -28,6 +28,7 @@ import {
   type PurchaseOrderRegisterFilter,
   type PurchaseOrderRegisterInput,
   GOODS_ABSENCE_WORDS,
+  GOODS_CATEGORY_WORDS,
   poDocumentNumberOf,
 } from "@carres/shared";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
@@ -1106,7 +1107,6 @@ export default function PurchaseOrdersPage() {
                   </Block>
                 </div>)}
               </div> : undefined}
-              toolbarSummary={(visible) => <span className="shrink-0 text-meta tabular-nums text-kit-slate-11">{visible.length} purchase orders</span>}
               palette="slate"
               searchPresentation="responsive"
               rows={visibleRows}
@@ -1147,14 +1147,24 @@ export default function PurchaseOrdersPage() {
                   testId="purchase-orders-show-filters"
                 />
               )}
-              /* One total, including collapsed groups; no quantity totals. */
-              statusSummary={(filtered) => (
-                <span data-testid="po-footer">
-                  {filtered.length === allRows.length
+              statusSummary={(filtered, selectedRows) => {
+                const scope = selectedRows.length ? selectedRows : filtered;
+                const quantities = new Map<string, number>();
+                for (const row of scope) for (const line of row.po.purchase_order_lines ?? []) {
+                  const category = goodsCategoryOf(line);
+                  quantities.set(category, (quantities.get(category) ?? 0) + Number(line.qty ?? 0));
+                }
+                const parts = GOODS_CATEGORY_WORDS.filter((word) => word !== "Service" && word !== "Other goods" && (quantities.get(word) ?? 0) > 0)
+                  .map((word) => `${word} ${quantities.get(word)}`);
+                const unknown = quantities.get("Other goods") ?? 0;
+                return <span data-testid="po-footer">
+                  {selectedRows.length ? `${selectedRows.length} selected purchase orders` : filtered.length === allRows.length
                     ? allRows.length === 1 ? "1 purchase order" : `${allRows.length} purchase orders`
                     : `${filtered.length} of ${allRows.length} purchase orders`}
-                </span>
-              )}
+                  {parts.length > 0 && ` · Qty: ${parts.join(" · ")}`}
+                  {unknown > 0 && ` · Not in catalog ${unknown}`}
+                </span>;
+              }}
             />
         </div>}
       </div>
