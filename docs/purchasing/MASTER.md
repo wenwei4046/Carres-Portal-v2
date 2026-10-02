@@ -3536,9 +3536,9 @@ changes, Cards or deployment. Reuse the existing Purchasing BUILD lane for a lat
 takeover and coordinate shared-template work with its existing controller. Independently
 commissioned business fixes keep their existing scope; no duplicate implementation chat.
 
-**Amendment discoverability — PROPOSAL / NOT LAW, 2026-10-02.** Keep one operational Listing
-row per PO, displaying its current V-number and current sending evidence. Offer an Amendments
-record view with one change/request per row: its existing identity, parent PO, before/after
+**Amendment discoverability — APPROVED TARGET / NOT BUILT; Jess, 2026-10-02.** Keep one operational Listing
+row per PO, displaying its current V-number and current sending evidence. Within Purchase Orders, place Listing, Amendments and Monthly demand in the local navigation.
+Amendments is a record view with one change/request per row: its existing identity, parent PO, before/after
 version, date, reason, actual actor and applicable approval/result. Search must resolve current
 and historical PO version numbers and any existing amendment/source-document numbers, returning
 the owning PO and exact revision/change, including rejected requests that produced no new version.
@@ -3546,7 +3546,7 @@ Do not invent an A-number scheme or copy Houzs permissions into Carres. Historic
 remain immutable; approval alone does not prove the revised PDF was sent. Existing amendment,
 cancellation and cross-module guards continue to govern the write. Trade-off: a separate record
 view costs a view switch but avoids duplicating commitments as multiple operational PO rows.
-Falsifier: operators cannot find a supplied historical/change number directly, or the record view
+Acceptance fails if operators cannot find a supplied historical/change number directly, or the record view
 creates a second revision writer or misleading duplicate quantity totals. Evidence: the current
 Houzs live revision inbox inspection is recorded in the existing purchasing-houzs research file;
 original 2990 PO amendment listing remains unverified.
