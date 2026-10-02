@@ -3514,9 +3514,9 @@ the fixed listing-tools row. Adding/clearing conditions must not shift the toolb
 Local preview uses the existing 36px condition-row token with horizontal overflow for multiple
 chips. Browser measurement confirmed the Search top remained 114px with no filter and with one
 active filter in the inspected 1146px viewport. This is local proof, not shared-kit deployment.
-**Local preview recommendation / NOT LAW:** omit the duplicate toolbar PO count, retaining the
-filtered PO count and quantity totals in the footer. Keep selected-row count separate because it
-identifies action scope.
+**Owner-approved 2026-10-02:** omit the duplicate toolbar PO count. The footer states filtered
+PO count and actual ordered quantity by goods category, or the selected visible PO scope when
+rows are selected. Unknown category quantity is named `Not in catalog`.
 **FACT — revised local preview, 2026-10-02:** selection scope/Clear now share the Search and
 Table/Cards toolbar instead of adding a separate row. The PO info quick panel shows Item with
 source/destination context and four quantity columns; complete labels wrap and all quantities
@@ -3618,8 +3618,10 @@ are UI MASTER §6.8's; the connected expansion is §6.9's.
 written on a package in a factory; an invented one sends somebody to look for furniture that does
 not exist.
 
-**Footer:** `{n} purchase orders` / `{n} of {m} purchase orders` / `1 purchase order`; no quantity
-totals, and no page title repeated inside the toolbar.
+**Footer — owner-approved 2026-10-02:** `{n} purchase orders` / `{n} of {m} purchase orders` /
+`1 purchase order`, followed by `Qty:` and actual ordered quantities by goods category. Selection
+uses the selected visible PO scope. Unknown goods are named `Not in catalog`; receipt quantities
+and money remain separate. No duplicate count or page title appears inside the toolbar.
 **Quantity facts elsewhere:** Order Qty, correct/accepted Received Qty and Pending Delivery Qty
 retain their canonical engine meanings in PO detail and Receiving. Damaged/wrong/extra never reduce
 pending. Removing their listing columns does not remove evidence, validation or workflow guards.
@@ -7306,3 +7308,7 @@ plus the existing shared presentation test pass. Release and authenticated retur
 acceptance remain owed. No full nine-facet or supplier-exception completeness is claimed.
 
 **PO left rail template — BUILD IN PROGRESS, owner-directed 2026-10-02.** Use the existing Sales Orders `so-template-rail` and `so-rail-navigation` composition for PO: shared group border/header, active rows and vertical Listing/Monthly demand navigation. Preserve Purchasing filter meanings. Local HTML updated; no new component, CSS recipe or token. Production acceptance pending.
+
+**PO count placement — owner-directed 2026-10-02.** Remove the toolbar PO count. The footer alone states the current filtered PO population against the loaded total. No duplicate count beside Search. Owner subsequently approves per-category ordered quantity in the footer, using actual PO lines and the existing goods classification; no invented money total.
+
+**PO footer category quantities — owner-approved 2026-10-02.** Follow the Sales Orders footer: document count followed by `Qty:` and actual ordered quantity per goods category. Scope is current filtered rows or current selected rows when selected. Use existing line classification; unknown category quantity is named `Not in catalog`, never silently omitted or guessed. Receipt quantity and money are separate facts, not part of this ordered-goods summary. This replaces the former count-only/no-quantity footer ruling. BUILD IN PROGRESS; local HTML first, production verification pending.
