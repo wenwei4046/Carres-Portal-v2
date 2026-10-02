@@ -900,6 +900,15 @@ function SubHead({ children, note }: { children: React.ReactNode; note?: string 
  * read-only value wore the same bordered box, so `SO Doc Date` looked exactly
  * as changeable as the phone number beside it (reviewer finding 16).
  */
+/** Contact corrections do not renew an existing delivery promise. */
+export function isContactOnlyCorrection(fields: readonly string[]): boolean {
+  const contactFields = new Set([
+    "customer_name", "customer_phone", "customer_email",
+    "emergency_name", "emergency_phone", "emergency_relationship",
+  ]);
+  return fields.length > 0 && fields.every((field) => contactFields.has(field));
+}
+
 export function Fact({
   label,
   value,
@@ -1712,6 +1721,9 @@ function SalesOrderWorkspaceBody() {
 
   const validateDraft = (needDealer: boolean): string | null => {
     if (!draft.customer_name.trim()) return "Customer name is required";
+    // Preserve unrelated legacy delivery facts when correcting contact details.
+    // Create and any mixed delivery/commercial edit still use the full checks.
+    if (!needDealer && isContactOnlyCorrection(changedFields)) return null;
     if (needDealer && !draft.dealer_id) return "A dealer is required";
     /* orders_salesperson_required (0296): every portal-born order names who
      * sold it. */

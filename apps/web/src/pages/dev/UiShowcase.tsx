@@ -780,7 +780,7 @@ export default function UiShowcase() {
             open={drawerOpen}
             onOpenChange={setDrawerOpen}
             title="SO-1256 · Tan Wei Ming"
-            headerActions={<><Button variant="ghost" icon="print">Print</Button><Button variant="ghost" iconOnly icon="open" aria-label="Open full page" /></>}
+            headerActions={<><Button variant="ghost" iconOnly icon="print" aria-label="Print sales order" /><Button variant="ghost" iconOnly icon="open" aria-label="Open full page" /></>}
           >
             <div className="flex flex-col gap-4" data-testid="sales-order-quick-view">
               <Block title="SO info" tone="muted">

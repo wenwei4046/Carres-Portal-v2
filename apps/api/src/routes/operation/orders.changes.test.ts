@@ -29,7 +29,7 @@ const LINES = [
 ];
 const ADDONS = [{ id: A1, addon_key: "DELIVERY", qty: 1, unit_price: "250.00", attrs: { kind: "base" } }];
 
-function mockDb(rpcImpl: (name: string, args: Record<string, unknown>) => { data: unknown; error: unknown }) {
+function mockDb(rpcImpl: (name: string, args: Record<string, unknown>) => { data: unknown; error: unknown }, storedOrder: Record<string, unknown> = ORDER) {
   const rpc = vi.fn(async (name: string, args: Record<string, unknown>) => rpcImpl(name, args));
   const table = (rows: unknown) => {
     const chain: Record<string, unknown> = {};
@@ -43,7 +43,7 @@ function mockDb(rpcImpl: (name: string, args: Record<string, unknown>) => { data
   vi.mocked(userClient).mockReturnValue({
     from: vi.fn((t: string) =>
       table(
-        t === "orders" ? ORDER
+        t === "orders" ? storedOrder
           : t === "order_lines" ? LINES
             : t === "sales_order_amendments" ? { order_id: ORDER_ID }
               : ADDONS,
@@ -98,6 +98,23 @@ describe("POST /api/operation/orders/:id/changes — the server chooses the comm
     expect(rpc).toHaveBeenCalledWith("sales_order_save_revision", {
       p_order_id: ORDER_ID, p_header: { customer_phone: "0199999999" }, p_lines: null,
       p_change: { change_type: "staff_correction", note: "New number" },
+    });
+  });
+
+  it("an emergency-contact correction preserves an old delivery promise and missing building facts", async () => {
+    const oldDate = "2026-08-01";
+    const rpc = mockDb(() => ({ data: { revision: 2 }, error: null }), {
+      ...ORDER, delivery_date: oldDate, entry_data: { fields: {} },
+    });
+    const res = await post({
+      header: header({ delivery_date: oldDate, entry_fields: {}, customer_emergency: "Helper · 0199999999 · Parent" }),
+      lines: lines(), addons: addons(), reason: "Emergency phone corrected",
+    });
+    expect(res.status).toBe(201);
+    expect((await bodyOf(res)).action).toBe("saved");
+    expect(rpc).toHaveBeenCalledWith("sales_order_save_revision", {
+      p_order_id: ORDER_ID, p_header: { customer_emergency: "Helper · 0199999999 · Parent" }, p_lines: null,
+      p_change: { change_type: "staff_correction", note: "Emergency phone corrected" },
     });
   });
 

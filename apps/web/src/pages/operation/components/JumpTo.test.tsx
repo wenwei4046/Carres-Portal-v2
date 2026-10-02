@@ -272,9 +272,12 @@ describe("the keyboard", () => {
     expect(screen.getByTestId("jump-to-surface")).toBeInTheDocument();
   });
 
-  it("the trigger prints its keyboard hint", () => {
+  it("the icon-only trigger retains its tooltip and keyboard shortcuts", () => {
     renderJump();
-    expect(screen.getByTestId("jump-to-trigger").textContent).toMatch(/⌘K|Ctrl K/);
+    const trigger = screen.getByTestId("jump-to-trigger");
+    expect(trigger.textContent).toBe("");
+    expect(trigger).toHaveAttribute("title", expect.stringMatching(/⌘K|Ctrl K/));
+    expect(trigger).toHaveAttribute("aria-keyshortcuts", "Meta+K Control+K");
   });
 });
 
