@@ -3522,7 +3522,7 @@ to catch remaining template errors one at a time or show intermediate partial fi
 This review gate does not authorise application implementation or deployment.
 
 **FACT — local design audit, 2026-10-02; NOT whole-preview approval or production proof.**
-The 5438 sample was corrected to the approved ten-filter monitoring rail and shared width/header,
+The 5438 sample was corrected to the approved four-group, nine-filter monitoring rail and shared width/header,
 quick-view and object compositions. Local walks checked exact-Unit destination movement, pending
 unknown-fee cancellation, ordinary evidenced no-fee cancellation, chargeable exception retention,
 version/send guards and a price answer retaining active inability. UI-controller inspection was
@@ -3531,8 +3531,14 @@ rail. Sales Order supplied bounded source feedback, not a completed independent 
 The final-preview gate therefore remains **OPEN**. Local supplier-reply, selection-toolbar and
 owner-export adapters demonstrate a target only; consolidate/admit them through their owning
 shared components before a separately authorised BUILD. New shared-kit completeness wording is
-still a draft with publication held; it supplies no additional approval. Application code and
+still a draft with publication held; it supplies no additional approval and does not block adoption
+of the approved deployed Sales Order template. Application code and
 production operations were not changed by this design audit.
+Additional local browser checks verified the global-navigation dirty guard and Keep editing,
+V1 historical PDF rendering after a V2 destination revision, and a second exact-Unit partial move
+merging into the existing matching destination line. The merged sample conserved ordered 5,
+received 2 and pending 3, retained all five Unit IDs across two lines, and created V3 unsent.
+These checks are fictional preview evidence, not production writer or historical-byte proof.
 
 
 **Expansion — APPROVED / LOCKED, owner confirmation 2026-09-18 · BUILT 2026-09-18; seventh column
