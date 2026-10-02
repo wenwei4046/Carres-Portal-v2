@@ -6838,15 +6838,19 @@ recorded number, loading and a failed read from genuine absence. Amendment numbe
 existing authoritative document identity; an internal UUID or SO revision is not automatically
 an Amendment No. Receipt and invoice links preserve Payments ownership and permissions.
 
-Implementation authorised by owner here; this does not resume unrelated UI/template work or
-authorise a new production deployment. Verify API lineage, hidden-column search and exact doors.
+Implementation and production release authorised through the dedicated BUILD controller.
+Built and merged in PR #1850 (`2fbc2b62ffcc23c23e869f236c976ee1a3102638`); API lineage,
+hidden-column search and exact doors have focused coverage and the complete CI passed.
+Release revision proof: [Deploy production run 36984977880](https://github.com/wenwei4046/Carres-Portal-v2/actions/runs/36984977880).
+This delivery does not resume unrelated Route/Customer/Monthly preview work.
 
 ### Optional Listing grouping — owner confirmed 2026-10-02
 
 Default None; existing ⋯ tools offers None / Delivery Status / Stock Status / Payment Status.
 Use one grouping at a time, section title + filtered SO count + collapse, shared column headers
 and one toolbar/search/selection/export engine. Row status pills remain. Reuse UI MASTER
-“Optional register grouping”. Complete 72-order local pilot contains this change, not production.
+“Optional register grouping”. Built and merged in PR #1850; the former 72-order local pilot
+is historical acceptance evidence, not the authenticated production dataset.
 Document discovery stays governed by the earlier related-document section; Amendment No, not
 Amendment status. Existing unnumbered amendments are Not recorded, confirmed none No amendment,
 and failed source Unavailable. Independent Amendment No allocation remains an authority gap.
