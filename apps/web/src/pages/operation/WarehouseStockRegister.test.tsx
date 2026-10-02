@@ -343,5 +343,9 @@ describe("Showroom reads existing PJ stock", () => {
     expect(screen.queryByText("U1-000-294")).not.toBeInTheDocument();
     expect(screen.getByText("U1-000-293")).toBeInTheDocument();
     expect(screen.getByTestId("stock-register-destination-header")).toHaveTextContent("Showroom Display");
+    const headings = screen.getAllByRole("columnheader").map((heading) => heading.textContent);
+    expect(headings.findIndex((label) => label?.includes("Item"))).toBeLessThan(headings.findIndex((label) => label?.includes("Unit ID")));
+    expect(screen.queryByText(/you can promise/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Request Transfer" })).not.toBeInTheDocument();
   });
 });

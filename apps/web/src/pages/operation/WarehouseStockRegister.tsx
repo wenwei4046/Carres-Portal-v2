@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   applyRailSelection,
@@ -26,7 +26,7 @@ import { fmtDate } from "@/lib/fmt-date";
 import { useStockRegister } from "@/lib/queries";
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
 import ModuleHeader from "./components/ModuleHeader";
-import { FilterRail, FilterRailGroup, FilterRailRow } from "./components/workspace-rail";
+import { FilterRail, FilterRailGroup, FilterRailRow, useFilterRailOpen } from "./components/workspace-rail";
 import Button from "@/components/kit/Button";
 import WarehouseUnitDetail from "./WarehouseUnitDetail";
 
@@ -121,7 +121,11 @@ export default function WarehouseStockRegister({ showroom = false }: { showroom?
     return `/operation?${next}`;
   };
   const { data, isLoading, isError, error, refetch } = useStockRegister(showroom ? "PJ Showroom" : undefined);
-  const [railOpen, setRailOpen] = useState(true);
+  const canvasRef = useRef<HTMLDivElement>(null);
+  const [responsiveRailOpen, setResponsiveRailOpen] = useFilterRailOpen("carres.showroom.filterRail", canvasRef);
+  const [stockRailOpen, setStockRailOpen] = useState(true);
+  const railOpen = showroom ? responsiveRailOpen : stockRailOpen;
+  const setRailOpen = showroom ? setResponsiveRailOpen : setStockRailOpen;
   const requestedView = params.get("view");
   const view: InventoryView =
     params.get("history") === "1" || requestedView === "history"
@@ -480,6 +484,13 @@ export default function WarehouseStockRegister({ showroom = false }: { showroom?
     [navigate, params, showroom],
   );
 
+  const displayColumns = useMemo(() => {
+    if (!showroom) return columns;
+    const first = ["item", "unitCode", "stockCondition", "inventoryStatus"];
+    return [...first.flatMap((key) => columns.filter((column) => column.key === key)),
+      ...columns.filter((column) => !first.includes(column.key)).map((column) => ({ ...column, defaultHidden: true }))];
+  }, [columns, showroom]);
+
   const filtered = isRailFiltered({ ...sel, query: search }) || !!status || view !== "all";
 
   return (
@@ -502,7 +513,7 @@ export default function WarehouseStockRegister({ showroom = false }: { showroom?
             testId="stock-register-destination-header"
             word={showroom ? "Showroom Display" : "Inventory"}
             docTitle={showroom ? "Showroom Display · Carres" : "Inventory · Warehouse — Carres"}
-            right={
+            right={showroom ? undefined :
               <Link className="text-kit-blue-11 text-body" to="/operation?tab=arrival-source&kind=transfer">
                 Request Transfer
               </Link>
@@ -510,7 +521,7 @@ export default function WarehouseStockRegister({ showroom = false }: { showroom?
             destinationHeader
           />
         )}
-        <div className="flex min-h-0 flex-1" data-testid="stock-register">
+        <div ref={canvasRef} className="flex min-h-0 flex-1" data-testid="stock-register">
           {railOpen ? (
             <FilterRail testId="stock-rail" onHide={() => setRailOpen(false)}>
               <FilterRailGroup title="Stock" icon="order">
@@ -616,7 +627,7 @@ export default function WarehouseStockRegister({ showroom = false }: { showroom?
                 key={gridRevision}
                 appearance="reference"
                 rows={rows}
-                columns={columns}
+                columns={displayColumns}
                 storageKey={showroom ? "carres.showroom.inventory.v1" : "carres.warehouse.inventory.v5"}
                 rowKey={(u) => u.id}
                 selectable={showroom ? {
@@ -670,8 +681,8 @@ export default function WarehouseStockRegister({ showroom = false }: { showroom?
                 statusSummary={(visibleRows) => {
                   /* UI MASTER §6.0: the 32px footer carries the summary; the
                      second fact is how many goods are still owed. */
-                  const line = registerSummaryLine(summariseRegister(visibleRows), scopedRows.length);
-                  const owed = view === "all" && !status ? stillToArriveLine(incomingCount) : null;
+                  const line = showroom ? `${visibleRows.length} records` : registerSummaryLine(summariseRegister(visibleRows), scopedRows.length);
+                  const owed = !showroom && view === "all" && !status ? stillToArriveLine(incomingCount) : null;
                   const text = owed ? `${line} · ${owed}` : line;
                   return (
                     <span className="block truncate" title={text}>
