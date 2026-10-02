@@ -3502,7 +3502,11 @@ explicitly changes it; final count scope and empty/error behaviour must be visib
 Supplier and Supplier Deliver To remain table-header filters, not duplicate rail groups.
 PO Doc Date uses the shared table-header month/date-range filter; it is distinct from arrival
 follow-up. Selected conditions and shared Clear all are above the table, not an additional rail
-reset control. Do not add the earlier proposed generic overview/date/supplier rail alongside this
+reset control. **Owner placement correction 2026-10-02:** Search, Table/Cards and page tools
+stay together above the listing; messages and selected-condition chips appear above this toolbar.
+**Local preview recommendation / NOT LAW:** omit the duplicate toolbar PO count, retaining the
+filtered PO count and quantity totals in the footer. Keep selected-row count separate because it
+identifies action scope. Do not add the earlier proposed generic overview/date/supplier rail alongside this
 approved monitor rail. Exact new labels are registered in COPY-STANDARD; template primitives
 and numerical values remain shared UI authority.
 
