@@ -287,7 +287,7 @@ describe("operation Work response composition", () => {
     expect(issuance[0]?.destination).toBe(
       "/operation?tab=manual-purchase&mp=request-1",
     );
-    expect(issuance[0]?.requiredResult).toBe("Purchase order issued");
+    expect(issuance[0]?.requiredResult).toBe("Current PO version marked as sent");
     /* Owner review 2026-09-25 (items 6/7): the document number is the
        reference; the composed context stands in only while none exists. */
     expect(issuance[0]?.object.label).toBe("Manual Purchase · Office use · Klang · Nice Future");
@@ -298,12 +298,7 @@ describe("operation Work response composition", () => {
     expect(numbered[0]?.object.label).toBe("MPR250924-4827");
   });
 
-  it("an ISSUED Manual Purchase raises no work for a missing send confirmation", () => {
-    /* ⭐ Owner ruling 2026-09-11, measured on production the same day: 62
-       purchase orders exist and 3 carry confirmed-sent evidence. The old rule
-       therefore raised an `Issue PO` task against 59 already-issued
-       documents. An existing numbered PO is an existing commitment, and the
-       absence of proof of sending is not a reason to buy again. */
+  it("an ordered Manual Purchase opens its existing unsent PO without buying again", () => {
     const items = projectManualPurchaseWork({
       requests: [
         {
@@ -314,13 +309,17 @@ describe("operation Work response composition", () => {
           orderBy: "2026-09-06",
           hasPos: true,
           posAllSent: false,
+          unsentPoId: "PO /2",
         },
       ],
       approver: { userId: "jess", name: "Jess" },
       poDuty: null,
       today: "2026-09-06",
     });
-    expect(items).toEqual([]);
+    expect(items).toHaveLength(1);
+    expect(items[0]?.action).toBe("Confirm PO sent to supplier");
+    expect(items[0]?.destination).toBe("/operation?tab=pos&po=PO%20%2F2");
+    expect(items[0]?.requiredResult).toBe("Current PO version marked as sent");
   });
 
   it("projects separate Sales Order actions with their own owner rules", () => {
