@@ -441,3 +441,10 @@ Reports 按授权 company/site/source/action 查 current display 与 last verifi
 当前展示品：只按真实到场／搬出／返还证据更新。部分交接逐件记录；新货到了而旧货未走仍有未完成搬出，不能整单假完成。旧货已移走而新货未到，当前展示如实显示缺口。申请历史持续可查，不当作现场库存。
 
 经营取舍：多一个是否搬旧货的条件问题，换取提前发现空间／取送依赖；无旧货时不要求空填。推翻条件：走查新增、先出后进、先入后出、部分移动仍需重复填商品地点，或订单状态直接改变现场数量，则需改稿。
+
+
+## PJ Showroom 已有库存：实际查询与owner ruling · 2026-10-02
+
+已只读查询 Carres-Portal-v2 production project `kfprgpjpaffedghytstl` 的 `stock_unit_register_v`，限定 `site_name = PJ Showroom`：36个Unit，30个SKU，各qty=1；Unit范围U1-000-293至U1-000-328。本次查询各记录为carres_owned、free、condition=new；holder_name为空。此为数据库现有记录，不是现场盘点证明，不可把系统new推定为现场检查结果。
+
+**OWNER-RULED：** Showroom 页面直接显示Warehouse已有的PJ location清单，不重新建opening stock，不另录一套展示库存。选择原Unit发起维修／清洁／更换／搬出；实际移入移出写回原Stock，页面读取同一事实。Dealer客户资产仍按不同ownership边界处理。既有PJ列表能力为可复用来源；Showroom入口及完整请求操作尚未因此变成已实现。

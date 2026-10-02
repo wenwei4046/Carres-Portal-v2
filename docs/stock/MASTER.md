@@ -154,6 +154,15 @@ is a Warehouse Settings fact about the Site, never a value on a Unit. NETS is no
 replaceable modules each have a Unit ID; pure shipping packages are children of their Unit.
 Missing required modules, components or packages prevents Ready stock eligibility.
 
+**PJ SHOWROOM EXISTING LIST — OWNER-RULED 2026-10-02; approved presentation target.**
+The Showroom page must directly read its existing Warehouse/Stock location-scoped list, rather
+than require staff to recreate opening display records. PJ Showroom staff see the goods already
+recorded at PJ and select those same identities when requesting repair, cleaning, replacement
+or movement. Actual movement evidence updates the owning Stock facts and therefore the same
+Showroom view; no duplicate showroom stock ledger. Dealer-owned goods remain outside this
+Carres-controlled inventory boundary. This ruling approves the source/presentation boundary,
+not application implementation or a claim that every physical count has been verified.
+
 ## 4 · Availability, reservation and replenishment
 
 The Unit register is authority. Every quantity is derived from identifiable Units; no rollup,
