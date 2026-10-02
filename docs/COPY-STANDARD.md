@@ -4947,3 +4947,5 @@ predicates stay with Purchasing MASTER §9.3 and their source owners. A missing 
 ### Sales Order linked documents and grouping — owner confirmed2026-10-02
 
 Use `Amendment No`, not `Amendment status`. Genuine absence is `No amendment`, without a link; unnumbered recorded amendments use `Not recorded`, unread source `Unavailable`. Never print an internal UUID as a document number. Related columns: `PO No`, `DO No`, `Invoice No`, `Receipt No`; genuine receipt absence `Receipt not recorded`. Page tools: `Group by: None`, `Group by: Delivery Status`, `Group by: Stock Status`, `Group by: Payment Status`.
+
+**Task inspection owner correction2026-10-02 / APPROVED TARGET, NOT BUILT:** `Info` is first; other tabs use actual governed task names. Header uses `Requested: {date}` with Calendar; full requested-delivery name and date remain in tooltip and Info. Avatar-only assignment exposes `Assigned to: {name}` on hover/focus/tap. This copy does not approve day-count arithmetic or change independent PO quick-panel labels.

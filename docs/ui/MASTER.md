@@ -60,6 +60,8 @@ accessibility and the complete reusable utility-panel template remain open accep
 
 ### Shared task inspection — latest owner correction, 2026-10-02
 
+**APPROVED TARGET / NOT BUILT.** Open this inspection panel on click; keep the background page layout unchanged. `Info` is the first tab; a task entry may open its exact task directly. Assignment shows only the avatar; hover, keyboard focus and tap expose `Assigned to: {name}`. Distinguish truly unassigned from failed identity loading. Header context uses Calendar plus `Requested: {date}`, with the full requested-delivery name/date in tooltip and Info.
+
 **APPROVED TARGET / NOT BUILT.** Owning operating law is
 [Workspace MASTER §5.11](../workspace/MASTER.md#511--task-inspection--owner-correction-2026-10-02).
 The panel has `Info` and actual task tabs. `Details`/`Communication` are not its two navigation

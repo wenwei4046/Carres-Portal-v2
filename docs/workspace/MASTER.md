@@ -2033,25 +2033,13 @@ calendar card. Use the Payment MASTER's governed collection/approval action and 
 Purchasing; GRN/received quantity belongs to Warehouse. Loan is its optional independent point.
 After-sales starts a separate mission after delivery unless its own MASTER explicitly connects it.
 
-#### Exact responsive and state contract
+#### Responsive acceptance boundary
 
-- ≥1280px: `240px rail · 420px list · remainder detail`; detail padding 16px, section gap 8px.
-- 768–1279px: 400px list plus detail; filters are behind the toolbar control.
-- <768px: list/detail share one stage; detail padding 12px; `Back to work` first.
-- Route is 88px and one horizontally scrollable line. Collapsed party card is exactly 72px.
-- Summary title 16/22/600; supporting 13/18; party heading 15/20/600; state 12/16;
-  expanded-section padding 10px; action buttons 36px; every touch target at least 40×40px.
-- At 743×704, Back, summary, Route and all three collapsed party headings are visible before any
-  party expansion. At 390px facts keep the same order, `27 Oct` never splits and the page never
-  scrolls sideways.
-
-No selection shows one `Select a work item` empty state and no fake route/cards. A missing Sales
-Order shows `Order details unavailable` and no guessed party state. A refresh failure keeps the last
-good mission with `Some information could not be refreshed. Try again.` Partial facts remain visible
-with the exact missing source named. Permission refusal reveals no restricted party/payment data.
-Skeletons use the final summary/88px Route/three 72px card geometry. Focus follows visual order;
-Enter/Space opens a card, Escape collapses it, focus returns correctly, and text/icons—not colour
-alone—announce every status.
+The former fixed88px Route/72px party-card panel recipe does not govern §5.11. Retain source
+business facts and independently governed Logistics controls. Task inspection must preserve
+keyboard/screen-reader access, full fact discovery, source-bound results, permission refusals,
+recoverable loading failures and selection/list restoration at desktop and phone widths. Its
+complete geometry remains unverified; do not infer it from a historical card height.
 
 #### Source facts and completions resolved for the build (2026-09-25)
 
@@ -2112,11 +2100,13 @@ one supplier; three suppliers with missing PO, delay and partial GRN; logistics 
 unscheduled; customer waiting/no answer/rescheduled; payment exception; loan; delivered; missing
 contact; partial failure; permission refusal.
 
-Acceptance measures 1440, 1180, 820, 743 and 390: no horizontal page scroll, 72px collapsed cards,
-one-line Route, one primary blue action, unwrapped `27 Oct`, correct keyboard/screen-reader behaviour,
+Acceptance measures 1440, 1180, 820, 743 and 390: no horizontal page scroll, current §5.11 task inspection,
+full date discovery, correct keyboard/screen-reader behaviour,
 no console error, and no regression to Logistics, left rail, middle cards or list restoration.
 
 ### 5.11 · Task inspection — owner correction 2026-10-02
+
+**APPROVED TARGET / NOT BUILT.** Open this inspection panel on click; keep the background page layout unchanged. `Info` is the first tab; a task entry may open its exact task directly. Assignment shows only the avatar; hover, keyboard focus and tap expose `Assigned to: {name}`. Distinguish truly unassigned from failed identity loading. Header context uses Calendar plus `Requested: {date}`, with the full requested-delivery name/date in tooltip and Info.
 
 **APPROVED TARGET / NOT BUILT.** Current navigation is `Info` plus the mission's actual tasks,
 not `Details`/`Communication` or four party tabs. This replaces older right-panel composition
