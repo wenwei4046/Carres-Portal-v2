@@ -186,7 +186,7 @@ describe.skipIf(!URL)("only a finance user or the principal is a finance approve
   }
 
   it("once Staff & Duties names a finance approver, that person approves and the HR tick stops counting", async () => {
-    // 0529: the holder is not the checker, who may never approve
+    // the holder here is not the person who checked this voucher
     const r = await withStaffAndDuties(U.financeHolder, null, async () => {
       const answers = [await approver(U.financeHolder), await approver(U.financeApprover), await approver(U.principal)];
       await actAs(U.financeApprover);
@@ -200,7 +200,7 @@ describe.skipIf(!URL)("only a finance user or the principal is a finance approve
     expect(r.byHolder.ok).toBe(true);
   });
 
-  it("the checker holding the approver duty still cannot approve what they checked (0529)", async () => {
+  it("the checker holding the approver duty may approve what they checked (0635, Chew 2026-10-03)", async () => {
     const r = await withStaffAndDuties(U.financeChecker, null, async () => {
       await actAs(U.financeChecker);
       return {
@@ -209,7 +209,7 @@ describe.skipIf(!URL)("only a finance user or the principal is a finance approve
       };
     });
     expect(r.answer).toBe(true);
-    expect(r.byChecker).toEqual({ ok: false, detail: "checker_cannot_approve" });
+    expect(r.byChecker.ok).toBe(true);
   });
 
   it("today's buddy cover approves in the holder's place, and separation of duties still applies to them", async () => {
