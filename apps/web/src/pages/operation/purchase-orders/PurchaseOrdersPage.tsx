@@ -1087,6 +1087,8 @@ export default function PurchaseOrdersPage() {
               appearance="reference"
               presentationTools
               sessionKey="carres.purchaseOrders.register.v2"
+              labelledToolbar
+              rowHeight={32}
               presentationKey={cards ? "cards" : "table"}
               toolbarEnd={presentationTabs}
               selectionPrimary={presentationTabs}
