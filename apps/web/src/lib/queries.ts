@@ -3401,6 +3401,8 @@ export interface operationPoListRow {
      *  to print the code). OPTIONAL: an older Worker degrades to the code. */
     model_name?: string | null;
     size?: string | null;
+    /** Catalog category through the shared SKU reader; null means unresolved. */
+    category?: string | null;
     /** Where THIS line goes (0311) — null = wherever the PO goes. */
     destination_id?: string | null;
     /** Purchasing's own internal note; never printed on the PO. */
