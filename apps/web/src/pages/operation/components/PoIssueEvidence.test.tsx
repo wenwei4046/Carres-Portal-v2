@@ -5,6 +5,8 @@ import { dirname, join } from "node:path";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 
 const apiFetch = vi.fn();
+const invalidateQueries = vi.fn().mockResolvedValue(undefined);
+vi.mock("@/lib/query-client", () => ({ queryClient: { invalidateQueries: (...args: unknown[]) => invalidateQueries(...args) } }));
 vi.mock("@/lib/api", async () => {
   const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
   return { ...actual, apiFetch: (...a: unknown[]) => apiFetch(...a) };
@@ -77,6 +79,7 @@ const renderIt = (
 
 beforeEach(() => {
   apiFetch.mockReset();
+  invalidateQueries.mockClear();
   onConfirmed.mockClear();
 });
 
@@ -217,6 +220,9 @@ describe("the confirmation declares the version it is looking at", () => {
       recipient: "Hooka Purchasing Group",
       poVersion: 3,
     });
+    expect(invalidateQueries.mock.calls.map(([args]) => args.queryKey)).toEqual([
+      ["operation", "pos"], ["operation", "work"], ["operation", "purchase", "today"],
+    ]);
   });
 
   it("a stale version is reported in the approved two lines", async () => {
@@ -239,6 +245,7 @@ describe("the confirmation declares the version it is looking at", () => {
     expect(err).toHaveTextContent("Open the latest PDF and send it again.");
     // Nothing was completed.
     expect(onConfirmed).not.toHaveBeenCalled();
+    expect(invalidateQueries).not.toHaveBeenCalled();
   });
 
   it("the tools still complete nothing — they open, and the act stays open", () => {
@@ -281,6 +288,16 @@ describe("PO sent to supplier — only the person's press records it (Jess 2026-
     fireEvent.change(screen.getByTestId("so-batch-evidence-channel"), { target: { value: "email" } });
     expect(recipient).toHaveValue("buy@hooka.my");
     expect(recipient).not.toHaveAttribute("placeholder");
+  });
+
+  it("refreshes Work and PO-window reads after the recorded-channel card confirmation", async () => {
+    apiFetch.mockResolvedValue({ ok: true });
+    render(<PoIssueEvidence po={{ ...PO, contact: "+60123456789", poSendChannel: "whatsapp" }} version={3} layout="card" onConfirmed={onConfirmed} />);
+    fireEvent.click(screen.getByTestId("so-batch-evidence-confirm"));
+    await waitFor(() => expect(onConfirmed).toHaveBeenCalled());
+    expect(invalidateQueries.mock.calls.map(([args]) => args.queryKey)).toEqual([
+      ["operation", "pos"], ["operation", "work"], ["operation", "purchase", "today"],
+    ]);
   });
 
   it("with nothing on file the person types the recipient", () => {
