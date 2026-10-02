@@ -43,7 +43,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Search } from "lucide-react";
+import Icon from "@/components/kit/Icon";
 import { JUMP_DOC_LABEL, type JumpDocumentResult } from "@carres/shared";
 import Modal from "@/components/kit/Modal";
 import SearchInput from "@/components/kit/SearchInput";
@@ -315,7 +315,7 @@ export default function JumpTo() {
         data-testid="jump-to-trigger"
         className="flex items-center justify-center h-8 w-8 rounded-md text-base-500 hover:text-base-900 hover:bg-hovertint transition-colors"
       >
-        <Search size={16} />
+        <Icon name="jump" size={16} />
       </button>
 
       <Modal open={open} onOpenChange={(o) => (o ? setOpen(true) : close())} title="Jump to…">

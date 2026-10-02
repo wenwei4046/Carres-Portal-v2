@@ -85,7 +85,7 @@ tables. Those follow content-led widths, governed row recipes and contained scro
 
 ## Compact Register search — approved target
 
-**OWNER ACCEPTED TEMPLATE / production verification pending — owner2026-10-01.** Clear compact search uses
+**OWNER ACCEPTED TEMPLATE / SO reference production-verified in PR1840 — owner2026-10-01.** Clear compact search uses
 Inter and existing Carres colours. Canonical dimensions live in01§7.2. Use the existing shared
 search control; preserve query, clear and keyboard access. Placeholder: `Search orders…`.
 Accessible hint names only verified supported search fields. Shrink on constrained screens
@@ -95,7 +95,7 @@ the Sales-first Register template, not automatic replacement of every search var
 
 ## Register toolbar overflow
 
-**OWNER ACCEPTED TEMPLATE / production verification pending — 2026-10-01.** Use the existing admitted shared menu/control
+**OWNER ACCEPTED TEMPLATE / SO reference production-verified in PR1840 — 2026-10-01.** Use the existing admitted shared menu/control
 family; do not build a page-local toolbar or new menu engine. Search/current filter summary and
 admitted Table/Cards stay visible. Fixed far-right `⋯` holds supported secondary page tools
 (Export, Columns; Wrap/reset only if supported). Entries use icon plus text; order writers do
@@ -223,12 +223,12 @@ action last, after a divider.
 
 **Purpose.** One meaning, one glyph.
 
-**Behaviour.** `name` is a union of 50 meanings — §5.3's 40 verbatim, plus the
+**Behaviour.** `name` is a union of 54 meanings — §5.3's 40 verbatim, plus the
 three made-to-order categories `mattress` · `bedframe` · `sofa` (Loo,
 2026-07-31, for the To Order rail's category level; Lucide `BedDouble` ·
 `Bed` · `Sofa`), `columnFilter`, `pillow`, `protector`, `panelToggle`, and the
 Work left rail's `previous` (`ChevronLeft`) · `noDate` (`CalendarOff`) ·
-`modules` (`LayoutGrid`) (owner-approved UI, 2026-09-24). A name outside it does not compile — which is the
+`modules` (`LayoutGrid`) (owner-approved UI, 2026-09-24). The registry also admits Work `mail`, Register `table`/`cards`, and global `jump` (Command, owner2026-10-02). Register `search` remains Search; Jump uses Command16 so navigation is visually distinct. A name outside it does not compile — which is the
 enforcement, not a convention. Sizes 14 · 16 · 18. Stroke is Lucide's 2 and
 there is no prop to change it.
 
@@ -505,3 +505,11 @@ Use existing DataGrid, FilterRail, Block, Drawer/DialogFrame, Button, Icon, Tool
 Accepted quick-view composition: existing Drawer `variant="quick-view"` owns the dark header and header actions; Block `tone="muted"` supplies the quiet identity section. `/ui` renders these same primitives. Close uses the canonical 32px desktop / 40px touch target. No page-local replacement drawer or card is admitted.
 
 The shared Tabs segmented presentation example uses canonical Table/Cards icons with visible words,16px inheriting colour; accessible names remain Table/Cards. This is the owner-approved2026-10-01 presentation amendment.
+
+Owner correction2026-10-02: shared global Jump to/Help/Settings triggers are icon-only on every
+width, retaining tooltip/accessibility/key shortcuts; bell keeps count. Quick-view Print is
+icon-only with tooltip/accessibility; full-object Print retains its visible word/menu.
+Use the complete existing component recipes, including focus/touch/state behavior. Ordinary
+result feedback reuses the governed Toast; do not add a duplicate result banner or new feedback
+component. Persistent source failures, business blockers and field errors retain their existing
+owned presentation.
