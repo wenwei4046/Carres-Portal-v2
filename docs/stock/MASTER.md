@@ -163,6 +163,13 @@ Showroom view; no duplicate showroom stock ledger. Dealer-owned goods remain out
 Carres-controlled inventory boundary. This ruling approves the source/presentation boundary,
 not application implementation or a claim that every physical count has been verified.
 
+**Showroom presentation closure — OWNER-APPROVED 2026-10-02.** Purchasing §9.8 owns the
+approved Showroom page/request journey. Stock supplies current Carres-controlled location goods,
+exact identities/counts and actual movement history; only evidenced physical events change it.
+Grouped products expose exact IDs where applicable, while counted goods retain quantities.
+Related outgoing requests remain visible without pretending the goods have already left.
+Dealer customer assets do not enter the Carres stock balance. UI delivery awaits BUILD.
+
 ## 4 · Availability, reservation and replenishment
 
 The Unit register is authority. Every quantity is derived from identifiable Units; no rollup,

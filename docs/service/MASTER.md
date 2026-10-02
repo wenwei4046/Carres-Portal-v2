@@ -104,6 +104,13 @@ rekeys the complaint, pictures, video, item or history.
 `Purchasing → Supplier Claims` is Purchasing's independent stock-claim Register, not a Case work
 view. When a related stock claim exists, the Case shows a read-only link to its progress.
 
+**Showroom journey closure — OWNER-APPROVED 2026-10-02.** The approved page/request journey
+is in Purchasing §9.8. Existing-goods service carries source identity/location/evidence into the
+same Case; the Showroom request view reads meaningful progress, proposal/fee acceptance,
+arrangements and outcome. New purchases follow normal order rules, without a duplicate Service
+progress workflow. Actual return/custody facts remain with their physical owners. The proposed
+5/7/3-day checkpoints and blanket Dealer 14-day promise were not approved by this page ruling.
+
 ### Dealer purchased display service — OWNER-RULED 2026-10-02
 
 **APPROVED TARGET / NOT BUILT.** Dealer goods, including display bedframes and mattresses,

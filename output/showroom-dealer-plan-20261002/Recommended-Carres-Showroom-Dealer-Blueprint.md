@@ -453,3 +453,12 @@ Reports 按授权 company/site/source/action 查 current display 与 last verifi
 ## 标签权威核对更正 · 2026-10-02
 
 当前clean authority Stock §3及Purchasing §6.2的2026-09-25 ruling：供应商目前不必贴Unit标签，实际receiver贴／核对系统issued ID。先前引用desktop旧文得出supplier必须包装贴标的回答已更正；当前Purchasing旧相冲突段落与Stock Settings supplier requirement同次删除／对齐最新ruling。PO/CO official issue按Catalog identity mode生成身份，不是draft confirmation；quantity模式的pillow/protector等不发Unit ID。PJ36个数据库ID不证明36件实物已盘点或贴标。旧货使用原ID，核对来源／实物后贴同ID；已有关联或历史不可任意交换，同型号身份未明确须查证，不再分配第二个ID。标签打印目标尚未据本次调查验证上线。
+
+
+## Owner review closure · 2026-10-02
+
+**RULING / APPROVED:** Jess approved the complete page/operating journey presented in the latest review: current location goods directly from owning records; orders/requests and actual movement history; select existing goods for service/removal/replacement; independent new purchase with optional outgoing goods; one source-linked submission; normal purchase rules; meaningful external facts and internal owned execution; actual/partial handover updates only; existing identities and Catalog counted scope. Persisted in Purchasing §9.8, Stock and Service MASTERs. This is the reviewed page/journey scope, not approval by implication of every earlier proposal in this artifact.
+
+**Intentional unapproved scope:** no new 5/7/3 numerical service commitments; no automatic Dealer14day entitlement; no external cutover, accounts or live changes. Broader proposed customer-asset implementation, initial-record verification and permission enforcement must follow their approved business boundary; detailed technical mechanics belong to BUILD, while genuinely unresolved entitlement policy cannot be silently invented.
+
+**PLAN MISSION COMPLETE — approved Showroom page and request journey.** Recommended next lane: Showroom — CONTINUOUS BUILD. Read Purchasing §9.8 and relevant Stock/Service/orders/UI authorities; deliver the approved current-goods, purchase/service intake, source-linked request view and actual movement history using existing owning facts. Scope excludes unapproved numerical service policy and external cutover. No Card or application code authored in this PLAN.

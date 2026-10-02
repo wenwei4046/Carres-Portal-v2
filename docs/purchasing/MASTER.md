@@ -6012,6 +6012,50 @@ not consignment. The existing Dealer-account customer Sales Order is a terminal-
 transaction, not proof of a Dealer-company display purchasing capability. Whole-Blueprint
 approval, account provisioning, cutover and application delivery remain outside this ruling.
 
+
+### Showroom page and request journey — OWNER-APPROVED / LOCKED 2026-10-02
+
+Approved presentation/operating target, not application delivery proof. One authorised Showroom
+entry provides current goods, orders/requests and actual inbound/outbound history using the
+shared Register/Object Detail grammar. Screen labels remain subject to governed COPY admission.
+The current-goods view reads the owning location-scoped records: PJ uses existing Warehouse
+Stock, not a second opening ledger. Group identical products by quantity and expose exact Unit
+IDs for selecting a particular piece; Catalog-counted goods remain quantity-based. Dealer-owned
+goods remain outside Carres inventory and require their company/location-scoped asset facts.
+
+Buying new goods starts without selecting old goods and follows the applicable normal order
+rules. The requester may additionally select exact outgoing goods and record movement intent,
+destination needs and whether removal must precede arrival. Adding goods never requires a
+one-in/one-out exchange. Buying pillows/protectors or other Catalog goods is available without
+an existing-display selection; the intended buyer, use and receiving location decide the source
+workflow and whether actual receipt belongs in the Showroom view.
+
+Repair, cleaning, removal and replacement start from the existing goods, carrying product,
+location, identity and evidence forward. Operation continues the same source-linked record;
+related purchase/service/movement documents remain with their owning modules rather than
+requiring a second blank submission. Replacement can link outgoing goods to a new purchase;
+new purchase execution still uses normal order rules. Unknown destination, acceptance or fees
+must be resolved, never presumed to approve return, refund or buyback.
+
+The orders/requests view provides submission identity/date, location, purchase/service nature,
+goods summary, relevant state, requested/confirmed arrangement and required requester action.
+Purchase detail shows normal commercial/fulfilment facts and outgoing-goods arrangements only
+when relevant; service detail shows evidence, progress, proposal, fees/acceptance, arrangements
+and outcome. Operation sees responsible owner, next action and deadline through governed Work.
+External readers need meaningful arrangements/actions/changes, not every internal step.
+
+Only actual, evidenced receipt/removal/return updates current goods and movement history.
+Submission, approval or published progress does not move inventory. Partial handovers update
+only completed quantities/identities; unfinished related movement remains visible. Repair retains
+identity, custody and service history; a physical replacement has its own governed identity.
+Existing IDs are verified and reused for labels, never reminted; printing/scanning follows Stock §3.
+
+This approval covers the page/journey above. It does not approve the proposed 5/7/3-day service
+checkpoints, blanket Dealer 14-day entitlement, external cutover or application implementation.
+Existing commercial, payment, ownership, entitlement, permission and physical-evidence gates
+remain applicable. Sales negotiation, Purchasing commitments, Stock truth, Service remedies,
+Delivery execution and Finance facts retain their current write owners.
+
 **Purpose / source:** record a Carres-owned showroom's new display placement, replacement, removal or change and connect
 it to the existing goods and the agreed supplier arrangement. For a replacement/removal, choose the
 showroom (PJ Showroom exists today), then select the exact existing display Units from Stock.
