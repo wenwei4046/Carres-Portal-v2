@@ -7335,21 +7335,6 @@ The existing API already returns the governed 422 refusal, so this SQL has no de
 application writer or interface change awaiting deployment.
 
 
-**PO Listing shared toolbar adoption — PRODUCTION-VERIFIED bounded journey, 2026-10-02.**
-PR1851 passed full CI run `36982055145` and merged as `59bd9827d4e60564d055509d281724f4888f65f4`.
-Its unneeded intermediate deployment run `36983507021` was cancelled during checks, before any
-production write, after PR1852 had merged. Both changes shipped through successful production
-run `36983987334` at `9078a14000d3b2cef7742314287ce82283d37954`; all five canonical surfaces
-independently converged (`/tmp/purchasing-production-1852-final.log`). Authenticated Principal
-acceptance showed 63 purchase orders, with Export/Columns in the shared Page tools overflow.
-Columns opened the existing eleven-column chooser; Export opened Excel/PDF options. Searching
-`PO-SMOKE-W` showed one result in both Table and Cards. No layout or column setting was saved,
-no export file was downloaded, and no business writer was exercised. Existing PO grouping,
-filters, source links and goods expansion remain. This bounded toolbar acceptance is not full
-Purchasing completion or full nine-facet/exception-fact acceptance. Screenshot:
-`/tmp/purchasing-page-tools-production.jpg`.
-
-
 **PO-window sending after receipt — DEPLOYED; real received-window journey UNVERIFIED, 2026-10-02.** The measured shared
 window adapter treated a received PO as already sent, contradicting §5.6 and §2.4. It now reads
 only current-version confirmed-sent evidence. A window with no demand left but an unsent
@@ -7368,35 +7353,51 @@ inventory found the four Completed POs PO-2052, PO-2054, PO-SMOKE-C and PO-SMOKE
 SO source lineage; no window membership is invented to create a live demonstration. This limits
 production acceptance until a real source-linked received PO exists; preserve every original fact.
 
-**PO Listing Table/Cards and selection adoption — PRODUCTION-VERIFIED bounded journey; object-return correction BUILT / RELEASE OWED, 2026-10-02.**
-Jess explicitly directs following the current deployed Sales Orders UI/UX. PO reuses shared
-segmented Table/Cards controls, Block, Checkbox, Button and DataGrid selection. PR1852 passed
-full CI run `36982655629` (13m38s), merged after PR1851, and shipped at
-`9078a14000d3b2cef7742314287ce82283d37954` through successful run `36983987334`.
-Authenticated acceptance: search `PO-SMOKE-W` produced one of 63 POs; Cards showed that exact
-PO's real supplier, destination, date, version/send fact and goods. Ticking it in Cards then
-returning to Table retained the selection and filtered result. Clear removed the tick; the
-shared Select all rows and its deselection respectively added and removed the current PO.
-Cards View opened the actual Completed PO-SMOKE-W V1 object, including its 2 ordered / 2
-received / 0 pending quantities. No source, receipt, stock or supplier fact was written.
-Removing selection persistence on disk made the journey test fail; restoration passed.
-Screenshot: `/tmp/purchasing-card-view-production.jpg`.
+**PO Listing template, quantity footer and return journey — PRODUCTION-VERIFIED bounded scope, 2026-10-02.**
+The owner-directed shared Sales template adoption (PR1851, PR1852 and PR1856) and its measured
+return/category corrections (PR1855) are delivered at `7d827ba8df5d7c863f998f985d8e8a2fbf5709a1`.
+PR1855 passed full CI run `37007662348` (14m27s); deployment run `37009270017` succeeded. All five
+canonical surfaces independently converged (`/tmp/purchasing-production-1855.log`).
 
-The same production walk found View → Back resetting Cards and search to an unfiltered Table.
-The bounded correction reuses DataGrid's existing `sessionKey` memory and preserves the listing's
-query before opening an object. Back restores that query and the existing selected-row state;
-a direct object link with no in-session listing origin keeps the ordinary Table fallback.
-It introduces no second search/filter engine, component or business writer. The new object-return
-journey fails on the delivered predecessor and passes with the correction; 49 PO-page tests
-plus the existing shared presentation test pass. Release and authenticated return/search
-acceptance remain owed. No full nine-facet or supplier-exception completeness is claimed.
+Authenticated Principal acceptance confirmed the existing Sales left-rail composition, vertical
+Listing/Monthly demand navigation, group frames and selected states, shared Table/Cards and Page
+tools. Columns opens the eleven-column chooser; Export opens Excel/PDF options. No setting was
+saved and no export file was downloaded. Both PO and deployed Sales rows measured 39px using
+their existing shared 32px row recipe. The toolbar has no duplicate PO count.
 
-**PO left rail template — BUILD IN PROGRESS, owner-directed 2026-10-02.** Use the existing Sales Orders `so-template-rail` and `so-rail-navigation` composition for PO: shared group border/header, active rows and vertical Listing/Monthly demand navigation. Preserve Purchasing filter meanings. Local HTML updated; no new component, CSS recipe or token. Production acceptance pending.
+The footer alone states the filtered/selected visible PO scope and actual ordered goods quantity.
+The existing catalog SKU-category reader now enriches PO lines for the shared classifier; unknown
+or unrecognised categories are explicitly counted as `Not in catalog`. The real unfiltered footer
+reads 63 purchase orders, Mattress 48, Bedframe 26, Sofa 50 and Not in catalog 6 — exactly matching
+the read-only production facts. Receipt quantity and money remain separate facts.
 
-**PO count placement — owner-directed 2026-10-02.** Remove the toolbar PO count. The footer alone states the current filtered PO population against the loaded total. No duplicate count beside Search. Owner subsequently approves per-category ordered quantity in the footer, using actual PO lines and the existing goods classification; no invented money total.
+Search `PO-SMOKE-W` yields one of 63 POs in Table and Cards. Cards selection survives Table;
+Clear and the shared select-all/deselect controls change only selection. View opens that exact
+Completed V1 object with 2 ordered / 2 received / 0 pending. Back restores Cards, the search and
+selection through the existing DataGrid session memory and saved origin query. A directly opened
+PO returns to the default unfiltered Table. The return and selection journeys fail when their
+predecessor resets are restored. The 390px Cards/search acceptance also passed.
+Screenshots: `/tmp/purchasing-listing-final-production.jpg`,
+`/tmp/purchasing-cards-return-production.jpg`, `/tmp/purchasing-cards-mobile-production.jpg`.
 
-**PO footer category quantities — owner-approved 2026-10-02.** Follow the Sales Orders footer: document count followed by `Qty:` and actual ordered quantity per goods category. Scope is current filtered rows or current selected rows when selected. Use the existing catalog SKU-category reader in the PO listing enrichment and the shared line classification; unknown category quantity is named `Not in catalog`, never silently omitted or guessed. Receipt quantity and money are separate facts, not part of this ordered-goods summary. This replaces the former count-only/no-quantity footer ruling. BUILD IN PROGRESS; local HTML first, production verification pending.
+Downloaded predecessor and deployed bundles retained the PO-register control (1→1), while the
+PO-region toolbar count changed 1→0, session memory 0→1, labelled toolbar 0→1 and shared row
+recipe 0→1. No source, sending, receipt, stock or supplier fact was written during acceptance.
+This is not full nine-facet/supplier-exception, PO-object or Purchasing-module completion.
+PR1859's quick-view Communication composition remains preliminary local evidence under owner
+review; its technical checks are not accepted UX or permission to deploy that composition.
 
-**PO table template adoption — BUILD IN PROGRESS, owner direction 2026-10-02.** Follow the current deployed Sales Orders DataGrid presentation: labelled toolbar and its existing 32px row recipe, same selection/expansion geometry and shared Page tools Export/Columns. PO retains date/identity columns and supplier document meaning; this does not borrow Sales Order print output. HTML updated; production acceptance pending.
-
-**Shared sending refresh — BUILT / TEST-VERIFIED; release proof owed, 2026-10-02.** Successful current-version confirmation through the existing `PoIssueEvidence` writer invalidates PO, derived Work and PO-window reads in both shared layouts. Refusals complete nothing and invalidate none. This fixes stale Work after an existing permitted action; no new action, channel, recipient, permission or supplier write is introduced. The 24 shared sending tests pass, including both layouts and the refusal boundary. Removing the refresh makes the new acceptance fail. No real PO was issued or confirmed sent for proof. The preliminary quick-view Communication composition in PR1859 remains under owner review and is not included in this release.
+**Shared sending refresh — DEPLOYED / TEST-VERIFIED; real confirmation deliberately unexercised, 2026-10-02.**
+Successful current-version confirmation through the existing `PoIssueEvidence` writer invalidates
+PO, derived Work and PO-window reads in both shared layouts. Refusals complete nothing and
+invalidate none. No new action, channel, recipient, permission or supplier writer is introduced.
+The 24 shared sending tests cover both layouts and refusal; removing the refresh makes the new
+acceptance fail. PR1861 passed full CI run `37010816296` (13m51s) and merged as
+`51aea8bb9c16f5ccdb0d1c5b0e7502c0e5d91753`. Deployment `37012403845` succeeded; all five
+canonical surfaces independently converged (`/tmp/purchasing-production-1861.log`).
+Downloaded predecessor/current bundles retain the confirmation door (2→2), with the exact
+PO/Work/PO-window refresh sequence changing 0→1. The authenticated register still reads the
+correct 63-PO/category quantities and serves the new asset `index-BzSQ-KHp.js`.
+No real PO was issued or confirmed sent and no inventory fact was changed for proof. The live
+confirmation-write journey is therefore not claimed as exercised. PR1859's preliminary quick-view
+Communication composition remains under owner review and is excluded from this release.
