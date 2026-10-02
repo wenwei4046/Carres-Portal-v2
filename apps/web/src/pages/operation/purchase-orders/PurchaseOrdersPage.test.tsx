@@ -177,6 +177,7 @@ vi.mock("../PurchasingTabs", () => ({
 }));
 
 vi.mock("@/lib/queries", () => ({
+  useMonthlyDemandFacts: () => ({ data: { orders: [], toBuyByLine: new Map() }, isLoading: false, isError: false, refetch }),
   useOperationPos: () => ({ data: queryData, isLoading: requiredLoading, isError: false, refetch }),
   useOperationSuppliers: () => ({
     data: {
@@ -314,6 +315,15 @@ beforeEach(() => {
    the SUPPLIER REPLY / RECEIVING / SUPPLIER / DELIVER TO rail and a footer
    without quantity totals. */
 describe("Purchase Orders Register", () => {
+  it("opens the shared source-demand view and returns to the PO listing", () => {
+    renderPage();
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "Monthly demand" }), { button: 0, ctrlKey: false });
+    expect(screen.getByTestId("monthly-demand")).toBeInTheDocument();
+    expect(screen.queryByTestId("register-grid")).not.toBeInTheDocument();
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "Listing" }), { button: 0, ctrlKey: false });
+    expect(screen.getByTestId("register-grid")).toBeInTheDocument();
+  });
+
   it("draws exactly the eleven approved columns, date first, and none of the retired ones", () => {
     renderPage();
     const grid = screen.getByTestId("register-grid");

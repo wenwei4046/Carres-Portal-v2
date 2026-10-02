@@ -7150,3 +7150,13 @@ The same `confirm-sent` door probes the request occurrence before and after its 
 records Completed only when every linked current version is sent and no demand remains.
 Approval, ordered quantities, receipt facts and ownership are unchanged. No SQL migration
 or external message is included. Production and authenticated acceptance remain owed.
+
+**Monthly demand adoption — BUILD IN PROGRESS, 2026-10-02.** Purchase Orders reuses the existing
+SalesOrderMonthlyDemand component, useMonthlyDemandFacts reader and monthlyDemandOf arithmetic.
+Listing and Monthly demand are shared vertical Tabs in the FilterRail fixed header. Monthly view
+reads the canonical customer demand/to-buy sources over the existing six-month default; PO rows
+never feed customer demand totals. A month opens the existing Sales Orders requested-month scope,
+including the existing special overdue/undated row semantics. Filters collapse/reopen through the
+shared rail control on narrow screens. No new demand writer or Sales Order edit is added.
+Expanded monthly filtering and other approved register controls remain separate delivery work;
+this entry is implementation evidence, not authenticated production acceptance.
