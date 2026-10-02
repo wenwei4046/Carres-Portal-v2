@@ -187,13 +187,13 @@ visual grammar never means identical fields, permissions or lifecycle.
 | Register | `components/register/DataGrid.tsx`, `register-field-widths`; `SalesOrdersRegister.tsx`, `WarehouseInbound.tsx` under `pages/operation/` | Shared search/column/filter/selection mechanics; explicit identity and action doors; governed widths/pinning and return context. Empty, loading, denied and failed reads are distinct. | Source population, business columns/order, approved exceptions, authorised actions and selection capability. |
 | Filter rail | `pages/operation/components/workspace-rail.tsx`: FilterRail, FilterRailGroup, FilterRailRow | Preserve the existing rail. Applied conditions, rows, quantity summary and export describe the same scope; record counts and goods quantities are labelled separately. Keep governed Site tabs where present. A narrow-screen filter surface retains the same conditions. | Admitted filter dimensions and governed base population; contextual facet counts follow the current shared filter law. |
 | Goods expansion | `pages/operation/components/GoodsMiniTable.tsx`; SalesOrdersRegister `ExpandedLines`; WarehouseInbound `InboundExpansion` | A structured read-only child table, real headings, aligned values and exact identity links. Expand has one job: goods and their relevant quantity/evidence detail. Never replace it with concatenated prose or a second editing form. | Source-owned receiving/loading results and approved line selection. Prove component capability before extending it; do not force Sales columns onto receipt facts. |
-| Object detail | `pages/operation/SalesOrderWorkspace.tsx`, `purchase-orders/PurchaseOrdersPage.tsx`, `WarehouseUnitDetail.tsx`; shared `components/kit/Block.tsx`, DocumentTable, TotalsSummary | Use the existing approved object composition: identity, current authorised actions, grouped facts, source documents/evidence and actual history. Use shared Block chrome and table/totals treatment. The object's MASTER owns placement and business meaning. | Business groups, appropriate action placement and source-owned facts. A Unit is not a sales commercial record. |
-| Edit / review | Existing source-owned forms and review surfaces; `components/kit/FieldFrame.tsx`, Input, Select, DatePicker, PdfPreview | Pre-filled known facts, grouped necessary inputs, field errors plus a discoverable blocked-save reason; preserve input on failure. Current-version preview, authorised save and clear saved/unsaved result. | Required fields, approved document preview arrangement and actual business validation. |
+| Object detail | `pages/operation/SalesOrderWorkspace.tsx`, `purchase-orders/PurchaseOrdersPage.tsx`, `WarehouseUnitDetail.tsx`; shared `kit/Block.tsx`, DocumentTable, TotalsSummary | Use the existing approved object composition: identity, current authorised actions, grouped facts, source documents/evidence and actual history. Use shared Block chrome and table/totals treatment. The object's MASTER owns placement and business meaning. | Business groups, appropriate action placement and source-owned facts. A Unit is not a sales commercial record. |
+| Edit / review | Existing source-owned forms and review surfaces; `kit/FieldFrame.tsx`, Input, Select, DatePicker, PdfPreview | Pre-filled known facts, grouped necessary inputs, field errors plus a discoverable blocked-save reason; preserve input on failure. Current-version preview, authorised save and clear saved/unsaved result. | Required fields, approved document preview arrangement and actual business validation. |
 | Field operation | `pages/operation/components/ReceivingWorkspace.tsx`, PoReceivingView; `WarehouseOutboundWork.tsx` Loading workspace | Preserve the one receiving/loading write door. Clear source identity, goods/Units, physical checks, evidence, next action and residual work. Return to the same list context. Warehouse submission is not posted GRN; loaded is not driver-confirmed. | Physical steps and source contracts, never a second stock or approval engine. |
-| Preview / confirmation | `components/kit/PdfPreview.tsx`, SavedEvidenceViewer, DialogFrame, Modal, Drawer | Use the existing admitted container for its purpose; correct version and evidence permissions, close/back behaviour and focus return. A preview is not a competing editable detail. | Evidence/file type and bounded confirmation content. Do not migrate all details to drawers because a reference uses one. |
-| Work / ownership | Shared Work source/resolver plus `components/kit/Block.tsx`, RouteStop, ChecklistRow, QuietRouteRow | Render resolved responsibility and source action; current UI law uses Assigned to and Completed by. Completion comes from the owning business result. Authorised help retains the actual performer. | Source, governed dates and actions; no page-local rota, substitute resolver or fake Mark done. |
+| Preview / confirmation | `kit/PdfPreview.tsx`, SavedEvidenceViewer, DialogFrame, Modal, Drawer | Use the existing admitted container for its purpose; correct version and evidence permissions, close/back behaviour and focus return. A preview is not a competing editable detail. | Evidence/file type and bounded confirmation content. Do not migrate all details to drawers because a reference uses one. |
+| Work / ownership | Shared Work source/resolver plus `kit/Block.tsx`, RouteStop, ChecklistRow, QuietRouteRow | Render resolved responsibility and source action; current UI law uses Assigned to and Completed by. Completion comes from the owning business result. Authorised help retains the actual performer. | Source, governed dates and actions; no page-local rota, substitute resolver or fake Mark done. |
 
-**Do not select by filename alone.** The inspected `components/kit/DetailShell.tsx` contains
+**Do not select by filename alone.** The inspected `kit/DetailShell.tsx` contains
 OrderActionTrack and a fixed four-fact identity contract. It is not evidence of an unrestricted
 cross-module detail template. Use the current approved object grammar and actual adopters above;
 do not impose that older order model on unrelated objects. Existing generic DataTable uses are
@@ -203,7 +203,7 @@ this MASTER's governed Register/DataGrid rules. Fix documentation scope, not wor
 ### Typography and colour usage
 
 **RESOLVED FROM EXISTING AUTHORITY:** `docs/01-design-tokens.md` owns the numerical values;
-`components/kit/tokens.ts` and the configured classes implement them. No page chooses a new palette,
+`kit/tokens.ts` and the configured classes implement them. No page chooses a new palette,
 font scale, border, radius or spacing to resemble a screenshot. Current page/card/body/meta roles
 remain 24/15/13/12 with the existing title, label and scoped Work-control roles. English uses the
 configured Inter chain; mixed CJK uses the existing CJK handling. Codes and numeric columns use
@@ -1314,7 +1314,7 @@ the whole reason the two components share a frame.
   gutter (selection + expand) and the **first data column** pin to the left edge while the rest
   slides under them. The engine does not know what an `SO No` is — the identity column is whatever
   the page put first.
-  - **The ruling said `components/kit/DataTable`, and that was a factual slip we are recording rather than
+  - **The ruling said `kit/DataTable`, and that was a factual slip we are recording rather than
     obeying.** The Sales Orders Register runs `register/DataGrid` under the ruled exception in the
     line above, so building the capability in the kit component would have satisfied the words and
     left the actual register scrolling its identity away. What binds is the ruling's own reason —
@@ -2266,7 +2266,7 @@ unbuilt; do not implement a page-local substitute or infer permission to alter o
 Monitor + Receiving, landed the same day).** `FilterRail` accepts an optional fixed `header`
 block: the header stays put while the filter groups scroll independently beneath it, separated
 by a hairline (`{testId}-fixed` / `{testId}-scroll` regions). Its governed content is the rail
-month calendar, and the kit gained **`MonthCalendar`** (`components/kit/MonthCalendar.tsx`) for
+month calendar, and the kit gained **`MonthCalendar`** (`kit/MonthCalendar.tsx`) for
 it: the same `react-day-picker` engine and token skin as `DatePicker`, rendered permanently
 instead of in a popover, acting as a FILTER (pick a day to narrow the register beside it, pick
 it again to clear, ‹ › move exactly one month). It prints the month spelled out as its caption,
@@ -2614,10 +2614,10 @@ page imports it, never draws it:
 
 | Piece | File | Locked values |
 |---|---|---|
-| `Block` — the ONE card | `components/kit/Block.tsx` (moved from `SalesOrderWorkspace.tsx`; Sales Order, Purchase Orders, Manual Purchase, Warehouse Unit and Work import it) | white · 1px `slate-5` · kit card radius · 12/16 padding · black `text-strong` title over a 1px rule · optional `why` second line under the title, 13/400 red (missed) / amber (due) / slate-11 |
-| `RouteStop` | `components/kit/RouteStop.tsx` | 24px dot on a 1.5px line (dashed `slate-6`, solid `slate-11` once done; none under the last stop) · dot: red `!` missed · amber `!` due · dark tick all done · grey otherwise · label 11/500 uppercase slate-11 `.06em` with `Missed` / `Due` only |
-| `ChecklistRow` | `components/kit/ChecklistRow.tsx` | 16px square mark (the Checkbox's 4px radius, read-only): dark tick done · 1.5px empty not yet · red / amber `!` the act now · no mark for a fact or a stop that cannot start · step 13/400 (13/600 when it is the act) · value 12/400 slate-11 (act colour for the act) · document on the right · ≥32px row · `stacked` drops the value under the step (the page sets it below 1340px) |
-| `QuietRouteRow` | `components/kit/QuietRouteRow.tsx` | one ≥48px line: stop label · status 13/400 · `{n} of {m} done` · chevron · white, 1px `slate-5`, kit card radius, 8/16 padding · outline red / amber when it holds an act · `wrap` puts the status on its own line below 1100px instead of cutting it |
+| `Block` — the ONE card | `kit/Block.tsx` (moved from `SalesOrderWorkspace.tsx`; Sales Order, Purchase Orders, Manual Purchase, Warehouse Unit and Work import it) | white · 1px `slate-5` · kit card radius · 12/16 padding · black `text-strong` title over a 1px rule · optional `why` second line under the title, 13/400 red (missed) / amber (due) / slate-11 |
+| `RouteStop` | `kit/RouteStop.tsx` | 24px dot on a 1.5px line (dashed `slate-6`, solid `slate-11` once done; none under the last stop) · dot: red `!` missed · amber `!` due · dark tick all done · grey otherwise · label 11/500 uppercase slate-11 `.06em` with `Missed` / `Due` only |
+| `ChecklistRow` | `kit/ChecklistRow.tsx` | 16px square mark (the Checkbox's 4px radius, read-only): dark tick done · 1.5px empty not yet · red / amber `!` the act now · no mark for a fact or a stop that cannot start · step 13/400 (13/600 when it is the act) · value 12/400 slate-11 (act colour for the act) · document on the right · ≥32px row · `stacked` drops the value under the step (the page sets it below 1340px) |
+| `QuietRouteRow` | `kit/QuietRouteRow.tsx` | one ≥48px line: stop label · status 13/400 · `{n} of {m} done` · chevron · white, 1px `slate-5`, kit card radius, 8/16 padding · outline red / amber when it holds an act · `wrap` puts the status on its own line below 1100px instead of cutting it |
 
 Two opt-in props came with them, and no other page moves: `Tabs fill` (tabs share a narrow bar by
 their own length with no gap, so Work's four Communication tabs stay on one row at 280px) and
@@ -3508,16 +3508,16 @@ Shared token radii: control6px, card10px. `text-strong` is15px/22px, weight600.
 
 | Surface / element | Exact source recipe | Design and responsive rule |
 |---|---|---|
-| Block card | `components/kit/Block.tsx`: horizontal padding16px, vertical12px; border1px; radius10px | White default, slate-3 muted identity; black15/22/600 heading; slate-5 border/divider |
+| Block card | `kit/Block.tsx`: horizontal padding16px, vertical12px; border1px; radius10px | White default, slate-3 muted identity; black15/22/600 heading; slate-5 border/divider |
 | Block heading | Bottom padding8px; header horizontal gap12px /vertical4px; body margin-top12px | Header wraps; read-only navigation may use headerSlot; writing actions stay with their facts |
-| Quick-view drawer | `components/kit/DialogFrame.tsx` + Tailwind `max-w-drawer`: width100%, maximum560px, full height | At desktop>=768 right offset64px preserves right rail; below768 uses side-frame right0 |
+| Quick-view drawer | `kit/DialogFrame.tsx` + Tailwind `max-w-drawer`: width100%, maximum560px, full height | At desktop>=768 right offset64px preserves right rail; below768 uses side-frame right0 |
 | Drawer header/body | Header padding16px horizontal /12px vertical; title/actions gap16px; actions gap8px; body padding16px | Quick view dark slate-12/white; title truncates with full tooltip; below768 header wraps into identity/actions rows with8px gap |
 | Quick-view content | Register composition: cards gap12px; fact grid2columns, gap12px; labels12px, value600, value margin-top4px | Contact facts first; no duplicate customer card; no footer; body owns vertical scrolling |
-| Button default | `components/kit/Button.tsx`: desktop>=768 height32px; phone40px; horizontal padding12px; gap8px; icon16px | Shared primary/secondary/ghost variants; no local className/style overrides |
+| Button default | `kit/Button.tsx`: desktop>=768 height32px; phone40px; horizontal padding12px; gap8px; icon16px | Shared primary/secondary/ghost variants; no local className/style overrides |
 | Icon-only button | Desktop32×32px; below76840×40px; padding0 | Tooltip and accessible name required; icon alone never removes keyboard access |
 | Button specialised sizes | `sm`: height24px, padding8px, gap4px; `touch`: desktop36px/phone40px, padding12px, gap6px; sm/touch icon14px | Supported API variants only; small size is not the default for phone actions |
 | FieldFrame | Label/control vertical gap4px | Shared label, required/error/hint semantics; do not hand-roll field wrappers |
-| Single-line field | `components/kit/field-recipe.ts`: height32px, horizontal padding8px, border1px, radius6px | White/rest slate-5; focus blue-9 ring2px; disabled slate-3/slate-9; error border red-9 |
+| Single-line field | `kit/field-recipe.ts`: height32px, horizontal padding8px, border1px, radius6px | White/rest slate-5; focus blue-9 ring2px; disabled slate-3/slate-9; error border red-9 |
 | Read-only framed fact | Workspace FullFact: minimum32px, padding8px horizontal /4px vertical, natural wrapping | Read-only is not disabled editing; automatic fact may use slate-3; preserve module ownership |
 | Multi-line field | Padding8px horizontal /4px vertical; natural content height | Same control skin; do not force all multiline facts to32px |
 | Toolbar field | Height36px at>=768,40px below; padding12px; text14/20 | Use supported toolbar shape, distinct from compact register search |
