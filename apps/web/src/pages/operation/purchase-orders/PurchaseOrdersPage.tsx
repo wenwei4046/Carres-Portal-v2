@@ -445,6 +445,7 @@ export default function PurchaseOrdersPage() {
   const monthly = params.get("view") === "monthly";
   const cards = params.get("view") === "cards";
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
+  const listingReturnParams = useRef<string | null>(null);
   const toggleRow = (id: string) => setSelectedKeys((previous) => {
     const next = new Set(previous);
     if (next.has(id)) next.delete(id); else next.add(id);
@@ -601,7 +602,10 @@ export default function PurchaseOrdersPage() {
         destinations={destinations}
         activeDestinations={activeDestinations}
         onBack={() => {
+          const returnParams = listingReturnParams.current;
+          listingReturnParams.current = null;
           setParams((current) => {
+            if (returnParams !== null) return new URLSearchParams(returnParams);
             const next = new URLSearchParams(current);
             next.delete("po");
             next.delete("view");
@@ -639,6 +643,7 @@ export default function PurchaseOrdersPage() {
     ...(filter.deliverTo ? [{ key: "deliverTo", label: `Supplier Deliver To: ${filter.deliverTo}`, onClear: () => setFilter((f) => ({ ...f, deliverTo: null })) }] : []),
   ];
   const openObject = (row: RegisterRow, view?: ObjectView) => {
+    listingReturnParams.current = params.toString();
     setParams((current) => {
       const next = new URLSearchParams(current);
       next.set("po", row.id);
@@ -1087,6 +1092,7 @@ export default function PurchaseOrdersPage() {
             <DataGrid<RegisterRow>
               appearance="reference"
               presentationTools
+              sessionKey="carres.purchaseOrders.register.v2"
               labelledToolbar
               rowHeight={32}
               presentationKey={cards ? "cards" : "table"}
@@ -1159,7 +1165,8 @@ export default function PurchaseOrdersPage() {
                 const scope = selectedRows.length ? selectedRows : filtered;
                 const quantities = new Map<string, number>();
                 for (const row of scope) for (const line of row.po.purchase_order_lines ?? []) {
-                  const category = goodsCategoryOf(line);
+                  const classified = goodsCategoryOf(line);
+                  const category = (GOODS_CATEGORY_WORDS as readonly string[]).includes(classified) ? classified : "Other goods";
                   quantities.set(category, (quantities.get(category) ?? 0) + Number(line.qty ?? 0));
                 }
                 const parts = GOODS_CATEGORY_WORDS.filter((word) => word !== "Service" && word !== "Other goods" && (quantities.get(word) ?? 0) > 0)

@@ -147,7 +147,7 @@ const queryData = {
 };
 
 vi.mock("@/components/register/DataGrid", () => ({
-  DataGrid: ({ rows, columns, onRowDoubleClick, statusSummary, fixedGroups, leadingColumns, personalLayouts, activeConditions, expandable, toolbarEnd, renderResults }: any) => (
+  DataGrid: ({ rows, columns, onRowDoubleClick, statusSummary, fixedGroups, leadingColumns, personalLayouts, activeConditions, expandable, toolbarEnd, renderResults, selectable }: any) => (
     <div
       data-testid="register-grid"
       data-groups={fixedGroups?.groups.map((g: any) => g.key).join(",")}
@@ -170,7 +170,7 @@ vi.mock("@/components/register/DataGrid", () => ({
           {expandable?.renderExpansion?.(row)}
         </div>
       ))}
-      {statusSummary?.(rows, [])}
+      {statusSummary?.(rows, rows.filter((row: any) => selectable?.selectedKeys.has(row.id)))}
     </div>
   ),
 }));
@@ -315,15 +315,29 @@ beforeEach(() => {
 });
 
 /* ⭐ Purchasing MASTER §9.3 (Jess, 2026-09-17): nine columns, four groups,
-   the SUPPLIER REPLY / RECEIVING / SUPPLIER / DELIVER TO rail and a footer
-   without quantity totals. */
+   the SUPPLIER REPLY / RECEIVING / SUPPLIER / DELIVER TO rail and an ordered-goods category footer. */
 describe("Purchase Orders Register", () => {
-  it("summarises ordered quantity by category without dropping unknown goods", () => {
-    const original = queryData.pos[0]!.purchase_order_lines[0]!.attrs;
-    queryData.pos[0]!.purchase_order_lines[0]!.attrs = { category: "Mattress" } as never;
-    renderPage();
-    expect(screen.getByTestId("po-footer")).toHaveTextContent("Qty: Mattress");
-    queryData.pos[0]!.purchase_order_lines[0]!.attrs = original;
+  it("summarises ordered quantity by category and names unknown goods", () => {
+    const line = queryData.pos[0]!.purchase_order_lines[0]!;
+    const original = line.attrs;
+    try {
+      line.attrs = { category: "Unrecognised goods" } as never;
+      renderPage();
+      expect(screen.getByTestId("po-footer")).toHaveTextContent("Not in catalog 3");
+    } finally { line.attrs = original; }
+  });
+
+  it("summarises the selected visible PO scope using ordered quantity", () => {
+    const line = queryData.pos[0]!.purchase_order_lines[0]!;
+    const original = line.attrs;
+    try {
+      line.attrs = { category: "Mattress" } as never;
+      renderPage("/operation/procurement?view=cards");
+      fireEvent.click(screen.getByRole("checkbox", { name: "Select PO-20260828-4827" }));
+      expect(screen.getByTestId("po-footer")).toHaveTextContent("1 selected purchase orders · Qty: Mattress 3");
+      fireEvent.click(screen.getByRole("checkbox", { name: "Select PO-20260828-4827" }));
+      expect(screen.getByTestId("po-footer")).toHaveTextContent("2 purchase orders · Qty: Mattress 3");
+    } finally { line.attrs = original; }
   });
   it("shows the same PO facts in Cards and preserves selection when returning to Table", () => {
     renderPage();
@@ -336,6 +350,17 @@ describe("Purchase Orders Register", () => {
     fireEvent.mouseDown(screen.getByRole("tab", { name: "Table" }), { button: 0, ctrlKey: false });
     expect(screen.queryByTestId("purchase-orders-cards")).not.toBeInTheDocument();
     fireEvent.mouseDown(screen.getByRole("tab", { name: "Cards" }), { button: 0, ctrlKey: false });
+    expect(screen.getByRole("checkbox", { name: "Select PO-20260828-4827" })).toBeChecked();
+  });
+
+  it("returns from a card's PO object to the original Cards view and selection", () => {
+    renderPage("/operation/procurement?view=cards");
+    fireEvent.click(screen.getByRole("checkbox", { name: "Select PO-20260828-4827" }));
+    const card = screen.getByRole("checkbox", { name: "Select PO-20260828-4827" }).closest("[data-row-key]") as HTMLElement;
+    fireEvent.click(within(card).getByRole("button", { name: "View" }));
+    expect(screen.getByTestId("purchase-order-object")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Back to Purchase Orders" }));
+    expect(screen.getByTestId("purchase-orders-cards")).toBeInTheDocument();
     expect(screen.getByRole("checkbox", { name: "Select PO-20260828-4827" })).toBeChecked();
   });
 
@@ -449,7 +474,7 @@ describe("Purchase Orders Register", () => {
     expect(screen.getByTestId("register-conditions")).toHaveTextContent(/^Supplier delivery date passed$/);
   });
 
-  it("a rail row or select narrows the list; the footer states n of m, never quantities", () => {
+  it("a rail row or select narrows the list; the footer states the filtered population and ordered quantities", () => {
     renderPage();
     expect(screen.getByTestId("po-footer")).toHaveTextContent(/^2 purchase orders/);
     const rail = within(screen.getByTestId("po-filter-rail"));

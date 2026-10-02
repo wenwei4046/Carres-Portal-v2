@@ -34,6 +34,7 @@ import { chunk } from "../../lib/purchase-demand-read";
 import { supplierPoFactsOf, type SupplierFactRows } from "../../lib/supplier-card-facts";
 import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
+import { skuCategories } from "../../lib/sku-categories";
 import { setTermsDaysInput } from "@carres/shared/schemas/finance-ap";
 import type { AppEnv } from "../../types";
 import { rpcWithArrivalTime } from "../../lib/receiving-time";
@@ -550,6 +551,7 @@ operationPosRouter.get("/", requireOperation, async (c) => {
     const lines = (row.purchase_order_lines as Array<Record<string, unknown>> | null) ?? [];
     for (const l of lines) skuSet.add(l.sku as string);
   }
+  const catalogCategories = await skuCategories(sb, [...skuSet]);
   const modelBySku = new Map<string, { model_name: string | null; size: string | null }>();
   if (skuSet.size > 0) {
     const skuResult = await readEveryChunked<Record<string, unknown>, string>(
@@ -843,6 +845,7 @@ operationPosRouter.get("/", requireOperation, async (c) => {
             }] : []),
           ],
           balance_answer_about_qty: balanceAboutByLine.get(l.id as string) ?? null,
+          category: catalogCategories.get(l.sku as string) ?? null,
           model_name: modelBySku.get(l.sku as string)?.model_name ?? null,
           size: modelBySku.get(l.sku as string)?.size ?? null,
           so_rows: soRowsOf(row, l.sku as string, Number(l.qty ?? 0)),
