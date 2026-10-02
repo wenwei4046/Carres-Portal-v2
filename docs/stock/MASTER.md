@@ -1322,7 +1322,7 @@ surface and are not deleted by the card above:
 - **Problems & evidence:** maintain only observable reason choices and their minimum scan/photo/
   receiver/factual-note evidence. Quarantine, Hold, Claim, write-off, compensation or replacement
   are downstream outcomes and cannot become observer reasons.
-- **Unit ID:** maintain format, governed product scope, supplier-label requirement, duplicate
+- **Unit ID:** maintain format, governed product scope, receiver-applied/verified labels, duplicate
   prevention, replacement-label rule and never-reuse law. Settings cannot rename an existing Unit;
   label error enters `Report a problem`.
 - **Permissions & approvals:** capability follows role/duty, never a hard-coded email. NETS

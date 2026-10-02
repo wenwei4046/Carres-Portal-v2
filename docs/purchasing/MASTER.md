@@ -1445,24 +1445,13 @@ none by law); an exact-unit line with no IDs after issue is an integrity failure
 IDs missing on this line — do not send this PO`, never an ordinary empty state. The official PO
 PDF heads the same column `UNIT ID` and prints the same line-bound IDs
 (`docs/pdf/PO-PDF-STANDARD.md`). The main Purchase Orders register stays one row per PO and
-carries no Unit ID column. Current supplier capability requires one simple extra line on its own
-package label:
-
-```text
-CARRES UNIT ID: U1-000-001
-```
-
-No supplier physical-Unit label, QR, barcode or Carres label template is required now. Carres
-Operations attaches the same text Unit ID to the physical sofa at the showroom. Future suppliers
-may attach the physical label and future QR/barcode may encode the same permanent machine value;
-neither upgrade may renumber the Unit.
-
-**Physical identity after unpacking — OPEN, owner statement 2026-09-25.** Suppliers write the Unit
-ID on the packaging only; once the packaging is removed the piece cannot be told from its twins. A
-Carres sticker for the product is a future idea with **no solution yet** for bedframes and sofas,
-which have no place to stick one. Consequence for every build: no rule, screen or check may depend
-on a physical label existing on the product; identity between unpacking and labelling is a known
-gap, stated, not hidden.
+carries no Unit ID column. The receiver applies and verifies labels under Stock §3's
+2026-09-25 warehouse-label ruling; suppliers are not required to label. Printing or replacing a
+label carries the same issued identity and never allocates another Unit. Supplier printing may
+later carry that same ID, with receiving verification. The approved warehouse label/scan target
+is not proof that every older unpacked piece already bears a physical label. Existing unlabelled
+goods must be matched to their recorded identity before applying a label; unresolved source or
+piece identity enters the governed evidence/problem process rather than being guessed.
 
 **MEASURED IN PRODUCTION, 2026-09-08.** `PO-20260908-2503` was issued through the real Manual
 Purchase screens and its Unit `U1-000-082` was written in the same transaction — both rows carry
