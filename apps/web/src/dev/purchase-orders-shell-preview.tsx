@@ -42,7 +42,7 @@ const pos = Array.from({ length: 26 }, (_, n) => {
          Unit IDs from the official issue. Measured on production 2026-09-27:
          103 of 103 live PO lines are `exact_unit` and none is missing a Unit. */
       destination_id: i % 4 ? "d1" : "d2", identity_mode: "exact_unit",
-      attrs: l === 0 && i % 2 ? { color: "Sand", fabric_name: "CG-012" } : null,
+      attrs: { category: (i + l) % MODELS.length === 1 ? "Sofa" : "Mattress", ...(l === 0 && i % 2 ? { color: "Sand", fabric_name: "CG-012" } : {}) },
       governed_sources: [], sources: [],
     };
   });

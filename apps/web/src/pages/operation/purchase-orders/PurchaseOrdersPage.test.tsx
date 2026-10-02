@@ -87,6 +87,7 @@ const queryData = {
         {
           id: "line-1",
           sku: "MAT-K-001",
+          attrs: null as Record<string, unknown> | null,
           qty: 3,
           received_qty: 1,
           identity_mode: null as "exact_unit" | "quantity" | null,
@@ -317,6 +318,13 @@ beforeEach(() => {
    the SUPPLIER REPLY / RECEIVING / SUPPLIER / DELIVER TO rail and a footer
    without quantity totals. */
 describe("Purchase Orders Register", () => {
+  it("summarises ordered quantity by category without dropping unknown goods", () => {
+    const original = queryData.pos[0]!.purchase_order_lines[0]!.attrs;
+    queryData.pos[0]!.purchase_order_lines[0]!.attrs = { category: "Mattress" } as never;
+    renderPage();
+    expect(screen.getByTestId("po-footer")).toHaveTextContent("Qty: Mattress");
+    queryData.pos[0]!.purchase_order_lines[0]!.attrs = original;
+  });
   it("shows the same PO facts in Cards and preserves selection when returning to Table", () => {
     renderPage();
     fireEvent.mouseDown(screen.getByRole("tab", { name: "Cards" }), { button: 0, ctrlKey: false });
@@ -422,9 +430,9 @@ describe("Purchase Orders Register", () => {
     const rail = within(screen.getByTestId("po-filter-rail"));
     const facet = rail.getByTestId("po-filter-partly_received");
     fireEvent.click(facet);
-    expect(screen.getByTestId("po-footer")).toHaveTextContent(/^1 of 2 purchase orders$/);
+    expect(screen.getByTestId("po-footer")).toHaveTextContent(/^1 of 2 purchase orders/);
     fireEvent.click(facet);
-    expect(screen.getByTestId("po-footer")).toHaveTextContent(/^2 purchase orders$/);
+    expect(screen.getByTestId("po-footer")).toHaveTextContent(/^2 purchase orders/);
   });
 
   it("SUPPLIER REPLY counts only the current version marked as sent with goods pending", () => {
@@ -443,21 +451,21 @@ describe("Purchase Orders Register", () => {
 
   it("a rail row or select narrows the list; the footer states n of m, never quantities", () => {
     renderPage();
-    expect(screen.getByTestId("po-footer")).toHaveTextContent(/^2 purchase orders$/);
+    expect(screen.getByTestId("po-footer")).toHaveTextContent(/^2 purchase orders/);
     const rail = within(screen.getByTestId("po-filter-rail"));
     fireEvent.click(rail.getByTestId("po-filter-partly_received"));
     expect(screen.queryByTestId("grid-row-PO-LEGACY")).not.toBeInTheDocument();
-    expect(screen.getByTestId("po-footer")).toHaveTextContent(/^1 of 2 purchase orders$/);
+    expect(screen.getByTestId("po-footer")).toHaveTextContent(/^1 of 2 purchase orders/);
     fireEvent.click(rail.getByTestId("po-filter-partly_received"));
     expect(screen.getByTestId("grid-row-PO-LEGACY")).toBeInTheDocument();
     // Both POs deliver to Carres Klang: the facet says so, and choosing it keeps both.
     const deliverTo = rail.getByRole("combobox", { name: "Supplier Deliver To" });
     expect(within(deliverTo).getByRole("option", { name: "Carres Klang · 2" })).toBeInTheDocument();
     fireEvent.change(deliverTo, { target: { value: "Carres Klang" } });
-    expect(screen.getByTestId("po-footer")).toHaveTextContent(/^2 purchase orders$/);
+    expect(screen.getByTestId("po-footer")).toHaveTextContent(/^2 purchase orders/);
     fireEvent.change(rail.getByRole("combobox", { name: "Supplier" }), { target: { value: "Hooka" } });
     fireEvent.click(rail.getByTestId("po-filter-partly_received"));
-    expect(screen.getByTestId("po-footer")).toHaveTextContent(/^1 of 2 purchase orders$/);
+    expect(screen.getByTestId("po-footer")).toHaveTextContent(/^1 of 2 purchase orders/);
     expect(screen.getByTestId("register-grid")).not.toHaveTextContent("Order Qty");
   });
 
