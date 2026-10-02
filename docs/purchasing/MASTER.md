@@ -3506,7 +3506,14 @@ reset control. **Owner placement correction 2026-10-02:** Search, Table/Cards an
 stay together above the listing; messages and selected-condition chips appear above this toolbar.
 **Local preview recommendation / NOT LAW:** omit the duplicate toolbar PO count, retaining the
 filtered PO count and quantity totals in the footer. Keep selected-row count separate because it
-identifies action scope. Do not add the earlier proposed generic overview/date/supplier rail alongside this
+identifies action scope.
+**FACT — revised local preview, 2026-10-02:** selection scope/Clear now share the Search and
+Table/Cards toolbar instead of adding a separate row. The PO info quick panel shows Item with
+source/destination context and four quantity columns; complete labels wrap and all quantities
+were visibly readable at the inspected 1146px viewport. Exact Unit detail remains on the full PO.
+Full PO facts use two columns within the left half beside the rendered PDF. Communication has
+one Record supplier answer action; the earlier duplicate was removed. These are local design
+adaptations, not admitted shared-kit changes or complete independent-preview clearance. Do not add the earlier proposed generic overview/date/supplier rail alongside this
 approved monitor rail. Exact new labels are registered in COPY-STANDARD; template primitives
 and numerical values remain shared UI authority.
 
