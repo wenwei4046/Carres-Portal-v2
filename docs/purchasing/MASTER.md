@@ -6277,6 +6277,22 @@ records the supplier outcome; Finance owns actual invoice, credit and payment co
 
 ---
 
+**Incoming consignment navigation recommendation — PROPOSAL / NOT LAW, 2026-10-02.**
+Keep Display Requests within Showroom as the common arrangement entry for purchased display,
+supplier-owned display, swaps, removal and misplaced goods recovery. Recommend an explicit
+Purchase Consignment group with Purchase Consignment Orders, Receiving (scoped to these orders
+through the existing Receiving engine), and Purchase Consignment Returns. Proposed fuller names
+replace Consignment Orders/Returns only after owner approval and COPY convergence; existing
+numbers and history do not change. Delivery stays the linked transport action, Stock the owning
+identity/custody door. Do not add outgoing Consignment Order/Note/Return pages: Carres external
+partner placement is not established. Carres Site-to-Site movement uses Stock Transfer. The
+Houzs-to-PJ misplaced-goods case preserves existing source and actual custody, then pickup and
+PJ receipt/handover; never assume the external warehouse is a Carres Site. Trade-off: a scoped
+Receiving entry adds a navigation shortcut but prevents staff missing the incoming receipt step
+without duplicating its engine. Acceptance fails if direction remains unclear, source facts are
+re-entered, a document issue changes custody, or receipt/transport is implemented twice. Reference
+function evidence is in purchasing-houzs-review.md; this is not application/build authorisation.
+
 ### 9.12 Showroom completeness audit and recommended completion — 2026-09-28
 
 **FACT / RESEARCH + PROPOSAL / NOT LAW.** This is the current whole-domain completeness audit,

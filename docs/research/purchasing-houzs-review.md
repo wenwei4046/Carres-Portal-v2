@@ -438,3 +438,27 @@ requested/approved/rejected requests and snapshots plus PO revision bump on appl
 states this is Houzs-native, with no 2990 mirror/dispatch. The available Desktop/2990s checkout
 did not establish a corresponding PO-amendment listing; do not attribute the Houzs design to2990.
 No request was raised, approved or rejected in this inspection.
+
+
+## Complete consignment direction/function review — 2026-10-02
+
+FACT: inspected the existing Houzs source snapshot, not a new production deployment proof.
+`docs/modules/consignment-alignment.md` and `purchase-consignment-order.md`, with the owning
+backend routes, establish two separate chains. Outgoing CO mirrors Sales Order, CN mirrors
+Delivery Order, CR mirrors Delivery Return. Incoming PCO mirrors PO, PCR mirrors GRN, PCT
+mirrors Purchase Return. PCO is an order-only supplier commitment and writes no inventory; PCR
+books incoming goods and PCT outgoing goods. CN creates outbound ledger effects; Houzs document
+creation/status is not proof of separate actual pickup and arrival. Shared enums contain values
+without corresponding operational buttons/automation. These behaviours must not be copied as
+Carres physical truth. Purchase Consignment means supplier-owned incoming goods, not purchased
+Carres ownership. Carres needs the incoming display chain; an outgoing partner-consignment
+operating need has not been established. Carres Site-to-Site relocation is not proof of that need.
+
+PROPOSAL / NOT LAW: keep Display Requests in Showroom because they cover purchased goods,
+supplier-owned display, swaps/removal and misplaced goods recovery. Make incoming direction
+explicit with Purchase Consignment Orders and Purchase Consignment Returns; offer a Receiving
+entry scoped to those orders using the same Receiving engine, not a duplicate receipt writer.
+Transport opens the same linked Delivery action. Outgoing CO/CN/CR reference capabilities are
+not admitted as new Carres documents without an established external placement business flow.
+Misplaced goods at Houzs use existing source, exact identity/ownership and actual custody, linked
+transport and PJ receipt/handover; do not mint another order or assume Houzs is a Carres Site.
