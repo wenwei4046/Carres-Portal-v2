@@ -5946,6 +5946,29 @@ Stock §12.9).
 
 ### 9.8 Display Requests
 
+**COMPANY / SHOWROOM LOCATION AND CONSIGNMENT SCOPE — OWNER-APPROVED / LOCKED;
+Jess, 2026-10-02.** A company may have multiple showroom locations. The showroom using the
+Portal enters work for its identified, authorised location; company, location and actual
+recorder stay distinct. Known company/location facts come from the authorised source and are
+carried into the same request Operation continues. Staff do not re-enter those facts for a
+second Operation request. Location access does not imply access to every company location;
+this ruling does not prescribe shared accounts or replace individual actor/proxy audit.
+
+Consignment display applies to Carres' own showrooms only. They may hold supplier-owned display
+goods or purchased Carres-owned goods, with the §7.7 display-only sales boundary unchanged.
+Dealers buy goods from Carres; their showroom locations do not receive consignment under this
+operating model. A Dealer purchase belongs to the Sales/commercial source, never an internal
+Manual Purchase, Stock Transfer or supplier consignment display placement solely because its
+destination is a showroom. A company having several locations changes destination and access
+scope, not the commercial nature of the transaction. No Dealer credit or new payment/ownership
+transition rule is inferred from this clarification.
+
+The same-request handoff and these channel/location boundaries are approved. The independent
+module, proposed broader request name, final menu, six-reference-document naming/placement and
+external Dealer permissions remain pending whole-Blueprint review. This is PLAN truth, not
+application delivery or authority to change existing Unit ownership, provision accounts or
+switch external channels. ERP Architecture §2.1 holds the cross-module seam.
+
 **SHOWROOM HANDOFF — APPROVED TARGET / NOT BUILT; Jess, 2026-09-28.** Sales negotiates
 with the supplier about the display goods, price and conditions; Operation does not negotiate or
 set the price. This internal record hands that arrangement to Operation for documentation and

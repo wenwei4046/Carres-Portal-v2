@@ -309,6 +309,26 @@ that Dashboard or every module projection is built.
 
 # §2.1 · Naming and navigation
 
+## Company, showroom location and channel boundary — OWNER-APPROVED, Jess 2026-10-02
+
+A company may have multiple showroom locations. A showroom is the actual operating location,
+not a separate company and not the login itself. A Portal entry identifies its company,
+showroom location and actual recorder; a location-scoped login uses that authorised location.
+Do not grant all-company or all-location visibility merely because a person can enter work at
+one showroom. Existing individual actor, authorised scope and proxy-recording rules remain.
+
+Carres' own showrooms and Dealer showrooms are different business channels. Carres-owned
+showrooms may hold purchased Carres stock or supplier-owned consignment display goods under
+Purchasing's display rules. Dealers buy from Carres; Dealer showrooms do not use consignment.
+Multiple locations do not turn a Dealer purchase into an internal Stock Transfer or a
+consignment placement. Location alone never determines Unit ownership.
+
+Showroom and Operation continue the same source request, retaining company, location, actor
+and connected documents without re-entry. This ruling establishes the company/location and
+channel semantics only. It does not approve an independent Showroom & Dealer module, a new
+request name, final navigation, external Dealer access design, Dealer credit, the whole pending
+Blueprint or application implementation. Purchasing §9.8 owns the display-specific handoff.
+
 **A page is named after the operator's primary responsibility.** Usually that is a business
 object; sometimes it is an accepted ERP operation (`Receiving`); cross-cutting system pages
 (`Reports`, `Settings`) are exceptions. **Never the screen form (`List`), never an action
