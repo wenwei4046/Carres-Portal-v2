@@ -1728,7 +1728,7 @@ checklist. Revisions 2 to 5 carry her corrections of the same day, made on the d
      | Card button | `Button` secondary | 36px, top right of the card; opens the owning form in the card |
      | Form in card | `FieldFrame` + `field-recipe` + `Select` / `DatePicker` | three fields per row, gap 12, label 11/500 slate-11 over a 32px field; white; only `Save` is `Button` primary (the one blue) |
      | Progress | text | `{n} of {m} done` 12/400 slate-11, bottom right of a card; only steps with completion evidence count |
-     | Communication | `Tabs` + `Select` + `Button` + `Icon` (`message`, `mail`) | four tabs on one row; To (recorded channels only) · Template · Message · icons · Copy · `History {n}` folded |
+     | Communication | `Tabs` + `Select` + `Button` + `Icon` (`message`, `mail`) | communication belongs inside the exact task tab (§5.11); recorded channels only · Template · Message · Copy · folded History |
      | Document number | link + `PdfPreview` sheet | underlined 12/400 ink; opens the official PDF over the page |
 
      **ADMITTED TO THE KIT 2026-09-28 (Jess "kit ok") and BUILT the same day — values now live in UI
@@ -1859,113 +1859,8 @@ another date) AND one PO serving three orders; no page scroll; each column scrol
 one blue; every word in COPY; and the one test that matters: pick an act in the Inbox, finish it in
 the Mission, contact the right party in Communication, never open a second page.
 
-#### The order-centred ruling of 2026-09-26 night (superseded in its layout by A4 above)
-
-**"Order 就是那整个东西的核心。"** After three days of right-panel pictures the owner put the
-reference images side by side — Jobdrive's deal, AML's transaction, Plain's thread, the mail
-clients — and named what they share: **the centre is the one record, never the one act.** Work is
-therefore ORDER-CENTRED:
-
-- **One row = one order** (a Sales Order; for supplier work, a PO). An order appears ONCE in the
-  list, however many open acts it carries. The row says: the number, the customer, where the
-  Route stands, and what must be done today.
-- **The right panel = that order, whole:** its number and state with ONE big button (today's next
-  act) on top → the **Order Route**, one line, every point dated → **today's acts**, one line each,
-  each with its own prepared message and button (`Call AL Logistics` · `Ask customer to pay`) →
-  then the order's facts — Customer · Balance · Supplier · Logistics · what happened (history) —
-  collapsed, opened on click.
-- **An act lives inside its order** (Jobdrive's "Next drip · Follow up proposal · Scheduled for
-  tomorrow" sits inside the deal; AML's investigation sits inside the transaction). Work never
-  scatters one order's acts into separate rows.
-- The left rail stays the month calendar: pick the day, then see that day's orders.
-- **Every card tallies a Route step (Jess, 2026-09-27: "every card is tally every order route step").**
-  Below the Route the cards come in Route order — `Proceed · Sales Order` · `PO · Supplier` ·
-  `GRN · Warehouse` · `Contact · Logistics` · `Delivery · Customer` — each ONE row in three segments
-  (the step · its status line · that step's date and status word from the Route, plus the one
-  button when the order's act lands there), collapsed; expand = the detail, card in card, two
-  sides (facts left, message and history right). Not every section is read every time. The
-  order's acts land on their step: a delivery act on Contact · Logistics (the WhatsApp door with
-  its template picker; the message folded until `Show message`), every other act on the Sales
-  Order row (its door). The first act's button is the panel's ONE blue. "Long" is the failure:
-  the panel uses its width, never its height.
-
-**Retired by this ruling:** the per-act row (SO-1362 appearing once for Delivery and again for
-Payment); the ACTION-card-only panel (ruling B, same night — superseded within the hour once the
-owner saw it: "I want my Order Route"); the 2026-09-25 composition's summary-less panel. The
-components built for them (Route, Sales Order card, party cards, ACTION card) are the parts this
-composition reuses; nothing is drawn twice.
-
-**Build order (owner to say "build"):** 1 · the middle list grouped by order, one row per order with
-its today's acts · 2 · the order panel: header + big button, dated Route, the acts list with their
-messages · 3 · the collapsed fact cards and history. Each step is shown on the real page, walked by
-the owner with two questions per row — *do I know what to do? · did I have to open another page?*
-
-#### The former per-act right panel (rulings 2026-09-25 / B 2026-09-26) — superseded, kept for the parts
-
-**WORK IS AN INBOX. The right panel is the ACTION card and nothing else.** Asked "how does Work
-help me work?", the owner chose, from three operating models, **B · do it here**: the left list
-is the day's work; the right panel is *doing this one thing* — COPY's sections `ACTION` (the
-sentence, the party, `due {date}`, red when missed) · `CURRENT FACT` · `FINISH WHEN` ·
-`WHAT HAPPENS NEXT` (only when the source supplies one) · `COMMUNICATION` (the owning module's
-prepared message, `Open WhatsApp group` / `Open WhatsApp` as the panel's ONE blue, `Copy message`,
-and the module door that records the answer) · the `Open {object}` door. Buttons live only here.
-When no module message is admitted, `Open {object}` is the act.
-
-**Retired from Work by this ruling:** the Order Route, the Sales Order card, the Logistics,
-Customer and Supplier cards and the mission header (option C, "see the whole order, then decide",
-was rejected: "I don't know what I should do now"; option A, a bare list, was rejected for making
-every act a page change). The whole-order view lives on the Sales Order page behind the door and
-is not drawn a second time in Work. The party-card components and their laws below remain the
-owning pages' material (Delivery §5.5 Logistics; Sales Order Route) — Work does not render them.
-`Owner, timing and source` stays as the last, closed disclosure.
-
-**Admitted messages so far:** Delivery work — Delivery's own logistics message (customer
-reference, address, building, goods by catalogue name, customer date, the external link) to the
-partner's WhatsApp group, door `Open in Delivery`. **Next:** Purchasing (the supplier group, PO
-reference) and Payment (the customer) bring their own when their MASTERs admit them — never a
-Workspace draft.
-
-#### The former whole-order composition (owner-approved 2026-09-25) — kept for the owning pages, NOT drawn in Work
-
-This section is the canonical continuation of §5.9. It freezes the complete selected-mission
-composition so a later chat reads it from the repository rather than reconstructing it from chat.
-The deployed left Date/Module rail, middle To do/Waiting/Completed cards, density contract in §5.5
-and Logistics behaviour in §5.9 are preserved. The build scope is the missing Customer card,
-multi-supplier Supplier card, compact Order Route and their shared communication/state behaviour.
-
-#### One fixed top-to-bottom composition (Jess, 2026-09-26 — Route FIRST; BUILT)
-
-1. **Order Route** — one compact horizontal mission-health line, first, always open; its title
-   line is `{object} · {module}` (`SO-1362 · Delivery`), never the words "Order Route"; it is not
-   a wizard or sequence.
-2. **Sales Order card** — the order's own facts, read-only, in two columns: `Customer` (name ·
-   phone) · `Deliver to` · `Goods` (`{name} ×{qty}` per line, catalogue names) · `Customer date` ·
-   `Balance` (`RM 0.00 · paid` / red `RM {n} · not paid · by {date}` — the collection deadline the
-   Route's payment line reads). The record door is the header's `open` icon (Jess, 2026-09-26).
-   The Balance is the panel's ONE money line.
-3. **Logistics card** — §5.9's deployed eight-section expansion, unchanged. Collapsed it reads like
-   Customer and Supplier (Jess, 2026-09-26): the heading row with `Checks {n} of 3`, then ONE
-   status line — the act in bold · its result · `due {date}` · the scheduled day · the one exception,
-   `·`-separated, wrapping, never a third row. Its money exception (`Hold delivery · RM {n}
-   unpaid`) is not printed on the right panel because the Balance already says it; the expanded
-   `1 working day before` check keeps it.
-4. **Customer card** — mission-relevant dates, contact checkpoint and structured answer only.
-5. **Supplier card** — one mission card; when expanded, one row per supplier/PO.
-6. **Owner, timing and source** — audit disclosure, last, not repeated inside every card.
-
-**THE ACTION CARD IS BACK ON TOP — owner ruling, Jess 2026-09-26 evening ("I lost … I don't know why
-I see so many info for what"; she chose option C with hide/expand).** The right panel is two layers:
-**do**, then **look**. The first card is the selected work itself — COPY's own sections `ACTION`
-(the sentence, the party, `due {date}`, red when missed) · `CURRENT FACT` · `FINISH WHEN` ·
-`WHAT HAPPENS NEXT` (only when the source supplies one) · `COMMUNICATION` (the owning module's
-prepared message, `Open WhatsApp group` / `Open WhatsApp` as the panel's ONE blue, `Copy message`,
-and the door that records the answer). Buttons live only here. Below it every information card —
-Sales Order · Logistics · Customer · Supplier — is collapsed to one line and expands on click, one
-at a time, exactly as §5.9 built them; the Order Route stays open and each point explains itself on
-click. The 2026-09-26 afternoon retirement of the summary block is overturned by this ruling. No section is dragged or reordered; sections are always open on a desktop.
-The Route says which mission obligation needs attention; the party card says who must answer and
-exposes the owning action. Only one party card expands at a time, and it remains expanded after a
-save or refresh. On a screen below 768px `Back to work` restores the same list position and filters.
+The current task-inspection composition is §5.11. Superseded whole-order/per-act layout
+instructions are removed; the source-fact and owning-module business boundaries below remain.
 
 #### Order Route — one line, concurrent facts
 
@@ -2220,6 +2115,37 @@ contact; partial failure; permission refusal.
 Acceptance measures 1440, 1180, 820, 743 and 390: no horizontal page scroll, 72px collapsed cards,
 one-line Route, one primary blue action, unwrapped `27 Oct`, correct keyboard/screen-reader behaviour,
 no console error, and no regression to Logistics, left rail, middle cards or list restoration.
+
+### 5.11 · Task inspection — owner correction 2026-10-02
+
+**APPROVED TARGET / NOT BUILT.** Current navigation is `Info` plus the mission's actual tasks,
+not `Details`/`Communication` or four party tabs. This replaces older right-panel composition
+instructions in §5.10; it preserves source ownership, Work lifecycle and the middle mission map.
+For SO-backed missions, Info uses the current compact SO quick-view cards, unchanged in order:
+Info, Delivery, Items, Payment, Related documents. Do not render the full editable form or repeat
+PO fields as a substitute. Non-SO work shows its own object facts; no fabricated SO association.
+
+Each task tab is bound to the selected task and exact originating document/line. It shows the
+action, assigned person, real Due/Missed state, latest actual reply with actor/time/evidence,
+required result and prepared contact message, owning source operation and complete history.
+No first-PO or supplier-name fallback may bind a task to another PO. Unknown identity remains
+unknown; the owning module supplies the write door. Copy/Open WhatsApp/send is not completion,
+does not pause the deadline and does not manufacture a reply. Reopening tomorrow does not reset
+Due. Planned follow-up is distinct from an automatic task deadline.
+
+SO/customer identity appears once. Customer Requested context belongs in the header/Info with
+full date discovery; Proceed is an Info fact, not task Due. Source-backed customer amendments
+change the effective customer request; supplier delays do not rewrite it. Record verified delay
+causes without guessing fault or blaming the current assignee. Current assignment uses the
+approved avatar presentation with the person's full name accessible on hover, focus and tap.
+Day-badge concept is approved; exact calendar/working-day arithmetic and numerical wording are
+**PROPOSAL / NOT LAW**, not silently admitted by this audit.
+
+The canonical source measurements, delivered SO boundary and open shared-template acceptance
+gaps are in [UI MASTER, Canonical audit](../ui/MASTER.md#canonical-audit-and-publication-state--2026-10-02).
+Do not claim this task-inspection target shipped from listing/quick-view verification.
+
+---
 
 ## 6 · Module admission gate
 

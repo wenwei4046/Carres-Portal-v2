@@ -20,6 +20,72 @@
 
 ---
 
+## Canonical audit and publication state — 2026-10-02
+
+**FACT / bounded production verification.** This audit uses source and the five production
+release endpoints at `de816e00cc530b72d3debeb1adc9f70799927a9c`. The authenticated Sales Orders
+walk covered Table/Cards, search, grouping, totals and the read-only quick view at 1440×1000
+and 390×844. Documentation publication does not prove the complete kit or every module shipped.
+The source recipes below are measurements, not new tokens. The three standards above retain
+value authority. No application code or deployment is part of this audit.
+
+| Surface / source under `apps/web/src/` | Exact current recipe | Verification / boundary |
+|---|---|---|
+| Shell: `pages/operation/OperationApp.tsx`, `pages/portal/PortalSidebar.tsx` | Sidebar expanded232 / collapsed60; mobile boundary768, sidebar drawer; bounded main scroll | Source; phone listing has no document overflow |
+| Page title: `pages/operation/components/ModuleHeader.tsx` | Word only24/32/600; destination minimum50 plus border; desktop inset24 | Source; not a task header |
+| Global tools: `GlobalTopBar.tsx` | Triggers32 desktop /40 phone, icons16, gap4 | Runtime in Sales; other pages not walked |
+| Global utility strip: `OperationRightRail.tsx` | Strip64, buttons60; icon18, label10/12; panel340, header48, inset14 | Source; distinct from task inspection and quick view; its complete target remains unbuilt |
+| Register rail: `pages/operation/components/workspace-rail.tsx`, `index.css` `.so-template-rail` | Width240; inset8/12 in SO; tabs36, gap4; group title13/600; SO rows32 desktop/40 phone, text12/18 | Source; Hide/Show28 remains a touch-target gap |
+| Register: `components/register/DataGrid.module.css` | SO rows32 desktop/40 phone; header36,11/600/14, inset8; footer32, inset12 | Stable desktop runtime; effective header600 overrides earlier700 declaration |
+| Toolbar: same stylesheet | Desktop40; mobile wraps with minimum48; search220×32 desktop/220×40 phone | Phone measured96 high; never describe all phone toolbars as48 |
+| Table/Cards: `components/kit/Tabs.tsx` | Segmented tab26 desktop /34 phone, inset10, icon16 | Phone actual34; unresolved against40 touch target |
+| Selection / filters: `DataGrid.module.css` | Selection inset4/12, gap8; filter row minimum36, inset6/12, gap6; chips maximum260, remove24 | Source; no claim all controls have40 hit area |
+| Grouping: `DataGrid.tsx` and stylesheet | Group heading38, title13/18/600; group-local sticky headers; one shared column layout | Delivery groups30/1; totals remain31 across collapse; not group subtotal truth |
+| Summary: `SalesOrdersRegister.tsx` | Four facts; labels12/16, values15/22/600, gap8, inset8; money right aligned/tabular | Search Kimmy:1 / RM2499 / RM1250 / RM1249; Table/Cards agree |
+| Cards: `SalesOrdersRegister.tsx` | Grid inset12, gap12; viewport1 column,768→2,1536→3 | Source; proposed container minimum320 thresholds652/984 are NOT BUILT; unavailable receipt/delivery evidence must not be invented |
+| Quick view: same page + `components/kit/DialogFrame.tsx` | Width maximum560/full phone; full height; radius10 at leading edge; desktop right offset64; header icons16 in32/40 buttons | Runtime560×1000 and390×844; close returns focus to SO1303; read-only, not task execution or generic editor |
+| Block: `components/kit/Block.tsx` | Border1 slate5, radius10, inset12/16; title15/22/600; body margin12 | Source and quick-view runtime; no new card kit |
+| Button: `components/kit/Button.tsx` | Default32/40, inset12, gap8, icon16; small24/icon14; touch36/40/icon14; focus2 offset1 | Source; default size does not upgrade every small control's hit area |
+| Modal/drawer: `components/kit/DialogFrame.tsx` | Named modal512/600/880, maximum85vh; drawer560; header12/16 gap16; body16; optional footer12/16 gap8 | Source; trap/Escape/scroll lock, return to surviving opener or explicit return target; generic combinations not runtime verified |
+| Tabs: `components/kit/Tabs.tsx` | Text13/18; inset4/8; icon gap8; tabs gap16; active underline2 blue and600 | Source; shared bar alone does not provide panels/association/overflow policy |
+| Fields: `components/kit/FieldFrame.tsx` and control skin | Gap4; label11/500/14, hint12/16, error13/18; input32, inset8, radius6, focus2 | Source; multiline uses natural height; generic validation journey not walked |
+| Status / neutral badge: `components/kit/StatusPill.tsx`, `components/kit/Badge.tsx` | Height22,11/14/500, inset4/8, capsule; status solid semantic step11/white; neutral badge slate3/slate11 | Source; identical geometry does not mean identical colour semantics |
+| Owner identity: `pages/operation/SalesOrderRoute.tsx`, `lib/staff-avatar.ts` | Current owner chip20, initials and assigned-name palette; current chip aria-hidden | Source; latest avatar-only hover/focus/tap target is NOT BUILT; title alone is insufficient |
+| Full SO: `pages/operation/SalesOrderTabs.tsx`, `pages/operation/SalesOrderWorkspace.tsx` | Header44 desktop; tabs36; form minimum660, PDF320; ≥1320 halves,980–1319 form660, below980 stack; inset16 | Source; listing proof does not verify the full form or complete shared object template |
+
+Inter was available to the browser (`document.fonts.check('12px Inter')`); this is not proof
+of every CJK glyph or every page. A real browser200% zoom walk was not performed. Narrow-canvas
+checks do not substitute for that test. Long-label disclosure, generic task tabs, avatar
+accessibility and the complete reusable utility-panel template remain open acceptance gaps.
+
+### Shared task inspection — latest owner correction, 2026-10-02
+
+**APPROVED TARGET / NOT BUILT.** Owning operating law is
+[Workspace MASTER §5.11](../workspace/MASTER.md#511--task-inspection--owner-correction-2026-10-02).
+The panel has `Info` and actual task tabs. `Details`/`Communication` are not its two navigation
+states. For SO-backed work, Info preserves the existing compact SO fact cards and their order:
+Info → Delivery → Items → Payment → Related documents. It is not a full editing form or a
+repeated PO-field inventory. A task tab presents that exact task's action, assignment, due/missed
+state, latest reply/evidence, required result, source operation and history. Communication is
+inside the task that owns it. The middle mission map and selection retain the same exact identity.
+
+Source object/line/task identity must be explicit. Never substitute the first PO, a supplier-label
+match or an unrelated order to fill missing binding. Non-SO work uses its real originating object;
+Showroom is not given a fabricated SO. Work reads source truth and uses the owning write door.
+Sending, copying or opening a channel does not complete work or pause its deadline. Customer
+Requested context is separate from task Due and recorded Proceed; supplier delay does not rewrite
+the customer's date. Avatar-only assignment requires full identity on hover, focus and tap.
+Exact day-count arithmetic and unresolved presentation dimensions remain PROPOSAL / NOT LAW.
+This target does not replace Purchasing's independently governed PO quick-panel tabs, the global
+utility strip or the read-only SO quick view.
+
+**Publication / alignment boundary.** Workspace, Showroom and Right Rail chats supplied source
+readbacks; Purchasing supplied no substantive readback at audit time. A message sent is not
+alignment proof. Publication in a PR is not publication on main; report the exact commit and
+subsequent reader confirmations before claiming the shared contract is adopted.
+
+---
+
 # §1 · Overview
 
 ## Reuse-first shared page templates — owner ruling 2026-10-01
@@ -1248,7 +1314,7 @@ the whole reason the two components share a frame.
   gutter (selection + expand) and the **first data column** pin to the left edge while the rest
   slides under them. The engine does not know what an `SO No` is — the identity column is whatever
   the page put first.
-  - **The ruling said `kit/DataTable`, and that was a factual slip we are recording rather than
+  - **The ruling said `components/kit/DataTable`, and that was a factual slip we are recording rather than
     obeying.** The Sales Orders Register runs `register/DataGrid` under the ruled exception in the
     line above, so building the capability in the kit component would have satisfied the words and
     left the actual register scrolling its identity away. What binds is the ruling's own reason —
@@ -3442,16 +3508,16 @@ Shared token radii: control6px, card10px. `text-strong` is15px/22px, weight600.
 
 | Surface / element | Exact source recipe | Design and responsive rule |
 |---|---|---|
-| Block card | `kit/Block.tsx`: horizontal padding16px, vertical12px; border1px; radius10px | White default, slate-3 muted identity; black15/22/600 heading; slate-5 border/divider |
+| Block card | `components/kit/Block.tsx`: horizontal padding16px, vertical12px; border1px; radius10px | White default, slate-3 muted identity; black15/22/600 heading; slate-5 border/divider |
 | Block heading | Bottom padding8px; header horizontal gap12px /vertical4px; body margin-top12px | Header wraps; read-only navigation may use headerSlot; writing actions stay with their facts |
-| Quick-view drawer | `kit/DialogFrame.tsx` + Tailwind `max-w-drawer`: width100%, maximum560px, full height | At desktop>=768 right offset64px preserves right rail; below768 uses side-frame right0 |
+| Quick-view drawer | `components/kit/DialogFrame.tsx` + Tailwind `max-w-drawer`: width100%, maximum560px, full height | At desktop>=768 right offset64px preserves right rail; below768 uses side-frame right0 |
 | Drawer header/body | Header padding16px horizontal /12px vertical; title/actions gap16px; actions gap8px; body padding16px | Quick view dark slate-12/white; title truncates with full tooltip; below768 header wraps into identity/actions rows with8px gap |
 | Quick-view content | Register composition: cards gap12px; fact grid2columns, gap12px; labels12px, value600, value margin-top4px | Contact facts first; no duplicate customer card; no footer; body owns vertical scrolling |
-| Button default | `kit/Button.tsx`: desktop>=768 height32px; phone40px; horizontal padding12px; gap8px; icon16px | Shared primary/secondary/ghost variants; no local className/style overrides |
+| Button default | `components/kit/Button.tsx`: desktop>=768 height32px; phone40px; horizontal padding12px; gap8px; icon16px | Shared primary/secondary/ghost variants; no local className/style overrides |
 | Icon-only button | Desktop32×32px; below76840×40px; padding0 | Tooltip and accessible name required; icon alone never removes keyboard access |
 | Button specialised sizes | `sm`: height24px, padding8px, gap4px; `touch`: desktop36px/phone40px, padding12px, gap6px; sm/touch icon14px | Supported API variants only; small size is not the default for phone actions |
 | FieldFrame | Label/control vertical gap4px | Shared label, required/error/hint semantics; do not hand-roll field wrappers |
-| Single-line field | `kit/field-recipe.ts`: height32px, horizontal padding8px, border1px, radius6px | White/rest slate-5; focus blue-9 ring2px; disabled slate-3/slate-9; error border red-9 |
+| Single-line field | `components/kit/field-recipe.ts`: height32px, horizontal padding8px, border1px, radius6px | White/rest slate-5; focus blue-9 ring2px; disabled slate-3/slate-9; error border red-9 |
 | Read-only framed fact | Workspace FullFact: minimum32px, padding8px horizontal /4px vertical, natural wrapping | Read-only is not disabled editing; automatic fact may use slate-3; preserve module ownership |
 | Multi-line field | Padding8px horizontal /4px vertical; natural content height | Same control skin; do not force all multiline facts to32px |
 | Toolbar field | Height36px at>=768,40px below; padding12px; text14/20 | Use supported toolbar shape, distinct from compact register search |
