@@ -56,7 +56,7 @@ vi.mock("./WarehouseWorkspace", () => ({
   ),
 }));
 vi.mock("./WarehouseStockRegister", () => ({
-  default: () => <div data-testid="stock-register-stub">stock-register</div>,
+  default: ({ showroom }: { showroom?: boolean }) => <div data-testid="stock-register-stub" data-showroom={showroom}>stock-register</div>,
 }));
 vi.mock("./OperationStockPlan", () => ({
   default: () => <div data-testid="stock-plan-stub">stock-plan</div>,
@@ -360,6 +360,12 @@ describe("OperationApp — Warehouse surfaces draw one top row, not two", () => 
   it("?tab=stock-onhand mounts the Inventory Register with no slim bar", () => {
     renderApp("/operation?tab=stock-onhand");
     expect(screen.getByTestId("stock-register-stub")).toBeInTheDocument();
+    expect(screen.queryByTestId("global-topbar-stub")).not.toBeInTheDocument();
+  });
+
+  it("Showroom mounts the scoped existing register with only one header", () => {
+    renderApp("/operation?tab=showroom");
+    expect(screen.getByTestId("stock-register-stub")).toHaveAttribute("data-showroom", "true");
     expect(screen.queryByTestId("global-topbar-stub")).not.toBeInTheDocument();
   });
 

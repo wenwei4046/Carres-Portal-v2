@@ -154,6 +154,25 @@ function buildSb(opts: SbOpts = {}) {
 }
 
 describe("GET /register — the one current listing", () => {
+  it("narrows the owning register to the requested showroom before enrichment", async () => {
+    const { sb, eqs, tables } = buildSb({ rows: [viewRow({ site_name: "PJ Showroom" })] });
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const res = await app.request("/api/ops/stock/register?site=PJ%20Showroom", {
+      headers: { Authorization: `Bearer ${await makeJwt("operation")}` },
+    }, env);
+    expect(res.status).toBe(200);
+    expect(eqs).toContainEqual({ col: "site_name", val: "PJ Showroom" });
+    expect(tables[0]).toBe("stock_unit_register_v");
+  });
+
+  it("a site query never grants a Dealer access to the internal stock register", async () => {
+    const res = await app.request("/api/ops/stock/register?site=PJ%20Showroom", {
+      headers: { Authorization: `Bearer ${await makeJwt("dealer")}` },
+    }, env);
+    expect(res.status).toBe(403);
+    expect(userClient).not.toHaveBeenCalled();
+  });
+
   it("does not report missing source facts when their lookup failed", async () => {
     const { sb } = buildSb({ rows: [viewRow()], sourceError: { code: "42703", message: "Source contract unavailable" } });
     vi.mocked(userClient).mockReturnValue(sb as never);

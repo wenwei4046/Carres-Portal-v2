@@ -87,9 +87,11 @@ export function useUnitOpenIssues(unitCode: string | undefined) {
   });
 }
 
-export default function WarehouseUnitDetail({ unitCode: selectedCode, onBack }: {
+export default function WarehouseUnitDetail({ unitCode: selectedCode, onBack, backTo = "/operation?tab=stock-onhand", backLabel = "Inventory" }: {
   unitCode?: string;
   onBack?: () => void;
+  backTo?: string;
+  backLabel?: string;
 } = {}) {
   const { unitCode: routeCode } = useParams<{ unitCode: string }>();
   const unitCode = selectedCode ?? routeCode;
@@ -147,8 +149,8 @@ export default function WarehouseUnitDetail({ unitCode: selectedCode, onBack }: 
       <SalesOrderTabs
         identity={unit?.unitCode ?? unitCode ?? "Unit"}
         customer={item}
-        backTo="/operation?tab=stock-onhand"
-        backLabel="Inventory"
+        backTo={backTo}
+        backLabel={backLabel}
         onBack={back}
         docTitle={unit ? `${unit.unitCode} · Warehouse — Carres` : "Unit · Warehouse — Carres"}
         right={menu}

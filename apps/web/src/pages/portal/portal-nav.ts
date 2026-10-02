@@ -81,6 +81,7 @@ export type PortalSection =
   | "Workspace"
   | "Sales"
   | "Purchasing"
+  | "Showroom"
   | "Delivery"
   | "Warehouse"
   | "Payments"
@@ -94,6 +95,7 @@ export const SECTION_ORDER: ReadonlyArray<PortalSection> = [
   "Workspace",
   "Sales",
   "Purchasing",
+  "Showroom",
   "Delivery",
   "Warehouse",
   "Payments",
@@ -398,6 +400,7 @@ export const PORTAL_NAV: PortalNavGroup[] = [
        * (Display Requests), some the supplier still owns (the consignment
        * papers); one drawer, because the operator's question is the same one:
        * what is on display, and whose is it. */
+      { key: "showroom", label: "Showroom Display", icon: Store, section: "Showroom" },
       { key: "display-requests", label: "Display Requests", icon: Store, soon: true, section: "Purchasing", pageGroup: "purchasing-showroom" },
       { key: "consignment-orders", label: "Consignment Orders", icon: ArrowDownLeft, soon: true, section: "Purchasing", pageGroup: "purchasing-showroom" },
       { key: "consignment-returns", label: "Consignment Returns", icon: Undo2, soon: true, section: "Purchasing", pageGroup: "purchasing-showroom" },

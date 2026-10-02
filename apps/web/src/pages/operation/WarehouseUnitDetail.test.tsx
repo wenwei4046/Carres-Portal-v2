@@ -23,13 +23,13 @@ vi.mock("@/lib/api", async (importOriginal) => ({
 import { useStockMovementEvidence, useStockUnit } from "@/lib/queries";
 import { apiFetch } from "@/lib/api";
 
-function renderAt(code: string) {
+function renderAt(code: string, showroom = false) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={qc}>
       <MemoryRouter initialEntries={[`/operation/stock/unit/${code}`]}>
         <Routes>
-          <Route path="/operation/stock/unit/:unitCode" element={<WarehouseUnitDetail />} />
+          <Route path="/operation/stock/unit/:unitCode" element={<WarehouseUnitDetail backTo={showroom ? "/operation?tab=showroom&category=bedframe" : undefined} backLabel={showroom ? "Showroom Display" : undefined} />} />
           <Route path="/operation" element={<div>Inventory destination</div>} />
         </Routes>
       </MemoryRouter>
@@ -100,6 +100,12 @@ describe("the header is the Sales Order page's — owner ruling 2026-09-26", () 
     expect(screen.getByRole("link", { name: "Back to Inventory" })).toHaveAttribute("href", "/operation?tab=stock-onhand");
     expect(screen.getByTestId("object-identity")).toHaveTextContent("U1-000-082");
     expect(screen.getByTestId("object-identity-customer")).toHaveTextContent("Jager · Super Single");
+  });
+
+  it("returns showroom-selected goods to the original showroom filters", () => {
+    loaded();
+    renderAt("U1-000-082", true);
+    expect(screen.getByRole("link", { name: "Back to Showroom Display" })).toHaveAttribute("href", "/operation?tab=showroom&category=bedframe");
   });
 
   it("returns a directly opened Unit to the real Inventory destination", () => {

@@ -202,7 +202,7 @@ opsStockRouter.get("/inventory", requireOperationOrPrincipal, async (c) => {
 opsStockRouter.get("/register", requireOperationOrPrincipal, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
 
-  const { data, error } = await sb
+  let query = sb
     .from("stock_unit_register_v")
     .select(
       "id, unit_code, sku, category, warehouse_id, site_name, holder_party_id, " +
@@ -211,6 +211,11 @@ opsStockRouter.get("/register", requireOperationOrPrincipal, async (c) => {
         "availability, lifecycle_outcome, last_event_at, last_event, identity_scope",
     )
     .order("unit_code", { ascending: true });
+  // Internal readers retain their existing role/RLS boundary. Narrow before
+  // enrichment/export so a Showroom surface receives its owning Site only.
+  const site = c.req.query("site");
+  if (site) query = query.eq("site_name", site);
+  const { data, error } = await query;
   if (error) throw mapErr(error);
 
   const units = (data ?? []).map((r) => {

@@ -7376,10 +7376,10 @@ export interface StockRegisterPayload {
   total: number;
 }
 
-export function useStockRegister() {
+export function useStockRegister(siteName?: string) {
   return useQuery<StockRegisterPayload, ApiError>({
-    queryKey: ["operation", "stock-register"],
-    queryFn: () => apiFetch<StockRegisterPayload>("/api/ops/stock/register"),
+    queryKey: siteName ? ["operation", "stock-register", siteName] : ["operation", "stock-register"],
+    queryFn: () => apiFetch<StockRegisterPayload>(`/api/ops/stock/register${siteName ? `?site=${encodeURIComponent(siteName)}` : ""}`),
     staleTime: 30_000,
   });
 }

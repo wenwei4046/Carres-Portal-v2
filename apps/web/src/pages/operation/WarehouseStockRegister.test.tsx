@@ -70,11 +70,11 @@ async function renderLoaded() {
   return r;
 }
 
-function renderRegister(qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })) {
+function renderRegister(qc = new QueryClient({ defaultOptions: { queries: { retry: false } } }), showroom = false) {
   return render(
     <QueryClientProvider client={qc}>
       <MemoryRouter initialEntries={["/operation?tab=stock-onhand"]}>
-        <WarehouseStockRegister />
+        <WarehouseStockRegister showroom={showroom} />
       </MemoryRouter>
     </QueryClientProvider>,
   );
@@ -325,4 +325,27 @@ it("returns from a Unit without losing the register, search, rail or scroll", as
   await waitFor(() => expect(screen.queryByTestId("stock-unit-detail")).not.toBeInTheDocument());
   expect(screen.getByText("U1-000-084")).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Clear filters" })).toBeInTheDocument();
+});
+
+
+describe("Showroom reads existing PJ stock", () => {
+  it("excludes Klang display goods and keeps its scope when filters are cleared", async () => {
+    apiFetchMock.mockImplementation((path: string) => path.startsWith("/api/ops/stock/register")
+      ? Promise.resolve({ units: [
+          unit({ id: "pj", unitCode: "U1-000-293", siteName: "PJ Showroom" }),
+          unit({ id: "klang", unitCode: "U1-000-294", siteName: "Carres Klang", condition: "exhibition", purchasePurpose: "showroom_display" }),
+        ], total: 2 }) : Promise.resolve({}));
+    renderRegister(undefined, true);
+    await screen.findByText("U1-000-293");
+    expect(screen.queryByText("U1-000-294")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("rail-display"));
+    fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
+    expect(screen.queryByText("U1-000-294")).not.toBeInTheDocument();
+    expect(screen.getByText("U1-000-293")).toBeInTheDocument();
+    expect(screen.getByTestId("stock-register-destination-header")).toHaveTextContent("Showroom Display");
+    const headings = screen.getAllByRole("columnheader").map((heading) => heading.textContent);
+    expect(headings.findIndex((label) => label?.includes("Item"))).toBeLessThan(headings.findIndex((label) => label?.includes("Unit ID")));
+    expect(screen.queryByText(/you can promise/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Request Transfer" })).not.toBeInTheDocument();
+  });
 });
