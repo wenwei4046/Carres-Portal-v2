@@ -58,6 +58,17 @@ of every CJK glyph or every page. A real browser200% zoom walk was not performed
 checks do not substitute for that test. Long-label disclosure, generic task tabs, avatar
 accessibility and the complete reusable utility-panel template remain open acceptance gaps.
 
+### Remaining shared-component acceptance gaps
+
+| Gap | Current evidence / required boundary |
+|---|---|
+| Accessible assignment avatar | Current page-local20px aria-hidden chip is not the shared avatar-only hover/focus/tap identity contract. No new component admitted or built by this audit. |
+| Actual-task inspection host | Shared Tabs is a bar, not a complete task/panel association, overflow, keyboard and focus-restoration template. Info/task target remains unbuilt. |
+| Exact source binding | Reported replay task PO6426 versus message PO7907 is an acceptance counterexample, not a newly reproduced production result. Reject first-PO/label fallback; verify document/version/line/batch/occurrence across facts, reply, recipient, template and result. |
+| Touch interaction | Segmented tab34 on phone, rail Hide/Show28, chip remove24 and bare checkbox16 do not establish40px hit areas. Preserve governed target; measure actual hit regions during delivery. |
+| Utility rail and long labels | Strip/panel primitives exist; complete Calendar/customer/Activity target, long status discovery and generic focus/error states are not all verified. |
+| Cards and full-page accessibility | Cards use viewport breakpoints; container320 proposal remains unbuilt. Real200% zoom, CJK glyph coverage, full object/form and other module composition remain unverified. |
+
 ### Shared task inspection — latest owner correction, 2026-10-02
 
 **APPROVED TARGET / NOT BUILT.** Open this inspection panel on click; keep the background page layout unchanged. `Info` is the first tab; a task entry may open its exact task directly. Assignment shows only the avatar; hover, keyboard focus and tap expose `Assigned to: {name}`. Distinguish truly unassigned from failed identity loading. For SO-backed missions, header context uses Calendar plus `Requested: {date}`, with the full customer requested-delivery name/date in tooltip and Info. Independent objects retain their own governed date facts.
@@ -134,8 +145,8 @@ boundary. Documentation approval is not proof of implementation or permission to
 
 **Numeric contract, 2026-10-01:** [01 §§7–8](../01-design-tokens.md#7--canonical-component-measurements--scoped-not-one-size-for-every-surface)
 contains self-contained Carres values, source/target/status and the Sales-first acceptance boundary.
-Old generic sizing assumptions are replaced by scoped shared recipes. Actual font loading remains
-unverified here. Source table-header weight drift and small touch targets are recorded as gaps;
+Old generic sizing assumptions are replaced by scoped shared recipes. Bounded SO Inter availability and effective header600 were verified2026-10-02.
+Small touch targets and generic template acceptance remain gaps;
 accepted Sales density and Cards composition follow Confirmed shared template; other adoption still requires verification.
 
 **RULING / APPROVED DIRECTION AND DOCUMENTATION COMMISSION.** One Carres kit serves every

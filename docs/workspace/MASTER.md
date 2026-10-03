@@ -2018,6 +2018,13 @@ keyboard/screen-reader access, full fact discovery, source-bound results, permis
 recoverable loading failures and selection/list restoration at desktop and phone widths. Its
 complete geometry remains unverified; do not infer it from a historical card height.
 
+No selection shows the governed empty state without fabricated facts. Missing SO data shows
+`Order details unavailable`; refresh failure preserves the last safe mission and names the failed
+source with retry. Permission refusal exposes no restricted party/payment data. Skeletons must
+match the actual selected surface; colour alone never announces state. Closing inspection restores
+focus to its opener; completion preserves the source receipt and safe list selection.
+
+
 #### Source facts and completions resolved for the build (2026-09-25)
 
 These close the questions §5.10 leaves to the owning modules; they change no approved word or layer.

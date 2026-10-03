@@ -56,7 +56,8 @@ On a conflict, Business wins.
   size, word, rail, table or guide document; when a kit gap is real, admit the thing to the kit
   (with its `/ui` example) and every page gets it. When an old rule is found, DELETE it and update
   the kit in the same change — never leave two versions. The old kit files are gone
-  (`UI-KIT-NEW-CHAT`, `archive/UI-KIT-*`, `ui-reference/`, the `carres-design` skill); do not
+  (`UI-KIT-NEW-CHAT`, `archive/UI-KIT-*`, the `carres-design` skill); retained isolated
+  `ui-reference/` mock material is explicitly NON-AUTHORITY, never a kit or delivery proof. Do not
   recreate them. Portal-wide standards ruled the same day: **no dash anywhere on a screen** ·
   **card titles are black bold `text-strong`, never blue** · **column separators by column
   count** · **rail = icon + title only; every group closed until clicked, its chosen value on the header; two views are a tab bar (owner ruling 2026-09-28; SO representative pilot owner correction 2026-10-01 stacks the two views and opens Delivery first, see Orders MASTER)** · **header filter icons on hover only**.
