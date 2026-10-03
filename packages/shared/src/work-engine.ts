@@ -94,7 +94,8 @@ export type WorkOwnerRule =
    * `workItemsForOrder`; Card 9's recorded boundary): */
   | "grn_duty" // the effective GRN Duty resolution from Workspace
   | "claim_month_po_duty" // the holder of the month the claim was OPENED — forever
-  | "purchasing_approver";
+  | "purchasing_approver"
+  | "sales_approver";
 
 export interface WorkRuleDefinition {
   key: string;
@@ -120,6 +121,20 @@ export interface WorkRule extends WorkRuleDefinition {
 
 /** Order-track rules — the keys `order-actions.ts` can raise. */
 export const ORDER_WORK_RULES: readonly WorkRuleDefinition[] = [
+  {
+    key: "orders.amendment_supplier", module: "orders",
+    trigger: "a live amendment has changed issued-PO lines without confirmed feasibility and a known supplier date",
+    owner: "the effective PO Duty", ownerRule: "po_duty", action: "Record supplier answer",
+    dueRule: "no owner-approved deadline; preserve no working date",
+    completionFact: "the amendment's current supplier scope is confirmed with evidence and a date",
+  },
+  {
+    key: "orders.amendment_sales", module: "orders",
+    trigger: "a live price-decrease amendment lacks Sales Approver's decision",
+    owner: "the effective qualified Sales Approver", ownerRule: "sales_approver", action: "Review amendment",
+    dueRule: "no owner-approved deadline; preserve no working date",
+    completionFact: "Sales Approver's decision covers the amendment's current terms",
+  },
   {
     key: "issue_po",
     module: "orders",
@@ -593,6 +608,8 @@ export const MODULE_WORK_RULES: readonly WorkRuleDefinition[] = [
 ];
 
 const WORK_COMPLETION_STATEMENTS: Readonly<Record<string, string>> = {
+  "orders.amendment_supplier": "Supplier answer recorded",
+  "orders.amendment_sales": "Amendment decision recorded",
   issue_po: "A purchase order covers the demand",
   confirm_ready_date: "A standing supplier promise is recorded",
   delay_planning: "The customer-plan decision and decided date are recorded",

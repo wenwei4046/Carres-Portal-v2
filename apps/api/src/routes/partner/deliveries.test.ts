@@ -12,6 +12,9 @@ import { signTestJwt, useTestJwks } from "../../test/jwt";
 import app from "../../index";
 import { _setJwksForTesting } from "../../middleware/auth";
 
+vi.mock("../../lib/early-delivery", () => ({ earlyDeliveryRefusal: vi.fn().mockResolvedValue(null) }));
+import { earlyDeliveryRefusal } from "../../lib/early-delivery";
+
 vi.mock("../../lib/supabase", () => ({ userClient: vi.fn(), adminClient: vi.fn() }));
 import { adminClient, userClient } from "../../lib/supabase";
 
@@ -32,6 +35,7 @@ async function makeJwt(role: string, partnerId?: string) {
 
 beforeEach(() => {
   useTestJwks();
+  vi.mocked(earlyDeliveryRefusal).mockReset().mockResolvedValue(null);
   vi.mocked(userClient).mockReset();
   vi.mocked(adminClient).mockReset();
 });
@@ -213,6 +217,22 @@ describe("PUT /:orderId/arrangement — Save Delivery Arrangement", () => {
     expect(row.partner_id).toBe(ME); // the partner can never move the partner
     expect(row.confirmed_date).toBe("2026-09-05");
     expect(inserts.some((i) => i.table === "order_history")).toBe(true);
+  });
+
+  it("cannot originate an earlier arrangement without customer evidence", async () => {
+    const { upserts } = mockAdmin([PARTNER_ROW, { data: null }, { data: ORDER_ROW }]);
+    const res = await save({ confirmedDate: "2026-09-04" });
+    expect(res.status).toBe(409); expect(upserts).toHaveLength(0);
+    expect(earlyDeliveryRefusal).not.toHaveBeenCalled();
+  });
+  it("an existing evidenced early date still obeys the current release gate", async () => {
+    vi.mocked(earlyDeliveryRefusal).mockResolvedValue("Hold delivery");
+    const { upserts } = mockAdmin([PARTNER_ROW,
+      { data: { id: "arr-1", order_id: ORDER_A, leg: 0, partner_id: ME, confirmed_date: "2026-09-04", reply_proof_path: "customer-reply" } },
+      { data: ORDER_ROW }]);
+    const res = await save({ confirmedDate: "2026-09-04" });
+    expect(res.status).toBe(409); expect(upserts).toHaveLength(0);
+    expect(earlyDeliveryRefusal).toHaveBeenCalledWith(expect.anything(), ORDER_A, "2026-09-04");
   });
 
   it("404s a scope another partner carries", async () => {

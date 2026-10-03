@@ -1,3 +1,4 @@
+import { loadAmendmentWork } from "../../lib/amendment-work";
 import { Hono, type Context } from "hono";
 import { sellableOf } from "./stock";
 import { HTTPException } from "hono/http-exception";
@@ -1765,15 +1766,16 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
   // the Purchasing source so a failed read fails that source's health.
   const repairOrderWork = () => loadRepairOrderWork(c, { poDuty, today, observedAt });
   const sourceResults = await Promise.all([
-    loadWorkSource("orders", observedAt, async () =>
-      orderItems.filter((item) =>
+    loadWorkSource("orders", observedAt, async () => [
+      ...(await loadAmendmentWork(c, { poDuty, salesApprover: dutyResolution(duties, "sales_approver", today) })),
+      ...orderItems.filter((item) =>
         item.module === "orders" &&
         item.ruleKey !== "collect" &&
         /* ⭐ Purchasing §5.6.1 / §5.7: buying is ONE card per PO window, never
            one per Sales Order, and the calculated PO Delivery Date is not a
            supplier confirmation — the Sales Order's own action ladder keeps
            both words; Work shows the window card instead. */
-        !PURCHASING_WINDOW_OWNED.has(item.ruleKey))),
+        !PURCHASING_WINDOW_OWNED.has(item.ruleKey))]),
     loadWorkSource("purchasing", observedAt, async () => [
       ...manualItems,
       ...purchaseOrderItems,

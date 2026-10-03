@@ -227,7 +227,7 @@ describe("STAGE 3 · 3.5 — the amendment spine, and the wall past it", () => {
       reason: "Customer wants one more",
     });
     expect(res.status).toBe(201);
-    expect(calls.map((c) => c.name)).toEqual(["sales_order_submit_amendment"]);
+    expect(calls.map((c) => c.name)).toEqual(["sales_order_submit_staff_amendment"]);
   });
 
   /* 0354 — `AMEND DELIVERY DATE` names the day the CUSTOMER asked, which is

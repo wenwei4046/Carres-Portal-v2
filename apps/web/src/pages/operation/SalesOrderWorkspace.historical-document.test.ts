@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { snapshotTemplateData } from "./SalesOrderWorkspace";
+import { readIssuedDocumentCandidate, snapshotTemplateData } from "./SalesOrderWorkspace";
 import type { SalesOrderTemplateData } from "@/lib/pdf/types";
 
 /**
@@ -140,5 +140,22 @@ describe("a historical Sales Order version's document", () => {
     expect(asAt.balance_due).toBe(4030 - 999.5);
     const today = snapshotTemplateData(REV2_SNAPSHOT, base);
     expect(today.paid).toBe(1999.5);
+  });
+});
+
+
+describe("issued-file provenance during a concurrent amendment", () => {
+  it("refuses a newer live sheet under the earlier revision's path", async () => {
+    let latest=2;
+    const candidate=await readIssuedDocumentCandidate(2,async()=>{
+      // A colleague's revision becomes effective while the live document loads.
+      latest=3;
+      return {...SIGNED_BASE,lines:[{sku:"NEWER-GOODS",qty:9}]} as SalesOrderTemplateData;
+    },async()=>latest);
+    expect(candidate).toBeNull();
+  });
+  it("keeps the requested current sheet, but fails closed if revision cannot be verified",async()=>{
+    expect(await readIssuedDocumentCandidate(2,async()=>SIGNED_BASE,async()=>2)).toBe(SIGNED_BASE);
+    expect(await readIssuedDocumentCandidate(2,async()=>SIGNED_BASE,async()=>null)).toBeNull();
   });
 });

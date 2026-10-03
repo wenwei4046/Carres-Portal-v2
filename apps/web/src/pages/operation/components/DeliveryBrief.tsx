@@ -213,7 +213,8 @@ export function DeliveryDatesEdit({
 
   const requestedIso = row.customerDeliveryIso;
   const later = laterThanRequested(date, requestedIso);
-  const needsReply = later && !proofPath;
+  const earlier = Boolean(date && requestedIso && date < requestedIso);
+  const needsReply = (later || earlier) && !proofPath;
   const dayRefused = date && (isSundayIso(date) || holidays.has(date)) ? MONITOR_COPY.notDeliveryDay : undefined;
   const canSave = Boolean(date) && !needsReply && !dayRefused && !save.isPending && !proof.busy;
 

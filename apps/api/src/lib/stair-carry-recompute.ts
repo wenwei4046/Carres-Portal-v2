@@ -33,6 +33,8 @@ import { STAIR_CARRY_ADDON_KEY, stairCarryCount, stairCarryFee } from "@carres/s
  */
 
 export interface StairCarryRecomputeContext {
+  /** Amendment pricing must fail before effect if its required catalogue key is missing. */
+  requireAddon?: boolean;
   floor: number;
   hasLift: boolean;
   stairItems: number | null | undefined;
@@ -178,6 +180,7 @@ export async function recomputeStairCarry(
     .eq("key", STAIR_CARRY_ADDON_KEY)
     .maybeSingle();
   if (keyError || !key) {
+    if (ctx.requireAddon) return { status: "server_error", message: "Could not price stair carry" };
     console.error(
       `stair carry NOT charged (RM${fee}): the '${STAIR_CARRY_ADDON_KEY}' addon key is missing. ` +
         "Apply migration 0393, then run `pnpm backfill:stair-carry -- --apply`.",

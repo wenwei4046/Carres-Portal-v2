@@ -77,7 +77,7 @@ async function record(
     }),
     env,
   );
-  return { res, calls };
+  return { res, calls: calls.filter((call) => call.name !== "sales_order_amendment_work") };
 }
 
 const WHATSAPP = {
@@ -91,13 +91,13 @@ describe("recording how the customer agreed", () => {
     for (const kind of ["signed_document", "customer_confirmation", "original_agreement"]) {
       const { res, calls } = await record("operation", { ...WHATSAPP, kind });
       expect(res.status).toBe(201);
-      expect(calls.map((c) => c.name)).toEqual(["sales_order_record_amendment_agreement"]);
+      expect(calls.map((c) => c.name)).toEqual(["sales_order_record_staff_agreement"]);
       expect(calls[0].args).toMatchObject({
         p_amendment_id: AMENDMENT_ID,
         p_kind: kind,
         p_reference: WHATSAPP.reference,
       });
-      /* Recording the evidence is not deciding the amendment. */
+      /* The atomic recorder applies eligible ordinary requests itself. No second mutation call. */
       expect(calls.map((c) => c.name)).not.toContain("sales_order_decide_amendment");
     }
   });
