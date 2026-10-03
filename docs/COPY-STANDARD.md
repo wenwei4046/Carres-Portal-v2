@@ -4947,3 +4947,23 @@ predicates stay with Purchasing MASTER §9.3 and their source owners. A missing 
 ### Sales Order linked documents and grouping — owner confirmed2026-10-02
 
 Use `Amendment No`, not `Amendment status`. Genuine absence is `No amendment`, without a link; unnumbered recorded amendments use `Not recorded`, unread source `Unavailable`. Never print an internal UUID as a document number. Related columns: `PO No`, `DO No`, `Invoice No`, `Receipt No`; genuine receipt absence `Receipt not recorded`. Page tools: `Group by: None`, `Group by: Delivery Status`, `Group by: Stock Status`, `Group by: Payment Status`.
+
+## Finance (Chew)
+
+Words for Finance's own screens, approved by **Chew** (Finance) as recorded in [`docs/finance/MASTER.md`](finance/MASTER.md). They are added beside the rest of this dictionary and change none of its other entries.
+
+### APPROVED by Chew on 3 Oct 2026, as written · Finance menu modules (Finance MASTER §4)
+
+The Finance area of the Portal sidebar groups Finance's own pages into modules. The Payments module (`Monitor` · `Payment Records`), `Rental Approver`, `Subscriptions` and `Dealers` keep their rows exactly as they are.
+
+| Module row | Pages under it (their words unchanged) |
+|---|---|
+| `Payables` | `AP · Payables` · `Bills` · `Payment Vouchers` |
+| `Receivables` | `AR · Receivables` · `Other debtors` · `Other receipts` |
+| `Bank & Cards` | `Card settlement` · `Money moves` |
+| `Ledger` | `Journal` · `Trial Balance` · `Self-check` |
+| `Reports` | `Reports`. It stays a plain row until a second report page joins it. |
+
+- `Dashboard` stays a plain row at the top.
+- `Payables` sits above `Receivables` to keep the owner ruling of 2026-09-14 that `AP · Payables` sits above AR.
+- The modules are not named `Money in` / `Money out`, because customer `Money In` is Payment's word (Payment MASTER §1) and `Money in full` is already a governed phrase.

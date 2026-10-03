@@ -88,7 +88,14 @@ export type PortalSection =
   | "Customer Care"
   | "Suppliers"
   | "Master Data"
-  | "Admin";
+  | "Admin"
+  /* The Finance modules (Chew, 2026-10-03; docs/finance/MASTER.md §4). Used
+   * only by Finance's own pages; no other area has a page in them. */
+  | "Payables"
+  | "Receivables"
+  | "Bank & Cards"
+  | "Ledger"
+  | "Reports";
 
 /** Rail order of the sections. The queue index's own order, unchanged. */
 export const SECTION_ORDER: ReadonlyArray<PortalSection> = [
@@ -103,6 +110,13 @@ export const SECTION_ORDER: ReadonlyArray<PortalSection> = [
   "Suppliers",
   "Master Data",
   "Admin",
+  /* Finance (Chew, 2026-10-03). Payables sits above Receivables because the
+   * owner ruling of 2026-09-14 keeps `AP · Payables` above AR. */
+  "Payables",
+  "Receivables",
+  "Bank & Cards",
+  "Ledger",
+  "Reports",
 ];
 
 /**
@@ -168,6 +182,15 @@ export const PORTAL_MODULES: ReadonlyArray<PortalModule> = [
      thing Customer Care is. The page itself did not move; only its door. */
   { section: "Suppliers", label: "Suppliers", icon: Truck },
   { section: "Master Data", label: "Master Data", icon: Library },
+  /* THE FINANCE MODULES (Chew, 2026-10-03; docs/finance/MASTER.md §4). Each
+   * module wears its flagship page's face, the same law as above. A module
+   * with one page draws no parent row (navBlocks), so Reports stays a plain
+   * row until a second report page joins it. */
+  { section: "Payables", label: "Payables", icon: ArrowUpRight },
+  { section: "Receivables", label: "Receivables", icon: ArrowDownLeft },
+  { section: "Bank & Cards", label: "Bank & Cards", icon: CreditCard },
+  { section: "Ledger", label: "Ledger", icon: BookOpen },
+  { section: "Reports", label: "Reports", icon: BarChart3 },
 ];
 
 export interface PortalNavItem {
@@ -558,25 +581,32 @@ export const PORTAL_NAV: PortalNavGroup[] = [
     defaultTab: "dashboard",
     items: [
       {
+        // Chew 2026-10-03: Dashboard stays its own plain row at the top. The
+        // `Workspace` section has no module row (PORTAL_MODULES), so it draws
+        // first and plain, exactly as the operation area's Dashboard does.
         key: "dashboard",
         label: "Dashboard",
         icon: LayoutDashboard,
         financePath: "/finance/dashboard",
+        section: "Workspace",
       },
       {
         // Owner ruling 2026-09-14: the sidebar word is `AP · Payables` again,
         // above AR. It opens what is still unpaid per supplier (0477); the old
-        // PO-cost page is gone and /finance/ap redirects here.
+        // PO-cost page is gone and /finance/ap redirects here. The Payables
+        // module sits above Receivables (SECTION_ORDER) to keep it above AR.
         key: "ap",
         label: "AP · Payables",
         icon: ArrowUpRight,
         financePath: "/finance/ap-outstanding",
+        section: "Payables",
       },
       {
         key: "ar",
         label: "AR · Receivables",
         icon: ArrowDownLeft,
         financePath: "/finance/ar",
+        section: "Receivables",
       },
       // 0477 — a supplier's bill and the voucher that pays it. What is still
       // unpaid per supplier is the `ap` row above (and the third listing of the
@@ -586,12 +616,14 @@ export const PORTAL_NAV: PortalNavGroup[] = [
         label: "Bills",
         icon: Receipt,
         financePath: "/finance/bills",
+        section: "Payables",
       },
       {
         key: "payment-vouchers",
         label: "Payment Vouchers",
         icon: Banknote,
         financePath: "/finance/payment-vouchers",
+        section: "Payables",
       },
       /* The finance role sees the SAME two Payments destinations, as the same
        * module — never a second Payment information architecture (owner
@@ -627,12 +659,13 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       // 0478 — money in that is not a sale. A party that is not a customer
       // (a sister company, a lender) is billed on Other debtors; a loan in,
       // other income or money against those invoices is an Other receipt.
-      { key: "other-debtors", label: "Other debtors", icon: Users, financePath: "/finance/other-debtors" },
-      { key: "other-receipts", label: "Other receipts", icon: HandCoins, financePath: "/finance/other-receipts" },
-      // 0529 — Finance moving its own money: bank transfers and card payouts.
-      { key: "money-moves", label: "Money moves", icon: ArrowLeftRight, financePath: "/finance/money-moves" },
+      { key: "other-debtors", label: "Other debtors", icon: Users, financePath: "/finance/other-debtors", section: "Receivables" },
+      { key: "other-receipts", label: "Other receipts", icon: HandCoins, financePath: "/finance/other-receipts", section: "Receivables" },
       // 0572 — the card companies' files, matched to the recorded card payments.
-      { key: "card-settlement", label: "Card settlement", icon: CreditCard, financePath: "/finance/card-settlement" },
+      // Above Money moves, as in Chew's menu draft (2026-10-03).
+      { key: "card-settlement", label: "Card settlement", icon: CreditCard, financePath: "/finance/card-settlement", section: "Bank & Cards" },
+      // 0529 — Finance moving its own money: bank transfers and card payouts.
+      { key: "money-moves", label: "Money moves", icon: ArrowLeftRight, financePath: "/finance/money-moves", section: "Bank & Cards" },
       // 0543 — Finance keeps the dealer master (code, state, address, contact)
       // on the same list the principal uses; inviting stays principal-only.
       { key: "dealers", label: "Dealers", icon: Users, financePath: "/finance/dealers" },
@@ -640,14 +673,15 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       // the Trial Balance and the Self-check are three different objects
       // (entries · account balances · checks), and UI MASTER §6.5 keeps tabs
       // for views of ONE object.
-      { key: "ledger", label: "Journal", icon: BookOpen, financePath: "/finance/ledger" },
-      { key: "trial-balance", label: "Trial Balance", icon: Scale, financePath: "/finance/ledger/trial-balance" },
-      { key: "self-check", label: "Self-check", icon: BadgeCheck, financePath: "/finance/ledger/self-check" },
+      { key: "ledger", label: "Journal", icon: BookOpen, financePath: "/finance/ledger", section: "Ledger" },
+      { key: "trial-balance", label: "Trial Balance", icon: Scale, financePath: "/finance/ledger/trial-balance", section: "Ledger" },
+      { key: "self-check", label: "Self-check", icon: BadgeCheck, financePath: "/finance/ledger/self-check", section: "Ledger" },
       {
         key: "reports",
         label: "Reports",
         icon: BarChart3,
         financePath: "/finance/reports",
+        section: "Reports",
       },
     ],
   },
