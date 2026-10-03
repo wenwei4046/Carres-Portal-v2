@@ -75,7 +75,7 @@ describe("/api/finance/payment-requests", () => {
   });
 
   it("the database's refusal keeps its reason", async () => {
-    mockRpc({ data: null, error: { code: "42501", message: "Only staff the boss has allowed can ask Finance to pay.", details: "not_allowed_to_request" } });
+    mockRpc({ data: null, error: { code: "42501", message: "Only staff allowed by Finance or the boss can ask Finance to pay.", details: "not_allowed_to_request" } });
     const res = await call("", { method: "POST", body: good });
     expect(res.status).toBe(403);
     expect(await res.json()).toMatchObject({ code: "not_allowed_to_request" });

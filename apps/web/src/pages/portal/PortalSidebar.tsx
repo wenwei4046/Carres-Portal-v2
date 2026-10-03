@@ -178,7 +178,7 @@ export default function PortalSidebar({ drawer = false }: {
 
   const groups = useMemo(() => visibleGroups(role), [role]);
   // Chew 2026-10-03 (Finance MASTER §3.3): the one entry shown by a grant, not
-  // a role — Payment Requests, for the staff the boss allows.
+  // a role — Payment Requests, for the staff Finance or the boss allows.
   const caps = useNavCapabilities(role, (session?.user as { id?: string } | undefined)?.id);
 
   // Active area = which base path we're under. Active tab = `?tab=` (or the

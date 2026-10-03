@@ -19,6 +19,7 @@
 > | Payment requests, with the one shared-menu entry (§3.3) | 0645 |
 > | Forecast (§3.6), built last | 0646 |
 > | Fix: a credit note follows a renumbered account (§3.2) | 0647 |
+> | Payment requests: Finance also ticks who may ask (§3.3) | 0648 |
 >
 > Their on-screen words are in COPY-STANDARD "Finance (Chew)"; those marked PROPOSAL wait for Chew.
 >
@@ -63,7 +64,7 @@ Chew, 2026-10-03: 「总之jess 的功能，ui 等等都别动到。我只专做
 | Finance user | Prepares payment vouchers. Keys supplier bills, other debtors and other receipts. Runs card and bank reconciliation and month-end. Reads the reports. |
 | Checker | Any Finance user except the one who prepared the voucher. |
 | Finance Approver | The existing Workspace duty `finance_approver` (Workspace MASTER §4 Staff & Duties). It takes Finance users only, allows a cover, and the principal can always approve. Approves vouchers and money moves, and cancels confirmed Finance documents. |
-| Staff with permission | Raise a payment request with the bill attached (§3.3). |
+| Staff with permission | Raise a payment request with the bill attached (§3.3). Finance or the boss gives the permission. |
 | The boss | Sets permissions and assigns duties. |
 
 - **Check and approve.** One person **may** both check and approve a voucher when they hold both rights (Chew).
@@ -135,7 +136,7 @@ Dealer commission rules:
 - The entry point is **one entry in the shared menu**, visible only to permitted staff. This is the one Jess-side change Chew approved (2026-10-03).
 
 **Payment requests approach — PROPOSAL / NOT LAW, built for Chew's test (0645).**
-- **Who may ask.** The boss (the principal) ticks which Operation staff may ask, under Finance Settings → `Payment requests`. Finance and the principal may always ask. Each grant is kept: unticking takes it back and never deletes it.
+- **Who may ask.** Finance or the boss (the principal) ticks which Operation staff may ask, under Finance Settings → `Payment requests` (Chew 2026-10-03; 0648 — 0645 let only the boss). Only the people ticked see the menu row and can ask. Finance and the principal may always ask. Each grant is kept, with who gave it and who took it back: unticking never deletes it.
   - It is a permission per person, kept by Finance, as the warehouse keeps its capability grants. It is not a Workspace duty, which has one holder a day, and it is not an HR position permission.
   - Today only Operation staff can be ticked, because the Finance pages are open to Finance, the principal and Operation.
 - **Asking.** The person fills `Payment Requests → New Payment Request`: who to pay, the amount, what it is for, pay by, the bill's own number and date, the bank details and a note. The bill must be attached before the request is sent. The request takes a number, `PRQ…`, drawn like every formal document.
@@ -146,7 +147,7 @@ Dealer commission rules:
   - Finance may instead `Return request` with a reason. The person changes it and sends it again.
 - **The stage** is read every time from the voucher or the bill, never stored: preparing, waiting for approval, paid, bill entered, partly paid. If that voucher or bill is cancelled, the request goes back to Finance, which answers it again or returns it.
 - **The person who asked** sees only their own requests, the stage, and the voucher or bill number, but not the voucher or bill itself. They may change or withdraw a request until Finance answers it.
-- **The shared menu** gains one row, `Payment Requests`, under Operations → Workspace. It shows only to the staff the boss allows. Finance and the principal find it under Finance → Payables.
+- **The shared menu** gains one row, `Payment Requests`, under Operations → Workspace. It shows only to the staff allowed, and to the boss, who may always ask; Chew 2026-10-03: it is fine in her menu. Finance and the boss also find it under Finance → Payables.
 - **The files** go to their own private store, so the person can upload without being given Finance's files. That store has two new access rules of its own; no existing rule changed.
 - **Not built:**
   - HR or BD staff asking. They cannot open the Finance pages today; letting them would need Jess's routes to change. Whether they should, and where the menu row sits, waits for Chew (2026-10-03).

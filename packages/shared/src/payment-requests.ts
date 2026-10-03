@@ -81,6 +81,8 @@ export interface PaymentRequestMe {
   may_request: boolean;
   finance: boolean;
   boss: boolean;
+  /** May tick who may ask: a Finance person or the boss (0648, Chew 2026-10-03). */
+  may_grant: boolean;
 }
 
 export interface RequestGrantRow {

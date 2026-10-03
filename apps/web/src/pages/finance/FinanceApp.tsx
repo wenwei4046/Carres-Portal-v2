@@ -92,7 +92,7 @@ export default function FinanceApp() {
           <Route path="payment-vouchers/*" element={financeOnly(<PaymentVouchers />)} />
           <Route path="ap-outstanding"     element={financeOnly(<ApOutstanding />)} />
           {/* 0645 — staff ask Finance to pay a bill (Chew 2026-10-03). NOT finance-only:
-              the Operation staff the boss allows reach it here, and the database
+              the Operation staff Finance or the boss allows reach it here, and the database
               shows each person only what they may see. */}
           <Route path="payment-requests/*" element={<PaymentRequests />} />
           {/* 0642 — a supplier's credit note takes money off what Carres owes (Chew 2026-10-03). */}

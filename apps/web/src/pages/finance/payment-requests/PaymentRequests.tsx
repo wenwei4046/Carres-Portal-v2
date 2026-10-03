@@ -37,7 +37,7 @@ import { money, num, refusal } from "../payables/payables-words";
 
 /**
  * Finance → Payment Requests (migration 0645; Chew 2026-10-03,
- * docs/finance/MASTER.md §3.3). Staff the boss allows ask Finance to pay a
+ * docs/finance/MASTER.md §3.3). Staff Finance or the boss allows ask Finance to pay a
  * bill; Finance answers with a payment voucher or a bill; the person who asked
  * sees the stage, read from that voucher or bill.
  *

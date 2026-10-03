@@ -340,7 +340,7 @@ export const PORTAL_NAV: PortalNavGroup[] = [
        * second person list. */
       { key: "issue-tracker", label: "Issue Tracker", icon: CircleAlert, path: "/operation/issues", section: "Workspace" },
       /* 0645 — Chew 2026-10-03 (Finance MASTER §3.3), the ONE shared-menu entry
-       * Chew approved: staff the boss allows ask Finance to pay a bill. Shown
+       * Chew approved: staff Finance or the boss allows ask Finance to pay a bill. Shown
        * only to them (`needs`); the page lives in Finance. */
       {
         key: "payment-requests",

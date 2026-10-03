@@ -61,7 +61,7 @@ beforeEach(() => {
   api.calls.length = 0;
   api.uploads.length = 0;
   api.routes = {
-    [`${B}/me`]: { may_request: true, finance: false, boss: false },
+    [`${B}/me`]: { may_request: true, finance: false, boss: false, may_grant: false },
     [B]: { rows: [row({})] },
   };
   localStorage.clear();
@@ -99,7 +99,7 @@ describe("Payment Requests, as the person who asks", () => {
   });
 
   it("someone no longer allowed still sees their requests, without the New button", async () => {
-    api.routes[`${B}/me`] = { may_request: false, finance: false, boss: false };
+    api.routes[`${B}/me`] = { may_request: false, finance: false, boss: false, may_grant: false };
     show("/finance/payment-requests");
     await screen.findByTestId("payment-request-row-PRQ261003-4821");
     expect(screen.queryByTestId("new-payment-request")).not.toBeInTheDocument();
@@ -151,7 +151,7 @@ describe("Payment Requests, as the person who asks", () => {
 
 describe("Payment Requests, as Finance", () => {
   beforeEach(() => {
-    api.routes[`${B}/me`] = { may_request: true, finance: true, boss: false };
+    api.routes[`${B}/me`] = { may_request: true, finance: true, boss: false, may_grant: true };
     api.routes[`${B}?all=1`] = { rows: [
       row({}),
       row({ id: "x", request_no: "PRQ261001-0001", status: "answered", requested_by_name: "Boon",
@@ -190,24 +190,32 @@ describe("Who may ask, in Finance Settings", () => {
     { user_id: "33333333-3333-4333-8333-333333333333", name: "Boon", role: "operation", allowed: false, granted_at: null, granted_by_name: null },
   ] };
 
-  it("the boss ticks who may ask", async () => {
-    api.routes[`${B}/me`] = { may_request: true, finance: true, boss: true };
-    api.routes[`${B}/grants`] = grants;
-    show("/finance/settings");
-    const boon = await screen.findByRole("checkbox", { name: "Boon may ask Finance to pay" });
-    await waitFor(() => expect(boon).not.toBeDisabled());
-    fireEvent.click(boon);
-    await waitFor(() => expect(writes()).toEqual([
-      { url: `${B}/grants/33333333-3333-4333-8333-333333333333`, method: "PUT", body: { allowed: true } },
-    ]));
+  it("Finance ticks who may ask (0648), and so may the boss", async () => {
+    for (const me of [
+      { may_request: true, finance: true, boss: false, may_grant: true },
+      { may_request: true, finance: true, boss: true, may_grant: true },
+    ]) {
+      api.routes[`${B}/me`] = me;
+      api.routes[`${B}/grants`] = grants;
+      api.calls = [];
+      const { unmount } = show("/finance/settings");
+      const boon = await screen.findByRole("checkbox", { name: "Boon may ask Finance to pay" });
+      await waitFor(() => expect(boon).not.toBeDisabled());
+      expect(screen.getByTestId("request-access")).not.toHaveTextContent("Only Finance and the boss change who may ask.");
+      fireEvent.click(boon);
+      await waitFor(() => expect(writes()).toEqual([
+        { url: `${B}/grants/33333333-3333-4333-8333-333333333333`, method: "PUT", body: { allowed: true } },
+      ]));
+      unmount();
+    }
   });
 
-  it("Finance reads it, and only the boss changes it", async () => {
-    api.routes[`${B}/me`] = { may_request: true, finance: true, boss: false };
+  it("a login that may not tick only reads", async () => {
+    api.routes[`${B}/me`] = { may_request: true, finance: true, boss: false, may_grant: false };
     api.routes[`${B}/grants`] = grants;
     show("/finance/settings");
     expect(await screen.findByRole("checkbox", { name: "Aina may ask Finance to pay" })).toBeDisabled();
-    expect(screen.getByTestId("request-access")).toHaveTextContent("Only the boss changes who may ask.");
+    expect(screen.getByTestId("request-access")).toHaveTextContent("Only Finance and the boss change who may ask.");
   });
 });
 

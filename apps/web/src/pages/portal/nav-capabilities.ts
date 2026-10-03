@@ -8,7 +8,7 @@ import { apiFetch } from "@/lib/api";
  *
  * ONE use today (Chew 2026-10-03, docs/finance/MASTER.md §3.3 — the one
  * shared-menu change Chew approved): the `Payment Requests` entry shows to the
- * Operation staff the boss has allowed to ask Finance to pay. Finance and the
+ * Operation staff Finance or the boss has allowed to ask Finance to pay. Finance and the
  * principal see it in the Finance area by their role.
  *
  * Read once per person with a plain request, not a react-query hook: the rail

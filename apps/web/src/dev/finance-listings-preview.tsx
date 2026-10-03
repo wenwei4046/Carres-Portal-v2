@@ -615,7 +615,7 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   const q = new URL(url, window.location.origin).searchParams;
   if (url.includes("/api/finance/invoices/register")) return json({ rows: INVOICES, total: INVOICES.length });
   if (url.includes("/api/finance/payments/register")) return json({ rows: [], total: 0 });
-  if (url.includes("/api/finance/payment-requests/me")) return json({ may_request: true, finance: true, boss: true });
+  if (url.includes("/api/finance/payment-requests/me")) return json({ may_request: true, finance: true, boss: true, may_grant: true });
   if (url.includes("/api/finance/payment-requests/grants")) return json({ rows: REQUEST_GRANTS });
   if (url.includes("/api/finance/payment-requests/prq-")) return json(PAYMENT_REQUEST_DOC);
   if (url.includes("/api/finance/payment-requests")) return json({ rows: PAYMENT_REQUESTS });

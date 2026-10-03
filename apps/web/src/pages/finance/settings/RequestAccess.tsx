@@ -8,21 +8,22 @@ import { ReadFailed } from "../payables/PayablesParts";
 import { refusal } from "../payables/payables-words";
 
 /**
- * Finance Settings → Payment requests (migration 0645; Chew 2026-10-03,
+ * Finance Settings → Payment requests (migrations 0645, 0648; Chew 2026-10-03,
  * docs/finance/MASTER.md §3.3): which Operation staff may ask Finance to pay a
- * bill. The boss ticks and unticks; Finance reads. Finance and the boss may
- * always ask. Every grant is kept: unticking takes it back, never deletes it.
+ * bill. Finance and the boss tick and untick; a shared login only reads.
+ * Finance and the boss may always ask. Every grant is kept: unticking takes it
+ * back, never deletes it.
  */
 export default function RequestAccess() {
   const me = useRequestMe();
   const grants = useRequestGrants();
   const set = useSetRequestGrant();
-  const boss = me.data?.boss === true;
+  const mayGrant = me.data?.may_grant === true;
 
   const columns: readonly Column<RequestGrantRow>[] = [
     { key: "allowed", label: "May ask", width: "90px", cell: (g) => (
       <Checkbox id={`grant-${g.user_id}`} ariaLabel={`${g.name} may ask Finance to pay`} checked={g.allowed}
-        disabled={!boss || set.isPending}
+        disabled={!mayGrant || set.isPending}
         onCheckedChange={(on) => set.mutate({ userId: g.user_id, allowed: on }, {
           onSuccess: () => toast.success(on ? `${g.name} may ask Finance to pay` : `${g.name} may no longer ask`),
           onError: (e) => toast.error(refusal(e)),
@@ -38,7 +39,7 @@ export default function RequestAccess() {
     <div className="flex flex-col gap-3 p-6" data-testid="request-access">
       <p className="text-body text-kit-slate-11">
         Operation staff ticked here may ask Finance to pay a bill, from Payment Requests. Finance and the boss always may.
-        {boss ? "" : " Only the boss changes who may ask."}
+        {mayGrant ? "" : " Only Finance and the boss change who may ask."}
       </p>
       <DataTable label="Who may ask Finance to pay" testId="request-access-table" rows={grants.data ?? []} columns={columns}
         rowId={(g) => g.user_id} sizing="content"

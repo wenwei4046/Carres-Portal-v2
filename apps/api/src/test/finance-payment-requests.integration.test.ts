@@ -85,19 +85,29 @@ describe.skipIf(!URL)("payment requests (real PostgreSQL, 0645)", () => {
     await db.end();
   });
 
-  it("only the boss allows a member of Operation to ask; Finance may always ask", async () => {
+  it("Finance or the boss allows a member of Operation to ask (0648); Finance may always ask", async () => {
     expect(await raise(U.aina)).toEqual({ ok: false, detail: "not_allowed_to_request" });
+    // A member of Operation cannot allow anyone, not even with a grant of their own.
+    await actAs(U.boon);
+    expect(await attempt("select public.finance_request_grant_set($1, true)", [U.aina])).toEqual({ ok: false, detail: "may_not_grant" });
     await actAs(U.finance);
-    expect(await attempt("select public.finance_request_grant_set($1, true)", [U.aina])).toEqual({ ok: false, detail: "not_the_boss" });
-    await actAs(U.boss);
+    expect((await q("select public.payment_request_me() as m")).rows[0].m).toMatchObject({ finance: true, may_grant: true });
     expect((await attempt("select public.finance_request_grant_set($1, true)", [U.aina])).ok).toBe(true);
     expect(await attempt("select public.finance_request_grant_set($1, true)", [U.finance])).toEqual({ ok: false, detail: "not_grantable" });
+    // The boss still may, and each act names who did it.
+    await actAs(U.boss);
+    expect((await attempt("select public.finance_request_grant_set($1, true)", [U.boon])).ok).toBe(true);
+    expect((await attempt("select public.finance_request_grant_set($1, false)", [U.boon])).ok).toBe(true);
+    expect((await q("select granted_by, revoked_by from finance_request_grants where user_id = $1", [U.boon])).rows)
+      .toEqual([{ granted_by: U.boss, revoked_by: U.boss }]);
+    expect((await q("select granted_by from finance_request_grants where user_id = $1 and revoked_at is null", [U.aina])).rows)
+      .toEqual([{ granted_by: U.finance }]);
     await actAs(U.finance);
     const list = (await q("select public.finance_request_grant_list() as l")).rows[0].l as Array<{ user_id: string; allowed: boolean }>;
     expect(list.find((x) => x.user_id === U.aina)?.allowed).toBe(true);
     expect(list.find((x) => x.user_id === U.boon)?.allowed).toBe(false);
     await actAs(U.aina);
-    expect((await q("select public.payment_request_me() as m")).rows[0].m).toEqual({ may_request: true, finance: false, boss: false });
+    expect((await q("select public.payment_request_me() as m")).rows[0].m).toEqual({ may_request: true, finance: false, boss: false, may_grant: false });
   });
 
   it("the person allowed raises a request with a number; nobody else of Operation can open it", async () => {
