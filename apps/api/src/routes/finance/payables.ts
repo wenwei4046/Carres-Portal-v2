@@ -13,7 +13,9 @@ import {
   type PaymentVoucherDraftInput,
   type SupplierBillDraftInput,
 } from "@carres/shared/schemas/finance-ap";
+import { apAgingQuery, apAgingReport, type ApAgingAnswer } from "@carres/shared/ap-aging";
 import { requireFinance } from "../../lib/auth-guards";
+import { todayIsoMYT } from "../../lib/delivery-order-issue";
 import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import { departmentQuery, keepByDepartment, tooManyDepartmentLines, withLineDepartments } from "../../lib/line-departments";
@@ -29,6 +31,8 @@ import type { AppEnv } from "../../types";
  *     GET  /accounts                    ap_account_choices — which account fits which box
  *     GET  /outstanding                 ap_outstanding — owed per supplier, zero included
  *     GET  /bill-outstanding            ap_bill_outstanding — owed per confirmed bill
+ *     GET  /aging?asAt=                 fin_ap_aging — owed on a day, bill by bill, tied
+ *                                       to the payables control accounts (0640)
  *     GET  /supplier-finance            finance_supplier_list — every supplier with Finance's
  *                                       own tax and bank details (0636)
  *     PUT  /supplier-finance/:supplierId  finance_supplier_profile_save (0636)
@@ -220,6 +224,32 @@ payablesRouter.put("/supplier-finance/:supplierId", requireFinance, async (c) =>
   });
   if (error) return pgFail(c, error);
   return c.json({ id: data as string });
+});
+
+// ── AP aging (0640; Chew 2026-10-03) ────────────────────────────────────────
+// What was owed to suppliers on a day, bill by bill, tied to the payables
+// control accounts. Read once through the shared arithmetic, which refuses a
+// figure it cannot read; the answer passes through as it came.
+
+payablesRouter.get("/aging", requireFinance, async (c) => {
+  const q = apAgingQuery.safeParse(Object.fromEntries(new URL(c.req.url).searchParams));
+  if (!q.success) {
+    return c.json({ error: "invalid_query", code: "invalid_param", message: q.error.issues[0]?.message ?? "invalid query" }, 422);
+  }
+  const { data, error } = await sb(c).rpc("fin_ap_aging", { p_as_at: q.data.asAt ?? todayIsoMYT() });
+  if (error?.code === "55000") {
+    return c.json({ error: "ledger_not_started", code: "ledger_not_started", message: "The ledger has no start date yet." }, 409);
+  }
+  const failed = () => c.json({ error: "rpc_failed", code: "rpc_failed", message: "AP aging could not be loaded. Try again." }, 500);
+  if (error) return mapPgError(error).status === 500 ? failed() : pgFail(c, error);
+  const answer = data as ApAgingAnswer | null;
+  if (!answer || typeof answer.as_at !== "string" || !Array.isArray(answer.suppliers) || !Array.isArray(answer.controls)) return failed();
+  try {
+    apAgingReport(answer, "bill", "month");
+  } catch {
+    return failed();
+  }
+  return c.json(answer);
 });
 
 payablesRouter.get("/bill-outstanding", requireFinance, async (c) => {

@@ -9,7 +9,7 @@
  *
  * `?page=` ar · bills · payment-vouchers · ap-outstanding · suppliers ·
  * other-debtors · other-debtor-parties · other-receipts · daily-bank ·
- * journal · general-ledger · trial-balance · reports · cash-flow.
+ * journal · general-ledger · trial-balance · reports · cash-flow · ap-aging.
  * Every listing carries at least one 60+ character party name so wrapping and
  * truncation are visible. Fixture evidence is not production evidence.
  */
@@ -398,6 +398,25 @@ const GENERAL_LEDGER = (from: string, to: string) => ({
   ],
 });
 
+// ── Reports → AP Aging (0640): owed to suppliers on a day ───────────────────
+const AP_AGING = (asAt: string) => ({
+  as_at: asAt, go_live_on: GO_LIVE,
+  controls: [{ account_code: "2110", name: "Trade payables", balance: 44350 }, { account_code: "2120", name: "Other payables", balance: 2400 }],
+  suppliers: [
+    { supplier_id: "s-1", name: LONG_SUPPLIER, kind: "factory_pickup", balance: 31250, bills: [
+      { bill_id: "b-1", bill_no: "BILL-2609-0012", supplier_invoice_no: "OH-INV-88231", bill_date: soon(-9), due_date: soon(21), total: 18250, open: 18250 },
+      { bill_id: "b-2", bill_no: "BILL-2608-0007", supplier_invoice_no: "OH-INV-87001", bill_date: soon(-40), due_date: soon(-10), total: 15000, open: 13000 },
+    ] },
+    { supplier_id: "s-2", name: "Lumen Sofa Works", kind: "factory_pickup", balance: 13100, bills: [
+      { bill_id: "b-3", bill_no: "BILL-2606-0002", supplier_invoice_no: "LS-31", bill_date: soon(-110), due_date: null, total: 9800, open: 9800 },
+      { bill_id: "b-4", bill_no: "BILL-2609-0015", supplier_invoice_no: "LS-77", bill_date: soon(-3), due_date: soon(27), total: 4000, open: 4000 },
+    ] },
+    { supplier_id: "s-3", name: "Tenaga Nasional Berhad", kind: "other_creditor", balance: 2400, bills: [
+      { bill_id: "b-5", bill_no: "BILL-2609-0016", supplier_invoice_no: "TNB-0930", bill_date: soon(-2), due_date: soon(12), total: 2400, open: 2400 },
+    ] },
+  ],
+});
+
 const realFetch = window.fetch.bind(window);
 window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
@@ -415,6 +434,7 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   if (url.includes("/api/finance/payables/suppliers"))
     return json({ rows: OUTSTANDING.map((o) => ({ id: o.supplier_id, name: o.supplier_name, kind: o.supplier_kind })) });
   if (url.includes("/api/finance/payables/supplier-finance")) return json({ rows: SUPPLIER_FINANCE });
+  if (url.includes("/api/finance/payables/aging")) return json(AP_AGING(q.get("asAt") ?? TODAY));
   if (url.includes("/api/finance/payables/")) return json({ rows: [] });
   if (url.includes("/api/finance/ledger/daily-bank")) return json(DAILY_BANK(q.get("day") ?? TODAY));
   if (url.includes("/api/finance/ledger/cash-flow")) return json(CASH_FLOW(q.get("from") ?? TODAY, q.get("to") ?? TODAY));
@@ -455,6 +475,7 @@ const ROUTES: Record<string, string> = {
   reports: "/finance/reports",
   "cash-flow": "/finance/reports/cash-flow",
   "general-ledger": "/finance/ledger/general-ledger",
+  "ap-aging": "/finance/reports/ap-aging",
 };
 window.history.replaceState(null, "", ROUTES[PAGE] ?? ROUTES.ar);
 

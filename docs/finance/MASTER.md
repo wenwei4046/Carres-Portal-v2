@@ -10,6 +10,7 @@
 > | Daily Bank (§3.4) | 0637 |
 > | Cash Flow (§3.6) | 0638 |
 > | General Ledger (§3.6, §4) | 0639 |
+> | AP Aging (§3.6) | 0640 |
 >
 > Their on-screen words are in COPY-STANDARD "Finance (Chew)"; those marked PROPOSAL wait for Chew.
 >
@@ -189,6 +190,14 @@ All reports only read. Reports → Payment stays Payment's.
 - A search narrows the accounts, never the lines; the department filter is the ledger pages' own. Export Excel writes the page's rows.
 - Not built: Houzs's "other side" and the second reference column, an account range picker, and a PDF.
 - Falsifier: in Chew's test, a balance here differs from the Journal's running balance for the same account and day, or Chew needs a column this report does not carry.
+
+**AP Aging approach — PROPOSAL / NOT LAW, built for Chew's test (0640).**
+- Reports → AP Aging. What was owed to each supplier on a chosen day: its balance on the payables control accounts in the books, its confirmed bills still owed that day by age, and `Not tied to a bill` for the rest of the balance.
+- Columns by whole calendar months (`This month` to `4 months and over`) or by 30-day steps, aged by bill date or due date, as Houzs's formal aging is.
+- A voucher pays a bill on the voucher's own date, the date it posts on; an advance knocked off a bill counts from the day of the knock-off until it is cancelled. How much of a bill is paid has one arithmetic, `ap_bill_settled`, which AP · Payables also reads now (its figures do not change).
+- Each row adds up to the supplier's balance in the books, and the footer ties the rows to the control accounts with the difference. A test walks bills, a voucher with an advance and a knock-off through the real doors and reads three days.
+- Not built: AR aging (it reads Payment's invoices and receipts, so it comes after AP), the trade or other payables chips, and a PDF.
+- Falsifier: in Chew's test, a supplier's balance here differs from AP · Payables' net owing today, or the footer's difference is not zero.
 
 ## 4 · Menu: DRAFT
 

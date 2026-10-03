@@ -5027,3 +5027,17 @@ These words are on screen in the branch and are not approved yet. The period con
 | Empty | `No account moved or carried a balance in this period.` · `No account matches this search.` |
 | States | `Loading the General Ledger…` · `The General Ledger could not be loaded. Try again.` · `Try again` · `The ledger has no start date yet. Nothing can be totalled.` · `The ledger started on {date}. Pick a day from then on.` |
 | Sheet | `General Ledger` · `Account` · `Date` · `Entry No` · `Source` · `Document` · `Description` · `Debit` · `Credit` · `Balance` · `Department` · `Brought forward` · `Total` |
+
+### PROPOSAL — PENDING CHEW · AP Aging (0640)
+
+These words are on screen in the branch and are not approved yet.
+
+| Where | Words |
+|---|---|
+| Reports page | A door like the others: `AP Aging` over `Balance · This month to 4 months and over · Not tied to a bill · by supplier on a day`, and `Open →` |
+| Page | Title `AP Aging`. `As of` (the Trial Balance's word) · `Age by` with `Bill date` · `Due date` · `Columns` with `By month` · `By days` · `Search suppliers…` |
+| Columns | `Supplier` · `Creditor Type` (hidden until asked for; `Supplier` · `Other creditor`) · `Balance` · by month `This month` · `1 month` · `2 months` · `3 months` · `4 months and over`, or by days `0 to 30 days` · `31 to 60 days` · `61 to 90 days` · `91 to 120 days` · `Over 120 days` · `Not tied to a bill` |
+| Meaning | `Balance` is what the supplier's payables accounts hold in the books on the day. The age columns are its confirmed bills still owed that day. `Not tied to a bill` is the rest of the balance: below zero, money paid ahead of a bill; above zero, money owed with no bill behind it, such as an opening balance. A bill with no due date ages by its bill date. |
+| Opened row | Toggle hover `Show bills`. Columns `Bill No` · `Supplier invoice` · `Bill date` · `Due date` · `Bill total` · `Still owed` · `Age`. Empty: `No bill is open. The balance is money not tied to a bill.` |
+| Footer | `{n} suppliers · In the books ({account codes}) on {date}: {money} · Difference {money}`; while it is not zero, above the table: `⚠ The suppliers differ from the books by {money}.` and `Open Self-check` |
+| States | `AP aging could not be loaded. Try again.` · `Try again` · `The ledger has no start date yet. Nothing can be totalled.` · `Nothing was owed to a supplier on {date}.` |

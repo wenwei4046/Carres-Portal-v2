@@ -248,6 +248,57 @@ describe("a supplier's finance details (0636, Chew 2026-10-03)", () => {
   });
 });
 
+describe("AP aging (0640, Chew 2026-10-03)", () => {
+  const AGING = {
+    as_at: "2026-09-30", go_live_on: "2026-06-01",
+    controls: [{ account_code: "2110", name: "Trade payables", balance: 4000 }],
+    suppliers: [{ supplier_id: SUPPLIER_ID, name: "Test Factory", kind: "factory_pickup", balance: 4000,
+      bills: [{ bill_id: BILL_ID, bill_no: "BILL-2609-0001", supplier_invoice_no: "TF-1", bill_date: "2026-09-02",
+        due_date: null, total: 4000, open: 4000 }] }],
+  };
+
+  it("asks for the day and passes the answer through whole", async () => {
+    const sb = mockRpc({ data: AGING, error: null });
+    const res = await call("/aging?asAt=2026-09-30");
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("fin_ap_aging", { p_as_at: "2026-09-30" });
+    expect(await res.json()).toEqual(AGING);
+  });
+
+  it("asks for today in Malaysia when no day is given", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-09-30T17:30:00Z")); // 01:30 on 1 Oct in Malaysia
+    try {
+      const sb = mockRpc({ data: AGING, error: null });
+      await call("/aging");
+      expect(sb.rpc).toHaveBeenCalledWith("fin_ap_aging", { p_as_at: "2026-10-01" });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("refuses a day that is not a date, before any database call", async () => {
+    const sb = mockRpc({ data: AGING, error: null });
+    expect((await call("/aging?asAt=30/09/2026")).status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
+
+  it("a ledger with no start date is 409; a figure it cannot read refuses in plain words", async () => {
+    mockRpc({ data: null, error: { code: "55000", message: "gl_config has no go-live date" } });
+    expect((await call("/aging?asAt=2026-09-30")).status).toBe(409);
+    const broken = structuredClone(AGING);
+    broken.suppliers[0]!.bills[0]!.open = "four thousand" as never;
+    mockRpc({ data: broken, error: null });
+    const res = await call("/aging?asAt=2026-09-30");
+    expect(res.status).toBe(500);
+    expect(await res.json()).toMatchObject({ message: "AP aging could not be loaded. Try again." });
+  });
+
+  it("refuses operation (finance and principal only)", async () => {
+    expect((await call("/aging", { role: "operation" })).status).toBe(403);
+  });
+});
+
 describe("bills", () => {
   it("POST /bills turns the form into the save-draft call, snake_case lines", async () => {
     const sb = mockRpc({ data: BILL_ID, error: null });

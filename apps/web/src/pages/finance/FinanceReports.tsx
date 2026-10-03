@@ -292,6 +292,16 @@ export default function FinanceReports() {
           </span>
           <span className="text-label text-muted-foreground">Open →</span>
         </Link>
+        {/* 0640 (Chew 2026-10-03): the same door. */}
+        <Link to="/finance/reports/ap-aging" data-testid="reports-ap-aging-door"
+          className="flex items-center justify-between rounded-card border border-border bg-card px-4 py-3 hover:bg-muted/40">
+          <span>
+            <span className="block text-meta font-semibold">AP Aging</span>
+            <span className="block text-label text-muted-foreground">
+              Balance · This month to 4 months and over · Not tied to a bill · by supplier on a day</span>
+          </span>
+          <span className="text-label text-muted-foreground">Open →</span>
+        </Link>
 
         {notStarted ? <div role="alert" className="text-body">
           <p>The ledger has no start date yet. Nothing can be totalled.</p>
