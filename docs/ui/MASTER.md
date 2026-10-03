@@ -60,7 +60,7 @@ accessibility and the complete reusable utility-panel template remain open accep
 
 ### Shared task inspection — latest owner correction, 2026-10-02
 
-**APPROVED TARGET / NOT BUILT.** Open this inspection panel on click; keep the background page layout unchanged. `Info` is the first tab; a task entry may open its exact task directly. Assignment shows only the avatar; hover, keyboard focus and tap expose `Assigned to: {name}`. Distinguish truly unassigned from failed identity loading. Header context uses Calendar plus `Requested: {date}`, with the full requested-delivery name/date in tooltip and Info.
+**APPROVED TARGET / NOT BUILT.** Open this inspection panel on click; keep the background page layout unchanged. `Info` is the first tab; a task entry may open its exact task directly. Assignment shows only the avatar; hover, keyboard focus and tap expose `Assigned to: {name}`. Distinguish truly unassigned from failed identity loading. For SO-backed missions, header context uses Calendar plus `Requested: {date}`, with the full customer requested-delivery name/date in tooltip and Info. Independent objects retain their own governed date facts.
 
 **APPROVED TARGET / NOT BUILT.** Owning operating law is
 [Workspace MASTER §5.11](../workspace/MASTER.md#511--task-inspection--owner-correction-2026-10-02).
@@ -81,8 +81,9 @@ Exact day-count arithmetic and unresolved presentation dimensions remain PROPOSA
 This target does not replace Purchasing's independently governed PO quick-panel tabs, the global
 utility strip or the read-only SO quick view.
 
-**Publication / alignment boundary.** Workspace, Showroom and Right Rail chats supplied source
-readbacks; Purchasing supplied no substantive readback at audit time. A message sent is not
+**Publication / alignment boundary.** All four chats supplied exact-version readbacks for815ae06b9; Workspace and Showroom
+identified residual layout/date-scope conflicts, now corrected. Final-head readback remains the
+publication gate. A message sent is not
 alignment proof. Publication in a PR is not publication on main; report the exact commit and
 subsequent reader confirmations before claiming the shared contract is adopted.
 

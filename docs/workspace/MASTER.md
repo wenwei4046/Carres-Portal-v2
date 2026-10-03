@@ -1048,87 +1048,11 @@ Jess reviewed the live page in an 829px window and approved 24 fixes as written 
   would push Work under 768px and into the phone layout — measured on production 2026-09-25);
   the person's own collapse is remembered; the bottom block shows the account's name where one
   exists.
-- **THE WORK SHELL IS THE §6.0 LISTING SHELL — owner ruling 2026-09-25 ("why you different from
-  sales order ui").** Work draws the same shell as the Sales Orders Register: the 50px Destination
-  Header (page name + Search · Alerts · Help · Settings, no count), then ONE plain white toolbar
-  row with a bottom rule (no framed box): `My Work · Team Work` · Search 340px.
-  **The left rail is the rail every page follows — the Payment Monitor's grammar (Jess,
-  2026-09-26) with her same-day correction:** the shared 240px `FilterRail` with `Hide filters`;
-  the one-line header `‹ Sep 2026 ›`; the Monday–Saturday month grid of day tiles; the fixed rows
-  `Missed {n}` and `No date {n}`; the `Status` rows; the `Page` group (`All pages` + each page with
-  its count) and, in Team Work, the `Owner` select — exactly as §5.2 Panel 1 writes it. Hidden, it
-  leaves the 44px `Show filters` strip; the choice is remembered per browser; on one stage it
-  floats over the list. The three-panel page is rail · list · detail. **The rail runs from the page header to the bottom; the toolbar belongs to the
-  right column and never spans above the rail (Jess, 2026-09-26).** The 72px header, framed toolbar, compact strip and toolbar selects are retired.
-  The middle column is the 300px two-line picker of §5.5 (Jess, 2026-09-26: "listing more important
-  than working panel?" — no); the 104px cards are retired.
-- **Phone shell (<768px, owner review 2026-09-25 round 2):** the page has the whole width; the
-  sidebar is a slide-in drawer behind a `Menu` button; the right rail is not drawn. The header's
-  `0 for you · {n} for the team` wraps instead of truncating. An empty list draws no
-  `Select a work item` box.
-- **Not done — needs its own card:** the bell badge (item 11) counts live order alerts and has no
-  notification record to mark read.
-
-### 5.3 · Filter, search and URL contract
-
-Search matches the authorised open set by object number/label, customer, supplier, recipient,
-problem and action. It never broadens permission scope and never searches a separately cached copy.
-
-The toolbar `Filters` door is governed for Work. It lives in the toolbar only and is never a Panel 1
-or rail heading. Filters are: `Scope` (`My Work` · `Team Work`), `Week`, `Working day` (`Missed` · admitted weekdays ·
-Saturday when generated · `No date`), `Status`, `Page`, `Owner` (Team only),
-`Blocked` and `Source failed`. `Broken commitment` is an attention filter, not a synonym for
-`Missed`. Multiple filters combine and every active filter is
-visible, individually removable and represented in the URL so Dashboard and module doors can open
-the exact same result. `Clear all` preserves the current scope. Refresh re-reads the one feed and
-does not change business state.
-
-The Module filter lists only currently admitted projections: `Sales Orders` · `Purchasing` ·
-`Receiving` · `Delivery` · `Payment` · `Issue Tracker`. `Service Case`, `Warehouse Outbound` and
-`Claims` do not appear until their admission gates and live projection close.
-
-Panel 2 group order is `BROKEN COMMITMENT` → `MISSED` → selected day (§5.1). Default ordering inside
-a group is module-governed materiality, oldest opened occurrence, then object label. Users may narrow
-the view but cannot manually reprioritise authoritative due facts. Search and filter results keep
-the same group and item grammar; zero matches is not the same as zero work.
-
-### 5.4 · Work states
-
-| State | Required presentation and behaviour |
-|---|---|
-| Loading | Keep the page shell and applied scope/filter visible; use quiet row placeholders, never `0` |
-| Empty My Work | `Nothing assigned to you` · `Open Team Work` for authorised supervisors; source freshness remains visible |
-| Empty Team Work | `No open work` only when every admitted source is healthy; otherwise show the failed source state |
-| No search/filter match | `No work matches these filters` · `Clear filters`; never imply the source set is empty |
-| Missed | `Required {weekday, date} · {n} working day(s) missed`; colour supports the words and is never the only signal |
-| Saturday | Appears only when an admitted action remains on Saturday after module and resolved-owner calendar law; retains the Saturday business date |
-| Public holiday | Day remains visible and names the holiday; only an authorised holiday operation may remain assigned there |
-| Calendar not configured | Name the affected Site/owner calendar and correction door; do not invent off-days or missed age |
-| Calendar read failed | Say working days could not be loaded, preserve safe dated facts and hide invented missed age; never treat failure as zero |
-| No eligible actor that day | Keep the action on its authoritative day · `Nobody works {date} for {Duty}.` · `Set cover in Settings → Staff & Duties`; do not falsely say the Duty has no holder |
-| Blocked | Stays in its own working-day group (no `Blocked` group) · `Blocked by {dependency}` plus the door that can resolve it; retain original working day and missed age; the `Blocked` filter narrows to these rows |
-| Not assigned | Group under the governed Duty word · `Nobody holds {Duty}` · `Set the holder in Settings → Staff & Duties` |
-| Covered | Preserve normal owner and effective cover evidence; My Work routes to today's acting person |
-| Source delayed | Preserve last safe observation and say `Could not refresh {source}` with time |
-| Source failed | Isolate and name the source; never omit its possible work or convert failure to zero |
-| Permission refused | `You do not have access to this work` and no leaked counts, objects or people |
-| Completed/history | Leaves the open set only after the authoritative completion fact; history shows result, actual actor and time |
-
-### 5.5 · Responsive and accessibility contract
-
-- **THE WORK DENSITY — owner ruling 2026-09-25, APPROVED / BUILT. Exact values, not a direction.**
-  Header: ONE white row, `Work` 28/34/600 with the count `{n} actions to do · {m} missed` 13/18/400
-  on the right, 72px tall with 24px sides from 768px wide; below 768px 24/30/600, 12/16/400, 64px,
-  16px sides. No breadcrumb row, no second title, KPI band or card header.
-- **THE WORK SHELL — owner ruling 2026-09-27, APPROVED TARGET.** Work is one continuous white
-  operating surface with quiet 1px dividers, no outer frame, large gutters, shadows or card field.
-  The application sidebar remains 88px and the global right rail remains 56px. Inside them, the
-  desktop Work surface is `280px Inbox · flexible Mission (minimum 560px) · 340px Communication`.
-  At compact desktop it is `260px · flexible Mission (minimum 420px) · 300px`. When that minimum
-  cannot be kept, the surface becomes `300px Inbox · Mission`; Communication is a 340px overlay
-  drawer and never squeezes the Mission. Below 760px, Inbox → Mission → Messages are one full-width
-  stage at a time. The page does not own one long desktop scroll: each column scrolls independently
-  beneath its fixed heading; Communication also has a fixed action footer.
+- **THE WORK SHELL — current task-inspection target:** shared shell geometry is owned by UI MASTER
+  (source sidebar232/60 and utility strip64, not former88/56). Preserve the Inbox and middle
+  mission/map layout. §5.11 inspection opens on click without reflowing the background; there is
+  no permanent Communication column or fixed communication-action footer. Independent scroll
+  regions and narrow-screen access must preserve selection, facts and reachable task actions.
 - **THE WORK INBOX — owner ruling 2026-09-27, APPROVED / LOCKED (Jess: "Left rail proposal approved and locked").** The left column owns scope,
   search, Filters, the Monday–Saturday month and the action list. It defaults to the whole month;
   pressing `{Mon YYYY}` contracts it to the selected week, and the last choice is remembered.
@@ -1148,28 +1072,15 @@ the same group and item grammar; zero matches is not the same as zero work.
   The month already names the selected date, so there is no repeated list heading or list tab bar.
   Rows draw 50 at a time; selection never shrinks the rendered range; a failed refresh keeps the
   last safe list and adds one retry row. Team Work may retain one 32px owner group line.
-- The Mission column takes every pixel the Inbox and Communication leave (the working panel is the
-  page; the list only picks). It stacks independent white sections in the §5.10 order: Order Route
-  first, the Sales Order card, then the PARTY CARDS (§5.9) — Logistics · Customer · Supplier — then
-  the audit disclosure. The selected-work summary block is drawn only for work that names no Sales
-  Order (a PO window, an embedded proof review).
-- **THE COMPACT DETAIL — owner ruling 2026-09-25, APPROVED / BUILT. Below 768px, exact values:**
-  12px canvas padding; sections 8px apart; `Back to work` a 40px row; the header card (12px
-  padding, height follows content) carries the object line, the problem 16/22/600 and the action
-  line 13/18; the task card (12px padding) puts its result line and the 32px `Open {object}`
-  button (13px) on ONE row, then the 36px `Owner, timing and source` disclosure (12px). Party cards:
-  12px sides, heading 15/20/600, current action 13/18/600, supporting/status text 12/16,
-  `Checks n of 3` 12px, a 40×40 chevron; Customer and Supplier collapse to exactly 72px; Logistics
-  is at least 72px and grows only for its approved scheduled/exception facts (its five-fact
-  collapsed law is unchanged); expanded bodies use 10px vertical padding and 8px between sections;
-  radius stays `rounded-work`. The same compact detail applies at 820px and 390px. From 768px the
-  previous detail geometry holds (16px gaps, 24/16px card padding, 14/20 current action).
+- The middle Mission/map remains the selected mission's context. Task inspection is §5.11,
+  not a second permanent collection of Route/party cards. Its Info reuses the compact source
+  facts; exact phone task-panel geometry remains unverified. Preserve full content and40px touch
+  targets rather than applying the former fixed-height compact detail recipe.
 - **One header row.** Work's header carries the top-bar icons (`Jump to…` · alerts · help ·
   settings) itself, so the slim 44px GlobalTopBar is not drawn on Work — the same law every page
   with its own Destination Header follows. When the row is too narrow (390px) the count wraps under
-  the title inside the 64px row; the title never truncates. Acceptance at 743×704: two toolbar rows,
-  and the detail title, task card, Logistics, Customer and Supplier headings all visible without
-  scrolling.
+  the title inside the 64px row; the title never truncates. Check narrow-width wrapping without clipping identity or global controls; do not require
+  all historical party headings above the fold in the new task inspector.
 - The page body does not own one long desktop scroll. Panel 1, Panel 2's action region and Panel 3's
   detail body scroll independently beneath fixed panel headings. On single-panel screens the active
   panel owns normal document scroll.
@@ -2072,10 +1983,9 @@ These close the questions §5.10 leaves to the owning modules; they change no ap
   evidence are Purchasing's APPROVED TARGET / NOT BUILT (the stored list is 0432's six).
 - **Loan** reads the Sales Order's loan offer (`ops_loan_offers`: offered · accepted · declined) and
   the loan Unit (`ops_sofa_loans`: lent out · returned). A loan is a loaner Unit, not financing.
-- **Logistics collapsed stays as deployed** (§5.9, up to five facts); `exactly 72px` binds the
-  Customer and Supplier cards, and the 743×704 acceptance requires all three headings visible.
-- **The Route line is 88px; each exception line beneath it (payment, `Logistics not assigned`,
-  `Logistics · Cannot deliver`) adds one 16px row.** A failed Purchasing read keeps the route:
+- **Logistics facts stay governed by §5.9.** Former Customer/Supplier72px and Route88px
+  heights do not govern task inspection and are withdrawn from this composition.
+- A failed Purchasing read keeps the safe source facts:
   `PO` and `GRN` read `Unavailable` with `Try again`. The supplier pre-arrival confirmation is
   Purchasing's `tomorrowDeliveryCallOf` (anchored on the PO's expected arrival, closed by an answer
   about that exact date) or a Supplier DO; only the `tomorrow_delivery` answer feeds the latest date;
@@ -2106,7 +2016,7 @@ no console error, and no regression to Logistics, left rail, middle cards or lis
 
 ### 5.11 · Task inspection — owner correction 2026-10-02
 
-**APPROVED TARGET / NOT BUILT.** Open this inspection panel on click; keep the background page layout unchanged. `Info` is the first tab; a task entry may open its exact task directly. Assignment shows only the avatar; hover, keyboard focus and tap expose `Assigned to: {name}`. Distinguish truly unassigned from failed identity loading. Header context uses Calendar plus `Requested: {date}`, with the full requested-delivery name/date in tooltip and Info.
+**APPROVED TARGET / NOT BUILT.** Open this inspection panel on click; keep the background page layout unchanged. `Info` is the first tab; a task entry may open its exact task directly. Assignment shows only the avatar; hover, keyboard focus and tap expose `Assigned to: {name}`. Distinguish truly unassigned from failed identity loading. For SO-backed missions, header context uses Calendar plus `Requested: {date}`, with the full customer requested-delivery name/date in tooltip and Info. Independent objects use their own governed date facts; they do not inherit customer-delivery semantics.
 
 **APPROVED TARGET / NOT BUILT.** Current navigation is `Info` plus the mission's actual tasks,
 not `Details`/`Communication` or four party tabs. This replaces older right-panel composition
