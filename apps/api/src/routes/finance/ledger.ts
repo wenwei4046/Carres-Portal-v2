@@ -45,6 +45,7 @@ import { CUSTOMERS, SUPPLIERS } from "@carres/shared/tables";
 import { dailyBankQuery, dailyBankRow, sen, type DailyBankDay } from "@carres/shared/daily-bank";
 import { cashFlowQuery, cashFlowReport, type CashFlowAnswer } from "@carres/shared/cash-flow";
 import { generalLedgerBlocks, generalLedgerQuery, type GeneralLedgerAnswer } from "@carres/shared/general-ledger";
+import { stockValueQuery, stockValueReport, type StockValueAnswer } from "@carres/shared/stock-value";
 import { requireFinance } from "../../lib/auth-guards";
 import { mapPgError, parseJsonBody, readAllPages } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
@@ -1070,6 +1071,27 @@ financeLedgerRouter.get("/general-ledger", requireFinance, async (c) => {
     generalLedgerBlocks(answer);
   } catch {
     return failed(c, "The General Ledger");
+  }
+  return c.json(answer);
+});
+
+// ── Stock value, provisional (0643, Chew 2026-10-03) ────────────────────────
+
+/** Every Carres-owned Unit held at the end of a day, grouped and costed by the
+ *  database from Stock's own Units. Read once through the shared arithmetic,
+ *  which refuses a value that is not quantity × cost; passed through as it came. */
+financeLedgerRouter.get("/stock-value", requireFinance, async (c) => {
+  const parsed = stockValueQuery.safeParse(queryOf(c));
+  if (!parsed.success) return invalid(c, parsed.error);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("fin_stock_value", { p_month_end: parsed.data.monthEnd });
+  if (error) return ledgerError(c, error, "The stock value");
+  const answer = data as StockValueAnswer | null;
+  if (!answer || !Array.isArray(answer.units) || !answer.left_out) return failed(c, "The stock value");
+  try {
+    stockValueReport(answer);
+  } catch {
+    return failed(c, "The stock value");
   }
   return c.json(answer);
 });

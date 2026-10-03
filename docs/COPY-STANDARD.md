@@ -5089,3 +5089,17 @@ These words are on screen in the branch and are not approved yet. The reading on
 | Picking the pages | `Choose the paper to read.` · `Read at most 8 pages at a time.` · `{file} is not a PDF or a photo (JPEG, PNG or WebP).` · `{file} is too big to read. 10 MB at most.` · `{file} could not be opened.` |
 | After saving | `The bill is saved, but a page that was read could not be attached. Attach it on the bill.` (and the same for a credit note) |
 | Refusals | `Reading bills is not set up yet. Type the bill in.` (until the key is given) · `These pages could not be read. Try a clearer photo, or the PDF.` · `Reading the bill took too long. Try again.` · `The bill could not be read. Try again, or type it in.` · `Read a PDF or a photo (JPEG, PNG or WebP).` · `That file is too big to read. 10 MB at most.` · `That file is empty.` · `That file could not be read.` · `Choose the bill to read.` · `A bill is read with at most 8 pages.` |
+
+### PROPOSAL — PENDING CHEW · Stock value, provisional (0643)
+
+These words are on screen in the branch and are not approved yet. Stock's own words for a Unit's status (`Free` · `Reserved` · `On hold` · `Transferred`) are read from Stock (`opsStockStatusLabel`), never copied.
+
+| Where | Words |
+|---|---|
+| Reports page | A door like the others: `Stock value` over `Warehouse · Showroom · In transit · Sent for repair · at a month end, provisional`, and `Open →` |
+| Page | Title `Stock value`. `Month` (each month as `Sep 2026`; opens on the last month that has ended) |
+| Note | `Provisional. Worked out from Stock's Units, at the end of {date}, until Stock confirms its month-end count.` · for the month not yet ended: `This month has not ended, so the Units are as they are now.` · `{n} consignment Unit(s) is/are left out: they belong to their suppliers.` |
+| Groups | `Group` · `Units` · `Value` · `No cost recorded` · `Total`. The groups: `Warehouse` · `Showroom` · `In transit` · `Sent for repair` · `Not placed` |
+| Units | `Unit ID` · `SKU` · `Group` · `Status` · `Site` · `Held by` (hidden until asked for) · `Qty` · `Cost` · `Value` · `PO No`. A Unit with no cost recorded has empty Cost and Value cells. Search: `Search Units…` |
+| Footer | `{n} Units · {money}` · ` · {k} with no cost recorded` |
+| States | `Loading the stock value…` · `The stock value could not be loaded. Try again.` · `Carres held no Unit at the end of {date}.` |

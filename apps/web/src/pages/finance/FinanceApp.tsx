@@ -31,6 +31,7 @@ import DealerCommission from "./reports/DealerCommission";
 import CardCharges from "./reports/CardCharges";
 import CashFlow from "./reports/CashFlow";
 import ApAging from "./reports/ApAging";
+import StockValue from "./reports/StockValue";
 import ApOutstanding from "./payables/ApOutstanding";
 import SupplierFinancePage from "./payables/SupplierFinancePage";
 import SupplierCreditNotes from "./payables/SupplierCreditNotes";
@@ -121,6 +122,8 @@ export default function FinanceApp() {
           <Route path="reports/cash-flow" element={financeOnly(<CashFlow />)} />
           {/* 0640 — what was owed to suppliers on a day, by age (Chew 2026-10-03). */}
           <Route path="reports/ap-aging" element={financeOnly(<ApAging />)} />
+          {/* 0643 — the provisional month-end stock value (Chew 2026-10-03). */}
+          <Route path="reports/stock-value" element={financeOnly(<StockValue />)} />
           {/* 0268 — the rent-to-own credit gate (9th tab). */}
           <Route path="rental-approver" element={financeOnly(<FinanceRentalApprover />)} />
           {/* 0538 — one month of subscription billing across every agreement. */}

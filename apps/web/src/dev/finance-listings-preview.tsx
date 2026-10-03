@@ -461,6 +461,25 @@ const BILL_OUTSTANDING = [
     go_live_on: GO_LIVE, ap_account_code: "2110", allocated_total: "2000.00", unallocated: "13000.00", supplier_kind: "supplier" },
 ];
 
+// ── Reports → Stock value (0643): provisional, at a month end ───────────────
+const STOCK_UNITS = [
+  ...Array.from({ length: 14 }, (_, i) => ({ unit_code: `U2-${String(100 + i)}-001`, sku: i % 2 ? "MAT-QUEEN-PLUSH" : "SOFA-3S-OSLO-GREY",
+    bucket: "warehouse", status: i % 3 ? "free" : "reserved", site_name: "Carres Klang", cost: i % 5 === 0 ? null : 480 + i * 35 })),
+  ...Array.from({ length: 6 }, (_, i) => ({ unit_code: `U2-${String(200 + i)}-001`, sku: "SOFA-L-HARBOUR-OATMEAL",
+    bucket: "showroom", status: "free", site_name: "PJ Showroom", cost: i < 4 ? null : 2150 })),
+  { unit_code: "U2-300-001", sku: "BED-KING-WALNUT", bucket: "transit", status: "reserved", site_name: "AL Sungai Buloh", cost: 1290 },
+  { unit_code: "U2-301-001", sku: "SOFA-3S-OSLO-GREY", bucket: "transit", status: "transferred", site_name: "Carres Klang", cost: 515 },
+  { unit_code: "U2-400-001", sku: "SOFA-2S-DUNE-SAND", bucket: "repair", status: "transferred", site_name: "Carres Klang", cost: 990 },
+].map((u, i) => ({
+  id: `su-${i}`, unit_code: u.unit_code, sku: u.sku, qty: 1, scope: "unit", status: u.status, bucket: u.bucket,
+  site_name: u.site_name, holder_name: null, po_no: u.cost === null ? null : `PO2609${String(10 + i)}-4827`,
+  unit_cost: u.cost === null ? null : u.cost.toFixed(2), value: u.cost === null ? null : u.cost.toFixed(2),
+}));
+const STOCK_VALUE = (monthEnd: string) => ({
+  month_end: monthEnd, cut_at: `${monthEnd}T16:00:00Z`, today: TODAY, provisional: true, units: STOCK_UNITS,
+  left_out: { consignment_units: 3, consignment_qty: 3 },
+});
+
 // ── Reports → AP Aging (0640): owed to suppliers on a day ───────────────────
 const AP_AGING = (asAt: string) => ({
   as_at: asAt, go_live_on: GO_LIVE,
@@ -508,6 +527,7 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   if (url.includes("/api/finance/ledger/daily-bank")) return json(DAILY_BANK(q.get("day") ?? TODAY));
   if (url.includes("/api/finance/ledger/cash-flow")) return json(CASH_FLOW(q.get("from") ?? TODAY, q.get("to") ?? TODAY));
   if (url.includes("/api/finance/ledger/general-ledger")) return json(GENERAL_LEDGER(q.get("from") ?? TODAY, q.get("to") ?? TODAY));
+  if (url.includes("/api/finance/ledger/stock-value")) return json(STOCK_VALUE(q.get("monthEnd") ?? TODAY));
   if (url.includes("/api/finance/other-money-in/parties")) return json(PARTIES);
   if (url.includes("/api/finance/other-money-in/invoices")) return json(DEBTOR_INVOICES);
   if (url.includes("/api/finance/other-money-in/receipts")) return json(RECEIPTS);
@@ -548,6 +568,7 @@ const ROUTES: Record<string, string> = {
   "credit-notes": "/finance/credit-notes",
   "credit-note": "/finance/credit-notes/cn-1",
   "credit-note-new": "/finance/credit-notes/new",
+  "stock-value": "/finance/reports/stock-value",
 };
 window.history.replaceState(null, "", ROUTES[PAGE] ?? ROUTES.ar);
 

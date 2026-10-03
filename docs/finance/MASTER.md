@@ -14,6 +14,7 @@
 > | Card money waiting (§3.4) | 0641 |
 > | Supplier credit notes (§3.2) | 0642 |
 > | Bill scanning: `Read the bill` and `Read the credit note` (§3.2); OFF until the AI key is given | none |
+> | Stock value, provisional (§3.5) | 0643 |
 >
 > Their on-screen words are in COPY-STANDARD "Finance (Chew)"; those marked PROPOSAL wait for Chew.
 >
@@ -187,6 +188,17 @@ Carres already has a simpler Card settlement. It takes Public Bank, GHL and Mayb
 | More than one company | Not needed. |
 | Event or project costs | Not needed. |
 | AutoCount | Stop using it once the ERP is stable. |
+
+**Stock value approach — PROPOSAL / NOT LAW, built for Chew's test (0643).**
+- Reports → Stock value, for a month end. Every Carres-owned Unit held at the end of that day (Kuala Lumpur): free, reserved, on hold or on a movement. Incoming, sold and ended Units are not counted; consignment Units are counted apart and never valued.
+- Each Unit's status, Site, holder and ownership are read back to that day from Stock's own log of changes, so an earlier month shows the Units as they stood then. The current month shows them as they are now, and says so.
+- Groups, first match wins: `Sent for repair` (collected on a repair pickup) · `In transit` (any other movement, a Unit a logistics company holds, or a Unit at a transit point such as AL or HOUZS) · `Showroom` · `Warehouse` (any other Carres Site) · `Not placed` (listed, never dropped).
+- Each Unit is valued at its PO line cost; a free-of-charge line costs nothing. A Unit with no PO line, or a line with no price, has no cost recorded: it is counted in `No cost recorded` and never valued as zero.
+- Nothing is saved and nothing is entered in the ledger; Stock MASTER §9 keeps the month-end total Stock's. When Stock's Month-end Stock Confirmation exists, it is the figure and this page is retired.
+- Measured 2026-10-03 on the test data: 344 Units and 10 quantity rows are held, and nearly all have no PO line (opening imports), so nearly all show `No cost recorded`. Go-live starts clean (CLAUDE.md §6), so after it Units come from POs with their cost.
+- Showroom: Stock has no Site type yet, and its own register finds PJ Showroom by its name (Stock MASTER §12.9). This page counts a Unit as Showroom when a showroom party holds it, its Site's profile names one, or its Site is named as a showroom. When Stock adds a Site type, the page reads it instead.
+- Not built: posting the value to the ledger (Dr stock on hand, Cr cost of goods sold) and valuing the go-live opening stock, which comes in without a PO cost. Both go to Chew.
+- Falsifier: in Chew's test, a Unit Chew knows was in the showroom or out for repair at a month end shows in another group, or a value differs from its PO line cost times its quantity.
 
 ### 3.6 Reports
 

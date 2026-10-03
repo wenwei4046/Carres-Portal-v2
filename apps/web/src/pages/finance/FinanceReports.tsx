@@ -302,6 +302,16 @@ export default function FinanceReports() {
           </span>
           <span className="text-label text-muted-foreground">Open →</span>
         </Link>
+        {/* 0643 (Chew 2026-10-03): the same door. Provisional until Stock confirms its month-end count. */}
+        <Link to="/finance/reports/stock-value" data-testid="reports-stock-value-door"
+          className="flex items-center justify-between rounded-card border border-border bg-card px-4 py-3 hover:bg-muted/40">
+          <span>
+            <span className="block text-meta font-semibold">Stock value</span>
+            <span className="block text-label text-muted-foreground">
+              Warehouse · Showroom · In transit · Sent for repair · at a month end, provisional</span>
+          </span>
+          <span className="text-label text-muted-foreground">Open →</span>
+        </Link>
 
         {notStarted ? <div role="alert" className="text-body">
           <p>The ledger has no start date yet. Nothing can be totalled.</p>
