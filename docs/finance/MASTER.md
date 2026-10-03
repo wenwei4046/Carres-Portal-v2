@@ -15,6 +15,7 @@
 > | Supplier credit notes (§3.2) | 0642 |
 > | Bill scanning: `Read the bill` and `Read the credit note` (§3.2); OFF until the AI key is given | none |
 > | Stock value, provisional (§3.5) | 0643 |
+> | Collection report (§3.6) | 0644 |
 >
 > Their on-screen words are in COPY-STANDARD "Finance (Chew)"; those marked PROPOSAL wait for Chew.
 >
@@ -237,6 +238,20 @@ All reports only read. Reports → Payment stays Payment's.
 - Each row adds up to the supplier's balance in the books, and the footer ties the rows to the control accounts with the difference. A test walks bills, a voucher with an advance and a knock-off through the real doors and reads three days.
 - Not built: AR aging (it reads Payment's invoices and receipts, so it comes after AP), the trade or other payables chips, and a PDF.
 - Falsifier: in Chew's test, a supplier's balance here differs from AP · Payables' net owing today, or the footer's difference is not zero.
+
+**Collection report approach — PROPOSAL / NOT LAW, built for Chew's test (0644).**
+- Reports → Collection, after Houzs Part 10 §6. The sales orders placed in a period (by SO Doc Date, a Kuala Lumpur day), not cancelled and not rental, per salesperson. Two views on a tab bar:
+  - `Deposit`: orders, order value, deposit, deposit % and how many orders fell below a chosen share (`Below (%)`, 50 unless changed).
+  - `Balance`, delivered orders only: invoiced value, deposit, balance due, balance paid, balance % and outstanding.
+- Opening a salesperson lists the orders.
+- Deposit is the money taken with the new order (payments of kind `deposit`); balance paid is every other customer payment, storage excepted. Both are read from live allocations, so a payment moved by Payment's `Correct allocation` counts on the order it was moved to, and a voided one counts nowhere.
+- Invoiced value is the live sales invoice; without one, the order value. An order counts as delivered when it is delivered or its sales invoice is issued.
+- The salesperson is the order's salesperson now.
+- It reads Orders' and Payment's records and changes none. It is per salesperson, so it does not repeat Payment's own reports, which are per order and per customer.
+- Not built: refunds netted against what was collected; an as-of date (the money is as it stands today); a PDF.
+- Falsifier: in Chew's test, a salesperson's deposit or balance differs from what Payment's records show for the same orders, or Chew counts deposits differently (for example, every payment before the invoice).
+
+**Performance P&L — NOT BUILT; a question for Chew.** Houzs reads each order line's cost from its sales order. Carres has no governed cost per sold line. `product_skus.cost` was filled at 55% of the price as a placeholder, a PO line's cost is linked to only some sales lines, and the ledger posts no cost of sales (0466). Before a Performance P&L can show gross profit, Chew decides what a sold line's cost is.
 
 ## 4 · Menu: DRAFT
 

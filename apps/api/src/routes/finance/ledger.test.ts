@@ -137,6 +137,8 @@ describe("finance ledger — who may read", () => {
     "/daily-bank",
     "/cash-flow?from=2026-09-01&to=2026-09-30",
     "/general-ledger?from=2026-09-01&to=2026-09-30",
+    "/stock-value?monthEnd=2026-09-30",
+    "/collection?from=2026-09-01&to=2026-09-30",
   ];
 
   it.each(["dealer", "operation", "supplier"])("refuses %s on every route before any database call", async (role) => {
@@ -1461,5 +1463,63 @@ describe("GET /general-ledger (0639)", () => {
     expect((await get("/general-ledger?from=2026-09-01&to=2026-09-30")).status).toBe(409);
     fakeClient(() => ok({ ...LEDGER, status: "BEFORE_GO_LIVE", accounts: [] }));
     expect(await json(await get("/general-ledger?from=2026-08-01&to=2026-08-31"))).toMatchObject({ status: "BEFORE_GO_LIVE" });
+  });
+});
+
+describe("GET /stock-value (0643)", () => {
+  const VALUE = {
+    month_end: "2026-09-30", cut_at: "2026-09-30T16:00:00Z", today: "2026-10-03", provisional: true,
+    units: [
+      { id: "u1", unit_code: "U1-000-001", sku: "SOFA-3S", qty: 1, scope: "unit", status: "free", bucket: "warehouse",
+        site_name: "Carres Klang", holder_name: null, po_no: "PO-1", unit_cost: "520.00", value: "520.00" },
+      { id: "u2", unit_code: "U1-000-002", sku: "SOFA-3S", qty: 1, scope: "unit", status: "free", bucket: "showroom",
+        site_name: "PJ Showroom", holder_name: null, po_no: null, unit_cost: null, value: null },
+    ],
+    left_out: { consignment_units: 1, consignment_qty: 1 },
+  };
+
+  it("asks for the month end and passes the answer through whole", async () => {
+    const { sb } = fakeClient(() => ok(VALUE));
+    const res = await get("/stock-value?monthEnd=2026-09-30");
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("fin_stock_value", { p_month_end: "2026-09-30" });
+    expect(await json(res)).toEqual(VALUE);
+  });
+
+  it("refuses a missing day before any database call, and a value that is not quantity times cost", async () => {
+    expect((await get("/stock-value")).status).toBe(422);
+    expect(userClient).not.toHaveBeenCalled();
+    const broken = structuredClone(VALUE);
+    broken.units[0]!.value = "521.00";
+    fakeClient(() => ok(broken));
+    const res = await get("/stock-value?monthEnd=2026-09-30");
+    expect(res.status).toBe(500);
+    expect((await json(res)).message).toBe("The stock value could not be loaded. Try again.");
+  });
+});
+
+describe("GET /collection (0644)", () => {
+  const ORDERS = {
+    from: "2026-09-01", to: "2026-09-30",
+    orders: [{ id: "o1", so: 1401, placed_on: "2026-09-05", status: "proceed_order", customer_name: "LIM KUAN YANG",
+      salesperson_id: "s1", salesperson_name: "Aina", channel: "showroom", dealer_name: "PJ Showroom",
+      order_value: "2000.00", deposit: "1000.00", balance_paid: "0.00", invoice_no: null, billed: null, issued_at: null, delivered: false }],
+  };
+
+  it("asks for the period and passes the answer through whole", async () => {
+    const { sb } = fakeClient(() => ok(ORDERS));
+    const res = await get("/collection?from=2026-09-01&to=2026-09-30");
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("fin_collection", { p_from: "2026-09-01", p_to: "2026-09-30" });
+    expect(await json(res)).toEqual(ORDERS);
+  });
+
+  it("refuses a backwards period before any database call, and a figure it cannot read", async () => {
+    expect((await get("/collection?from=2026-09-30&to=2026-09-01")).status).toBe(422);
+    expect(userClient).not.toHaveBeenCalled();
+    fakeClient(() => ok({ ...ORDERS, orders: [{ ...ORDERS.orders[0], deposit: "lots" }] }));
+    const res = await get("/collection?from=2026-09-01&to=2026-09-30");
+    expect(res.status).toBe(500);
+    expect((await json(res)).message).toBe("The Collection report could not be loaded. Try again.");
   });
 });

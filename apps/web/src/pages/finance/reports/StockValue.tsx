@@ -36,6 +36,7 @@ import { appTodayIso, fmtDate, fmtMonth } from "@/lib/fmt-date";
 import { rm } from "@/lib/format-currency";
 import ModuleHeader from "@/pages/operation/components/ModuleHeader";
 import { ReadFailed } from "../payables/PayablesParts";
+import { recentMonths } from "./period";
 
 /** The month before today's, as YYYY-MM: the last month that has ended. */
 export function lastEndedMonth(today: string): string {
@@ -44,17 +45,7 @@ export function lastEndedMonth(today: string): string {
 }
 
 /** This month and the 23 before it, newest first, plus the month on screen. */
-export function stockMonths(today: string, shown: string | null): string[] {
-  const out = new Set<string>();
-  let [y, m] = today.split("-").map(Number) as [number, number];
-  for (let i = 0; i < 24; i += 1) {
-    out.add(`${y}-${String(m).padStart(2, "0")}`);
-    m -= 1;
-    if (m === 0) { m = 12; y -= 1; }
-  }
-  if (shown) out.add(shown);
-  return [...out].sort().reverse();
-}
+export const stockMonths = recentMonths;
 
 const amount = (sen: number) => rm(sen / 100);
 const costOf = (u: StockValueUnit) => (u.unit_cost === null ? null : Number(u.unit_cost));

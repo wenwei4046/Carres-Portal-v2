@@ -480,6 +480,25 @@ const STOCK_VALUE = (monthEnd: string) => ({
   left_out: { consignment_units: 3, consignment_qty: 3 },
 });
 
+// ── Reports → Collection (0644): deposit and balance per salesperson ────────
+const SALESPEOPLE = [["s1", "NUR AISYAH BINTI KAMARUL ZAMAN"], ["s2", "Boon Keat"], ["s3", "Priya Raman"]] as const;
+const COLLECTION_ORDERS = Array.from({ length: 18 }, (_, i) => {
+  const [sid, sname] = SALESPEOPLE[i % 3]!;
+  const value = 1800 + (i * 377) % 4200;
+  const depositShare = [0.3, 0.5, 0.2, 0.6, 0.45, 1][i % 6]!;
+  const delivered = i % 4 === 0 || i % 5 === 0;
+  const deposit = Math.round(value * depositShare);
+  return {
+    id: `co-${i}`, so: 1500 + i, placed_on: soon(-25 + i), status: delivered ? "delivered" : "proceed_order",
+    customer_name: i === 2 ? LONG_CUSTOMER : ["LIM KUAN YANG", "SITI AMINAH", "WONG MEI LING"][i % 3]!,
+    salesperson_id: i === 17 ? null : sid, salesperson_name: i === 17 ? null : sname, channel: "showroom", dealer_name: "PJ Showroom",
+    order_value: value.toFixed(2), deposit: deposit.toFixed(2),
+    balance_paid: delivered ? Math.round((value - deposit) * (i % 2 ? 1 : 0.4)).toFixed(2) : "0.00",
+    invoice_no: delivered ? `INV-2609-${String(100 + i)}` : null, billed: delivered ? value.toFixed(2) : null,
+    issued_at: delivered ? soon(-3) : null, delivered,
+  };
+});
+
 // ── Reports → AP Aging (0640): owed to suppliers on a day ───────────────────
 const AP_AGING = (asAt: string) => ({
   as_at: asAt, go_live_on: GO_LIVE,
@@ -528,6 +547,8 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   if (url.includes("/api/finance/ledger/cash-flow")) return json(CASH_FLOW(q.get("from") ?? TODAY, q.get("to") ?? TODAY));
   if (url.includes("/api/finance/ledger/general-ledger")) return json(GENERAL_LEDGER(q.get("from") ?? TODAY, q.get("to") ?? TODAY));
   if (url.includes("/api/finance/ledger/stock-value")) return json(STOCK_VALUE(q.get("monthEnd") ?? TODAY));
+  if (url.includes("/api/finance/ledger/collection"))
+    return json({ from: q.get("from") ?? TODAY, to: q.get("to") ?? TODAY, orders: COLLECTION_ORDERS });
   if (url.includes("/api/finance/other-money-in/parties")) return json(PARTIES);
   if (url.includes("/api/finance/other-money-in/invoices")) return json(DEBTOR_INVOICES);
   if (url.includes("/api/finance/other-money-in/receipts")) return json(RECEIPTS);
@@ -569,6 +590,7 @@ const ROUTES: Record<string, string> = {
   "credit-note": "/finance/credit-notes/cn-1",
   "credit-note-new": "/finance/credit-notes/new",
   "stock-value": "/finance/reports/stock-value",
+  collection: "/finance/reports/collection",
 };
 window.history.replaceState(null, "", ROUTES[PAGE] ?? ROUTES.ar);
 

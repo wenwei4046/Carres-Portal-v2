@@ -302,6 +302,16 @@ export default function FinanceReports() {
           </span>
           <span className="text-label text-muted-foreground">Open →</span>
         </Link>
+        {/* 0644 (Chew 2026-10-03): the same door. */}
+        <Link to="/finance/reports/collection" data-testid="reports-collection-door"
+          className="flex items-center justify-between rounded-card border border-border bg-card px-4 py-3 hover:bg-muted/40">
+          <span>
+            <span className="block text-meta font-semibold">Collection</span>
+            <span className="block text-label text-muted-foreground">
+              Deposit · Deposit % · Balance paid · Outstanding · by salesperson</span>
+          </span>
+          <span className="text-label text-muted-foreground">Open →</span>
+        </Link>
         {/* 0643 (Chew 2026-10-03): the same door. Provisional until Stock confirms its month-end count. */}
         <Link to="/finance/reports/stock-value" data-testid="reports-stock-value-door"
           className="flex items-center justify-between rounded-card border border-border bg-card px-4 py-3 hover:bg-muted/40">

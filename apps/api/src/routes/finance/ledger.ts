@@ -46,6 +46,7 @@ import { dailyBankQuery, dailyBankRow, sen, type DailyBankDay } from "@carres/sh
 import { cashFlowQuery, cashFlowReport, type CashFlowAnswer } from "@carres/shared/cash-flow";
 import { generalLedgerBlocks, generalLedgerQuery, type GeneralLedgerAnswer } from "@carres/shared/general-ledger";
 import { stockValueQuery, stockValueReport, type StockValueAnswer } from "@carres/shared/stock-value";
+import { collectionQuery, collectionReport, type CollectionAnswer } from "@carres/shared/collection";
 import { requireFinance } from "../../lib/auth-guards";
 import { mapPgError, parseJsonBody, readAllPages } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
@@ -1092,6 +1093,27 @@ financeLedgerRouter.get("/stock-value", requireFinance, async (c) => {
     stockValueReport(answer);
   } catch {
     return failed(c, "The stock value");
+  }
+  return c.json(answer);
+});
+
+// ── Collection report (0644, Chew 2026-10-03) ───────────────────────────────
+
+/** The orders placed in a period with their deposit, balance paid and sales
+ *  invoice, read from Orders' and Payment's own records. Read once through the
+ *  shared arithmetic, which refuses a figure it cannot read; passed through. */
+financeLedgerRouter.get("/collection", requireFinance, async (c) => {
+  const parsed = collectionQuery.safeParse(queryOf(c));
+  if (!parsed.success) return invalid(c, parsed.error);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("fin_collection", { p_from: parsed.data.from, p_to: parsed.data.to });
+  if (error) return ledgerError(c, error, "The Collection report");
+  const answer = data as CollectionAnswer | null;
+  if (!answer || !Array.isArray(answer.orders)) return failed(c, "The Collection report");
+  try {
+    collectionReport(answer, 50);
+  } catch {
+    return failed(c, "The Collection report");
   }
   return c.json(answer);
 });

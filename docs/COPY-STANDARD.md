@@ -5103,3 +5103,18 @@ These words are on screen in the branch and are not approved yet. Stock's own wo
 | Units | `Unit ID` · `SKU` · `Group` · `Status` · `Site` · `Held by` (hidden until asked for) · `Qty` · `Cost` · `Value` · `PO No`. A Unit with no cost recorded has empty Cost and Value cells. Search: `Search Units…` |
 | Footer | `{n} Units · {money}` · ` · {k} with no cost recorded` |
 | States | `Loading the stock value…` · `The stock value could not be loaded. Try again.` · `Carres held no Unit at the end of {date}.` |
+
+### PROPOSAL — PENDING CHEW · Collection report (0644)
+
+These words are on screen in the branch and are not approved yet. `SO Doc Date` and `SO No` are the Orders words (Orders MASTER).
+
+| Where | Words |
+|---|---|
+| Reports page | A door like the others: `Collection` over `Deposit · Deposit % · Balance paid · Outstanding · by salesperson`, and `Open →` |
+| Page | Title `Collection`. `Month` · `From` · `Up to` (Cash Flow's words; `Custom Date Range` when the period is not a whole month) · `Below (%)` (50 unless changed) · the tab bar `Deposit` · `Balance` · `Search salespeople…` |
+| Deposit | `Salesperson` · `Orders` · `Order value` · `Deposit` · `Deposit %` · `Below {N}%` (empty when none) |
+| Balance | `Salesperson` · `Delivered` · `Invoiced value` · `Deposit` · `Balance due` · `Balance paid` · `Balance %` · `Outstanding` |
+| Opened row | Toggle hover `Show orders`. `SO No` (`SO-{n}`) · `SO Doc Date` · `Customer` · `Order value` · `Deposit` · `Deposit %` · `Invoice` · `Balance paid` · `Outstanding` (both empty until delivered). Empty: `No order of theirs placed in the period is delivered yet.` |
+| Group | `No salesperson` (an order with no salesperson recorded) |
+| Footer | The money columns' totals and the shares of the whole. `{n} salespeople · {k} orders · {m} below {N}%`, or on Balance `{n} salespeople · {k} delivered` |
+| States | `The Collection report could not be loaded. Try again.` · `No order was placed from {date} to {date}.` · `Choose a period whose start is not after its end.` |

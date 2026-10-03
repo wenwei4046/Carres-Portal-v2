@@ -44,6 +44,21 @@ export function monthChoices(goLive: string | null, today: string, shown: string
   return [...out].sort().reverse();
 }
 
+/** This month and the 23 before it, newest first, plus the month on screen.
+ *  For a report that does not start at the ledger's go-live (Stock value,
+ *  Collection): it reads other modules' records, which are older. */
+export function recentMonths(today: string, shown: string | null): string[] {
+  const out = new Set<string>();
+  let [y, m] = today.split("-").map(Number) as [number, number];
+  for (let i = 0; i < 24; i += 1) {
+    out.add(`${y}-${String(m).padStart(2, "0")}`);
+    m -= 1;
+    if (m === 0) { m = 12; y -= 1; }
+  }
+  if (shown) out.add(shown);
+  return [...out].sort().reverse();
+}
+
 /** The period in the address, or this month. An Up to before From is read as From. */
 export function readPeriod(params: URLSearchParams, today: string): { from: string; to: string } {
   const ym = today.slice(0, 7);
