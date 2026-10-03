@@ -6857,3 +6857,7 @@ and failed source Unavailable. Independent Amendment No allocation remains an au
 
 
 Owner correction2026-10-02: toolbar omits the duplicate SO count; footer keeps filtered SO count and quantity. Listing uses COPY-STANDARD’s `Listing` tab word.
+
+### Confirmed embedded Delivery card — 2026-10-03
+
+The current approved composition is [UI MASTER §4.3](../ui/MASTER.md#43--confirmed-compact-module-card--2026-10-03) and [the complete copy contract](../ui-reference/DELIVERY-CARD-TEMPLATE.md), including Communication and compact Timeline. Delivery owns operational arrangements; other module cards reuse composition with their own facts. Requested target, confirmed date and ETA remain distinct. Sample stock and draft links are not verified stock/contact. Reference publication does not certify production module-card adoption; existing business gates and ownership remain unchanged.

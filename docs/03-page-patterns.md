@@ -470,3 +470,7 @@ Sales orders · Total payable · Paid to date · Balance due all remain visible.
 FilterRailGroup, Money and typography; count uses text-strong, values right/tabular/no-wrap,
 8px row gap. Conditional missing-amount notices span the row. Filtering/calculation ownership
 and loaded-scope tooltip/count stay unchanged; other modules derive aggregates from their own facts.
+
+## Object Detail · confirmed compact module card — 2026-10-03
+
+Use [UI MASTER §4.3](ui/MASTER.md#43--confirmed-compact-module-card--2026-10-03) and [the complete copy contract](ui-reference/DELIVERY-CARD-TEMPLATE.md) as the current composition source, including Communication and Timeline. Copy HTML/CSS/measurements together and retain their measured-state limits. Each module supplies its own facts, permissions and ownership; Delivery’s four fields are not mandatory for Purchasing. The published reference does not certify production module-card adoption.
