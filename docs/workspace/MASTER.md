@@ -1512,18 +1512,12 @@ checklist. Revisions 2 to 5 carry her corrections of the same day, made on the d
    customer missed"); a status sits only on the step it belongs to. A PO serving several orders, or
    stock, keeps a two-line PO header: `PO No · Supplier` / `PO Delivery Date {date} · Expected
    arrival {date} · Related orders · {n}`.
-5. **Revision 3 (Jess, 2026-09-27: "Yes. This is clearer.") — under the full-width header the
-   Mission is two columns.** LEFT (≈264px): the Route as a vertical list — every module always
-   visible, in order `Proceed · Loan (only when a loan exists) · PO · GRN · Logistics · Customer
-   delivery · Payment (only when it affects the delivery)` — each with its status word and its
-   checklist directly beneath. A tick, an open circle or a warning comes from a recorded fact;
-   staff never tick anything. More than one module may show an open item. RIGHT: the record panel —
-   the exact forms that complete this order's open acts, stacked (A6), and nothing else (it does
-   not repeat the order). The Inbox act opens with its item selected; after Save the checklist
-   re-reads its facts. The card is the owning module's own
-   component in place (for a PO answer, Purchasing's `Record supplier answer` form with its own
-   words: `Confirmed` · `New date` · `Split delivery`, the eight governed reasons, `Evidence`,
-   `Supplier DO received`, `Save`) — never a Workspace copy. The left column scrolls alone.
+5. **Mission and source operations — current §5.11 composition.** The background keeps its
+   Route/map, recorded dates, status and module checklist; concurrent open module facts remain
+   visible. Clicking a task opens that exact task in the right inspector. The owning module's
+   existing authorised form/door supplies the operation there, not a stacked second form in the
+   middle and not a Workspace writer. A PO answer reuses Purchasing's admitted answer/evidence
+   operation. After authoritative completion, re-read the same task and background source facts.
    **APPROVED (Jess, 2026-09-27: "good thing is route got date, module title + checklist"):** the left
    column reads as a vertical timeline like her references — the step's date in a fixed left
    column, a dot on one line (solid where done, dashed ahead), the module title with its status on
@@ -1533,30 +1527,21 @@ checklist. Revisions 2 to 5 carry her corrections of the same day, made on the d
 6. **Order of work, one meaning per colour (Jess, 2026-09-27: "又有红又有蓝，没有让我知道先要做什么").**
    Every open act of the signed-in person on this order carries a mark on its checklist item: a red
    `!` when missed, an amber `!` when due (Jess, 2026-09-27: "confused the numbering work?" — the
-   1, 2, 3 badges were removed because they did not read top to bottom). The first missed act in
-   Route order opens by itself.
-   **One page, no paging (Jess, 2026-09-27: "why working record panel need turn to next? i want
-   one page"):** the record panel lists every open act of this order at once, stacked in number
-   order, each headed by its number badge and title with its owning module's form beneath. The act
-   being worked carries the 3px blue edge and opens its exact task inspector; pressing a Route item
-   scrolls to its form; after Save the act leaves the list and the rest renumber. Red = missed; amber = due on the chosen day (`Due {date}`, PROPOSED); blue
-   = only the one item open now (pale-blue wash, 3px edge) and the card's primary button. An open
-   item owned by someone else is grey, unnumbered, and names its owner (`No PO yet · {owner}`).
-   Done is a dark tick; waiting is a hollow circle. Step dots are dark when done, red when missed,
-   grey otherwise; there is no larger "current step" dot.
+   1, 2, 3 badges were removed because they did not read top to bottom). The first missed act may be selected in the background; inspection opens on click.
+   **One mission, exact task inspection.** Keep open-task summaries in the background map;
+   do not stack every module form there. Click a summary/Route task to open its exact right-panel
+   task, with the existing source operation inside that task. Completion changes the source-backed
+   work set; copying, channel opening or a mere local Save acknowledgement does not. Due/Missed,
+   waiting and done retain their existing module-derived meanings; assignment is distinct from
+   the historical updater/completer.
 6a. **Five adaptations from the ChatGPT order-desk prototype (Jess "ok", 2026-09-27).** Ours stays
    the base; these five are added:
-   1. The Communication pane follows its layout: `To` is a select (the party's contact or group),
-      `Template` a select with the message shown beneath, the doors in one row — WhatsApp and Email
-      as ICONS plus `Copy message` — then History, folded to one line `History {n}` and opened on press. The owning
-      module's form is the Mission card, so the pane shows no answer door while it is open (Jess,
-      2026-09-27: "history can hide").
-   2. **Every fact appears once (Jess, 2026-09-27: "every module why repeated … no use word").** The
-      Route carries the facts; the action area under it carries only its title and the owning
-      module's form, never a fact the Route already shows (no `Why` rows, no party line). An item
-      line never repeats its step's date. A step's items state that step's own fact (a PO item says
-      `Confirmed`, never GRN's `Received`), and GRN lists only goods that have a PO; nothing is
-      given a guessed date.
+   1. Inside the exact task, `To` combines recorded recipient/channel; `Template` and message
+      use the owning module's admitted content. Preserve Copy/Open WhatsApp and full folded
+      history. The latest actual reply and the required result remain visible in that task.
+   2. Each fact is source-owned and each mutation uses one existing operation. No duplicate form
+      or answer door in the middle mission. A PO item states PO truth, never GRN's received fact;
+      GRN lists only its proven source goods. Missing binding/date remains unknown.
    3. No grey line under each step: the step name already says what it is (the proposed
       `Sales Order` / `Supplier confirmation` / … lines are withdrawn).
    4. `Missed {n}` and `No date {n}` under the Inbox month are two pressable boxes, not text rows.
@@ -1591,8 +1576,7 @@ checklist. Revisions 2 to 5 carry her corrections of the same day, made on the d
    - **A card with work:** title (15/600, black) = WHAT TO DO, the act's own row line from
      COPY-STANDARD; line 2 = WHY (13px, red when missed, amber when due today); a hairline, then
      the facts in grey (document link · goods · Deliver To). The owning module's button sits at the
-     top right as an outline button. Pressing it opens that module's form INSIDE the card, laid out
-     like the SO info grid (label over a bordered field, three per row, white). **The only blue is
+     top right as an outline button. Pressing it opens the exact task inspector and its existing module operation (§5.11). **The only blue is
      the primary `Save`** (and document links). Save closes the form; nothing opens by itself.
    - **A card without work:** title = the module's current state (`Not received yet` ·
      `RM {amount} unpaid`); facts under it; no button.
@@ -1664,8 +1648,7 @@ checklist. Revisions 2 to 5 carry her corrections of the same day, made on the d
    - **The layout stays Claude's stop-card version (Jess 2026-09-28: "i want your version … content can
      improve like chatgpt advise, but not bad ui from chatgpt").** No separate `To do` block on top and
      no route of outlined one-liners. The vertical line keeps one stop per node; a stop with an act (or
-     facts that matter now) draws its white cards IN PLACE, the act's button on the card and its form
-     opening inside it; a stop with no act now (`SUPPLIER` before the send is confirmed, `RECEIVING`,
+     facts that matter now) draws its white cards IN PLACE, the act's button opening the exact §5.11 task inspector; a stop with no act now (`SUPPLIER` before the send is confirmed, `RECEIVING`,
      `STOCK`, `DELIVER`, `DELIVERY PHOTO` on SO-1333) is one quiet line (node · status · progress ·
      chevron) that opens to its facts, and a stop that cannot start yet shows no empty checkboxes.
      ChatGPT's CONTENT corrections are kept (send-not-confirmed act, no early collection act,
@@ -1700,8 +1683,8 @@ checklist. Revisions 2 to 5 carry her corrections of the same day, made on the d
      | Rail | `FilterRail` style C (`workspace-rail.tsx`) + `MonthCalendar` | group title = kit `Icon` 16px + 13/600 slate-12; rows 14/400 + right count, no row icon; ONE blue in the rail (Jess 2026-09-28: "why force to select all module with blue? confusing like select 2"): only the chosen ORDER row is blue-3 + 3px blue edge; a chosen filter (Attention, Module, the day) is the grey chip with bold text like the `My Task` · `Team Work` switch; the month grid prints each day's count UNDER its number (13 over 11/500, 36px rows), today a dark ring |
      | Order header | `DetailShell` header slots | SO/customer once; Calendar + Requested date context and day badge (§5.11); Proceed Date in Info; accessible assignment avatar only |
      | Act card | `Block` (SalesOrderWorkspace; ONE KIT LAW) | white, 1px slate-5, radius 10, padding 12/16, gap 12 between cards; title 15/600 black; second line 13/400 red (missed) / amber (due) / slate-11; hairline, then checklist |
-     | Card button | `Button` secondary | 36px, top right of the card; opens the owning form in the card |
-     | Form in card | `FieldFrame` + `field-recipe` + `Select` / `DatePicker` | three fields per row, gap 12, label 11/500 slate-11 over a 32px field; white; only `Save` is `Button` primary (the one blue) |
+     | Card button | `Button` secondary | 36px, top right of the card; opens exact task inspection with the owning operation |
+     | Form in card | `FieldFrame` + `field-recipe` + `Select` / `DatePicker` | reuse the source module form and kit fields in the exact task; no forced full-edit grid or duplicate form |
      | Progress | text | `{n} of {m} done` 12/400 slate-11, bottom right of a card; only steps with completion evidence count |
      | Communication | `Tabs` + `Select` + `Button` + `Icon` (`message`, `mail`) | communication belongs inside the exact task tab (§5.11); recorded channels only · Template · Message · Copy · folded History |
      | Document number | link + `PdfPreview` sheet | underlined 12/400 ink; opens the official PDF over the page |
@@ -1745,21 +1728,13 @@ checklist. Revisions 2 to 5 carry her corrections of the same day, made on the d
    before · {date} · Opens {date}`; on its date the 1-day check lists one line per gap (`Goods not
    ready` · `Hold delivery · RM {amount} unpaid` …). Dates count back from the Scheduled date, else
    the Requested date, Mon to Sat with public holidays; a done or missed check keeps its date. One
-   `Record scheduled delivery` save closes the 3-day and 2-day checks together. The Route needs
-   ≥500px for this row to stay one line (B2).
-7b. **Route and To do say the same words; open work cannot be folded (Jess, 2026-09-27: "order
-   route not tally the to do 1 2 3 title … once done can hide and expand, before complete, cannot
-   hide").** Each To do item opens with a two-line summary header: line 1 = the number and EXACTLY
-   the Route item's words (`① Delivery details · Not received`), line 2 grey = `{step} · {the owning
-   form's name}` (`Logistics · Record scheduled delivery`); the form follows. A Route step holding
-   an open act and every open To do item stay open and show no fold arrow. After Save the item
-   moves to the end of To do as one line (`✓ Delivery details · Received` / `Logistics · Saved`),
-   which opens on press to show what was recorded; its Route step then folds and can be opened.
-8a. **One title per panel, one row (Jess, 2026-09-27: "we need align each panel got one title like
-   communication but not too big font size").** Every column opens with the same 48px title row,
-   14px semibold, aligned across the page: the left column's `My Work` · `Team Work` switch ·
-   `Order Route` · `To do {n}` (the record panel: this order's open acts) · `Communication`.
-   PROPOSED: `To do` is the rail's governed Status word, reused as the panel's name.
+   `Record scheduled delivery` save closes the 3-day and 2-day checks together. Preserve full dates and discoverable facts without the withdrawn B2 width requirement.
+7b. **Route and task say the same source words.** Background summaries identify open work.
+   The right task presents its own required result and source operation. After source completion,
+   preserve the recorded receipt/history and refresh the map; never complete a second task or
+   write a second result merely because it is opened from another surface.
+8a. **Panel navigation.** Preserve governed background headings. Right inspection uses Info first
+   plus actual task labels (§5.11), never a duplicate module navigation or Communication column.
 8b. **The left column copies the ChatGPT order-desk rail (Jess, 2026-09-27: "i want the left nav
    rail, follow" / "i asked you copy").** Top to bottom: search and `Filters` · the month · the Mon
    to Sat grid with each day's count printed under its number (today ringed, the chosen day a
