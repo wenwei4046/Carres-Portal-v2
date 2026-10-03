@@ -1473,7 +1473,7 @@ scaling, only the owning form's primary button blue, every word in COPY-STANDARD
 words"). **Measured 2026-09-28 on the SO-1333 replay preview (the real reads, test data):** columns
 280·804·340 (1440) · 240·624·300 (1180) · 220·507·280 (1023) · 220·403·280 (919); no sideways scroll;
 body 13px; buttons 36px; column title rows 64px; quiet rows 48px; card title 15/600; rail rows
-14/400; the act's card on the first screen at every width; the four Communication tabs on one row
+14/400; the act's card on the first screen at every width; source facts reachable
 at every width; no status cut (a quiet row wraps below 1100px).
 
 
@@ -1538,7 +1538,7 @@ checklist. Revisions 2 to 5 carry her corrections of the same day, made on the d
    **One page, no paging (Jess, 2026-09-27: "why working record panel need turn to next? i want
    one page"):** the record panel lists every open act of this order at once, stacked in number
    order, each headed by its number badge and title with its owning module's form beneath. The act
-   being worked carries the 3px blue edge and drives Communication's tab; pressing a Route item
+   being worked carries the 3px blue edge and opens its exact task inspector; pressing a Route item
    scrolls to its form; after Save the act leaves the list and the rest renumber. Red = missed; amber = due on the chosen day (`Due {date}`, PROPOSED); blue
    = only the one item open now (pale-blue wash, 3px edge) and the card's primary button. An open
    item owned by someone else is grey, unnumbered, and names its owner (`No PO yet · {owner}`).
@@ -1580,15 +1580,13 @@ checklist. Revisions 2 to 5 carry her corrections of the same day, made on the d
    `usePdfCanvases`. The card title, the Communication pane and the Inbox never repeat it as a link
    (the Inbox's line 1 stays plain text). `Expected arrival` (the
    supplier's newest date) prints beside the PDF's `PO Delivery Date`, never instead of it.
-8. Communication has one tab per outside party on the Route, always there, in Route order:
-   `Supplier` · `Warehouse` · `Logistics` · `Customer` (Jess, 2026-09-27: "communication should got
-   warehouse, every module"). The item open picks the tab: PO → Supplier · GRN → Warehouse ·
-   Logistics → Logistics · Customer delivery and Payment → Customer. Proceed is internal and picks
-   none. Copying or opening WhatsApp completes nothing.
+8. Communication is scoped to the exact actual task (§5.11), with recorded recipient/channel,
+   admitted template, latest reply/evidence and full history. There are no fixed party-navigation
+   tabs. Copying or opening WhatsApp completes nothing.
 7. **REVISION 12 · THE CARD BLUEPRINT — built from the module acts (Jess, 2026-09-28: "your job to
    plan and blueprint what to do, check with every module what mission and show").** Order header as before. Under `Order Route · To do {n}`, one stop per module in Route order
    (`Purchasing · Receiving · Warehouse · Payment · Delivery`); the line joins modules only.
-   - **Card = the Sales Order `Block`:** white, 1px `slate-5` line, 6px radius, 12/16 padding.
+   - **Card = the Sales Order `Block`:** white, 1px `slate-5` line, 10px radius, 12/16 padding.
      Every module has at least one card.
    - **A card with work:** title (15/600, black) = WHAT TO DO, the act's own row line from
      COPY-STANDARD; line 2 = WHY (13px, red when missed, amber when due today); a hairline, then
@@ -1679,14 +1677,10 @@ checklist. Revisions 2 to 5 carry her corrections of the same day, made on the d
      (Purchasing §5.6). No recorded channel → the form names the missing contact, no input.
    - **Six fixes 2026-09-28 (Jess "yes"):** the `3 working days before` check is a STEP (§5.9: done
      only when the company has the details), so LOGISTICS reads `1 of 2 done` and is not ticked; the
-     four Communication tabs stay on one row; SUPPLIER's line is its own sentence `Supplier has not
+     task communication follows §5.11; SUPPLIER's line is its own sentence `Supplier has not
      confirmed the ready date`; every text is at least 4.5:1 (calendar, search hint, counts, the SO
      link); a stop's outline takes its state colour (red missed · amber due); a route line carries one
      status and wraps below 1100px instead of being cut.
-   - **Widths:** the page never scales on desktop. 1340+ as B2; 1100–1339 rail 240 · Mission ≥460 ·
-     Communication 300 with checklist rows stacking the state under the step; 900–1099 rail 220 ·
-     Mission ≥400 · Communication 280. Measured at 1440 / 1180 / 1023 / 919: 13px text, 36px buttons,
-     no sideways scroll, the three acts on the first screen. Phone (below 900) is its own round.
    - **Acts first (Jess 2026-09-28: "make sure need to do put on top, not scroll down to find what to
      do").** Stops holding an open act come first, in Route order among themselves, with their full
      cards; every other stop follows in Route order as one quiet line. Measured on SO-1333 at 1440,
@@ -1696,7 +1690,7 @@ checklist. Revisions 2 to 5 carry her corrections of the same day, made on the d
      Built deviations, each for a kit or document law: the card and the quiet row use the kit CARD
      radius (10px), not the prototype's 6 (token values are locked); the header's `Proceed Date` is
      the Sales Order document's own Proceed Date (A7), not the hand-off time the prototype printed;
-     the Communication tabs are the kit `Tabs` (its selected tab carries the kit's blue indicator);
+     the actual task tabs are the kit `Tabs` (its selected tab carries the kit's blue indicator);
      the calendar is the Work rail's existing Monday-to-Saturday month grid with each day's count.
 
      | Part | Kit component (exists) | Exact values |
@@ -1704,8 +1698,8 @@ checklist. Revisions 2 to 5 carry her corrections of the same day, made on the d
      | Page columns | `PageShell` + `grid-layout` | Background Inbox/mission retained; click-open §5.11 inspector; no permanent Communication column or whole-page scaling |
      | Column title rows | `SectionHeader` | 64px tall, 15/600 slate-12, governed heading separator; no fixed third Communication column |
      | Rail | `FilterRail` style C (`workspace-rail.tsx`) + `MonthCalendar` | group title = kit `Icon` 16px + 13/600 slate-12; rows 14/400 + right count, no row icon; ONE blue in the rail (Jess 2026-09-28: "why force to select all module with blue? confusing like select 2"): only the chosen ORDER row is blue-3 + 3px blue edge; a chosen filter (Attention, Module, the day) is the grey chip with bold text like the `My Task` · `Team Work` switch; the month grid prints each day's count UNDER its number (13 over 11/500, 36px rows), today a dark ring |
-     | Order header | `DetailShell` header slots | three blocks of two lines: `SO No` link 15/600 over customer 13/400 · `Proceed Date` 11/500 over date 13 · `Customer Requested Delivery Date` 11/500 over date 13 |
-     | Act card | `Block` (SalesOrderWorkspace; ONE KIT LAW) | white, 1px slate-5, radius 6, padding 12/16, gap 12 between cards; title 15/600 black; second line 13/400 red (missed) / amber (due) / slate-11; hairline, then checklist |
+     | Order header | `DetailShell` header slots | SO/customer once; Calendar + Requested date context and day badge (§5.11); Proceed Date in Info; accessible assignment avatar only |
+     | Act card | `Block` (SalesOrderWorkspace; ONE KIT LAW) | white, 1px slate-5, radius 10, padding 12/16, gap 12 between cards; title 15/600 black; second line 13/400 red (missed) / amber (due) / slate-11; hairline, then checklist |
      | Card button | `Button` secondary | 36px, top right of the card; opens the owning form in the card |
      | Form in card | `FieldFrame` + `field-recipe` + `Select` / `DatePicker` | three fields per row, gap 12, label 11/500 slate-11 over a 32px field; white; only `Save` is `Button` primary (the one blue) |
      | Progress | text | `{n} of {m} done` 12/400 slate-11, bottom right of a card; only steps with completion evidence count |
@@ -1929,8 +1923,7 @@ and recorded history. Both read the same Sales Orders / Delivery / Payment recor
 
 #### Supplier card
 
-One mission has one Supplier card even when it has several suppliers. Collapsed height is exactly
-natural height. It prints only group progress plus the highest-material exception, for example
+One mission has one Supplier card even when it has several suppliers. Collapsed height follows content. It prints only group progress plus the highest-material exception, for example
 `2 of 3 POs issued` · `2 of 3 dates ready · 1 delayed` · `2 of 3 received · 1 arriving 27 Oct` ·
 `No purchase order for this Sales Order`. It does not print owner, supplier names or PO numbers
 unless one is required to identify the exception.
