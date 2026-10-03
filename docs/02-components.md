@@ -529,3 +529,7 @@ neutral Badge counts and action-tone surfaces keep their existing recipes.
 ### Accepted Register composition
 
 DataGrid `pageToolsItems` composes module-owned presentation commands into the existing Page tools menu. It does not create another toolbar or filtering engine. Governed `fixedGroups` retain one width/sort/filter/selection/export state and group-local headers; None restores the flat grid. The confirmed geometry, adoption checks and bounded production evidence live in [UI MASTER’s Complete-template adoption contract](ui/MASTER.md#complete-template-adoption-contract--clarified-2026-10-02).
+
+## Confirmed compact module card composition — 2026-10-03
+
+The admitted composition and current controls are governed by [UI MASTER §4.3](ui/MASTER.md#43--confirmed-compact-module-card--2026-10-03) and [the complete copy contract](ui-reference/DELIVERY-CARD-TEMPLATE.md). Read the linked HTML, complete CSS and measurements together. Reuse shared primitives with module-owned facts. Communication and compact Timeline are owner-confirmed; do not reuse the superseded clean-communication29 controls. Reference publication is not proof of a shipped reusable application component.
