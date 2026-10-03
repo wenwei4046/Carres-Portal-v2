@@ -529,3 +529,10 @@ neutral Badge counts and action-tone surfaces keep their existing recipes.
 ### Accepted Register composition
 
 DataGrid `pageToolsItems` composes module-owned presentation commands into the existing Page tools menu. It does not create another toolbar or filtering engine. Governed `fixedGroups` retain one width/sort/filter/selection/export state and group-local headers; None restores the flat grid. The confirmed geometry, adoption checks and bounded production evidence live in [UI MASTER’s Complete-template adoption contract](ui/MASTER.md#complete-template-adoption-contract--clarified-2026-10-02).
+
+
+## Compact module card composition — owner-approved, 2026-10-03
+
+**APPROVED UI TARGET / NOT BUILT.** This admitted composition reuses the governed Card/Panel, tabs, icon buttons, collapsible sections and form controls; it does not claim a shipped new component. See `ui/MASTER.md` §4.3 and `ui-reference/delivery-card-approved.html`.
+
+Customer context uses a compact grey header. Module facts occupy one strip. Editors expand inline and end with Cancel then blue Save at bottom right. The items icon and Stock control share one controlled item-table expansion. Communication has its own controlled collapse below items, with grey header, recipient line, Message and Template together, one attachment entry and right-aligned actions. Icon buttons retain accessible labels and collapsible controls expose expanded state. Module-specific fields and ownership remain with the caller.

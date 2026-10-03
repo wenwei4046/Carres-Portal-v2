@@ -6857,3 +6857,10 @@ and failed source Unavailable. Independent Amendment No allocation remains an au
 
 
 Owner correction2026-10-02: toolbar omits the duplicate SO count; footer keeps filtered SO count and quantity. Listing uses COPY-STANDARD’s `Listing` tab word.
+
+
+### Delivery module card composition — owner-approved, 2026-10-03
+
+**APPROVED UI TARGET / NOT BUILT.** The embedded Delivery card uses the approved compact composition in `ui/MASTER.md` §4.3 and `ui-reference/delivery-card-approved.html`; Delivery owns the arrangement contract in `delivery/MASTER.md` under “Compact Delivery card in Sales Order”. Preserve compact grey customer context, module tabs/message/items icons, one Delivery strip, inline editors, shared collapsed item table and Communication below items. Other module cards reuse the composition with their own facts, not mandatory Delivery fields.
+
+The requested date in the header remains the target; confirmed operational date remains distinct from ETA and Sales' commercial promise. Stock 1/1 in the reference is a layout example, not verified SO1368 or packing/handover evidence. Communication recipient/API/evidence persistence are implementation gaps. This approval does not establish production behavior or change module write ownership.

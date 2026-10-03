@@ -3520,3 +3520,12 @@ verified are separate claims; include scope and evidence for each.
 
 **Scope boundary:** the accepted shell/register/object/quick-view recipe is confirmed. Order Route compact-card redesign and Monthly Demand planning composition are governed separately by Orders MASTER; their current local work is not a universal kit pattern or part of this listing release. No complete2990 comparison is claimed.
 The master contract being documented does not mean every module has migrated or been verified.
+
+
+## §4.3 · Compact module card — owner-approved, 2026-10-03
+
+**APPROVED UI TARGET / NOT BUILT.** Jess approved the Delivery composition in the Sales Order (Houzs) review. The frozen visual reference is [`delivery-card-approved.html`](../ui-reference/delivery-card-approved.html), SHA-256 `14ca07bf11b34d16eaa97e8c73fea80ded06327dbe68b673cea84cb338a713e0`. Source: `delivery-complete-preview.html?review=clean-communication-29`, reviewed 2026-10-03. This static reference is not application code, production evidence or proof of working communication.
+
+The shared contract is a compact grey customer header, module tabs, message/items icon controls, one compact module-fact strip, inline editors and right-bottom actions: Cancel followed by blue Save. Items start collapsed; the Stock control opens that same item table. Communication collapses below items in the same panel: grey header, compact recipient line, Template beside Message, one attachment entry and actions on the right. Do not duplicate headings, attachment menus or explanatory paragraphs inside the card. Delivery item rows have no product image icon.
+
+Reuse the composition with each module's own facts, ownership and permissions. Stock / Logistics / Confirmed Delivery / DO are Delivery's strip, not four mandatory fields for Purchasing or any other module. Component admission is recorded in `02-components.md`; page composition in `03-page-patterns.md`; visible language in `COPY-STANDARD.md`. Existing tokens remain authoritative. The artifact's sample values and simulated controls are illustrative; its DO demonstration does not replace the owning module's complete release gates.

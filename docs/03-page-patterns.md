@@ -470,3 +470,10 @@ Sales orders · Total payable · Paid to date · Balance due all remain visible.
 FilterRailGroup, Money and typography; count uses text-strong, values right/tabular/no-wrap,
 8px row gap. Conditional missing-amount notices span the row. Filtering/calculation ownership
 and loaded-scope tooltip/count stay unchanged; other modules derive aggregates from their own facts.
+
+
+## Object Detail · compact module card — owner-approved, 2026-10-03
+
+**APPROVED UI TARGET / NOT BUILT.** Governed reference: `ui-reference/delivery-card-approved.html`; shared contract: `ui/MASTER.md` §4.3. Retain the compact grey customer header and module tabs with message/items icons. Below them, use one compact strip of the module's own facts, inline editors, and Cancel then blue Save at bottom right.
+
+Items default collapsed. Delivery Stock opens the same table as the items icon, never a duplicate table. Communication expands below items within the panel with a grey header, compact recipient line, Template beside Message, one attachment entry and actions right. No duplicate headings or explanatory card paragraphs. Delivery lines do not show product image icons. Reuse this grammar in Purchasing with Purchasing facts; do not force Delivery's four fields into other modules. Review explanations stay outside operator cards. Sample counts and simulated actions are not verified business facts.
