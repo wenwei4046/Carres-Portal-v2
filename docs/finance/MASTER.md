@@ -8,6 +8,7 @@
 > | Finance menu modules (§4) | none |
 > | Suppliers: Finance's own tax and bank details, and `Pay to` on a voucher (§3.2) | 0636 |
 > | Daily Bank (§3.4) | 0637 |
+> | Cash Flow (§3.6) | 0638 |
 >
 > Their on-screen words are in COPY-STANDARD "Finance (Chew)"; those marked PROPOSAL wait for Chew.
 >
@@ -171,6 +172,15 @@ The reports are:
 - Forecast, built last.
 
 All reports only read. Reports → Payment stays Payment's.
+
+**Cash Flow approach — PROPOSAL / NOT LAW, built for Chew's test (0638).**
+- A receipts and payments statement of the cash and bank accounts, as Houzs's Cash Flow is; not an indirect cash-flow statement. Reached from a door on the Reports page, like Card charges.
+- Each line names the account on the other side of the money. A line that pays several things is shared across them in proportion, to the sen, so the lines always add up to the accounts' money in and out.
+- A move between two of Carres's own cash or bank accounts shows as a transfer, in on one and out on the other.
+- Card and online money counts as cash when its card payout reaches a bank. Until then the foot shows the card and online payments of the period and what still waits for its payout.
+- For one day, each account's figures equal Daily Bank's; a test holds the two together.
+- Not built: Houzs's split of a supplier payment into what the bills bought ("rule A"), one column per account, the by-month view and a layout editor.
+- Falsifier: in Chew's test, an account's carried forward differs from its Journal running balance on the last day, or a line Chew cannot tell what it was for.
 
 ## 4 · Menu: DRAFT
 

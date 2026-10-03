@@ -23,7 +23,6 @@
  * 12, the latest first), each the statement's own read for that month, so a
  * month there never disagrees with the statement for that month.
  */
-import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useQueries } from "@tanstack/react-query";
 import { ledgerAccountHref } from "@carres/shared/finance-ledger";
@@ -31,7 +30,6 @@ import Button from "@/components/kit/Button";
 import DocumentTable from "@/components/kit/DocumentTable";
 import Loading from "@/components/kit/Loading";
 import DatePicker from "@/components/kit/DatePicker";
-import { FieldError } from "@/components/kit/FieldFrame";
 import Panel from "@/components/kit/Panel";
 import Select from "@/components/kit/Select";
 import Tabs from "@/components/kit/Tabs";
@@ -39,59 +37,12 @@ import { appTodayIso, fmtDate, fmtMonth } from "@/lib/fmt-date";
 import { rm } from "@/lib/format-currency";
 import ModuleHeader from "@/pages/operation/components/ModuleHeader";
 import StatementTable, { indent, nothingInPeriod, nothingOnDay, paidBeforeInvoiceNote } from "./reports/StatementTable";
-import { packMonths, statementExport, writeStatementExcel, writeStatementPdf } from "./month-end-pack";
+import { packMonths, statementExport } from "./month-end-pack";
+import ExportStatement from "./reports/ExportStatement";
+import { monthChoices, monthEnd, readDay, readPeriod, wholeMonth } from "./reports/period";
 import { balanceSheetQuery, profitAndLossQuery, useBalanceSheet, useProfitAndLoss, type ProfitAndLoss } from "./reports/report-queries";
 import { byMonthExport, byMonthLines, lastMonths, MONTH_CHOICES, readMonthCount } from "./reports/by-month";
 import { DepartmentFilter, departmentWord, useDepartmentParam, useDepartments } from "./department";
-
-const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
-
-/** A real calendar day as YYYY-MM-DD, or null. */
-function readDay(v: string | null): string | null {
-  if (!v || !ISO_DAY.test(v)) return null;
-  const [y, m, d] = v.split("-").map(Number) as [number, number, number];
-  const day = new Date(Date.UTC(y, m - 1, d));
-  return day.getUTCFullYear() === y && day.getUTCMonth() === m - 1 && day.getUTCDate() === d ? v : null;
-}
-
-/** The last day of a YYYY-MM month. */
-function monthEnd(ym: string): string {
-  const [y, m] = ym.split("-").map(Number) as [number, number];
-  return `${ym}-${String(new Date(Date.UTC(y, m, 0)).getUTCDate()).padStart(2, "0")}`;
-}
-
-function nextMonth(ym: string): string {
-  const [y, m] = ym.split("-").map(Number) as [number, number];
-  return m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, "0")}`;
-}
-
-/** YYYY-MM when the period is exactly one whole month, else null. */
-function wholeMonth(from: string, to: string): string | null {
-  const ym = from.slice(0, 7);
-  return from === `${ym}-01` && to === monthEnd(ym) ? ym : null;
-}
-
-/** Every month from the ledger's first to this one, newest first, plus the
- *  month on screen if it falls outside that. */
-function monthChoices(goLive: string | null, today: string, shown: string | null): string[] {
-  const last = today.slice(0, 7);
-  const out = new Set<string>([last]);
-  let ym = (goLive ?? today).slice(0, 7);
-  for (let i = 0; ym <= last && i < 600; i += 1) {
-    out.add(ym);
-    ym = nextMonth(ym);
-  }
-  if (shown) out.add(shown);
-  return [...out].sort().reverse();
-}
-
-/** The period in the address, or this month. An Up to before From is read as From. */
-function readPeriod(params: URLSearchParams, today: string): { from: string; to: string } {
-  const ym = today.slice(0, 7);
-  const from = readDay(params.get("from")) ?? `${ym}-01`;
-  const to = readDay(params.get("to")) ?? monthEnd(ym);
-  return { from, to: to < from ? from : to };
-}
 
 const notStartedError = (error: unknown) => (error as { status?: number } | null)?.status === 409;
 
@@ -107,41 +58,6 @@ function ReadFailed({ testId, sentence, retrying, onRetry }: {
   return <div role="alert" data-testid={testId} className="flex flex-col items-start gap-3 text-body">
     <p>{sentence}</p>
     <Button variant="neutral" loading={retrying} onClick={onRetry}>Try again</Button>
-  </div>;
-}
-
-/** Export Excel · Export PDF: the table on screen, as rows for a sheet (`build`).
- *  Off until the table has figures to write (`build` is null). By month has no PDF. */
-function ExportStatement({ testId, word, build, pdf = true }: {
-  testId: string;
-  word: string;
-  build: (() => ReturnType<typeof statementExport>) | null;
-  pdf?: boolean;
-}) {
-  const [busy, setBusy] = useState<"excel" | "pdf" | null>(null);
-  const [failed, setFailed] = useState(false);
-  const ready = build !== null;
-  const run = async (as: "excel" | "pdf") => {
-    if (!build) return;
-    setBusy(as);
-    setFailed(false);
-    try {
-      const out = build();
-      await (as === "excel" ? writeStatementExcel(out) : writeStatementPdf(out));
-    } catch {
-      setFailed(true);
-    } finally {
-      setBusy(null);
-    }
-  };
-  return <div className="ml-auto flex flex-wrap items-end gap-3" data-testid={testId}>
-    {failed && <FieldError>The {word} could not be exported. Try again.</FieldError>}
-    <Button icon="download" loading={busy === "excel"} disabled={!ready || busy !== null} onClick={() => void run("excel")}>
-      Export Excel
-    </Button>
-    {pdf && <Button icon="download" loading={busy === "pdf"} disabled={!ready || busy !== null} onClick={() => void run("pdf")}>
-      Export PDF
-    </Button>}
   </div>;
 }
 
@@ -363,6 +279,16 @@ export default function FinanceReports() {
             <span className="block text-meta font-semibold">Card charges</span>
             <span className="block text-label text-muted-foreground">
               Sales total · Fee · Paid into bank · Fee % · by month and card company</span>
+          </span>
+          <span className="text-label text-muted-foreground">Open →</span>
+        </Link>
+        {/* 0638 (Chew 2026-10-03): the same door, in the same words' shape. */}
+        <Link to="/finance/reports/cash-flow" data-testid="reports-cash-flow-door"
+          className="flex items-center justify-between rounded-card border border-border bg-card px-4 py-3 hover:bg-muted/40">
+          <span>
+            <span className="block text-meta font-semibold">Cash Flow</span>
+            <span className="block text-label text-muted-foreground">
+              Inflow · Outflow · Net cash flow · Carried forward · by cash and bank account</span>
           </span>
           <span className="text-label text-muted-foreground">Open →</span>
         </Link>

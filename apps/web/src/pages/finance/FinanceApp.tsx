@@ -27,6 +27,7 @@ import PaymentVouchers from "./payables/PaymentVouchers";
 import FinanceSettings from "./settings/FinanceSettings";
 import DealerCommission from "./reports/DealerCommission";
 import CardCharges from "./reports/CardCharges";
+import CashFlow from "./reports/CashFlow";
 import ApOutstanding from "./payables/ApOutstanding";
 import SupplierFinancePage from "./payables/SupplierFinancePage";
 
@@ -110,6 +111,8 @@ export default function FinanceApp() {
           <Route path="reports/dealer-commission" element={financeOnly(<DealerCommission />)} />
           {/* Card sales, card fee and what reached the bank, per month and card company. */}
           <Route path="reports/card-charges" element={financeOnly(<CardCharges />)} />
+          {/* 0638 — cash and bank money over a period, and what it was for (Chew 2026-10-03). */}
+          <Route path="reports/cash-flow" element={financeOnly(<CashFlow />)} />
           {/* 0268 — the rent-to-own credit gate (9th tab). */}
           <Route path="rental-approver" element={financeOnly(<FinanceRentalApprover />)} />
           {/* 0538 — one month of subscription billing across every agreement. */}

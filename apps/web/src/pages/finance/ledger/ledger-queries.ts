@@ -17,6 +17,7 @@ import type {
   TrialBalanceReport,
 } from "@carres/shared/finance-ledger";
 import type { DailyBankDay } from "@carres/shared/daily-bank";
+import type { CashFlowAnswer } from "@carres/shared/cash-flow";
 import { apiFetch } from "@/lib/api";
 import { departmentSearch } from "../department";
 
@@ -38,6 +39,7 @@ export const ledgerKeys = {
   trialBalance: (asOf: string, dept = "") => ["finance", "ledger", "trial-balance", asOf, dept] as const,
   selfCheck: () => ["finance", "ledger", "self-check"] as const,
   dailyBank: (day: string) => ["finance", "ledger", "daily-bank", day] as const,
+  cashFlow: (from: string, to: string) => ["finance", "ledger", "cash-flow", from, to] as const,
 };
 
 /** The server's page size is PostgREST's own row cap. */
@@ -193,6 +195,16 @@ export function useDailyBank(day: string) {
   return useQuery({
     queryKey: ledgerKeys.dailyBank(day),
     queryFn: () => apiFetch<DailyBankDay>(`/api/finance/ledger/daily-bank?${new URLSearchParams({ day }).toString()}`),
+    retry: (count: number, error: unknown) => (error as { status?: number }).status !== 422 && count < 2,
+  });
+}
+
+/** Cash Flow (0638): the cash and bank accounts over a period, both days
+ *  included. The page works the totals out through the shared arithmetic. */
+export function useCashFlow(from: string, to: string) {
+  return useQuery({
+    queryKey: ledgerKeys.cashFlow(from, to),
+    queryFn: () => apiFetch<CashFlowAnswer>(`/api/finance/ledger/cash-flow?${new URLSearchParams({ from, to }).toString()}`),
     retry: (count: number, error: unknown) => (error as { status?: number }).status !== 422 && count < 2,
   });
 }

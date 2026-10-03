@@ -43,6 +43,7 @@ import {
 } from "@carres/shared/finance-ledger";
 import { CUSTOMERS, SUPPLIERS } from "@carres/shared/tables";
 import { dailyBankQuery, dailyBankRow, sen, type DailyBankDay } from "@carres/shared/daily-bank";
+import { cashFlowQuery, cashFlowReport, type CashFlowAnswer } from "@carres/shared/cash-flow";
 import { requireFinance } from "../../lib/auth-guards";
 import { mapPgError, parseJsonBody, readAllPages } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
@@ -1021,6 +1022,27 @@ financeLedgerRouter.get("/daily-bank", requireFinance, async (c) => {
     return failed(c, "Daily Bank");
   }
   return c.json(day);
+});
+
+// ── Cash Flow (0638, Chew 2026-10-03) ───────────────────────────────────────
+
+/** A period of cash and bank money, passed through. It is read once through
+ *  the shared arithmetic, which refuses figures it cannot read and rows that
+ *  do not add up to the accounts' money in and out. */
+financeLedgerRouter.get("/cash-flow", requireFinance, async (c) => {
+  const parsed = cashFlowQuery.safeParse(queryOf(c));
+  if (!parsed.success) return invalid(c, parsed.error);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("fin_cash_flow", { p_from: parsed.data.from, p_to: parsed.data.to });
+  if (error) return ledgerError(c, error, "Cash Flow");
+  const answer = data as CashFlowAnswer | null;
+  if (!answer || !Array.isArray(answer.accounts) || !Array.isArray(answer.rows) || !answer.card) return failed(c, "Cash Flow");
+  try {
+    cashFlowReport(answer);
+  } catch {
+    return failed(c, "Cash Flow");
+  }
+  return c.json(answer);
 });
 
 export default financeLedgerRouter;

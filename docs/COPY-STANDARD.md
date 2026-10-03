@@ -5000,3 +5000,16 @@ These words are on screen in the branch and are not approved yet. Words borrowed
 | Footer | Each money column's total. `{n} accounts · {date}` |
 | Opened row | Toggle hover `Show lines` (the Journal's word). Columns `Entry No` · `Source` · `Document` · `Party` · `Inflow` · `Outflow` · `Waiting for approval` · `Description` · `Total`. The Journal's words for sources, parties and missing values (`No party` · `No memo` · `Name not available` · `No document number`). A voucher with no number yet: `Draft, no number yet` (the Payment Vouchers word). A voucher's purpose when it has no note: `Pay supplier bills` · `Direct payment`. Empty: `Nothing moved on this account on {date}, and no voucher is waiting to pay from it.` |
 | States | `Daily Bank could not be loaded. Try again.` · `Try again` · `The ledger has no start date yet. Nothing can be totalled.` · `The ledger started on {date}. Pick a day from then on.` · `No bank or cash account yet. Finance adds them in Settings.` |
+
+### PROPOSAL — PENDING CHEW · Cash Flow (0638)
+
+These words are on screen in the branch and are not approved yet. The period controls, export buttons and states are the Profit and Loss's own.
+
+| Where | Words |
+|---|---|
+| Reports page | A door like the others: `Cash Flow` over `Inflow · Outflow · Net cash flow · Carried forward · by cash and bank account`, and `Open →` |
+| Page | Title `Cash Flow`. `Since {date} · No opening balances` · `Month` · `From` · `Up to` · `Custom Date Range` · `Export Excel` · `Export PDF` · `The cash flow could not be exported. Try again.` |
+| Statement | Panel `Cash Flow`. Columns `Account` · `Amount`. Sections `Inflow` · `Outflow`, each with its total. A line is `{code} {name}`, or `Transfer from {code} {name}` · `Transfer to {code} {name}` between two of Carres's own cash and bank accounts, or `Card payout from {code} {name}` when card or online money reaches a bank. Empty sections: `No money came into the cash and bank accounts in this period.` · `No money went out of the cash and bank accounts in this period.` Bottom line `Net cash flow`. Under it: `Brought forward` · `Carried forward` · `Card and online payments in this period` · `Waiting for card payout at the end` |
+| By account | Panel `By account`. Columns `Account` · `Brought forward` · `Inflow` · `Outflow` · `Carried forward`, and a `Total` row |
+| Meaning | `Inflow` and `Outflow` are money into and out of the cash and bank accounts. A line names the account on the other side of the money. `Carried forward` is brought forward plus inflow less outflow. Card and online money is not cash until its card payout reaches a bank. |
+| States | `Loading Cash Flow…` · `Cash Flow could not be loaded. Try again.` · `Try again` · `The ledger has no start date yet. Nothing can be totalled.` · `The ledger started on {date}. Pick a day from then on.` |

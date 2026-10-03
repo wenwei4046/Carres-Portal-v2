@@ -9,7 +9,7 @@
  *
  * `?page=` ar · bills · payment-vouchers · ap-outstanding · suppliers ·
  * other-debtors · other-debtor-parties · other-receipts · daily-bank ·
- * journal · trial-balance · reports.
+ * journal · trial-balance · reports · cash-flow.
  * Every listing carries at least one 60+ character party name so wrapping and
  * truncation are visible. Fixture evidence is not production evidence.
  */
@@ -343,6 +343,27 @@ const DAILY_BANK = (day: string) => ({
   ],
 });
 
+// ── Reports → Cash Flow (0638): the period's cash and bank money ────────────
+const CASH_FLOW = (from: string, to: string) => ({
+  from, to, go_live_on: GO_LIVE,
+  accounts: [
+    { account_code: "1110", name: "Cash in hand", money_kind: "CASH", is_active: true, opening: 1250, receipts: 2380, payments: 2000 },
+    { account_code: "1121", name: "Public Bank", money_kind: "BANK", is_active: true, opening: 48210.55, receipts: 61497.5, payments: 38850 },
+    { account_code: "1122", name: "Maybank", money_kind: "BANK", is_active: true, opening: 15000, receipts: 0, payments: 0 },
+  ],
+  rows: [
+    { side: "IN", account_code: "1210", name: "Trade receivables", kind: "ASSET", money_kind: null, amount: 55300 },
+    { side: "IN", account_code: "1131", name: "GHL", kind: "ASSET", money_kind: "HOLDING", amount: 6197.5 },
+    { side: "IN", account_code: "4900", name: "Other income", kind: "INCOME", money_kind: null, amount: 380 },
+    { side: "IN", account_code: "1110", name: "Cash in hand", kind: "ASSET", money_kind: "CASH", amount: 2000 },
+    { side: "OUT", account_code: "2110", name: "Trade payables", kind: "LIABILITY", money_kind: null, amount: 31250 },
+    { side: "OUT", account_code: "6100", name: "Staff cost and commission", kind: "EXPENSE", money_kind: null, amount: 4200 },
+    { side: "OUT", account_code: "6800", name: "Electricity and water, PJ Showroom and Carres Klang warehouse", kind: "EXPENSE", money_kind: null, amount: 3400 },
+    { side: "OUT", account_code: "1121", name: "Public Bank", kind: "ASSET", money_kind: "BANK", amount: 2000 },
+  ],
+  card: { taken: 8350, waiting: 2152.5 },
+});
+
 const realFetch = window.fetch.bind(window);
 window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
@@ -362,6 +383,7 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   if (url.includes("/api/finance/payables/supplier-finance")) return json({ rows: SUPPLIER_FINANCE });
   if (url.includes("/api/finance/payables/")) return json({ rows: [] });
   if (url.includes("/api/finance/ledger/daily-bank")) return json(DAILY_BANK(q.get("day") ?? TODAY));
+  if (url.includes("/api/finance/ledger/cash-flow")) return json(CASH_FLOW(q.get("from") ?? TODAY, q.get("to") ?? TODAY));
   if (url.includes("/api/finance/other-money-in/parties")) return json(PARTIES);
   if (url.includes("/api/finance/other-money-in/invoices")) return json(DEBTOR_INVOICES);
   if (url.includes("/api/finance/other-money-in/receipts")) return json(RECEIPTS);
@@ -396,6 +418,7 @@ const ROUTES: Record<string, string> = {
   journal: "/finance/ledger",
   "trial-balance": "/finance/ledger/trial-balance",
   reports: "/finance/reports",
+  "cash-flow": "/finance/reports/cash-flow",
 };
 window.history.replaceState(null, "", ROUTES[PAGE] ?? ROUTES.ar);
 

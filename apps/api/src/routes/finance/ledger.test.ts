@@ -135,6 +135,7 @@ describe("finance ledger — who may read", () => {
     "/profit-and-loss?from=2026-09-01&to=2026-09-30",
     "/balance-sheet",
     "/daily-bank",
+    "/cash-flow?from=2026-09-01&to=2026-09-30",
   ];
 
   it.each(["dealer", "operation", "supplier"])("refuses %s on every route before any database call", async (role) => {
@@ -1341,5 +1342,61 @@ describe("GET /daily-bank (0637)", () => {
     const res = await get("/daily-bank?day=2026-10-02");
     expect(res.status).toBe(500);
     expect((await json(res)).message).toBe("Daily Bank could not be loaded. Try again.");
+  });
+});
+
+// ── Cash Flow (0638, Chew 2026-10-03) ───────────────────────────────────────
+
+describe("GET /cash-flow (0638)", () => {
+  const FLOW = {
+    from: "2026-09-01",
+    to: "2026-09-30",
+    go_live_on: "2026-09-01",
+    accounts: [
+      { account_code: "1121", name: "Public Bank", money_kind: "BANK", is_active: true, opening: "10000.00", receipts: "6300.00", payments: "1200.00" },
+    ],
+    rows: [
+      { side: "IN", account_code: "1210", name: "Trade receivables", kind: "ASSET", money_kind: null, amount: 6300 },
+      { side: "OUT", account_code: "2110", name: "Trade payables", kind: "LIABILITY", money_kind: null, amount: 1200 },
+    ],
+    card: { taken: 0, waiting: 0 },
+  };
+
+  it("asks for the period and passes the answer through whole", async () => {
+    const { sb } = fakeClient(() => ok(FLOW));
+    const res = await get("/cash-flow?from=2026-09-01&to=2026-09-30");
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("fin_cash_flow", { p_from: "2026-09-01", p_to: "2026-09-30" });
+    expect(await json(res)).toEqual(FLOW);
+  });
+
+  it("refuses a missing or backwards period before any database call", async () => {
+    expect((await get("/cash-flow?from=2026-09-01")).status).toBe(422);
+    expect((await get("/cash-flow?from=2026-09-30&to=2026-09-01")).status).toBe(422);
+    expect((await get("/cash-flow?from=01/09/2026&to=2026-09-30")).status).toBe(422);
+    expect(userClient).not.toHaveBeenCalled();
+  });
+
+  it("rows that do not add up to the accounts' money in and out refuse the whole report", async () => {
+    const broken = structuredClone(FLOW);
+    broken.rows[0]!.amount = 6299.99;
+    fakeClient(() => ok(broken));
+    const res = await get("/cash-flow?from=2026-09-01&to=2026-09-30");
+    expect(res.status).toBe(500);
+    expect((await json(res)).message).toBe("Cash Flow could not be loaded. Try again.");
+  });
+
+  it("fails closed on a shapeless answer, and says a database failure in plain words", async () => {
+    fakeClient(() => ok({ from: "2026-09-01" }));
+    expect((await get("/cash-flow?from=2026-09-01&to=2026-09-30")).status).toBe(500);
+    fakeClient(() => fail("XX000", "relation gl_entries is broken"));
+    const res = await get("/cash-flow?from=2026-09-01&to=2026-09-30");
+    expect(res.status).toBe(500);
+    expect((await json(res)).message).toBe("Cash Flow could not be loaded. Try again.");
+  });
+
+  it("the database's own refusal stays a refusal", async () => {
+    fakeClient(() => refuse("42501", "not_internal", "Cash Flow is internal."));
+    expect((await get("/cash-flow?from=2026-09-01&to=2026-09-30", "principal")).status).toBe(403);
   });
 });
