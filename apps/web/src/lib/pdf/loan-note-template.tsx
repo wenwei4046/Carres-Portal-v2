@@ -125,9 +125,6 @@ export function LoanNoteTemplate(data: LoanNoteTemplateData) {
           <View style={styles.signBlock}>
             <Text style={styles.signLabel}>Customer signature (received on loan)</Text>
           </View>
-          <View style={styles.signBlock}>
-            <Text style={styles.signLabel}>Carres / driver</Text>
-          </View>
         </View>
 
         <Text style={styles.disclaimer}>
