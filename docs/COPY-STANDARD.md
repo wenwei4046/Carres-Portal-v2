@@ -4958,15 +4958,18 @@ The Finance area of the Portal sidebar groups Finance's own pages into modules. 
 
 | Module row | Pages under it (their words unchanged) |
 |---|---|
-| `Payables` | `AP · Payables` · `Bills` · `Payment Vouchers` |
+| `Payables` | `AP · Payables` · `Payment Vouchers` · `Bills` · `Payment Requests` · `Credit Notes` · `Suppliers` |
 | `Receivables` | `AR · Receivables` · `Other debtors` · `Other receipts` |
-| `Bank & Cards` | `Card settlement` · `Money moves` |
-| `Ledger` | `Journal` · `Trial Balance` · `Self-check` |
-| `Reports` | `Reports`. It stays a plain row until a second report page joins it. |
+| `Bank & Cards` | `Daily Bank` · `Card settlement` · `Card money waiting` · `Money moves` |
+| `Ledger` | `Journal` · `General Ledger` · `Trial Balance` · `Self-check` |
+| `Reports` | `Profit and Loss` · `Balance Sheet` · `Cash Flow` · `AP Aging` · `Collection` · `Card charges` · `Dealer commission` · `Stock value` · `Payment` (Payment's own report, unchanged) |
 
-- `Dashboard` stays a plain row at the top.
-- `Payables` sits above `Receivables` to keep the owner ruling of 2026-09-14 that `AP · Payables` sits above AR.
+- `Dashboard` stays a plain row at the top. `Forecast` is a plain row after `Reports` (Chew, 3 Oct 2026).
+- A menu row's word is its page's title. The Profit and Loss and the Balance Sheet are two pages, titled `Profit and Loss` and `Balance Sheet`; the browser tab reads `{title} · Carres`. The Reports page's door cards (`Open →`) are retired, because every report is a row.
+- The rows' words above are approved as menu words. A page's own words keep the status of their own entry below.
+- `Payables` sits above `Receivables` to keep the ruling of 2026-09-14 that `AP · Payables` sits above AR.
 - The modules are not named `Money in` / `Money out`, because customer `Money In` is Payment's word (Payment MASTER §1) and `Money in full` is already a governed phrase.
+- An area title folds its area with its chevron alone; no word is added (Finance MASTER §4.1).
 
 ### APPROVED by Chew on 3 Oct 2026 · One person may check and approve a voucher (0635)
 
@@ -5007,7 +5010,7 @@ These words are on screen in the branch and are not approved yet. The period con
 
 | Where | Words |
 |---|---|
-| Reports page | A door like the others: `Cash Flow` over `Inflow · Outflow · Net cash flow · Carried forward · by cash and bank account`, and `Open →` |
+| Menu | `Cash Flow`, a row under `Reports` |
 | Page | Title `Cash Flow`. `Since {date} · No opening balances` · `Month` · `From` · `Up to` · `Custom Date Range` · `Export Excel` · `Export PDF` · `The cash flow could not be exported. Try again.` |
 | Statement | Panel `Cash Flow`. Columns `Account` · `Amount`. Sections `Inflow` · `Outflow`, each with its total. A line is `{code} {name}`, or `Transfer from {code} {name}` · `Transfer to {code} {name}` between two of Carres's own cash and bank accounts, or `Card payout from {code} {name}` when card or online money reaches a bank. Empty sections: `No money came into the cash and bank accounts in this period.` · `No money went out of the cash and bank accounts in this period.` Bottom line `Net cash flow`. Under it: `Brought forward` · `Carried forward` · `Card and online payments in this period` · `Waiting for card payout at the end` |
 | By account | Panel `By account`. Columns `Account` · `Brought forward` · `Inflow` · `Outflow` · `Carried forward`, and a `Total` row |
@@ -5034,7 +5037,7 @@ These words are on screen in the branch and are not approved yet.
 
 | Where | Words |
 |---|---|
-| Reports page | A door like the others: `AP Aging` over `Balance · This month to 4 months and over · Not tied to a bill · by supplier on a day`, and `Open →` |
+| Menu | `AP Aging`, a row under `Reports` |
 | Page | Title `AP Aging`. `As of` (the Trial Balance's word) · `Age by` with `Bill date` · `Due date` · `Columns` with `By month` · `By days` · `Search suppliers…` |
 | Columns | `Supplier` · `Creditor Type` (hidden until asked for; `Supplier` · `Other creditor`) · `Balance` · by month `This month` · `1 month` · `2 months` · `3 months` · `4 months and over`, or by days `0 to 30 days` · `31 to 60 days` · `61 to 90 days` · `91 to 120 days` · `Over 120 days` · `Not tied to a bill` |
 | Meaning | `Balance` is what the supplier's payables accounts hold in the books on the day. The age columns are its confirmed bills still owed that day. `Not tied to a bill` is the rest of the balance: below zero, money paid ahead of a bill; above zero, money owed with no bill behind it, such as an opening balance. A bill with no due date ages by its bill date. |
@@ -5096,7 +5099,7 @@ These words are on screen in the branch and are not approved yet. Stock's own wo
 
 | Where | Words |
 |---|---|
-| Reports page | A door like the others: `Stock value` over `Warehouse · Showroom · In transit · Sent for repair · at a month end, provisional`, and `Open →` |
+| Menu | `Stock value`, a row under `Reports` |
 | Page | Title `Stock value`. `Month` (each month as `Sep 2026`; opens on the last month that has ended) |
 | Note | `Provisional. Worked out from Stock's Units, at the end of {date}, until Stock confirms its month-end count.` · for the month not yet ended: `This month has not ended, so the Units are as they are now.` · `{n} consignment Unit(s) is/are left out: they belong to their suppliers.` |
 | Groups | `Group` · `Units` · `Value` · `No cost recorded` · `Total`. The groups: `Warehouse` · `Showroom` · `In transit` · `Sent for repair` · `Not placed` |
@@ -5110,7 +5113,7 @@ These words are on screen in the branch and are not approved yet. `SO Doc Date` 
 
 | Where | Words |
 |---|---|
-| Reports page | A door like the others: `Collection` over `Deposit · Deposit % · Balance paid · Outstanding · by salesperson`, and `Open →` |
+| Menu | `Collection`, a row under `Reports` |
 | Page | Title `Collection`. `Month` · `From` · `Up to` (Cash Flow's words; `Custom Date Range` when the period is not a whole month) · `Below (%)` (50 unless changed) · the tab bar `Deposit` · `Balance` · `Search salespeople…` |
 | Deposit | `Salesperson` · `Orders` · `Order value` · `Deposit` · `Deposit %` · `Below {N}%` (empty when none) |
 | Balance | `Salesperson` · `Delivered` · `Invoiced value` · `Deposit` · `Balance due` · `Balance paid` · `Balance %` · `Outstanding` |
@@ -5142,7 +5145,7 @@ These words are on screen in the branch and are not approved yet. `Net result` i
 
 | Where | Words |
 |---|---|
-| Reports page | A door like the others: `Forecast` over `Plan · % of income · Actual · Difference · by account, one month at a time`, and `Open →` |
+| Menu | `Forecast`, its own row after `Reports` |
 | Page | Title `Forecast`. `Month` (each month as `Sep 2026`; opens on this month) · `Copy plan from {Mon YYYY}` · `Not saved` · `Discard` · `Save` |
 | Note | `Plan income as an amount. Plan a cost as an amount or as a % of the month's planned income; the other box shows what it works out to. Difference is actual less plan.` · ` Saved by {name} on {date and time}.` |
 | Table | `Account` (`{code} {name}`) · `Plan` · `% of income` · `Actual` · `Difference`. Bands `Income` · `Cost of sales` · `Expense`, each with its totals. The line `Gross profit` after cost of sales. Foot `Net result`. A retired account shows washed out, only with a plan or an actual |

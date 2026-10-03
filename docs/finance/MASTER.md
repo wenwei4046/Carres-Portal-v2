@@ -1,13 +1,13 @@
 # FINANCE — MASTER
 
-> **Status 2026-10-03: DELIVERY in PR #1864.** Chew chose to test on production (no separate test database) and approved going live: the migrations below are applied through the governed path, then the PR is merged. Chew tests everything once, on production.
+> **Status 2026-10-03: PR #1864 DEPLOYED** (merge `030ea3d8c`). Chew chose to test on production (no separate test database) and approved going live: the work below is on production, and its migrations 0635–0648 were applied through the governed path. Chew tests everything once, on production; that walk is owed. §4's menu (one row per report, the Forecast row, the area fold) is built in the PR that follows #1864.
 >
 > **Who approves Finance's production changes.** Chew approves Finance's own production database changes and their release; he holds that permission for the Finance module (Chew 2026-10-03). ENGINEERING.md names Jess for migration approval; that was raised with Chew, who confirmed his authority over Finance's own changes. A change outside Finance still goes to Jess.
 >
-> | Built on the branch (tests pass locally) | Migration |
+> | Delivered in PR #1864 | Migration |
 > |---|---|
 > | One person may check and approve a voucher (§2) | 0635 |
-> | Finance menu modules (§4) | none |
+> | Finance menu modules (§4; regrouped by the PR after it) | none |
 > | Suppliers: Finance's own tax and bank details, and `Pay to` on a voucher (§3.2) | 0636 |
 > | Daily Bank (§3.4) | 0637 |
 > | Cash Flow (§3.6) | 0638 |
@@ -135,7 +135,7 @@ Dealer commission rules:
 ### 3.3 Staff payment requests
 
 - **Build.** Staff with permission raise a request with the bill. Finance answers it with a voucher or a bill, and the requester can see which stage it has reached.
-- The entry point is **one entry in the shared menu**, visible only to permitted staff. This is the one Jess-side change Chew approved (2026-10-03).
+- The entry point is **one entry in the shared menu**, visible only to permitted staff. This is the first Jess-side change Chew approved (2026-10-03); the second is the area fold (§4.1).
 
 **Payment requests approach — PROPOSAL / NOT LAW, built for Chew's test (0645).**
 - **Who may ask.** Finance or the boss (the principal) ticks which Operation staff may ask, under Finance Settings → `Payment requests` (Chew 2026-10-03; 0648 — 0645 let only the boss). Only the people ticked see the menu row and can ask. Finance and the principal may always ask. Each grant is kept, with who gave it and who took it back: unticking never deletes it.
@@ -295,30 +295,42 @@ All reports only read. Reports → Payment stays Payment's.
 
 **Performance P&L — NOT BUILT.** A sold item's cost is the cost on its PO; an item with no PO shows no cost, never a guessed one (Chew 2026-10-03). Houzs reads each order line's cost from its sales order; Carres has no governed cost per sold line, and `product_skus.cost` was filled at 55% of the price as a placeholder, so it is not used.
 
-## 4 · Menu: DRAFT
+## 4 · Menu
 
-- **Status.** Chew 2026-10-03: 「可以，先这样」. This is a draft, not final. It will be shown again before any UI work.
-- **Words.** Screen words come from `docs/COPY-STANDARD.md`. The Chinese group names are for reading only.
+- **Status.** APPROVED by Chew 2026-10-03 (「都可以」), after he sent a picture of the menu he wants and the conflicts below were shown to him. Built in the PR that follows #1864.
+- **Words.** Screen words come from `docs/COPY-STANDARD.md` "Finance (Chew)". A menu word is its page's title, so a page keeps one name.
 
 ```text
-Finance
+FINANCE          its title folds the area (§4.1)
 ├─ Dashboard
-├─ 收钱 money in         AR · Other debtors · Other receipts
-├─ 付钱 money out        Payment Requests · Bills · Payment Vouchers · AP
-│                        Supplier credit / debit notes · Suppliers
-├─ 银行和刷卡 bank/cards Daily Bank · Card settlement · Bank recon · Unmatched · Money moves
-├─ 账本 books            Journal · General Ledger · Trial Balance · Month-end · Self-check
-└─ 报表 reports          P&L · Balance Sheet · Cash Flow · Aging · Performance
-                         Collection · Card charges · Dealer commission · Forecast
+├─ Payments      Monitor · Payment Records                                   Payment's, unchanged
+├─ Payables      AP · Payables · Payment Vouchers · Bills · Payment Requests · Credit Notes · Suppliers
+├─ Receivables   AR · Receivables · Other debtors · Other receipts
+├─ Bank & Cards  Daily Bank · Card settlement · Card money waiting · Money moves
+├─ Ledger        Journal · General Ledger · Trial Balance · Self-check
+├─ Reports       Profit and Loss · Balance Sheet · Cash Flow · AP Aging · Collection
+│                Card charges · Dealer commission · Stock value · Payment
+├─ Forecast
+└─ Rental Approver · Subscriptions · Dealers                                 unchanged
 ```
 
-These stay exactly as they are today, because they are not Finance's:
-- Monitor and Payment Records. UI MASTER "One portal rail" says Payments is a module of two destinations.
-- Rental Approver and Subscriptions.
-- Dealers.
-- Reports → Payment.
+- **Reports.** One row per report. The Profit and Loss and the Balance Sheet are two pages: `/finance/reports/profit-and-loss` and `/finance/reports/balance-sheet`. The old `/finance/reports` opens the one its address asked for, keeping its dates. The old page's list of doors is gone, because every report is on the menu. Reports → Payment stays Payment's own report, unchanged; it is now also a row.
+- **Forecast.** Its own row after Reports. It becomes a group when a second forecasting page exists.
+- **A page joins the menu when it is built.** No `Coming soon` rows. Not built yet, from Chew's picture: Deposit Invoices, Not Yet Billed, Credit / Debit Notes, Official Invoices Owed, Bank Recon, Month-end, AR Aging, Corrections, Performance P&L, Event costs, Sales Report, a forecasting Dashboard, Item Groups, Currencies. Several of them are not decided yet.
+- **Where the picture met an existing rule, the rule stays** (Chew agreed, 2026-10-03):
+  - No `Money in` / `Money out` group names. Customer `Money In` is Payment's word (Payment MASTER §1).
+  - No `Setup` group. The gear in the page header is the one Settings entry (UI MASTER, GLOBAL SETTINGS ENTRY, Loo 2026-08-11). Chart of Accounts and the rest stay in Finance Settings; Currencies and Item Groups go there when built.
+  - No customer `Official Receipts`, `AR Invoices` or `Receipts` pages. Customer money has one home, Payments (owner ruling 2026-09-12).
+  - No icon on a page row. A group row carries the one icon (UI MASTER rail rules).
+  - Payables stays above Receivables (ruling YH 2026-09-14: `AP · Payables` above AR).
+  - The current page names stay (`Bills`, `Journal`, `Card settlement`, `Card money waiting`, `Card charges`, `Suppliers`, `Forecast`). Chew may rename a Finance page later, one at a time.
 
-Settings stay in the central Settings.
+### 4.1 · The area you are in folds
+
+- **Ruling.** Chew 2026-10-03 (「都可以」): the title of the area you are in folds it, and the next click opens it. Another area's title still jumps to that area, and the area you left closes, as before.
+- **This is the second shared change Chew approved** (the first is §3.3's menu row). It applies to every area, on every login that sees area titles (principal-level logins). Jess's login sees it too; Chew approved that knowingly. Nothing else in the shared menu changed.
+- The fold stays while you move between pages of that area. Going to another area and back, or reloading, opens it again.
+- A folded area's title turns blue. It has hidden the page you are on, so it is the rail's one mark of where you are (the rail rule: a shut parent is lit).
 
 ## 5 · Open items
 
