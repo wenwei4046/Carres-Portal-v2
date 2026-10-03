@@ -44,6 +44,7 @@ import {
 import { CUSTOMERS, SUPPLIERS } from "@carres/shared/tables";
 import { dailyBankQuery, dailyBankRow, sen, type DailyBankDay } from "@carres/shared/daily-bank";
 import { cashFlowQuery, cashFlowReport, type CashFlowAnswer } from "@carres/shared/cash-flow";
+import { generalLedgerBlocks, generalLedgerQuery, type GeneralLedgerAnswer } from "@carres/shared/general-ledger";
 import { requireFinance } from "../../lib/auth-guards";
 import { mapPgError, parseJsonBody, readAllPages } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
@@ -1041,6 +1042,34 @@ financeLedgerRouter.get("/cash-flow", requireFinance, async (c) => {
     cashFlowReport(answer);
   } catch {
     return failed(c, "Cash Flow");
+  }
+  return c.json(answer);
+});
+
+// ── General Ledger (0639, Chew 2026-10-03) ──────────────────────────────────
+
+/** Every account's period, gathered by the database from gl_account_ledger's
+ *  own rows. Read once through the shared reader, which refuses a block that
+ *  does not hold together; the answer passes through as it came. */
+financeLedgerRouter.get("/general-ledger", requireFinance, async (c) => {
+  const parsed = generalLedgerQuery.safeParse(queryOf(c));
+  if (!parsed.success) return invalid(c, parsed.error);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("fin_general_ledger", {
+    p_from: parsed.data.from,
+    p_to: parsed.data.to,
+    p_accounts: parsed.data.accounts ? parsed.data.accounts.split(",") : null,
+    ...departmentRpcArgs(parsed.data),
+  });
+  if (error) return ledgerError(c, error, "The General Ledger");
+  const answer = data as GeneralLedgerAnswer | null;
+  if (!answer || (answer.status !== "OK" && answer.status !== "BEFORE_GO_LIVE") || !Array.isArray(answer.accounts)) {
+    return failed(c, "The General Ledger");
+  }
+  try {
+    generalLedgerBlocks(answer);
+  } catch {
+    return failed(c, "The General Ledger");
   }
   return c.json(answer);
 });

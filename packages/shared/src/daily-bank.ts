@@ -75,7 +75,7 @@ export interface DailyBankDay {
  *  must never print as a whole one. */
 export function sen(v: Wire): number {
   const n = typeof v === "number" ? v : /^-?\d+(\.\d+)?$/.test(v.trim()) ? Number(v) : NaN;
-  if (!Number.isFinite(n)) throw new Error("A Daily Bank figure could not be read.");
+  if (!Number.isFinite(n)) throw new Error("A money figure could not be read.");
   return Math.round(n * 100);
 }
 

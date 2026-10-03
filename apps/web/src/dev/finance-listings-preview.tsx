@@ -9,7 +9,7 @@
  *
  * `?page=` ar · bills · payment-vouchers · ap-outstanding · suppliers ·
  * other-debtors · other-debtor-parties · other-receipts · daily-bank ·
- * journal · trial-balance · reports · cash-flow.
+ * journal · general-ledger · trial-balance · reports · cash-flow.
  * Every listing carries at least one 60+ character party name so wrapping and
  * truncation are visible. Fixture evidence is not production evidence.
  */
@@ -364,6 +364,40 @@ const CASH_FLOW = (from: string, to: string) => ({
   card: { taken: 8350, waiting: 2152.5 },
 });
 
+// ── Ledger → General Ledger (0639): gl_account_ledger's rows per account ────
+const glRow = (code: string, name: string, kind: string, over: Record<string, unknown>) => ({
+  row_kind: "LINE", account_code: code, account_name: name, kind, entry_date: soon(-2), entry_no: null,
+  source_type: null, source_doc_no: null, narration: null, memo: null, debit: null, credit: null, running_balance: 0, ...over,
+});
+const glBlock = (code: string, name: string, kind: string, opening: number,
+  lines: Array<[string, string, string, string | null, number, number]>) => {
+  const debitSide = kind === "ASSET" || kind === "EXPENSE";
+  let bal = opening;
+  const rows = [glRow(code, name, kind, { row_kind: "OPENING", entry_date: null, running_balance: opening })];
+  for (const [entry, source, doc, memo, dr, cr] of lines) {
+    bal = Math.round((bal + (debitSide ? dr - cr : cr - dr)) * 100) / 100;
+    rows.push(glRow(code, name, kind, { entry_no: entry, source_type: source, source_doc_no: doc, memo, narration: "Posted",
+      debit: dr, credit: cr, running_balance: bal }));
+  }
+  rows.push(glRow(code, name, kind, { row_kind: "CLOSING", entry_date: null, running_balance: bal }));
+  return { account_code: code, rows };
+};
+const GENERAL_LEDGER = (from: string, to: string) => ({
+  status: "OK", go_live_on: GO_LIVE, from, to,
+  accounts: [
+    glBlock("1121", "Public Bank", "ASSET", 48210.55, [
+      ["JE-2610-0043", "CUSTOMER_PAYMENT", "OR-2610-0032", null, 6400, 0],
+      ["JE-2610-0044", "PAYMENT_VOUCHER", "PV-2610-0011", "Bills for September, Ohana Furniture Manufacturing Industries", 0, 12850],
+      ["JE-2610-0046", "CARD_PAYOUT", "MM-20261002-0002", null, 3500.5, 0],
+    ]),
+    glBlock("2110", "Trade payables", "LIABILITY", 31250, [
+      ["JE-2610-0040", "SUPPLIER_BILL", "BILL-2610-0007", null, 0, 7200],
+      ["JE-2610-0044", "PAYMENT_VOUCHER", "PV-2610-0011", null, 12850, 0],
+    ]),
+    glBlock("6800", "Electricity and water", "EXPENSE", 0, [["JE-2610-0047", "PAYMENT_VOUCHER", "PV-2610-0013", "Electricity September, PJ Showroom", 2400, 0]]),
+  ],
+});
+
 const realFetch = window.fetch.bind(window);
 window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
@@ -384,6 +418,7 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   if (url.includes("/api/finance/payables/")) return json({ rows: [] });
   if (url.includes("/api/finance/ledger/daily-bank")) return json(DAILY_BANK(q.get("day") ?? TODAY));
   if (url.includes("/api/finance/ledger/cash-flow")) return json(CASH_FLOW(q.get("from") ?? TODAY, q.get("to") ?? TODAY));
+  if (url.includes("/api/finance/ledger/general-ledger")) return json(GENERAL_LEDGER(q.get("from") ?? TODAY, q.get("to") ?? TODAY));
   if (url.includes("/api/finance/other-money-in/parties")) return json(PARTIES);
   if (url.includes("/api/finance/other-money-in/invoices")) return json(DEBTOR_INVOICES);
   if (url.includes("/api/finance/other-money-in/receipts")) return json(RECEIPTS);
@@ -419,6 +454,7 @@ const ROUTES: Record<string, string> = {
   "trial-balance": "/finance/ledger/trial-balance",
   reports: "/finance/reports",
   "cash-flow": "/finance/reports/cash-flow",
+  "general-ledger": "/finance/ledger/general-ledger",
 };
 window.history.replaceState(null, "", ROUTES[PAGE] ?? ROUTES.ar);
 

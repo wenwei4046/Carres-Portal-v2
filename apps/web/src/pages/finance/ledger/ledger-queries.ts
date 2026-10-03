@@ -18,6 +18,7 @@ import type {
 } from "@carres/shared/finance-ledger";
 import type { DailyBankDay } from "@carres/shared/daily-bank";
 import type { CashFlowAnswer } from "@carres/shared/cash-flow";
+import type { GeneralLedgerAnswer } from "@carres/shared/general-ledger";
 import { apiFetch } from "@/lib/api";
 import { departmentSearch } from "../department";
 
@@ -40,6 +41,7 @@ export const ledgerKeys = {
   selfCheck: () => ["finance", "ledger", "self-check"] as const,
   dailyBank: (day: string) => ["finance", "ledger", "daily-bank", day] as const,
   cashFlow: (from: string, to: string) => ["finance", "ledger", "cash-flow", from, to] as const,
+  generalLedger: (from: string, to: string, dept = "") => ["finance", "ledger", "general-ledger", from, to, dept] as const,
 };
 
 /** The server's page size is PostgREST's own row cap. */
@@ -196,6 +198,17 @@ export function useDailyBank(day: string) {
     queryKey: ledgerKeys.dailyBank(day),
     queryFn: () => apiFetch<DailyBankDay>(`/api/finance/ledger/daily-bank?${new URLSearchParams({ day }).toString()}`),
     retry: (count: number, error: unknown) => (error as { status?: number }).status !== 422 && count < 2,
+  });
+}
+
+/** General Ledger (0639): every account's period, as gl_account_ledger
+ *  answers it. 409 (no start date) and 422 (a date) are answers, not retries. */
+export function useGeneralLedger(from: string, to: string, dept = "") {
+  return useQuery({
+    queryKey: ledgerKeys.generalLedger(from, to, dept),
+    queryFn: () => apiFetch<GeneralLedgerAnswer>(
+      `/api/finance/ledger/general-ledger?${new URLSearchParams({ from, to, ...departmentSearch(dept) }).toString()}`),
+    retry: (count: number, error: unknown) => ![409, 422].includes((error as { status?: number }).status ?? 0) && count < 2,
   });
 }
 

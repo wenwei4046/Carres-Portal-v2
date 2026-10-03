@@ -5013,3 +5013,17 @@ These words are on screen in the branch and are not approved yet. The period con
 | By account | Panel `By account`. Columns `Account` · `Brought forward` · `Inflow` · `Outflow` · `Carried forward`, and a `Total` row |
 | Meaning | `Inflow` and `Outflow` are money into and out of the cash and bank accounts. A line names the account on the other side of the money. `Carried forward` is brought forward plus inflow less outflow. Card and online money is not cash until its card payout reaches a bank. |
 | States | `Loading Cash Flow…` · `Cash Flow could not be loaded. Try again.` · `Try again` · `The ledger has no start date yet. Nothing can be totalled.` · `The ledger started on {date}. Pick a day from then on.` |
+
+### PROPOSAL — PENDING CHEW · General Ledger (0639)
+
+These words are on screen in the branch and are not approved yet. The period controls, department filter, sources, balance words and states are the Ledger pages' own.
+
+| Where | Words |
+|---|---|
+| Menu | `General Ledger`, under `Ledger` after `Journal` |
+| Page | Title `General Ledger`. `Since {date} · No opening balances` · `Month` · `From` · `Up to` · `Custom Date Range` · `Department` · `Search accounts…` (accessible name `Search accounts`) · `Export Excel` · `The general ledger could not be exported. Try again.` |
+| Table | A band per account: `{code} {name} · {kind}`. Columns `Date` · `Entry No` · `Source` · `Document` · `Description` · `Debit` · `Credit` · `Balance`. Rows `Brought forward` and `Total`. A balance reads `{money} Debit` · `{money} Credit` · `RM 0.00`, as on the Journal. A line with no memo or narration: `No memo` |
+| Footer | `{n} accounts · {date} to {date}`, and `{n} accounts of {m}` while a search narrows them |
+| Empty | `No account moved or carried a balance in this period.` · `No account matches this search.` |
+| States | `Loading the General Ledger…` · `The General Ledger could not be loaded. Try again.` · `Try again` · `The ledger has no start date yet. Nothing can be totalled.` · `The ledger started on {date}. Pick a day from then on.` |
+| Sheet | `General Ledger` · `Account` · `Date` · `Entry No` · `Source` · `Document` · `Description` · `Debit` · `Credit` · `Balance` · `Department` · `Brought forward` · `Total` |

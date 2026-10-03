@@ -10,7 +10,7 @@ import { PORTAL_MODULES, PORTAL_NAV, navBlocks, navItemHref } from "./portal-nav
  *     Payables            AP · Payables · Bills · Payment Vouchers · Suppliers
  *     Receivables         AR · Receivables · Other debtors · Other receipts
  *     Bank & Cards        Daily Bank · Card settlement · Money moves
- *     Ledger              Journal · Trial Balance · Self-check
+ *     Ledger              Journal · General Ledger · Trial Balance · Self-check
  *     Reports
  *     Rental Approver · Subscriptions · Dealers               (unchanged)
  *
@@ -36,7 +36,7 @@ describe("the Finance modules (Chew, 2026-10-03)", () => {
       "Payables: AP · Payables · Bills · Payment Vouchers · Suppliers",
       "Receivables: AR · Receivables · Other debtors · Other receipts",
       "Bank & Cards: Daily Bank · Card settlement · Money moves",
-      "Ledger: Journal · Trial Balance · Self-check",
+      "Ledger: Journal · General Ledger · Trial Balance · Self-check",
       "Reports",
       "Rental Approver",
       "Subscriptions",
@@ -81,6 +81,7 @@ describe("the Finance modules (Chew, 2026-10-03)", () => {
       "money-moves": "/finance/money-moves",
       dealers: "/finance/dealers",
       ledger: "/finance/ledger",
+      "general-ledger": "/finance/ledger/general-ledger",
       "trial-balance": "/finance/ledger/trial-balance",
       "self-check": "/finance/ledger/self-check",
       reports: "/finance/reports",

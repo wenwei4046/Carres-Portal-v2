@@ -136,6 +136,7 @@ describe("finance ledger — who may read", () => {
     "/balance-sheet",
     "/daily-bank",
     "/cash-flow?from=2026-09-01&to=2026-09-30",
+    "/general-ledger?from=2026-09-01&to=2026-09-30",
   ];
 
   it.each(["dealer", "operation", "supplier"])("refuses %s on every route before any database call", async (role) => {
@@ -1398,5 +1399,67 @@ describe("GET /cash-flow (0638)", () => {
   it("the database's own refusal stays a refusal", async () => {
     fakeClient(() => refuse("42501", "not_internal", "Cash Flow is internal."));
     expect((await get("/cash-flow?from=2026-09-01&to=2026-09-30", "principal")).status).toBe(403);
+  });
+});
+
+// ── General Ledger (0639, Chew 2026-10-03) ──────────────────────────────────
+
+describe("GET /general-ledger (0639)", () => {
+  const glRow = (over: AnyJson) => ({
+    row_kind: "LINE", account_code: "1121", account_name: "Public Bank", kind: "ASSET",
+    entry_date: "2026-09-02", entry_no: "JE-202609-0001", source_type: "CUSTOMER_PAYMENT", source_doc_no: "OR-1",
+    narration: "Payment", memo: null, debit: 0, credit: 0, running_balance: 0, ...over,
+  });
+  const LEDGER = {
+    status: "OK", go_live_on: "2026-09-01", from: "2026-09-01", to: "2026-09-30",
+    accounts: [{
+      account_code: "1121",
+      rows: [
+        glRow({ row_kind: "OPENING", entry_date: null, entry_no: null, source_type: null, source_doc_no: null, debit: null, credit: null, running_balance: 0 }),
+        glRow({ debit: 250.5, running_balance: 250.5 }),
+        glRow({ row_kind: "CLOSING", entry_date: null, entry_no: null, source_type: null, source_doc_no: null, debit: null, credit: null, running_balance: 250.5 }),
+      ],
+    }],
+  };
+
+  it("asks for the period, every account, and passes the answer through whole", async () => {
+    const { sb } = fakeClient(() => ok(LEDGER));
+    const res = await get("/general-ledger?from=2026-09-01&to=2026-09-30");
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("fin_general_ledger", {
+      p_from: "2026-09-01", p_to: "2026-09-30", p_accounts: null, p_department_type: null, p_department_id: null,
+    });
+    expect(await json(res)).toEqual(LEDGER);
+  });
+
+  it("asks for the accounts named, and for one department", async () => {
+    const { sb } = fakeClient(() => ok(LEDGER));
+    const id = "11111111-1111-4111-8111-111111111111";
+    await get(`/general-ledger?from=2026-09-01&to=2026-09-30&accounts=1121,2110&departmentType=DEALER&departmentId=${id}`);
+    expect(sb.rpc).toHaveBeenCalledWith("fin_general_ledger", {
+      p_from: "2026-09-01", p_to: "2026-09-30", p_accounts: ["1121", "2110"], p_department_type: "DEALER", p_department_id: id,
+    });
+  });
+
+  it("refuses a backwards period or an account that is not a code, before any database call", async () => {
+    expect((await get("/general-ledger?from=2026-09-30&to=2026-09-01")).status).toBe(422);
+    expect((await get("/general-ledger?from=2026-09-01&to=2026-09-30&accounts=1121;x")).status).toBe(422);
+    expect(userClient).not.toHaveBeenCalled();
+  });
+
+  it("a block whose balance does not follow its lines refuses the whole report", async () => {
+    const broken = structuredClone(LEDGER);
+    broken.accounts[0]!.rows[1]!.running_balance = 250.49;
+    fakeClient(() => ok(broken));
+    const res = await get("/general-ledger?from=2026-09-01&to=2026-09-30");
+    expect(res.status).toBe(500);
+    expect((await json(res)).message).toBe("The General Ledger could not be loaded. Try again.");
+  });
+
+  it("a ledger with no start date is 409, before go-live passes through", async () => {
+    fakeClient(() => fail("55000"));
+    expect((await get("/general-ledger?from=2026-09-01&to=2026-09-30")).status).toBe(409);
+    fakeClient(() => ok({ ...LEDGER, status: "BEFORE_GO_LIVE", accounts: [] }));
+    expect(await json(await get("/general-ledger?from=2026-08-01&to=2026-08-31"))).toMatchObject({ status: "BEFORE_GO_LIVE" });
   });
 });

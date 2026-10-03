@@ -52,7 +52,7 @@ describe("Daily Bank arithmetic (0637, Chew 2026-10-03)", () => {
   });
 
   it("refuses a figure it cannot read rather than counting it as zero", () => {
-    expect(() => sen("abc")).toThrow("A Daily Bank figure could not be read.");
+    expect(() => sen("abc")).toThrow("A money figure could not be read.");
     expect(() => dailyBankRow(acct({ received: "" }))).toThrow();
   });
 });

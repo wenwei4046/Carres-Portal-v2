@@ -21,6 +21,7 @@ import DailyBankPage from "./daily-bank/DailyBankPage";
 // The read-only Finance Ledger — three destinations, three nav rows.
 import LedgerJournal from "./ledger/LedgerJournal";
 import LedgerTrialBalance from "./ledger/LedgerTrialBalance";
+import GeneralLedger from "./ledger/GeneralLedger";
 import LedgerSelfCheck from "./ledger/LedgerSelfCheck";
 import SupplierBills from "./payables/SupplierBills";
 import PaymentVouchers from "./payables/PaymentVouchers";
@@ -133,6 +134,8 @@ export default function FinanceApp() {
           <Route path="dealers" element={financeOnly(<PrincipalDealers channel="dealer" financeView={role !== "principal"} />)} />
           {/* The Finance Ledger (read-only). `?entry=JE-…` opens one entry. */}
           <Route path="ledger" element={financeOnly(<LedgerJournal />)} />
+          {/* 0639 — every account's period, one block each (Chew 2026-10-03). */}
+          <Route path="ledger/general-ledger" element={financeOnly(<GeneralLedger />)} />
           <Route path="ledger/trial-balance" element={financeOnly(<LedgerTrialBalance />)} />
           <Route path="ledger/self-check" element={financeOnly(<LedgerSelfCheck />)} />
           {/* 0512 — the one list of money accounts. */}

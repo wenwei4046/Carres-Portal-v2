@@ -9,6 +9,7 @@
 > | Suppliers: Finance's own tax and bank details, and `Pay to` on a voucher (§3.2) | 0636 |
 > | Daily Bank (§3.4) | 0637 |
 > | Cash Flow (§3.6) | 0638 |
+> | General Ledger (§3.6, §4) | 0639 |
 >
 > Their on-screen words are in COPY-STANDARD "Finance (Chew)"; those marked PROPOSAL wait for Chew.
 >
@@ -181,6 +182,13 @@ All reports only read. Reports → Payment stays Payment's.
 - For one day, each account's figures equal Daily Bank's; a test holds the two together.
 - Not built: Houzs's split of a supplier payment into what the bills bought ("rule A"), one column per account, the by-month view and a layout editor.
 - Falsifier: in Chew's test, an account's carried forward differs from its Journal running balance on the last day, or a line Chew cannot tell what it was for.
+
+**General Ledger approach — PROPOSAL / NOT LAW, built for Chew's test (0639).**
+- Ledger → General Ledger, after the Journal. Every account that moved or carries a balance in the period, in code order: `Brought forward`, each line with the balance after it, then `Total` with the period's debits and credits and the balance at the end.
+- The figures are the Journal's own account ledger (0540), gathered for every account, so the two can never disagree; a test holds them together. Reversals and their contras both show, as on the Journal.
+- A search narrows the accounts, never the lines; the department filter is the ledger pages' own. Export Excel writes the page's rows.
+- Not built: Houzs's "other side" and the second reference column, an account range picker, and a PDF.
+- Falsifier: in Chew's test, a balance here differs from the Journal's running balance for the same account and day, or Chew needs a column this report does not carry.
 
 ## 4 · Menu: DRAFT
 
