@@ -227,12 +227,14 @@ export default function DailyBankPage() {
             stickyIdentity
             isLoading={!query.isSuccess}
             searchPlaceholder="Search accounts…"
+            wrapToolbar
             expandTitle="Show lines"
             expandable={{ renderExpansion: (r) => <AccountDay row={r} day={day} /> }}
-            // The toolbar holds the day's controls only, so it stays one row on
-            // a phone; what the figures mean is said in the footer under them.
+            // The toolbar holds the day's controls only, and they wrap rather
+            // than clip on a phone (wrapToolbar); what the figures mean is said
+            // in the footer under them.
             toolbarStart={
-              <span className="flex items-center gap-2 text-body">
+              <span className="flex flex-wrap items-center gap-2 text-body">
                 <Button iconOnly icon="previous" aria-label="Previous day" onClick={() => setDay(addDaysIso(day, -1))} />
                 <span className="w-36"><DateField value={day} onChange={(iso) => setDay(iso || today)} aria-label="Day" /></span>
                 <Button iconOnly icon="forward" aria-label="Next day" onClick={() => setDay(addDaysIso(day, 1))} />

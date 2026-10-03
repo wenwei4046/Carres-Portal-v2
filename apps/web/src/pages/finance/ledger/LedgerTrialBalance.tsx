@@ -163,6 +163,7 @@ export default function LedgerTrialBalance() {
           initialGroupBy={["kind"]} groupBanner={false} stickyIdentity isLoading={!query.isSuccess}
           onSortChange={onSortChange} onSearchChange={onSearchChange} countsInGroup={isAccount}
           searchPlaceholder="Search accounts…"
+          wrapToolbar
           toolbarStart={<span className="flex items-center gap-3 text-body">
             <span>As of</span>
             <span className="w-40"><DateField value={asOf} onChange={setAsOf} aria-label="As of" /></span>
