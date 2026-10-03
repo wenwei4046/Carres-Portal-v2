@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, it, expect } from "vitest";
 import { PORTAL_MODULES, PORTAL_NAV, navBlocks, navItemHref, visibleItems } from "./portal-nav";
 
@@ -7,14 +10,15 @@ import { PORTAL_MODULES, PORTAL_NAV, navBlocks, navItemHref, visibleItems } from
  *
  *     Dashboard
  *     Payments            Monitor · Payment Records          (unchanged)
- *     Payables            AP · Payables · Bills · Payment Vouchers · Payment Requests · Credit Notes · Suppliers
+ *     Payables            AP · Payables · Payment Vouchers · Bills · Payment Requests · Credit Notes · Suppliers
  *     Receivables         AR · Receivables · Other debtors · Other receipts
  *     Bank & Cards        Daily Bank · Card settlement · Card money waiting · Money moves
  *     Ledger              Journal · General Ledger · Trial Balance · Self-check
- *     Reports
+ *     Reports             one row per report, Payment's own report last
+ *     Forecast
  *     Rental Approver · Subscriptions · Dealers               (unchanged)
  *
- * Payables sits above Receivables to keep the owner ruling of 2026-09-14
+ * Payables sits above Receivables to keep the ruling of 2026-09-14
  * (`AP · Payables` above AR). Grouping is presentation only, so every page
  * keeps its address.
  */
@@ -33,11 +37,12 @@ describe("the Finance modules (Chew, 2026-10-03)", () => {
     expect(shape("finance")).toEqual([
       "Dashboard",
       "Payments: Monitor · Payment Records",
-      "Payables: AP · Payables · Bills · Payment Vouchers · Payment Requests · Credit Notes · Suppliers",
+      "Payables: AP · Payables · Payment Vouchers · Bills · Payment Requests · Credit Notes · Suppliers",
       "Receivables: AR · Receivables · Other debtors · Other receipts",
       "Bank & Cards: Daily Bank · Card settlement · Card money waiting · Money moves",
       "Ledger: Journal · General Ledger · Trial Balance · Self-check",
-      "Reports",
+      "Reports: Profit and Loss · Balance Sheet · Cash Flow · AP Aging · Collection · Card charges · Dealer commission · Stock value · Payment",
+      "Forecast",
       "Rental Approver",
       "Subscriptions",
       "Dealers",
@@ -58,10 +63,13 @@ describe("the Finance modules (Chew, 2026-10-03)", () => {
       "Reports",
     ]);
     expect(PORTAL_MODULES.some((m) => /money (in|out)/i.test(m.label))).toBe(false);
+    // Forecast has one page, so it has no module row yet.
+    expect(PORTAL_MODULES.some((m) => m.section === "Forecast")).toBe(false);
   });
 
-  /* Grouping moved no address: every bookmark and in-page link still lands. */
-  it("every Finance page keeps its address", () => {
+  /* Grouping moved no address: every bookmark and in-page link still lands.
+     The Profit and Loss and the Balance Sheet each have their own now. */
+  it("every Finance page keeps its address, and every report has its own", () => {
     const hrefs = Object.fromEntries(FINANCE.items.map((it) => [it.key, navItemHref(FINANCE, it)]));
     expect(hrefs).toEqual({
       dashboard: "/finance/dashboard",
@@ -87,12 +95,32 @@ describe("the Finance modules (Chew, 2026-10-03)", () => {
       "general-ledger": "/finance/ledger/general-ledger",
       "trial-balance": "/finance/ledger/trial-balance",
       "self-check": "/finance/ledger/self-check",
-      reports: "/finance/reports",
+      "profit-and-loss": "/finance/reports/profit-and-loss",
+      "balance-sheet": "/finance/reports/balance-sheet",
+      "cash-flow": "/finance/reports/cash-flow",
+      "ap-aging": "/finance/reports/ap-aging",
+      collection: "/finance/reports/collection",
+      "card-charges": "/finance/reports/card-charges",
+      "dealer-commission": "/finance/reports/dealer-commission",
+      "stock-value": "/finance/reports/stock-value",
+      "payment-report": "/finance/reports/payment",
+      forecast: "/finance/reports/forecast",
     });
   });
 
+  /* A row whose address no route answers would land on the area's first page
+     without a word, so each one is checked against the routes FinanceApp declares. */
+  it("every Finance row opens a page FinanceApp routes", () => {
+    const here = dirname(fileURLToPath(import.meta.url));
+    const routes = readFileSync(join(here, "..", "finance", "FinanceApp.tsx"), "utf8");
+    for (const item of FINANCE.items) {
+      const path = navItemHref(FINANCE, item).replace(/^\/finance\//, "").split("?")[0]!;
+      expect(routes.includes(`path="${path}"`) || routes.includes(`path="${path}/*"`), item.key).toBe(true);
+    }
+  });
+
   it("no other area has a page in a Finance module", () => {
-    const financeSections = new Set(["Payables", "Receivables", "Bank & Cards", "Ledger", "Reports"]);
+    const financeSections = new Set(["Payables", "Receivables", "Bank & Cards", "Ledger", "Reports", "Forecast"]);
     const elsewhere = PORTAL_NAV.filter((g) => g.area !== "finance").flatMap((g) =>
       g.items.filter((it) => it.section && financeSections.has(it.section)).map((it) => `${g.area}:${it.key}`),
     );

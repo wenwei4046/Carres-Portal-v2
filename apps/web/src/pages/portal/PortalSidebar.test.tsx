@@ -143,6 +143,67 @@ describe("PortalSidebar — role visibility", () => {
   });
 });
 
+/**
+ * ⭐ THE AREA YOU ARE IN FOLDS (Chew, 2026-10-03; Finance MASTER §4). Its
+ * title folds it and opens it again, and the page stays where it is. Another
+ * area's title still jumps to that area, as before. One rule for every area.
+ */
+describe("PortalSidebar — the area you are in folds", () => {
+  beforeEach(() => {
+    mockRole = "principal";
+  });
+
+  it("its title folds it and opens it again, and the page does not move", () => {
+    renderAt("/finance/dashboard");
+    const finance = screen.getByTestId("nav-area-finance");
+    expect(finance).toHaveAttribute("aria-expanded", "true");
+    expect(child("dashboard")).toBeInTheDocument();
+    fireEvent.click(finance);
+    expect(finance).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByTestId("nav-child-dashboard")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("nav-module-payables")).not.toBeInTheDocument();
+    expect(screen.getByTestId("location-probe")).toHaveTextContent(/^\/finance\/dashboard$/);
+    fireEvent.click(finance);
+    expect(finance).toHaveAttribute("aria-expanded", "true");
+    expect(child("dashboard")).toBeInTheDocument();
+  });
+
+  it("folded, its title is the one blue mark of where you are", () => {
+    renderAt("/finance/dashboard");
+    const finance = screen.getByTestId("nav-area-finance");
+    expect(finance).not.toHaveClass("text-kit-blue-9");
+    fireEvent.click(finance);
+    expect(finance).toHaveClass("text-kit-blue-9");
+    expect(screen.getByTestId("nav-area-operation")).not.toHaveClass("text-kit-blue-9");
+  });
+
+  it("every area title carries its chevron, open or shut", () => {
+    renderAt("/finance/dashboard");
+    for (const area of ["operation", "finance", "hr", "principal"]) {
+      expect(screen.getByTestId(`nav-area-${area}`).querySelector("svg"), area).not.toBeNull();
+    }
+  });
+
+  it("another area's title still jumps there, and that area opens", () => {
+    renderAt("/finance/dashboard");
+    fireEvent.click(screen.getByTestId("nav-area-finance"));
+    fireEvent.click(screen.getByTestId("nav-area-operation"));
+    expect(screen.getByTestId("location-probe")).toHaveTextContent("/operation?tab=dashboard");
+    expect(screen.getByTestId("nav-area-operation")).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByTestId("nav-area-finance")).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("is the same rule in every area: Operations folds too", () => {
+    renderAt("/operation");
+    const operations = screen.getByTestId("nav-area-operation");
+    expect(module_("purchasing")).toBeInTheDocument();
+    fireEvent.click(operations);
+    expect(operations).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByTestId("nav-module-purchasing")).not.toBeInTheDocument();
+    expect(screen.getByTestId("location-probe")).toHaveTextContent(/^\/operation$/);
+  });
+});
+
 describe("PortalSidebar — narrow desktop", () => {
   /* Owner review 2026-09-25 item 9 applies from 1280px; below it the named
      rail would push Work into the phone layout, so it starts as icons. */

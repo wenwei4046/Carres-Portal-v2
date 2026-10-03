@@ -9,9 +9,10 @@
  *
  * `?page=` ar · bills · payment-vouchers · ap-outstanding · suppliers ·
  * other-debtors · other-debtor-parties · other-receipts · daily-bank ·
- * journal · general-ledger · trial-balance · reports · cash-flow · ap-aging ·
- * credit-notes · credit-note · credit-note-new · forecast (last month, so the
- * actual is a whole month).
+ * journal · general-ledger · trial-balance · reports · profit-and-loss ·
+ * balance-sheet · cash-flow · ap-aging · credit-notes · credit-note ·
+ * credit-note-new · forecast (last month, so the actual is a whole month).
+ * `?role=principal` draws the area titles, to see an area fold.
  * Every listing carries at least one 60+ character party name so wrapping and
  * truncation are visible. Fixture evidence is not production evidence.
  */
@@ -676,7 +677,10 @@ const ROUTES: Record<string, string> = {
   "other-receipts": "/finance/other-receipts",
   journal: "/finance/ledger",
   "trial-balance": "/finance/ledger/trial-balance",
+  // The old address, to see it open the Profit and Loss.
   reports: "/finance/reports",
+  "profit-and-loss": "/finance/reports/profit-and-loss",
+  "balance-sheet": "/finance/reports/balance-sheet",
   "cash-flow": "/finance/reports/cash-flow",
   "general-ledger": "/finance/ledger/general-ledger",
   "ap-aging": "/finance/reports/ap-aging",

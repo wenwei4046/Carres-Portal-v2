@@ -1,5 +1,5 @@
 import { cleanup, render, screen } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, expect, it, vi } from "vitest";
 import FinanceApp from "./FinanceApp";
@@ -200,5 +200,41 @@ describe("Finance routing", () => {
     expect(screen.getByTestId("payment-monitor-destination-header")).toBeInTheDocument();
     expect(screen.queryByTestId("trial-balance-destination-header")).not.toBeInTheDocument();
     auth.role = "finance";
+  });
+  /* Chew 2026-10-03: the Profit and Loss and the Balance Sheet are two pages,
+     each a row under Reports. */
+  it("opens the Profit and Loss and the Balance Sheet, each on its own route", () => {
+    show("/finance/reports/profit-and-loss");
+    expect(screen.getByTestId("profit-and-loss-destination-header")).toBeInTheDocument();
+    expect(screen.queryByTestId("balance-sheet-destination-header")).not.toBeInTheDocument();
+    cleanup();
+    show("/finance/reports/balance-sheet");
+    expect(screen.getByTestId("balance-sheet-destination-header")).toBeInTheDocument();
+    expect(screen.queryByTestId("profit-and-loss-destination-header")).not.toBeInTheDocument();
+  });
+  it("an old /finance/reports address opens the statement it asked for, with every value it carried", () => {
+    function Address() {
+      const { pathname, search } = useLocation();
+      return <output data-testid="address">{pathname}{search}</output>;
+    }
+    const open = (path: string) => render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <MemoryRouter initialEntries={[path]}>
+          <Routes>
+            <Route path="/finance/*" element={<><FinanceApp /><Address /></>} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    open("/finance/reports?from=2026-09-01&to=2026-09-30&dept=SHOWROOM");
+    expect(screen.getByTestId("address")).toHaveTextContent("/finance/reports/profit-and-loss?from=2026-09-01&to=2026-09-30&dept=SHOWROOM");
+    expect(screen.getByTestId("profit-and-loss-destination-header")).toBeInTheDocument();
+    cleanup();
+    open("/finance/reports?asOf=2026-09-30");
+    expect(screen.getByTestId("address")).toHaveTextContent("/finance/reports/balance-sheet?asOf=2026-09-30");
+    expect(screen.getByTestId("balance-sheet-destination-header")).toBeInTheDocument();
+    cleanup();
+    open("/finance/reports");
+    expect(screen.getByTestId("address")).toHaveTextContent(/^\/finance\/reports\/profit-and-loss$/);
   });
 });
