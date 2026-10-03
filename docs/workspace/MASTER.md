@@ -1048,6 +1048,78 @@ Jess reviewed the live page in an 829px window and approved 24 fixes as written 
   would push Work under 768px and into the phone layout — measured on production 2026-09-25);
   the person's own collapse is remembered; the bottom block shows the account's name where one
   exists.
+- **THE WORK SHELL IS THE §6.0 LISTING SHELL — owner ruling 2026-09-25 ("why you different from
+  sales order ui").** Work draws the same shell as the Sales Orders Register: the 50px Destination
+  Header (page name + Search · Alerts · Help · Settings, no count), then ONE plain white toolbar
+  row with a bottom rule (no framed box): `My Work · Team Work` · Search 340px.
+  **The left rail is the rail every page follows — the Payment Monitor's grammar (Jess,
+  2026-09-26) with her same-day correction:** the shared 240px `FilterRail` with `Hide filters`;
+  the one-line header `‹ Sep 2026 ›`; the Monday–Saturday month grid of day tiles; the fixed rows
+  `Missed {n}` and `No date {n}`; the `Status` rows; the `Page` group (`All pages` + each page with
+  its count) and, in Team Work, the `Owner` select — exactly as §5.2 Panel 1 writes it. Hidden, it
+  leaves the 44px `Show filters` strip; the choice is remembered per browser; on one stage it
+  floats over the list. The three-panel page is rail · list · detail. **The rail runs from the page header to the bottom; the toolbar belongs to the
+  right column and never spans above the rail (Jess, 2026-09-26).** The 72px header, framed toolbar, compact strip and toolbar selects are retired.
+  The middle column is the 300px two-line picker of §5.5 (Jess, 2026-09-26: "listing more important
+  than working panel?" — no); the 104px cards are retired.
+- **Phone shell (<768px, owner review 2026-09-25 round 2):** the page has the whole width; the
+  sidebar is a slide-in drawer behind a `Menu` button; the right rail is not drawn. The header's
+  `0 for you · {n} for the team` wraps instead of truncating. An empty list draws no
+  `Select a work item` box.
+- **Not done — needs its own card:** the bell badge (item 11) counts live order alerts and has no
+  notification record to mark read.
+
+### 5.3 · Filter, search and URL contract
+
+Search matches the authorised open set by object number/label, customer, supplier, recipient,
+problem and action. It never broadens permission scope and never searches a separately cached copy.
+
+The toolbar `Filters` door is governed for Work. It lives in the toolbar only and is never a Panel 1
+or rail heading. Filters are: `Scope` (`My Work` · `Team Work`), `Week`, `Working day` (`Missed` · admitted weekdays ·
+Saturday when generated · `No date`), `Status`, `Page`, `Owner` (Team only),
+`Blocked` and `Source failed`. `Broken commitment` is an attention filter, not a synonym for
+`Missed`. Multiple filters combine and every active filter is
+visible, individually removable and represented in the URL so Dashboard and module doors can open
+the exact same result. `Clear all` preserves the current scope. Refresh re-reads the one feed and
+does not change business state.
+
+The Module filter lists only currently admitted projections: `Sales Orders` · `Purchasing` ·
+`Receiving` · `Delivery` · `Payment` · `Issue Tracker`. `Service Case`, `Warehouse Outbound` and
+`Claims` do not appear until their admission gates and live projection close.
+
+Panel 2 group order is `BROKEN COMMITMENT` → `MISSED` → selected day (§5.1). Default ordering inside
+a group is module-governed materiality, oldest opened occurrence, then object label. Users may narrow
+the view but cannot manually reprioritise authoritative due facts. Search and filter results keep
+the same group and item grammar; zero matches is not the same as zero work.
+
+### 5.4 · Work states
+
+| State | Required presentation and behaviour |
+|---|---|
+| Loading | Keep the page shell and applied scope/filter visible; use quiet row placeholders, never `0` |
+| Empty My Work | `Nothing assigned to you` · `Open Team Work` for authorised supervisors; source freshness remains visible |
+| Empty Team Work | `No open work` only when every admitted source is healthy; otherwise show the failed source state |
+| No search/filter match | `No work matches these filters` · `Clear filters`; never imply the source set is empty |
+| Missed | `Required {weekday, date} · {n} working day(s) missed`; colour supports the words and is never the only signal |
+| Saturday | Appears only when an admitted action remains on Saturday after module and resolved-owner calendar law; retains the Saturday business date |
+| Public holiday | Day remains visible and names the holiday; only an authorised holiday operation may remain assigned there |
+| Calendar not configured | Name the affected Site/owner calendar and correction door; do not invent off-days or missed age |
+| Calendar read failed | Say working days could not be loaded, preserve safe dated facts and hide invented missed age; never treat failure as zero |
+| No eligible actor that day | Keep the action on its authoritative day · `Nobody works {date} for {Duty}.` · `Set cover in Settings → Staff & Duties`; do not falsely say the Duty has no holder |
+| Blocked | Stays in its own working-day group (no `Blocked` group) · `Blocked by {dependency}` plus the door that can resolve it; retain original working day and missed age; the `Blocked` filter narrows to these rows |
+| Not assigned | Group under the governed Duty word · `Nobody holds {Duty}` · `Set the holder in Settings → Staff & Duties` |
+| Covered | Preserve normal owner and effective cover evidence; My Work routes to today's acting person |
+| Source delayed | Preserve last safe observation and say `Could not refresh {source}` with time |
+| Source failed | Isolate and name the source; never omit its possible work or convert failure to zero |
+| Permission refused | `You do not have access to this work` and no leaked counts, objects or people |
+| Completed/history | Leaves the open set only after the authoritative completion fact; history shows result, actual actor and time |
+
+### 5.5 · Responsive and accessibility contract
+
+- **THE WORK DENSITY — owner ruling 2026-09-25, APPROVED / BUILT. Exact values, not a direction.**
+  Header: ONE white row, `Work` 28/34/600 with the count `{n} actions to do · {m} missed` 13/18/400
+  on the right, 72px tall with 24px sides from 768px wide; below 768px 24/30/600, 12/16/400, 64px,
+  16px sides. No breadcrumb row, no second title, KPI band or card header.
 - **THE WORK SHELL — current task-inspection target:** shared shell geometry is owned by UI MASTER
   (source sidebar232/60 and utility strip64, not former88/56). Preserve the Inbox and middle
   mission/map layout. §5.11 inspection opens on click without reflowing the background; there is
