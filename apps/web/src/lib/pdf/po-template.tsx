@@ -27,7 +27,7 @@ import type { ReactNode } from "react";
 import { Document, Image, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
 import { NOTO_SANS_SC_FAMILY } from "./fonts/noto";
 import { CARRES_COMPANY } from "./letterhead";
-import { poDocumentNumberOf } from "@carres/shared";
+import { DELIVERY_METHOD_WORDS, poDocumentNumberOf } from "@carres/shared";
 import type { PoTemplateData } from "./types";
 
 const INK = "#1A1714";
@@ -91,13 +91,19 @@ const styles = StyleSheet.create({
 
   // ── section 2 — SUPPLIER · DELIVER TO · PO DETAILS ──
   cards: { flexDirection: "row", minHeight: mm(28) },
+  /* ⭐ SECTION-2 WIDTHS — owner review of PO-20260908-2503 V1 (2026-09-30).
+     Measured at Noto 8pt: the longest PO DETAILS label `PO 14-Day Delivery
+     Date` is 31.7mm and the longest value `PO-20260908-2503 V1` 28mm, so the
+     label now prints on ONE line in a 32mm gutter and the column is 63mm —
+     `PO No` never wraps. The two address columns share the other 123mm with a
+     3mm gap and a 12mm label (`Address` is 10.4mm): 46.5mm of address per
+     line, which holds `LORONG HAJI ABDUL MANAN/KU 8,` (43mm) whole. */
+  partyCol: { flex: 1, paddingRight: mm(3) },
+  detailsCol: { width: mm(63) },
   blockLabel: { fontSize: 8.5, fontWeight: 700, color: INK, letterSpacing: 0.5, textTransform: "uppercase", lineHeight: 1 },
   pairRow: { flexDirection: "row" },
-  /* PO DETAILS only: the two-line `PO {n}-Day / Delivery Date` label puts its
-     colon and value on the label's LAST line (the SO's two-line-label rule). */
-  pairRowEnd: { flexDirection: "row", alignItems: "flex-end" },
-  pairLabel: { fontSize: 8, color: GREY, width: mm(15), lineHeight: 1.42 },
-  detailLabel: { fontSize: 8, color: GREY, width: mm(23), lineHeight: 1.42 },
+  pairLabel: { fontSize: 8, color: GREY, width: mm(12), lineHeight: 1.42 },
+  detailLabel: { fontSize: 8, color: GREY, width: mm(32), lineHeight: 1.42 },
   pairValue: { fontSize: 8, flex: 1, lineHeight: 1.42 },
   deliverNote: { fontSize: 7, color: GREY, marginTop: mm(0.8), lineHeight: 1.3 },
 
@@ -267,6 +273,34 @@ function isChaise(code: string): boolean {
    nobody reviews. */
 const destKey = (d: Destination) => `${d.name}\u0000${d.address}`;
 
+/**
+ * THE ADDRESS AS ENTERED (owner 2026-09-30). The stored line breaks are the
+ * lines; a line soft-wraps only when it genuinely does not fit, and then never
+ * leaves a short last word alone (`8,` under `…MANAN/KU`): the final space of
+ * each line before a token of three characters or fewer becomes a no-break
+ * space, so the pair moves together.
+ */
+export function addressAsEntered(address: string): string {
+  return address
+    .split(/\r?\n/)
+    .map((line) => line.trim().replace(/ (\S{1,3})$/, "\u00A0$1"))
+    .join("\n");
+}
+
+/**
+ * DESCRIPTION speaks the product (owner 2026-09-30): the Catalog model name
+ * and the variant, `Fenrir · King`; the SKU only when Catalog has no name.
+ * A kept version's payload carries no `model_name` and reprints as sent.
+ */
+export function descriptionOf(
+  line: { sku: string; description: string; model_name?: string | null },
+  showVariant: boolean | "" | null | undefined,
+): string {
+  const name = line.model_name?.trim();
+  if (name) return line.description && line.description !== line.sku ? `${name} · ${line.description}` : name;
+  return showVariant ? `${line.sku} · ${line.description}` : line.sku;
+}
+
 export function PoTemplate(data: PoTemplateData) {
   const { po_number, version, issue_date, supplier, destination, delivery_instructions, eta_date, so_refs, issued_by, lines } = data;
   const draft = Boolean(data.draft);
@@ -302,14 +336,16 @@ export function PoTemplate(data: PoTemplateData) {
   if (groups.length === 0) groups.push({ dest: destination, lines: [] });
   const poTotal = lines.reduce((n, l) => n + Number(l.qty), 0);
 
+  /* ONE line (owner 2026-09-30): the label never breaks into `PO 8-Day` over
+     `Delivery Date` with an empty first row. */
   const daysLabel = data.delivery_working_days != null && data.delivery_working_days > 0
-    ? `PO ${data.delivery_working_days}-Day\nDelivery Date`
+    ? `PO ${data.delivery_working_days}-Day Delivery Date`
     : "PO Delivery Date";
   const deliveryValue = poPrintDate(eta_date) ?? (draft ? null : "Not recorded");
-  const methodValue =
-    data.delivery_method === "we_collect" ? "We collect" : data.delivery_method === "supplier_delivers" ? "Supplier delivers" : null;
+  const methodValue = data.delivery_method ? DELIVERY_METHOD_WORDS[data.delivery_method] : null;
   const detailRows: Array<[string, string | null, boolean?]> = [
-    ["PO No", draft ? "Assigned when issued" : poId],
+    /* The number and its version never part (NBSP): `PO-20260908-2503 V1`. */
+    ["PO No", draft ? "Assigned when issued" : poId.replace(/ /g, "\u00A0")],
     ["PO Doc Date", poPrintDate(issue_date)],
     [daysLabel, deliveryValue, true],
     ["Delivery Method", methodValue],
@@ -317,7 +353,7 @@ export function PoTemplate(data: PoTemplateData) {
 
   const Section2 = ({ dest }: { dest: Destination }) => (
     <View style={styles.cards}>
-      <View style={{ flex: 1, paddingRight: mm(5) }}>
+      <View style={styles.partyCol}>
         <Text style={styles.blockLabel}>Supplier</Text>
         <View style={{ marginTop: mm(1.5) }}>
           <View style={styles.pairRow}>
@@ -327,7 +363,7 @@ export function PoTemplate(data: PoTemplateData) {
           {supplier.address ? (
             <View style={styles.pairRow}>
               <Text style={styles.pairLabel}>Address</Text>
-              <Text style={styles.pairValue}>{supplier.address}</Text>
+              <Text style={styles.pairValue}>{addressAsEntered(supplier.address)}</Text>
             </View>
           ) : null}
           {supplier.contact ? (
@@ -338,7 +374,7 @@ export function PoTemplate(data: PoTemplateData) {
           ) : null}
         </View>
       </View>
-      <View style={{ flex: 1, paddingRight: mm(5) }}>
+      <View style={styles.partyCol}>
         <Text style={styles.blockLabel}>Deliver To</Text>
         <View style={{ marginTop: mm(1.5) }}>
           <View style={styles.pairRow}>
@@ -348,18 +384,18 @@ export function PoTemplate(data: PoTemplateData) {
           {dest.address ? (
             <View style={styles.pairRow}>
               <Text style={styles.pairLabel}>Address</Text>
-              <Text style={styles.pairValue}>{dest.address}</Text>
+              <Text style={styles.pairValue}>{addressAsEntered(dest.address)}</Text>
             </View>
           ) : null}
           {delivery_instructions ? <Text style={styles.deliverNote}>{delivery_instructions}</Text> : null}
         </View>
       </View>
-      <View style={{ width: mm(52) }}>
+      <View style={styles.detailsCol}>
         <Text style={styles.blockLabel}>PO Details</Text>
         <View style={{ marginTop: mm(1.5) }}>
           {detailRows.map(([label, value, bold]) =>
             value ? (
-              <View key={label} style={label.includes("\n") ? styles.pairRowEnd : styles.pairRow}>
+              <View key={label} style={styles.pairRow}>
                 <Text style={styles.detailLabel}>{label}</Text>
                 <Text style={styles.pairValue}>
                   :  <Text style={bold ? { fontWeight: 700 } : {}}>{value}</Text>
@@ -450,10 +486,7 @@ export function PoTemplate(data: PoTemplateData) {
               )}
             </View>
             <View style={styles.bDesc}>
-              <Text style={styles.descMain}>
-                {line.sku}
-                {showVariant ? ` · ${line.description}` : ""}
-              </Text>
+              <Text style={styles.descMain}>{descriptionOf(line, showVariant)}</Text>
               {bits.length > 0 ? <Text style={styles.descSub}>{bits.join(" · ")}</Text> : null}
             </View>
             <View style={styles.bQty}><Text style={styles.cellQty}>{line.qty}</Text></View>

@@ -2450,6 +2450,7 @@ export {
 } from "./purchase-demands";
 export {
   SO_BATCH_PURCHASE_WORDS,
+  DELIVERY_METHOD_WORDS,
   SO_BATCH_RAIL,
   SO_BATCH_RAIL_CLEAR,
   soBatchOrderSupplierNames,

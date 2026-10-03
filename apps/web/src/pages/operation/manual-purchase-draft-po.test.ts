@@ -43,7 +43,8 @@ describe("manualPurchaseDraftPos — the create page's draft PO paper", () => {
     expect(po!.data.destination).toEqual({ name: "Carres Klang", address: "Lot 5, Klang" });
     expect(po!.data.lines[0]).toMatchObject({
       sku: "B1201S-K",
-      description: "Booqit King · Ready Stock",
+      model_name: "Booqit King",
+      description: "Ready Stock",
       qty: 2,
       attrs: { color: "Sand", fabric_name: "CG-012" },
     });

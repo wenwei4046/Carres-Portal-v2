@@ -151,6 +151,38 @@ describe("GET /api/operation/pos/:id/print-data", () => {
     expect(body.lines[0].unit_codes).toEqual(["U1-000-001"]);
   });
 
+  it("adds each line's Catalog model name beside the document (owner 2026-09-30), never overwriting a field", async () => {
+    const rpc = vi.fn(() => Promise.resolve({ data: makeDocument(), error: null }));
+    const fromImpl = vi.fn((table: string) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const chain: any = {
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        in: vi.fn(() => Promise.resolve({
+          data: table === "product_skus" ? [{ sku: "CODY-Q", product_models: { name: "Cody" } }] : [],
+          error: null,
+        })),
+        maybeSingle: vi.fn(() => Promise.resolve({ data: { so: 4001, so_refs: [4001] }, error: null })),
+      };
+      return chain;
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc, from: fromImpl } as any);
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/pos/${PO_ID}/print-data`, {
+        headers: { Authorization: `Bearer ${await makeJwt("operation")}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await res.json()) as any;
+    expect(body.lines[0]).toMatchObject({ sku: "CODY-Q", description: "Queen", model_name: "Cody" });
+    /* A SKU Catalog cannot name gets no field; the paper falls back to the SKU. */
+    expect(body.lines[1].model_name).toBeUndefined();
+    expect(body.lines[1].description).toBe("King");
+  });
+
   it("?version=N answers with the KEPT document of that version, through its own authority", async () => {
     /* 0430 — a confirmed send freezes the document per version; reprinting an
        already-sent version reads THAT record, never a live reconstruction. */
@@ -231,8 +263,10 @@ describe("GET /api/operation/pos/:id/print-data", () => {
     );
     /* A second read of so_refs / issuer / destination was a second truth about
        the same paper (0383). The only reads left are the three inputs of the
-       two paper facts (owner 2026-09-22): nothing else, no other column. */
+       two paper facts (owner 2026-09-22) and the Catalog model name the
+       DESCRIPTION prints (owner 2026-09-30): nothing else, no other column. */
     expect(reads.sort((a, b) => a.table.localeCompare(b.table))).toEqual([
+      { table: "product_skus", columns: "sku, product_models(name)" },
       { table: "purchase_orders", columns: "supplier_id" },
       { table: "purchasing_supplier_settings", columns: "off_days" },
       { table: "suppliers", columns: "kind" },

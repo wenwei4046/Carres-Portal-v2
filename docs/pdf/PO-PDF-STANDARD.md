@@ -72,18 +72,23 @@ not theirs. 100% legible on a cheap B/W laser, a fax, a WhatsApp photo.
 - **PO DETAILS — rows, in order (Jess, 2026-09-22; dictionary words only):**
   `PO No` (`PO…({n})`) · `PO Doc Date` · **`PO {n}-Day Delivery Date`** (bold
   value — the supplier's 3-second fact) · `Delivery Method` (`Supplier
-  delivers` / `We collect`). `{n}` is exactly the applicable working-day value recorded from Settings
+  delivers` / `Carres collects` — owner ruling 2026-09-30: every line names WHO; `We collect`
+  is retired). `{n}` is exactly the applicable working-day value recorded from Settings
   for this PO, with NO added transit days (Jess, 2026-09-22 correction;
   APPROVED / NOT BUILT). Calculate from PO Date using n working days, skipping
   applicable weekends and public holidays. Example format only:
   `PO 14-Day Delivery Date : Fri, 9 Oct 2026`; Settings at 10 days reads
   `PO 10-Day Delivery Date`. An unknown original prints `PO Delivery Date :
-  Not recorded`. **Measured (Noto 8pt):** one line is 31.7mm of label + 22.0mm
-  of bold value = 53.7mm > the 52mm column, so the label prints on TWO
-  deliberate lines — `PO 14-Day` / `Delivery Date` — colon and value on its
-  last line (the SO's two-line-label rule). Label gutter **23mm** (widest
-  one-line label `Delivery Method` 21.4mm; widest value `:  Supplier
-  delivers` 24.2mm; 23 + 24.2 = 47.2mm ≤ 52). Retired on paper:
+  Not recorded`. **ONE LINE, NEVER SPLIT — owner review of PO-20260908-2503 V1 (2026-09-30).**
+  The label prints on one line; the retired two-line `PO 14-Day` / `Delivery Date` left an empty
+  first row. Measured (Noto 8pt): the widest label `PO 14-Day Delivery Date` is 31.7mm and the
+  widest value `PO-20260908-2503 V1` 28.4mm, so the label gutter is **32mm** and the PO DETAILS
+  column **63mm**. `PO No` never wraps: number and version are joined by a no-break space.
+  The SUPPLIER and DELIVER TO columns share the other 123mm (3mm gap, 12mm label): an address
+  prints its **stored lines as entered**, soft-wraps only a line that genuinely does not fit, at a
+  space, and never leaves a last word of three characters or fewer alone (`KU 8,` moves
+  together). DESCRIPTION prints the Catalog product name and the variant (`all aasnda · King`);
+  the SKU only when Catalog has no name. A kept version reprints exactly as sent. Retired on paper:
   `Deliver by` · `Issued` · `Version` row · **`PO Date`** · `Supplier Default
   Delivery Date` · `Delivery method`. *(This list read `PO Doc Date` until
   2026-09-23 and contradicted the row order three lines above it, which has
@@ -294,3 +299,4 @@ PO. The paper therefore carries `PO No` **and** `Version` (§2).
 | 2026-09-23 | `PO Date` → **`PO Doc Date`** — owner ruling: every document's own date reads `{DOC} Doc Date` (COPY-STANDARD). **BUILT** on the live template the same day. | Jess |
 | 2026-09-23 | **BUILT** — the hero, the `PO No` row and the footer print `poDocumentNumberOf(po_number, version)`: a new-form number wears `(n)` with no space (`PO260924-4827(2)`), and every pre-cutover number keeps the ` V{n}` its supplier already holds, INCLUDING a kept version reprinted from `po_version_documents` (its payload carries the old number, so the frozen paper comes back exactly as sent — no stored flag). New form measured at 57.5mm, 10.4mm narrower than the old one; no layout change was needed. Numbers themselves come from migration 0574. | Jess |
 | 2026-09-23 | Historical header measurement on the OLD number format: `PO-20260922-8987 V2` is 67.9mm, not the 52.9mm §2 quoted for a number the allocator cannot mint. The left column is 97.1mm and its widest content — the company name row at 87.6mm, not the address — leaves 9.5mm. No layout change; these figures apply only to that historical string. The new `PO260922-8987(2)` form remains unmeasured. | historical measurement |
+| 2026-09-30 | **Owner review of PO-20260908-2503 V1 — BUILT.** `We collect` → **`Carres collects`** (every line names WHO) on the paper, SO Batch review and Catalog supplier setup; `PO {n}-Day Delivery Date` on ONE line (gutter 32mm, column 63mm); `PO No` never wraps; addresses print their stored lines and never orphan a short last word; DESCRIPTION prints the Catalog product name (`GET /print-data` adds `model_name` beside the document), the SKU only when Catalog has none. | Jess |

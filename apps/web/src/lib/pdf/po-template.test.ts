@@ -3,7 +3,7 @@ import { isValidElement, type ReactElement, type ReactNode } from "react";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
-import { PoTemplate, poPrintDate, unitRuns } from "./po-template";
+import { PoTemplate, addressAsEntered, descriptionOf, poPrintDate, unitRuns } from "./po-template";
 import type { PoTemplateData } from "./types";
 
 // PO-PDF-STANDARD guard (2026-08-02). A render test only sees the branches its
@@ -112,7 +112,9 @@ describe("po-template obeys docs/pdf/PO-PDF-STANDARD.md", () => {
     expect(CODE).not.toMatch(/\["Version",/);
     expect(CODE).not.toMatch(/versionLabel/);
     const text = renderedText(PoTemplate(twoLocationV2()));
-    expect(text.split("PO-2609-0042 V2").length - 1).toBeGreaterThanOrEqual(3);
+    /* The PO No row joins number and version with a no-break space (owner
+       2026-09-30); the header and footer keep the plain one. */
+    expect(text.split(/PO-2609-0042[ \u00A0]V2/).length - 1).toBeGreaterThanOrEqual(3);
   });
 
   /**
@@ -189,7 +191,9 @@ describe("po-template obeys docs/pdf/PO-PDF-STANDARD.md", () => {
 describe("PO {n}-Day Delivery Date and Delivery Method (owner 2026-09-22)", () => {
   it("names the working days the payload counted, and prints the date as Fri, 9 Oct 2026", () => {
     const text = renderedText(PoTemplate(twoLocationV2()));
-    expect(text).toContain("PO 14-Day\nDelivery Date");
+    /* ONE line (owner 2026-09-30): no `PO 14-Day` row with an empty value. */
+    expect(text).toContain("PO 14-Day Delivery Date");
+    expect(text).not.toContain("PO 14-Day\nDelivery Date");
     expect(text).toContain("Fri, 9 Oct 2026");
     expect(text).toContain("Mon, 21 Sep 2026");
     expect(text).toContain("Supplier delivers");
@@ -203,10 +207,36 @@ describe("PO {n}-Day Delivery Date and Delivery Method (owner 2026-09-22)", () =
     expect(text).not.toContain("Delivery Method");
   });
 
-  it("an unknown date reads Not recorded; a collection supplier reads We collect", () => {
+  it("an unknown date reads Not recorded; a collection supplier reads Carres collects (owner 2026-09-30), never We collect", () => {
     const text = renderedText(PoTemplate({ ...twoLocationV2(), eta_date: null, delivery_working_days: null, delivery_method: "we_collect" }));
     expect(text).toContain("Not recorded");
-    expect(text).toContain("We collect");
+    expect(text).toContain("Carres collects");
+    expect(text).not.toContain("We collect");
+  });
+});
+
+describe("the PO-20260908-2503 V1 review (owner 2026-09-30)", () => {
+  it("the PO No and its version never part", () => {
+    const text = renderedText(PoTemplate({ ...twoLocationV2(), po_number: "PO-20260908-2503", po_id: "PO-20260908-2503", version: 1 }));
+    expect(text).toContain("PO-20260908-2503\u00A0V1");
+  });
+
+  it("an address prints its stored lines, and a short last word never stands alone", () => {
+    expect(addressAsEntered("5, WELLOYD INDUSTRIAL PARK,\nLORONG HAJI ABDUL MANAN/KU 8,\n41050 KLANG, SELANGOR")).toBe(
+      "5, WELLOYD INDUSTRIAL PARK,\nLORONG HAJI ABDUL MANAN/KU\u00A08,\n41050 KLANG, SELANGOR",
+    );
+  });
+
+  it("DESCRIPTION speaks the product: model name and variant, the SKU only when Catalog has no name", () => {
+    expect(descriptionOf({ sku: "ALL-AASNDA-K", description: "King", model_name: "all aasnda" }, true)).toBe("all aasnda · King");
+    expect(descriptionOf({ sku: "ALL-AASNDA-K", description: "King", model_name: null }, true)).toBe("ALL-AASNDA-K · King");
+    expect(descriptionOf({ sku: "PIL-STD", description: "PIL-STD" }, false)).toBe("PIL-STD");
+  });
+
+  it("the section-2 geometry is the measured one", () => {
+    expect(SRC).toContain("detailsCol: { width: mm(63) }");
+    expect(SRC).toContain("detailLabel: { fontSize: 8, color: GREY, width: mm(32)");
+    expect(SRC).not.toContain("pairRowEnd");
   });
 });
 
