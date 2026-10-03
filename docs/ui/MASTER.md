@@ -3520,3 +3520,11 @@ verified are separate claims; include scope and evidence for each.
 
 **Scope boundary:** the accepted shell/register/object/quick-view recipe is confirmed. Order Route compact-card redesign and Monthly Demand planning composition are governed separately by Orders MASTER; their current local work is not a universal kit pattern or part of this listing release. No complete2990 comparison is claimed.
 The master contract being documented does not mean every module has migrated or been verified.
+
+## §4.3 · Confirmed compact module card — 2026-10-03
+
+**OWNER CONFIRMED TEMPLATE.** The current single source is [DELIVERY-CARD-TEMPLATE.md](../ui-reference/DELIVERY-CARD-TEMPLATE.md), [complete HTML](../ui-reference/delivery-card-approved.html), [exact CSS](../ui-reference/delivery-card-approved.css) and [measured dimensions](../ui-reference/delivery-card-measurements.json). All module chats must copy these together before proposing derivative cards. This replaces earlier clean-communication29 and toolbar proposals.
+
+Communication uses a header channel dropdown, editable recipient choice/manual entry, email-only Subject, Message ellipsis for Find/Save/Manage templates, a compact naming dialog and one attachment entry. Timeline follows Communication with avatar-only actor identity, readable event summary/date-time, a second line for result/reference, explicit missing time and actual source timestamps. Links open drafts, not confirmed sends. Sample stock is not verified stock. Template persistence is browser-local, not team-shared. The complete contract defines all measured states and limits.
+
+Published static reference: `/ui-kit/delivery-card.html`. This approval and reference publication do not certify migration of production module cards. Preserve existing business gates and use each module's own facts. Shared-kit owner owns adoption gaps; module chats own their implementation.
