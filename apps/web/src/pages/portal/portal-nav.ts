@@ -41,6 +41,7 @@ import {
   CreditCard,
   Landmark,
   BookOpenText,
+  Hourglass,
   type LucideIcon,
 } from "lucide-react";
 import type { Role } from "@carres/shared/domain";
@@ -673,6 +674,9 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       // 0572 — the card companies' files, matched to the recorded card payments.
       // Above Money moves, as in Chew's menu draft (2026-10-03).
       { key: "card-settlement", label: "Card settlement", icon: CreditCard, financePath: "/finance/card-settlement", section: "Bank & Cards" },
+      // 0641 — each card and online payment not in the bank yet, and where it
+      // is; after Card settlement, where most of them are moved on.
+      { key: "card-money-waiting", label: "Card money waiting", icon: Hourglass, financePath: "/finance/card-money-waiting", section: "Bank & Cards" },
       // 0529 — Finance moving its own money: bank transfers and card payouts.
       { key: "money-moves", label: "Money moves", icon: ArrowLeftRight, financePath: "/finance/money-moves", section: "Bank & Cards" },
       // 0543 — Finance keeps the dealer master (code, state, address, contact)

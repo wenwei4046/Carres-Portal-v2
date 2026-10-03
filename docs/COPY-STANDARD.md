@@ -5041,3 +5041,16 @@ These words are on screen in the branch and are not approved yet.
 | Opened row | Toggle hover `Show bills`. Columns `Bill No` · `Supplier invoice` · `Bill date` · `Due date` · `Bill total` · `Still owed` · `Age`. Empty: `No bill is open. The balance is money not tied to a bill.` |
 | Footer | `{n} suppliers · In the books ({account codes}) on {date}: {money} · Difference {money}`; while it is not zero, above the table: `⚠ The suppliers differ from the books by {money}.` and `Open Self-check` |
 | States | `AP aging could not be loaded. Try again.` · `Try again` · `The ledger has no start date yet. Nothing can be totalled.` · `Nothing was owed to a supplier on {date}.` |
+
+### PROPOSAL — PENDING CHEW · Card money waiting (0641)
+
+These words are on screen in the branch and are not approved yet. This is the menu draft's "Unmatched" for cards: it also lists payments that are matched but not yet paid out, so it is named after what it shows.
+
+| Where | Words |
+|---|---|
+| Menu | `Card money waiting`, under `Bank & Cards` after `Card settlement` |
+| Page | Title `Card money waiting`. `Search payments…` |
+| Columns | `Paid on` · `Document` · `Source` (hidden until asked for; the Journal's source words) · `SO No` (`SO-{n}`, the Payment Records word) · `Customer` · `Card account` · `Amount` · `Days` · `Waiting` (hidden until asked for: `0 to 7 days` · `8 to 14 days` · `15 to 30 days` · `Over 30 days`) · `Where it is` |
+| Where it is | `No card company file shows it yet` · `Matched · card payout not prepared` · `Card payout {MM No} waiting for approval` (each opens Card settlement) |
+| Footer | `{n} payments · {money} waiting · The card and online accounts hold {money} in the books`; while they differ, above the table: `⚠ The card and online accounts hold {money} more than these payments.` (or `less`) and `Open Money moves` |
+| States | `Card money waiting could not be loaded. Try again.` · `Try again` · `No card or online money is waiting. Every payment has reached the bank.` |

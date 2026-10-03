@@ -11,6 +11,7 @@
 > | Cash Flow (§3.6) | 0638 |
 > | General Ledger (§3.6, §4) | 0639 |
 > | AP Aging (§3.6) | 0640 |
+> | Card money waiting (§3.4) | 0641 |
 >
 > Their on-screen words are in COPY-STANDARD "Finance (Chew)"; those marked PROPOSAL wait for Chew.
 >
@@ -146,6 +147,14 @@ Carres already has a simpler Card settlement. It takes Public Bank, GHL and Mayb
 - Until Finance enters opening balances (§3.5), `Brought forward` counts from go-live, and the page says so.
 - Not built: Houzs's picture export for WhatsApp, and placing each card holding account under the bank it pays out to.
 - Falsifier: in Chew's test, an account's `Balance` on a day differs from the Journal's running balance for that account on that day, or Chew needs a figure the board does not answer.
+
+**Card money waiting approach — PROPOSAL / NOT LAW, built for Chew's test (0641).**
+- Bank & Cards → Card money waiting, after Card settlement. Each card and online payment whose money has not reached the bank: the day it was posted, its document and order, its card account, how many days it has waited, and where it is: no card company file shows it yet · matched but the card payout is not prepared · the card payout waits for approval.
+- It covers two of the three lists in "Card reconciliation approach" above: card payments no report has shown yet, and money still with the card companies. A payment leaves the list when its day's card payout is approved.
+- The footer ties the list to the card and online holding accounts in the books; a card payout made by hand on Money moves shows as a difference.
+- A test walks payments, a GHL file, a match, a prepared payout and its approval, reading the list after each step.
+- Not built: report rows with no payment behind them (Card settlement already shows them per day), and transfers waiting for the bank statement (that needs Bank reconciliation and its samples).
+- Falsifier: in Chew's test, a payment Chew knows reached the bank is still listed, or the footer's difference is not explained by a manual card payout.
 
 ### 3.5 Ledger, month-end and tax
 
