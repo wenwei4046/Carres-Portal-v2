@@ -139,6 +139,7 @@ describe("finance ledger — who may read", () => {
     "/general-ledger?from=2026-09-01&to=2026-09-30",
     "/stock-value?monthEnd=2026-09-30",
     "/collection?from=2026-09-01&to=2026-09-30",
+    "/forecast?month=2026-10",
   ];
 
   it.each(["dealer", "operation", "supplier"])("refuses %s on every route before any database call", async (role) => {
@@ -1521,5 +1522,74 @@ describe("GET /collection (0644)", () => {
     const res = await get("/collection?from=2026-09-01&to=2026-09-30");
     expect(res.status).toBe(500);
     expect((await json(res)).message).toBe("The Collection report could not be loaded. Try again.");
+  });
+});
+
+describe("GET and PUT /forecast (0646)", () => {
+  const ACCOUNTS = [
+    { code: "4100", name: "Furniture sales", kind: "INCOME", active: true, block: "income" },
+    { code: "5100", name: "Cost of goods sold", kind: "EXPENSE", active: true, block: "cost" },
+    { code: "6200", name: "Rent and utilities", kind: "EXPENSE", active: true, block: "expense" },
+  ];
+  const PLAN = {
+    month: "2026-10", accounts: ACCOUNTS,
+    lines: { "4100": { amount: 100000 }, "5100": { share: 5500 } },
+    updated_at: "2026-10-03T08:15:00.123456+00:00", updated_by_name: "Chew",
+    previous: { month: "2026-09", lines: { "6200": { amount: 8000 } } },
+    planned_months: ["2026-09", "2026-10"],
+  };
+  const put = async (month: string, body: unknown, role = "finance") =>
+    app.fetch(new Request(`http://t/api/finance/ledger/forecast/${month}`, {
+      method: "PUT",
+      headers: { Authorization: `Bearer ${await makeJwt(role)}`, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }), env);
+
+  it("asks for the month and passes the plan through whole", async () => {
+    const { sb } = fakeClient(() => ok(PLAN));
+    const res = await get("/forecast?month=2026-10");
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("fin_forecast_read", { p_month: "2026-10" });
+    expect(await json(res)).toEqual(PLAN);
+  });
+
+  it("refuses a month that is not one before any database call, and a plan it cannot read", async () => {
+    expect((await get("/forecast?month=2026-13")).status).toBe(422);
+    expect(userClient).not.toHaveBeenCalled();
+    fakeClient(() => ok({ ...PLAN, lines: { "4100": { share: 100 } } }));
+    const res = await get("/forecast?month=2026-10");
+    expect(res.status).toBe(500);
+    expect((await json(res)).message).toBe("The forecast could not be loaded. Try again.");
+    fakeClient(() => ok({ ...PLAN, month: "2026-09" }));
+    expect((await get("/forecast?month=2026-10")).status).toBe(500);
+  });
+
+  it("saves the whole month with the time the page read, and answers the new time", async () => {
+    const { sb } = fakeClient(() => ok("2026-10-03T09:00:00.5+00:00"));
+    const res = await put("2026-10", { lines: { "4100": { amount: 0.1 + 0.2 }, "5100": { share: 5500 } }, was: PLAN.updated_at });
+    expect(res.status).toBe(200);
+    expect(await json(res)).toEqual({ month: "2026-10", saved_at: "2026-10-03T09:00:00.5+00:00" });
+    expect(sb.rpc).toHaveBeenCalledWith("fin_forecast_save", {
+      p_month: "2026-10", p_lines: { "4100": { amount: 0.3 }, "5100": { share: 5500 } }, p_was: PLAN.updated_at,
+    });
+  });
+
+  it("refuses a broken cell before the database, and passes the database's own refusals through", async () => {
+    const { sb } = fakeClient(() => ok(null));
+    expect((await put("2026-10", { lines: { "6200": { amount: 1.234 } }, was: null })).status).toBe(422);
+    expect((await put("2026-1", { lines: {}, was: null })).status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
+    expect((await put("2026-10", { lines: {}, was: null }, "operation")).status).toBe(403);
+
+    fakeClient(() => ({ data: null, error: { code: "40001", details: "forecast_changed", message: "Someone else saved this month after you opened it. Open it again to see their plan." } }));
+    const stale = await put("2026-10", { lines: {}, was: null });
+    expect(stale.status).toBe(409);
+    expect(await json(stale)).toMatchObject({ code: "forecast_changed" });
+    fakeClient(() => ({ data: null, error: { code: "P0001", details: "income_needs_amount", message: "4100 Furniture sales: an income account is planned as an amount." } }));
+    const income = await put("2026-10", { lines: { "4100": { share: 1 } }, was: null });
+    expect(income.status).toBe(422);
+    expect(await json(income)).toMatchObject({ code: "income_needs_amount", message: "4100 Furniture sales: an income account is planned as an amount." });
+    fakeClient(() => fail("XX000"));
+    expect((await json(await put("2026-10", { lines: {}, was: null }))).message).toBe("The forecast could not be saved. Try again.");
   });
 });

@@ -238,4 +238,18 @@ describe.skipIf(!URL)("supplier credit notes (real PostgreSQL, 0642)", () => {
     };
     expect(a.suppliers.reduce((t, s) => t + sen(s.balance), 0)).toBe(a.controls.reduce((t, c) => t + sen(c.balance), 0));
   });
+
+  it("an account a credit note uses can be renumbered, and the note follows it (0647)", async () => {
+    await actAs(U.finance);
+    const name = (await q("select name from gl_accounts where code = $1", [expense])).rows[0].name as string;
+    const fresh = (await q(
+      "select min(c)::text as c from generate_series(6950, 6999) c where not exists (select 1 from gl_accounts where code = c::text)",
+    )).rows[0].c as string;
+    // Before 0647 this was refused by the credit note line's key.
+    const moved = await attempt("select public.gl_account_update($1, $2, $3) as code", [expense, name, fresh]);
+    expect(moved).toEqual({ ok: true, value: fresh });
+    const kept = (await q("select account_code from supplier_credit_note_lines where note_id = $1 order by line_no", [noteId])).rows;
+    expect(kept.map((r) => r.account_code)).toEqual([fresh, income]);
+    expect(await attempt("select public.gl_account_update($1, $2, $3) as code", [fresh, name, expense])).toEqual({ ok: true, value: expense });
+  });
 });

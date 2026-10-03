@@ -17,6 +17,8 @@
 > | Stock value, provisional (§3.5) | 0643 |
 > | Collection report (§3.6) | 0644 |
 > | Payment requests, with the one shared-menu entry (§3.3) | 0645 |
+> | Forecast (§3.6), built last | 0646 |
+> | Fix: a credit note follows a renumbered account (§3.2) | 0647 |
 >
 > Their on-screen words are in COPY-STANDARD "Finance (Chew)"; those marked PROPOSAL wait for Chew.
 >
@@ -115,6 +117,7 @@ Dealer commission rules:
 - AP · Payables gains `Credit Left`, and its last money column subtracts it (`Unpaid After Advance and Credit`), so it still equals the books. AP Aging and the Self-check read the same arithmetic. A test walks a bill, a credit note, a knock-off, a voucher refused over what is left, a take-off and a cancel through the real doors.
 - A supplier debit note (the supplier charges more) is entered as a bill and paid by a voucher, the doors that exist, so one act keeps one form (ERP-ARCHITECTURE law C). Whether it needs its own mark goes to Chew.
 - Not built: reading the supplier's paper (the bill scan will, once its AI key is given); the supplier paying a credit back in money (goes to Chew); a PDF.
+- 0647 fixes a fault 0642 shipped with: a credit note's two account columns did not follow a renumbered account (0570 says every key that names the chart must), so renumbering an account a credit note used was refused. Both now follow, and the file refuses to apply while any key onto the chart still does not. A test renumbers an account under a confirmed credit note.
 - Falsifier: in Chew's test, a supplier's `Unpaid After Advance and Credit` differs from its balance in the books, or a bill shows a credit note Chew did not knock off.
 
 **Bill scanning approach — PROPOSAL / NOT LAW, built for Chew's test (no migration).**
@@ -273,6 +276,16 @@ All reports only read. Reports → Payment stays Payment's.
 - It reads Orders' and Payment's records and changes none. It is per salesperson, so it does not repeat Payment's own reports, which are per order and per customer.
 - Not built: refunds netted against what was collected; an as-of date (the money is as it stands today); a PDF.
 - Falsifier: in Chew's test, a salesperson's deposit or balance differs from what Payment's records show for the same orders, or Chew counts deposits differently (for example, every payment before the invoice).
+
+**Forecast approach — PROPOSAL / NOT LAW, built for Chew's test (0646).**
+- Reports → Forecast, after Houzs Part 10 §18. One month at a time (this month unless chosen): a plan for each income and expense account of the chart, beside what the Profit and Loss shows for that month, and `Difference` (actual less plan).
+- An income account is planned as an amount. A cost or expense account is planned as an amount or as a % of the month's planned income; typing one clears the other, and the other box shows what it works out to in grey. The blocks are `Income`, `Cost of sales` (the top heading that holds the cost of goods sold account, by role) and `Expense`; `Gross profit` comes after cost of sales and `Net result` at the foot, the P&L's own word.
+- The whole month saves at once. Every box is checked first; a wrong one is named above the table, and the database names the first wrong cell again and keeps nothing. When someone else saved the month after it was opened, the save is refused and `Discard` shows their plan. The month cannot be changed while a plan is not saved.
+- `Copy plan from {month}` fills the boxes left blank from the latest earlier planned month: amounts and shares both, never over a typed box. Houzs copies shares only; Carres copies amounts too because a fixed cost such as rent is planned as an amount.
+- A plan is kept per account in its own rows, so a renumbered account keeps its plan (0570). Nothing posts from a plan. A month not started has no actual; before the ledger's start date neither does a month.
+- Measured 2026-10-03: production has 13 accounts that can be planned (5 income, 2 cost of sales, 6 expense), so a month is one screen.
+- Not built: Houzs's months across one sheet, the plan for a product group (its purchase-basis rule needs item groups Carres does not have), a plan on the Dashboard beside the actual, a frozen account column when the table scrolls sideways on a phone (the kit's table has none), export.
+- Falsifier: in Chew's test, Chew needs to plan several months side by side, or reads `Difference` the other way round (plan less actual), or a gross profit or net result here differs from the P&L for the same month.
 
 **Performance P&L — NOT BUILT; a question for Chew.** Houzs reads each order line's cost from its sales order. Carres has no governed cost per sold line. `product_skus.cost` was filled at 55% of the price as a placeholder, a PO line's cost is linked to only some sales lines, and the ledger posts no cost of sales (0466). Before a Performance P&L can show gross profit, Chew decides what a sold line's cost is.
 

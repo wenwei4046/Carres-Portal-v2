@@ -322,6 +322,16 @@ export default function FinanceReports() {
           </span>
           <span className="text-label text-muted-foreground">Open →</span>
         </Link>
+        {/* 0646 (Chew 2026-10-03): the same door. Built last, as Chew asked. */}
+        <Link to="/finance/reports/forecast" data-testid="reports-forecast-door"
+          className="flex items-center justify-between rounded-card border border-border bg-card px-4 py-3 hover:bg-muted/40">
+          <span>
+            <span className="block text-meta font-semibold">Forecast</span>
+            <span className="block text-label text-muted-foreground">
+              Plan · % of income · Actual · Difference · by account, one month at a time</span>
+          </span>
+          <span className="text-label text-muted-foreground">Open →</span>
+        </Link>
 
         {notStarted ? <div role="alert" className="text-body">
           <p>The ledger has no start date yet. Nothing can be totalled.</p>

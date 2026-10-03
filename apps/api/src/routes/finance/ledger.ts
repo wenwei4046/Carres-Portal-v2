@@ -47,6 +47,7 @@ import { cashFlowQuery, cashFlowReport, type CashFlowAnswer } from "@carres/shar
 import { generalLedgerBlocks, generalLedgerQuery, type GeneralLedgerAnswer } from "@carres/shared/general-ledger";
 import { stockValueQuery, stockValueReport, type StockValueAnswer } from "@carres/shared/stock-value";
 import { collectionQuery, collectionReport, type CollectionAnswer } from "@carres/shared/collection";
+import { forecastQuery, forecastReport, forecastSaveInput, type ForecastAnswer, type ForecastSaved } from "@carres/shared/forecast";
 import { requireFinance } from "../../lib/auth-guards";
 import { mapPgError, parseJsonBody, readAllPages } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
@@ -1116,6 +1117,60 @@ financeLedgerRouter.get("/collection", requireFinance, async (c) => {
     return failed(c, "The Collection report");
   }
   return c.json(answer);
+});
+
+// ── Forecast (0646, Chew 2026-10-03) ────────────────────────────────────────
+
+/** A month's plan and the accounts it can hold. Read once through the shared
+ *  arithmetic, which refuses a cell it cannot read; passed through as it came.
+ *  The page sets it beside the month's Profit and Loss, read on its own. */
+financeLedgerRouter.get("/forecast", requireFinance, async (c) => {
+  const parsed = forecastQuery.safeParse(queryOf(c));
+  if (!parsed.success) return invalid(c, parsed.error);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("fin_forecast_read", { p_month: parsed.data.month });
+  if (error) return ledgerError(c, error, "The forecast");
+  const answer = data as ForecastAnswer | null;
+  if (!answer || answer.month !== parsed.data.month || !Array.isArray(answer.accounts) || !Array.isArray(answer.planned_months)
+      || answer.lines === null || typeof answer.lines !== "object") {
+    return failed(c, "The forecast");
+  }
+  try {
+    forecastReport(answer.accounts, answer.lines, null);
+    if (answer.previous) forecastReport(answer.accounts, answer.previous.lines, null);
+  } catch {
+    return failed(c, "The forecast");
+  }
+  return c.json(answer);
+});
+
+/**
+ * The whole month at once. The database checks every cell and names the
+ * first wrong one; its sentence and tag pass through (mapPgError):
+ *   not_finance 42501 → 403 · month_invalid, lines_invalid 22023 → 422 ·
+ *   account_not_plannable, cell_invalid, income_needs_amount P0001 → 422 ·
+ *   forecast_changed 40001 → 409 (someone else saved the month since).
+ */
+financeLedgerRouter.put("/forecast/:month", requireFinance, async (c) => {
+  const month = forecastQuery.safeParse({ month: c.req.param("month") });
+  if (!month.success) return invalid(c, month.error);
+  const body = await parseJsonBody(c, forecastSaveInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("fin_forecast_save", {
+    p_month: month.data.month,
+    p_lines: body.data.lines,
+    p_was: body.data.was,
+  });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.status === 500 ? { ...m.body, message: "The forecast could not be saved. Try again." } : m.body, m.status);
+  }
+  if (typeof data !== "string") {
+    return c.json({ error: "rpc_failed", code: "rpc_failed", message: "The forecast could not be saved. Try again." }, 500);
+  }
+  const out: ForecastSaved = { month: month.data.month, saved_at: data };
+  return c.json(out);
 });
 
 export default financeLedgerRouter;

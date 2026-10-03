@@ -10,7 +10,8 @@
  * `?page=` ar · bills · payment-vouchers · ap-outstanding · suppliers ·
  * other-debtors · other-debtor-parties · other-receipts · daily-bank ·
  * journal · general-ledger · trial-balance · reports · cash-flow · ap-aging ·
- * credit-notes · credit-note · credit-note-new.
+ * credit-notes · credit-note · credit-note-new · forecast (last month, so the
+ * actual is a whole month).
  * Every listing carries at least one 60+ character party name so wrapping and
  * truncation are visible. Fixture evidence is not production evidence.
  */
@@ -554,6 +555,56 @@ const AP_AGING = (asAt: string) => ({
   ],
 });
 
+// ── Forecast (0646): a plan on the live chart's accounts, and that month's
+// Profit and Loss in the statement's own rows. Figures are invented.
+const FORECAST_ACCOUNTS = ([
+  ["4100", "Furniture sales", "income"], ["4200", "Rental income", "income"], ["4300", "Delivery income", "income"],
+  ["4400", "Storage fee income", "income"], ["4900", "Other income", "income"],
+  ["5100", "Cost of goods sold", "cost"], ["5200", "Inbound freight and duty", "cost"],
+  ["6100", "Staff cost and commission", "expense"], ["6200", "Rent and utilities", "expense"],
+  ["6300", "Outbound delivery and transport", "expense"], ["6400", "Service and warranty cost", "expense"],
+  ["6500", "Bank and payment charges", "expense"], ["6900", "Office, marketing and general", "expense"],
+] as const).map(([code, name, block]) => ({ code, name, kind: block === "income" ? "INCOME" : "EXPENSE", active: true, block }));
+const FORECAST_PLAN = {
+  "4100": { amount: 180000 }, "4200": { amount: 12000 }, "4300": { amount: 6000 }, "4400": { amount: 1500 },
+  "5100": { share: 5500 }, "5200": { share: 400 },
+  "6100": { amount: 28000 }, "6200": { amount: 15000 }, "6300": { share: 300 }, "6400": { share: 100 }, "6500": { share: 150 }, "6900": { amount: 6000 },
+};
+const monthBefore = (ym: string) => {
+  const [y, m] = ym.split("-").map(Number) as [number, number];
+  return m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, "0")}`;
+};
+const FORECAST = (month: string) => ({
+  month, accounts: FORECAST_ACCOUNTS, lines: FORECAST_PLAN, updated_at: at(-2), updated_by_name: "Chew",
+  previous: { month: monthBefore(month), lines: FORECAST_PLAN }, planned_months: [monthBefore(month), month],
+});
+function forecastPl(from: string, to: string) {
+  const common = { report_status: "OK", go_live_on: GO_LIVE, period_from: from, period_to: to };
+  const actual: Record<string, number> = {
+    "4100": 171250, "4200": 11400, "4300": 6350, "4400": 1180, "4900": 420,
+    "5100": 96800, "5200": 7950, "6100": 29400, "6200": 15000, "6300": 6120, "6400": 1250, "6500": 2960, "6900": 4880,
+  };
+  const head = (b: string) => (b === "income" ? ["4000", "Income"] : b === "cost" ? ["5000", "Cost of sales"] : ["6000", "Operating expenses"]);
+  const rows: Record<string, unknown>[] = [];
+  let income = 0;
+  let expense = 0;
+  for (const section of ["INCOME", "EXPENSE"] as const) {
+    for (const block of section === "INCOME" ? ["income"] : ["cost", "expense"]) {
+      const [hc, hn] = head(block);
+      let sub = 0;
+      for (const a of FORECAST_ACCOUNTS.filter((x) => x.block === block)) {
+        rows.push({ row_kind: "ACCOUNT", section, header_code: hc, header_name: hn, account_code: a.code, account_name: a.name, amount: actual[a.code] });
+        sub += actual[a.code]!;
+      }
+      rows.push({ row_kind: "HEADER_SUBTOTAL", section, header_code: hc, header_name: hn, amount: sub });
+      if (section === "INCOME") income += sub; else expense += sub;
+    }
+    rows.push({ row_kind: "SECTION_TOTAL", section, amount: section === "INCOME" ? income : expense });
+  }
+  rows.push({ row_kind: "NET", section: "NET", amount: income - expense });
+  return { rows: rows.map((r, i) => ({ ...common, ordinal: i + 1, ...r })) };
+}
+
 const realFetch = window.fetch.bind(window);
 window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
@@ -600,7 +651,10 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     return json({ go_live_on: GO_LIVE, accounts: ACCOUNTS.map(([code, name, kind]) => ({ code, name, kind, parent_code: null,
       is_control: code === "1200" || code === "2100", control_for: null, is_active: true, is_header: false })) });
   if (url.includes("/api/finance/ledger/trial-balance")) return json({ ...TB, as_of: q.get("asOf") ?? TODAY });
-  if (url.includes("/api/finance/ledger/profit-and-loss")) return json(plRows(q.get("from") ?? "", q.get("to") ?? ""));
+  if (url.includes("/api/finance/ledger/forecast")) return json(FORECAST(q.get("month") ?? TODAY.slice(0, 7)));
+  if (url.includes("/api/finance/ledger/profit-and-loss")) {
+    return json((PAGE.startsWith("forecast") ? forecastPl : plRows)(q.get("from") ?? "", q.get("to") ?? ""));
+  }
   if (url.includes("/api/finance/ledger/balance-sheet")) return json(bsRows(q.get("asOf") ?? ""));
   if (url.includes("/api/finance/payment-settings"))
     return json({ bank_accounts: [], manual_methods: [], storage_rules: [], collection_timing: [], setting_changes: [],
@@ -635,6 +689,7 @@ const ROUTES: Record<string, string> = {
   "payment-request": "/finance/payment-requests/prq-0",
   "payment-request-new": "/finance/payment-requests/new",
   "request-access": "/finance/settings?tab=requests",
+  forecast: `/finance/reports/forecast?month=${monthBefore(TODAY.slice(0, 7))}`,
 };
 window.history.replaceState(null, "", ROUTES[PAGE] ?? ROUTES.ar);
 

@@ -33,6 +33,7 @@ import CashFlow from "./reports/CashFlow";
 import ApAging from "./reports/ApAging";
 import StockValue from "./reports/StockValue";
 import Collection from "./reports/Collection";
+import Forecast from "./reports/Forecast";
 import ApOutstanding from "./payables/ApOutstanding";
 import SupplierFinancePage from "./payables/SupplierFinancePage";
 import SupplierCreditNotes from "./payables/SupplierCreditNotes";
@@ -132,6 +133,8 @@ export default function FinanceApp() {
           <Route path="reports/stock-value" element={financeOnly(<StockValue />)} />
           {/* 0644 — deposit and balance per salesperson (Chew 2026-10-03). */}
           <Route path="reports/collection" element={financeOnly(<Collection />)} />
+          {/* 0646 — the plan for a month beside its actual (Chew 2026-10-03). */}
+          <Route path="reports/forecast" element={financeOnly(<Forecast />)} />
           {/* 0268 — the rent-to-own credit gate (9th tab). */}
           <Route path="rental-approver" element={financeOnly(<FinanceRentalApprover />)} />
           {/* 0538 — one month of subscription billing across every agreement. */}
