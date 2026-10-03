@@ -17,6 +17,7 @@ import PrincipalDealers from "../principal/PrincipalDealers";
 import OtherReceiptsPage from "./other-money-in/OtherReceiptsPage";
 import MoneyMovesPage from "./money-moves/MoneyMovesPage";
 import CardSettlementPage from "./card-settlement/CardSettlementPage";
+import DailyBankPage from "./daily-bank/DailyBankPage";
 // The read-only Finance Ledger — three destinations, three nav rows.
 import LedgerJournal from "./ledger/LedgerJournal";
 import LedgerTrialBalance from "./ledger/LedgerTrialBalance";
@@ -121,6 +122,8 @@ export default function FinanceApp() {
           <Route path="money-moves" element={financeOnly(<MoneyMovesPage />)} />
           {/* 0572 — card settlement files matched to the recorded card payments. */}
           <Route path="card-settlement" element={financeOnly(<CardSettlementPage />)} />
+          {/* 0637 — every money account on one day (Chew 2026-10-03). */}
+          <Route path="daily-bank" element={financeOnly(<DailyBankPage />)} />
           {/* The principal also reaches this page from the Finance rail, and
               keeps Invite dealer, Suspend and Reactivate here (0543: those
               stay principal-only, not off for everyone on this address). */}

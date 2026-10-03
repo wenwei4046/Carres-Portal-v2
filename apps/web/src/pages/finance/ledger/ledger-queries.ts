@@ -1,6 +1,7 @@
 /**
- * The Finance Ledger reads — Journal, one entry, the chart, Trial Balance and
- * Self-check. Read-only: nothing here writes, so nothing here invalidates.
+ * The Finance Ledger reads — Journal, one entry, the chart, Trial Balance,
+ * Self-check and Daily Bank. Read-only: nothing here writes, so nothing here
+ * invalidates.
  *
  * Kept beside the ledger pages instead of in `lib/queries.ts` so the three
  * pages (and their tests) own one small file, and the shared hooks file does
@@ -15,6 +16,7 @@ import type {
   LedgerSelfCheck,
   TrialBalanceReport,
 } from "@carres/shared/finance-ledger";
+import type { DailyBankDay } from "@carres/shared/daily-bank";
 import { apiFetch } from "@/lib/api";
 import { departmentSearch } from "../department";
 
@@ -35,6 +37,7 @@ export const ledgerKeys = {
   chart: () => ["finance", "ledger", "chart"] as const,
   trialBalance: (asOf: string, dept = "") => ["finance", "ledger", "trial-balance", asOf, dept] as const,
   selfCheck: () => ["finance", "ledger", "self-check"] as const,
+  dailyBank: (day: string) => ["finance", "ledger", "daily-bank", day] as const,
 };
 
 /** The server's page size is PostgREST's own row cap. */
@@ -181,6 +184,17 @@ export function trialBalanceQuery(asOf: string, dept = "") {
 
 export function useTrialBalance(asOf: string, dept = "") {
   return useQuery(trialBalanceQuery(asOf, dept));
+}
+
+/** Daily Bank (0637): every money account on one day. The figures arrive
+ *  as the database's parts; the page works out the rest through the shared
+ *  daily-bank arithmetic. */
+export function useDailyBank(day: string) {
+  return useQuery({
+    queryKey: ledgerKeys.dailyBank(day),
+    queryFn: () => apiFetch<DailyBankDay>(`/api/finance/ledger/daily-bank?${new URLSearchParams({ day }).toString()}`),
+    retry: (count: number, error: unknown) => (error as { status?: number }).status !== 422 && count < 2,
+  });
 }
 
 /** How many entries the Dashboard's Activity card lists. */

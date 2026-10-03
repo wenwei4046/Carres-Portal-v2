@@ -42,6 +42,7 @@ import {
   trialBalanceSides,
 } from "@carres/shared/finance-ledger";
 import { CUSTOMERS, SUPPLIERS } from "@carres/shared/tables";
+import { dailyBankQuery, dailyBankRow, sen, type DailyBankDay } from "@carres/shared/daily-bank";
 import { requireFinance } from "../../lib/auth-guards";
 import { mapPgError, parseJsonBody, readAllPages } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
@@ -994,6 +995,32 @@ financeLedgerRouter.get("/balance-sheet", requireFinance, async (c) => {
   if (error) return ledgerError(c, error, "The balance sheet");
   if (!Array.isArray(data) || data.length === 0) return failed(c, "The balance sheet");
   return c.json({ rows: data });
+});
+
+// ── Daily Bank (0637, Chew 2026-10-03) ──────────────────────────────────────
+
+/** One day, every money account, passed through. Closing, available and the
+ *  totals are the shared daily-bank arithmetic's, worked out on the page and
+ *  nowhere here. The figures are read once so a broken answer refuses with a
+ *  plain sentence instead of printing as a whole one. */
+financeLedgerRouter.get("/daily-bank", requireFinance, async (c) => {
+  const parsed = dailyBankQuery.safeParse(queryOf(c));
+  if (!parsed.success) return invalid(c, parsed.error);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("fin_daily_bank", { p_day: parsed.data.day ?? todayIsoMYT() });
+  if (error) return ledgerError(c, error, "Daily Bank");
+  const day = data as DailyBankDay | null;
+  if (!day || typeof day.day !== "string" || !Array.isArray(day.accounts)) return failed(c, "Daily Bank");
+  try {
+    for (const a of day.accounts) {
+      dailyBankRow(a);
+      for (const l of a.lines) { sen(l.received); sen(l.paid); }
+      for (const v of a.pending_vouchers) sen(v.amount);
+    }
+  } catch {
+    return failed(c, "Daily Bank");
+  }
+  return c.json(day);
 });
 
 export default financeLedgerRouter;

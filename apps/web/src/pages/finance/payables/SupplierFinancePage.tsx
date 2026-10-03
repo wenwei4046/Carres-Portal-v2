@@ -23,23 +23,26 @@ export default function SupplierFinancePage() {
   const query = useSupplierFinance();
   const [editing, setEditing] = useState<SupplierFinanceRow | null>(null);
   const rows = query.data ?? [];
+  // Where the money goes first, so it is whole on a 1440px screen with the
+  // menu open; the tax facts after it. A detail nobody keyed is an empty cell
+  // (UI MASTER §6.0: no glyph, no absence word for an optional fact).
   const columns = useMemo<DataGridColumn<SupplierFinanceRow>[]>(() => [
     { key: "supplier", label: "Supplier", width: 240, accessor: (r) => r.name,
       searchValue: (r) =>
         [r.name, r.tax_no, r.registration_no, r.bank_name, r.bank_account_no, r.bank_account_holder].filter(Boolean).join(" ") },
-    { key: "kind", label: "Creditor Type", width: 140, accessor: (r) => creditorKindWord(r.kind),
-      filterValue: (r) => creditorKindWord(r.kind), filterType: "enum" },
-    { key: "tax", label: "Tax No", width: 160, accessor: (r) => r.tax_no ?? "No tax number on file" },
-    { key: "registration", label: "Registration No", width: 180,
-      accessor: (r) => r.registration_no ?? "No registration number on file" },
-    { key: "bank", label: "Bank", width: 160, accessor: (r) => r.bank_name ?? "No bank on file",
-      filterValue: (r) => r.bank_name ?? "No bank on file", filterType: "enum" },
-    { key: "account", label: "Account No", width: 170, accessor: (r) => r.bank_account_no ?? "No account on file" },
-    { key: "holder", label: "Account holder", width: 220,
-      accessor: (r) => r.bank_account_holder ?? "No account holder on file" },
-    { key: "changed", label: "Last changed", width: 230,
-      accessor: (r) => (r.updated_at ? `${fmtDate(r.updated_at, { time: true })} · ${r.updated_by_name ?? "Not recorded"}` : "Never changed"),
+    { key: "bank", label: "Bank", width: 130, accessor: (r) => r.bank_name ?? "",
+      filterValue: (r) => r.bank_name ?? "", filterType: "enum" },
+    { key: "account", label: "Account No", width: 140, accessor: (r) => r.bank_account_no ?? "" },
+    { key: "holder", label: "Account holder", width: 200, accessor: (r) => r.bank_account_holder ?? "" },
+    { key: "changed", label: "Last changed", width: 200,
+      accessor: (r) => (r.updated_at
+        ? [fmtDate(r.updated_at, { time: true }), r.updated_by_name].filter(Boolean).join(" · ")
+        : ""),
       dateValue: (r) => (r.updated_at ? appDateIsoOf(r.updated_at) : null), filterType: "date" },
+    { key: "tax", label: "Tax No", width: 130, accessor: (r) => r.tax_no ?? "" },
+    { key: "registration", label: "Registration No", width: 140, accessor: (r) => r.registration_no ?? "" },
+    { key: "kind", label: "Creditor Type", width: 130, accessor: (r) => creditorKindWord(r.kind),
+      filterValue: (r) => creditorKindWord(r.kind), filterType: "enum" },
   ], []);
 
   return (

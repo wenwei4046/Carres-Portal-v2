@@ -134,6 +134,7 @@ describe("finance ledger — who may read", () => {
     "/account-ledger?account=1210&from=2026-09-01&to=2026-09-30",
     "/profit-and-loss?from=2026-09-01&to=2026-09-30",
     "/balance-sheet",
+    "/daily-bank",
   ];
 
   it.each(["dealer", "operation", "supplier"])("refuses %s on every route before any database call", async (role) => {
@@ -1244,5 +1245,101 @@ describe("GET and PUT /books-closed (0622)", () => {
     const res = await put({ closedThrough: "2026-09-30" });
     expect(res.status).toBe(422);
     expect(await json(res)).toMatchObject({ code: "books_closed_not_ended", message: "Choose a day that has ended. 30 Sep 2026 has not ended yet." });
+  });
+});
+
+// ── Daily Bank (0637, Chew 2026-10-03) ──────────────────────────────────────
+
+describe("GET /daily-bank (0637)", () => {
+  const DAY = {
+    day: "2026-10-02",
+    go_live_on: "2026-09-01",
+    accounts: [
+      {
+        account_code: "1110", name: "Cash in hand", money_kind: "CASH", is_active: true,
+        brought_forward: "500.00", received: "120.00", paid: "0.00", pending: "0.00",
+        pending_vouchers: [],
+        lines: [{ entry_no: "JE-202610-0001", source_type: "PAYMENT_RECEIVED", source_doc_no: "OR-1", description: "Deposit", party_name: "Tan Ah Kow", received: "120.00", paid: "0.00" }],
+      },
+      {
+        account_code: "1122", name: "Maybank", money_kind: "BANK", is_active: true,
+        brought_forward: "10000.00", received: "0.00", paid: "0.00", pending: "800.00",
+        pending_vouchers: [{ voucher_id: "bbbbbbbb-0000-4000-8000-000000000001", voucher_no: "PV-0007", payee_name: "Lumen Sofa Works", voucher_date: "2026-10-01", amount: "800.00" }],
+        lines: [] as AnyJson[],
+      },
+    ],
+  };
+
+  it("asks for the day it is given and passes the answer through whole", async () => {
+    const { sb } = fakeClient(() => ok(DAY));
+    const res = await get("/daily-bank?day=2026-10-02");
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("fin_daily_bank", { p_day: "2026-10-02" });
+    expect(await json(res)).toEqual(DAY);
+  });
+
+  it("admits the principal", async () => {
+    fakeClient(() => ok(DAY));
+    expect((await get("/daily-bank?day=2026-10-02", "principal")).status).toBe(200);
+  });
+
+  it("defaults to today in Malaysia", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-02T17:30:00Z")); // 01:30 on the 3rd in Malaysia
+    try {
+      const { sb } = fakeClient(() => ok(DAY));
+      await get("/daily-bank");
+      expect(sb.rpc).toHaveBeenCalledWith("fin_daily_bank", { p_day: "2026-10-03" });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("refuses a day that is not a date, and a question it does not know, before any database call", async () => {
+    expect((await get("/daily-bank?day=02/10/2026")).status).toBe(422);
+    expect((await get("/daily-bank?day=2026-10-02&account=1122")).status).toBe(422);
+    expect(userClient).not.toHaveBeenCalled();
+  });
+
+  it("a day the calendar does not have is a date problem, not a crash", async () => {
+    fakeClient(() => fail("22008"));
+    const res = await get("/daily-bank?day=2026-02-30");
+    expect(res.status).toBe(422);
+    expect((await json(res)).message).toBe("Daily Bank needs a valid date.");
+  });
+
+  it("the database's own refusal stays a refusal", async () => {
+    fakeClient(() => refuse("42501", "not_internal", "Daily Bank is internal."));
+    expect((await get("/daily-bank?day=2026-10-02")).status).toBe(403);
+  });
+
+  it("a figure it cannot read refuses the whole day instead of printing part of it", async () => {
+    const broken = structuredClone(DAY);
+    broken.accounts[1]!.pending_vouchers[0]!.amount = "eight hundred";
+    fakeClient(() => ok(broken));
+    const res = await get("/daily-bank?day=2026-10-02");
+    expect(res.status).toBe(500);
+    expect((await json(res)).message).toBe("Daily Bank could not be loaded. Try again.");
+  });
+
+  it("a line with an unreadable figure refuses too", async () => {
+    const broken = structuredClone(DAY);
+    broken.accounts[0]!.lines[0]!.received = "";
+    fakeClient(() => ok(broken));
+    expect((await get("/daily-bank?day=2026-10-02")).status).toBe(500);
+  });
+
+  it("fails closed on an empty or shapeless answer", async () => {
+    fakeClient(() => ok(null));
+    expect((await get("/daily-bank?day=2026-10-02")).status).toBe(500);
+    fakeClient(() => ok({ day: "2026-10-02" }));
+    expect((await get("/daily-bank?day=2026-10-02")).status).toBe(500);
+  });
+
+  it("a database failure is a plain sentence, not the database's text", async () => {
+    fakeClient(() => fail("XX000", "relation gl_money_accounts is broken"));
+    const res = await get("/daily-bank?day=2026-10-02");
+    expect(res.status).toBe(500);
+    expect((await json(res)).message).toBe("Daily Bank could not be loaded. Try again.");
   });
 });

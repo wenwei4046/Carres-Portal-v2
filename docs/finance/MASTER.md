@@ -1,6 +1,15 @@
 # FINANCE — MASTER
 
-> **Status 2026-10-03: PLAN. Decisions recorded; nothing built under this MASTER yet.**
+> **Status 2026-10-03: BUILD on the local branch `finance-build`. Nothing is pushed, merged, applied to the production database or live.** Chew tests everything once at the end; nothing goes live before Chew approves it.
+>
+> | Built on the branch (tests pass locally) | Migration |
+> |---|---|
+> | One person may check and approve a voucher (§2) | 0635 |
+> | Finance menu modules (§4) | none |
+> | Suppliers: Finance's own tax and bank details, and `Pay to` on a voucher (§3.2) | 0636 |
+> | Daily Bank (§3.4) | 0637 |
+>
+> Their on-screen words are in COPY-STANDARD "Finance (Chew)"; those marked PROPOSAL wait for Chew.
 >
 > **Whose decisions these are.** Every decision here was made by **Chew** (Finance) in chat on 2026-10-03 and written down at Chew's request. They are **not** Jess's owner rulings.
 >
@@ -125,6 +134,15 @@ Dealer commission rules:
 AhaPay, Stripe and DuitNow are not in Houzs, so they are designed separately for Carres.
 
 Carres already has a simpler Card settlement. It takes Public Bank, GHL and Maybank reports, and approving a day moves that day's money to the bank. This work extends that page rather than adding a second one.
+
+**Daily Bank approach — PROPOSAL / NOT LAW, built for Chew's test (0637).**
+- One row per money account (cash, bank, card and online holding) for the chosen day: `Brought forward` · `Inflow` · `Outflow` · `Balance` · `Waiting for approval` (checked vouchers paying from it) · `Available to pay` (balance less waiting; cash and bank only) · `Waiting for card payout` (holding accounts only, never available to pay). The totals are the table's footer.
+- Opening a row lists the day's entries on the account and the vouchers waiting, totalled.
+- A reversed entry and its contra both show, as the Journal shows them (0469). Houzs leaves the pair out; Carres keeps one reading of the ledger.
+- `Waiting for approval` is read from each voucher's status now, so an earlier day cannot show what was waiting on it at the time; the page says so on an earlier day.
+- Until Finance enters opening balances (§3.5), `Brought forward` counts from go-live, and the page says so.
+- Not built: Houzs's picture export for WhatsApp, and placing each card holding account under the bank it pays out to.
+- Falsifier: in Chew's test, an account's `Balance` on a day differs from the Journal's running balance for that account on that day, or Chew needs a figure the board does not answer.
 
 ### 3.5 Ledger, month-end and tax
 

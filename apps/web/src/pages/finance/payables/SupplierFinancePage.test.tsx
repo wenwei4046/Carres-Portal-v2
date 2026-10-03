@@ -72,15 +72,23 @@ function show() {
 const writes = () => api.calls.filter((c) => c.method !== "GET");
 
 describe("Finance → Suppliers (0636)", () => {
-  it("lists every supplier with Finance's details, in words when one is missing", async () => {
+  it("lists every supplier with Finance's details; a detail nobody keyed is an empty cell", async () => {
     show();
     expect(await screen.findByText("Lumen Sofa Works")).toBeInTheDocument();
     expect(screen.getByText("514012345678")).toBeInTheDocument();
     expect(screen.getByText("Bayview Properties")).toBeInTheDocument();
     expect(screen.getByText("Other creditor")).toBeInTheDocument();
-    expect(screen.getByText("No account on file")).toBeInTheDocument();
-    expect(screen.getByText("Never changed")).toBeInTheDocument();
+    const empty = screen.getByTestId(`supplier-finance-row-${LANDLORD}`);
+    expect(empty).not.toHaveTextContent(/on file|Never changed|Not recorded/);
+    expect(empty).not.toHaveTextContent("—");
     expect(screen.getByTestId("supplier-finance-summary")).toHaveTextContent("2 suppliers · 1 with a bank account");
+  });
+
+  it("puts where the money goes before the tax facts", async () => {
+    show();
+    await screen.findByText("Lumen Sofa Works");
+    const heads = screen.getAllByRole("columnheader").map((h) => h.textContent?.trim()).filter(Boolean);
+    expect(heads.slice(0, 5)).toEqual(["Supplier", "Bank", "Account No", "Account holder", "Last changed"]);
   });
 
   it("saves the details a person typed, as typed (the server tidies them)", async () => {

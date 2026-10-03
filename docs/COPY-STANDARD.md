@@ -4979,10 +4979,24 @@ These words are on screen in the branch and are not approved yet.
 | Where | Words |
 |---|---|
 | Menu | `Suppliers`, under `Payables` |
-| Page | Title `Suppliers`. Columns: `Supplier` · `Creditor Type` · `Tax No` · `Registration No` · `Bank` · `Account No` · `Account holder` · `Last changed`. Search: `Search suppliers…`. Footer: `{n} suppliers · {m} with a bank account`. |
-| Missing values | `No tax number on file` · `No registration number on file` · `No bank on file` · `No account on file` · `No account holder on file` · `Never changed` · `Not recorded` |
+| Page | Title `Suppliers`. Columns, where the money goes first: `Supplier` · `Bank` · `Account No` · `Account holder` · `Last changed` (`{date and time} · {name}`) · `Tax No` · `Registration No` · `Creditor Type`. Search: `Search suppliers…`. Footer: `{n} suppliers · {m} with a bank account`. |
+| Missing values | None on the list: a detail nobody keyed is an empty cell (UI MASTER §6.0). |
 | Row | `Inspect supplier` · `Pay to {bank} · {account no} · {holder}` · `No bank account on file. A payment to this supplier names no account.` · `Edit details` |
 | Form | Title: `Edit details`. Description: `{supplier} · {creditor type}. Finance's own details; the supplier stays Purchasing's.` Fields: `Tax No` · `Registration No` · `Bank` · `Account No` · `Account holder`. Buttons: `Back` · `Save details`. On save: `Details saved.` |
 | Refusals | `An account number is 6 to 20 digits.` · `Choose the bank for this account number.` · `The tax number is too long.` · `The registration number is too long.` · `The bank name is too long.` · `The account holder's name is too long.` · `Only Finance edits a supplier's finance details.` · `That supplier does not exist.` |
 | Empty list | `No supplier yet. Purchasing adds suppliers; an other creditor is added from a bill.` |
 | Payment voucher | The fact `Pay to` shows only until the voucher is approved. On the form: `Pay to {bank} · {account no} · {holder}`. Missing or not loaded: `No bank account on file` · `Bank details could not be loaded` · `Loading bank details…` |
+
+### PROPOSAL — PENDING CHEW · Daily Bank (0637)
+
+These words are on screen in the branch and are not approved yet. Words borrowed from another Finance page keep that page's meaning.
+
+| Where | Words |
+|---|---|
+| Menu | `Daily Bank`, first under `Bank & Cards` |
+| Toolbar | `Previous day` · `Next day` (icon buttons; the words are their names) · `Day` (the date field's name) · `Today` · `Since {date} · No opening balances` (the Trial Balance's words) · on an earlier day: `Waiting for approval shows the vouchers still waiting now.` · Search: `Search accounts…` |
+| Columns | `Account` · `Kind` with the Money accounts words `Cash` · `Bank account` · `Card and online holding` · `Brought forward` · `Inflow` · `Outflow` (the Dashboard's words) · `Balance` · `Waiting for approval` · `Available to pay` · `Waiting for card payout` |
+| Meaning | `Brought forward` is the balance at the end of the day before. `Balance` is brought forward plus inflow less outflow. `Waiting for approval` is the checked payment vouchers that will pay out of the account. `Available to pay` is balance less waiting for approval, on cash and bank accounts only. `Waiting for card payout` is the balance of a card and online holding account: money not yet paid out to a bank, never available to pay. |
+| Footer | Each money column's total. `{n} accounts · {date}` |
+| Opened row | Toggle hover `Show lines` (the Journal's word). Columns `Entry No` · `Source` · `Document` · `Party` · `Inflow` · `Outflow` · `Waiting for approval` · `Description` · `Total`. The Journal's words for sources, parties and missing values (`No party` · `No memo` · `Name not available` · `No document number`). A voucher with no number yet: `Draft, no number yet` (the Payment Vouchers word). A voucher's purpose when it has no note: `Pay supplier bills` · `Direct payment`. Empty: `Nothing moved on this account on {date}, and no voucher is waiting to pay from it.` |
+| States | `Daily Bank could not be loaded. Try again.` · `Try again` · `The ledger has no start date yet. Nothing can be totalled.` · `The ledger started on {date}. Pick a day from then on.` · `No bank or cash account yet. Finance adds them in Settings.` |

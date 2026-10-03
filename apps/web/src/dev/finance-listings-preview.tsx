@@ -7,8 +7,9 @@
  * and every API read answered by a local fixture. A separate vite entry — it
  * cannot reach production, and nothing leaves the browser.
  *
- * `?page=` ar · bills · payment-vouchers · ap-outstanding · other-debtors ·
- * other-debtor-parties · other-receipts · journal · trial-balance · reports.
+ * `?page=` ar · bills · payment-vouchers · ap-outstanding · suppliers ·
+ * other-debtors · other-debtor-parties · other-receipts · daily-bank ·
+ * journal · trial-balance · reports.
  * Every listing carries at least one 60+ character party name so wrapping and
  * truncation are visible. Fixture evidence is not production evidence.
  */
@@ -291,6 +292,57 @@ function bsRows(asOf: string) {
   return { rows: rows.map((r, i) => ({ ...common, ordinal: i + 1, ...r })) };
 }
 
+// ── Payables → Suppliers: Finance's own tax and bank details (0636) ─────────
+const SUPPLIER_FINANCE = [
+  { supplier_id: "s-1", name: LONG_SUPPLIER, kind: "factory_pickup", tax_no: "C 2001234567", registration_no: "201901012345",
+    bank_name: "Maybank", bank_account_no: "514012345678", bank_account_holder: "Ohana Furniture Manufacturing Industries (M) Sdn Bhd",
+    updated_at: at(-2), updated_by_name: "Chew" },
+  { supplier_id: "s-2", name: "Lumen Sofa Works", kind: "factory_pickup", tax_no: null, registration_no: null,
+    bank_name: "Public Bank", bank_account_no: "3123456789", bank_account_holder: "Lumen Sofa Works Sdn Bhd",
+    updated_at: at(-30), updated_by_name: null },
+  { supplier_id: "s-3", name: "Bayview Properties", kind: "other_creditor", tax_no: null, registration_no: null,
+    bank_name: null, bank_account_no: null, bank_account_holder: null, updated_at: null, updated_by_name: null },
+];
+
+// ── Bank & Cards → Daily Bank (0637): every money account on one day ────────
+const bankLine = (entry: number, source_type: string, source_doc_no: string, party: [string, string] | null,
+  description: string | null, received: number, paid: number) => ({
+  entry_no: `JE-${TODAY.slice(2, 4)}${TODAY.slice(5, 7)}-${String(entry).padStart(4, "0")}`, source_type, source_doc_no,
+  description, party_type: party?.[0] ?? null, party_name: party?.[1] ?? null, received, paid,
+});
+const money = (account_code: string, name: string, money_kind: string, brought_forward: number,
+  lines: ReturnType<typeof bankLine>[] = [], pending_vouchers: Array<Record<string, unknown>> = []) => ({
+  account_code, name, money_kind, is_active: true, brought_forward,
+  received: lines.reduce((s, l) => s + l.received, 0), paid: lines.reduce((s, l) => s + l.paid, 0),
+  pending: pending_vouchers.reduce((s, v) => s + Number(v.amount), 0), pending_vouchers, lines,
+});
+const DAILY_BANK = (day: string) => ({
+  day, go_live_on: GO_LIVE,
+  accounts: [
+    money("1110", "Cash in hand", "CASH", 1250, [
+      bankLine(41, "CUSTOMER_PAYMENT", "OR-2610-0031", ["CUSTOMER", LONG_CUSTOMER], "Deposit for SO-1405", 300, 0),
+      bankLine(42, "OTHER_RECEIPT", "ORC-2610-0004", ["OTHER", LONG_PARTY], "Hall rental refund", 80, 0),
+    ]),
+    money("1121", "Public Bank", "BANK", 48210.55, [
+      bankLine(43, "CUSTOMER_PAYMENT", "OR-2610-0032", ["CUSTOMER", "NURUL AIN BINTI ISMAIL"], null, 6400, 0),
+      bankLine(44, "PAYMENT_VOUCHER", "PV-2610-0011", ["SUPPLIER", LONG_SUPPLIER], "Bills for September", 0, 12850),
+    ], [
+      { voucher_id: "v-1", voucher_no: "PV-2610-0012", supplier_id: "s-1", payee_name: LONG_SUPPLIER, voucher_date: soon(-1),
+        purpose: "SUPPLIER_BILLS", narration: null, amount: 7200 },
+      { voucher_id: "v-2", voucher_no: "PV-2610-0013", supplier_id: null, payee_name: "Tenaga Nasional Berhad", voucher_date: TODAY,
+        purpose: "DIRECT", narration: "Electricity September, PJ Showroom", amount: 2400 },
+    ]),
+    money("1122", "Maybank", "BANK", 15000),
+    money("1123", "Hong Leong", "BANK", -1200),
+    money("1131", "GHL", "HOLDING", 3580, [
+      bankLine(45, "CUSTOMER_PAYMENT", "OR-2610-0033", ["CUSTOMER", "LIM KUAN YANG"], "Card, 6 months instalment", 2150, 0),
+      bankLine(46, "CARD_PAYOUT", "MM-20261002-0002", null, "Card settlement GHL 2 Oct 2026", 0, 3580),
+    ]),
+    money("1132", "AhaPay", "HOLDING", 0, [bankLine(47, "CUSTOMER_PAYMENT", "OR-2610-0034", ["CUSTOMER", "SITI AMINAH"], null, 899, 0)]),
+    money("1133", "Online", "HOLDING", 0),
+  ],
+});
+
 const realFetch = window.fetch.bind(window);
 window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
@@ -307,7 +359,9 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   if (url.includes("/api/finance/payables/bill-outstanding")) return json({ rows: [] });
   if (url.includes("/api/finance/payables/suppliers"))
     return json({ rows: OUTSTANDING.map((o) => ({ id: o.supplier_id, name: o.supplier_name, kind: o.supplier_kind })) });
+  if (url.includes("/api/finance/payables/supplier-finance")) return json({ rows: SUPPLIER_FINANCE });
   if (url.includes("/api/finance/payables/")) return json({ rows: [] });
+  if (url.includes("/api/finance/ledger/daily-bank")) return json(DAILY_BANK(q.get("day") ?? TODAY));
   if (url.includes("/api/finance/other-money-in/parties")) return json(PARTIES);
   if (url.includes("/api/finance/other-money-in/invoices")) return json(DEBTOR_INVOICES);
   if (url.includes("/api/finance/other-money-in/receipts")) return json(RECEIPTS);
@@ -334,6 +388,8 @@ const ROUTES: Record<string, string> = {
   bills: "/finance/bills",
   "payment-vouchers": "/finance/payment-vouchers",
   "ap-outstanding": "/finance/ap-outstanding",
+  suppliers: "/finance/suppliers",
+  "daily-bank": "/finance/daily-bank",
   "other-debtors": "/finance/other-debtors",
   "other-debtor-parties": "/finance/other-debtors?view=parties",
   "other-receipts": "/finance/other-receipts",

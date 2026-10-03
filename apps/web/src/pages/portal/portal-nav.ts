@@ -39,6 +39,7 @@ import {
   Banknote,
   CalendarClock,
   CreditCard,
+  Landmark,
   type LucideIcon,
 } from "lucide-react";
 import type { Role } from "@carres/shared/domain";
@@ -664,6 +665,10 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       // other income or money against those invoices is an Other receipt.
       { key: "other-debtors", label: "Other debtors", icon: Users, financePath: "/finance/other-debtors", section: "Receivables" },
       { key: "other-receipts", label: "Other receipts", icon: HandCoins, financePath: "/finance/other-receipts", section: "Receivables" },
+      // 0637 — every money account on one day: the day before, money in and
+      // out, the vouchers waiting and what is left to pay with. First under
+      // Bank & Cards, as in Chew's menu draft (2026-10-03).
+      { key: "daily-bank", label: "Daily Bank", icon: Landmark, financePath: "/finance/daily-bank", section: "Bank & Cards" },
       // 0572 — the card companies' files, matched to the recorded card payments.
       // Above Money moves, as in Chew's menu draft (2026-10-03).
       { key: "card-settlement", label: "Card settlement", icon: CreditCard, financePath: "/finance/card-settlement", section: "Bank & Cards" },
