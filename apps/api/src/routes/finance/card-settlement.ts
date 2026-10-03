@@ -1,6 +1,7 @@
 import { Hono, type Context } from "hono";
 import { z } from "zod";
 import { CARD_ACQUIRERS, parseCardFile } from "@carres/shared/card-settlement";
+import { cardMoneyWaiting, type CardWaitingAnswer } from "@carres/shared/card-money-waiting";
 import { requireFinance } from "../../lib/auth-guards";
 import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
@@ -14,6 +15,7 @@ import type { AppEnv } from "../../types";
  *
  *   GET  /                 the days, their rows and suggestions, the payments to pick from
  *   GET  /charges          approved card payouts in a period, by department (Reports → Card charges)
+ *   GET  /waiting          each card and online payment not in the bank yet (0641)
  *   POST /import           read the file here, then keep it and its rows whole
  *   POST /rows/:id/match   approve a suggestion or pick by hand; null takes the match off
  *   POST /days/payout      Approve day: prepare the day's one card payout
@@ -55,6 +57,24 @@ financeCardSettlementRouter.get("/", requireFinance, async (c) => {
   const { data, error } = await userClient(c.env, c.var.auth.jwt).rpc("card_settlement_review");
   if (error) return fail(c, error);
   return c.json(data ?? { days: [], rows: [], payments: [] });
+});
+
+/** GET /waiting — Card money waiting (0641; Chew 2026-10-03): each card and
+ *  online payment not in the bank yet, with where it is, and each holding
+ *  account's balance. Read once through the shared arithmetic, which refuses
+ *  a figure it cannot read; the answer passes through as it came. */
+financeCardSettlementRouter.get("/waiting", requireFinance, async (c) => {
+  const { data, error } = await userClient(c.env, c.var.auth.jwt).rpc("fin_card_money_waiting");
+  const failed = () => c.json({ error: "rpc_failed", code: "rpc_failed", message: "Card money waiting could not be loaded. Try again." }, 500);
+  if (error) return mapPgError(error).status === 500 ? failed() : fail(c, error);
+  const answer = data as CardWaitingAnswer | null;
+  if (!answer || typeof answer.today !== "string" || !Array.isArray(answer.payments) || !Array.isArray(answer.holdings)) return failed();
+  try {
+    cardMoneyWaiting(answer);
+  } catch {
+    return failed();
+  }
+  return c.json(answer);
 });
 
 /** GET /charges?from=&to= — Reports → Card charges: each approved card payout

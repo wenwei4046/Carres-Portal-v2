@@ -91,7 +91,9 @@ describe("PortalSidebar — role visibility", () => {
   it("finance sees Finance items only — no Operations", () => {
     mockRole = "finance";
     renderAt("/finance/dashboard");
-    expect(screen.getByText("AR · Receivables")).toBeInTheDocument();
+    // Chew 2026-10-03: Finance's own pages sit in Finance modules.
+    expect(module_("payables")).toBeInTheDocument();
+    expect(module_("receivables")).toBeInTheDocument();
     // §13 (payment/MASTER.md) — the Bank Matching workspace retired
     // 2026-09-07: its row must NOT come back.
     expect(screen.queryByText("Reconciliation")).not.toBeInTheDocument();
@@ -117,18 +119,20 @@ describe("PortalSidebar — role visibility", () => {
     expect(screen.queryByText("Accounts")).not.toBeInTheDocument();
   });
 
-  it("Finance opens Dashboard, AP · Payables, AR · Receivables — in that order (owner ruling 2026-09-14)", () => {
+  it("Finance keeps Dashboard on top and AP · Payables above AR (owner ruling 2026-09-14; Finance modules, Chew 2026-10-03)", () => {
     mockRole = "finance";
-    renderAt("/finance/dashboard");
+    renderAt("/finance/ap-outstanding");
     const dashboard = child("dashboard");
+    const payables = module_("payables");
+    const receivables = module_("receivables");
     const ap = child("ap");
-    const ar = child("ar");
     expect(ap).toHaveTextContent("AP · Payables");
     expect(ap).toHaveAttribute("href", "/finance/ap-outstanding");
     expect(screen.queryByText("Unpaid by Supplier")).not.toBeInTheDocument();
-    expect(dashboard.compareDocumentPosition(ap) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(ap.compareDocumentPosition(ar) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(ar.compareDocumentPosition(child("bills")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(dashboard.compareDocumentPosition(payables) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // AP sits inside Payables, and Payables sits above Receivables — so AP stays above AR.
+    expect(payables.compareDocumentPosition(ap) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(ap.compareDocumentPosition(receivables) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it("principal on the Finance base expands the Finance area", () => {
@@ -261,8 +265,8 @@ describe("a module is an expandable PARENT ROW, never a heading", () => {
     expect(child("payment-records").className).toContain("bg-kit-blue-3");
     expect(screen.queryByText("Refunds & Credits")).not.toBeInTheDocument();
     expect(screen.queryByText("Invoices")).not.toBeInTheDocument();
-    // Genuine finance-only capability keeps its own rows.
-    expect(screen.getByText("AR · Receivables")).toBeInTheDocument();
+    // Genuine finance-only capability keeps its own rows, in Finance's own modules.
+    expect(module_("receivables")).toBeInTheDocument();
   });
 });
 

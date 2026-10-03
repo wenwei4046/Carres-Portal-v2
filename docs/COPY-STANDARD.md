@@ -4947,3 +4947,207 @@ predicates stay with Purchasing MASTER §9.3 and their source owners. A missing 
 ### Sales Order linked documents and grouping — owner confirmed2026-10-02
 
 Use `Amendment No`, not `Amendment status`. Genuine absence is `No amendment`, without a link; unnumbered recorded amendments use `Not recorded`, unread source `Unavailable`. Never print an internal UUID as a document number. Related columns: `PO No`, `DO No`, `Invoice No`, `Receipt No`; genuine receipt absence `Receipt not recorded`. Page tools: `Group by: None`, `Group by: Delivery Status`, `Group by: Stock Status`, `Group by: Payment Status`.
+
+## Finance (Chew)
+
+Words for Finance's own screens, approved by **Chew** (Finance) as recorded in [`docs/finance/MASTER.md`](finance/MASTER.md). They are added beside the rest of this dictionary and change none of its other entries.
+
+### APPROVED by Chew on 3 Oct 2026, as written · Finance menu modules (Finance MASTER §4)
+
+The Finance area of the Portal sidebar groups Finance's own pages into modules. The Payments module (`Monitor` · `Payment Records`), `Rental Approver`, `Subscriptions` and `Dealers` keep their rows exactly as they are.
+
+| Module row | Pages under it (their words unchanged) |
+|---|---|
+| `Payables` | `AP · Payables` · `Bills` · `Payment Vouchers` |
+| `Receivables` | `AR · Receivables` · `Other debtors` · `Other receipts` |
+| `Bank & Cards` | `Card settlement` · `Money moves` |
+| `Ledger` | `Journal` · `Trial Balance` · `Self-check` |
+| `Reports` | `Reports`. It stays a plain row until a second report page joins it. |
+
+- `Dashboard` stays a plain row at the top.
+- `Payables` sits above `Receivables` to keep the owner ruling of 2026-09-14 that `AP · Payables` sits above AR.
+- The modules are not named `Money in` / `Money out`, because customer `Money In` is Payment's word (Payment MASTER §1) and `Money in full` is already a governed phrase.
+
+### APPROVED by Chew on 3 Oct 2026 · One person may check and approve a voucher (0635)
+
+0635 retires the refusal `You checked payment voucher {PV No}, so somebody else must approve it. Three different people prepare, check and approve a payment.`, which is listed under "Money moves and the three-person voucher". The database no longer raises it. That entry is left as it is.
+
+### PROPOSAL — PENDING CHEW · Suppliers: Finance's own tax and bank details (0636)
+
+These words are on screen in the branch and are not approved yet.
+
+| Where | Words |
+|---|---|
+| Menu | `Suppliers`, under `Payables` |
+| Page | Title `Suppliers`. Columns, where the money goes first: `Supplier` · `Bank` · `Account No` · `Account holder` · `Last changed` (`{date and time} · {name}`) · `Tax No` · `Registration No` · `Creditor Type`. Search: `Search suppliers…`. Footer: `{n} suppliers · {m} with a bank account`. |
+| Missing values | None on the list: a detail nobody keyed is an empty cell (UI MASTER §6.0). |
+| Row | `Inspect supplier` · `Pay to {bank} · {account no} · {holder}` · `No bank account on file. A payment to this supplier names no account.` · `Edit details` |
+| Form | Title: `Edit details`. Description: `{supplier} · {creditor type}. Finance's own details; the supplier stays Purchasing's.` Fields: `Tax No` · `Registration No` · `Bank` · `Account No` · `Account holder`. Buttons: `Back` · `Save details`. On save: `Details saved.` |
+| Refusals | `An account number is 6 to 20 digits.` · `Choose the bank for this account number.` · `The tax number is too long.` · `The registration number is too long.` · `The bank name is too long.` · `The account holder's name is too long.` · `Only Finance edits a supplier's finance details.` · `That supplier does not exist.` |
+| Empty list | `No supplier yet. Purchasing adds suppliers; an other creditor is added from a bill.` |
+| Payment voucher | The fact `Pay to` shows only until the voucher is approved. On the form: `Pay to {bank} · {account no} · {holder}`. Missing or not loaded: `No bank account on file` · `Bank details could not be loaded` · `Loading bank details…` |
+
+### PROPOSAL — PENDING CHEW · Daily Bank (0637)
+
+These words are on screen in the branch and are not approved yet. Words borrowed from another Finance page keep that page's meaning.
+
+| Where | Words |
+|---|---|
+| Menu | `Daily Bank`, first under `Bank & Cards` |
+| Toolbar | `Previous day` · `Next day` (icon buttons; the words are their names) · `Day` (the date field's name) · `Today` · `Since {date} · No opening balances` (the Trial Balance's words) · on an earlier day: `Waiting for approval shows the vouchers still waiting now.` · Search: `Search accounts…` |
+| Columns | `Account` · `Kind` with the Money accounts words `Cash` · `Bank account` · `Card and online holding` · `Brought forward` · `Inflow` · `Outflow` (the Dashboard's words) · `Balance` · `Waiting for approval` · `Available to pay` · `Waiting for card payout` |
+| Meaning | `Brought forward` is the balance at the end of the day before. `Balance` is brought forward plus inflow less outflow. `Waiting for approval` is the checked payment vouchers that will pay out of the account. `Available to pay` is balance less waiting for approval, on cash and bank accounts only. `Waiting for card payout` is the balance of a card and online holding account: money not yet paid out to a bank, never available to pay. |
+| Footer | Each money column's total. `{n} accounts · {date}` |
+| Opened row | Toggle hover `Show lines` (the Journal's word). Columns `Entry No` · `Source` · `Document` · `Party` · `Inflow` · `Outflow` · `Waiting for approval` · `Description` · `Total`. The Journal's words for sources, parties and missing values (`No party` · `No memo` · `Name not available` · `No document number`). A voucher with no number yet: `Draft, no number yet` (the Payment Vouchers word). A voucher's purpose when it has no note: `Pay supplier bills` · `Direct payment`. Empty: `Nothing moved on this account on {date}, and no voucher is waiting to pay from it.` |
+| States | `Daily Bank could not be loaded. Try again.` · `Try again` · `The ledger has no start date yet. Nothing can be totalled.` · `The ledger started on {date}. Pick a day from then on.` · `No bank or cash account yet. Finance adds them in Settings.` |
+
+### PROPOSAL — PENDING CHEW · Cash Flow (0638)
+
+These words are on screen in the branch and are not approved yet. The period controls, export buttons and states are the Profit and Loss's own.
+
+| Where | Words |
+|---|---|
+| Reports page | A door like the others: `Cash Flow` over `Inflow · Outflow · Net cash flow · Carried forward · by cash and bank account`, and `Open →` |
+| Page | Title `Cash Flow`. `Since {date} · No opening balances` · `Month` · `From` · `Up to` · `Custom Date Range` · `Export Excel` · `Export PDF` · `The cash flow could not be exported. Try again.` |
+| Statement | Panel `Cash Flow`. Columns `Account` · `Amount`. Sections `Inflow` · `Outflow`, each with its total. A line is `{code} {name}`, or `Transfer from {code} {name}` · `Transfer to {code} {name}` between two of Carres's own cash and bank accounts, or `Card payout from {code} {name}` when card or online money reaches a bank. Empty sections: `No money came into the cash and bank accounts in this period.` · `No money went out of the cash and bank accounts in this period.` Bottom line `Net cash flow`. Under it: `Brought forward` · `Carried forward` · `Card and online payments in this period` · `Waiting for card payout at the end` |
+| By account | Panel `By account`. Columns `Account` · `Brought forward` · `Inflow` · `Outflow` · `Carried forward`, and a `Total` row |
+| Meaning | `Inflow` and `Outflow` are money into and out of the cash and bank accounts. A line names the account on the other side of the money. `Carried forward` is brought forward plus inflow less outflow. Card and online money is not cash until its card payout reaches a bank. |
+| States | `Loading Cash Flow…` · `Cash Flow could not be loaded. Try again.` · `Try again` · `The ledger has no start date yet. Nothing can be totalled.` · `The ledger started on {date}. Pick a day from then on.` |
+
+### PROPOSAL — PENDING CHEW · General Ledger (0639)
+
+These words are on screen in the branch and are not approved yet. The period controls, department filter, sources, balance words and states are the Ledger pages' own.
+
+| Where | Words |
+|---|---|
+| Menu | `General Ledger`, under `Ledger` after `Journal` |
+| Page | Title `General Ledger`. `Since {date} · No opening balances` · `Month` · `From` · `Up to` · `Custom Date Range` · `Department` · `Search accounts…` (accessible name `Search accounts`) · `Export Excel` · `The general ledger could not be exported. Try again.` |
+| Table | A band per account: `{code} {name} · {kind}`. Columns `Date` · `Entry No` · `Source` · `Document` · `Description` · `Debit` · `Credit` · `Balance`. Rows `Brought forward` and `Total`. A balance reads `{money} Debit` · `{money} Credit` · `RM 0.00`, as on the Journal. A line with no memo or narration: `No memo` |
+| Footer | `{n} accounts · {date} to {date}`, and `{n} accounts of {m}` while a search narrows them |
+| Empty | `No account moved or carried a balance in this period.` · `No account matches this search.` |
+| States | `Loading the General Ledger…` · `The General Ledger could not be loaded. Try again.` · `Try again` · `The ledger has no start date yet. Nothing can be totalled.` · `The ledger started on {date}. Pick a day from then on.` |
+| Sheet | `General Ledger` · `Account` · `Date` · `Entry No` · `Source` · `Document` · `Description` · `Debit` · `Credit` · `Balance` · `Department` · `Brought forward` · `Total` |
+
+### PROPOSAL — PENDING CHEW · AP Aging (0640)
+
+These words are on screen in the branch and are not approved yet.
+
+| Where | Words |
+|---|---|
+| Reports page | A door like the others: `AP Aging` over `Balance · This month to 4 months and over · Not tied to a bill · by supplier on a day`, and `Open →` |
+| Page | Title `AP Aging`. `As of` (the Trial Balance's word) · `Age by` with `Bill date` · `Due date` · `Columns` with `By month` · `By days` · `Search suppliers…` |
+| Columns | `Supplier` · `Creditor Type` (hidden until asked for; `Supplier` · `Other creditor`) · `Balance` · by month `This month` · `1 month` · `2 months` · `3 months` · `4 months and over`, or by days `0 to 30 days` · `31 to 60 days` · `61 to 90 days` · `91 to 120 days` · `Over 120 days` · `Not tied to a bill` |
+| Meaning | `Balance` is what the supplier's payables accounts hold in the books on the day. The age columns are its confirmed bills still owed that day. `Not tied to a bill` is the rest of the balance: below zero, money paid ahead of a bill; above zero, money owed with no bill behind it, such as an opening balance. A bill with no due date ages by its bill date. |
+| Opened row | Toggle hover `Show bills`. Columns `Bill No` · `Supplier invoice` · `Bill date` · `Due date` · `Bill total` · `Still owed` · `Age`. Empty: `No bill is open. The balance is money not tied to a bill.` |
+| Footer | `{n} suppliers · In the books ({account codes}) on {date}: {money} · Difference {money}`; while it is not zero, above the table: `⚠ The suppliers differ from the books by {money}.` and `Open Self-check` |
+| States | `AP aging could not be loaded. Try again.` · `Try again` · `The ledger has no start date yet. Nothing can be totalled.` · `Nothing was owed to a supplier on {date}.` |
+
+### PROPOSAL — PENDING CHEW · Card money waiting (0641)
+
+These words are on screen in the branch and are not approved yet. This is the menu draft's "Unmatched" for cards: it also lists payments that are matched but not yet paid out, so it is named after what it shows.
+
+| Where | Words |
+|---|---|
+| Menu | `Card money waiting`, under `Bank & Cards` after `Card settlement` |
+| Page | Title `Card money waiting`. `Search payments…` |
+| Columns | `Paid on` · `Document` · `Source` (hidden until asked for; the Journal's source words) · `SO No` (`SO-{n}`, the Payment Records word) · `Customer` · `Card account` · `Amount` · `Days` · `Waiting` (hidden until asked for: `0 to 7 days` · `8 to 14 days` · `15 to 30 days` · `Over 30 days`) · `Where it is` |
+| Where it is | `No card company file shows it yet` · `Matched · card payout not prepared` · `Card payout {MM No} waiting for approval` (each opens Card settlement) |
+| Footer | `{n} payments · {money} waiting · The card and online accounts hold {money} in the books`; while they differ, above the table: `⚠ The card and online accounts hold {money} more than these payments.` (or `less`) and `Open Money moves` |
+| States | `Card money waiting could not be loaded. Try again.` · `Try again` · `No card or online money is waiting. Every payment has reached the bank.` |
+
+### PROPOSAL — PENDING CHEW · Supplier credit notes (0642)
+
+These words are on screen in the branch and are not approved yet. `Credit Note` is already a kept business noun of this dictionary; `knock off` is the supplier advance's word (0485), used here the same way. A word borrowed from Bills, Payment Vouchers or the advances keeps its meaning there.
+
+| Where | Words |
+|---|---|
+| Menu | `Credit Notes`, under `Payables` after `Payment Vouchers` |
+| Register | Title `Credit Notes`. `New Credit Note` · `Search credit notes…`. Columns `Credit Note No` (a draft: `Draft, no number yet`) · `Date` · `Supplier` · `Supplier's credit note` · `Status` (the bill's `Draft` · `Confirmed` · `Cancelled`) · `Total` · `Knocked off` · `Left to knock off` (both empty until confirmed) · `Files`. Footer `{n} credit notes · {money} left to knock off`. Empty: `No credit note yet. A supplier's credit note appears here once it is entered.` |
+| Number | `SCN-YYYYMMDD-RRRR`, drawn when the credit note is confirmed, like a bill's number |
+| Credit note page | Header `{SCN No}` or `Draft credit note` · `Edit` · `Cancel credit note` · `Confirm credit note`. Card `Credit note facts`: `Supplier` (`{name} · {creditor type}`) · `Supplier's credit note` · `Date` · `Payables account` · `Total` · `Knocked off` · `Left to knock off` (`Not confirmed` before it is) · `Note` · `Ledger entry` (`None yet. Confirming the credit note makes it` · ` · reversed by {JE No}`) · `Cancelled` (`{date and time} · {name} · {reason}`). Card `Lines`: `Description` · `Account` · `Department` · `Amount` · `Total`; empty `This credit note has no lines.` Card `Knocked off bills`: `Knock off a bill`; a row `{Bill No} · Applied · {date} · {money}` with `Take off the bill`, or `{Bill No} · Taken off · {date} · {money} · {reason}`; empty `Not knocked off any bill yet.` or, before confirming, `A credit note is knocked off bills once it is confirmed.` Files and History are the bill's own cards. |
+| Confirm | `Confirm this credit note?` · `{money} comes off what Carres owes {supplier}, dated {date}. A confirmed credit note cannot be edited.` · `Check the lines against the supplier's credit note first.` · `Back` · `Confirm credit note` |
+| Cancel | `Cancel this credit note?` · confirmed: `The ledger entry is reversed on the credit note's date. A credit note still knocked off a bill cannot be cancelled.` · draft: `The draft is kept, marked cancelled.` · `Cancel credit note` (a reason is asked, as on a bill) |
+| Knock off | `Knock off a bill` · `{money} of {SCN No} is left. Nothing is entered in the ledger; the bill owes less.` · `Bill` (`Choose a bill`; each `{Bill No} · {bill date} · {money} left to pay`) · `Amount (RM)` (`At most {money}`) · the button names the gap: `Choose a bill` · `Type the amount` · `At most {money}`, then `Knock off` · `Loading bills…` · `The supplier's bills could not be loaded. Try again.` · `This supplier has no bill left to pay on account {code}.` |
+| Take off | `Take this credit note off the bill?` · `Nothing is entered in the ledger. The bill is unpaid again by this amount, and the credit is left to knock off.` · `Take off the bill` |
+| Form | Title `New Credit Note`. Card `Who sent this credit note`: `Supplier` (`Choose who sent this credit note`) · `Supplier's credit note No` · `Date` (`The date printed on the supplier's credit note. It is entered in that month.`) · `Payables account` (`{code} {name} (usual)`, or `The usual account` while the chart loads; `Knocked off only bills on the same payables account.`) · `Note`. Card `Lines`: `Add line` · `Line {n} · Description` · `Account` (`Choose an account`; an expense, asset or income account) · `Amount (RM)` · `Department…` · `Remove` · `Total {money}`. `Back` · `Save`, or the gap: `Choose who sent this credit note` · `Type the supplier's credit note number` · `The credit note number is too long` · `A credit note needs at least one line` · `Choose an account` · `Say what this credit is for` · `The description is too long` · `The amount must be more than RM 0.00`. `Only a draft credit note can be changed.` · `Back to the credit note` · `Loading credit note…` |
+| Toasts | `Credit note saved` · `Credit note confirmed` · `Credit note cancelled` · `Credit note knocked off the bill` · `Credit note taken off the bill` |
+| History | `Credit note knocked off` · `Credit note taken off`, on both the credit note and the bill |
+| Journal | Source `Supplier credit note`, and `Supplier credit note reversal` |
+| A bill | Its Payments card: `Credit note {SCN No} · Applied · {date} · {money}` (opens the credit note, where it is taken off). The cancel refusal becomes `RM {money} of this bill is on a payment voucher, an advance or a credit note. Cancel the voucher, or take the advance or the credit note off this bill, first.` |
+| Unpaid by Supplier | Column `Credit Left` after `Advance Left`. `Unpaid After Advance` becomes `Unpaid After Advance and Credit`, because the database's figure (`net_owing`) now subtracts credit too. Opened row: `Credit notes` · `{SCN No} · {date} · {money} left of {money}` · `The credit notes could not be loaded. Try again.` |
+| Refusals | `Only Finance enters a supplier credit note.` · `Choose who sent this credit note.` · `Type the number printed on the supplier's credit note.` · `The credit note number is too long.` · `Type the date printed on the supplier's credit note.` · `Credit note {paper No} from {supplier} is already entered, as {SCN No}.` (or `as a draft credit note`) · `A credit note needs at least one line.` · `A credit note can have at most 300 lines.` · `Line {n}: say what this credit is for.` · `Line {n}: the description is too long.` · `Line {n}: the amount must be more than RM 0.00.` · `Line {n}: {account} is a control account. A credit note line takes back a cost or records a rebate. Choose an expense, asset or income account.` · `Line {n}: {account} is not an expense, asset or income account.` · `Line {n}: {account} is a cash or bank account. A credit note does not move money.` · `A credit note of RM 0.00 takes nothing off.` · `Say why this credit note is cancelled.` · `Cancelling a confirmed credit note takes the finance approver.` · `RM {money} of this credit note is knocked off bills. Take it off the bills first.` · `Credit note {SCN No} is not confirmed. Only a confirmed credit note is knocked off a bill.` · `Bill {Bill No} is not confirmed. A credit note is knocked off only a confirmed bill.` · `Bill {Bill No} belongs to a different supplier. A credit note is knocked off only its own supplier's bills.` · `Bill {Bill No} is in account {code}, but credit note {SCN No} is in account {code}. They cannot be matched.` · `Credit note {SCN No} is already knocked off bill {Bill No}. Take it off first to change the amount.` · `Only RM {money} of credit note {SCN No} is left. RM {money} is more than that.` · `Bill {Bill No} has RM {money} left to pay. RM {money} is more than that.` · `Say why the credit note is taken off this bill.` · `This credit note is already taken off the bill.` · `That credit note does not exist.` · `A file belongs to a bill, a payment voucher or a supplier credit note.` The bill line refusal loses its dash: `… is a control account. A bill line is a cost. Choose an expense or asset account.` |
+
+### PROPOSAL — PENDING CHEW · Reading a supplier's paper (bill scanning)
+
+These words are on screen in the branch and are not approved yet. The reading only pre-fills the form; a person checks and saves.
+
+| Where | Words |
+|---|---|
+| Bill form | `Read the bill`, on the `Who sent this bill` card; while it reads: `Reading…` |
+| Credit note form | `Read the credit note`, on the `Who sent this credit note` card |
+| Notes after a reading | `Read from {n} page(s). Check every figure before you save.` · `From {supplier}.` · `From {supplier}: the paper prints {name}. Check it is the same supplier.` · `The paper names {name}. No supplier has that name, so choose the supplier.` · `The supplier's name could not be read. Choose the supplier.` · `It reads as a proforma invoice, not a final invoice.` · `It reads as a quotation, not an invoice.` · `It reads as a credit note. A credit note is entered under Credit Notes.` · `It does not read as a credit note. Check the paper.` · `The paper is in {currency}. Carres enters it in ringgit.` · `The lines were not changed, as the form already has lines.` · `No item line could be read. Add the lines.` · `{line}: {money} off was read. Take it off the lines it belongs to.` · `The total could not be read.` · `The lines come to {money}, but the total reads {money}. Check the lines.` |
+| Picking the pages | `Choose the paper to read.` · `Read at most 8 pages at a time.` · `{file} is not a PDF or a photo (JPEG, PNG or WebP).` · `{file} is too big to read. 10 MB at most.` · `{file} could not be opened.` |
+| After saving | `The bill is saved, but a page that was read could not be attached. Attach it on the bill.` (and the same for a credit note) |
+| Refusals | `Reading bills is not set up yet. Type the bill in.` (until the key is given) · `These pages could not be read. Try a clearer photo, or the PDF.` · `Reading the bill took too long. Try again.` · `The bill could not be read. Try again, or type it in.` · `Read a PDF or a photo (JPEG, PNG or WebP).` · `That file is too big to read. 10 MB at most.` · `That file is empty.` · `That file could not be read.` · `Choose the bill to read.` · `A bill is read with at most 8 pages.` |
+
+### PROPOSAL — PENDING CHEW · Stock value, provisional (0643)
+
+These words are on screen in the branch and are not approved yet. Stock's own words for a Unit's status (`Free` · `Reserved` · `On hold` · `Transferred`) are read from Stock (`opsStockStatusLabel`), never copied.
+
+| Where | Words |
+|---|---|
+| Reports page | A door like the others: `Stock value` over `Warehouse · Showroom · In transit · Sent for repair · at a month end, provisional`, and `Open →` |
+| Page | Title `Stock value`. `Month` (each month as `Sep 2026`; opens on the last month that has ended) |
+| Note | `Provisional. Worked out from Stock's Units, at the end of {date}, until Stock confirms its month-end count.` · for the month not yet ended: `This month has not ended, so the Units are as they are now.` · `{n} consignment Unit(s) is/are left out: they belong to their suppliers.` |
+| Groups | `Group` · `Units` · `Value` · `No cost recorded` · `Total`. The groups: `Warehouse` · `Showroom` · `In transit` · `Sent for repair` · `Not placed` |
+| Units | `Unit ID` · `SKU` · `Group` · `Status` · `Site` · `Held by` (hidden until asked for) · `Qty` · `Cost` · `Value` · `PO No`. A Unit with no cost recorded has empty Cost and Value cells. Search: `Search Units…` |
+| Footer | `{n} Units · {money}` · ` · {k} with no cost recorded` |
+| States | `Loading the stock value…` · `The stock value could not be loaded. Try again.` · `Carres held no Unit at the end of {date}.` |
+
+### PROPOSAL — PENDING CHEW · Collection report (0644)
+
+These words are on screen in the branch and are not approved yet. `SO Doc Date` and `SO No` are the Orders words (Orders MASTER).
+
+| Where | Words |
+|---|---|
+| Reports page | A door like the others: `Collection` over `Deposit · Deposit % · Balance paid · Outstanding · by salesperson`, and `Open →` |
+| Page | Title `Collection`. `Month` · `From` · `Up to` (Cash Flow's words; `Custom Date Range` when the period is not a whole month) · `Below (%)` (50 unless changed) · the tab bar `Deposit` · `Balance` · `Search salespeople…` |
+| Deposit | `Salesperson` · `Orders` · `Order value` · `Deposit` · `Deposit %` · `Below {N}%` (empty when none) |
+| Balance | `Salesperson` · `Delivered` · `Invoiced value` · `Deposit` · `Balance due` · `Balance paid` · `Balance %` · `Outstanding` |
+| Opened row | Toggle hover `Show orders`. `SO No` (`SO-{n}`) · `SO Doc Date` · `Customer` · `Order value` · `Deposit` · `Deposit %` · `Invoice` · `Balance paid` · `Outstanding` (both empty until delivered). Empty: `No order of theirs placed in the period is delivered yet.` |
+| Group | `No salesperson` (an order with no salesperson recorded) |
+| Footer | The money columns' totals and the shares of the whole. `{n} salespeople · {k} orders · {m} below {N}%`, or on Balance `{n} salespeople · {k} delivered` |
+| States | `The Collection report could not be loaded. Try again.` · `No order was placed from {date} to {date}.` · `Choose a period whose start is not after its end.` |
+
+### PROPOSAL — PENDING CHEW · Payment Requests (0645)
+
+These words are on screen in the branch and are not approved yet. The Operations rail entry is the one shared-menu change Chew approved (Finance MASTER §3.3).
+
+| Where | Words |
+|---|---|
+| Menu | `Payment Requests`: in Finance under `Payables` after `Payment Vouchers`; in Operations under `Workspace` after `Issue Tracker`, shown only to the staff Finance or the boss allows, and to the boss |
+| Register | Title `Payment Requests`. Finance's tab bar `Waiting for Finance` · `All requests`. `New Payment Request` · `Search payment requests…`. Columns `Request No` · `Date` · `Requested by` (Finance only) · `Pay to` · `Amount` · `Stage` · `Pay by` · `What it is for` · `Paid by` · `Files`. Footer `{n} requests · {money}`. Empty: `No payment request is waiting for Finance.` · `No payment request yet. Ask Finance to pay a bill with New Payment Request.` |
+| Stage | `With Finance` · `Finance is preparing the payment` · `Payment waiting for approval` · `Finance is entering the bill` · `Bill entered, not paid yet` · `Partly paid` · `Paid` · `Payment cancelled, Finance pays it again` · `Returned` · `Withdrawn` |
+| Request page | `Edit` · `Withdraw request`. `Returned by {name}: {note}`. `No bill is attached yet. Finance pays a request once its bill is attached.` Card `Answer the request` (Finance): `Pay it now with a payment voucher, or enter it as a bill to pay later. Each answers this request.` · `Make payment voucher` · `Make bill` · `Return request`. Card `What is asked`: `Requested by` · `Pay to` · `Amount` · `Pay by` · `What it is for` · `The bill` · `Pay into` · `Note` · `Stage` · `Paid by`. Card `The bill`: `Attach file` · `No file attached.` Card `History`: `Sent to Finance` · `Changed` · `Changed and sent to Finance again` · `Withdrawn` · `Returned` · `Answered with {document}` · `File attached` |
+| Withdraw | `Withdraw this request?` · `Finance will not pay it. A withdrawn request cannot be sent again; ask again with a new request.` · `Back` · `Withdraw request` |
+| Return | `Return {PRQ No}?` · `{name} reads why, changes the request and sends it again.` · `Return request` (a reason is asked) |
+| Form | Title `New Payment Request`. Cards `What to pay` (`Pay to` · `Amount (RM)` · `What it is for` · `Pay by`, `Leave empty when there is no date.`) · `The bill` (`Bill No`, `The number printed on the bill.` · `Bill date` · `Attach the bill` · `Remove`) · `Pay into` (`Bank` · `Account No` · `Account holder`) · `Note to Finance` (`Note`). `Back` · `Send to Finance`, or `Send again`; until ready the button names the gap: `Say who is to be paid` · `Type the amount` · `The amount must be more than RM 0.00` · `Type the amount in ringgit and sen` · `Say what the payment is for` · `An account number is digits only` · `Attach the bill`. `Only a request waiting for Finance, or returned to you, can be changed.` · `Back to the request` |
+| Toasts | `Request sent to Finance` · `Request changed` · `Request withdrawn` · `Request returned` · `File attached` · `Files attached` · `The request is sent, but the bill could not be attached. Attach it on the request.` · on a voucher or bill made from a request: `{PRQ No} is answered by this voucher` (or `bill`) · `The voucher is saved, but it does not answer {PRQ No}: {reason}` (or `bill`) |
+| Finance Settings | Tab `Payment requests`. `Operation staff ticked here may ask Finance to pay a bill, from Payment Requests. Finance and the boss always may.` · `Only Finance and the boss change who may ask.` Columns `May ask` · `Staff` · `Allowed since` · `Allowed by`. `{name} may ask Finance to pay` · `{name} may no longer ask` · `No Operation staff account is active.` |
+| Refusals | `Only staff allowed by Finance or the boss can ask Finance to pay.` · `Say who is to be paid.` · `The payee's name is too long.` · `Say what the payment is for.` · `Keep what it is for to 300 characters.` · `Keep the note to 2,000 characters.` · `A bank or bill detail is too long.` · `An account number is digits only.` · `That payment request is not one you can open.` · `Only the person who asked changes a request. Finance returns it instead.` · `Payment request {no} is answered by Finance and can no longer change.` (or `is withdrawn`) · `Only the person who asked can withdraw a request.` · `Finance has answered {no} already. Ask Finance to cancel the payment instead.` · `Only Finance returns a payment request.` · `Say why it goes back. The person who asked reads it.` · `Only Finance answers a payment request.` · `Answer with one payment voucher or one bill.` · `Payment request {no} has no bill attached. Return it so the bill is attached.` · `A cancelled document cannot answer a request.` · `{Document} answers payment request {no} already.` · `This payment request takes no file from you now.` · `Only Finance or the boss decides who may ask Finance to pay.` · `Only an active Operation staff member can be allowed to ask.` |
+
+### PROPOSAL — PENDING CHEW · Forecast (0646)
+
+These words are on screen in the branch and are not approved yet. `Net result` is the Profit and Loss's own word for its foot; `Not saved` and `Discard` are already in this file.
+
+| Where | Words |
+|---|---|
+| Reports page | A door like the others: `Forecast` over `Plan · % of income · Actual · Difference · by account, one month at a time`, and `Open →` |
+| Page | Title `Forecast`. `Month` (each month as `Sep 2026`; opens on this month) · `Copy plan from {Mon YYYY}` · `Not saved` · `Discard` · `Save` |
+| Note | `Plan income as an amount. Plan a cost as an amount or as a % of the month's planned income; the other box shows what it works out to. Difference is actual less plan.` · ` Saved by {name} on {date and time}.` |
+| Table | `Account` (`{code} {name}`) · `Plan` · `% of income` · `Actual` · `Difference`. Bands `Income` · `Cost of sales` · `Expense`, each with its totals. The line `Gross profit` after cost of sales. Foot `Net result`. A retired account shows washed out, only with a plan or an actual |
+| Boxes | Accessible names `Plan for {code} {name}` · `% of income for {code} {name}`. A wrong box, named once above the table: `{code} {name}: type the amount in ringgit and sen.` · `{code} {name}: a share is 0% or more, to two decimals.` |
+| No actual | `This month has not started, so it has no actual yet.` · `The ledger starts on {date}, so this month has no actual.` · `The ledger has no start date yet, so there is no actual.` · `The month's actual could not be loaded. Try again.` |
+| Toasts | `Forecast saved` · `Plan copied from {Mon YYYY}. Save to keep it.` |
+| States | `Loading the forecast…` · `The forecast could not be loaded. Try again.` · `No income or expense account is in the chart.` |
+| Refusals | `Only Finance plans a forecast.` · `Choose the month.` · `The plan could not be read.` · `Account {code} cannot be planned: it is not an income or expense account.` · `{code} {name}: plan an amount or a share, not both.` · `{code} {name}: the amount is not a number.` · `{code} {name}: type the amount in ringgit and sen.` · `{code} {name}: an income account is planned as an amount.` · `{code} {name}: the share is not a number.` · `{code} {name}: a share is 0% or more, to two decimals.` · `Someone else saved this month after you opened it. Open it again to see their plan.` · `The forecast could not be saved. Try again.` |

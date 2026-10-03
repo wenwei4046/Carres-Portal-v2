@@ -87,10 +87,99 @@ export const otherCreditorInput = z
   .strict();
 export type OtherCreditorInput = z.infer<typeof otherCreditorInput>;
 
+// ── a supplier's finance details (0636; Chew 2026-10-03, Finance MASTER §3.2) ─
+/** Blank text means no value, exactly as the database door stores it. */
+const blankToNull = (v: string | null | undefined): string | null => {
+  const t = (v ?? "").trim();
+  return t === "" ? null : t;
+};
+
+/**
+ * Finance's own tax and bank details for a supplier. The supplier stays
+ * Purchasing's record. finance_supplier_profile_save checks the same rules;
+ * this only turns a bad form into a sentence before the round trip.
+ */
+export const supplierFinanceInput = z
+  .object({
+    taxNo: z.string().max(40, "The tax number is too long.").nullable().optional(),
+    registrationNo: z.string().max(60, "The registration number is too long.").nullable().optional(),
+    bankName: z.string().max(100, "The bank name is too long.").nullable().optional(),
+    bankAccountNo: z.string().max(40, "An account number is 6 to 20 digits.").nullable().optional(),
+    bankAccountHolder: z.string().max(200, "The account holder's name is too long.").nullable().optional(),
+  })
+  .strict()
+  .transform((v) => ({
+    taxNo: blankToNull(v.taxNo),
+    registrationNo: blankToNull(v.registrationNo),
+    bankName: blankToNull(v.bankName),
+    // Spaces and dashes typed with the number are dropped (0636, as 0598 does for dealers).
+    bankAccountNo: blankToNull(v.bankAccountNo?.replace(/[\s-]/g, "")),
+    bankAccountHolder: blankToNull(v.bankAccountHolder),
+  }))
+  .refine((v) => v.bankAccountNo === null || /^[0-9]{6,20}$/.test(v.bankAccountNo), {
+    message: "An account number is 6 to 20 digits.",
+    path: ["bankAccountNo"],
+  })
+  .refine((v) => v.bankAccountNo === null || v.bankName !== null, {
+    message: "Choose the bank for this account number.",
+    path: ["bankName"],
+  });
+export type SupplierFinanceInput = z.infer<typeof supplierFinanceInput>;
+/** What the form sends, before blanks become null. */
+export type SupplierFinanceFormInput = z.input<typeof supplierFinanceInput>;
+
+/** One supplier on Finance's Suppliers page (finance_supplier_list, 0636). */
+export interface SupplierFinanceRow {
+  supplier_id: string;
+  name: string;
+  kind: string;
+  tax_no: string | null;
+  registration_no: string | null;
+  bank_name: string | null;
+  bank_account_no: string | null;
+  bank_account_holder: string | null;
+  updated_at: string | null;
+  updated_by_name: string | null;
+}
+
+/** Where a payment to this supplier goes, on one line: `Maybank · 514012345678 ·
+ *  Ah Seng Trading`. Null while Finance keeps no account number. */
+export function supplierPayTo(
+  row: Pick<SupplierFinanceRow, "bank_name" | "bank_account_no" | "bank_account_holder">,
+): string | null {
+  if (!row.bank_account_no) return null;
+  return [row.bank_name, row.bank_account_no, row.bank_account_holder].filter(Boolean).join(" · ");
+}
+
 export const apReasonInput = z
   .object({ reason: z.string().trim().min(1, "Say why").max(500) })
   .strict();
 export type ApReasonInput = z.infer<typeof apReasonInput>;
+
+// ── supplier credit notes (0642; Chew 2026-10-03, Finance MASTER §3.2) ────────
+/** One line of a supplier's credit note: what the credit is for, and where it
+ *  goes back to (an expense, asset or income account — the database checks). */
+export const supplierCreditNoteLineInput = z
+  .object({
+    accountCode: z.string().trim().min(1, "Choose an account").max(10),
+    description: z.string().trim().min(1, "Say what this credit is for").max(200, "The description is too long"),
+    amount: money.refine((n) => n > 0, "The amount must be more than RM 0.00"),
+    ...lineDepartmentFields,
+  })
+  .strict();
+export type SupplierCreditNoteLineInput = z.infer<typeof supplierCreditNoteLineInput>;
+
+export const supplierCreditNoteDraftInput = z
+  .object({
+    supplierId: z.string().uuid({ message: "Choose who sent this credit note" }),
+    supplierNoteNo: z.string().trim().min(1, "Type the supplier's credit note number").max(60, "The credit note number is too long"),
+    noteDate: isoDate,
+    apAccountCode: optText(10),
+    narration: optText(500),
+    lines: z.array(supplierCreditNoteLineInput).min(1, "A credit note needs at least one line").max(300),
+  })
+  .strict();
+export type SupplierCreditNoteDraftInput = z.infer<typeof supplierCreditNoteDraftInput>;
 
 // ── payment vouchers ─────────────────────────────────────────────────────────
 export const PAYMENT_VOUCHER_PURPOSES = ["SUPPLIER_BILLS", "DIRECT"] as const;
@@ -253,17 +342,19 @@ export interface SupplierBillDocument {
     /** 0540 */
     department_type?: string | null; department_id?: string | null;
   }>;
-  /** A voucher that pays the bill, or (0485) an advance knocked off it. */
+  /** A voucher that pays the bill, (0485) an advance knocked off it, or
+   *  (0642) a supplier credit note knocked off it. For a credit note,
+   *  voucher_id / voucher_no / voucher_date are the note's own. */
   payments: Array<{
-    kind: "voucher" | "advance";
-    /** The knock-off's own id — set for kind "advance" only. */
+    kind: "voucher" | "advance" | "credit_note";
+    /** The knock-off's own id — set for kinds "advance" and "credit_note". */
     application_id: string | null;
     voucher_id: string;
     voucher_no: string | null;
     /** The voucher's status, or the knock-off's: "applied" · "cancelled". */
     status: string;
     voucher_date: string;
-    /** The day an advance was applied; null for a voucher. */
+    /** The day a knock-off was made; null for a voucher. */
     applied_on: string | null;
     amount_applied: ApMoney;
   }>;
@@ -330,6 +421,8 @@ export interface ApAccountChoice {
   for_voucher_line: boolean;
   for_ap: boolean;
   for_pay_from: boolean;
+  /** 0642: a supplier credit note line — expense, asset or income. */
+  for_credit_line?: boolean;
 }
 
 export interface ApCreditor {
@@ -356,8 +449,95 @@ export interface ApOutstandingRow {
   oldest_unpaid_bill_date: string | null;
   /** 0484: advance paid and not yet knocked off a bill or sent back. */
   advance_open: ApMoney;
-  /** 0484: balance_owing less advance_open — what the ledger says is owed. */
+  /** 0484 · 0642: balance_owing less advance_open and credit_open — what the
+   *  ledger says is owed. */
   net_owing: ApMoney;
+  /** 0642: confirmed supplier credit notes not yet knocked off a bill. */
+  credit_open?: ApMoney;
+}
+
+/** One supplier credit note on its register (0642 supplier_credit_note_register). */
+export interface SupplierCreditNoteRegisterRow {
+  id: string;
+  note_no: string | null;
+  status: "draft" | "confirmed" | "cancelled";
+  supplier_id: string;
+  supplier_name: string;
+  supplier_kind: string;
+  supplier_note_no: string;
+  note_date: string;
+  ap_account_code: string;
+  total_amount: ApMoney;
+  /** Knocked off bills; null unless confirmed. */
+  applied_total: ApMoney | null;
+  /** Not knocked off yet; null unless confirmed. */
+  credit_open: ApMoney | null;
+  file_count: number;
+  created_at: string;
+}
+
+/** One supplier credit note, whole (0642 supplier_credit_note_document). */
+export interface SupplierCreditNoteDocument {
+  note: {
+    id: string;
+    note_no: string | null;
+    status: "draft" | "confirmed" | "cancelled";
+    supplier_id: string;
+    supplier_name: string;
+    supplier_kind: string;
+    supplier_note_no: string;
+    note_date: string;
+    ap_account_code: string;
+    ap_account_name: string | null;
+    total_amount: ApMoney;
+    narration: string | null;
+    cancel_reason: string | null;
+    created_at: string;
+    created_by_name: string | null;
+    confirmed_at: string | null;
+    confirmed_by_name: string | null;
+    cancelled_at: string | null;
+    cancelled_by_name: string | null;
+    entry_no: string | null;
+    reversal_entry_no: string | null;
+  };
+  lines: Array<{
+    line_no: number;
+    account_code: string;
+    account_name: string | null;
+    description: string;
+    amount: ApMoney;
+    department_type: string | null;
+    department_id: string | null;
+  }>;
+  /** Each knock-off of this note's credit off a bill. */
+  applications: Array<{
+    application_id: string;
+    bill_id: string;
+    bill_no: string | null;
+    supplier_invoice_no: string;
+    bill_date: string;
+    amount: ApMoney;
+    status: "applied" | "cancelled";
+    created_at: string;
+    applied_on: string;
+    created_by_name: string | null;
+    cancelled_at: string | null;
+    cancel_reason: string | null;
+  }>;
+  files: ApFile[];
+  events: ApEvent[];
+  applied_total: ApMoney | null;
+  credit_open: ApMoney | null;
+  go_live_on: string | null;
+  can: {
+    edit: boolean;
+    confirm: boolean;
+    cancel: boolean;
+    add_file: boolean;
+    apply: boolean;
+    take_off: boolean;
+  };
 }
 
 /** One approved advance and what is left of it (0485 supplier_advances). */

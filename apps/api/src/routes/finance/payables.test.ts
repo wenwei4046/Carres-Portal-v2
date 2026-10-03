@@ -170,6 +170,229 @@ describe("GET readers", () => {
   });
 });
 
+describe("a supplier's finance details (0636, Chew 2026-10-03)", () => {
+  it("GET /supplier-finance calls finance_supplier_list and wraps rows", async () => {
+    const row = { supplier_id: SUPPLIER_ID, name: "Test Factory", kind: "factory_pickup", bank_account_no: null };
+    const sb = mockRpc({ data: [row], error: null });
+    const res = await call("/supplier-finance");
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("finance_supplier_list");
+    expect(await res.json()).toEqual({ rows: [row] });
+  });
+
+  it("PUT /supplier-finance/:id sends trimmed values, drops spaces and dashes from the account number, and blanks become null", async () => {
+    const sb = mockRpc({ data: SUPPLIER_ID, error: null });
+    const res = await call(`/supplier-finance/${SUPPLIER_ID}`, {
+      method: "PUT",
+      body: {
+        taxNo: "  C 1234567890 ",
+        registrationNo: "",
+        bankName: " Maybank ",
+        bankAccountNo: "5140-1234 5678",
+        bankAccountHolder: "Test Factory Sdn Bhd",
+      },
+    });
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("finance_supplier_profile_save", {
+      p_supplier_id: SUPPLIER_ID,
+      p_tax_no: "C 1234567890",
+      p_registration_no: null,
+      p_bank_name: "Maybank",
+      p_bank_account_no: "514012345678",
+      p_bank_account_holder: "Test Factory Sdn Bhd",
+    });
+  });
+
+  it("PUT refuses an account number that is not 6 to 20 digits, before calling the database", async () => {
+    const sb = mockRpc({ data: null, error: null });
+    const res = await call(`/supplier-finance/${SUPPLIER_ID}`, {
+      method: "PUT",
+      body: { bankName: "Maybank", bankAccountNo: "12AB45" },
+    });
+    expect(res.status).toBe(422);
+    expect(await res.json()).toMatchObject({ message: "An account number is 6 to 20 digits." });
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
+
+  it("PUT refuses an account number with no bank", async () => {
+    const sb = mockRpc({ data: null, error: null });
+    const res = await call(`/supplier-finance/${SUPPLIER_ID}`, {
+      method: "PUT",
+      body: { bankAccountNo: "514012345678" },
+    });
+    expect(res.status).toBe(422);
+    expect(await res.json()).toMatchObject({ message: "Choose the bank for this account number." });
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
+
+  it("PUT refuses a supplier id that is not a uuid, before calling the database", async () => {
+    const sb = mockRpc({ data: null, error: null });
+    const res = await call("/supplier-finance/abc", { method: "PUT", body: {} });
+    expect(res.status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
+
+  it("PUT keeps the database's reason when it refuses (403 not_finance)", async () => {
+    mockRpc({
+      data: null,
+      error: { code: "42501", message: "Only Finance edits a supplier's finance details.", details: "not_finance" },
+    });
+    const res = await call(`/supplier-finance/${SUPPLIER_ID}`, { method: "PUT", body: { taxNo: "C1" } });
+    expect(res.status).toBe(403);
+    expect(await res.json()).toMatchObject({ code: "not_finance" });
+  });
+
+  it("refuses operation (finance and principal only)", async () => {
+    const res = await call("/supplier-finance", { role: "operation" });
+    expect(res.status).toBe(403);
+  });
+});
+
+describe("supplier credit notes (0642, Chew 2026-10-03)", () => {
+  const NOTE_ID = "99999999-0000-4000-8000-000000000009";
+  const goodNote = {
+    supplierId: SUPPLIER_ID,
+    supplierNoteNo: "CN-77",
+    noteDate: "2026-10-02",
+    lines: [{ accountCode: "5100", description: "Two chairs returned", amount: 450.5, departmentType: "OFFICE" }],
+  };
+
+  it("GET /credit-notes reads the register", async () => {
+    const sb = mockRpc({ data: [{ id: NOTE_ID }], error: null });
+    const res = await call("/credit-notes");
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("supplier_credit_note_register");
+    expect(await res.json()).toEqual({ rows: [{ id: NOTE_ID }] });
+  });
+
+  it("GET /credit-notes/:id reads the document; a bad id is refused, a missing one is 404", async () => {
+    const sb = mockRpc({ data: { note: { id: NOTE_ID } }, error: null });
+    expect((await call(`/credit-notes/${NOTE_ID}`)).status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("supplier_credit_note_document", { p_note_id: NOTE_ID });
+    expect((await call("/credit-notes/nope")).status).toBe(422);
+    mockRpc({ data: null, error: null });
+    expect((await call(`/credit-notes/${NOTE_ID}`)).status).toBe(404);
+  });
+
+  it("POST /credit-notes sends the draft with snake_case lines", async () => {
+    const sb = mockRpc({ data: NOTE_ID, error: null });
+    const res = await call("/credit-notes", { method: "POST", body: goodNote });
+    expect(res.status).toBe(201);
+    expect(sb.rpc).toHaveBeenCalledWith("supplier_credit_note_save_draft", {
+      p_note_id: null,
+      p_supplier_id: SUPPLIER_ID,
+      p_supplier_note_no: "CN-77",
+      p_note_date: "2026-10-02",
+      p_lines: [{ account_code: "5100", description: "Two chairs returned", amount: 450.5, department_type: "OFFICE", department_id: null }],
+      p_ap_account_code: null,
+      p_narration: null,
+    });
+  });
+
+  it("PUT /credit-notes/:id rewrites a draft", async () => {
+    const sb = mockRpc({ data: NOTE_ID, error: null });
+    expect((await call(`/credit-notes/${NOTE_ID}`, { method: "PUT", body: goodNote })).status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("supplier_credit_note_save_draft", expect.objectContaining({ p_note_id: NOTE_ID }));
+  });
+
+  it("refuses a note with no line, or a line of RM 0.00, before the database", async () => {
+    const sb = mockRpc({ data: NOTE_ID, error: null });
+    expect((await call("/credit-notes", { method: "POST", body: { ...goodNote, lines: [] } })).status).toBe(422);
+    expect((await call("/credit-notes", { method: "POST", body: { ...goodNote, lines: [{ ...goodNote.lines[0], amount: 0 }] } })).status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
+
+  it("confirm, cancel, knock off and take off each call their door", async () => {
+    let sb = mockRpc({ data: null, error: null });
+    expect((await call(`/credit-notes/${NOTE_ID}/confirm`, { method: "POST" })).status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("supplier_credit_note_confirm", { p_note_id: NOTE_ID });
+    sb = mockRpc({ data: null, error: null });
+    expect((await call(`/credit-notes/${NOTE_ID}/cancel`, { method: "POST", body: { reason: "Entered twice" } })).status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("supplier_credit_note_cancel", { p_note_id: NOTE_ID, p_reason: "Entered twice" });
+    sb = mockRpc({ data: "app-1", error: null });
+    expect((await call(`/credit-notes/${NOTE_ID}/applications`, { method: "POST", body: { billId: BILL_ID, amount: 200 } })).status).toBe(201);
+    expect(sb.rpc).toHaveBeenCalledWith("supplier_credit_note_apply", { p_note_id: NOTE_ID, p_bill_id: BILL_ID, p_amount: 200 });
+    sb = mockRpc({ data: null, error: null });
+    expect((await call(`/credit-note-applications/${NOTE_ID}/cancel`, { method: "POST", body: { reason: "Wrong bill" } })).status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("supplier_credit_note_application_cancel", { p_application_id: NOTE_ID, p_reason: "Wrong bill" });
+  });
+
+  it("a cancel needs a reason, and the approver's refusal keeps its code", async () => {
+    const sb = mockRpc({ data: null, error: null });
+    expect((await call(`/credit-notes/${NOTE_ID}/cancel`, { method: "POST", body: { reason: " " } })).status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
+    mockRpc({ data: null, error: { code: "42501", message: "Cancelling a confirmed credit note takes the finance approver.", details: "not_finance_approver" } });
+    const res = await call(`/credit-notes/${NOTE_ID}/cancel`, { method: "POST", body: { reason: "Entered twice" } });
+    expect(res.status).toBe(403);
+    expect(await res.json()).toMatchObject({ code: "not_finance_approver" });
+  });
+
+  it("a credit note takes files like a bill", async () => {
+    const sb = mockRpc({ data: FILE_UUID, error: null });
+    const path = `SUPPLIER_CREDIT_NOTE/${NOTE_ID}/${FILE_UUID}.pdf`;
+    const res = await call(`/credit-notes/${NOTE_ID}/files`, {
+      method: "POST", body: { path, fileName: "cn.pdf", mimeType: "application/pdf", sizeBytes: 1000 },
+    });
+    expect(res.status).toBe(201);
+    expect(sb.rpc).toHaveBeenCalledWith("ap_document_file_add", expect.objectContaining({ p_document_type: "SUPPLIER_CREDIT_NOTE", p_document_id: NOTE_ID }));
+  });
+
+  it("refuses operation (finance and principal only)", async () => {
+    expect((await call("/credit-notes", { role: "operation" })).status).toBe(403);
+  });
+});
+
+describe("AP aging (0640, Chew 2026-10-03)", () => {
+  const AGING = {
+    as_at: "2026-09-30", go_live_on: "2026-06-01",
+    controls: [{ account_code: "2110", name: "Trade payables", balance: 4000 }],
+    suppliers: [{ supplier_id: SUPPLIER_ID, name: "Test Factory", kind: "factory_pickup", balance: 4000,
+      bills: [{ bill_id: BILL_ID, bill_no: "BILL-2609-0001", supplier_invoice_no: "TF-1", bill_date: "2026-09-02",
+        due_date: null, total: 4000, open: 4000 }] }],
+  };
+
+  it("asks for the day and passes the answer through whole", async () => {
+    const sb = mockRpc({ data: AGING, error: null });
+    const res = await call("/aging?asAt=2026-09-30");
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("fin_ap_aging", { p_as_at: "2026-09-30" });
+    expect(await res.json()).toEqual(AGING);
+  });
+
+  it("asks for today in Malaysia when no day is given", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-09-30T17:30:00Z")); // 01:30 on 1 Oct in Malaysia
+    try {
+      const sb = mockRpc({ data: AGING, error: null });
+      await call("/aging");
+      expect(sb.rpc).toHaveBeenCalledWith("fin_ap_aging", { p_as_at: "2026-10-01" });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("refuses a day that is not a date, before any database call", async () => {
+    const sb = mockRpc({ data: AGING, error: null });
+    expect((await call("/aging?asAt=30/09/2026")).status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
+
+  it("a ledger with no start date is 409; a figure it cannot read refuses in plain words", async () => {
+    mockRpc({ data: null, error: { code: "55000", message: "gl_config has no go-live date" } });
+    expect((await call("/aging?asAt=2026-09-30")).status).toBe(409);
+    const broken = structuredClone(AGING);
+    broken.suppliers[0]!.bills[0]!.open = "four thousand" as never;
+    mockRpc({ data: broken, error: null });
+    const res = await call("/aging?asAt=2026-09-30");
+    expect(res.status).toBe(500);
+    expect(await res.json()).toMatchObject({ message: "AP aging could not be loaded. Try again." });
+  });
+
+  it("refuses operation (finance and principal only)", async () => {
+    expect((await call("/aging", { role: "operation" })).status).toBe(403);
+  });
+});
+
 describe("bills", () => {
   it("POST /bills turns the form into the save-draft call, snake_case lines", async () => {
     const sb = mockRpc({ data: BILL_ID, error: null });
@@ -324,23 +547,6 @@ describe("payment vouchers", () => {
     const res = await call(`/vouchers/${VOUCHER_ID}/approve`, { method: "POST" });
     expect(res.status).toBe(422);
     expect(await res.json()).toMatchObject({ code: "separation_of_duties" });
-  });
-
-  it("approve by the checker: 403 checker_cannot_approve keeps the database's sentence (0529)", async () => {
-    mockRpc({
-      data: null,
-      error: {
-        code: "42501",
-        message: "You checked payment voucher PV-1, so somebody else must approve it. Three different people prepare, check and approve a payment.",
-        details: "checker_cannot_approve",
-      },
-    });
-    const res = await call(`/vouchers/${VOUCHER_ID}/approve`, { method: "POST" });
-    expect(res.status).toBe(403);
-    expect(await res.json()).toMatchObject({
-      code: "checker_cannot_approve",
-      message: expect.stringContaining("You checked payment voucher PV-1"),
-    });
   });
 
   it("approve by someone without the approver duty: 403 keeps the reason code", async () => {

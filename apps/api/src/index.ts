@@ -91,6 +91,7 @@ import collectionOwnerRouter from "./routes/finance/collection-owner";
 import paymentStorageRouter from "./routes/finance/payment-storage";
 import financeRefundsRouter from "./routes/finance/refunds";
 import financePayablesRouter from "./routes/finance/payables";
+import financePaymentRequestsRouter from "./routes/finance/payment-requests";
 import financeExceptionsRouter from "./routes/finance/exceptions";
 import financeReconciliationRouter from "./routes/finance/reconciliation";
 import financeOtherMoneyInRouter from "./routes/finance/other-money-in";
@@ -294,6 +295,8 @@ api.route("/finance/refunds", financeRefundsRouter);
 api.route("/finance/other-money-in", financeOtherMoneyInRouter);
 // Supplier bills and payment vouchers (0477). Before the `/finance` catch-all.
 api.route("/finance/payables", financePayablesRouter);
+// Staff ask Finance to pay a bill (0645, Chew 2026-10-03). Before the catch-all.
+api.route("/finance/payment-requests", financePaymentRequestsRouter);
 // The one money blocker on a delivery order (0355, owner ruling 2026-08-16).
 // Mounted before the catch-all `/finance` reconciliation router below.
 api.route("/finance/exceptions", financeExceptionsRouter);

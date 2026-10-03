@@ -48,6 +48,14 @@ const suppliers = { rows: [
   { id: SUP, name: "Lumen Sofa Works", kind: "supplier" },
   { id: LANDLORD, name: "Bayview Properties", kind: "other_creditor" },
 ] };
+// 0636: Finance's own bank details — the supplier has one, the landlord none.
+const supplierFinance = { rows: [
+  { supplier_id: SUP, name: "Lumen Sofa Works", kind: "supplier", tax_no: null, registration_no: null,
+    bank_name: "Maybank", bank_account_no: "514012345678", bank_account_holder: "Lumen Sofa Works Sdn Bhd",
+    updated_at: "2026-10-03T03:15:00Z", updated_by_name: "Chew" },
+  { supplier_id: LANDLORD, name: "Bayview Properties", kind: "other_creditor", tax_no: null, registration_no: null,
+    bank_name: null, bank_account_no: null, bank_account_holder: null, updated_at: null, updated_by_name: null },
+] };
 const accounts = { rows: [
   { code: "1110", name: "Cash in hand", kind: "ASSET", parent_code: "1100", is_control: false, control_for: null,
     for_bill_line: false, for_voucher_line: false, for_ap: false, for_pay_from: true },
@@ -127,6 +135,7 @@ beforeEach(() => {
   api.fail.clear();
   api.routes = {
     [`${B}/suppliers`]: suppliers,
+    [`${B}/supplier-finance`]: supplierFinance,
     [`${B}/accounts`]: accounts,
     [MONEY]: moneyAccounts,
     // AutoCount-shaped roles: the form names the usual accounts from these.
@@ -556,6 +565,31 @@ describe("Payment voucher form", () => {
       payMethod: "CASH", allocations: [], lines: [{ accountCode: "6500", amount: 150 }],
     });
   });
+
+  it("0645: a voucher made from a payment request starts from what was asked, and answers it once saved", async () => {
+    const REQ = "abababab-0000-4000-8000-000000000001";
+    api.routes[`/api/finance/payment-requests/${REQ}`] = {
+      request: { id: REQ, request_no: "PRQ261003-4821", status: "submitted", requested_by: "u", requested_by_name: "Aina",
+        payee_name: "Bayview Properties", amount: "3500.00", pay_by: null, purpose: "October rent, PJ showroom", note: null,
+        bank_name: "Maybank", bank_account_no: "514012345678", bank_account_holder: "Bayview Properties Sdn Bhd",
+        bill_no: "BV-1007", bill_date: "2026-10-01", return_note: null, decided_at: null, decided_by_name: null,
+        created_at: "2026-10-03T02:00:00Z", updated_at: "2026-10-03T02:00:00Z", file_count: 1, voucher: null, bill: null },
+      files: [], events: [], finance: true, can: { edit: false, withdraw: false, add_file: true, return: true, answer: true },
+    };
+    show(`/finance/payment-vouchers/new?request=${REQ}`);
+    await waitFor(() => expect(screen.getByLabelText("Payee")).toHaveValue("Bayview Properties"));
+    expect(screen.getByLabelText("Purpose")).toHaveValue("DIRECT");
+    expect(screen.getByLabelText("Line 1 description")).toHaveValue("October rent, PJ showroom");
+    expect(screen.getByLabelText("Line 1 amount")).toHaveValue("3500.00");
+    expect(screen.getByLabelText("Note")).toHaveValue("Payment request PRQ261003-4821 · October rent, PJ showroom · pay to Maybank 514012345678 Bayview Properties Sdn Bhd");
+    fireEvent.change(screen.getByLabelText("Line 1 account"), { target: { value: "6500" } });
+    await pickDept("Line 1 department", "OFFICE");
+    fireEvent.change(screen.getByLabelText("Paid from"), { target: { value: "1120" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(writes()).toHaveLength(2));
+    expect(writes()[1]).toMatchObject({ url: `/api/finance/payment-requests/${REQ}/answer`, method: "POST",
+      body: { voucherId: "33333333-3333-4333-8333-333333333333" } });
+  });
 });
 
 describe("Payment voucher detail", () => {
@@ -599,6 +633,39 @@ describe("Payment voucher detail", () => {
     fireEvent.click(go);
     await waitFor(() => expect(writes()).toHaveLength(1));
     expect(writes()[0]).toMatchObject({ url: `${B}/vouchers/${PV}/cancel`, body: { reason: "Paid twice" } });
+  });
+
+  /* 0636 (Chew 2026-10-03): where the money goes, from Finance's own supplier details. */
+  it("a voucher still to be paid shows where the money goes", async () => {
+    api.routes[`${B}/vouchers/${PV}`] = voucherDoc({ status: "checked", can: { approve: true } });
+    show(`/finance/payment-vouchers/${PV}`);
+    expect(await screen.findByTestId("voucher-pay-to")).toHaveTextContent("Maybank · 514012345678 · Lumen Sofa Works Sdn Bhd");
+  });
+
+  it("an approved voucher no longer shows today's bank details", async () => {
+    api.routes[`${B}/vouchers/${PV}`] = voucherDoc({ status: "approved", can: {} });
+    show(`/finance/payment-vouchers/${PV}`);
+    await screen.findByTestId("voucher-amount");
+    expect(screen.queryByTestId("voucher-pay-to")).not.toBeInTheDocument();
+  });
+
+  it("a failed read of the bank details says so, never 'no account'", async () => {
+    api.fail.add(`${B}/supplier-finance`);
+    api.routes[`${B}/vouchers/${PV}`] = voucherDoc({ status: "prepared", can: {} });
+    show(`/finance/payment-vouchers/${PV}`);
+    expect(await screen.findByText("Bank details could not be loaded")).toBeInTheDocument();
+  });
+});
+
+describe("Payment voucher form · pay to (0636)", () => {
+  it("names the supplier's bank account once the supplier is chosen", async () => {
+    show("/finance/payment-vouchers/new");
+    const supplier = await screen.findByLabelText("Supplier");
+    await screen.findByRole("option", { name: /Lumen Sofa Works/ });
+    fireEvent.change(supplier, { target: { value: SUP } });
+    expect(await screen.findByTestId("voucher-form-pay-to")).toHaveTextContent("Pay to Maybank · 514012345678 · Lumen Sofa Works Sdn Bhd");
+    fireEvent.change(supplier, { target: { value: LANDLORD } });
+    expect(await screen.findByTestId("voucher-form-pay-to")).toHaveTextContent("No bank account on file");
   });
 });
 
@@ -747,9 +814,50 @@ describe("Supplier advance (0484–0485)", () => {
     expect(writes()[0]).toMatchObject({ url: `${B}/vouchers/${PV}/advance-applications`,
       body: { billId: BILL1, amount: 300 } });
   });
+
+  it("0642: the bill lists a credit note knocked off it, linked to the credit note where it is taken off", async () => {
+    const NOTE = "22222222-2222-4222-8222-222222222222";
+    api.routes[`${B}/bills/${BILL1}`] = {
+      bill: { id: BILL1, bill_no: "BILL-4XK2", status: "confirmed", supplier_id: SUP, supplier_name: "Lumen Sofa Works",
+        supplier_kind: "supplier", supplier_invoice_no: "LSW-901", bill_date: "2026-09-10", due_date: null, po_id: null,
+        ap_account_code: "2110", ap_account_name: "Trade payables", total_amount: "1025.00", narration: null,
+        cancel_reason: null, created_at: "2026-09-10T01:00:00Z", created_by_name: "Aina", confirmed_at: null,
+        confirmed_by_name: null, cancelled_at: null, cancelled_by_name: null, entry_no: "JE-2", reversal_entry_no: null },
+      lines: [],
+      payments: [{ kind: "credit_note", application_id: APP, voucher_id: NOTE, voucher_no: "SCN-20260920-4821", status: "applied",
+        voucher_date: "2026-09-20", applied_on: "2026-09-20", amount_applied: "100.00" }],
+      files: [], events: [], paid_total: "100.00", allocated_total: "100.00", unpaid: "925.00", left_to_pay: "925.00",
+      advance_open: "0.00", go_live_on: "2026-09-10",
+      can: { edit: false, confirm: false, cancel: false, add_file: false, apply_advance: false, take_advance_off: true },
+    };
+    show(`/finance/bills/${BILL1}`);
+    const row = await screen.findByTestId(`bill-credit-note-${NOTE}`);
+    expect(row).toHaveTextContent("Credit note SCN-20260920-4821 · Applied · Sun, 20 Sep · RM 100.00");
+    expect(within(row).getByRole("link", { name: "SCN-20260920-4821" })).toHaveAttribute("href", `/finance/credit-notes/${NOTE}`);
+    expect(within(row).queryByRole("button")).not.toBeInTheDocument();
+  });
 });
 
 describe("Unpaid by Supplier", () => {
+  it("0642: a credit note not knocked off yet is Credit Left, and comes off what is owed", async () => {
+    const NOTE = "22222222-2222-4222-8222-222222222222";
+    const owed = (api.routes[`${B}/outstanding`] as { rows: Array<Record<string, unknown>> }).rows[0]!;
+    api.routes[`${B}/outstanding`] = { rows: [{ ...owed, credit_open: "150.00", net_owing: "775.00" }] };
+    api.routes[`${B}/credit-notes`] = { rows: [
+      { id: NOTE, note_no: "SCN-20260920-4821", status: "confirmed", supplier_id: SUP, supplier_name: "Lumen Sofa Works",
+        supplier_kind: "supplier", supplier_note_no: "LSW-CN-7", note_date: "2026-09-20", ap_account_code: "2110",
+        total_amount: "350.00", applied_total: "200.00", credit_open: "150.00", file_count: 0, created_at: "2026-09-20T02:00:00Z" },
+    ] };
+    show("/finance/ap-outstanding");
+    await screen.findByText("Lumen Sofa Works");
+    expect(screen.getByText("Credit Left")).toBeInTheDocument();
+    expect(screen.getByText("RM 150.00")).toBeInTheDocument();
+    expect(screen.getByText("RM 775.00")).toBeInTheDocument();
+    fireEvent.click(screen.getAllByTitle("Show unpaid bills")[0]!);
+    expect(await screen.findByTestId(`ap-outstanding-credits-${SUP}`))
+      .toHaveTextContent("SCN-20260920-4821 · Sun, 20 Sep · RM 150.00 left of RM 350.00");
+  });
+
   it("shows what is owed per supplier, and what already sits on a voucher", async () => {
     show("/finance/ap-outstanding");
     await screen.findByText("Lumen Sofa Works");

@@ -408,6 +408,18 @@ describe("Reports — the statements read the ledger", () => {
     expect(screen.getByTestId("reports-payment-door")).toHaveAttribute("href", "/finance/reports/payment");
   });
 
+  it("opens Cash Flow through its own door (0638)", async () => {
+    show();
+    await screen.findByTestId("reports-go-live");
+    expect(screen.getByTestId("reports-cash-flow-door")).toHaveAttribute("href", "/finance/reports/cash-flow");
+  });
+
+  it("opens AP Aging through its own door (0640)", async () => {
+    show();
+    await screen.findByTestId("reports-go-live");
+    expect(screen.getByTestId("reports-ap-aging-door")).toHaveAttribute("href", "/finance/reports/ap-aging");
+  });
+
   it("prints none of the old invented figures and asks for none of the old reads", async () => {
     show();
     await within(screen.getByTestId("profit-and-loss")).findByRole("link", { name: "4100 Furniture sales" });

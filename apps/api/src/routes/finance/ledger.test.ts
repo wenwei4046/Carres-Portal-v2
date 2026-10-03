@@ -134,6 +134,12 @@ describe("finance ledger — who may read", () => {
     "/account-ledger?account=1210&from=2026-09-01&to=2026-09-30",
     "/profit-and-loss?from=2026-09-01&to=2026-09-30",
     "/balance-sheet",
+    "/daily-bank",
+    "/cash-flow?from=2026-09-01&to=2026-09-30",
+    "/general-ledger?from=2026-09-01&to=2026-09-30",
+    "/stock-value?monthEnd=2026-09-30",
+    "/collection?from=2026-09-01&to=2026-09-30",
+    "/forecast?month=2026-10",
   ];
 
   it.each(["dealer", "operation", "supplier"])("refuses %s on every route before any database call", async (role) => {
@@ -1244,5 +1250,346 @@ describe("GET and PUT /books-closed (0622)", () => {
     const res = await put({ closedThrough: "2026-09-30" });
     expect(res.status).toBe(422);
     expect(await json(res)).toMatchObject({ code: "books_closed_not_ended", message: "Choose a day that has ended. 30 Sep 2026 has not ended yet." });
+  });
+});
+
+// ── Daily Bank (0637, Chew 2026-10-03) ──────────────────────────────────────
+
+describe("GET /daily-bank (0637)", () => {
+  const DAY = {
+    day: "2026-10-02",
+    go_live_on: "2026-09-01",
+    accounts: [
+      {
+        account_code: "1110", name: "Cash in hand", money_kind: "CASH", is_active: true,
+        brought_forward: "500.00", received: "120.00", paid: "0.00", pending: "0.00",
+        pending_vouchers: [],
+        lines: [{ entry_no: "JE-202610-0001", source_type: "PAYMENT_RECEIVED", source_doc_no: "OR-1", description: "Deposit", party_name: "Tan Ah Kow", received: "120.00", paid: "0.00" }],
+      },
+      {
+        account_code: "1122", name: "Maybank", money_kind: "BANK", is_active: true,
+        brought_forward: "10000.00", received: "0.00", paid: "0.00", pending: "800.00",
+        pending_vouchers: [{ voucher_id: "bbbbbbbb-0000-4000-8000-000000000001", voucher_no: "PV-0007", payee_name: "Lumen Sofa Works", voucher_date: "2026-10-01", amount: "800.00" }],
+        lines: [] as AnyJson[],
+      },
+    ],
+  };
+
+  it("asks for the day it is given and passes the answer through whole", async () => {
+    const { sb } = fakeClient(() => ok(DAY));
+    const res = await get("/daily-bank?day=2026-10-02");
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("fin_daily_bank", { p_day: "2026-10-02" });
+    expect(await json(res)).toEqual(DAY);
+  });
+
+  it("admits the principal", async () => {
+    fakeClient(() => ok(DAY));
+    expect((await get("/daily-bank?day=2026-10-02", "principal")).status).toBe(200);
+  });
+
+  it("defaults to today in Malaysia", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-02T17:30:00Z")); // 01:30 on the 3rd in Malaysia
+    try {
+      const { sb } = fakeClient(() => ok(DAY));
+      await get("/daily-bank");
+      expect(sb.rpc).toHaveBeenCalledWith("fin_daily_bank", { p_day: "2026-10-03" });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("refuses a day that is not a date, and a question it does not know, before any database call", async () => {
+    expect((await get("/daily-bank?day=02/10/2026")).status).toBe(422);
+    expect((await get("/daily-bank?day=2026-10-02&account=1122")).status).toBe(422);
+    expect(userClient).not.toHaveBeenCalled();
+  });
+
+  it("a day the calendar does not have is a date problem, not a crash", async () => {
+    fakeClient(() => fail("22008"));
+    const res = await get("/daily-bank?day=2026-02-30");
+    expect(res.status).toBe(422);
+    expect((await json(res)).message).toBe("Daily Bank needs a valid date.");
+  });
+
+  it("the database's own refusal stays a refusal", async () => {
+    fakeClient(() => refuse("42501", "not_internal", "Daily Bank is internal."));
+    expect((await get("/daily-bank?day=2026-10-02")).status).toBe(403);
+  });
+
+  it("a figure it cannot read refuses the whole day instead of printing part of it", async () => {
+    const broken = structuredClone(DAY);
+    broken.accounts[1]!.pending_vouchers[0]!.amount = "eight hundred";
+    fakeClient(() => ok(broken));
+    const res = await get("/daily-bank?day=2026-10-02");
+    expect(res.status).toBe(500);
+    expect((await json(res)).message).toBe("Daily Bank could not be loaded. Try again.");
+  });
+
+  it("a line with an unreadable figure refuses too", async () => {
+    const broken = structuredClone(DAY);
+    broken.accounts[0]!.lines[0]!.received = "";
+    fakeClient(() => ok(broken));
+    expect((await get("/daily-bank?day=2026-10-02")).status).toBe(500);
+  });
+
+  it("fails closed on an empty or shapeless answer", async () => {
+    fakeClient(() => ok(null));
+    expect((await get("/daily-bank?day=2026-10-02")).status).toBe(500);
+    fakeClient(() => ok({ day: "2026-10-02" }));
+    expect((await get("/daily-bank?day=2026-10-02")).status).toBe(500);
+  });
+
+  it("a database failure is a plain sentence, not the database's text", async () => {
+    fakeClient(() => fail("XX000", "relation gl_money_accounts is broken"));
+    const res = await get("/daily-bank?day=2026-10-02");
+    expect(res.status).toBe(500);
+    expect((await json(res)).message).toBe("Daily Bank could not be loaded. Try again.");
+  });
+});
+
+// ── Cash Flow (0638, Chew 2026-10-03) ───────────────────────────────────────
+
+describe("GET /cash-flow (0638)", () => {
+  const FLOW = {
+    from: "2026-09-01",
+    to: "2026-09-30",
+    go_live_on: "2026-09-01",
+    accounts: [
+      { account_code: "1121", name: "Public Bank", money_kind: "BANK", is_active: true, opening: "10000.00", receipts: "6300.00", payments: "1200.00" },
+    ],
+    rows: [
+      { side: "IN", account_code: "1210", name: "Trade receivables", kind: "ASSET", money_kind: null, amount: 6300 },
+      { side: "OUT", account_code: "2110", name: "Trade payables", kind: "LIABILITY", money_kind: null, amount: 1200 },
+    ],
+    card: { taken: 0, waiting: 0 },
+  };
+
+  it("asks for the period and passes the answer through whole", async () => {
+    const { sb } = fakeClient(() => ok(FLOW));
+    const res = await get("/cash-flow?from=2026-09-01&to=2026-09-30");
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("fin_cash_flow", { p_from: "2026-09-01", p_to: "2026-09-30" });
+    expect(await json(res)).toEqual(FLOW);
+  });
+
+  it("refuses a missing or backwards period before any database call", async () => {
+    expect((await get("/cash-flow?from=2026-09-01")).status).toBe(422);
+    expect((await get("/cash-flow?from=2026-09-30&to=2026-09-01")).status).toBe(422);
+    expect((await get("/cash-flow?from=01/09/2026&to=2026-09-30")).status).toBe(422);
+    expect(userClient).not.toHaveBeenCalled();
+  });
+
+  it("rows that do not add up to the accounts' money in and out refuse the whole report", async () => {
+    const broken = structuredClone(FLOW);
+    broken.rows[0]!.amount = 6299.99;
+    fakeClient(() => ok(broken));
+    const res = await get("/cash-flow?from=2026-09-01&to=2026-09-30");
+    expect(res.status).toBe(500);
+    expect((await json(res)).message).toBe("Cash Flow could not be loaded. Try again.");
+  });
+
+  it("fails closed on a shapeless answer, and says a database failure in plain words", async () => {
+    fakeClient(() => ok({ from: "2026-09-01" }));
+    expect((await get("/cash-flow?from=2026-09-01&to=2026-09-30")).status).toBe(500);
+    fakeClient(() => fail("XX000", "relation gl_entries is broken"));
+    const res = await get("/cash-flow?from=2026-09-01&to=2026-09-30");
+    expect(res.status).toBe(500);
+    expect((await json(res)).message).toBe("Cash Flow could not be loaded. Try again.");
+  });
+
+  it("the database's own refusal stays a refusal", async () => {
+    fakeClient(() => refuse("42501", "not_internal", "Cash Flow is internal."));
+    expect((await get("/cash-flow?from=2026-09-01&to=2026-09-30", "principal")).status).toBe(403);
+  });
+});
+
+// ── General Ledger (0639, Chew 2026-10-03) ──────────────────────────────────
+
+describe("GET /general-ledger (0639)", () => {
+  const glRow = (over: AnyJson) => ({
+    row_kind: "LINE", account_code: "1121", account_name: "Public Bank", kind: "ASSET",
+    entry_date: "2026-09-02", entry_no: "JE-202609-0001", source_type: "CUSTOMER_PAYMENT", source_doc_no: "OR-1",
+    narration: "Payment", memo: null, debit: 0, credit: 0, running_balance: 0, ...over,
+  });
+  const LEDGER = {
+    status: "OK", go_live_on: "2026-09-01", from: "2026-09-01", to: "2026-09-30",
+    accounts: [{
+      account_code: "1121",
+      rows: [
+        glRow({ row_kind: "OPENING", entry_date: null, entry_no: null, source_type: null, source_doc_no: null, debit: null, credit: null, running_balance: 0 }),
+        glRow({ debit: 250.5, running_balance: 250.5 }),
+        glRow({ row_kind: "CLOSING", entry_date: null, entry_no: null, source_type: null, source_doc_no: null, debit: null, credit: null, running_balance: 250.5 }),
+      ],
+    }],
+  };
+
+  it("asks for the period, every account, and passes the answer through whole", async () => {
+    const { sb } = fakeClient(() => ok(LEDGER));
+    const res = await get("/general-ledger?from=2026-09-01&to=2026-09-30");
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("fin_general_ledger", {
+      p_from: "2026-09-01", p_to: "2026-09-30", p_accounts: null, p_department_type: null, p_department_id: null,
+    });
+    expect(await json(res)).toEqual(LEDGER);
+  });
+
+  it("asks for the accounts named, and for one department", async () => {
+    const { sb } = fakeClient(() => ok(LEDGER));
+    const id = "11111111-1111-4111-8111-111111111111";
+    await get(`/general-ledger?from=2026-09-01&to=2026-09-30&accounts=1121,2110&departmentType=DEALER&departmentId=${id}`);
+    expect(sb.rpc).toHaveBeenCalledWith("fin_general_ledger", {
+      p_from: "2026-09-01", p_to: "2026-09-30", p_accounts: ["1121", "2110"], p_department_type: "DEALER", p_department_id: id,
+    });
+  });
+
+  it("refuses a backwards period or an account that is not a code, before any database call", async () => {
+    expect((await get("/general-ledger?from=2026-09-30&to=2026-09-01")).status).toBe(422);
+    expect((await get("/general-ledger?from=2026-09-01&to=2026-09-30&accounts=1121;x")).status).toBe(422);
+    expect(userClient).not.toHaveBeenCalled();
+  });
+
+  it("a block whose balance does not follow its lines refuses the whole report", async () => {
+    const broken = structuredClone(LEDGER);
+    broken.accounts[0]!.rows[1]!.running_balance = 250.49;
+    fakeClient(() => ok(broken));
+    const res = await get("/general-ledger?from=2026-09-01&to=2026-09-30");
+    expect(res.status).toBe(500);
+    expect((await json(res)).message).toBe("The General Ledger could not be loaded. Try again.");
+  });
+
+  it("a ledger with no start date is 409, before go-live passes through", async () => {
+    fakeClient(() => fail("55000"));
+    expect((await get("/general-ledger?from=2026-09-01&to=2026-09-30")).status).toBe(409);
+    fakeClient(() => ok({ ...LEDGER, status: "BEFORE_GO_LIVE", accounts: [] }));
+    expect(await json(await get("/general-ledger?from=2026-08-01&to=2026-08-31"))).toMatchObject({ status: "BEFORE_GO_LIVE" });
+  });
+});
+
+describe("GET /stock-value (0643)", () => {
+  const VALUE = {
+    month_end: "2026-09-30", cut_at: "2026-09-30T16:00:00Z", today: "2026-10-03", provisional: true,
+    units: [
+      { id: "u1", unit_code: "U1-000-001", sku: "SOFA-3S", qty: 1, scope: "unit", status: "free", bucket: "warehouse",
+        site_name: "Carres Klang", holder_name: null, po_no: "PO-1", unit_cost: "520.00", value: "520.00" },
+      { id: "u2", unit_code: "U1-000-002", sku: "SOFA-3S", qty: 1, scope: "unit", status: "free", bucket: "showroom",
+        site_name: "PJ Showroom", holder_name: null, po_no: null, unit_cost: null, value: null },
+    ],
+    left_out: { consignment_units: 1, consignment_qty: 1 },
+  };
+
+  it("asks for the month end and passes the answer through whole", async () => {
+    const { sb } = fakeClient(() => ok(VALUE));
+    const res = await get("/stock-value?monthEnd=2026-09-30");
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("fin_stock_value", { p_month_end: "2026-09-30" });
+    expect(await json(res)).toEqual(VALUE);
+  });
+
+  it("refuses a missing day before any database call, and a value that is not quantity times cost", async () => {
+    expect((await get("/stock-value")).status).toBe(422);
+    expect(userClient).not.toHaveBeenCalled();
+    const broken = structuredClone(VALUE);
+    broken.units[0]!.value = "521.00";
+    fakeClient(() => ok(broken));
+    const res = await get("/stock-value?monthEnd=2026-09-30");
+    expect(res.status).toBe(500);
+    expect((await json(res)).message).toBe("The stock value could not be loaded. Try again.");
+  });
+});
+
+describe("GET /collection (0644)", () => {
+  const ORDERS = {
+    from: "2026-09-01", to: "2026-09-30",
+    orders: [{ id: "o1", so: 1401, placed_on: "2026-09-05", status: "proceed_order", customer_name: "LIM KUAN YANG",
+      salesperson_id: "s1", salesperson_name: "Aina", channel: "showroom", dealer_name: "PJ Showroom",
+      order_value: "2000.00", deposit: "1000.00", balance_paid: "0.00", invoice_no: null, billed: null, issued_at: null, delivered: false }],
+  };
+
+  it("asks for the period and passes the answer through whole", async () => {
+    const { sb } = fakeClient(() => ok(ORDERS));
+    const res = await get("/collection?from=2026-09-01&to=2026-09-30");
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("fin_collection", { p_from: "2026-09-01", p_to: "2026-09-30" });
+    expect(await json(res)).toEqual(ORDERS);
+  });
+
+  it("refuses a backwards period before any database call, and a figure it cannot read", async () => {
+    expect((await get("/collection?from=2026-09-30&to=2026-09-01")).status).toBe(422);
+    expect(userClient).not.toHaveBeenCalled();
+    fakeClient(() => ok({ ...ORDERS, orders: [{ ...ORDERS.orders[0], deposit: "lots" }] }));
+    const res = await get("/collection?from=2026-09-01&to=2026-09-30");
+    expect(res.status).toBe(500);
+    expect((await json(res)).message).toBe("The Collection report could not be loaded. Try again.");
+  });
+});
+
+describe("GET and PUT /forecast (0646)", () => {
+  const ACCOUNTS = [
+    { code: "4100", name: "Furniture sales", kind: "INCOME", active: true, block: "income" },
+    { code: "5100", name: "Cost of goods sold", kind: "EXPENSE", active: true, block: "cost" },
+    { code: "6200", name: "Rent and utilities", kind: "EXPENSE", active: true, block: "expense" },
+  ];
+  const PLAN = {
+    month: "2026-10", accounts: ACCOUNTS,
+    lines: { "4100": { amount: 100000 }, "5100": { share: 5500 } },
+    updated_at: "2026-10-03T08:15:00.123456+00:00", updated_by_name: "Chew",
+    previous: { month: "2026-09", lines: { "6200": { amount: 8000 } } },
+    planned_months: ["2026-09", "2026-10"],
+  };
+  const put = async (month: string, body: unknown, role = "finance") =>
+    app.fetch(new Request(`http://t/api/finance/ledger/forecast/${month}`, {
+      method: "PUT",
+      headers: { Authorization: `Bearer ${await makeJwt(role)}`, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }), env);
+
+  it("asks for the month and passes the plan through whole", async () => {
+    const { sb } = fakeClient(() => ok(PLAN));
+    const res = await get("/forecast?month=2026-10");
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("fin_forecast_read", { p_month: "2026-10" });
+    expect(await json(res)).toEqual(PLAN);
+  });
+
+  it("refuses a month that is not one before any database call, and a plan it cannot read", async () => {
+    expect((await get("/forecast?month=2026-13")).status).toBe(422);
+    expect(userClient).not.toHaveBeenCalled();
+    fakeClient(() => ok({ ...PLAN, lines: { "4100": { share: 100 } } }));
+    const res = await get("/forecast?month=2026-10");
+    expect(res.status).toBe(500);
+    expect((await json(res)).message).toBe("The forecast could not be loaded. Try again.");
+    fakeClient(() => ok({ ...PLAN, month: "2026-09" }));
+    expect((await get("/forecast?month=2026-10")).status).toBe(500);
+  });
+
+  it("saves the whole month with the time the page read, and answers the new time", async () => {
+    const { sb } = fakeClient(() => ok("2026-10-03T09:00:00.5+00:00"));
+    const res = await put("2026-10", { lines: { "4100": { amount: 0.1 + 0.2 }, "5100": { share: 5500 } }, was: PLAN.updated_at });
+    expect(res.status).toBe(200);
+    expect(await json(res)).toEqual({ month: "2026-10", saved_at: "2026-10-03T09:00:00.5+00:00" });
+    expect(sb.rpc).toHaveBeenCalledWith("fin_forecast_save", {
+      p_month: "2026-10", p_lines: { "4100": { amount: 0.3 }, "5100": { share: 5500 } }, p_was: PLAN.updated_at,
+    });
+  });
+
+  it("refuses a broken cell before the database, and passes the database's own refusals through", async () => {
+    const { sb } = fakeClient(() => ok(null));
+    expect((await put("2026-10", { lines: { "6200": { amount: 1.234 } }, was: null })).status).toBe(422);
+    expect((await put("2026-1", { lines: {}, was: null })).status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
+    expect((await put("2026-10", { lines: {}, was: null }, "operation")).status).toBe(403);
+
+    fakeClient(() => ({ data: null, error: { code: "40001", details: "forecast_changed", message: "Someone else saved this month after you opened it. Open it again to see their plan." } }));
+    const stale = await put("2026-10", { lines: {}, was: null });
+    expect(stale.status).toBe(409);
+    expect(await json(stale)).toMatchObject({ code: "forecast_changed" });
+    fakeClient(() => ({ data: null, error: { code: "P0001", details: "income_needs_amount", message: "4100 Furniture sales: an income account is planned as an amount." } }));
+    const income = await put("2026-10", { lines: { "4100": { share: 1 } }, was: null });
+    expect(income.status).toBe(422);
+    expect(await json(income)).toMatchObject({ code: "income_needs_amount", message: "4100 Furniture sales: an income account is planned as an amount." });
+    fakeClient(() => fail("XX000"));
+    expect((await json(await put("2026-10", { lines: {}, was: null }))).message).toBe("The forecast could not be saved. Try again.");
   });
 });

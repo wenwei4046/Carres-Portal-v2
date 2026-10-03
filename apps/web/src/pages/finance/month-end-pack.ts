@@ -30,7 +30,7 @@ import {
 
 type Cell = string | number;
 export interface PackSheet {
-  name: "Trial Balance" | "Profit and Loss" | "Balance Sheet";
+  name: "Trial Balance" | "Profit and Loss" | "Balance Sheet" | "Cash Flow" | "General Ledger";
   rows: Cell[][];
 }
 

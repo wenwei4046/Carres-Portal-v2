@@ -36,13 +36,18 @@ import {
   Library,
   SlidersHorizontal,
   Receipt,
+  ReceiptText,
   Banknote,
   CalendarClock,
   CreditCard,
+  Landmark,
+  BookOpenText,
+  Hourglass,
   type LucideIcon,
 } from "lucide-react";
 import type { Role } from "@carres/shared/domain";
 import type { PurchasingPageGroupKey } from "./purchasing-sidebar";
+import { NO_CAPS, type NavCapability } from "./nav-capabilities";
 
 /**
  * Unified Internal Portal nav model (2026-06-30, Loo).
@@ -88,7 +93,14 @@ export type PortalSection =
   | "Customer Care"
   | "Suppliers"
   | "Master Data"
-  | "Admin";
+  | "Admin"
+  /* The Finance modules (Chew, 2026-10-03; docs/finance/MASTER.md §4). Used
+   * only by Finance's own pages; no other area has a page in them. */
+  | "Payables"
+  | "Receivables"
+  | "Bank & Cards"
+  | "Ledger"
+  | "Reports";
 
 /** Rail order of the sections. The queue index's own order, unchanged. */
 export const SECTION_ORDER: ReadonlyArray<PortalSection> = [
@@ -103,6 +115,13 @@ export const SECTION_ORDER: ReadonlyArray<PortalSection> = [
   "Suppliers",
   "Master Data",
   "Admin",
+  /* Finance (Chew, 2026-10-03). Payables sits above Receivables because the
+   * owner ruling of 2026-09-14 keeps `AP · Payables` above AR. */
+  "Payables",
+  "Receivables",
+  "Bank & Cards",
+  "Ledger",
+  "Reports",
 ];
 
 /**
@@ -168,6 +187,15 @@ export const PORTAL_MODULES: ReadonlyArray<PortalModule> = [
      thing Customer Care is. The page itself did not move; only its door. */
   { section: "Suppliers", label: "Suppliers", icon: Truck },
   { section: "Master Data", label: "Master Data", icon: Library },
+  /* THE FINANCE MODULES (Chew, 2026-10-03; docs/finance/MASTER.md §4). Each
+   * module wears its flagship page's face, the same law as above. A module
+   * with one page draws no parent row (navBlocks), so Reports stays a plain
+   * row until a second report page joins it. */
+  { section: "Payables", label: "Payables", icon: ArrowUpRight },
+  { section: "Receivables", label: "Receivables", icon: ArrowDownLeft },
+  { section: "Bank & Cards", label: "Bank & Cards", icon: CreditCard },
+  { section: "Ledger", label: "Ledger", icon: BookOpen },
+  { section: "Reports", label: "Reports", icon: BarChart3 },
 ];
 
 export interface PortalNavItem {
@@ -198,6 +226,10 @@ export interface PortalNavItem {
   /** optional per-item narrowing of the group's roles — the item shows only
    *  for these roles. */
   roles?: ReadonlyArray<Role>;
+  /** A capability beyond the role the person must hold for the item to show
+   *  (`nav-capabilities.ts`). One use: Payment Requests, for the staff the
+   *  boss allows (Chew 2026-10-03). */
+  needs?: NavCapability;
   /** The MODULE this page belongs to (`PORTAL_MODULES`).
    *
    *  ⭐ A MODULE IS AN EXPANDABLE PARENT ROW, NOT A HEADING (Jess, 2026-08-19
@@ -307,6 +339,18 @@ export const PORTAL_NAV: PortalNavGroup[] = [
        * Receiving & GRN card). Modules reference duties; they never keep a
        * second person list. */
       { key: "issue-tracker", label: "Issue Tracker", icon: CircleAlert, path: "/operation/issues", section: "Workspace" },
+      /* 0645 — Chew 2026-10-03 (Finance MASTER §3.3), the ONE shared-menu entry
+       * Chew approved: staff Finance or the boss allows ask Finance to pay a bill. Shown
+       * only to them (`needs`); the page lives in Finance. */
+      {
+        key: "payment-requests",
+        label: "Payment Requests",
+        icon: HandCoins,
+        path: "/finance/payment-requests",
+        activeFor: ["path:/finance/payment-requests"],
+        section: "Workspace",
+        needs: "payment-requester",
+      },
       /* ⭐ `Old Orders (temporary)` LEFT THE RAIL (Jess, owner ruling
        * 2026-09-23): "Replace the previous standalone Sales Orders entry;
        * remove the old/legacy order menu entry from this tree."
@@ -558,25 +602,32 @@ export const PORTAL_NAV: PortalNavGroup[] = [
     defaultTab: "dashboard",
     items: [
       {
+        // Chew 2026-10-03: Dashboard stays its own plain row at the top. The
+        // `Workspace` section has no module row (PORTAL_MODULES), so it draws
+        // first and plain, exactly as the operation area's Dashboard does.
         key: "dashboard",
         label: "Dashboard",
         icon: LayoutDashboard,
         financePath: "/finance/dashboard",
+        section: "Workspace",
       },
       {
         // Owner ruling 2026-09-14: the sidebar word is `AP · Payables` again,
         // above AR. It opens what is still unpaid per supplier (0477); the old
-        // PO-cost page is gone and /finance/ap redirects here.
+        // PO-cost page is gone and /finance/ap redirects here. The Payables
+        // module sits above Receivables (SECTION_ORDER) to keep it above AR.
         key: "ap",
         label: "AP · Payables",
         icon: ArrowUpRight,
         financePath: "/finance/ap-outstanding",
+        section: "Payables",
       },
       {
         key: "ar",
         label: "AR · Receivables",
         icon: ArrowDownLeft,
         financePath: "/finance/ar",
+        section: "Receivables",
       },
       // 0477 — a supplier's bill and the voucher that pays it. What is still
       // unpaid per supplier is the `ap` row above (and the third listing of the
@@ -586,13 +637,22 @@ export const PORTAL_NAV: PortalNavGroup[] = [
         label: "Bills",
         icon: Receipt,
         financePath: "/finance/bills",
+        section: "Payables",
       },
       {
         key: "payment-vouchers",
         label: "Payment Vouchers",
         icon: Banknote,
         financePath: "/finance/payment-vouchers",
+        section: "Payables",
       },
+      // 0645 — staff ask Finance to pay a bill; Finance answers here (Chew 2026-10-03).
+      { key: "payment-requests", label: "Payment Requests", icon: HandCoins, financePath: "/finance/payment-requests", section: "Payables" },
+      // 0642 — a supplier's credit note takes money off what Carres owes (Chew 2026-10-03).
+      { key: "credit-notes", label: "Credit Notes", icon: ReceiptText, financePath: "/finance/credit-notes", section: "Payables" },
+      // 0636 — Finance's own tax and bank details per supplier (Chew 2026-10-03).
+      // Keyed apart from the operation area's Suppliers pages.
+      { key: "supplier-finance", label: "Suppliers", icon: Truck, financePath: "/finance/suppliers", section: "Payables" },
       /* The finance role sees the SAME two Payments destinations, as the same
        * module — never a second Payment information architecture (owner
        * ruling 2026-09-12). `Order Payments`, `Invoices` and `Refunds &
@@ -627,12 +687,20 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       // 0478 — money in that is not a sale. A party that is not a customer
       // (a sister company, a lender) is billed on Other debtors; a loan in,
       // other income or money against those invoices is an Other receipt.
-      { key: "other-debtors", label: "Other debtors", icon: Users, financePath: "/finance/other-debtors" },
-      { key: "other-receipts", label: "Other receipts", icon: HandCoins, financePath: "/finance/other-receipts" },
-      // 0529 — Finance moving its own money: bank transfers and card payouts.
-      { key: "money-moves", label: "Money moves", icon: ArrowLeftRight, financePath: "/finance/money-moves" },
+      { key: "other-debtors", label: "Other debtors", icon: Users, financePath: "/finance/other-debtors", section: "Receivables" },
+      { key: "other-receipts", label: "Other receipts", icon: HandCoins, financePath: "/finance/other-receipts", section: "Receivables" },
+      // 0637 — every money account on one day: the day before, money in and
+      // out, the vouchers waiting and what is left to pay with. First under
+      // Bank & Cards, as in Chew's menu draft (2026-10-03).
+      { key: "daily-bank", label: "Daily Bank", icon: Landmark, financePath: "/finance/daily-bank", section: "Bank & Cards" },
       // 0572 — the card companies' files, matched to the recorded card payments.
-      { key: "card-settlement", label: "Card settlement", icon: CreditCard, financePath: "/finance/card-settlement" },
+      // Above Money moves, as in Chew's menu draft (2026-10-03).
+      { key: "card-settlement", label: "Card settlement", icon: CreditCard, financePath: "/finance/card-settlement", section: "Bank & Cards" },
+      // 0641 — each card and online payment not in the bank yet, and where it
+      // is; after Card settlement, where most of them are moved on.
+      { key: "card-money-waiting", label: "Card money waiting", icon: Hourglass, financePath: "/finance/card-money-waiting", section: "Bank & Cards" },
+      // 0529 — Finance moving its own money: bank transfers and card payouts.
+      { key: "money-moves", label: "Money moves", icon: ArrowLeftRight, financePath: "/finance/money-moves", section: "Bank & Cards" },
       // 0543 — Finance keeps the dealer master (code, state, address, contact)
       // on the same list the principal uses; inviting stays principal-only.
       { key: "dealers", label: "Dealers", icon: Users, financePath: "/finance/dealers" },
@@ -640,14 +708,18 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       // the Trial Balance and the Self-check are three different objects
       // (entries · account balances · checks), and UI MASTER §6.5 keeps tabs
       // for views of ONE object.
-      { key: "ledger", label: "Journal", icon: BookOpen, financePath: "/finance/ledger" },
-      { key: "trial-balance", label: "Trial Balance", icon: Scale, financePath: "/finance/ledger/trial-balance" },
-      { key: "self-check", label: "Self-check", icon: BadgeCheck, financePath: "/finance/ledger/self-check" },
+      { key: "ledger", label: "Journal", icon: BookOpen, financePath: "/finance/ledger", section: "Ledger" },
+      // 0639 — every account's period, one block each; after the Journal, as
+      // in Chew's menu draft (2026-10-03).
+      { key: "general-ledger", label: "General Ledger", icon: BookOpenText, financePath: "/finance/ledger/general-ledger", section: "Ledger" },
+      { key: "trial-balance", label: "Trial Balance", icon: Scale, financePath: "/finance/ledger/trial-balance", section: "Ledger" },
+      { key: "self-check", label: "Self-check", icon: BadgeCheck, financePath: "/finance/ledger/self-check", section: "Ledger" },
       {
         key: "reports",
         label: "Reports",
         icon: BarChart3,
         financePath: "/finance/reports",
+        section: "Reports",
       },
     ],
   },
@@ -754,12 +826,15 @@ export function visibleGroups(role: Role | null): PortalNavGroup[] {
   return PORTAL_NAV.filter((g) => g.roles.includes(role));
 }
 
-/** The items of a group a given role may see (per-item `roles` narrowing). */
+/** The items of a group a given role may see (per-item `roles` narrowing, and
+ *  an item that `needs` a capability only for a person who holds it). */
 export function visibleItems(
   group: PortalNavGroup,
   role: Role | null,
+  caps: ReadonlySet<NavCapability> = NO_CAPS,
 ): PortalNavItem[] {
-  return group.items.filter((it) => !it.roles || (role != null && it.roles.includes(role)));
+  return group.items.filter((it) =>
+    (!it.roles || (role != null && it.roles.includes(role))) && (!it.needs || caps.has(it.needs)));
 }
 
 /** The href a nav item points at. */
@@ -800,8 +875,9 @@ export type NavBlock =
 export function navBlocks(
   group: PortalNavGroup,
   role: Role | null,
+  caps: ReadonlySet<NavCapability> = NO_CAPS,
 ): NavBlock[] {
-  const items = visibleItems(group, role);
+  const items = visibleItems(group, role, caps);
   const bySection = new Map<PortalSection | "__none__", PortalNavItem[]>();
   for (const item of items) {
     const key = item.section ?? "__none__";

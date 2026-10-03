@@ -42,6 +42,12 @@ import {
   trialBalanceSides,
 } from "@carres/shared/finance-ledger";
 import { CUSTOMERS, SUPPLIERS } from "@carres/shared/tables";
+import { dailyBankQuery, dailyBankRow, sen, type DailyBankDay } from "@carres/shared/daily-bank";
+import { cashFlowQuery, cashFlowReport, type CashFlowAnswer } from "@carres/shared/cash-flow";
+import { generalLedgerBlocks, generalLedgerQuery, type GeneralLedgerAnswer } from "@carres/shared/general-ledger";
+import { stockValueQuery, stockValueReport, type StockValueAnswer } from "@carres/shared/stock-value";
+import { collectionQuery, collectionReport, type CollectionAnswer } from "@carres/shared/collection";
+import { forecastQuery, forecastReport, forecastSaveInput, type ForecastAnswer, type ForecastSaved } from "@carres/shared/forecast";
 import { requireFinance } from "../../lib/auth-guards";
 import { mapPgError, parseJsonBody, readAllPages } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
@@ -994,6 +1000,177 @@ financeLedgerRouter.get("/balance-sheet", requireFinance, async (c) => {
   if (error) return ledgerError(c, error, "The balance sheet");
   if (!Array.isArray(data) || data.length === 0) return failed(c, "The balance sheet");
   return c.json({ rows: data });
+});
+
+// ── Daily Bank (0637, Chew 2026-10-03) ──────────────────────────────────────
+
+/** One day, every money account, passed through. Closing, available and the
+ *  totals are the shared daily-bank arithmetic's, worked out on the page and
+ *  nowhere here. The figures are read once so a broken answer refuses with a
+ *  plain sentence instead of printing as a whole one. */
+financeLedgerRouter.get("/daily-bank", requireFinance, async (c) => {
+  const parsed = dailyBankQuery.safeParse(queryOf(c));
+  if (!parsed.success) return invalid(c, parsed.error);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("fin_daily_bank", { p_day: parsed.data.day ?? todayIsoMYT() });
+  if (error) return ledgerError(c, error, "Daily Bank");
+  const day = data as DailyBankDay | null;
+  if (!day || typeof day.day !== "string" || !Array.isArray(day.accounts)) return failed(c, "Daily Bank");
+  try {
+    for (const a of day.accounts) {
+      dailyBankRow(a);
+      for (const l of a.lines) { sen(l.received); sen(l.paid); }
+      for (const v of a.pending_vouchers) sen(v.amount);
+    }
+  } catch {
+    return failed(c, "Daily Bank");
+  }
+  return c.json(day);
+});
+
+// ── Cash Flow (0638, Chew 2026-10-03) ───────────────────────────────────────
+
+/** A period of cash and bank money, passed through. It is read once through
+ *  the shared arithmetic, which refuses figures it cannot read and rows that
+ *  do not add up to the accounts' money in and out. */
+financeLedgerRouter.get("/cash-flow", requireFinance, async (c) => {
+  const parsed = cashFlowQuery.safeParse(queryOf(c));
+  if (!parsed.success) return invalid(c, parsed.error);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("fin_cash_flow", { p_from: parsed.data.from, p_to: parsed.data.to });
+  if (error) return ledgerError(c, error, "Cash Flow");
+  const answer = data as CashFlowAnswer | null;
+  if (!answer || !Array.isArray(answer.accounts) || !Array.isArray(answer.rows) || !answer.card) return failed(c, "Cash Flow");
+  try {
+    cashFlowReport(answer);
+  } catch {
+    return failed(c, "Cash Flow");
+  }
+  return c.json(answer);
+});
+
+// ── General Ledger (0639, Chew 2026-10-03) ──────────────────────────────────
+
+/** Every account's period, gathered by the database from gl_account_ledger's
+ *  own rows. Read once through the shared reader, which refuses a block that
+ *  does not hold together; the answer passes through as it came. */
+financeLedgerRouter.get("/general-ledger", requireFinance, async (c) => {
+  const parsed = generalLedgerQuery.safeParse(queryOf(c));
+  if (!parsed.success) return invalid(c, parsed.error);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("fin_general_ledger", {
+    p_from: parsed.data.from,
+    p_to: parsed.data.to,
+    p_accounts: parsed.data.accounts ? parsed.data.accounts.split(",") : null,
+    ...departmentRpcArgs(parsed.data),
+  });
+  if (error) return ledgerError(c, error, "The General Ledger");
+  const answer = data as GeneralLedgerAnswer | null;
+  if (!answer || (answer.status !== "OK" && answer.status !== "BEFORE_GO_LIVE") || !Array.isArray(answer.accounts)) {
+    return failed(c, "The General Ledger");
+  }
+  try {
+    generalLedgerBlocks(answer);
+  } catch {
+    return failed(c, "The General Ledger");
+  }
+  return c.json(answer);
+});
+
+// ── Stock value, provisional (0643, Chew 2026-10-03) ────────────────────────
+
+/** Every Carres-owned Unit held at the end of a day, grouped and costed by the
+ *  database from Stock's own Units. Read once through the shared arithmetic,
+ *  which refuses a value that is not quantity × cost; passed through as it came. */
+financeLedgerRouter.get("/stock-value", requireFinance, async (c) => {
+  const parsed = stockValueQuery.safeParse(queryOf(c));
+  if (!parsed.success) return invalid(c, parsed.error);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("fin_stock_value", { p_month_end: parsed.data.monthEnd });
+  if (error) return ledgerError(c, error, "The stock value");
+  const answer = data as StockValueAnswer | null;
+  if (!answer || !Array.isArray(answer.units) || !answer.left_out) return failed(c, "The stock value");
+  try {
+    stockValueReport(answer);
+  } catch {
+    return failed(c, "The stock value");
+  }
+  return c.json(answer);
+});
+
+// ── Collection report (0644, Chew 2026-10-03) ───────────────────────────────
+
+/** The orders placed in a period with their deposit, balance paid and sales
+ *  invoice, read from Orders' and Payment's own records. Read once through the
+ *  shared arithmetic, which refuses a figure it cannot read; passed through. */
+financeLedgerRouter.get("/collection", requireFinance, async (c) => {
+  const parsed = collectionQuery.safeParse(queryOf(c));
+  if (!parsed.success) return invalid(c, parsed.error);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("fin_collection", { p_from: parsed.data.from, p_to: parsed.data.to });
+  if (error) return ledgerError(c, error, "The Collection report");
+  const answer = data as CollectionAnswer | null;
+  if (!answer || !Array.isArray(answer.orders)) return failed(c, "The Collection report");
+  try {
+    collectionReport(answer, 50);
+  } catch {
+    return failed(c, "The Collection report");
+  }
+  return c.json(answer);
+});
+
+// ── Forecast (0646, Chew 2026-10-03) ────────────────────────────────────────
+
+/** A month's plan and the accounts it can hold. Read once through the shared
+ *  arithmetic, which refuses a cell it cannot read; passed through as it came.
+ *  The page sets it beside the month's Profit and Loss, read on its own. */
+financeLedgerRouter.get("/forecast", requireFinance, async (c) => {
+  const parsed = forecastQuery.safeParse(queryOf(c));
+  if (!parsed.success) return invalid(c, parsed.error);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("fin_forecast_read", { p_month: parsed.data.month });
+  if (error) return ledgerError(c, error, "The forecast");
+  const answer = data as ForecastAnswer | null;
+  if (!answer || answer.month !== parsed.data.month || !Array.isArray(answer.accounts) || !Array.isArray(answer.planned_months)
+      || answer.lines === null || typeof answer.lines !== "object") {
+    return failed(c, "The forecast");
+  }
+  try {
+    forecastReport(answer.accounts, answer.lines, null);
+    if (answer.previous) forecastReport(answer.accounts, answer.previous.lines, null);
+  } catch {
+    return failed(c, "The forecast");
+  }
+  return c.json(answer);
+});
+
+/**
+ * The whole month at once. The database checks every cell and names the
+ * first wrong one; its sentence and tag pass through (mapPgError):
+ *   not_finance 42501 → 403 · month_invalid, lines_invalid 22023 → 422 ·
+ *   account_not_plannable, cell_invalid, income_needs_amount P0001 → 422 ·
+ *   forecast_changed 40001 → 409 (someone else saved the month since).
+ */
+financeLedgerRouter.put("/forecast/:month", requireFinance, async (c) => {
+  const month = forecastQuery.safeParse({ month: c.req.param("month") });
+  if (!month.success) return invalid(c, month.error);
+  const body = await parseJsonBody(c, forecastSaveInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("fin_forecast_save", {
+    p_month: month.data.month,
+    p_lines: body.data.lines,
+    p_was: body.data.was,
+  });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.status === 500 ? { ...m.body, message: "The forecast could not be saved. Try again." } : m.body, m.status);
+  }
+  if (typeof data !== "string") {
+    return c.json({ error: "rpc_failed", code: "rpc_failed", message: "The forecast could not be saved. Try again." }, 500);
+  }
+  const out: ForecastSaved = { month: month.data.month, saved_at: data };
+  return c.json(out);
 });
 
 export default financeLedgerRouter;

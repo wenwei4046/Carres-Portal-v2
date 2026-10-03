@@ -9,10 +9,17 @@ import {
   otherCreditorInput,
   paymentVoucherDraftInput,
   supplierBillDraftInput,
+  supplierCreditNoteDraftInput,
+  supplierFinanceInput,
   type PaymentVoucherDraftInput,
   type SupplierBillDraftInput,
+  type SupplierCreditNoteDraftInput,
 } from "@carres/shared/schemas/finance-ap";
+import { apAgingQuery, apAgingReport, type ApAgingAnswer } from "@carres/shared/ap-aging";
+import { billReadInput, matchSupplier, type BillReadAnswer } from "@carres/shared/bill-reading";
 import { requireFinance } from "../../lib/auth-guards";
+import { billReaderKey, billReaderModel, readBillWithModel } from "../../lib/finance-bill-reader";
+import { todayIsoMYT } from "../../lib/delivery-order-issue";
 import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import { departmentQuery, keepByDepartment, tooManyDepartmentLines, withLineDepartments } from "../../lib/line-departments";
@@ -28,6 +35,11 @@ import type { AppEnv } from "../../types";
  *     GET  /accounts                    ap_account_choices — which account fits which box
  *     GET  /outstanding                 ap_outstanding — owed per supplier, zero included
  *     GET  /bill-outstanding            ap_bill_outstanding — owed per confirmed bill
+ *     GET  /aging?asAt=                 fin_ap_aging — owed on a day, bill by bill, tied
+ *                                       to the payables control accounts (0640)
+ *     GET  /supplier-finance            finance_supplier_list — every supplier with Finance's
+ *                                       own tax and bank details (0636)
+ *     PUT  /supplier-finance/:supplierId  finance_supplier_profile_save (0636)
  *
  *   Bills (a supplier's invoice, entered)
  *     GET  /bills                       supplier_bill_register
@@ -38,6 +50,8 @@ import type { AppEnv } from "../../types";
  *     PUT  /bills/:id                   supplier_bill_save_draft (rewrite a draft)
  *     POST /bills/:id/confirm           supplier_bill_confirm — posts the bill
  *     POST /bills/:id/cancel            supplier_bill_cancel — reverses it if confirmed
+ *     POST /read-bill                   read a bill's pages with Claude to pre-fill a form;
+ *                                       writes nothing; 503 until ANTHROPIC_API_KEY is set
  *
  *   Payment vouchers (Draft → Prepared → Checked → Approved)
  *     GET  /vouchers                    payment_voucher_register
@@ -55,9 +69,19 @@ import type { AppEnv } from "../../types";
  *     POST /vouchers/:id/money-back     supplier_advance_money_back_record — the supplier sent money back
  *     POST /money-back/:id/cancel       supplier_advance_money_back_cancel — the approver reverses it
  *
- *   Files (supplier invoices, receipts, bank slips)
- *     POST /bills/:id/files/sign  · POST /vouchers/:id/files/sign    signed upload URL
- *     POST /bills/:id/files       · POST /vouchers/:id/files         record the uploaded file
+ *   Supplier credit notes (0642: the supplier takes money off what Carres owes)
+ *     GET  /credit-notes                supplier_credit_note_register
+ *     GET  /credit-notes/:id            supplier_credit_note_document
+ *     POST /credit-notes                supplier_credit_note_save_draft (new draft)
+ *     PUT  /credit-notes/:id            supplier_credit_note_save_draft (rewrite a draft)
+ *     POST /credit-notes/:id/confirm    supplier_credit_note_confirm — posts it
+ *     POST /credit-notes/:id/cancel     supplier_credit_note_cancel — reverses it if confirmed
+ *     POST /credit-notes/:id/applications       supplier_credit_note_apply — knock it off a bill; posts nothing
+ *     POST /credit-note-applications/:id/cancel supplier_credit_note_application_cancel — take it off again
+ *
+ *   Files (supplier invoices, receipts, bank slips, credit notes)
+ *     POST /bills/:id/files/sign  · POST /vouchers/:id/files/sign · POST /credit-notes/:id/files/sign
+ *     POST /bills/:id/files       · POST /vouchers/:id/files      · POST /credit-notes/:id/files
  *     GET  /files/url?path=                                          short-lived read URL
  *
  * Every call runs as the SIGNED-IN USER (userClient). The database functions
@@ -69,7 +93,7 @@ const payablesRouter = new Hono<AppEnv>();
 const AP_BUCKET = "ap-documents";
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-type DocType = "SUPPLIER_BILL" | "PAYMENT_VOUCHER";
+type DocType = "SUPPLIER_BILL" | "PAYMENT_VOUCHER" | "SUPPLIER_CREDIT_NOTE";
 
 /** mapPgError, but a 403 keeps the database's reason code (not_finance_approver,
  *  voucher_cancelled …) so the page can say which rule refused. */
@@ -176,6 +200,34 @@ payablesRouter.post("/other-creditors", requireFinance, async (c) => {
   return c.json({ id: data as string });
 });
 
+// ── reading a bill (Chew 2026-10-03, Finance MASTER §3.2 Bill scanning) ─────
+// The pages go to the model once; the answer pre-fills a form a person then
+// checks. Nothing is written here, and the supplier is matched by name only.
+payablesRouter.post("/read-bill", requireFinance, async (c) => {
+  const key = billReaderKey(c.env);
+  if (!key) {
+    return c.json({ error: "not_configured", code: "bill_reader_not_set_up",
+      message: "Reading bills is not set up yet. Type the bill in." }, 503);
+  }
+  const body = await parseJsonBody(c, billReadInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const read = await readBillWithModel({ key, model: billReaderModel(c.env), files: body.data.files });
+  if (!read.ok) {
+    const message = read.why === "refused" ? "These pages could not be read. Try a clearer photo, or the PDF."
+      : read.why === "timeout" ? "Reading the bill took too long. Try again."
+      : "The bill could not be read. Try again, or type it in.";
+    return c.json({ error: "read_failed", code: `bill_${read.why}`, message }, 502);
+  }
+  const { data, error } = await sb(c).from("suppliers").select("id, name, kind");
+  if (error) return pgFail(c, error);
+  const match = matchSupplier(read.reading.vendorName, (data ?? []) as Array<{ id: string; name: string; kind: string | null }>);
+  const answer: BillReadAnswer = {
+    reading: read.reading,
+    supplier: match ? { id: match.supplier.id, name: match.supplier.name, kind: match.supplier.kind, how: match.how } : null,
+  };
+  return c.json(answer);
+});
+
 payablesRouter.get("/accounts", requireFinance, async (c) => {
   const { data, error } = await sb(c).rpc("ap_account_choices");
   if (error) return pgFail(c, error);
@@ -188,6 +240,60 @@ payablesRouter.get("/outstanding", requireFinance, async (c) => {
   const { data, error } = await sb(c).rpc("ap_outstanding", { p_supplier_id: f.value });
   if (error) return pgFail(c, error);
   return c.json({ rows: data ?? [] });
+});
+
+// ── a supplier's finance details (0636; Chew 2026-10-03) ────────────────────
+// Finance's own record beside Purchasing's supplier: tax number, registration
+// number and the bank account a payment goes to.
+
+payablesRouter.get("/supplier-finance", requireFinance, async (c) => {
+  const { data, error } = await sb(c).rpc("finance_supplier_list");
+  if (error) return pgFail(c, error);
+  return c.json({ rows: data ?? [] });
+});
+
+payablesRouter.put("/supplier-finance/:supplierId", requireFinance, async (c) => {
+  const supplierId = c.req.param("supplierId");
+  if (!UUID_RE.test(supplierId)) return badId(c, "supplier");
+  const body = await parseJsonBody(c, supplierFinanceInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const d = body.data;
+  const { data, error } = await sb(c).rpc("finance_supplier_profile_save", {
+    p_supplier_id: supplierId,
+    p_tax_no: d.taxNo,
+    p_registration_no: d.registrationNo,
+    p_bank_name: d.bankName,
+    p_bank_account_no: d.bankAccountNo,
+    p_bank_account_holder: d.bankAccountHolder,
+  });
+  if (error) return pgFail(c, error);
+  return c.json({ id: data as string });
+});
+
+// ── AP aging (0640; Chew 2026-10-03) ────────────────────────────────────────
+// What was owed to suppliers on a day, bill by bill, tied to the payables
+// control accounts. Read once through the shared arithmetic, which refuses a
+// figure it cannot read; the answer passes through as it came.
+
+payablesRouter.get("/aging", requireFinance, async (c) => {
+  const q = apAgingQuery.safeParse(Object.fromEntries(new URL(c.req.url).searchParams));
+  if (!q.success) {
+    return c.json({ error: "invalid_query", code: "invalid_param", message: q.error.issues[0]?.message ?? "invalid query" }, 422);
+  }
+  const { data, error } = await sb(c).rpc("fin_ap_aging", { p_as_at: q.data.asAt ?? todayIsoMYT() });
+  if (error?.code === "55000") {
+    return c.json({ error: "ledger_not_started", code: "ledger_not_started", message: "The ledger has no start date yet." }, 409);
+  }
+  const failed = () => c.json({ error: "rpc_failed", code: "rpc_failed", message: "AP aging could not be loaded. Try again." }, 500);
+  if (error) return mapPgError(error).status === 500 ? failed() : pgFail(c, error);
+  const answer = data as ApAgingAnswer | null;
+  if (!answer || typeof answer.as_at !== "string" || !Array.isArray(answer.suppliers) || !Array.isArray(answer.controls)) return failed();
+  try {
+    apAgingReport(answer, "bill", "month");
+  } catch {
+    return failed();
+  }
+  return c.json(answer);
 });
 
 payablesRouter.get("/bill-outstanding", requireFinance, async (c) => {
@@ -405,6 +511,107 @@ payablesRouter.post("/advance-applications/:id/cancel", requireFinance, async (c
   return c.json({ id });
 });
 
+// ── supplier credit notes (0642; Chew 2026-10-03) ───────────────────────────
+// The supplier's credit note, entered once. Confirming posts Dr the payables
+// account (party = the supplier) / Cr each line; a knock-off ties its credit
+// to one of the supplier's bills and posts nothing.
+
+function creditNoteArgs(noteId: string | null, d: SupplierCreditNoteDraftInput) {
+  return {
+    p_note_id: noteId,
+    p_supplier_id: d.supplierId,
+    p_supplier_note_no: d.supplierNoteNo,
+    p_note_date: d.noteDate,
+    p_lines: d.lines.map((l) => ({
+      account_code: l.accountCode,
+      description: l.description,
+      amount: l.amount,
+      department_type: l.departmentType ?? null,
+      department_id: l.departmentId ?? null,
+    })),
+    p_ap_account_code: d.apAccountCode ?? null,
+    p_narration: d.narration ?? null,
+  };
+}
+
+payablesRouter.get("/credit-notes", requireFinance, async (c) => {
+  const { data, error } = await sb(c).rpc("supplier_credit_note_register");
+  if (error) return pgFail(c, error);
+  return c.json({ rows: data ?? [] });
+});
+
+payablesRouter.get("/credit-notes/:id", requireFinance, async (c) => {
+  const id = c.req.param("id");
+  if (!UUID_RE.test(id)) return badId(c, "credit note");
+  const { data, error } = await sb(c).rpc("supplier_credit_note_document", { p_note_id: id });
+  if (error) return pgFail(c, error);
+  if (!data) return c.json({ error: "not_found", code: "note_missing", message: "That credit note does not exist." }, 404);
+  return c.json(data);
+});
+
+payablesRouter.post("/credit-notes", requireFinance, async (c) => {
+  const body = await parseJsonBody(c, supplierCreditNoteDraftInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const { data, error } = await sb(c).rpc("supplier_credit_note_save_draft", creditNoteArgs(null, body.data));
+  if (error) return pgFail(c, error);
+  return c.json({ id: data as string }, 201);
+});
+
+payablesRouter.put("/credit-notes/:id", requireFinance, async (c) => {
+  const id = c.req.param("id");
+  if (!UUID_RE.test(id)) return badId(c, "credit note");
+  const body = await parseJsonBody(c, supplierCreditNoteDraftInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const { data, error } = await sb(c).rpc("supplier_credit_note_save_draft", creditNoteArgs(id, body.data));
+  if (error) return pgFail(c, error);
+  return c.json({ id: data as string });
+});
+
+payablesRouter.post("/credit-notes/:id/confirm", requireFinance, async (c) => {
+  const id = c.req.param("id");
+  if (!UUID_RE.test(id)) return badId(c, "credit note");
+  const { error } = await sb(c).rpc("supplier_credit_note_confirm", { p_note_id: id });
+  if (error) return pgFail(c, error);
+  return c.json({ id });
+});
+
+payablesRouter.post("/credit-notes/:id/cancel", requireFinance, async (c) => {
+  const id = c.req.param("id");
+  if (!UUID_RE.test(id)) return badId(c, "credit note");
+  const body = await parseJsonBody(c, apReasonInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const { error } = await sb(c).rpc("supplier_credit_note_cancel", { p_note_id: id, p_reason: body.data.reason });
+  if (error) return pgFail(c, error);
+  return c.json({ id });
+});
+
+payablesRouter.post("/credit-notes/:id/applications", requireFinance, async (c) => {
+  const id = c.req.param("id");
+  if (!UUID_RE.test(id)) return badId(c, "credit note");
+  const body = await parseJsonBody(c, advanceApplyInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const { data, error } = await sb(c).rpc("supplier_credit_note_apply", {
+    p_note_id: id,
+    p_bill_id: body.data.billId,
+    p_amount: body.data.amount,
+  });
+  if (error) return pgFail(c, error);
+  return c.json({ id: data as string }, 201);
+});
+
+payablesRouter.post("/credit-note-applications/:id/cancel", requireFinance, async (c) => {
+  const id = c.req.param("id");
+  if (!UUID_RE.test(id)) return badId(c, "credit note on a bill");
+  const body = await parseJsonBody(c, apReasonInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const { error } = await sb(c).rpc("supplier_credit_note_application_cancel", {
+    p_application_id: id,
+    p_reason: body.data.reason,
+  });
+  if (error) return pgFail(c, error);
+  return c.json({ id });
+});
+
 payablesRouter.post("/vouchers/:id/money-back", requireFinance, async (c) => {
   const id = c.req.param("id");
   if (!UUID_RE.test(id)) return badId(c, "payment voucher");
@@ -449,6 +656,7 @@ const EXT: Record<z.infer<typeof apFileSignInput>["mimeType"], string> = {
 const DOC_ROUTES: ReadonlyArray<{ prefix: string; type: DocType; what: string }> = [
   { prefix: "/bills", type: "SUPPLIER_BILL", what: "bill" },
   { prefix: "/vouchers", type: "PAYMENT_VOUCHER", what: "payment voucher" },
+  { prefix: "/credit-notes", type: "SUPPLIER_CREDIT_NOTE", what: "credit note" },
 ];
 
 for (const { prefix, type, what } of DOC_ROUTES) {
@@ -491,7 +699,7 @@ for (const { prefix, type, what } of DOC_ROUTES) {
 const filePathQuery = z
   .string()
   .max(400)
-  .regex(/^(SUPPLIER_BILL|PAYMENT_VOUCHER)\/[0-9a-f-]{36}\/[0-9a-f-]{36}\.(pdf|jpg|png|webp)$/i);
+  .regex(/^(SUPPLIER_BILL|PAYMENT_VOUCHER|SUPPLIER_CREDIT_NOTE)\/[0-9a-f-]{36}\/[0-9a-f-]{36}\.(pdf|jpg|png|webp)$/i);
 
 payablesRouter.get("/files/url", requireFinance, async (c) => {
   const parsed = filePathQuery.safeParse(c.req.query("path") ?? "");

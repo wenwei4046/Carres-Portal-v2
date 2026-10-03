@@ -2,6 +2,7 @@ import { Fragment, useEffect, useMemo, useRef, useState, type Ref } from "react"
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { ChevronDown, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { useAuth } from "@/lib/auth";
+import { useNavCapabilities } from "./nav-capabilities";
 import CarresLockup from "@/components/CarresLockup";
 import NavBadge from "@/components/NavBadge";
 import {
@@ -176,6 +177,9 @@ export default function PortalSidebar({ drawer = false }: {
   const navigate = useNavigate();
 
   const groups = useMemo(() => visibleGroups(role), [role]);
+  // Chew 2026-10-03 (Finance MASTER §3.3): the one entry shown by a grant, not
+  // a role — Payment Requests, for the staff Finance or the boss allows.
+  const caps = useNavCapabilities(role, (session?.user as { id?: string } | undefined)?.id);
 
   // Active area = which base path we're under. Active tab = `?tab=` (or the
   // path-driven operation section, or the finance pathname).
@@ -343,7 +347,7 @@ export default function PortalSidebar({ drawer = false }: {
    * that stamp, opening Purchasing and then jumping to a Warehouse page would
    * leave Purchasing open and hide the row you had just moved to. */
   const activeModuleSection: PortalSection | null = activeGroup
-    ? (navBlocks(activeGroup, role).find(
+    ? (navBlocks(activeGroup, role, caps).find(
         (b) => b.kind === "module" && b.pages.some((p) => isItemActive(activeGroup, p)),
       ) as Extract<NavBlock, { kind: "module" }> | undefined)?.module.section ?? null
     : null;
@@ -405,7 +409,7 @@ export default function PortalSidebar({ drawer = false }: {
   const purchasingPages = useMemo(
     () =>
       activeGroup
-        ? visibleItems(activeGroup, role).filter((item) => item.section === PURCHASING)
+        ? visibleItems(activeGroup, role, caps).filter((item) => item.section === PURCHASING)
         : [],
     [activeGroup, role],
   );
@@ -913,7 +917,7 @@ export default function PortalSidebar({ drawer = false }: {
             // disappear and the MODULE's one icon remains (`ui/MASTER.md`
             // §4.2): an icon rail is for table room, not for navigating
             // thirteen pages by guessing thirteen icons.
-            (activeGroup ? navBlocks(activeGroup, role) : []).map((block) => {
+            (activeGroup ? navBlocks(activeGroup, role, caps) : []).map((block) => {
               const target =
                 block.kind === "plain" ? block.item : moduleLandingPage(block);
               // An unbuilt page is not a control and gets no icon.
@@ -983,7 +987,7 @@ export default function PortalSidebar({ drawer = false }: {
 
                   {open && (
                     <div className="flex flex-col gap-0.5">
-                      {navBlocks(group, role).map((block) =>
+                      {navBlocks(group, role, caps).map((block) =>
                         block.kind === "plain"
                           ? renderPlain(group, block.item)
                           : renderModule(group, block),

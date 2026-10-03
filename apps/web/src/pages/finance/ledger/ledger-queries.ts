@@ -1,6 +1,7 @@
 /**
- * The Finance Ledger reads — Journal, one entry, the chart, Trial Balance and
- * Self-check. Read-only: nothing here writes, so nothing here invalidates.
+ * The Finance Ledger reads — Journal, one entry, the chart, Trial Balance,
+ * Self-check and Daily Bank. Read-only: nothing here writes, so nothing here
+ * invalidates.
  *
  * Kept beside the ledger pages instead of in `lib/queries.ts` so the three
  * pages (and their tests) own one small file, and the shared hooks file does
@@ -15,6 +16,9 @@ import type {
   LedgerSelfCheck,
   TrialBalanceReport,
 } from "@carres/shared/finance-ledger";
+import type { DailyBankDay } from "@carres/shared/daily-bank";
+import type { CashFlowAnswer } from "@carres/shared/cash-flow";
+import type { GeneralLedgerAnswer } from "@carres/shared/general-ledger";
 import { apiFetch } from "@/lib/api";
 import { departmentSearch } from "../department";
 
@@ -35,6 +39,9 @@ export const ledgerKeys = {
   chart: () => ["finance", "ledger", "chart"] as const,
   trialBalance: (asOf: string, dept = "") => ["finance", "ledger", "trial-balance", asOf, dept] as const,
   selfCheck: () => ["finance", "ledger", "self-check"] as const,
+  dailyBank: (day: string) => ["finance", "ledger", "daily-bank", day] as const,
+  cashFlow: (from: string, to: string) => ["finance", "ledger", "cash-flow", from, to] as const,
+  generalLedger: (from: string, to: string, dept = "") => ["finance", "ledger", "general-ledger", from, to, dept] as const,
 };
 
 /** The server's page size is PostgREST's own row cap. */
@@ -181,6 +188,38 @@ export function trialBalanceQuery(asOf: string, dept = "") {
 
 export function useTrialBalance(asOf: string, dept = "") {
   return useQuery(trialBalanceQuery(asOf, dept));
+}
+
+/** Daily Bank (0637): every money account on one day. The figures arrive
+ *  as the database's parts; the page works out the rest through the shared
+ *  daily-bank arithmetic. */
+export function useDailyBank(day: string) {
+  return useQuery({
+    queryKey: ledgerKeys.dailyBank(day),
+    queryFn: () => apiFetch<DailyBankDay>(`/api/finance/ledger/daily-bank?${new URLSearchParams({ day }).toString()}`),
+    retry: (count: number, error: unknown) => (error as { status?: number }).status !== 422 && count < 2,
+  });
+}
+
+/** General Ledger (0639): every account's period, as gl_account_ledger
+ *  answers it. 409 (no start date) and 422 (a date) are answers, not retries. */
+export function useGeneralLedger(from: string, to: string, dept = "") {
+  return useQuery({
+    queryKey: ledgerKeys.generalLedger(from, to, dept),
+    queryFn: () => apiFetch<GeneralLedgerAnswer>(
+      `/api/finance/ledger/general-ledger?${new URLSearchParams({ from, to, ...departmentSearch(dept) }).toString()}`),
+    retry: (count: number, error: unknown) => ![409, 422].includes((error as { status?: number }).status ?? 0) && count < 2,
+  });
+}
+
+/** Cash Flow (0638): the cash and bank accounts over a period, both days
+ *  included. The page works the totals out through the shared arithmetic. */
+export function useCashFlow(from: string, to: string) {
+  return useQuery({
+    queryKey: ledgerKeys.cashFlow(from, to),
+    queryFn: () => apiFetch<CashFlowAnswer>(`/api/finance/ledger/cash-flow?${new URLSearchParams({ from, to }).toString()}`),
+    retry: (count: number, error: unknown) => (error as { status?: number }).status !== 422 && count < 2,
+  });
 }
 
 /** How many entries the Dashboard's Activity card lists. */

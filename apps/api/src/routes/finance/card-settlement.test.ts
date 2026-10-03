@@ -181,3 +181,36 @@ describe("/api/finance/card-settlement", () => {
     expect((await call("POST", `/rows/${LINE_ID}/match`, { paymentId: PAY_ID })).status).toBe(404);
   });
 });
+
+describe("GET /waiting — card money waiting (0641, Chew 2026-10-03)", () => {
+  const WAITING = {
+    today: "2026-10-03", go_live_on: "2026-09-01",
+    holdings: [{ account_code: "1131", name: "GHL", balance: 300 }],
+    payments: [{ entry_no: "JE-202610-0001", entry_date: "2026-10-01", source_type: "CUSTOMER_PAYMENT", doc_no: "OR-1",
+      account_code: "1131", amount: 300, payment_id: PAY_ID, receipt_no: "OR-1", order_id: null, so: 1401,
+      customer_name: "Tan Mei Ling", acquirer: null, day_date: null, move_no: null, state: "NOT_ON_A_FILE" }],
+  };
+
+  it("reads the list and passes it through whole", async () => {
+    const sb = stubRpc({ data: WAITING, error: null });
+    const res = await call("GET", "/waiting");
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("fin_card_money_waiting");
+    expect(await res.json()).toEqual(WAITING);
+  });
+
+  it("a figure it cannot read, or a shapeless answer, refuses in plain words", async () => {
+    const broken = structuredClone(WAITING);
+    broken.payments[0]!.amount = "three hundred" as never;
+    stubRpc({ data: broken, error: null });
+    const res = await call("GET", "/waiting");
+    expect(res.status).toBe(500);
+    expect(await res.json()).toMatchObject({ message: "Card money waiting could not be loaded. Try again." });
+    stubRpc({ data: { today: "2026-10-03" }, error: null });
+    expect((await call("GET", "/waiting")).status).toBe(500);
+  });
+
+  it("is Finance's", async () => {
+    expect((await call("GET", "/waiting", undefined, "operation")).status).toBe(403);
+  });
+});

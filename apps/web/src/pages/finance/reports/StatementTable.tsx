@@ -28,6 +28,9 @@ const NOTHING_ON_DAY: Record<string, string> = {
   EQUITY: "No equity on this day.",
 };
 /** Profit and Loss: `No income in this period.` · `No expenses in this period.` */
+/** A statement line's account link: one line, cut with … when it is long. */
+export const STATEMENT_LINK = "min-w-0 truncate underline underline-offset-2";
+
 export const nothingInPeriod = (section: string): string => NOTHING_IN_PERIOD[section] ?? NOTHING_IN_PERIOD.INCOME!;
 /** Balance Sheet: `No assets on this day.` · `No liabilities …` · `No equity …` */
 export const nothingOnDay = (section: string): string => NOTHING_ON_DAY[section] ?? NOTHING_ON_DAY.ASSET!;
@@ -192,11 +195,14 @@ export default function StatementTable({
   const bySection = new Map(sections.map((s) => [s.kind, s]));
   const rows = statementRows(sections);
 
+  // The amount column is fixed and the account takes what is left, so a
+  // figure is never cut. At 70% / 30% a 375px phone gave the amount 70px and
+  // cut `RM 4,185.00` (measured in the Finance preview, 2026-10-03).
   const columns: Column<StatementRow>[] = [
     {
       key: "account",
       label: "Account",
-      width: 70,
+      width: "auto",
       cell: (r) => {
         switch (r.kind) {
           case "group":
@@ -207,7 +213,7 @@ export default function StatementTable({
             // with "…"; the mark never does.
             const note = lineNote?.(r) ?? null;
             return <span className={`flex items-center ${indent(r.depth)}`}>
-              <Link className="min-w-0 truncate underline underline-offset-2" to={accountHref(r.code)}>
+              <Link className={STATEMENT_LINK} to={accountHref(r.code)}>
                 {r.code} {r.name ?? "Account name not available"}
               </Link>
               {note && <Tooltip content={note}>
@@ -225,7 +231,7 @@ export default function StatementTable({
     {
       key: "amount",
       label: "Amount",
-      width: 30,
+      width: "140px",
       align: "right",
       numeric: true,
       cell: (r) => {
