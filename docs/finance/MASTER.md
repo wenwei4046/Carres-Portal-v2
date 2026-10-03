@@ -1,6 +1,8 @@
 # FINANCE — MASTER
 
-> **Status 2026-10-03: BUILD on the local branch `finance-build`. Nothing is pushed, merged, applied to the production database or live.** Chew tests everything once at the end; nothing goes live before Chew approves it.
+> **Status 2026-10-03: DELIVERY in PR #1864.** Chew chose to test on production (no separate test database) and approved going live: the migrations below are applied through the governed path, then the PR is merged. Chew tests everything once, on production.
+>
+> **Who approves Finance's production changes.** Chew approves Finance's own production database changes and their release; he holds that permission for the Finance module (Chew 2026-10-03). ENGINEERING.md names Jess for migration approval; that was raised with Chew, who confirmed his authority over Finance's own changes. A change outside Finance still goes to Jess.
 >
 > | Built on the branch (tests pass locally) | Migration |
 > |---|---|
