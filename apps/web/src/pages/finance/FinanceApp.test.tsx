@@ -138,6 +138,18 @@ describe("Finance routing", () => {
     expect(screen.getByTestId("payment-monitor-destination-header")).toBeInTheDocument();
     auth.role = "finance";
   });
+  /* 0645 (Chew 2026-10-03, Finance MASTER §3.3): the staff the boss allows ask
+     Finance to pay from here, so Payment Requests is not finance-only. The
+     database shows each person only their own requests. */
+  it("operation staff reach Payment Requests, and only that among Finance's own pages", () => {
+    auth.role = "operation";
+    show("/finance/payment-requests");
+    expect(screen.getByTestId("payment-requests-destination-header")).toBeInTheDocument();
+    cleanup();
+    show("/finance/payment-vouchers");
+    expect(screen.getByTestId("payment-monitor-destination-header")).toBeInTheDocument();
+    auth.role = "finance";
+  });
   it("opens the three Finance Ledger destinations, each on its own route", () => {
     show("/finance/ledger");
     expect(screen.getByTestId("journal-destination-header")).toBeInTheDocument();

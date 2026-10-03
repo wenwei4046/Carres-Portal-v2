@@ -53,12 +53,15 @@ import { useAuth } from "@/lib/auth";
 import { fmtDate } from "@/lib/fmt-date";
 import { FieldError } from "@/components/kit/FieldFrame";
 import ChartOfAccounts from "./ChartOfAccounts";
+import RequestAccess from "./RequestAccess";
 
 const TABS = [
   { value: "money", label: "Money accounts" },
   { value: "chart", label: "Chart of accounts" },
   { value: "card", label: "Card payout banks" },
   { value: "closed", label: "Closed months" },
+  // 0645 (Chew 2026-10-03): which Operation staff may ask Finance to pay.
+  { value: "requests", label: "Payment requests" },
 ] as const;
 
 const KIND_OPTIONS = [
@@ -80,7 +83,8 @@ export default function FinanceSettings() {
         <Tabs tabs={TABS} value={tab} label="Finance Settings" onValueChange={(v) => setParams(v === "money" ? {} : { tab: v })} />
       </div>
       <div className="min-h-0 flex-1">
-        {tab === "chart" ? <ChartOfAccounts /> : tab === "card" ? <CardRoutes /> : tab === "closed" ? <ClosedMonths /> : <MoneyAccounts />}
+        {tab === "chart" ? <ChartOfAccounts /> : tab === "card" ? <CardRoutes /> : tab === "closed" ? <ClosedMonths />
+          : tab === "requests" ? <RequestAccess /> : <MoneyAccounts />}
       </div>
     </div>
   );

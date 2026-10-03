@@ -36,6 +36,7 @@ import Collection from "./reports/Collection";
 import ApOutstanding from "./payables/ApOutstanding";
 import SupplierFinancePage from "./payables/SupplierFinancePage";
 import SupplierCreditNotes from "./payables/SupplierCreditNotes";
+import PaymentRequests from "./payment-requests/PaymentRequests";
 
 /**
  * Finance (HQ Internal) shell — sidebar + main routing area.
@@ -89,6 +90,10 @@ export default function FinanceApp() {
           <Route path="bills/*"            element={financeOnly(<SupplierBills />)} />
           <Route path="payment-vouchers/*" element={financeOnly(<PaymentVouchers />)} />
           <Route path="ap-outstanding"     element={financeOnly(<ApOutstanding />)} />
+          {/* 0645 — staff ask Finance to pay a bill (Chew 2026-10-03). NOT finance-only:
+              the Operation staff the boss allows reach it here, and the database
+              shows each person only what they may see. */}
+          <Route path="payment-requests/*" element={<PaymentRequests />} />
           {/* 0642 — a supplier's credit note takes money off what Carres owes (Chew 2026-10-03). */}
           <Route path="credit-notes/*"     element={financeOnly(<SupplierCreditNotes />)} />
           {/* 0636 — Finance's own tax and bank details per supplier (Chew 2026-10-03). */}

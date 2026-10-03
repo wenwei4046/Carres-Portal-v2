@@ -33,6 +33,7 @@ import {
   useVoucherAct,
   type VoucherAct,
 } from "@/lib/payables-queries";
+import { answerPaymentRequest, usePaymentRequest } from "@/lib/payment-request-queries";
 import {
   PAY_METHOD_WORD,
   VOUCHER_PURPOSE_WORD,
@@ -530,6 +531,21 @@ function VoucherForm() {
   const [advance, setAdvance] = useState("");
   const [loaded, setLoaded] = useState(!id);
   const formPayTo = useSupplierPayTo(supplierId || null);
+  // 0645 (Chew 2026-10-03): a voucher made for a payment request starts from
+  // what was asked, and answers the request once it is saved.
+  const requestId = id ? null : params.get("request");
+  const fromRequest = usePaymentRequest(requestId);
+  const [requestApplied, setRequestApplied] = useState(false);
+  useEffect(() => {
+    const r = fromRequest.data?.request;
+    if (!r || requestApplied) return;
+    setPurpose("DIRECT");
+    setPayee(r.payee_name);
+    const bank = [r.bank_name, r.bank_account_no, r.bank_account_holder].filter(Boolean).join(" ");
+    setNarration(`Payment request ${r.request_no} · ${r.purpose}${bank ? ` · pay to ${bank}` : ""}`.slice(0, 500));
+    setLines([{ ...newLine(), description: r.purpose.slice(0, 200), amount: String(r.amount) }]);
+    setRequestApplied(true);
+  }, [fromRequest.data, requestApplied]);
 
   // Editing a draft: the form starts from the voucher as saved.
   useEffect(() => {
@@ -616,8 +632,16 @@ function VoucherForm() {
       advanceAmount: advanceN,
     };
     save.mutate({ id, input }, {
-      onSuccess: (out) => {
+      onSuccess: async (out) => {
         toast.success(id ? "Voucher saved" : "Draft voucher saved");
+        if (requestId && fromRequest.data) {
+          try {
+            await answerPaymentRequest(requestId, { voucherId: out.id });
+            toast.success(`${fromRequest.data.request.request_no} is answered by this voucher`);
+          } catch (e) {
+            toast.error(`The voucher is saved, but it does not answer ${fromRequest.data.request.request_no}: ${refusal(e)}`);
+          }
+        }
         navigate(`/finance/payment-vouchers/${out.id}`);
       },
       onError: (e) => toast.error(refusal(e)),

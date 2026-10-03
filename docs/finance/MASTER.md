@@ -16,6 +16,7 @@
 > | Bill scanning: `Read the bill` and `Read the credit note` (§3.2); OFF until the AI key is given | none |
 > | Stock value, provisional (§3.5) | 0643 |
 > | Collection report (§3.6) | 0644 |
+> | Payment requests, with the one shared-menu entry (§3.3) | 0645 |
 >
 > Their on-screen words are in COPY-STANDARD "Finance (Chew)"; those marked PROPOSAL wait for Chew.
 >
@@ -128,6 +129,28 @@ Dealer commission rules:
 
 - **Build.** Staff with permission raise a request with the bill. Finance answers it with a voucher or a bill, and the requester can see which stage it has reached.
 - The entry point is **one entry in the shared menu**, visible only to permitted staff. This is the one Jess-side change Chew approved (2026-10-03).
+
+**Payment requests approach — PROPOSAL / NOT LAW, built for Chew's test (0645).**
+- **Who may ask.** The boss (the principal) ticks which Operation staff may ask, under Finance Settings → `Payment requests`. Finance and the principal may always ask. Each grant is kept: unticking takes it back and never deletes it.
+  - It is a permission per person, kept by Finance, as the warehouse keeps its capability grants. It is not a Workspace duty, which has one holder a day, and it is not an HR position permission.
+  - Today only Operation staff can be ticked, because the Finance pages are open to Finance, the principal and Operation.
+- **Asking.** The person fills `Payment Requests → New Payment Request`: who to pay, the amount, what it is for, pay by, the bill's own number and date, the bank details and a note. The bill must be attached before the request is sent. The request takes a number, `PRQ…`, drawn like every formal document.
+- **Finance's answer.** Finance sees the requests waiting for it and answers each with `Make payment voucher` or `Make bill`.
+  - The voucher or bill form opens pre-filled from the request. Saving it answers the request.
+  - One request has one live answer, and one document answers one request.
+  - A request with no bill attached cannot be answered.
+  - Finance may instead `Return request` with a reason. The person changes it and sends it again.
+- **The stage** is read every time from the voucher or the bill, never stored: preparing, waiting for approval, paid, bill entered, partly paid. If that voucher or bill is cancelled, the request goes back to Finance, which answers it again or returns it.
+- **The person who asked** sees only their own requests, the stage, and the voucher or bill number, but not the voucher or bill itself. They may change or withdraw a request until Finance answers it.
+- **The shared menu** gains one row, `Payment Requests`, under Operations → Workspace. It shows only to the staff the boss allows. Finance and the principal find it under Finance → Payables.
+- **The files** go to their own private store, so the person can upload without being given Finance's files. That store has two new access rules of its own; no existing rule changed.
+- **Not built:**
+  - HR or BD staff asking. They cannot open the Finance pages today; letting them would need Jess's routes to change.
+  - Asking for the balance of a bill again.
+  - The official invoice owed after a proforma.
+  - Reading the bill on the request.
+  - A request that names an event.
+- **Falsifier:** in Chew's test, a requester sees a stage that does not match the voucher or bill, or someone the boss did not tick can ask.
 
 ### 3.4 Bank and cards
 

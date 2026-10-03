@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { PORTAL_MODULES, PORTAL_NAV, navBlocks, navItemHref } from "./portal-nav";
+import { PORTAL_MODULES, PORTAL_NAV, navBlocks, navItemHref, visibleItems } from "./portal-nav";
 
 /**
  * ⭐ THE FINANCE MODULES — Chew, 2026-10-03 (`docs/finance/MASTER.md` §4 and the
@@ -7,7 +7,7 @@ import { PORTAL_MODULES, PORTAL_NAV, navBlocks, navItemHref } from "./portal-nav
  *
  *     Dashboard
  *     Payments            Monitor · Payment Records          (unchanged)
- *     Payables            AP · Payables · Bills · Payment Vouchers · Credit Notes · Suppliers
+ *     Payables            AP · Payables · Bills · Payment Vouchers · Payment Requests · Credit Notes · Suppliers
  *     Receivables         AR · Receivables · Other debtors · Other receipts
  *     Bank & Cards        Daily Bank · Card settlement · Card money waiting · Money moves
  *     Ledger              Journal · General Ledger · Trial Balance · Self-check
@@ -33,7 +33,7 @@ describe("the Finance modules (Chew, 2026-10-03)", () => {
     expect(shape("finance")).toEqual([
       "Dashboard",
       "Payments: Monitor · Payment Records",
-      "Payables: AP · Payables · Bills · Payment Vouchers · Credit Notes · Suppliers",
+      "Payables: AP · Payables · Bills · Payment Vouchers · Payment Requests · Credit Notes · Suppliers",
       "Receivables: AR · Receivables · Other debtors · Other receipts",
       "Bank & Cards: Daily Bank · Card settlement · Card money waiting · Money moves",
       "Ledger: Journal · General Ledger · Trial Balance · Self-check",
@@ -69,6 +69,7 @@ describe("the Finance modules (Chew, 2026-10-03)", () => {
       ar: "/finance/ar",
       bills: "/finance/bills",
       "payment-vouchers": "/finance/payment-vouchers",
+      "payment-requests": "/finance/payment-requests",
       "credit-notes": "/finance/credit-notes",
       "supplier-finance": "/finance/suppliers",
       payments: "/finance/monitor",
@@ -96,5 +97,32 @@ describe("the Finance modules (Chew, 2026-10-03)", () => {
       g.items.filter((it) => it.section && financeSections.has(it.section)).map((it) => `${g.area}:${it.key}`),
     );
     expect(elsewhere).toEqual([]);
+  });
+});
+
+/**
+ * ⭐ THE ONE SHARED-MENU ENTRY CHEW APPROVED (2026-10-03, Finance MASTER §3.3):
+ * Payment Requests shows to the Operation staff the boss allows — by a grant,
+ * not a role — and opens the page in Finance. Nobody else of Operation sees it.
+ */
+describe("Payment Requests in the Operations rail", () => {
+  const OPERATIONS = PORTAL_NAV.find((g) => g.area === "operation")!;
+  const keys = (caps?: ReadonlySet<"payment-requester">) => visibleItems(OPERATIONS, "operation", caps).map((i) => i.key);
+
+  it("is hidden without the grant, and shows with it", () => {
+    expect(keys()).not.toContain("payment-requests");
+    expect(keys(new Set(["payment-requester"] as const))).toContain("payment-requests");
+  });
+
+  it("opens the Finance page and sits in Workspace", () => {
+    const item = OPERATIONS.items.find((i) => i.key === "payment-requests")!;
+    expect(navItemHref(OPERATIONS, item)).toBe("/finance/payment-requests");
+    expect(item.section).toBe("Workspace");
+    expect(item.needs).toBe("payment-requester");
+  });
+
+  it("the grant changes nothing else in the rail", () => {
+    const withGrant = keys(new Set(["payment-requester"] as const)).filter((k) => k !== "payment-requests");
+    expect(withGrant).toEqual(keys());
   });
 });

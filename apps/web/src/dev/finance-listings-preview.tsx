@@ -499,6 +499,42 @@ const COLLECTION_ORDERS = Array.from({ length: 18 }, (_, i) => {
   };
 });
 
+// ── Payables → Payment Requests (0645): staff ask Finance to pay ────────────
+const PRQ_ROW = (i: number, over: Record<string, unknown>) => ({
+  id: `prq-${i}`, request_no: `PRQ2610${String(10 + i).padStart(2, "0")}-${4821 + i}`, status: "submitted",
+  requested_by: `u-${i % 3}`, requested_by_name: ["NUR AISYAH BINTI KAMARUL ZAMAN", "Boon Keat", "Priya Raman"][i % 3],
+  payee_name: ["Bayview Properties", "Persatuan Penduduk Taman Bukit Indah Kota Damansara", "Quickfix Plumbing", "Tenaga Nasional Berhad"][i % 4],
+  amount: (350 + i * 415).toFixed(2), pay_by: soon(3 + i), purpose: ["October rent, PJ showroom", "Booth at the Kota Damansara fair",
+    "Pipe repair, Klang warehouse", "Electricity, September"][i % 4],
+  note: null, bank_name: "Maybank", bank_account_no: "514012345678", bank_account_holder: "Bayview Properties Sdn Bhd",
+  bill_no: `BV-${1000 + i}`, bill_date: soon(-2 - i), return_note: null, decided_at: null, decided_by_name: null,
+  created_at: at(-i), updated_at: at(-i), file_count: 1, voucher: null, bill: null, ...over,
+});
+const PAYMENT_REQUESTS = [
+  PRQ_ROW(0, {}),
+  PRQ_ROW(1, {}),
+  PRQ_ROW(2, { status: "answered", voucher: { id: "v-1", voucher_no: "PV261002-1187", status: "checked", voucher_date: soon(-1) } }),
+  PRQ_ROW(3, { status: "answered", bill: { id: "b-1", bill_no: "BILL-2609-0016", status: "confirmed", total: "2400.00", paid: "0.00" } }),
+  PRQ_ROW(4, { status: "returned", return_note: "Attach the official invoice, not the quotation", decided_by_name: "Chew" }),
+  PRQ_ROW(5, { status: "answered", voucher: { id: "v-2", voucher_no: "PV260928-0954", status: "approved", voucher_date: soon(-5) } }),
+];
+const PAYMENT_REQUEST_DOC = {
+  request: PAYMENT_REQUESTS[0],
+  files: [{ id: "pf-1", file_name: "BV-1000 October rent.pdf", mime_type: "application/pdf", size_bytes: 182000,
+    storage_path: "prq-0/f.pdf", uploaded_at: at(0), uploaded_by_name: "NUR AISYAH BINTI KAMARUL ZAMAN" }],
+  events: [
+    { action: "submitted", note: null, at: at(0), actor_name: "NUR AISYAH BINTI KAMARUL ZAMAN" },
+    { action: "file_added", note: "BV-1000 October rent.pdf", at: at(0), actor_name: "NUR AISYAH BINTI KAMARUL ZAMAN" },
+  ],
+  finance: true,
+  can: { edit: false, withdraw: false, add_file: true, return: true, answer: true },
+};
+const REQUEST_GRANTS = [
+  { user_id: "u-0", name: "NUR AISYAH BINTI KAMARUL ZAMAN", role: "operation", allowed: true, granted_at: at(-30), granted_by_name: "Jess" },
+  { user_id: "u-1", name: "Boon Keat", role: "operation", allowed: true, granted_at: at(-12), granted_by_name: "Jess" },
+  { user_id: "u-2", name: "Priya Raman", role: "operation", allowed: false, granted_at: null, granted_by_name: null },
+];
+
 // ── Reports → AP Aging (0640): owed to suppliers on a day ───────────────────
 const AP_AGING = (asAt: string) => ({
   as_at: asAt, go_live_on: GO_LIVE,
@@ -528,6 +564,10 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   const q = new URL(url, window.location.origin).searchParams;
   if (url.includes("/api/finance/invoices/register")) return json({ rows: INVOICES, total: INVOICES.length });
   if (url.includes("/api/finance/payments/register")) return json({ rows: [], total: 0 });
+  if (url.includes("/api/finance/payment-requests/me")) return json({ may_request: true, finance: true, boss: true });
+  if (url.includes("/api/finance/payment-requests/grants")) return json({ rows: REQUEST_GRANTS });
+  if (url.includes("/api/finance/payment-requests/prq-")) return json(PAYMENT_REQUEST_DOC);
+  if (url.includes("/api/finance/payment-requests")) return json({ rows: PAYMENT_REQUESTS });
   if (url.includes("/api/finance/payables/bills")) return json({ rows: BILLS });
   if (url.includes("/api/finance/payables/vouchers")) return json({ rows: VOUCHERS });
   if (url.includes("/api/finance/payables/outstanding")) return json({ rows: OUTSTANDING });
@@ -591,6 +631,10 @@ const ROUTES: Record<string, string> = {
   "credit-note-new": "/finance/credit-notes/new",
   "stock-value": "/finance/reports/stock-value",
   collection: "/finance/reports/collection",
+  "payment-requests": "/finance/payment-requests",
+  "payment-request": "/finance/payment-requests/prq-0",
+  "payment-request-new": "/finance/payment-requests/new",
+  "request-access": "/finance/settings?tab=requests",
 };
 window.history.replaceState(null, "", ROUTES[PAGE] ?? ROUTES.ar);
 

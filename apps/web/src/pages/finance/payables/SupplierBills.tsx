@@ -51,6 +51,7 @@ import {
 } from "./payables-words";
 import { FactRow, Facts, FilesCard, HistoryCard, PayablesSwitch, ReadFailed, ReasonModal } from "./PayablesParts";
 import { attachPages, formLines, ReadPaperButton, readPaperNotes } from "./ReadPaper";
+import { answerPaymentRequest, usePaymentRequest } from "@/lib/payment-request-queries";
 import type { BillReadAnswer } from "@carres/shared/bill-reading";
 import { AdvanceModal, AmountField } from "./VoucherAdvance";
 import { useSaveKey } from "../save-key";
@@ -546,6 +547,20 @@ function BillForm() {
   // Chew 2026-10-03: the pages read with "Read the bill", attached once the
   // bill is saved, and what to check about the reading.
   const [read, setRead] = useState<{ files: File[]; notes: string[] } | null>(null);
+  // 0645 (Chew 2026-10-03): a bill made for a payment request starts from what
+  // was asked, and answers the request once it is saved.
+  const requestId = id ? null : params.get("request");
+  const fromRequest = usePaymentRequest(requestId);
+  const [requestApplied, setRequestApplied] = useState(false);
+  useEffect(() => {
+    const r = fromRequest.data?.request;
+    if (!r || requestApplied) return;
+    if (r.bill_no) setInvoiceNo(r.bill_no);
+    if (r.bill_date) setBillDate(r.bill_date);
+    setNarration(`Payment request ${r.request_no} · ${r.purpose}`.slice(0, 500));
+    setLines([{ ...blankLine(), description: r.purpose.slice(0, 200), amount: String(r.amount) }]);
+    setRequestApplied(true);
+  }, [fromRequest.data, requestApplied]);
 
   // Editing a draft: the form starts from the bill as saved.
   useEffect(() => {
@@ -603,6 +618,14 @@ function BillForm() {
         toast.success(id ? "Bill saved" : "Draft bill saved");
         if (read && !(await attachPages("bills", out.id, read.files))) {
           toast.error("The bill is saved, but a page that was read could not be attached. Attach it on the bill.");
+        }
+        if (requestId && fromRequest.data) {
+          try {
+            await answerPaymentRequest(requestId, { billId: out.id });
+            toast.success(`${fromRequest.data.request.request_no} is answered by this bill`);
+          } catch (e) {
+            toast.error(`The bill is saved, but it does not answer ${fromRequest.data.request.request_no}: ${refusal(e)}`);
+          }
         }
         navigate(`/finance/bills/${out.id}`);
       },

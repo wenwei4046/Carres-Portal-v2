@@ -47,6 +47,7 @@ import {
 } from "lucide-react";
 import type { Role } from "@carres/shared/domain";
 import type { PurchasingPageGroupKey } from "./purchasing-sidebar";
+import { NO_CAPS, type NavCapability } from "./nav-capabilities";
 
 /**
  * Unified Internal Portal nav model (2026-06-30, Loo).
@@ -225,6 +226,10 @@ export interface PortalNavItem {
   /** optional per-item narrowing of the group's roles — the item shows only
    *  for these roles. */
   roles?: ReadonlyArray<Role>;
+  /** A capability beyond the role the person must hold for the item to show
+   *  (`nav-capabilities.ts`). One use: Payment Requests, for the staff the
+   *  boss allows (Chew 2026-10-03). */
+  needs?: NavCapability;
   /** The MODULE this page belongs to (`PORTAL_MODULES`).
    *
    *  ⭐ A MODULE IS AN EXPANDABLE PARENT ROW, NOT A HEADING (Jess, 2026-08-19
@@ -334,6 +339,18 @@ export const PORTAL_NAV: PortalNavGroup[] = [
        * Receiving & GRN card). Modules reference duties; they never keep a
        * second person list. */
       { key: "issue-tracker", label: "Issue Tracker", icon: CircleAlert, path: "/operation/issues", section: "Workspace" },
+      /* 0645 — Chew 2026-10-03 (Finance MASTER §3.3), the ONE shared-menu entry
+       * Chew approved: staff the boss allows ask Finance to pay a bill. Shown
+       * only to them (`needs`); the page lives in Finance. */
+      {
+        key: "payment-requests",
+        label: "Payment Requests",
+        icon: HandCoins,
+        path: "/finance/payment-requests",
+        activeFor: ["path:/finance/payment-requests"],
+        section: "Workspace",
+        needs: "payment-requester",
+      },
       /* ⭐ `Old Orders (temporary)` LEFT THE RAIL (Jess, owner ruling
        * 2026-09-23): "Replace the previous standalone Sales Orders entry;
        * remove the old/legacy order menu entry from this tree."
@@ -629,6 +646,8 @@ export const PORTAL_NAV: PortalNavGroup[] = [
         financePath: "/finance/payment-vouchers",
         section: "Payables",
       },
+      // 0645 — staff ask Finance to pay a bill; Finance answers here (Chew 2026-10-03).
+      { key: "payment-requests", label: "Payment Requests", icon: HandCoins, financePath: "/finance/payment-requests", section: "Payables" },
       // 0642 — a supplier's credit note takes money off what Carres owes (Chew 2026-10-03).
       { key: "credit-notes", label: "Credit Notes", icon: ReceiptText, financePath: "/finance/credit-notes", section: "Payables" },
       // 0636 — Finance's own tax and bank details per supplier (Chew 2026-10-03).
@@ -807,12 +826,15 @@ export function visibleGroups(role: Role | null): PortalNavGroup[] {
   return PORTAL_NAV.filter((g) => g.roles.includes(role));
 }
 
-/** The items of a group a given role may see (per-item `roles` narrowing). */
+/** The items of a group a given role may see (per-item `roles` narrowing, and
+ *  an item that `needs` a capability only for a person who holds it). */
 export function visibleItems(
   group: PortalNavGroup,
   role: Role | null,
+  caps: ReadonlySet<NavCapability> = NO_CAPS,
 ): PortalNavItem[] {
-  return group.items.filter((it) => !it.roles || (role != null && it.roles.includes(role)));
+  return group.items.filter((it) =>
+    (!it.roles || (role != null && it.roles.includes(role))) && (!it.needs || caps.has(it.needs)));
 }
 
 /** The href a nav item points at. */
@@ -853,8 +875,9 @@ export type NavBlock =
 export function navBlocks(
   group: PortalNavGroup,
   role: Role | null,
+  caps: ReadonlySet<NavCapability> = NO_CAPS,
 ): NavBlock[] {
-  const items = visibleItems(group, role);
+  const items = visibleItems(group, role, caps);
   const bySection = new Map<PortalSection | "__none__", PortalNavItem[]>();
   for (const item of items) {
     const key = item.section ?? "__none__";

@@ -565,6 +565,31 @@ describe("Payment voucher form", () => {
       payMethod: "CASH", allocations: [], lines: [{ accountCode: "6500", amount: 150 }],
     });
   });
+
+  it("0645: a voucher made from a payment request starts from what was asked, and answers it once saved", async () => {
+    const REQ = "abababab-0000-4000-8000-000000000001";
+    api.routes[`/api/finance/payment-requests/${REQ}`] = {
+      request: { id: REQ, request_no: "PRQ261003-4821", status: "submitted", requested_by: "u", requested_by_name: "Aina",
+        payee_name: "Bayview Properties", amount: "3500.00", pay_by: null, purpose: "October rent, PJ showroom", note: null,
+        bank_name: "Maybank", bank_account_no: "514012345678", bank_account_holder: "Bayview Properties Sdn Bhd",
+        bill_no: "BV-1007", bill_date: "2026-10-01", return_note: null, decided_at: null, decided_by_name: null,
+        created_at: "2026-10-03T02:00:00Z", updated_at: "2026-10-03T02:00:00Z", file_count: 1, voucher: null, bill: null },
+      files: [], events: [], finance: true, can: { edit: false, withdraw: false, add_file: true, return: true, answer: true },
+    };
+    show(`/finance/payment-vouchers/new?request=${REQ}`);
+    await waitFor(() => expect(screen.getByLabelText("Payee")).toHaveValue("Bayview Properties"));
+    expect(screen.getByLabelText("Purpose")).toHaveValue("DIRECT");
+    expect(screen.getByLabelText("Line 1 description")).toHaveValue("October rent, PJ showroom");
+    expect(screen.getByLabelText("Line 1 amount")).toHaveValue("3500.00");
+    expect(screen.getByLabelText("Note")).toHaveValue("Payment request PRQ261003-4821 · October rent, PJ showroom · pay to Maybank 514012345678 Bayview Properties Sdn Bhd");
+    fireEvent.change(screen.getByLabelText("Line 1 account"), { target: { value: "6500" } });
+    await pickDept("Line 1 department", "OFFICE");
+    fireEvent.change(screen.getByLabelText("Paid from"), { target: { value: "1120" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(writes()).toHaveLength(2));
+    expect(writes()[1]).toMatchObject({ url: `/api/finance/payment-requests/${REQ}/answer`, method: "POST",
+      body: { voucherId: "33333333-3333-4333-8333-333333333333" } });
+  });
 });
 
 describe("Payment voucher detail", () => {
