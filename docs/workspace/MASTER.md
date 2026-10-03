@@ -1156,8 +1156,7 @@ the same group and item grammar; zero matches is not the same as zero work.
 - The page body does not own one long desktop scroll. Panel 1, Panel 2's action region and Panel 3's
   detail body scroll independently beneath fixed panel headings. On single-panel screens the active
   panel owns normal document scroll.
-- Panel 3 has 24px horizontal / 16px vertical heading padding and a left-aligned detail body no wider
-  than 760px. `open_module` and `read_only` retain the full structured brief. `embedded` is compact:
+- Task inspection uses §5.11; its precise responsive geometry remains unverified. `open_module` and `read_only` retain the full structured brief. `embedded` is compact:
   object/module header; one current-fact line; module-owned form with `Finish when: {statement}` as
   supporting copy immediately below its heading; one primary mutation; then the secondary
   `Open {object}` door and expandable owner/timing/source evidence. At 1440×900 the primary mutation
@@ -1190,9 +1189,8 @@ The implementation reuses `PageShell`, `Tabs`, `SearchInput`, `Select`, `Button`
 `FilterRailGroup`, `FilterRailRow`, `Loading`, `EmptyState`, `Badge`, `Tooltip` and Lucide icons.
 Status text that must wrap does not use the truncating `StatusPill`. A shared `Avatar` must first
 govern one initials algorithm plus full-name hover/focus/tap behaviour; Work may not choose among
-page-local avatar recipes. The only page-specific pieces permitted are `WorkSplitShell` (geometry), `WorkDayNav`
-(provided dates/counts), `WorkActionRow` (presentation) and `WorkActionPanel` (the §5.10 summary and
-host for an admitted owning-module component), and the §5.10 right-panel pieces `PartyCardShell`,
+page-local avatar recipes. Existing page-specific pieces include `WorkSplitShell` (geometry), `WorkDayNav`
+(provided dates/counts), `WorkActionRow` (presentation) and `WorkActionPanel` (host for an admitted owning-module component under §5.11), and the §5.10 right-panel pieces `PartyCardShell`,
 `CustomerCard`, `SupplierCard`, `LogisticsCard`, `WorkOrderRoute` and `WorkOwnerSource`. None calculates business dates, ownership, severity, completion or source health. They are
 not promoted into the global kit until a separately governed second use exists.
 
@@ -1487,8 +1485,8 @@ checklist. Revisions 2 to 5 carry her corrections of the same day, made on the d
 "定"; the shell and the Inbox rulings above are already hers.
 
 **A · The page (settled direction, revision 5 wording).**
-1. Three columns: Inbox 280 · Mission (rest, ≥560) · Communication 340; narrower and drawer rules
-   as in "THE WORK SHELL" above. The global right rail is separate and not in this build.
+1. Preserve the governed Inbox and middle mission/map. The §5.11 task inspector opens on click;
+   communication belongs inside its task, not in a permanent third column. The global utility rail is separate.
 2. Inbox: one row = one act (76px, three lines); Missed first on open; one date choice at a time.
 3. **What the Mission's top shows.** The top is ALWAYS a summary of the record the act belongs to,
    and no step detail ever replaces it:
@@ -1703,8 +1701,8 @@ checklist. Revisions 2 to 5 carry her corrections of the same day, made on the d
 
      | Part | Kit component (exists) | Exact values |
      |---|---|---|
-     | Page columns | `PageShell` + `grid-layout` | ≥1340: rail 280 · Mission ≥460 · Communication 340; 1100–1339: 240 · ≥460 · 300; 900–1099: 220 · ≥400 · 280; never scales; below 900 = phone round |
-     | Column title rows | `SectionHeader` | 64px tall, 15/600 slate-12, one bottom line shared by all three columns |
+     | Page columns | `PageShell` + `grid-layout` | Background Inbox/mission retained; click-open §5.11 inspector; no permanent Communication column or whole-page scaling |
+     | Column title rows | `SectionHeader` | 64px tall, 15/600 slate-12, governed heading separator; no fixed third Communication column |
      | Rail | `FilterRail` style C (`workspace-rail.tsx`) + `MonthCalendar` | group title = kit `Icon` 16px + 13/600 slate-12; rows 14/400 + right count, no row icon; ONE blue in the rail (Jess 2026-09-28: "why force to select all module with blue? confusing like select 2"): only the chosen ORDER row is blue-3 + 3px blue edge; a chosen filter (Attention, Module, the day) is the grey chip with bold text like the `My Task` · `Team Work` switch; the month grid prints each day's count UNDER its number (13 over 11/500, 36px rows), today a dark ring |
      | Order header | `DetailShell` header slots | three blocks of two lines: `SO No` link 15/600 over customer 13/400 · `Proceed Date` 11/500 over date 13 · `Customer Requested Delivery Date` 11/500 over date 13 |
      | Act card | `Block` (SalesOrderWorkspace; ONE KIT LAW) | white, 1px slate-5, radius 6, padding 12/16, gap 12 between cards; title 15/600 black; second line 13/400 red (missed) / amber (due) / slate-11; hairline, then checklist |
@@ -1795,10 +1793,6 @@ checklist. Revisions 2 to 5 carry her corrections of the same day, made on the d
 
 **B · Decisions (revision 2).**
 - **B1 · AGREED WITH CORRECTIONS** — as A5.
-- **B2 · SIZES (revision 7)** — three columns: rail 280 · Mission (rest, ≥720: Route 220 + To do)
-  · Communication 340; each column fills the height and scrolls alone; Communication is always its
-  own column. Narrower than 1340 the whole page scales down to fit (never stacks, never scrolls
-  sideways). The left rail is never hidden.
 - **B3 · AGREED IN PRINCIPLE.** Purchasing owns the template; its fields come from the real PO.
   Proposed wording (Jess 2026-09-27):
   `Hi {supplier},` / `Please confirm whether {PO No} will be delivered to {Deliver To} tomorrow,
@@ -1892,7 +1886,7 @@ This overwrites the earlier §5.10 wording that made `Contact due today`, `Waiti
 mission. Those are not default Carres work. Outstation release remains the explicit separate
 ERP-ARCHITECTURE §6.5 exception and keeps its governed proof/message rule.
 
-Collapsed height is exactly **72px**. It prints `Customer · {name}` and one source-derived line:
+The independently governed Customer fact component prints `Customer · {name}` and one source-derived line:
 `{company} contacts the customer · by {date}` before the partner's deadline; `Scheduled {date}`
 after the arrangement; or the highest-material exception `Customer requested another date ·
 {date}` · `Customer refused delivery` · `Phone number is wrong` ·
@@ -1936,7 +1930,7 @@ and recorded history. Both read the same Sales Orders / Delivery / Payment recor
 #### Supplier card
 
 One mission has one Supplier card even when it has several suppliers. Collapsed height is exactly
-**72px**. It prints only group progress plus the highest-material exception, for example
+natural height. It prints only group progress plus the highest-material exception, for example
 `2 of 3 POs issued` · `2 of 3 dates ready · 1 delayed` · `2 of 3 received · 1 arriving 27 Oct` ·
 `No purchase order for this Sales Order`. It does not print owner, supplier names or PO numbers
 unless one is required to identify the exception.
