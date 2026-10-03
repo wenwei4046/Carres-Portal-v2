@@ -13,6 +13,7 @@
 > | AP Aging (§3.6) | 0640 |
 > | Card money waiting (§3.4) | 0641 |
 > | Supplier credit notes (§3.2) | 0642 |
+> | Bill scanning: `Read the bill` and `Read the credit note` (§3.2); OFF until the AI key is given | none |
 >
 > Their on-screen words are in COPY-STANDARD "Finance (Chew)"; those marked PROPOSAL wait for Chew.
 >
@@ -112,6 +113,14 @@ Dealer commission rules:
 - A supplier debit note (the supplier charges more) is entered as a bill and paid by a voucher, the doors that exist, so one act keeps one form (ERP-ARCHITECTURE law C). Whether it needs its own mark goes to Chew.
 - Not built: reading the supplier's paper (the bill scan will, once its AI key is given); the supplier paying a credit back in money (goes to Chew); a PDF.
 - Falsifier: in Chew's test, a supplier's `Unpaid After Advance and Credit` differs from its balance in the books, or a bill shows a credit note Chew did not knock off.
+
+**Bill scanning approach — PROPOSAL / NOT LAW, built for Chew's test (no migration).**
+- `Read the bill` on the bill form and `Read the credit note` on the credit note form. The person picks the pages (PDF or photos, up to 8, 10 MB each); they go once to Anthropic's Claude model (`claude-sonnet-5-5`, changeable with the `BILL_READER_MODEL` setting), which answers the supplier's name, the paper's number, date, due date, currency, total and lines.
+- What is read fills only what the form does not have yet: the supplier when one has that name (never a guess between two), the number, the date, the due date, and the lines when the form has none. A person still picks each line's account and department and saves. Notes under the card say what to check: a close name, a proforma, another currency, lines that do not add up to the total, a discount read as its own line. A credit note printed with minus signs is read as the credit it is.
+- Once the paper is saved, the pages that were read are attached to it as its files. Nothing is written by the reading itself.
+- It is OFF until Chew gives the key, which becomes the Worker secret `ANTHROPIC_API_KEY`; until then the button answers `Reading bills is not set up yet. Type the bill in.` Each reading costs a little per bill.
+- Not built: Houzs's account memory (filling a line's account from the supplier's earlier bills), the multi-bill scan page, and reading for payment vouchers and payment requests.
+- Falsifier: in Chew's test with real bills, a read figure is wrong more often than right, or the pre-filled form takes longer to check than typing it.
 
 ### 3.3 Staff payment requests
 

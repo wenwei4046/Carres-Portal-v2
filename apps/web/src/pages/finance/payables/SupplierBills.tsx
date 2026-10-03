@@ -50,6 +50,8 @@ import {
   VOUCHER_STATUS_WORD,
 } from "./payables-words";
 import { FactRow, Facts, FilesCard, HistoryCard, PayablesSwitch, ReadFailed, ReasonModal } from "./PayablesParts";
+import { attachPages, formLines, ReadPaperButton, readPaperNotes } from "./ReadPaper";
+import type { BillReadAnswer } from "@carres/shared/bill-reading";
 import { AdvanceModal, AmountField } from "./VoucherAdvance";
 import { useSaveKey } from "../save-key";
 
@@ -541,6 +543,9 @@ function BillForm() {
   const [grnOpen, setGrnOpen] = useState(params.has("po"));
   const [creditorOpen, setCreditorOpen] = useState(false);
   const [loaded, setLoaded] = useState(!id);
+  // Chew 2026-10-03: the pages read with "Read the bill", attached once the
+  // bill is saved, and what to check about the reading.
+  const [read, setRead] = useState<{ files: File[]; notes: string[] } | null>(null);
 
   // Editing a draft: the form starts from the bill as saved.
   useEffect(() => {
@@ -594,12 +599,27 @@ function BillForm() {
       lines: lines.map(toInput),
     };
     save.mutate({ id, input }, {
-      onSuccess: (out) => {
+      onSuccess: async (out) => {
         toast.success(id ? "Bill saved" : "Draft bill saved");
+        if (read && !(await attachPages("bills", out.id, read.files))) {
+          toast.error("The bill is saved, but a page that was read could not be attached. Attach it on the bill.");
+        }
         navigate(`/finance/bills/${out.id}`);
       },
       onError: (e) => toast.error(refusal(e)),
     });
+  };
+
+  /** What "Read the bill" found fills only what the form does not have yet. */
+  const applyReading = (answer: BillReadAnswer, files: File[]) => {
+    const r = answer.reading;
+    if (supplierId === "" && answer.supplier) setSupplierId(answer.supplier.id);
+    if (invoiceNo.trim() === "" && r.invoiceNumber) setInvoiceNo(r.invoiceNumber);
+    if (r.invoiceDate) setBillDate(r.invoiceDate);
+    if (r.dueDate) { setDueTouched(true); setDueDate(r.dueDate); }
+    const linesKept = lines.length > 0;
+    if (!linesKept) setLines(formLines(answer).map((l) => ({ ...blankLine(), ...l })));
+    setRead({ files, notes: readPaperNotes(answer, { pages: files.length, expect: "bill", linesKept }) });
   };
 
   const gap = billSaveGap({ supplierId, invoiceNo, billDate, lines });
@@ -630,7 +650,12 @@ function BillForm() {
       />
       <div className="flex-1 overflow-auto p-4" data-testid="bill-form">
         <div className="flex max-w-[1100px] flex-col gap-4">
-          <Facts title="Who sent this bill">
+          <Facts title="Who sent this bill" right={<ReadPaperButton label="Read the bill" testId="read-bill" onRead={applyReading} />}>
+            {read && (
+              <ul className="mb-3 list-disc pl-5 text-body" data-testid="bill-read-notes">
+                {read.notes.map((n) => <li key={n}>{n}</li>)}
+              </ul>
+            )}
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
               <label className="block">
                 Supplier

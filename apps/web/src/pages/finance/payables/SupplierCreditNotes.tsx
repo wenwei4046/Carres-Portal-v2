@@ -35,6 +35,8 @@ import { useLedgerChart } from "../ledger/ledger-queries";
 import { useSaveKey } from "../save-key";
 import { DepartmentName, DepartmentPicker } from "../department";
 import { FactRow, Facts, FilesCard, HistoryCard, ReadFailed, ReasonModal } from "./PayablesParts";
+import { asCredit, attachPages, formLines, ReadPaperButton, readPaperNotes } from "./ReadPaper";
+import type { BillReadAnswer } from "@carres/shared/bill-reading";
 import { ADVANCE_APPLICATION_STATUS_WORD, BILL_STATUS_WORD, cents, creditorKindWord, money, num, refusal, word } from "./payables-words";
 
 /**
@@ -391,6 +393,8 @@ function CreditNoteForm() {
   const [narration, setNarration] = useState("");
   const [lines, setLines] = useState<LineDraft[]>(() => [newLine()]);
   const [loaded, setLoaded] = useState(!id);
+  // The pages read with "Read the credit note", attached once it is saved.
+  const [read, setRead] = useState<{ files: File[]; notes: string[] } | null>(null);
 
   // Editing a draft: the form starts from the note as saved.
   useEffect(() => {
@@ -437,9 +441,28 @@ function CreditNoteForm() {
   const submit = () => {
     if (!checked.success) return;
     save.mutate({ id, input: checked.data }, {
-      onSuccess: (r) => { toast.success("Credit note saved"); navigate(`/finance/credit-notes/${r.id}`); },
+      onSuccess: async (r) => {
+        toast.success("Credit note saved");
+        if (read && !(await attachPages("credit-notes", r.id, read.files))) {
+          toast.error("The credit note is saved, but a page that was read could not be attached. Attach it on the credit note.");
+        }
+        navigate(`/finance/credit-notes/${r.id}`);
+      },
       onError: (e) => toast.error(refusal(e)),
     });
+  };
+
+  /** What "Read the credit note" found fills only what the form does not have yet. */
+  const applyReading = (raw: BillReadAnswer, files: File[]) => {
+    const answer = asCredit(raw);
+    const r = answer.reading;
+    if (supplierId === "" && answer.supplier) setSupplierId(answer.supplier.id);
+    if (paperNo.trim() === "" && r.invoiceNumber) setPaperNo(r.invoiceNumber);
+    if (r.invoiceDate) setNoteDate(r.invoiceDate);
+    const linesKept = lines.some((l) => l.description.trim() !== "" || l.amount.trim() !== "");
+    const taken = formLines(answer);
+    if (!linesKept && taken.length > 0) setLines(taken.map((l) => ({ ...newLine(), ...l })));
+    setRead({ files, notes: readPaperNotes(answer, { pages: files.length, expect: "credit_note", linesKept }) });
   };
   // F3 or Ctrl+S saves, as on a bill — only once a draft has loaded and may be changed.
   useSaveKey(submit, gap === null && !save.isPending && (!id || existing.data?.can.edit === true));
@@ -471,7 +494,13 @@ function CreditNoteForm() {
       />
       <div className="flex-1 overflow-auto p-4" data-testid="credit-note-form">
         <div className="flex max-w-[1100px] flex-col gap-4">
-          <Facts title="Who sent this credit note">
+          <Facts title="Who sent this credit note"
+            right={<ReadPaperButton label="Read the credit note" testId="read-credit-note" onRead={applyReading} />}>
+            {read && (
+              <ul className="mb-3 list-disc pl-5 text-body" data-testid="credit-note-read-notes">
+                {read.notes.map((n) => <li key={n}>{n}</li>)}
+              </ul>
+            )}
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
               <Select id="credit-note-supplier" label="Supplier" value={supplierId || undefined} placeholder="Choose who sent this credit note"
                 onValueChange={setSupplierId}

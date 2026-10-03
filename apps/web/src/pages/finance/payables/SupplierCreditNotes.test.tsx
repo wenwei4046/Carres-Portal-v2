@@ -13,11 +13,15 @@ import SupplierCreditNotes from "./SupplierCreditNotes";
 const api = vi.hoisted(() => ({
   routes: {} as Record<string, unknown>,
   calls: [] as Array<{ url: string; method: string; body: unknown }>,
+  read: null as unknown,
+  uploads: [] as string[],
 }));
 vi.mock("@/lib/api", () => ({
   apiFetch: vi.fn(async (url: string, init?: { method?: string; body?: string }) => {
     const method = init?.method ?? "GET";
     api.calls.push({ url, method, body: init?.body ? JSON.parse(init.body) : undefined });
+    if (url.endsWith("/read-bill")) return api.read;
+    if (url.endsWith("/files/sign")) return { bucket: "ap-documents", token: "t", path: `SUPPLIER_CREDIT_NOTE/${NOTE}/x.pdf` };
     if (method !== "GET") return { id: NOTE };
     const path = url.replace(/\?.*$/, "");
     if (!(path in api.routes)) throw new Error(`unexpected read ${url}`);
@@ -25,7 +29,11 @@ vi.mock("@/lib/api", () => ({
   }),
   ApiError: class ApiError extends Error {},
 }));
-vi.mock("@/lib/supabase", () => ({ supabase: { storage: { from: vi.fn() } } }));
+vi.mock("@/lib/supabase", () => ({
+  supabase: { storage: { from: vi.fn(() => ({
+    uploadToSignedUrl: vi.fn(async (path: string) => { api.uploads.push(path); return { error: null }; }),
+  })) } },
+}));
 vi.mock("@/pages/operation/components/GlobalTopBar", () => ({ TopBarIcons: () => null }));
 vi.mock("@/lib/auth", () => ({
   useAuth: (sel: (s: unknown) => unknown) => sel({ user: { id: "u1" }, role: "finance" }),
@@ -82,6 +90,8 @@ const applied = { application_id: APP, bill_id: BILL1, bill_no: "BILL-4XK2", sup
 
 beforeEach(() => {
   api.calls.length = 0;
+  api.uploads.length = 0;
+  api.read = null;
   api.routes = {
     [`${B}/credit-notes`]: register,
     [`${B}/suppliers`]: { rows: [{ id: SUP, name: "Lumen Sofa Works", kind: "supplier" }] },
@@ -247,6 +257,47 @@ describe("New Credit Note", () => {
       lines: [{ accountCode: "4900", description: "Rebate for September", amount: 75.5, departmentType: "SUBSCRIPTION", departmentId: null }],
     });
     expect((sent.body as { noteDate: string }).noteDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+});
+
+describe("Read the credit note", () => {
+  it("fills an empty form from the supplier's paper, and attaches the pages once it is saved", async () => {
+    api.read = {
+      reading: { vendorName: "LUMEN SOFA WORKS SDN BHD", vendorRegNo: null, documentKind: "credit_note", invoiceNumber: "LSW-CN-11",
+        invoiceDate: "2026-09-30", dueDate: null, currency: "MYR", total: -350,
+        lines: [{ description: "Two chairs returned", amount: -300 }, { description: "Rebate", amount: -50 }] },
+      supplier: { id: SUP, name: "Lumen Sofa Works", kind: "supplier", how: "exact" },
+    };
+    show("/finance/credit-notes/new");
+    const form = await screen.findByTestId("credit-note-form");
+    const page = new File(["%PDF-1.4"], "lsw-cn-11.pdf", { type: "application/pdf" });
+    fireEvent.change(screen.getByTestId("read-credit-note-input"), { target: { files: [page] } });
+
+    expect(await screen.findByTestId("credit-note-read-notes")).toHaveTextContent("Read from 1 page. Check every figure before you save.");
+    const read = api.calls.find((c) => c.url.endsWith("/read-bill"))!;
+    expect(read.body).toMatchObject({ files: [{ name: "lsw-cn-11.pdf", mime: "application/pdf" }] });
+    expect((read.body as { files: Array<{ dataBase64: string }> }).files[0]!.dataBase64).toBe(btoa("%PDF-1.4"));
+    expect(within(form).getByLabelText(/Supplier's credit note No/)).toHaveValue("LSW-CN-11");
+    expect(within(form).getByLabelText(/Line 1 · Description/)).toHaveValue("Two chairs returned");
+    expect(within(form).getByLabelText(/Line 2 · Description/)).toHaveValue("Rebate");
+    expect(screen.getByTestId("credit-note-form-total")).toHaveTextContent("Total RM 350.00");
+
+    // A person still chooses each line's account and department, then saves.
+    await screen.findAllByRole("option", { name: "Subscription" });
+    for (const [n, account, dept] of [[1, "5100 Cost of goods sold", "OFFICE"], [2, "4900 Other income", "SUBSCRIPTION"]] as const) {
+      const line = screen.getByTestId(`credit-note-line-${n}`);
+      fireEvent.keyDown(within(line).getByRole("combobox", { name: /Account/ }), { key: "Enter" });
+      fireEvent.click(await screen.findByRole("option", { name: account }));
+      fireEvent.change(within(line).getByLabelText(`Line ${n} department`), { target: { value: dept } });
+    }
+    await waitFor(() => expect(screen.getByTestId("save-credit-note")).toHaveTextContent("Save"));
+    fireEvent.click(screen.getByTestId("save-credit-note"));
+    await waitFor(() => expect(api.calls.map((c) => `${c.method} ${c.url}`)).toEqual(expect.arrayContaining([
+      `POST ${B}/credit-notes`,
+      `POST ${B}/credit-notes/${NOTE}/files/sign`,
+      `POST ${B}/credit-notes/${NOTE}/files`,
+    ])));
+    expect(api.uploads).toEqual([`SUPPLIER_CREDIT_NOTE/${NOTE}/x.pdf`]);
   });
 });
 

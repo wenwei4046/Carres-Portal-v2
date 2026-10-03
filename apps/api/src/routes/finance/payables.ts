@@ -16,7 +16,9 @@ import {
   type SupplierCreditNoteDraftInput,
 } from "@carres/shared/schemas/finance-ap";
 import { apAgingQuery, apAgingReport, type ApAgingAnswer } from "@carres/shared/ap-aging";
+import { billReadInput, matchSupplier, type BillReadAnswer } from "@carres/shared/bill-reading";
 import { requireFinance } from "../../lib/auth-guards";
+import { billReaderKey, billReaderModel, readBillWithModel } from "../../lib/finance-bill-reader";
 import { todayIsoMYT } from "../../lib/delivery-order-issue";
 import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
@@ -48,6 +50,8 @@ import type { AppEnv } from "../../types";
  *     PUT  /bills/:id                   supplier_bill_save_draft (rewrite a draft)
  *     POST /bills/:id/confirm           supplier_bill_confirm — posts the bill
  *     POST /bills/:id/cancel            supplier_bill_cancel — reverses it if confirmed
+ *     POST /read-bill                   read a bill's pages with Claude to pre-fill a form;
+ *                                       writes nothing; 503 until ANTHROPIC_API_KEY is set
  *
  *   Payment vouchers (Draft → Prepared → Checked → Approved)
  *     GET  /vouchers                    payment_voucher_register
@@ -194,6 +198,34 @@ payablesRouter.post("/other-creditors", requireFinance, async (c) => {
   });
   if (error) return pgFail(c, error);
   return c.json({ id: data as string });
+});
+
+// ── reading a bill (Chew 2026-10-03, Finance MASTER §3.2 Bill scanning) ─────
+// The pages go to the model once; the answer pre-fills a form a person then
+// checks. Nothing is written here, and the supplier is matched by name only.
+payablesRouter.post("/read-bill", requireFinance, async (c) => {
+  const key = billReaderKey(c.env);
+  if (!key) {
+    return c.json({ error: "not_configured", code: "bill_reader_not_set_up",
+      message: "Reading bills is not set up yet. Type the bill in." }, 503);
+  }
+  const body = await parseJsonBody(c, billReadInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const read = await readBillWithModel({ key, model: billReaderModel(c.env), files: body.data.files });
+  if (!read.ok) {
+    const message = read.why === "refused" ? "These pages could not be read. Try a clearer photo, or the PDF."
+      : read.why === "timeout" ? "Reading the bill took too long. Try again."
+      : "The bill could not be read. Try again, or type it in.";
+    return c.json({ error: "read_failed", code: `bill_${read.why}`, message }, 502);
+  }
+  const { data, error } = await sb(c).from("suppliers").select("id, name, kind");
+  if (error) return pgFail(c, error);
+  const match = matchSupplier(read.reading.vendorName, (data ?? []) as Array<{ id: string; name: string; kind: string | null }>);
+  const answer: BillReadAnswer = {
+    reading: read.reading,
+    supplier: match ? { id: match.supplier.id, name: match.supplier.name, kind: match.supplier.kind, how: match.how } : null,
+  };
+  return c.json(answer);
 });
 
 payablesRouter.get("/accounts", requireFinance, async (c) => {
