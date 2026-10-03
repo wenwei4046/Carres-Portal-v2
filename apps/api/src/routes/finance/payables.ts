@@ -9,6 +9,7 @@ import {
   otherCreditorInput,
   paymentVoucherDraftInput,
   supplierBillDraftInput,
+  supplierFinanceInput,
   type PaymentVoucherDraftInput,
   type SupplierBillDraftInput,
 } from "@carres/shared/schemas/finance-ap";
@@ -28,6 +29,9 @@ import type { AppEnv } from "../../types";
  *     GET  /accounts                    ap_account_choices — which account fits which box
  *     GET  /outstanding                 ap_outstanding — owed per supplier, zero included
  *     GET  /bill-outstanding            ap_bill_outstanding — owed per confirmed bill
+ *     GET  /supplier-finance            finance_supplier_list — every supplier with Finance's
+ *                                       own tax and bank details (0636)
+ *     PUT  /supplier-finance/:supplierId  finance_supplier_profile_save (0636)
  *
  *   Bills (a supplier's invoice, entered)
  *     GET  /bills                       supplier_bill_register
@@ -188,6 +192,34 @@ payablesRouter.get("/outstanding", requireFinance, async (c) => {
   const { data, error } = await sb(c).rpc("ap_outstanding", { p_supplier_id: f.value });
   if (error) return pgFail(c, error);
   return c.json({ rows: data ?? [] });
+});
+
+// ── a supplier's finance details (0636; Chew 2026-10-03) ────────────────────
+// Finance's own record beside Purchasing's supplier: tax number, registration
+// number and the bank account a payment goes to.
+
+payablesRouter.get("/supplier-finance", requireFinance, async (c) => {
+  const { data, error } = await sb(c).rpc("finance_supplier_list");
+  if (error) return pgFail(c, error);
+  return c.json({ rows: data ?? [] });
+});
+
+payablesRouter.put("/supplier-finance/:supplierId", requireFinance, async (c) => {
+  const supplierId = c.req.param("supplierId");
+  if (!UUID_RE.test(supplierId)) return badId(c, "supplier");
+  const body = await parseJsonBody(c, supplierFinanceInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const d = body.data;
+  const { data, error } = await sb(c).rpc("finance_supplier_profile_save", {
+    p_supplier_id: supplierId,
+    p_tax_no: d.taxNo,
+    p_registration_no: d.registrationNo,
+    p_bank_name: d.bankName,
+    p_bank_account_no: d.bankAccountNo,
+    p_bank_account_holder: d.bankAccountHolder,
+  });
+  if (error) return pgFail(c, error);
+  return c.json({ id: data as string });
 });
 
 payablesRouter.get("/bill-outstanding", requireFinance, async (c) => {

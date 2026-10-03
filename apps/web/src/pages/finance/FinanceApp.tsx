@@ -27,6 +27,7 @@ import FinanceSettings from "./settings/FinanceSettings";
 import DealerCommission from "./reports/DealerCommission";
 import CardCharges from "./reports/CardCharges";
 import ApOutstanding from "./payables/ApOutstanding";
+import SupplierFinancePage from "./payables/SupplierFinancePage";
 
 /**
  * Finance (HQ Internal) shell — sidebar + main routing area.
@@ -80,6 +81,8 @@ export default function FinanceApp() {
           <Route path="bills/*"            element={financeOnly(<SupplierBills />)} />
           <Route path="payment-vouchers/*" element={financeOnly(<PaymentVouchers />)} />
           <Route path="ap-outstanding"     element={financeOnly(<ApOutstanding />)} />
+          {/* 0636 — Finance's own tax and bank details per supplier (Chew 2026-10-03). */}
+          <Route path="suppliers"          element={financeOnly(<SupplierFinancePage />)} />
           {/* PAYMENTS → Monitor · Payment Records (owner ruling 2026-09-12).
               Monitor is the SO-keyed collection control listing and opens the
               collection workspace (`?invoice=`); Payment Records is the

@@ -625,6 +625,9 @@ export const PORTAL_NAV: PortalNavGroup[] = [
         financePath: "/finance/payment-vouchers",
         section: "Payables",
       },
+      // 0636 — Finance's own tax and bank details per supplier (Chew 2026-10-03).
+      // Keyed apart from the operation area's Suppliers pages.
+      { key: "supplier-finance", label: "Suppliers", icon: Truck, financePath: "/finance/suppliers", section: "Payables" },
       /* The finance role sees the SAME two Payments destinations, as the same
        * module — never a second Payment information architecture (owner
        * ruling 2026-09-12). `Order Payments`, `Invoices` and `Refunds &

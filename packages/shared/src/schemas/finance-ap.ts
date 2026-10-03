@@ -87,6 +87,70 @@ export const otherCreditorInput = z
   .strict();
 export type OtherCreditorInput = z.infer<typeof otherCreditorInput>;
 
+// ── a supplier's finance details (0636; Chew 2026-10-03, Finance MASTER §3.2) ─
+/** Blank text means no value, exactly as the database door stores it. */
+const blankToNull = (v: string | null | undefined): string | null => {
+  const t = (v ?? "").trim();
+  return t === "" ? null : t;
+};
+
+/**
+ * Finance's own tax and bank details for a supplier. The supplier stays
+ * Purchasing's record. finance_supplier_profile_save checks the same rules;
+ * this only turns a bad form into a sentence before the round trip.
+ */
+export const supplierFinanceInput = z
+  .object({
+    taxNo: z.string().max(40, "The tax number is too long.").nullable().optional(),
+    registrationNo: z.string().max(60, "The registration number is too long.").nullable().optional(),
+    bankName: z.string().max(100, "The bank name is too long.").nullable().optional(),
+    bankAccountNo: z.string().max(40, "An account number is 6 to 20 digits.").nullable().optional(),
+    bankAccountHolder: z.string().max(200, "The account holder's name is too long.").nullable().optional(),
+  })
+  .strict()
+  .transform((v) => ({
+    taxNo: blankToNull(v.taxNo),
+    registrationNo: blankToNull(v.registrationNo),
+    bankName: blankToNull(v.bankName),
+    // Spaces and dashes typed with the number are dropped (0636, as 0598 does for dealers).
+    bankAccountNo: blankToNull(v.bankAccountNo?.replace(/[\s-]/g, "")),
+    bankAccountHolder: blankToNull(v.bankAccountHolder),
+  }))
+  .refine((v) => v.bankAccountNo === null || /^[0-9]{6,20}$/.test(v.bankAccountNo), {
+    message: "An account number is 6 to 20 digits.",
+    path: ["bankAccountNo"],
+  })
+  .refine((v) => v.bankAccountNo === null || v.bankName !== null, {
+    message: "Choose the bank for this account number.",
+    path: ["bankName"],
+  });
+export type SupplierFinanceInput = z.infer<typeof supplierFinanceInput>;
+/** What the form sends, before blanks become null. */
+export type SupplierFinanceFormInput = z.input<typeof supplierFinanceInput>;
+
+/** One supplier on Finance's Suppliers page (finance_supplier_list, 0636). */
+export interface SupplierFinanceRow {
+  supplier_id: string;
+  name: string;
+  kind: string;
+  tax_no: string | null;
+  registration_no: string | null;
+  bank_name: string | null;
+  bank_account_no: string | null;
+  bank_account_holder: string | null;
+  updated_at: string | null;
+  updated_by_name: string | null;
+}
+
+/** Where a payment to this supplier goes, on one line: `Maybank · 514012345678 ·
+ *  Ah Seng Trading`. Null while Finance keeps no account number. */
+export function supplierPayTo(
+  row: Pick<SupplierFinanceRow, "bank_name" | "bank_account_no" | "bank_account_holder">,
+): string | null {
+  if (!row.bank_account_no) return null;
+  return [row.bank_name, row.bank_account_no, row.bank_account_holder].filter(Boolean).join(" · ");
+}
+
 export const apReasonInput = z
   .object({ reason: z.string().trim().min(1, "Say why").max(500) })
   .strict();

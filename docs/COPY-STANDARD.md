@@ -4967,3 +4967,22 @@ The Finance area of the Portal sidebar groups Finance's own pages into modules. 
 - `Dashboard` stays a plain row at the top.
 - `Payables` sits above `Receivables` to keep the owner ruling of 2026-09-14 that `AP · Payables` sits above AR.
 - The modules are not named `Money in` / `Money out`, because customer `Money In` is Payment's word (Payment MASTER §1) and `Money in full` is already a governed phrase.
+
+### APPROVED by Chew on 3 Oct 2026 · One person may check and approve a voucher (0635)
+
+0635 retires the refusal `You checked payment voucher {PV No}, so somebody else must approve it. Three different people prepare, check and approve a payment.`, which is listed under "Money moves and the three-person voucher". The database no longer raises it. That entry is left as it is.
+
+### PROPOSAL — PENDING CHEW · Suppliers: Finance's own tax and bank details (0636)
+
+These words are on screen in the branch and are not approved yet.
+
+| Where | Words |
+|---|---|
+| Menu | `Suppliers`, under `Payables` |
+| Page | Title `Suppliers`. Columns: `Supplier` · `Creditor Type` · `Tax No` · `Registration No` · `Bank` · `Account No` · `Account holder` · `Last changed`. Search: `Search suppliers…`. Footer: `{n} suppliers · {m} with a bank account`. |
+| Missing values | `No tax number on file` · `No registration number on file` · `No bank on file` · `No account on file` · `No account holder on file` · `Never changed` · `Not recorded` |
+| Row | `Inspect supplier` · `Pay to {bank} · {account no} · {holder}` · `No bank account on file. A payment to this supplier names no account.` · `Edit details` |
+| Form | Title: `Edit details`. Description: `{supplier} · {creditor type}. Finance's own details; the supplier stays Purchasing's.` Fields: `Tax No` · `Registration No` · `Bank` · `Account No` · `Account holder`. Buttons: `Back` · `Save details`. On save: `Details saved.` |
+| Refusals | `An account number is 6 to 20 digits.` · `Choose the bank for this account number.` · `The tax number is too long.` · `The registration number is too long.` · `The bank name is too long.` · `The account holder's name is too long.` · `Only Finance edits a supplier's finance details.` · `That supplier does not exist.` |
+| Empty list | `No supplier yet. Purchasing adds suppliers; an other creditor is added from a bill.` |
+| Payment voucher | The fact `Pay to` shows only until the voucher is approved. On the form: `Pay to {bank} · {account no} · {holder}`. Missing or not loaded: `No bank account on file` · `Bank details could not be loaded` · `Loading bank details…` |

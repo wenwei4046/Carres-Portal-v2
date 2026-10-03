@@ -18,6 +18,8 @@ import {
   type SupplierBillDocument,
   type SupplierBillDraftInput,
   type SupplierBillRegisterRow,
+  type SupplierFinanceFormInput,
+  type SupplierFinanceRow,
 } from "@carres/shared/schemas/finance-ap";
 import { apiFetch, ApiError } from "./api";
 import { withDepartment } from "@/pages/finance/department";
@@ -51,6 +53,8 @@ export const payablesKeys = {
   voucher: (id: string) => ["finance", "payables", "voucher", id] as const,
   advances: (supplierId: string | null) =>
     ["finance", "payables", "advances", supplierId ?? "all"] as const,
+  /** 0636: Finance's own tax and bank details per supplier. */
+  supplierFinance: () => ["finance", "payables", "supplier-finance"] as const,
 };
 
 type Rows<T> = { rows: T[] };
@@ -167,6 +171,26 @@ export function useBillAct() {
       apiFetch<{ id: string }>(`${BASE}/bills/${id}/${act}`, {
         method: "POST",
         body: act === "cancel" ? JSON.stringify({ reason }) : undefined,
+      }),
+    onSuccess: () => { void refresh(); },
+  });
+}
+
+/** 0636: every supplier with Finance's own tax and bank details (Chew 2026-10-03). */
+export function useSupplierFinance() {
+  return useQuery({
+    queryKey: payablesKeys.supplierFinance(),
+    queryFn: async () => (await apiFetch<Rows<SupplierFinanceRow>>(`${BASE}/supplier-finance`)).rows,
+  });
+}
+
+export function useSaveSupplierFinance() {
+  const refresh = useInvalidatePayables();
+  return useMutation<{ id: string }, ApiError, { supplierId: string; input: SupplierFinanceFormInput }>({
+    mutationFn: ({ supplierId, input }) =>
+      apiFetch<{ id: string }>(`${BASE}/supplier-finance/${supplierId}`, {
+        method: "PUT",
+        body: JSON.stringify(input),
       }),
     onSuccess: () => { void refresh(); },
   });

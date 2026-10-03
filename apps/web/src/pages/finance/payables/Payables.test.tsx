@@ -48,6 +48,14 @@ const suppliers = { rows: [
   { id: SUP, name: "Lumen Sofa Works", kind: "supplier" },
   { id: LANDLORD, name: "Bayview Properties", kind: "other_creditor" },
 ] };
+// 0636: Finance's own bank details — the supplier has one, the landlord none.
+const supplierFinance = { rows: [
+  { supplier_id: SUP, name: "Lumen Sofa Works", kind: "supplier", tax_no: null, registration_no: null,
+    bank_name: "Maybank", bank_account_no: "514012345678", bank_account_holder: "Lumen Sofa Works Sdn Bhd",
+    updated_at: "2026-10-03T03:15:00Z", updated_by_name: "Chew" },
+  { supplier_id: LANDLORD, name: "Bayview Properties", kind: "other_creditor", tax_no: null, registration_no: null,
+    bank_name: null, bank_account_no: null, bank_account_holder: null, updated_at: null, updated_by_name: null },
+] };
 const accounts = { rows: [
   { code: "1110", name: "Cash in hand", kind: "ASSET", parent_code: "1100", is_control: false, control_for: null,
     for_bill_line: false, for_voucher_line: false, for_ap: false, for_pay_from: true },
@@ -127,6 +135,7 @@ beforeEach(() => {
   api.fail.clear();
   api.routes = {
     [`${B}/suppliers`]: suppliers,
+    [`${B}/supplier-finance`]: supplierFinance,
     [`${B}/accounts`]: accounts,
     [MONEY]: moneyAccounts,
     // AutoCount-shaped roles: the form names the usual accounts from these.
@@ -599,6 +608,39 @@ describe("Payment voucher detail", () => {
     fireEvent.click(go);
     await waitFor(() => expect(writes()).toHaveLength(1));
     expect(writes()[0]).toMatchObject({ url: `${B}/vouchers/${PV}/cancel`, body: { reason: "Paid twice" } });
+  });
+
+  /* 0636 (Chew 2026-10-03): where the money goes, from Finance's own supplier details. */
+  it("a voucher still to be paid shows where the money goes", async () => {
+    api.routes[`${B}/vouchers/${PV}`] = voucherDoc({ status: "checked", can: { approve: true } });
+    show(`/finance/payment-vouchers/${PV}`);
+    expect(await screen.findByTestId("voucher-pay-to")).toHaveTextContent("Maybank · 514012345678 · Lumen Sofa Works Sdn Bhd");
+  });
+
+  it("an approved voucher no longer shows today's bank details", async () => {
+    api.routes[`${B}/vouchers/${PV}`] = voucherDoc({ status: "approved", can: {} });
+    show(`/finance/payment-vouchers/${PV}`);
+    await screen.findByTestId("voucher-amount");
+    expect(screen.queryByTestId("voucher-pay-to")).not.toBeInTheDocument();
+  });
+
+  it("a failed read of the bank details says so, never 'no account'", async () => {
+    api.fail.add(`${B}/supplier-finance`);
+    api.routes[`${B}/vouchers/${PV}`] = voucherDoc({ status: "prepared", can: {} });
+    show(`/finance/payment-vouchers/${PV}`);
+    expect(await screen.findByText("Bank details could not be loaded")).toBeInTheDocument();
+  });
+});
+
+describe("Payment voucher form · pay to (0636)", () => {
+  it("names the supplier's bank account once the supplier is chosen", async () => {
+    show("/finance/payment-vouchers/new");
+    const supplier = await screen.findByLabelText("Supplier");
+    await screen.findByRole("option", { name: /Lumen Sofa Works/ });
+    fireEvent.change(supplier, { target: { value: SUP } });
+    expect(await screen.findByTestId("voucher-form-pay-to")).toHaveTextContent("Pay to Maybank · 514012345678 · Lumen Sofa Works Sdn Bhd");
+    fireEvent.change(supplier, { target: { value: LANDLORD } });
+    expect(await screen.findByTestId("voucher-form-pay-to")).toHaveTextContent("No bank account on file");
   });
 });
 

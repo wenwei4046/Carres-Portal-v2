@@ -170,6 +170,84 @@ describe("GET readers", () => {
   });
 });
 
+describe("a supplier's finance details (0636, Chew 2026-10-03)", () => {
+  it("GET /supplier-finance calls finance_supplier_list and wraps rows", async () => {
+    const row = { supplier_id: SUPPLIER_ID, name: "Test Factory", kind: "factory_pickup", bank_account_no: null };
+    const sb = mockRpc({ data: [row], error: null });
+    const res = await call("/supplier-finance");
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("finance_supplier_list");
+    expect(await res.json()).toEqual({ rows: [row] });
+  });
+
+  it("PUT /supplier-finance/:id sends trimmed values, drops spaces and dashes from the account number, and blanks become null", async () => {
+    const sb = mockRpc({ data: SUPPLIER_ID, error: null });
+    const res = await call(`/supplier-finance/${SUPPLIER_ID}`, {
+      method: "PUT",
+      body: {
+        taxNo: "  C 1234567890 ",
+        registrationNo: "",
+        bankName: " Maybank ",
+        bankAccountNo: "5140-1234 5678",
+        bankAccountHolder: "Test Factory Sdn Bhd",
+      },
+    });
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("finance_supplier_profile_save", {
+      p_supplier_id: SUPPLIER_ID,
+      p_tax_no: "C 1234567890",
+      p_registration_no: null,
+      p_bank_name: "Maybank",
+      p_bank_account_no: "514012345678",
+      p_bank_account_holder: "Test Factory Sdn Bhd",
+    });
+  });
+
+  it("PUT refuses an account number that is not 6 to 20 digits, before calling the database", async () => {
+    const sb = mockRpc({ data: null, error: null });
+    const res = await call(`/supplier-finance/${SUPPLIER_ID}`, {
+      method: "PUT",
+      body: { bankName: "Maybank", bankAccountNo: "12AB45" },
+    });
+    expect(res.status).toBe(422);
+    expect(await res.json()).toMatchObject({ message: "An account number is 6 to 20 digits." });
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
+
+  it("PUT refuses an account number with no bank", async () => {
+    const sb = mockRpc({ data: null, error: null });
+    const res = await call(`/supplier-finance/${SUPPLIER_ID}`, {
+      method: "PUT",
+      body: { bankAccountNo: "514012345678" },
+    });
+    expect(res.status).toBe(422);
+    expect(await res.json()).toMatchObject({ message: "Choose the bank for this account number." });
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
+
+  it("PUT refuses a supplier id that is not a uuid, before calling the database", async () => {
+    const sb = mockRpc({ data: null, error: null });
+    const res = await call("/supplier-finance/abc", { method: "PUT", body: {} });
+    expect(res.status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
+
+  it("PUT keeps the database's reason when it refuses (403 not_finance)", async () => {
+    mockRpc({
+      data: null,
+      error: { code: "42501", message: "Only Finance edits a supplier's finance details.", details: "not_finance" },
+    });
+    const res = await call(`/supplier-finance/${SUPPLIER_ID}`, { method: "PUT", body: { taxNo: "C1" } });
+    expect(res.status).toBe(403);
+    expect(await res.json()).toMatchObject({ code: "not_finance" });
+  });
+
+  it("refuses operation (finance and principal only)", async () => {
+    const res = await call("/supplier-finance", { role: "operation" });
+    expect(res.status).toBe(403);
+  });
+});
+
 describe("bills", () => {
   it("POST /bills turns the form into the save-draft call, snake_case lines", async () => {
     const sb = mockRpc({ data: BILL_ID, error: null });

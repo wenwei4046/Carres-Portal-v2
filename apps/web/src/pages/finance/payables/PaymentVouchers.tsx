@@ -9,6 +9,7 @@ import {
   type PaymentVoucherDraftInput,
   type PaymentVoucherRegisterRow,
   type SupplierBillRegisterRow,
+  supplierPayTo,
 } from "@carres/shared/schemas/finance-ap";
 import ListPageShell from "@/components/ListPageShell";
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
@@ -28,6 +29,7 @@ import {
   useSupplierBills,
   usePaymentVouchers,
   useSaveVoucher,
+  useSupplierFinance,
   useVoucherAct,
   type VoucherAct,
 } from "@/lib/payables-queries";
@@ -67,6 +69,28 @@ import { useSaveKey } from "../save-key";
  * the bill. Approving posts it Dr the payables account like a bill payment;
  * it is applied to a bill later, or sent back, from the voucher's Advance card.
  */
+/**
+ * 0636 (Chew 2026-10-03): where a payment to this supplier goes, from
+ * Finance's own supplier details. A read that fails says so; it never
+ * pretends there is no account.
+ */
+function useSupplierPayTo(supplierId: string | null):
+  | { state: "none" } | { state: "loading" } | { state: "failed" } | { state: "ready"; payTo: string | null } {
+  const q = useSupplierFinance();
+  if (!supplierId) return { state: "none" };
+  if (q.isError) return { state: "failed" };
+  if (!q.isSuccess) return { state: "loading" };
+  const row = q.data.find((r) => r.supplier_id === supplierId);
+  return { state: "ready", payTo: row ? supplierPayTo(row) : null };
+}
+
+function payToWords(p: ReturnType<typeof useSupplierPayTo>): string {
+  if (p.state === "failed") return "Bank details could not be loaded";
+  if (p.state === "loading") return "Loading bank details…";
+  if (p.state === "ready" && p.payTo) return p.payTo;
+  return "No bank account on file";
+}
+
 export default function PaymentVouchers() {
   return (
     <Routes>
@@ -212,6 +236,7 @@ function VoucherDetail() {
   const [reasonFor, setReasonFor] = useState<"reject" | "cancel" | null>(null);
   const [printing, setPrinting] = useState(false);
   const doc = query.data;
+  const payTo = useSupplierPayTo(doc?.voucher.supplier_id ?? null);
 
   if (query.isError) {
     return (
@@ -291,6 +316,12 @@ function VoucherDetail() {
               {v.supplier_name ? `${v.supplier_name} · ${creditorKindWord(v.supplier_kind)}` : "No supplier"}
             </FactRow>
             <FactRow label="Payee">{v.payee_name}</FactRow>
+            {/* 0636: today's bank details, while somebody still has to send the
+                money. Once approved the money has gone, and today's account may
+                not be the one it went to, so the row leaves. */}
+            {v.supplier_id && (v.status === "draft" || v.status === "prepared" || v.status === "checked") && (
+              <FactRow label="Pay to"><span data-testid="voucher-pay-to">{payToWords(payTo)}</span></FactRow>
+            )}
             <FactRow label="Voucher date">{fmtDate(v.voucher_date)}</FactRow>
             <FactRow label="Paid from">{v.pay_from_account_code} {v.pay_from_name ?? ""}</FactRow>
             <FactRow label="Method">{word(PAY_METHOD_WORD, v.pay_method)}</FactRow>
@@ -498,6 +529,7 @@ function VoucherForm() {
   const [lines, setLines] = useState<DirectLine[]>([]);
   const [advance, setAdvance] = useState("");
   const [loaded, setLoaded] = useState(!id);
+  const formPayTo = useSupplierPayTo(supplierId || null);
 
   // Editing a draft: the form starts from the voucher as saved.
   useEffect(() => {
@@ -649,6 +681,13 @@ function VoucherForm() {
                     <option key={s.id} value={s.id}>{s.name} · {creditorKindWord(s.kind)}</option>
                   ))}
                 </select>
+                {supplierId !== "" && (
+                  <span className="text-meta text-kit-slate-11" data-testid="voucher-form-pay-to">
+                    {formPayTo.state === "ready" && formPayTo.payTo
+                      ? `Pay to ${formPayTo.payTo}`
+                      : payToWords(formPayTo)}
+                  </span>
+                )}
               </label>
               <label className="block">
                 Payee
