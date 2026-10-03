@@ -37,6 +37,7 @@ import WorkMission from "./work/WorkMission";
 import WorkPoMission from "./work/WorkPoMission";
 import WorkCommunication from "./work/WorkCommunication";
 import WorkActionPanel from "./work/WorkActionPanel";
+import WorkIssueCard from "./work/WorkIssueCard";
 import PoWindowPanel from "./work/PoWindowPanel";
 import { useLogisticsModel } from "./work/LogisticsCard";
 
@@ -388,6 +389,10 @@ export default function OperationWork() {
                 <WorkActionPanel item={item.source} onOpen={() => window.location.assign(item.destination)} />
                 <PoWindowPanel item={item.source} />
               </div>
+            ) : item.source.object.kind === "issue" ? (
+              /* An Issue Tracker act is finished HERE, in the Issue Tracker's
+                 own form (§5.10: nothing sends the operator to another page). */
+              <WorkIssueCard key={item.id} item={item.source} />
             ) : (
               <WorkActionPanel key={item.id} item={item.source} onOpen={() => window.location.assign(item.destination)} />
             ),
