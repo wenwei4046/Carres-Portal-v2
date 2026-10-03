@@ -24,6 +24,7 @@ number, the party and the date already worked out, and one obvious button.
 
 **Mandatory UI cold-start:** before any listing/UI proposal or build, read `docs/ui/MASTER.md`
 §6.0, §6.7–6.10 and Complete-template adoption contract, the canonical token/component/pattern files, the owning module listing section and COPY entries. Reuse the kit and complete the contract’s full-page checks before delivery.
+Read UI MASTER “Canonical audit and publication state — 2026-10-02” and, for task inspection, Workspace §5.11. Source measurement is not whole-kit delivery proof.
 Approved goods/Ready Stock flows: Purchasing §9.1 SO Batch and §9.2 Manual Purchase (Jess
 2026-09-18, both BUILT 2026-09-18 — the authenticated production walk is owed for both, and
 Manual Purchase's migrations 0545–0547 + 0549 are APPLIED 2026-09-20 and only the authenticated walk
@@ -55,7 +56,8 @@ On a conflict, Business wins.
   size, word, rail, table or guide document; when a kit gap is real, admit the thing to the kit
   (with its `/ui` example) and every page gets it. When an old rule is found, DELETE it and update
   the kit in the same change — never leave two versions. The old kit files are gone
-  (`UI-KIT-NEW-CHAT`, `archive/UI-KIT-*`, `ui-reference/`, the `carres-design` skill); do not
+  (`UI-KIT-NEW-CHAT`, `archive/UI-KIT-*`, the `carres-design` skill); retained isolated
+  `ui-reference/` mock material is explicitly NON-AUTHORITY, never a kit or delivery proof. Do not
   recreate them. Portal-wide standards ruled the same day: **no dash anywhere on a screen** ·
   **card titles are black bold `text-strong`, never blue** · **column separators by column
   count** · **rail = icon + title only; every group closed until clicked, its chosen value on the header; two views are a tab bar (owner ruling 2026-09-28; SO representative pilot owner correction 2026-10-01 stacks the two views and opens Delivery first, see Orders MASTER)** · **header filter icons on hover only**.

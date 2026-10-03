@@ -20,6 +20,86 @@
 
 ---
 
+## Canonical audit and publication state — 2026-10-02
+
+**FACT / bounded production verification.** This audit uses source and the five production
+release endpoints at `de816e00cc530b72d3debeb1adc9f70799927a9c`. The authenticated Sales Orders
+walk covered Table/Cards, search, grouping, totals and the read-only quick view at 1440×1000
+and 390×844. Documentation publication does not prove the complete kit or every module shipped.
+The source recipes below are measurements, not new tokens. The three standards above retain
+value authority. No application code or deployment is part of this audit.
+
+| Surface / source under `apps/web/src/` | Exact current recipe | Verification / boundary |
+|---|---|---|
+| Shell: [pages/operation/OperationApp.tsx](https://github.com/wenwei4046/Carres-Portal-v2/blob/de816e00cc530b72d3debeb1adc9f70799927a9c/apps/web/src/pages/operation/OperationApp.tsx), [pages/portal/PortalSidebar.tsx](https://github.com/wenwei4046/Carres-Portal-v2/blob/de816e00cc530b72d3debeb1adc9f70799927a9c/apps/web/src/pages/portal/PortalSidebar.tsx) | Sidebar expanded232 / collapsed60; mobile boundary768, sidebar drawer; bounded main scroll | Source; phone listing has no document overflow |
+| Page title: [pages/operation/components/ModuleHeader.tsx](https://github.com/wenwei4046/Carres-Portal-v2/blob/de816e00cc530b72d3debeb1adc9f70799927a9c/apps/web/src/pages/operation/components/ModuleHeader.tsx) | Word only24/32/600; destination minimum50 plus border; desktop inset24 | Source; not a task header |
+| Global tools: [GlobalTopBar.tsx](https://github.com/wenwei4046/Carres-Portal-v2/blob/de816e00cc530b72d3debeb1adc9f70799927a9c/apps/web/src/pages/operation/components/GlobalTopBar.tsx) | Triggers32 desktop /40 phone, icons16, gap4 | Runtime in Sales; other pages not walked |
+| Global utility strip: [OperationRightRail.tsx](https://github.com/wenwei4046/Carres-Portal-v2/blob/de816e00cc530b72d3debeb1adc9f70799927a9c/apps/web/src/pages/operation/components/OperationRightRail.tsx) | Strip64, buttons60; icon18, label10/12; panel340, header48, inset14 | Source; distinct from task inspection and quick view; its complete target remains unbuilt |
+| Register rail: [pages/operation/components/workspace-rail.tsx](https://github.com/wenwei4046/Carres-Portal-v2/blob/de816e00cc530b72d3debeb1adc9f70799927a9c/apps/web/src/pages/operation/components/workspace-rail.tsx), [index.css](https://github.com/wenwei4046/Carres-Portal-v2/blob/de816e00cc530b72d3debeb1adc9f70799927a9c/apps/web/src/index.css) `.so-template-rail` | Width240; inset8/12 in SO; tabs36, gap4; group title13/600; SO rows32 desktop/40 phone, text12/18 | Source; Hide/Show28 remains a touch-target gap |
+| Register: [components/register/DataGrid.module.css](https://github.com/wenwei4046/Carres-Portal-v2/blob/de816e00cc530b72d3debeb1adc9f70799927a9c/apps/web/src/components/register/DataGrid.module.css) | SO rows32 desktop/40 phone; header36,11/600/14, inset8; footer32, inset12 | Stable desktop runtime; effective header600 overrides earlier700 declaration |
+| Toolbar: same stylesheet | Desktop40; mobile wraps with minimum48; search220×32 desktop/220×40 phone | Phone measured96 high; never describe all phone toolbars as48 |
+| Table/Cards: [components/kit/Tabs.tsx](https://github.com/wenwei4046/Carres-Portal-v2/blob/de816e00cc530b72d3debeb1adc9f70799927a9c/apps/web/src/components/kit/Tabs.tsx) | Segmented tab26 desktop /34 phone, inset10, icon16 | Phone actual34; unresolved against40 touch target |
+| Selection / filters: [DataGrid.module.css](https://github.com/wenwei4046/Carres-Portal-v2/blob/de816e00cc530b72d3debeb1adc9f70799927a9c/apps/web/src/components/register/DataGrid.module.css) | Selection inset4/12, gap8; filter row minimum36, inset6/12, gap6; chips maximum260, remove24 | Source; no claim all controls have40 hit area |
+| Grouping: [DataGrid.tsx](https://github.com/wenwei4046/Carres-Portal-v2/blob/de816e00cc530b72d3debeb1adc9f70799927a9c/apps/web/src/components/register/DataGrid.tsx) and stylesheet | Group heading38, title13/18/600; group-local sticky headers; one shared column layout | Delivery groups30/1; totals remain31 across collapse; not group subtotal truth |
+| Summary: [SalesOrdersRegister.tsx](https://github.com/wenwei4046/Carres-Portal-v2/blob/de816e00cc530b72d3debeb1adc9f70799927a9c/apps/web/src/pages/operation/SalesOrdersRegister.tsx) | Four facts; labels12/16, values15/22/600, gap8, inset8; money right aligned/tabular | Search Kimmy:1 / RM2499 / RM1250 / RM1249; Table/Cards agree |
+| Cards: [SalesOrdersRegister.tsx](https://github.com/wenwei4046/Carres-Portal-v2/blob/de816e00cc530b72d3debeb1adc9f70799927a9c/apps/web/src/pages/operation/SalesOrdersRegister.tsx) | Grid inset12, gap12; viewport1 column,768→2,1536→3 | Source; proposed container minimum320 thresholds652/984 are NOT BUILT; unavailable receipt/delivery evidence must not be invented |
+| Quick view: same page + [components/kit/DialogFrame.tsx](https://github.com/wenwei4046/Carres-Portal-v2/blob/de816e00cc530b72d3debeb1adc9f70799927a9c/apps/web/src/components/kit/DialogFrame.tsx) | Width maximum560/full phone; full height; radius10 at leading edge; desktop right offset64; header icons16 in32/40 buttons | Runtime560×1000 and390×844; close returns focus to SO1303; read-only, not task execution or generic editor |
+| Block: [components/kit/Block.tsx](https://github.com/wenwei4046/Carres-Portal-v2/blob/de816e00cc530b72d3debeb1adc9f70799927a9c/apps/web/src/components/kit/Block.tsx) | Border1 slate5, radius10, inset12/16; title15/22/600; body margin12 | Source and quick-view runtime; no new card kit |
+| Button: [components/kit/Button.tsx](https://github.com/wenwei4046/Carres-Portal-v2/blob/de816e00cc530b72d3debeb1adc9f70799927a9c/apps/web/src/components/kit/Button.tsx) | Default32/40, inset12, gap8, icon16; small24/icon14; touch36/40/icon14; focus2 offset1 | Source; default size does not upgrade every small control's hit area |
+| Modal/drawer: [components/kit/DialogFrame.tsx](https://github.com/wenwei4046/Carres-Portal-v2/blob/de816e00cc530b72d3debeb1adc9f70799927a9c/apps/web/src/components/kit/DialogFrame.tsx) | Named modal512/600/880, maximum85vh; drawer560; header12/16 gap16; body16; optional footer12/16 gap8 | Source; trap/Escape/scroll lock, return to surviving opener or explicit return target; generic combinations not runtime verified |
+| Tabs: [components/kit/Tabs.tsx](https://github.com/wenwei4046/Carres-Portal-v2/blob/de816e00cc530b72d3debeb1adc9f70799927a9c/apps/web/src/components/kit/Tabs.tsx) | Text13/18; inset4/8; icon gap8; tabs gap16; active underline2 blue and600 | Source; shared bar alone does not provide panels/association/overflow policy |
+| Fields: [components/kit/FieldFrame.tsx](https://github.com/wenwei4046/Carres-Portal-v2/blob/de816e00cc530b72d3debeb1adc9f70799927a9c/apps/web/src/components/kit/FieldFrame.tsx) and control skin | Gap4; label11/500/14, hint12/16, error13/18; input32, inset8, radius6, focus2 | Source; multiline uses natural height; generic validation journey not walked |
+| Status / neutral badge: [components/kit/StatusPill.tsx](https://github.com/wenwei4046/Carres-Portal-v2/blob/de816e00cc530b72d3debeb1adc9f70799927a9c/apps/web/src/components/kit/StatusPill.tsx), [components/kit/Badge.tsx](https://github.com/wenwei4046/Carres-Portal-v2/blob/de816e00cc530b72d3debeb1adc9f70799927a9c/apps/web/src/components/kit/Badge.tsx) | Height22,11/14/500, inset4/8, capsule; status solid semantic step11/white; neutral badge slate3/slate11 | Source; identical geometry does not mean identical colour semantics |
+| Owner identity: [pages/operation/SalesOrderRoute.tsx](https://github.com/wenwei4046/Carres-Portal-v2/blob/de816e00cc530b72d3debeb1adc9f70799927a9c/apps/web/src/pages/operation/SalesOrderRoute.tsx), [lib/staff-avatar.ts](https://github.com/wenwei4046/Carres-Portal-v2/blob/de816e00cc530b72d3debeb1adc9f70799927a9c/apps/web/src/lib/staff-avatar.ts) | Current owner chip20, initials and assigned-name palette; current chip aria-hidden | Source; latest avatar-only hover/focus/tap target is NOT BUILT; title alone is insufficient |
+| Full SO: [pages/operation/SalesOrderTabs.tsx](https://github.com/wenwei4046/Carres-Portal-v2/blob/de816e00cc530b72d3debeb1adc9f70799927a9c/apps/web/src/pages/operation/SalesOrderTabs.tsx), [pages/operation/SalesOrderWorkspace.tsx](https://github.com/wenwei4046/Carres-Portal-v2/blob/de816e00cc530b72d3debeb1adc9f70799927a9c/apps/web/src/pages/operation/SalesOrderWorkspace.tsx) | Header44 desktop; tabs36; form minimum660, PDF320; ≥1320 halves,980–1319 form660, below980 stack; inset16 | Source; listing proof does not verify the full form or complete shared object template |
+
+Inter was available to the browser (`document.fonts.check('12px Inter')`); this is not proof
+of every CJK glyph or every page. A real browser200% zoom walk was not performed. Narrow-canvas
+checks do not substitute for that test. Long-label disclosure, generic task tabs, avatar
+accessibility and the complete reusable utility-panel template remain open acceptance gaps.
+
+### Remaining shared-component acceptance gaps
+
+| Gap | Current evidence / required boundary |
+|---|---|
+| Accessible assignment avatar | Current page-local20px aria-hidden chip is not the shared avatar-only hover/focus/tap identity contract. No new component admitted or built by this audit. |
+| Actual-task inspection host | Shared Tabs is a bar, not a complete task/panel association, overflow, keyboard and focus-restoration template. Info/task target remains unbuilt. |
+| Exact source binding | Reported replay task PO6426 versus message PO7907 is an acceptance counterexample, not a newly reproduced production result. Reject first-PO/label fallback; verify document/version/line/batch/occurrence across facts, reply, recipient, template and result. |
+| Touch interaction | Segmented tab34 on phone, rail Hide/Show28, chip remove24 and bare checkbox16 do not establish40px hit areas. Preserve governed target; measure actual hit regions during delivery. |
+| Utility rail and long labels | Strip/panel primitives exist; complete Calendar/customer/Activity target, long status discovery and generic focus/error states are not all verified. |
+| Cards and full-page accessibility | Cards use viewport breakpoints; container320 proposal remains unbuilt. Real200% zoom, CJK glyph coverage, full object/form and other module composition remain unverified. |
+
+### Shared task inspection — latest owner correction, 2026-10-02
+
+**APPROVED TARGET / NOT BUILT.** Open this inspection panel on click; keep the background page layout unchanged. `Info` is the first tab; a task entry may open its exact task directly. Assignment shows only the avatar; hover, keyboard focus and tap expose `Assigned to: {name}`. Distinguish truly unassigned from failed identity loading. For SO-backed missions, header context uses Calendar plus `Requested: {date}`, with the full customer requested-delivery name/date in tooltip and Info. Independent objects retain their own governed date facts.
+
+**APPROVED TARGET / NOT BUILT.** Owning operating law is
+[Workspace MASTER §5.11](../workspace/MASTER.md#511--task-inspection--owner-correction-2026-10-02).
+The panel has `Info` and actual task tabs. `Details`/`Communication` are not its two navigation
+states. For SO-backed work, Info preserves the existing compact SO fact cards and their order:
+Info → Delivery → Items → Payment → Related documents. It is not a full editing form or a
+repeated PO-field inventory. A task tab presents that exact task's action, assignment, due/missed
+state, latest reply/evidence, required result, source operation and history. Communication is
+inside the task that owns it. The middle mission map and selection retain the same exact identity.
+
+Source object/line/task identity must be explicit. Never substitute the first PO, a supplier-label
+match or an unrelated order to fill missing binding. Non-SO work uses its real originating object;
+Showroom is not given a fabricated SO. Work reads source truth and uses the owning write door.
+Sending, copying or opening a channel does not complete work or pause its deadline. Customer
+Requested context is separate from task Due and recorded Proceed; supplier delay does not rewrite
+the customer's date. Avatar-only assignment requires full identity on hover, focus and tap.
+Exact day-count arithmetic and unresolved presentation dimensions remain PROPOSAL / NOT LAW.
+This target does not replace Purchasing's independently governed PO quick-panel tabs, the global
+utility strip or the read-only SO quick view.
+
+**Publication / alignment boundary.** All four chats supplied exact-version readbacks for815ae06b9; Workspace and Showroom
+identified residual layout/date-scope conflicts, now corrected. Final-head readback remains the
+publication gate. A message sent is not
+alignment proof. Publication in a PR is not publication on main; report the exact commit and
+subsequent reader confirmations before claiming the shared contract is adopted.
+
+---
+
 # §1 · Overview
 
 ## Reuse-first shared page templates — owner ruling 2026-10-01
@@ -65,8 +145,8 @@ boundary. Documentation approval is not proof of implementation or permission to
 
 **Numeric contract, 2026-10-01:** [01 §§7–8](../01-design-tokens.md#7--canonical-component-measurements--scoped-not-one-size-for-every-surface)
 contains self-contained Carres values, source/target/status and the Sales-first acceptance boundary.
-Old generic sizing assumptions are replaced by scoped shared recipes. Actual font loading remains
-unverified here. Source table-header weight drift and small touch targets are recorded as gaps;
+Old generic sizing assumptions are replaced by scoped shared recipes. Bounded SO Inter availability and effective header600 were verified2026-10-02.
+Small touch targets and generic template acceptance remain gaps;
 accepted Sales density and Cards composition follow Confirmed shared template; other adoption still requires verification.
 
 **RULING / APPROVED DIRECTION AND DOCUMENTATION COMMISSION.** One Carres kit serves every
@@ -121,13 +201,13 @@ visual grammar never means identical fields, permissions or lifecycle.
 | Register | `components/register/DataGrid.tsx`, `register-field-widths`; `SalesOrdersRegister.tsx`, `WarehouseInbound.tsx` under `pages/operation/` | Shared search/column/filter/selection mechanics; explicit identity and action doors; governed widths/pinning and return context. Empty, loading, denied and failed reads are distinct. | Source population, business columns/order, approved exceptions, authorised actions and selection capability. |
 | Filter rail | `pages/operation/components/workspace-rail.tsx`: FilterRail, FilterRailGroup, FilterRailRow | Preserve the existing rail. Applied conditions, rows, quantity summary and export describe the same scope; record counts and goods quantities are labelled separately. Keep governed Site tabs where present. A narrow-screen filter surface retains the same conditions. | Admitted filter dimensions and governed base population; contextual facet counts follow the current shared filter law. |
 | Goods expansion | `pages/operation/components/GoodsMiniTable.tsx`; SalesOrdersRegister `ExpandedLines`; WarehouseInbound `InboundExpansion` | A structured read-only child table, real headings, aligned values and exact identity links. Expand has one job: goods and their relevant quantity/evidence detail. Never replace it with concatenated prose or a second editing form. | Source-owned receiving/loading results and approved line selection. Prove component capability before extending it; do not force Sales columns onto receipt facts. |
-| Object detail | `pages/operation/SalesOrderWorkspace.tsx`, `purchase-orders/PurchaseOrdersPage.tsx`, `WarehouseUnitDetail.tsx`; shared `components/kit/Block.tsx`, DocumentTable, TotalsSummary | Use the existing approved object composition: identity, current authorised actions, grouped facts, source documents/evidence and actual history. Use shared Block chrome and table/totals treatment. The object's MASTER owns placement and business meaning. | Business groups, appropriate action placement and source-owned facts. A Unit is not a sales commercial record. |
-| Edit / review | Existing source-owned forms and review surfaces; `components/kit/FieldFrame.tsx`, Input, Select, DatePicker, PdfPreview | Pre-filled known facts, grouped necessary inputs, field errors plus a discoverable blocked-save reason; preserve input on failure. Current-version preview, authorised save and clear saved/unsaved result. | Required fields, approved document preview arrangement and actual business validation. |
+| Object detail | `pages/operation/SalesOrderWorkspace.tsx`, `purchase-orders/PurchaseOrdersPage.tsx`, `WarehouseUnitDetail.tsx`; shared `kit/Block.tsx`, DocumentTable, TotalsSummary | Use the existing approved object composition: identity, current authorised actions, grouped facts, source documents/evidence and actual history. Use shared Block chrome and table/totals treatment. The object's MASTER owns placement and business meaning. | Business groups, appropriate action placement and source-owned facts. A Unit is not a sales commercial record. |
+| Edit / review | Existing source-owned forms and review surfaces; `kit/FieldFrame.tsx`, Input, Select, DatePicker, PdfPreview | Pre-filled known facts, grouped necessary inputs, field errors plus a discoverable blocked-save reason; preserve input on failure. Current-version preview, authorised save and clear saved/unsaved result. | Required fields, approved document preview arrangement and actual business validation. |
 | Field operation | `pages/operation/components/ReceivingWorkspace.tsx`, PoReceivingView; `WarehouseOutboundWork.tsx` Loading workspace | Preserve the one receiving/loading write door. Clear source identity, goods/Units, physical checks, evidence, next action and residual work. Return to the same list context. Warehouse submission is not posted GRN; loaded is not driver-confirmed. | Physical steps and source contracts, never a second stock or approval engine. |
-| Preview / confirmation | `components/kit/PdfPreview.tsx`, SavedEvidenceViewer, DialogFrame, Modal, Drawer | Use the existing admitted container for its purpose; correct version and evidence permissions, close/back behaviour and focus return. A preview is not a competing editable detail. | Evidence/file type and bounded confirmation content. Do not migrate all details to drawers because a reference uses one. |
-| Work / ownership | Shared Work source/resolver plus `components/kit/Block.tsx`, RouteStop, ChecklistRow, QuietRouteRow | Render resolved responsibility and source action; current UI law uses Assigned to and Completed by. Completion comes from the owning business result. Authorised help retains the actual performer. | Source, governed dates and actions; no page-local rota, substitute resolver or fake Mark done. |
+| Preview / confirmation | `kit/PdfPreview.tsx`, SavedEvidenceViewer, DialogFrame, Modal, Drawer | Use the existing admitted container for its purpose; correct version and evidence permissions, close/back behaviour and focus return. A preview is not a competing editable detail. | Evidence/file type and bounded confirmation content. Do not migrate all details to drawers because a reference uses one. |
+| Work / ownership | Shared Work source/resolver plus `kit/Block.tsx`, RouteStop, ChecklistRow, QuietRouteRow | Render resolved responsibility and source action; current UI law uses Assigned to and Completed by. Completion comes from the owning business result. Authorised help retains the actual performer. | Source, governed dates and actions; no page-local rota, substitute resolver or fake Mark done. |
 
-**Do not select by filename alone.** The inspected `components/kit/DetailShell.tsx` contains
+**Do not select by filename alone.** The inspected `kit/DetailShell.tsx` contains
 OrderActionTrack and a fixed four-fact identity contract. It is not evidence of an unrestricted
 cross-module detail template. Use the current approved object grammar and actual adopters above;
 do not impose that older order model on unrelated objects. Existing generic DataTable uses are
@@ -137,7 +217,7 @@ this MASTER's governed Register/DataGrid rules. Fix documentation scope, not wor
 ### Typography and colour usage
 
 **RESOLVED FROM EXISTING AUTHORITY:** `docs/01-design-tokens.md` owns the numerical values;
-`components/kit/tokens.ts` and the configured classes implement them. No page chooses a new palette,
+`kit/tokens.ts` and the configured classes implement them. No page chooses a new palette,
 font scale, border, radius or spacing to resemble a screenshot. Current page/card/body/meta roles
 remain 24/15/13/12 with the existing title, label and scoped Work-control roles. English uses the
 configured Inter chain; mixed CJK uses the existing CJK handling. Codes and numeric columns use
@@ -2200,7 +2280,7 @@ unbuilt; do not implement a page-local substitute or infer permission to alter o
 Monitor + Receiving, landed the same day).** `FilterRail` accepts an optional fixed `header`
 block: the header stays put while the filter groups scroll independently beneath it, separated
 by a hairline (`{testId}-fixed` / `{testId}-scroll` regions). Its governed content is the rail
-month calendar, and the kit gained **`MonthCalendar`** (`components/kit/MonthCalendar.tsx`) for
+month calendar, and the kit gained **`MonthCalendar`** (`kit/MonthCalendar.tsx`) for
 it: the same `react-day-picker` engine and token skin as `DatePicker`, rendered permanently
 instead of in a popover, acting as a FILTER (pick a day to narrow the register beside it, pick
 it again to clear, ‹ › move exactly one month). It prints the month spelled out as its caption,
@@ -2548,10 +2628,10 @@ page imports it, never draws it:
 
 | Piece | File | Locked values |
 |---|---|---|
-| `Block` — the ONE card | `components/kit/Block.tsx` (moved from `SalesOrderWorkspace.tsx`; Sales Order, Purchase Orders, Manual Purchase, Warehouse Unit and Work import it) | white · 1px `slate-5` · kit card radius · 12/16 padding · black `text-strong` title over a 1px rule · optional `why` second line under the title, 13/400 red (missed) / amber (due) / slate-11 |
-| `RouteStop` | `components/kit/RouteStop.tsx` | 24px dot on a 1.5px line (dashed `slate-6`, solid `slate-11` once done; none under the last stop) · dot: red `!` missed · amber `!` due · dark tick all done · grey otherwise · label 11/500 uppercase slate-11 `.06em` with `Missed` / `Due` only |
-| `ChecklistRow` | `components/kit/ChecklistRow.tsx` | 16px square mark (the Checkbox's 4px radius, read-only): dark tick done · 1.5px empty not yet · red / amber `!` the act now · no mark for a fact or a stop that cannot start · step 13/400 (13/600 when it is the act) · value 12/400 slate-11 (act colour for the act) · document on the right · ≥32px row · `stacked` drops the value under the step (the page sets it below 1340px) |
-| `QuietRouteRow` | `components/kit/QuietRouteRow.tsx` | one ≥48px line: stop label · status 13/400 · `{n} of {m} done` · chevron · white, 1px `slate-5`, kit card radius, 8/16 padding · outline red / amber when it holds an act · `wrap` puts the status on its own line below 1100px instead of cutting it |
+| `Block` — the ONE card | `kit/Block.tsx` (moved from `SalesOrderWorkspace.tsx`; Sales Order, Purchase Orders, Manual Purchase, Warehouse Unit and Work import it) | white · 1px `slate-5` · kit card radius · 12/16 padding · black `text-strong` title over a 1px rule · optional `why` second line under the title, 13/400 red (missed) / amber (due) / slate-11 |
+| `RouteStop` | `kit/RouteStop.tsx` | 24px dot on a 1.5px line (dashed `slate-6`, solid `slate-11` once done; none under the last stop) · dot: red `!` missed · amber `!` due · dark tick all done · grey otherwise · label 11/500 uppercase slate-11 `.06em` with `Missed` / `Due` only |
+| `ChecklistRow` | `kit/ChecklistRow.tsx` | 16px square mark (the Checkbox's 4px radius, read-only): dark tick done · 1.5px empty not yet · red / amber `!` the act now · no mark for a fact or a stop that cannot start · step 13/400 (13/600 when it is the act) · value 12/400 slate-11 (act colour for the act) · document on the right · ≥32px row · `stacked` drops the value under the step (the page sets it below 1340px) |
+| `QuietRouteRow` | `kit/QuietRouteRow.tsx` | one ≥48px line: stop label · status 13/400 · `{n} of {m} done` · chevron · white, 1px `slate-5`, kit card radius, 8/16 padding · outline red / amber when it holds an act · `wrap` puts the status on its own line below 1100px instead of cutting it |
 
 Two opt-in props came with them, and no other page moves: `Tabs fill` (tabs share a narrow bar by
 their own length with no gap, so Work's four Communication tabs stay on one row at 280px) and
