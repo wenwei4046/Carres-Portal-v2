@@ -789,9 +789,50 @@ describe("Supplier advance (0484–0485)", () => {
     expect(writes()[0]).toMatchObject({ url: `${B}/vouchers/${PV}/advance-applications`,
       body: { billId: BILL1, amount: 300 } });
   });
+
+  it("0642: the bill lists a credit note knocked off it, linked to the credit note where it is taken off", async () => {
+    const NOTE = "22222222-2222-4222-8222-222222222222";
+    api.routes[`${B}/bills/${BILL1}`] = {
+      bill: { id: BILL1, bill_no: "BILL-4XK2", status: "confirmed", supplier_id: SUP, supplier_name: "Lumen Sofa Works",
+        supplier_kind: "supplier", supplier_invoice_no: "LSW-901", bill_date: "2026-09-10", due_date: null, po_id: null,
+        ap_account_code: "2110", ap_account_name: "Trade payables", total_amount: "1025.00", narration: null,
+        cancel_reason: null, created_at: "2026-09-10T01:00:00Z", created_by_name: "Aina", confirmed_at: null,
+        confirmed_by_name: null, cancelled_at: null, cancelled_by_name: null, entry_no: "JE-2", reversal_entry_no: null },
+      lines: [],
+      payments: [{ kind: "credit_note", application_id: APP, voucher_id: NOTE, voucher_no: "SCN-20260920-4821", status: "applied",
+        voucher_date: "2026-09-20", applied_on: "2026-09-20", amount_applied: "100.00" }],
+      files: [], events: [], paid_total: "100.00", allocated_total: "100.00", unpaid: "925.00", left_to_pay: "925.00",
+      advance_open: "0.00", go_live_on: "2026-09-10",
+      can: { edit: false, confirm: false, cancel: false, add_file: false, apply_advance: false, take_advance_off: true },
+    };
+    show(`/finance/bills/${BILL1}`);
+    const row = await screen.findByTestId(`bill-credit-note-${NOTE}`);
+    expect(row).toHaveTextContent("Credit note SCN-20260920-4821 · Applied · Sun, 20 Sep · RM 100.00");
+    expect(within(row).getByRole("link", { name: "SCN-20260920-4821" })).toHaveAttribute("href", `/finance/credit-notes/${NOTE}`);
+    expect(within(row).queryByRole("button")).not.toBeInTheDocument();
+  });
 });
 
 describe("Unpaid by Supplier", () => {
+  it("0642: a credit note not knocked off yet is Credit Left, and comes off what is owed", async () => {
+    const NOTE = "22222222-2222-4222-8222-222222222222";
+    const owed = (api.routes[`${B}/outstanding`] as { rows: Array<Record<string, unknown>> }).rows[0]!;
+    api.routes[`${B}/outstanding`] = { rows: [{ ...owed, credit_open: "150.00", net_owing: "775.00" }] };
+    api.routes[`${B}/credit-notes`] = { rows: [
+      { id: NOTE, note_no: "SCN-20260920-4821", status: "confirmed", supplier_id: SUP, supplier_name: "Lumen Sofa Works",
+        supplier_kind: "supplier", supplier_note_no: "LSW-CN-7", note_date: "2026-09-20", ap_account_code: "2110",
+        total_amount: "350.00", applied_total: "200.00", credit_open: "150.00", file_count: 0, created_at: "2026-09-20T02:00:00Z" },
+    ] };
+    show("/finance/ap-outstanding");
+    await screen.findByText("Lumen Sofa Works");
+    expect(screen.getByText("Credit Left")).toBeInTheDocument();
+    expect(screen.getByText("RM 150.00")).toBeInTheDocument();
+    expect(screen.getByText("RM 775.00")).toBeInTheDocument();
+    fireEvent.click(screen.getAllByTitle("Show unpaid bills")[0]!);
+    expect(await screen.findByTestId(`ap-outstanding-credits-${SUP}`))
+      .toHaveTextContent("SCN-20260920-4821 · Sun, 20 Sep · RM 150.00 left of RM 350.00");
+  });
+
   it("shows what is owed per supplier, and what already sits on a voucher", async () => {
     show("/finance/ap-outstanding");
     await screen.findByText("Lumen Sofa Works");

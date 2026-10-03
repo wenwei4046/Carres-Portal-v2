@@ -251,7 +251,18 @@ function BillDetail() {
           >
             {doc.payments.length === 0
               ? <p>No payment voucher pays this bill yet.</p>
-              : doc.payments.map((p) => p.kind === "advance"
+              : doc.payments.map((p) => p.kind === "credit_note"
+                ? (
+                  // 0642: a credit note knocked off this bill. It is taken off
+                  // on the credit note, the one place its knock-offs are kept.
+                  <p key={p.application_id ?? `${p.voucher_id}-credit`} data-testid={`bill-credit-note-${p.voucher_id}`}>
+                    Credit note{" "}
+                    <Link className="text-kit-blue-11 underline underline-offset-2" to={`/finance/credit-notes/${p.voucher_id}`}>{p.voucher_no ?? "Draft credit note"}</Link>
+                    {" · "}{word(ADVANCE_APPLICATION_STATUS_WORD, p.status)}
+                    {" · "}{fmtDate(p.applied_on ?? p.voucher_date)} · {money(p.amount_applied)}
+                  </p>
+                )
+                : p.kind === "advance"
                 ? (
                   <p key={p.application_id ?? `${p.voucher_id}-advance`}>
                     Advance from{" "}

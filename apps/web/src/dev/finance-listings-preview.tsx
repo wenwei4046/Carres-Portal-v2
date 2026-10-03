@@ -9,7 +9,8 @@
  *
  * `?page=` ar · bills · payment-vouchers · ap-outstanding · suppliers ·
  * other-debtors · other-debtor-parties · other-receipts · daily-bank ·
- * journal · general-ledger · trial-balance · reports · cash-flow · ap-aging.
+ * journal · general-ledger · trial-balance · reports · cash-flow · ap-aging ·
+ * credit-notes · credit-note · credit-note-new.
  * Every listing carries at least one 60+ character party name so wrapping and
  * truncation are visible. Fixture evidence is not production evidence.
  */
@@ -136,7 +137,7 @@ const OUTSTANDING = [
   { supplier_id: "s-1", supplier_name: LONG_SUPPLIER, bills_confirmed: 4, billed_total: "48210.00", allocated_total: "30000.00",
     paid_total: "25000.00", balance_owing: "23210.00", uncommitted: "18210.00", oldest_confirmed_bill_date: soon(-50),
     go_live_on: GO_LIVE, supplier_kind: "supplier", open_bills: 2, oldest_unpaid_bill_date: soon(-9),
-    advance_open: "0.00", net_owing: "23210.00" },
+    advance_open: "0.00", credit_open: "650.00", net_owing: "22560.00" },
   { supplier_id: "s-5", supplier_name: "Dorsettloft", bills_confirmed: 2, billed_total: "15760.00", allocated_total: "9760.00",
     paid_total: "6000.00", balance_owing: "9760.00", uncommitted: "0.00", oldest_confirmed_bill_date: soon(-40),
     go_live_on: GO_LIVE, supplier_kind: "supplier", open_bills: 1, oldest_unpaid_bill_date: soon(-18),
@@ -398,6 +399,68 @@ const GENERAL_LEDGER = (from: string, to: string) => ({
   ],
 });
 
+// ── Payables → Credit Notes (0642) ──────────────────────────────────────────
+const CREDIT_NOTES = [
+  { id: "cn-1", note_no: "SCN-20261001-4821", status: "confirmed", supplier_id: "s-1", supplier_name: LONG_SUPPLIER,
+    supplier_kind: "supplier", supplier_note_no: "OH-CN-2210", note_date: soon(-2), ap_account_code: "2110",
+    total_amount: "1650.00", applied_total: "1000.00", credit_open: "650.00", file_count: 1, created_at: at(-2) },
+  { id: "cn-2", note_no: "SCN-20260924-1187", status: "confirmed", supplier_id: "s-5", supplier_name: "Dorsettloft",
+    supplier_kind: "supplier", supplier_note_no: "DL-CN-31", note_date: soon(-9), ap_account_code: "2110",
+    total_amount: "420.00", applied_total: "420.00", credit_open: "0.00", file_count: 0, created_at: at(-9) },
+  { id: "cn-3", note_no: null, status: "draft", supplier_id: "s-3", supplier_name: "Nice Future",
+    supplier_kind: "supplier", supplier_note_no: "NF-RB-0930", note_date: soon(-1), ap_account_code: "2110",
+    total_amount: "300.00", applied_total: null, credit_open: null, file_count: 0, created_at: at(-1) },
+  { id: "cn-4", note_no: "SCN-20260912-0954", status: "cancelled", supplier_id: "s-2", supplier_name: "Hooka",
+    supplier_kind: "supplier", supplier_note_no: "HK-CN-4", note_date: soon(-21), ap_account_code: "2110",
+    total_amount: "90.00", applied_total: null, credit_open: null, file_count: 0, created_at: at(-21) },
+];
+const CREDIT_NOTE = {
+  note: { id: "cn-1", note_no: "SCN-20261001-4821", status: "confirmed", supplier_id: "s-1", supplier_name: LONG_SUPPLIER,
+    supplier_kind: "supplier", supplier_note_no: "OH-CN-2210", note_date: soon(-2), ap_account_code: "2110",
+    ap_account_name: "Trade payables", total_amount: "1650.00", narration: "Two sofas returned damaged, and the September volume rebate",
+    cancel_reason: null, created_at: at(-2), created_by_name: "Chew", confirmed_at: at(-2), confirmed_by_name: "Chew",
+    cancelled_at: null, cancelled_by_name: null, entry_no: "JE-2610-0051", reversal_entry_no: null },
+  lines: [
+    { line_no: 1, account_code: "5100", account_name: "Cost of goods sold", description: "Two 3 seater sofas returned, damaged in transit",
+      amount: "1400.00", department_type: "OFFICE", department_id: null },
+    { line_no: 2, account_code: "4900", account_name: "Other income", description: "September volume rebate",
+      amount: "250.00", department_type: "SUBSCRIPTION", department_id: null },
+  ],
+  applications: [
+    { application_id: "ca-1", bill_id: "b-1", bill_no: "BILL-2609-0012", supplier_invoice_no: "OH-INV-88231", bill_date: soon(-9),
+      amount: "1000.00", status: "applied", created_at: at(-1), applied_on: soon(-1), created_by_name: "Chew", cancelled_at: null, cancel_reason: null },
+  ],
+  files: [{ id: "f-1", file_name: "OH-CN-2210.pdf", mime_type: "application/pdf", size_bytes: 182000,
+    storage_path: "SUPPLIER_CREDIT_NOTE/cn-1/OH-CN-2210.pdf", uploaded_at: at(-2), uploaded_by_name: "Chew" }],
+  events: [
+    { action: "created", note: null, at: at(-2), actor_name: "Chew" },
+    { action: "confirmed", note: "SCN-20261001-4821", at: at(-2), actor_name: "Chew" },
+    { action: "credit_applied", note: "BILL-2609-0012 · RM 1,000.00", at: at(-1), actor_name: "Chew" },
+  ],
+  applied_total: "1000.00", credit_open: "650.00", go_live_on: GO_LIVE,
+  can: { edit: false, confirm: false, cancel: false, add_file: true, apply: true, take_off: true },
+};
+const AP_ACCOUNT_CHOICES = [
+  { code: "2110", name: "Trade payables", kind: "LIABILITY", parent_code: "2100", is_control: true, control_for: "SUPPLIER",
+    for_bill_line: false, for_voucher_line: false, for_ap: true, for_pay_from: false, for_credit_line: false },
+  { code: "2120", name: "Other payables", kind: "LIABILITY", parent_code: "2100", is_control: true, control_for: "SUPPLIER",
+    for_bill_line: false, for_voucher_line: false, for_ap: true, for_pay_from: false, for_credit_line: false },
+  { code: "4900", name: "Other income", kind: "INCOME", parent_code: "4000", is_control: false, control_for: null,
+    for_bill_line: false, for_voucher_line: false, for_ap: false, for_pay_from: false, for_credit_line: true },
+  { code: "5100", name: "Cost of goods sold", kind: "EXPENSE", parent_code: "5000", is_control: false, control_for: null,
+    for_bill_line: true, for_voucher_line: true, for_ap: false, for_pay_from: false, for_credit_line: true },
+  { code: "6500", name: "Bank charges", kind: "EXPENSE", parent_code: "6000", is_control: false, control_for: null,
+    for_bill_line: true, for_voucher_line: true, for_ap: false, for_pay_from: false, for_credit_line: true },
+];
+const BILL_OUTSTANDING = [
+  { bill_id: "b-1", bill_no: "BILL-2609-0012", supplier_id: "s-1", supplier_name: LONG_SUPPLIER, supplier_invoice_no: "OH-INV-88231",
+    bill_date: soon(-9), due_date: soon(21), po_id: null, total_amount: "18250.00", paid_total: "1000.00", balance_owing: "17250.00",
+    go_live_on: GO_LIVE, ap_account_code: "2110", allocated_total: "1000.00", unallocated: "17250.00", supplier_kind: "supplier" },
+  { bill_id: "b-2", bill_no: "BILL-2608-0007", supplier_id: "s-1", supplier_name: LONG_SUPPLIER, supplier_invoice_no: "OH-INV-87001",
+    bill_date: soon(-40), due_date: soon(-10), po_id: null, total_amount: "15000.00", paid_total: "2000.00", balance_owing: "13000.00",
+    go_live_on: GO_LIVE, ap_account_code: "2110", allocated_total: "2000.00", unallocated: "13000.00", supplier_kind: "supplier" },
+];
+
 // ── Reports → AP Aging (0640): owed to suppliers on a day ───────────────────
 const AP_AGING = (asAt: string) => ({
   as_at: asAt, go_live_on: GO_LIVE,
@@ -430,7 +493,13 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   if (url.includes("/api/finance/payables/bills")) return json({ rows: BILLS });
   if (url.includes("/api/finance/payables/vouchers")) return json({ rows: VOUCHERS });
   if (url.includes("/api/finance/payables/outstanding")) return json({ rows: OUTSTANDING });
-  if (url.includes("/api/finance/payables/bill-outstanding")) return json({ rows: [] });
+  if (url.includes("/api/finance/payables/bill-outstanding")) return json({ rows: BILL_OUTSTANDING });
+  if (url.includes("/api/finance/payables/credit-notes/cn-1")) return json(CREDIT_NOTE);
+  if (url.includes("/api/finance/payables/credit-notes")) return json({ rows: CREDIT_NOTES });
+  if (url.includes("/api/finance/payables/accounts")) return json({ rows: AP_ACCOUNT_CHOICES });
+  if (url.includes("/api/finance/ledger/departments"))
+    return json({ rows: [{ department_type: "SUBSCRIPTION", department_id: null, name: "Subscription" },
+      { department_type: "OFFICE", department_id: null, name: "Office" }] });
   if (url.includes("/api/finance/payables/suppliers"))
     return json({ rows: OUTSTANDING.map((o) => ({ id: o.supplier_id, name: o.supplier_name, kind: o.supplier_kind })) });
   if (url.includes("/api/finance/payables/supplier-finance")) return json({ rows: SUPPLIER_FINANCE });
@@ -476,6 +545,9 @@ const ROUTES: Record<string, string> = {
   "cash-flow": "/finance/reports/cash-flow",
   "general-ledger": "/finance/ledger/general-ledger",
   "ap-aging": "/finance/reports/ap-aging",
+  "credit-notes": "/finance/credit-notes",
+  "credit-note": "/finance/credit-notes/cn-1",
+  "credit-note-new": "/finance/credit-notes/new",
 };
 window.history.replaceState(null, "", ROUTES[PAGE] ?? ROUTES.ar);
 

@@ -248,6 +248,100 @@ describe("a supplier's finance details (0636, Chew 2026-10-03)", () => {
   });
 });
 
+describe("supplier credit notes (0642, Chew 2026-10-03)", () => {
+  const NOTE_ID = "99999999-0000-4000-8000-000000000009";
+  const goodNote = {
+    supplierId: SUPPLIER_ID,
+    supplierNoteNo: "CN-77",
+    noteDate: "2026-10-02",
+    lines: [{ accountCode: "5100", description: "Two chairs returned", amount: 450.5, departmentType: "OFFICE" }],
+  };
+
+  it("GET /credit-notes reads the register", async () => {
+    const sb = mockRpc({ data: [{ id: NOTE_ID }], error: null });
+    const res = await call("/credit-notes");
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("supplier_credit_note_register");
+    expect(await res.json()).toEqual({ rows: [{ id: NOTE_ID }] });
+  });
+
+  it("GET /credit-notes/:id reads the document; a bad id is refused, a missing one is 404", async () => {
+    const sb = mockRpc({ data: { note: { id: NOTE_ID } }, error: null });
+    expect((await call(`/credit-notes/${NOTE_ID}`)).status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("supplier_credit_note_document", { p_note_id: NOTE_ID });
+    expect((await call("/credit-notes/nope")).status).toBe(422);
+    mockRpc({ data: null, error: null });
+    expect((await call(`/credit-notes/${NOTE_ID}`)).status).toBe(404);
+  });
+
+  it("POST /credit-notes sends the draft with snake_case lines", async () => {
+    const sb = mockRpc({ data: NOTE_ID, error: null });
+    const res = await call("/credit-notes", { method: "POST", body: goodNote });
+    expect(res.status).toBe(201);
+    expect(sb.rpc).toHaveBeenCalledWith("supplier_credit_note_save_draft", {
+      p_note_id: null,
+      p_supplier_id: SUPPLIER_ID,
+      p_supplier_note_no: "CN-77",
+      p_note_date: "2026-10-02",
+      p_lines: [{ account_code: "5100", description: "Two chairs returned", amount: 450.5, department_type: "OFFICE", department_id: null }],
+      p_ap_account_code: null,
+      p_narration: null,
+    });
+  });
+
+  it("PUT /credit-notes/:id rewrites a draft", async () => {
+    const sb = mockRpc({ data: NOTE_ID, error: null });
+    expect((await call(`/credit-notes/${NOTE_ID}`, { method: "PUT", body: goodNote })).status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("supplier_credit_note_save_draft", expect.objectContaining({ p_note_id: NOTE_ID }));
+  });
+
+  it("refuses a note with no line, or a line of RM 0.00, before the database", async () => {
+    const sb = mockRpc({ data: NOTE_ID, error: null });
+    expect((await call("/credit-notes", { method: "POST", body: { ...goodNote, lines: [] } })).status).toBe(422);
+    expect((await call("/credit-notes", { method: "POST", body: { ...goodNote, lines: [{ ...goodNote.lines[0], amount: 0 }] } })).status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
+
+  it("confirm, cancel, knock off and take off each call their door", async () => {
+    let sb = mockRpc({ data: null, error: null });
+    expect((await call(`/credit-notes/${NOTE_ID}/confirm`, { method: "POST" })).status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("supplier_credit_note_confirm", { p_note_id: NOTE_ID });
+    sb = mockRpc({ data: null, error: null });
+    expect((await call(`/credit-notes/${NOTE_ID}/cancel`, { method: "POST", body: { reason: "Entered twice" } })).status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("supplier_credit_note_cancel", { p_note_id: NOTE_ID, p_reason: "Entered twice" });
+    sb = mockRpc({ data: "app-1", error: null });
+    expect((await call(`/credit-notes/${NOTE_ID}/applications`, { method: "POST", body: { billId: BILL_ID, amount: 200 } })).status).toBe(201);
+    expect(sb.rpc).toHaveBeenCalledWith("supplier_credit_note_apply", { p_note_id: NOTE_ID, p_bill_id: BILL_ID, p_amount: 200 });
+    sb = mockRpc({ data: null, error: null });
+    expect((await call(`/credit-note-applications/${NOTE_ID}/cancel`, { method: "POST", body: { reason: "Wrong bill" } })).status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("supplier_credit_note_application_cancel", { p_application_id: NOTE_ID, p_reason: "Wrong bill" });
+  });
+
+  it("a cancel needs a reason, and the approver's refusal keeps its code", async () => {
+    const sb = mockRpc({ data: null, error: null });
+    expect((await call(`/credit-notes/${NOTE_ID}/cancel`, { method: "POST", body: { reason: " " } })).status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
+    mockRpc({ data: null, error: { code: "42501", message: "Cancelling a confirmed credit note takes the finance approver.", details: "not_finance_approver" } });
+    const res = await call(`/credit-notes/${NOTE_ID}/cancel`, { method: "POST", body: { reason: "Entered twice" } });
+    expect(res.status).toBe(403);
+    expect(await res.json()).toMatchObject({ code: "not_finance_approver" });
+  });
+
+  it("a credit note takes files like a bill", async () => {
+    const sb = mockRpc({ data: FILE_UUID, error: null });
+    const path = `SUPPLIER_CREDIT_NOTE/${NOTE_ID}/${FILE_UUID}.pdf`;
+    const res = await call(`/credit-notes/${NOTE_ID}/files`, {
+      method: "POST", body: { path, fileName: "cn.pdf", mimeType: "application/pdf", sizeBytes: 1000 },
+    });
+    expect(res.status).toBe(201);
+    expect(sb.rpc).toHaveBeenCalledWith("ap_document_file_add", expect.objectContaining({ p_document_type: "SUPPLIER_CREDIT_NOTE", p_document_id: NOTE_ID }));
+  });
+
+  it("refuses operation (finance and principal only)", async () => {
+    expect((await call("/credit-notes", { role: "operation" })).status).toBe(403);
+  });
+});
+
 describe("AP aging (0640, Chew 2026-10-03)", () => {
   const AGING = {
     as_at: "2026-09-30", go_live_on: "2026-06-01",

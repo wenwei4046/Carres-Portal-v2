@@ -18,6 +18,9 @@ import {
   type SupplierBillDocument,
   type SupplierBillDraftInput,
   type SupplierBillRegisterRow,
+  type SupplierCreditNoteDocument,
+  type SupplierCreditNoteDraftInput,
+  type SupplierCreditNoteRegisterRow,
   type SupplierFinanceFormInput,
   type SupplierFinanceRow,
 } from "@carres/shared/schemas/finance-ap";
@@ -55,6 +58,8 @@ export const payablesKeys = {
     ["finance", "payables", "advances", supplierId ?? "all"] as const,
   /** 0636: Finance's own tax and bank details per supplier. */
   supplierFinance: () => ["finance", "payables", "supplier-finance"] as const,
+  creditNotes: () => ["finance", "payables", "credit-notes"] as const,
+  creditNote: (id: string) => ["finance", "payables", "credit-note", id] as const,
 };
 
 type Rows<T> = { rows: T[] };
@@ -271,6 +276,73 @@ export function useTakeAdvanceOff() {
   });
 }
 
+// ── supplier credit notes (0642; Chew 2026-10-03) ───────────────────────────
+
+export function useSupplierCreditNotes() {
+  return useQuery({
+    queryKey: payablesKeys.creditNotes(),
+    queryFn: async () => (await apiFetch<Rows<SupplierCreditNoteRegisterRow>>(`${BASE}/credit-notes`)).rows,
+    staleTime: 15_000,
+  });
+}
+
+export function useSupplierCreditNote(id: string | undefined) {
+  return useQuery({
+    queryKey: payablesKeys.creditNote(id ?? ""),
+    queryFn: () => apiFetch<SupplierCreditNoteDocument>(`${BASE}/credit-notes/${id}`),
+    enabled: !!id,
+  });
+}
+
+export function useSaveCreditNote() {
+  const refresh = useInvalidatePayables();
+  return useMutation<{ id: string }, ApiError, { id?: string; input: SupplierCreditNoteDraftInput }>({
+    mutationFn: ({ id, input }) =>
+      apiFetch<{ id: string }>(id ? `${BASE}/credit-notes/${id}` : `${BASE}/credit-notes`, {
+        method: id ? "PUT" : "POST",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: () => { void refresh(); },
+  });
+}
+
+export function useCreditNoteAct() {
+  const refresh = useInvalidatePayables();
+  return useMutation<{ id: string }, ApiError, { id: string; act: BillAct; reason?: string }>({
+    mutationFn: ({ id, act, reason }) =>
+      apiFetch<{ id: string }>(`${BASE}/credit-notes/${id}/${act}`, {
+        method: "POST",
+        body: act === "cancel" ? JSON.stringify({ reason }) : undefined,
+      }),
+    onSuccess: () => { void refresh(); },
+  });
+}
+
+/** Knock part of a confirmed credit note off one of the supplier's bills. Posts nothing. */
+export function useApplyCredit() {
+  const refresh = useInvalidatePayables();
+  return useMutation<{ id: string }, ApiError, { noteId: string; input: AdvanceApplyInput }>({
+    mutationFn: ({ noteId, input }) =>
+      apiFetch<{ id: string }>(`${BASE}/credit-notes/${noteId}/applications`, {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: () => { void refresh(); },
+  });
+}
+
+export function useTakeCreditOff() {
+  const refresh = useInvalidatePayables();
+  return useMutation<{ id: string }, ApiError, { applicationId: string; reason: string }>({
+    mutationFn: ({ applicationId, reason }) =>
+      apiFetch<{ id: string }>(`${BASE}/credit-note-applications/${applicationId}/cancel`, {
+        method: "POST",
+        body: JSON.stringify({ reason }),
+      }),
+    onSuccess: () => { void refresh(); },
+  });
+}
+
 export function useRecordMoneyBack() {
   const refresh = useInvalidatePayables();
   return useMutation<{ id: string }, ApiError, { voucherId: string; input: MoneyBackInput }>({
@@ -295,7 +367,7 @@ export function useCancelMoneyBack() {
   });
 }
 
-export type ApDocKind = "bills" | "vouchers";
+export type ApDocKind = "bills" | "vouchers" | "credit-notes";
 
 /**
  * Attach one file to a bill or a voucher — the repo's signed-upload pattern:

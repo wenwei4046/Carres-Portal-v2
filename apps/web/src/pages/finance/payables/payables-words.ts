@@ -51,6 +51,9 @@ export const EVENT_WORD: Record<string, string> = {
   advance_taken_off: "Advance taken off",
   money_back: "Money back recorded",
   money_back_cancelled: "Money back cancelled",
+  // Supplier credit notes (migration 0642).
+  credit_applied: "Credit note knocked off",
+  credit_taken_off: "Credit note taken off",
 };
 
 /** One knock-off of an advance against a bill (migration 0485). */

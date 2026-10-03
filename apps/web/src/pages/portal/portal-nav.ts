@@ -36,6 +36,7 @@ import {
   Library,
   SlidersHorizontal,
   Receipt,
+  ReceiptText,
   Banknote,
   CalendarClock,
   CreditCard,
@@ -628,6 +629,8 @@ export const PORTAL_NAV: PortalNavGroup[] = [
         financePath: "/finance/payment-vouchers",
         section: "Payables",
       },
+      // 0642 — a supplier's credit note takes money off what Carres owes (Chew 2026-10-03).
+      { key: "credit-notes", label: "Credit Notes", icon: ReceiptText, financePath: "/finance/credit-notes", section: "Payables" },
       // 0636 — Finance's own tax and bank details per supplier (Chew 2026-10-03).
       // Keyed apart from the operation area's Suppliers pages.
       { key: "supplier-finance", label: "Suppliers", icon: Truck, financePath: "/finance/suppliers", section: "Payables" },

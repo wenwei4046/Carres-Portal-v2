@@ -33,6 +33,7 @@ import CashFlow from "./reports/CashFlow";
 import ApAging from "./reports/ApAging";
 import ApOutstanding from "./payables/ApOutstanding";
 import SupplierFinancePage from "./payables/SupplierFinancePage";
+import SupplierCreditNotes from "./payables/SupplierCreditNotes";
 
 /**
  * Finance (HQ Internal) shell — sidebar + main routing area.
@@ -86,6 +87,8 @@ export default function FinanceApp() {
           <Route path="bills/*"            element={financeOnly(<SupplierBills />)} />
           <Route path="payment-vouchers/*" element={financeOnly(<PaymentVouchers />)} />
           <Route path="ap-outstanding"     element={financeOnly(<ApOutstanding />)} />
+          {/* 0642 — a supplier's credit note takes money off what Carres owes (Chew 2026-10-03). */}
+          <Route path="credit-notes/*"     element={financeOnly(<SupplierCreditNotes />)} />
           {/* 0636 — Finance's own tax and bank details per supplier (Chew 2026-10-03). */}
           <Route path="suppliers"          element={financeOnly(<SupplierFinancePage />)} />
           {/* PAYMENTS → Monitor · Payment Records (owner ruling 2026-09-12).

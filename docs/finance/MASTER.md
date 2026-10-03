@@ -12,6 +12,7 @@
 > | General Ledger (§3.6, §4) | 0639 |
 > | AP Aging (§3.6) | 0640 |
 > | Card money waiting (§3.4) | 0641 |
+> | Supplier credit notes (§3.2) | 0642 |
 >
 > Their on-screen words are in COPY-STANDARD "Finance (Chew)"; those marked PROPOSAL wait for Chew.
 >
@@ -103,6 +104,14 @@ Deposit invoice rules:
 Dealer commission rules:
 - Each month a **draft** payment voucher is raised automatically.
 - There is **no monthly accrual**, because CLAUDE.md §7 says there is no HQ→dealer debt. The commission posts to the ledger when the voucher is approved.
+
+**Supplier credit notes approach — PROPOSAL / NOT LAW, built for Chew's test (0642).**
+- Payables → Credit Notes. The supplier's own credit note is entered once, with lines, as a bill is: draft → confirmed → cancelled. Confirming posts on the credit note's date: Dr the payables account with the supplier as the party, Cr each line. An expense or asset line takes a cost back; an income line records a rebate. The number is `SCN-YYYYMMDD-RRRR`, drawn like a bill's.
+- Its credit is knocked off that supplier's confirmed bills on the same payables account, as an advance is (0485). A knock-off posts nothing and can be taken off with a reason. A bill counts it as paid from the later of the credit note's date and the knock-off's day. A voucher cannot pay what a credit note already took off, and a bill with a credit note on it cannot be cancelled.
+- AP · Payables gains `Credit Left`, and its last money column subtracts it (`Unpaid After Advance and Credit`), so it still equals the books. AP Aging and the Self-check read the same arithmetic. A test walks a bill, a credit note, a knock-off, a voucher refused over what is left, a take-off and a cancel through the real doors.
+- A supplier debit note (the supplier charges more) is entered as a bill and paid by a voucher, the doors that exist, so one act keeps one form (ERP-ARCHITECTURE law C). Whether it needs its own mark goes to Chew.
+- Not built: reading the supplier's paper (the bill scan will, once its AI key is given); the supplier paying a credit back in money (goes to Chew); a PDF.
+- Falsifier: in Chew's test, a supplier's `Unpaid After Advance and Credit` differs from its balance in the books, or a bill shows a credit note Chew did not knock off.
 
 ### 3.3 Staff payment requests
 

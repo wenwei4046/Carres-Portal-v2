@@ -9,9 +9,11 @@ import {
   otherCreditorInput,
   paymentVoucherDraftInput,
   supplierBillDraftInput,
+  supplierCreditNoteDraftInput,
   supplierFinanceInput,
   type PaymentVoucherDraftInput,
   type SupplierBillDraftInput,
+  type SupplierCreditNoteDraftInput,
 } from "@carres/shared/schemas/finance-ap";
 import { apAgingQuery, apAgingReport, type ApAgingAnswer } from "@carres/shared/ap-aging";
 import { requireFinance } from "../../lib/auth-guards";
@@ -63,9 +65,19 @@ import type { AppEnv } from "../../types";
  *     POST /vouchers/:id/money-back     supplier_advance_money_back_record — the supplier sent money back
  *     POST /money-back/:id/cancel       supplier_advance_money_back_cancel — the approver reverses it
  *
- *   Files (supplier invoices, receipts, bank slips)
- *     POST /bills/:id/files/sign  · POST /vouchers/:id/files/sign    signed upload URL
- *     POST /bills/:id/files       · POST /vouchers/:id/files         record the uploaded file
+ *   Supplier credit notes (0642: the supplier takes money off what Carres owes)
+ *     GET  /credit-notes                supplier_credit_note_register
+ *     GET  /credit-notes/:id            supplier_credit_note_document
+ *     POST /credit-notes                supplier_credit_note_save_draft (new draft)
+ *     PUT  /credit-notes/:id            supplier_credit_note_save_draft (rewrite a draft)
+ *     POST /credit-notes/:id/confirm    supplier_credit_note_confirm — posts it
+ *     POST /credit-notes/:id/cancel     supplier_credit_note_cancel — reverses it if confirmed
+ *     POST /credit-notes/:id/applications       supplier_credit_note_apply — knock it off a bill; posts nothing
+ *     POST /credit-note-applications/:id/cancel supplier_credit_note_application_cancel — take it off again
+ *
+ *   Files (supplier invoices, receipts, bank slips, credit notes)
+ *     POST /bills/:id/files/sign  · POST /vouchers/:id/files/sign · POST /credit-notes/:id/files/sign
+ *     POST /bills/:id/files       · POST /vouchers/:id/files      · POST /credit-notes/:id/files
  *     GET  /files/url?path=                                          short-lived read URL
  *
  * Every call runs as the SIGNED-IN USER (userClient). The database functions
@@ -77,7 +89,7 @@ const payablesRouter = new Hono<AppEnv>();
 const AP_BUCKET = "ap-documents";
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-type DocType = "SUPPLIER_BILL" | "PAYMENT_VOUCHER";
+type DocType = "SUPPLIER_BILL" | "PAYMENT_VOUCHER" | "SUPPLIER_CREDIT_NOTE";
 
 /** mapPgError, but a 403 keeps the database's reason code (not_finance_approver,
  *  voucher_cancelled …) so the page can say which rule refused. */
@@ -467,6 +479,107 @@ payablesRouter.post("/advance-applications/:id/cancel", requireFinance, async (c
   return c.json({ id });
 });
 
+// ── supplier credit notes (0642; Chew 2026-10-03) ───────────────────────────
+// The supplier's credit note, entered once. Confirming posts Dr the payables
+// account (party = the supplier) / Cr each line; a knock-off ties its credit
+// to one of the supplier's bills and posts nothing.
+
+function creditNoteArgs(noteId: string | null, d: SupplierCreditNoteDraftInput) {
+  return {
+    p_note_id: noteId,
+    p_supplier_id: d.supplierId,
+    p_supplier_note_no: d.supplierNoteNo,
+    p_note_date: d.noteDate,
+    p_lines: d.lines.map((l) => ({
+      account_code: l.accountCode,
+      description: l.description,
+      amount: l.amount,
+      department_type: l.departmentType ?? null,
+      department_id: l.departmentId ?? null,
+    })),
+    p_ap_account_code: d.apAccountCode ?? null,
+    p_narration: d.narration ?? null,
+  };
+}
+
+payablesRouter.get("/credit-notes", requireFinance, async (c) => {
+  const { data, error } = await sb(c).rpc("supplier_credit_note_register");
+  if (error) return pgFail(c, error);
+  return c.json({ rows: data ?? [] });
+});
+
+payablesRouter.get("/credit-notes/:id", requireFinance, async (c) => {
+  const id = c.req.param("id");
+  if (!UUID_RE.test(id)) return badId(c, "credit note");
+  const { data, error } = await sb(c).rpc("supplier_credit_note_document", { p_note_id: id });
+  if (error) return pgFail(c, error);
+  if (!data) return c.json({ error: "not_found", code: "note_missing", message: "That credit note does not exist." }, 404);
+  return c.json(data);
+});
+
+payablesRouter.post("/credit-notes", requireFinance, async (c) => {
+  const body = await parseJsonBody(c, supplierCreditNoteDraftInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const { data, error } = await sb(c).rpc("supplier_credit_note_save_draft", creditNoteArgs(null, body.data));
+  if (error) return pgFail(c, error);
+  return c.json({ id: data as string }, 201);
+});
+
+payablesRouter.put("/credit-notes/:id", requireFinance, async (c) => {
+  const id = c.req.param("id");
+  if (!UUID_RE.test(id)) return badId(c, "credit note");
+  const body = await parseJsonBody(c, supplierCreditNoteDraftInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const { data, error } = await sb(c).rpc("supplier_credit_note_save_draft", creditNoteArgs(id, body.data));
+  if (error) return pgFail(c, error);
+  return c.json({ id: data as string });
+});
+
+payablesRouter.post("/credit-notes/:id/confirm", requireFinance, async (c) => {
+  const id = c.req.param("id");
+  if (!UUID_RE.test(id)) return badId(c, "credit note");
+  const { error } = await sb(c).rpc("supplier_credit_note_confirm", { p_note_id: id });
+  if (error) return pgFail(c, error);
+  return c.json({ id });
+});
+
+payablesRouter.post("/credit-notes/:id/cancel", requireFinance, async (c) => {
+  const id = c.req.param("id");
+  if (!UUID_RE.test(id)) return badId(c, "credit note");
+  const body = await parseJsonBody(c, apReasonInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const { error } = await sb(c).rpc("supplier_credit_note_cancel", { p_note_id: id, p_reason: body.data.reason });
+  if (error) return pgFail(c, error);
+  return c.json({ id });
+});
+
+payablesRouter.post("/credit-notes/:id/applications", requireFinance, async (c) => {
+  const id = c.req.param("id");
+  if (!UUID_RE.test(id)) return badId(c, "credit note");
+  const body = await parseJsonBody(c, advanceApplyInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const { data, error } = await sb(c).rpc("supplier_credit_note_apply", {
+    p_note_id: id,
+    p_bill_id: body.data.billId,
+    p_amount: body.data.amount,
+  });
+  if (error) return pgFail(c, error);
+  return c.json({ id: data as string }, 201);
+});
+
+payablesRouter.post("/credit-note-applications/:id/cancel", requireFinance, async (c) => {
+  const id = c.req.param("id");
+  if (!UUID_RE.test(id)) return badId(c, "credit note on a bill");
+  const body = await parseJsonBody(c, apReasonInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const { error } = await sb(c).rpc("supplier_credit_note_application_cancel", {
+    p_application_id: id,
+    p_reason: body.data.reason,
+  });
+  if (error) return pgFail(c, error);
+  return c.json({ id });
+});
+
 payablesRouter.post("/vouchers/:id/money-back", requireFinance, async (c) => {
   const id = c.req.param("id");
   if (!UUID_RE.test(id)) return badId(c, "payment voucher");
@@ -511,6 +624,7 @@ const EXT: Record<z.infer<typeof apFileSignInput>["mimeType"], string> = {
 const DOC_ROUTES: ReadonlyArray<{ prefix: string; type: DocType; what: string }> = [
   { prefix: "/bills", type: "SUPPLIER_BILL", what: "bill" },
   { prefix: "/vouchers", type: "PAYMENT_VOUCHER", what: "payment voucher" },
+  { prefix: "/credit-notes", type: "SUPPLIER_CREDIT_NOTE", what: "credit note" },
 ];
 
 for (const { prefix, type, what } of DOC_ROUTES) {
@@ -553,7 +667,7 @@ for (const { prefix, type, what } of DOC_ROUTES) {
 const filePathQuery = z
   .string()
   .max(400)
-  .regex(/^(SUPPLIER_BILL|PAYMENT_VOUCHER)\/[0-9a-f-]{36}\/[0-9a-f-]{36}\.(pdf|jpg|png|webp)$/i);
+  .regex(/^(SUPPLIER_BILL|PAYMENT_VOUCHER|SUPPLIER_CREDIT_NOTE)\/[0-9a-f-]{36}\/[0-9a-f-]{36}\.(pdf|jpg|png|webp)$/i);
 
 payablesRouter.get("/files/url", requireFinance, async (c) => {
   const parsed = filePathQuery.safeParse(c.req.query("path") ?? "");
