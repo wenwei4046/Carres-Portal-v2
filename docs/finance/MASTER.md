@@ -60,7 +60,7 @@ Chew, 2026-10-03: 「总之jess 的功能，ui 等等都别动到。我只专做
 
 | Person | Does |
 |---|---|
-| Finance user | Prepares payment vouchers. Keys supplier bills, other debtors and other receipts. Runs card and bank reconciliation, the daily cash close and month-end. Reads the reports. |
+| Finance user | Prepares payment vouchers. Keys supplier bills, other debtors and other receipts. Runs card and bank reconciliation and month-end. Reads the reports. |
 | Checker | Any Finance user except the one who prepared the voucher. |
 | Finance Approver | The existing Workspace duty `finance_approver` (Workspace MASTER §4 Staff & Duties). It takes Finance users only, allows a cover, and the principal can always approve. Approves vouchers and money moves, and cancels confirmed Finance documents. |
 | Staff with permission | Raise a payment request with the bill attached (§3.3). |
@@ -81,7 +81,7 @@ Chew, 2026-10-03: 「总之jess 的功能，ui 等等都别动到。我只专做
 | Topic | Decision |
 |---|---|
 | Recording, receipts and corrections | **Payment's rules stand.** Each recorded payment reaches the Finance ledger automatically, and Finance does not re-enter it. Payment's rules are: one collection owner; the receipt is made at recording; void or correct allocation is done by the Payment Approver. |
-| Refunds | **Jess's no-refund policy stands** (Payment MASTER §13). The exceptional refund (Service Case → Management → Finance pays) is paid with a Finance **Customer Refund** voucher, so that it is in the ledger. |
+| Refunds | **Jess's no-refund policy stands** (Payment MASTER §13). The exceptional refund (Service Case → Management → Finance pays) is paid with a Finance **Customer Refund** voucher, so that it is in the ledger. Where it shows: on Finance's own AR page, the refunded amount stands on its own beside the customer's outstanding; Payment's figures and pages do not change (Chew 2026-10-03). **Not built.** |
 | Moving a deposit to another order | **Not built.** It changes payment records, and Payment already has `Correct allocation`. |
 | Old-slip approval window | **Not built.** |
 | Customer credit and debit notes | **Not built.** Customer invoices belong to Payment (Payment MASTER §1). |
@@ -101,22 +101,23 @@ Deposit invoice rules:
 | Payment vouchers | Prepare → Check → Approve, as in §2. The voucher is the only way money leaves. |
 | Supplier bills | Keep: from a GRN at PO price, and through other creditors for non-goods bills. |
 | Supplier advances | Keep. |
-| Supplier credit and debit notes | **Build.** This includes reading the supplier's paper and knocking the note off that supplier's invoices. |
+| Supplier credit and debit notes | **Build.** This includes reading the supplier's paper and knocking the note off that supplier's invoices. A **debit note** (the supplier charges more) is its own document, with its own number and list, never mixed with bills; it is paid by a payment voucher and counts in AP and AP Aging (Chew 2026-10-03; **not built**). A supplier never pays a credit back in money: the credit is knocked off the next bill, or a credit or debit note is raised, so no refund-from-supplier door is built. |
 | Supplier finance data (tax numbers, bank account) | **Build** as Finance's own record, linked to Purchasing's supplier. Purchasing screens do not change. |
 | Bill scanning | **Build.** It sends bill images to an external AI service and costs a little per bill. |
-| Foreign currency | Needed, but rarely used. |
+| Foreign currency | Needed, but rarely used. Record the foreign amount and the rate only; the books stay in RM, and no exchange gain or loss is worked out automatically (Chew 2026-10-03). **Not built.** |
 | Dealer commission | Calculated on money actually received; Finance maintains the rates. See the rules below this table. |
 
 Dealer commission rules:
 - Each month a **draft** payment voucher is raised automatically.
 - There is **no monthly accrual**, because CLAUDE.md §7 says there is no HQ→dealer debt. The commission posts to the ledger when the voucher is approved.
+- The calculation itself is checked with Chew step by step before anything about commission changes, including the automatic draft voucher (Chew 2026-10-03).
 
 **Supplier credit notes approach — PROPOSAL / NOT LAW, built for Chew's test (0642).**
 - Payables → Credit Notes. The supplier's own credit note is entered once, with lines, as a bill is: draft → confirmed → cancelled. Confirming posts on the credit note's date: Dr the payables account with the supplier as the party, Cr each line. An expense or asset line takes a cost back; an income line records a rebate. The number is `SCN-YYYYMMDD-RRRR`, drawn like a bill's.
 - Its credit is knocked off that supplier's confirmed bills on the same payables account, as an advance is (0485). A knock-off posts nothing and can be taken off with a reason. A bill counts it as paid from the later of the credit note's date and the knock-off's day. A voucher cannot pay what a credit note already took off, and a bill with a credit note on it cannot be cancelled.
 - AP · Payables gains `Credit Left`, and its last money column subtracts it (`Unpaid After Advance and Credit`), so it still equals the books. AP Aging and the Self-check read the same arithmetic. A test walks a bill, a credit note, a knock-off, a voucher refused over what is left, a take-off and a cancel through the real doors.
-- A supplier debit note (the supplier charges more) is entered as a bill and paid by a voucher, the doors that exist, so one act keeps one form (ERP-ARCHITECTURE law C). Whether it needs its own mark goes to Chew.
-- Not built: reading the supplier's paper (the bill scan will, once its AI key is given); the supplier paying a credit back in money (goes to Chew); a PDF.
+- A supplier debit note is not entered as a bill: it is its own document (the table above, Chew 2026-10-03), not built yet.
+- Not built: a PDF.
 - 0647 fixes a fault 0642 shipped with: a credit note's two account columns did not follow a renumbered account (0570 says every key that names the chart must), so renumbering an account a credit note used was refused. Both now follow, and the file refuses to apply while any key onto the chart still does not. A test renumbers an account under a confirmed credit note.
 - Falsifier: in Chew's test, a supplier's `Unpaid After Advance and Credit` differs from its balance in the books, or a bill shows a credit note Chew did not knock off.
 
@@ -148,7 +149,7 @@ Dealer commission rules:
 - **The shared menu** gains one row, `Payment Requests`, under Operations → Workspace. It shows only to the staff the boss allows. Finance and the principal find it under Finance → Payables.
 - **The files** go to their own private store, so the person can upload without being given Finance's files. That store has two new access rules of its own; no existing rule changed.
 - **Not built:**
-  - HR or BD staff asking. They cannot open the Finance pages today; letting them would need Jess's routes to change.
+  - HR or BD staff asking. They cannot open the Finance pages today; letting them would need Jess's routes to change. Whether they should, and where the menu row sits, waits for Chew (2026-10-03).
   - Asking for the balance of a bill again.
   - The official invoice owed after a proforma.
   - Reading the bill on the request.
@@ -162,7 +163,7 @@ Dealer commission rules:
 | Card (merchant) reconciliation | **Build fully.** Covers Public Bank, Maybank, GHL, Hong Leong and AhaPay, plus online money (Stripe, DuitNow). |
 | Bank reconciliation | **Build inside Finance**, outside daily Payment. This matches Payment MASTER "The collection workspace": "Finance checks the bank outside daily Payment". Payment §13's reject of a bank-matching workspace *in Payment* is unchanged. |
 | Daily Bank | **Build.** |
-| Daily cash close | **Build.** Carres takes cash. |
+| Daily cash close | **Not built (Chew 2026-10-03).** No cash is kept in the stores: every cash receipt is banked. A cash over or short is the difference between the cash recorded and the cash banked; bank reconciliation finds it, and it is booked to a cash over/short account. |
 
 **Card reconciliation approach.** It follows Houzs Part 7, adapted for Carres. Details are confirmed with Chew before build.
 
@@ -209,7 +210,7 @@ Carres already has a simpler Card settlement. It takes Public Bank, GHL and Mayb
 | Closed months lock | Keep, but **do not switch it on**. |
 | Month-end stock value: groups | Four groups: warehouse, showroom, in transit (road, transit points and partner legs) and sent for repair. Supplier consignment and dealer stock are excluded; Stock MASTER §12.9 says dealer display stock is the dealer's own. |
 | Month-end stock value: source | Use Stock MASTER §12.10's Month-end Stock Confirmation once it exists. Until then, Finance works out a **provisional** value from Stock's Units, reading only, and marks it provisional. |
-| Opening balances | Finance's own account figures at go-live. No old transactions are brought in, because CLAUDE.md §6 stands. |
+| Opening balances | Finance's own account figures at go-live. No old transactions are brought in, because CLAUDE.md §6 stands. **Parked (Chew 2026-10-03)** until every feature is tested: it is data entered at go-live, though each customer's and supplier's opening balance will need a place to be entered. |
 | SST | Carres is not SST-registered, so there is no tax on invoices. |
 | Year-end close | Later, before year end. |
 | More than one company | Not needed. |
@@ -224,7 +225,8 @@ Carres already has a simpler Card settlement. It takes Public Bank, GHL and Mayb
 - Nothing is saved and nothing is entered in the ledger; Stock MASTER §9 keeps the month-end total Stock's. When Stock's Month-end Stock Confirmation exists, it is the figure and this page is retired.
 - Measured 2026-10-03 on the test data: 344 Units and 10 quantity rows are held, and nearly all have no PO line (opening imports), so nearly all show `No cost recorded`. Go-live starts clean (CLAUDE.md §6), so after it Units come from POs with their cost.
 - Showroom: Stock has no Site type yet, and its own register finds PJ Showroom by its name (Stock MASTER §12.9). This page counts a Unit as Showroom when a showroom party holds it, its Site's profile names one, or its Site is named as a showroom. When Stock adds a Site type, the page reads it instead.
-- Not built: posting the value to the ledger (Dr stock on hand, Cr cost of goods sold) and valuing the go-live opening stock, which comes in without a PO cost. Both go to Chew.
+- Chew 2026-10-03: this page is Finance reading Stock's data, and it is separate from Stock's Month-end Stock Confirmation (Stock MASTER §9), which it neither feeds nor replaces.
+- Not built: posting the value to the ledger (Dr stock on hand, Cr cost of goods sold; bills from a GRN post the goods to cost of goods sold, 0477, so without it the month's cost is every purchase of the month) and valuing the go-live opening stock, which comes in without a PO cost. When posting is built, Stock MASTER §9 applies: Finance values from the confirmation version it acknowledges and saves no month-end Stock total of its own. Both go to Chew.
 - Falsifier: in Chew's test, a Unit Chew knows was in the showroom or out for repair at a month end shows in another group, or a value differs from its PO line cost times its quantity.
 
 ### 3.6 Reports
@@ -262,7 +264,8 @@ All reports only read. Reports → Payment stays Payment's.
 - Columns by whole calendar months (`This month` to `4 months and over`) or by 30-day steps, aged by bill date or due date, as Houzs's formal aging is.
 - A voucher pays a bill on the voucher's own date, the date it posts on; an advance knocked off a bill counts from the day of the knock-off until it is cancelled. How much of a bill is paid has one arithmetic, `ap_bill_settled`, which AP · Payables also reads now (its figures do not change).
 - Each row adds up to the supplier's balance in the books, and the footer ties the rows to the control accounts with the difference. A test walks bills, a voucher with an advance and a knock-off through the real doors and reads three days.
-- Not built: AR aging (it reads Payment's invoices and receipts, so it comes after AP), the trade or other payables chips, and a PDF.
+- AR Aging is built the same way as AP Aging, reading Payment's invoices and receipts and changing none (Chew 2026-10-03). **Not built yet.**
+- Not built: the trade or other payables chips, and a PDF.
 - Falsifier: in Chew's test, a supplier's balance here differs from AP · Payables' net owing today, or the footer's difference is not zero.
 
 **Collection report approach — PROPOSAL / NOT LAW, built for Chew's test (0644).**
@@ -287,7 +290,7 @@ All reports only read. Reports → Payment stays Payment's.
 - Not built: Houzs's months across one sheet, the plan for a product group (its purchase-basis rule needs item groups Carres does not have), a plan on the Dashboard beside the actual, a frozen account column when the table scrolls sideways on a phone (the kit's table has none), export.
 - Falsifier: in Chew's test, Chew needs to plan several months side by side, or reads `Difference` the other way round (plan less actual), or a gross profit or net result here differs from the P&L for the same month.
 
-**Performance P&L — NOT BUILT; a question for Chew.** Houzs reads each order line's cost from its sales order. Carres has no governed cost per sold line. `product_skus.cost` was filled at 55% of the price as a placeholder, a PO line's cost is linked to only some sales lines, and the ledger posts no cost of sales (0466). Before a Performance P&L can show gross profit, Chew decides what a sold line's cost is.
+**Performance P&L — NOT BUILT.** A sold item's cost is the cost on its PO; an item with no PO shows no cost, never a guessed one (Chew 2026-10-03). Houzs reads each order line's cost from its sales order; Carres has no governed cost per sold line, and `product_skus.cost` was filled at 55% of the price as a placeholder, so it is not used.
 
 ## 4 · Menu: DRAFT
 
@@ -318,8 +321,8 @@ Settings stay in the central Settings.
 
 1. **YH.** YH changes Finance code almost every day: over 100 commits from 2026-09-19 to 2026-10-01. Agree with YH before any Finance code changes.
 2. **File samples.** Before the readers are built, collect a sample card report and a sample bank statement from each provider. Hong Leong's card report is a secured PDF.
-3. **Deposit invoices.** Check them against Payment's invoice rules and e-invoice before switching them on.
-4. **Exceptional refunds.** Decide how the Customer Refund voucher shows next to Payment's outstanding figure before it is built.
+3. **Deposit invoices.** Chew confirms them with Jess (2026-10-03). Check them against Payment's invoice rules and e-invoice before switching them on.
+4. **Dealer commission.** Check the calculation with Chew step by step before anything about it changes.
 5. **Stock confirmation.** Stock's Month-end Stock Confirmation is not built, so Finance's stock value stays provisional until it is.
 6. **Year-end close.** Design it before year end.
 7. **New words.** New Finance screen words go through COPY-STANDARD before UI work.
