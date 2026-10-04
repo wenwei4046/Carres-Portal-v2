@@ -121,6 +121,21 @@ successful results, so retry cannot silently resend every document. Use governed
 ownership, permissions and actual supplier contact authority; this approval commissions target
 truth, not a live external email, supplier-settings write or production transmission.
 
+**OWNER RULING — copy and adapt Houzs supplier Email capability, 2026-10-04.**
+Use the inspected real-email/PDF pattern as the proven reference for Carres, adapted to its existing
+PO/version, communication, permissions and supplier contact authorities. Any supplier with a valid
+saved Email may use Email sending; no supplier-name restriction. Without an Email, keep WhatsApp
+preparation/download available and direct contact maintenance to the supplier record; never fabricate
+a recipient. Default to the saved preferred channel and retain channel switching. For the approved
+supplier bundle panel, selected PO numbers/versions, message listing and independent PDF attachments
+must be the same set. One supplier Email may carry the selected separate PO PDFs; never merge them
+into one PDF or silently omit an attachment. Confirm recipient and selected documents before actual
+send, record actual actor/channel/recipient/PO-version set and outcome, and expose failure/retry
+without duplicate issue. Reuse short duplicate-send protection adapted to explicit resend and version
+semantics; email success means dispatch, not supplier receipt. PDF preparation failure prevents this
+send, with no summary-only fallback. This is approved copy/adapt target, not proof of Carres build,
+production deployment or authorization to send a real supplier order during research.
+
 **REFERENCE FINDING — Houzs supplier Email, checked 2026-10-04.** Live PO
 `https://erp.houzscentury.com/scm/purchase-orders/068c294e-1b44-400c-9338-2a5223912d63`
 (HC-PO-2610-059) exposes Send to supplier; missing saved supplier email produced a named refusal.
