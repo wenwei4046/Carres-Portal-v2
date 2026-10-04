@@ -41,7 +41,7 @@ before quoting. Built is not the same as owner-verified on every page.
 | Fact cards | `Block` — the one object card (§4.1) · `Panel` · `StatusPill` · `EmptyState` · `Loading` | `components/kit/*` | LOCKED · built |
 | Orders list / drawer band | `SectionPanel` (cream band) — that surface only, not a general card | `components/SectionPanel.tsx` | Governed by §4.1; not a `Block` duplicate |
 | Dialogs and panels | `Modal` · `Drawer` (incl. quick view) · `Toast` · `PdfPreview` · `SavedEvidenceViewer` | `components/kit/*` | Built |
-| **Compact module card** (shared customer header, module tabs, module summary, editors, items, Communication, Timeline) | **`CompactModuleCard`** — pass the header facts once and each module's own facts, editors and items | `components/kit/CompactModuleCard.tsx` · `/ui#compact-card` · contract `docs/ui-reference/MODULE-CARD-TEMPLATE.md` | Owner rules 2026-10-03/04 (§4.3) · built on branch, parity proven against the owner's reference page · **Sales Orders quick-view production verified (PR #1871; §4.3 evidence)** · palette/font/radius await the token decision |
+| **Compact module card** (shared customer header, module tabs, module summary, editors, items, Communication, Timeline) | **`CompactModuleCard`** — pass the header facts once and each module's own facts, editors and items | `components/kit/CompactModuleCard.tsx` · `/ui#compact-card` · contract `docs/ui-reference/MODULE-CARD-TEMPLATE.md` | Owner rules 2026-10-03/04 (§4.3) · shared component built · **Sales Orders adoption and confirmed corrections production verified 2026-10-05 (PR #1893/#1896/#1897; §4.3 evidence)** · palette/font/radius await the token decision |
 | Work right-panel Communication | `WorkCommunication` — recorded channels only | `pages/operation/work/WorkCommunication.tsx` | Owner ruling 2026-09-17 · built; differs from the compact card's editable `To` (open owner question) |
 | Record history | §5 three-rank grammar 13/12/11 | this MASTER §5 | LOCKED · no shared component; each page draws it |
 
@@ -3603,13 +3603,21 @@ The master contract being documented does not mean every module has migrated or 
 
 ## §4.3 · Compact module card — owner rules 2026-10-03 / 2026-10-04
 
-**OWNER CONFIRMED · SHARED KIT BUILT · INITIAL SALES ORDERS ADOPTION PRODUCTION VERIFIED; AUDIT CORRECTIONS IN BUILD.** Every module card
+**OWNER CONFIRMED · SHARED KIT BUILT · SALES ORDERS ADOPTION AND CONFIRMED AUDIT CORRECTIONS PRODUCTION VERIFIED (2026-10-05).** Every module card
 uses the kit [`CompactModuleCard`](../../apps/web/src/components/kit/CompactModuleCard.tsx) (live on
 `/ui#compact-card` with Info and Delivery). Never copy reference HTML or CSS into a page. The
 complete rules, the sample-data boundary and the deviations from the reference page live in
 [`MODULE-CARD-TEMPLATE.md`](../ui-reference/MODULE-CARD-TEMPLATE.md); the reference page
 `module-card-reference.html` is the proof target of `scripts/compact-card-states.mjs`
 (25 states × 5 widths; reference parity evidence is distinct from business-page acceptance).
+
+**Read the whole confirmed template before reuse.** This section is the shared entry point, not a claim that every Sales Order business workflow or every module has migrated. Read the single linked card contract, then Orders MASTER for full-page Items/Payment and Delivery MASTER for Customer/Logistics/DO business rules. Reuse `CompactModuleCard` and the source-owned adapter; never copy HTML/CSS, substitute sample facts, or assume another module has customer/SO fields. Other module adoption must verify its own source, permissions, states and full-page return path.
+
+**Compact editor field skin and density — confirmed, deployed:** both universal border resets and button resets must exclude `data-kit` controls. The shared field recipe supplies visible 1px borders and 32px controls. Customer fields use two columns above 400px actual card width and one at 400px or below. Logistics crew shares a row; its condo textarea has two natural rows (48px in the accepted empty state), with no long hint. Keep source choice, evidence, ETA, failed-save input and actual business gates. One editor opens at once; Cancel then Save at right.
+
+**Full Sales Order continuation — confirmed, deployed:** Orders MASTER owns the existing full-page layout. Remove only duplicate Quantity/category and Services prose below Items; retain line quantities, amounts and Total payable. Payment links use attachment icon + `Slip`, preserving both source-owned slip doors and the existing layout. Info `Balance due` agrees with the saved PDF; do not change amounts/calculation to match a visual proposal.
+
+**Latest confirmed-correction release proof — 2026-10-05:** PR1893 adds compact form density and removes duplicate Items prose; PR1896 corrects the stale Customer build record; PR1897 preserves kit control borders. Final merge `2ce91e2d0ce7b118cfd7bb95c2b8e6974233ad3f` passed full CI37212809683 and deployment37213753695. Independent ERP, POS, both Pages version endpoints and API health matched that SHA. Actual SO-1368 Customer and Logistics controls have solid1px borders; selects/inputs32px, empty condo textarea48px. Actual card widths560/440/416/396/366 were verified: Customer two/two/two/one/one columns, visible fields/actions within bounds. Cancel leaves the saved summaries unchanged. Related shared/form tests cover one editor, save success folding, save failure input retention and source/recorder distinction; no real customer agreement was saved for acceptance. Full-page Items retains quantities1/1/2 and totalRM2,759; paidRM1,380 and balanceRM1,379 remain. Both Slip links have attachment icons. The real PDF renders with its titled toolbar; Close PDF keeps the order and returns focus to the SO number, Close order returns to View. Dark header/countdown, sales facts, address, module summary, Items, Communication and Timeline were rechecked top to bottom on this release. Timeline shows recorded time without MYT and actor avatar without repeated visible name. Source contracts and this proof are authoritative; a screenshot alone is not a second template.
 
 **SO file preview — owner approved 2026-10-04:** The source-owned preview uses the shared `PdfPreviewHeader`: `Sales order PDF · {actual SO number}` at left, existing saved-document `Download` and `Close PDF` × at right. Zoom stays on the next row, then the actual PDF. Identity and Close remain available during loading/error; Download is disabled until its saved Blob exists. No separate Close row. Close PDF returns to Info and focuses the SO number; the dark Header `Close order` × closes the whole Register Drawer and returns to its opener. Neither control saves business facts or changes current/historical issued documents.
 
@@ -3625,7 +3633,7 @@ fewest lines, four at most; one editor at a time, folded on success, kept on fai
 without a zone suffix while the full instant is kept; nothing in a module repeats the header, a date,
 the sales facts or a completion note.
 
-**Current bounded production acceptance — 2026-10-04:** PR1888 exact head
+**Earlier register/navigation production acceptance — 2026-10-04:** PR1888 exact head
 `dd581fb3139b9539216f1f1c9ddc25b107e3d4a5` passed full CI37207794735 and deployed as
 `36d96ac427f059901f6fdf2d623bd6277adeb611` (Deploy37208534384); independent verification matched
 all five revision surfaces. Orders MASTER owns the measured existing-path matrix and boundaries.

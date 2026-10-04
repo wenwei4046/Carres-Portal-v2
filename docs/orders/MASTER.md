@@ -2698,6 +2698,7 @@ scoped multi-review routing remains target work, not a shipped capability.
   - **Amounts print to the cent** through `fmtMoney`. The rounding `<Money>` recipe would show
     `RM 2,500` against a ledger row of `RM 2,499.50`, and the receipt would disagree with the
     screen.
+  - **Slip presentation — owner confirmed 2026-10-04:** use the existing attachment icon plus `Slip`, replacing `View slip`. Keep the at-sale and transaction slip doors, their saved-file sources, permissions and the existing Payment layout; this is a label/icon correction only.
   - **`Receipt` is `receipt_no`; `Slip` is `receipt_url`** — the mapping the order drawer already
     uses (`viewSlip`). `recorded_by` resolves to a name from `app_users`, fail-soft, the same
     lookup the SO PDF does; an unreadable name prints `Not recorded` and never costs the ledger.
@@ -6946,3 +6947,5 @@ Owner correction2026-10-02: toolbar omits the duplicate SO count; footer keeps f
 The full Sales Order Items table keeps each line’s quantity and amount plus Total payable.
 Remove the repeated Quantity/category and Services prose underneath that table; those facts
 are already visible in the rows. Payment transaction details and financial totals remain.
+
+**Confirmed card correction delivery — production verified 2026-10-05:** UI MASTER §4.3 owns shared Header, control skin/density, disclosures and current release proof (PR1893/1896/1897, production2ce91e2d). Orders owns the full-page Items and Payment rules above; MODULE-CARD-TEMPLATE is the only shared card contract. Real SO-1368 retains quantities1/1/2, totalRM2,759, paidRM1,380 and balanceRM1,379 after duplicate prose removal. Both Slip doors contain attachment icon + Slip. This is scoped presentation delivery, not whole Sales Order business/module completion or universal other-module adoption.
