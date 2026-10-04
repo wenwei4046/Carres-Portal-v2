@@ -229,15 +229,68 @@ execution. Missing implementation does not reopen these decisions.
 **MEASURED OPEN TARGETS, 2026-10-04.** Whole-round non-overlapping stock suggestions/location/
 priority/bulk acceptance, SO Batch shared Table/Cards/Page tools presentation, complete source
 Quick View actions still require implementation or direct proof. Formal PO read-only 50/50
-original-information/current-PDF composition is now built locally using existing facts and PDF
+original-information/current-PDF composition is now deployed using existing facts and PDF
 components; 54 PO Register/object tests pass, including the actual shared DataGrid opening a PO,
 read-only opening, separate explicit issue
 work and cancelled-document refusal. Desktop actual-component sample acceptance shows equal facts/PDF panes with the real PDF renderer
 (`/tmp/so-batch-po-readonly-split-preview.png`); the local fixture rejects all writes. At 390px the original facts stack above the PDF and the complete paper fits the pane
 (`/tmp/so-batch-po-readonly-mobile-preview.png`). The shared canvas hook now retains paper aspect
-ratio while fitting the current pane across resize. Production proof remains open. A real-grid facet callback render loop found during
+ratio while fitting the current pane across resize. PR #1880 merged as
+`50c548ae985cf6094d14712d278ff1f0703e85b2`; production run `37201311503` succeeded and
+independent ERP/POS/Worker SHA convergence passed on all five destinations. Authenticated
+production PO `PO-20260902-8370` opens read-only V1 with its actual PDF; at a 1400px viewport
+the two panes each measure 530px. Evidence: `/tmp/so-batch-po-live-desktop-split.png`.
+Browser return retains the original `time=11:00` Batch scope. The authenticated PO Register
+selected-download action produced `/Users/chaichiewlim/Downloads/Purchase-orders.zip` at
+2026-10-04 20:35 MYT: one selected PO, exactly one `PO-20260902-8370-V1.pdf` entry (26,847
+bytes). The browser download-event observation timed out, but the actual filesystem archive
+proves completion. Result-group return, multiple selected live POs and the remaining complete
+workflow still require direct acceptance. A real-grid facet callback render loop found during
 this walk was corrected by retaining unchanged membership, with a real-grid integration regression. Existing individual stock reservation, guarded issue and current-version evidence
 are reusable authorities, not permission to infer whole-round or shared-panel completion.
+
+**Whole-round capability measurement, 2026-10-04 — LOCAL BUILD, NOT OPERATOR DELIVERY.**
+
+| Capability | Existing source / readiness | Delivery boundary |
+|---|---|---|
+| Compatible available Unit candidates | `readFreeStock` reads the authoritative stock register availability; per-order Ready Stock supplies compatible line IDs | Reuse; candidate location identity, ownership filtering and canonical remainder integration must be verified |
+| Non-overlapping whole-record suggestions | Existing To Order P10 allocation and 113 tests; READY for reuse | Extracted `allocateWholeStockRecords` is shared by existing To Order and the new round matcher, not a second allocation implementation |
+| Customer-date / Proceed priority, site scope, FIFO | New `matchSoBatchReadyStock` adapts that proven allocation, with 9 tests | Actual Listing now offers manual matching and Stock Location; persisted priority Settings and production acceptance remain open |
+| Exact Unit acceptance | Existing Sales Order-owned `/ready-stock/save` / reserve doors | Actual Listing selection/Proceed now reuses this door; local tests prove exact confirmation, visible-scope restriction, partial success retention and lost-response readback; production acceptance remains open |
+
+122 combined old/new allocation tests and shared type checking pass locally. Stable warehouse
+identity is carried on candidate reads and used for location matching; two locations sharing a
+display name cannot borrow each other's stock. Suggestions do not
+change original demand or saved reservations. The matcher excludes supplier-owned, counted,
+already-reserved and blocked stock; it refuses conflicting repeated Unit facts and duplicate
+source lines. The actual Listing now shows suggested quantities and location, places rows with
+suggestions first, and accepts chosen exact Units through the existing reservation door. Matching
+and ticking write nothing. Definite refusal retains remaining choices; an unknown outcome reads
+back exact held Units and blocks replay when that read cannot confirm the result. Eight hook
+tests and 154 existing Register/page tests pass locally. Candidate reads now page the complete
+available-stock source and fail closed on unreadable data; 36 route tests include the 1,001st
+candidate and source failure. Order-relative `no_line_needs_it` rows do not falsely conflict with
+another customer's compatible candidate. Persisted priority Settings and authenticated production
+acceptance remain open. The per-order Ready Stock read now obtains remaining demand from the existing
+`so_line_remaining_requirement` RPC, shared with issue/reservation. Source-linked Units are not
+counted again in independent stock coverage. 34 route tests include linked-PO overlap and
+fail-closed canonical-read errors. The individual picker also excludes supplier-owned goods from
+available customer-sale quantity and choice while retaining readable ownership facts and existing
+saved-choice removal. The individual picker now selects Stock Location, defaults to Carres Klang
+when present and keeps chosen/saved Units from other locations visible; location changes write
+nothing. 44 picker tests pass, including a saved Unit outside the default location. These stock
+changes are local build facts, not production proof.
+
+Authenticated production acceptance also found that the Batch Purchase Orders toolbar opened
+an empty result panel after a fresh mount because it relied only on browser-held issue results.
+The local correction loads the exact deduplicated PO lineage of visible Register rows through
+the existing permission-bound issue-context reads, including retained completed rows. Shared
+DataGrid search and column filters determine membership; no broader supplier pool is substituted.
+All reads must succeed with matching PO identities before the panel opens. Starting a new read
+closes the old result scope. A failed read says `Supplier details could not be loaded.` and offers
+`Try again` on the same exact PO read, rather than presenting an empty or stale PO answer.
+23 page journey and 131 actual Register tests pass, including fresh-mount recovery, search scope
+and failed-read retry without a write. Direct production acceptance remains open.
 
 ### SO Batch PO Status — owner-approved 2026-10-04
 

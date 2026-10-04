@@ -1,3 +1,4 @@
+import { allocateWholeStockRecords } from "./so-batch-stock-match";
 /**
  * To Order — the Planning Workspace projection.
  *
@@ -1671,30 +1672,19 @@ export function buildToOrder(input: BuildToOrderInput): ToOrderProposal[] {
     const groupOf = (l: ToOrderLine) => `${l.orderId}::${l.buildKey ?? `line::${l.lineId}`}`;
     for (const l of eligible) groupSize.set(groupOf(l), (groupSize.get(groupOf(l)) ?? 0) + 1);
 
-    const pool = new Map<string, { id: string; qty: number }[]>();
-    for (const [k, recs] of Object.entries(input.freeStock)) pool.set(k, [...recs]);
-
-    for (const r of net.lines) {
-      const line = r.line as ToOrderLine;
-      const need = r.toOrder;
-      if (need <= 0) continue;
-      if ((groupSize.get(groupOf(line)) ?? 1) > 1) continue;
-      const recs = pool.get(line.stockKey ?? line.sku);
-      if (!recs || recs.length === 0) continue;
-      let qty = 0;
-      const itemIds: string[] = [];
-      for (let i = 0; i < recs.length && qty < need; i += 1) {
-        const rec = recs[i]!;
-        if (qty + rec.qty > need) continue; // would over-reserve — skip, never split
-        qty += rec.qty;
-        itemIds.push(rec.id);
-      }
-      if (qty <= 0) continue;
-      pool.set(
-        line.stockKey ?? line.sku,
-        recs.filter((rec) => !itemIds.includes(rec.id)),
-      );
-      offerByLine.set(line.lineId, { qty, itemIds });
+    const records = Object.entries(input.freeStock).flatMap(([stockKey, units]) =>
+      units.map(unit => ({ ...unit, stockKey })));
+    const offers = allocateWholeStockRecords(net.lines, records,
+      result => result.toOrder,
+      (result, record) => {
+        const line = result.line as ToOrderLine;
+        return (groupSize.get(groupOf(line)) ?? 1) <= 1 && record.stockKey === (line.stockKey ?? line.sku);
+      });
+    for (const [result, records] of offers) {
+      offerByLine.set((result.line as ToOrderLine).lineId, {
+        qty: records.reduce((sum, record) => sum + record.qty, 0),
+        itemIds: records.map(record => record.id),
+      });
     }
   }
 

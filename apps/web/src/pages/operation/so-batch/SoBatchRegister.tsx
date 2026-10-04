@@ -6,6 +6,10 @@ import { ApiError, apiFetch } from "@/lib/api";
 import Button from "@/components/kit/Button";
 import Icon from "@/components/kit/Icon";
 import Tabs from "@/components/kit/Tabs";
+import Select from "@/components/kit/Select";
+import Block from "@/components/kit/Block";
+import ReadyStockTable from "../components/ReadyStockTable";
+import { useWholeRoundReadyStock } from "./useWholeRoundReadyStock";
 import {
   SO_BATCH_PURCHASE_WORDS as W,
   SO_BATCH_RAIL,
@@ -367,13 +371,14 @@ export interface SoBatchRegisterProps {
   hidden?: boolean;
   /** Hands the arrangement to the issue journey. This page creates nothing. */
   onIssue: (selections: SoBatchSelection[]) => void;
-  onOpenPurchaseOrders?: () => void;
+  onOpenPurchaseOrders?: (poIds: readonly string[]) => void;
+  purchaseOrdersLoading?: boolean;
   /** The PO window Work opened this page on (Purchasing §5.6.1): its name,
    *  and the way back to every window's demand. */
   scope?: { label: string; onClear: () => void; preselectKey?: string };
 }
 
-export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurchaseOrders, initialSearch, hidden = false, scope, roundNavigation }: SoBatchRegisterProps) {
+export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurchaseOrders, purchaseOrdersLoading = false, initialSearch, hidden = false, scope, roundNavigation }: SoBatchRegisterProps) {
   const navigate = useNavigate();
   /* R8 — a `display:none` box forgets its scroll offset, and by the time a
      render hides it the offset already reads 0. So the offset is remembered
@@ -520,6 +525,10 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
     () => orders.filter(order => rail.visibleOrderIds.has(order.orderId) && (!roundNavigation?.selected || orderMatchesTime(order, roundNavigation.selected))).sort(compareOrderBy),
     [orders, rail.visibleOrderIds, compareOrderBy, roundNavigation?.selected, orderMatchesTime],
   );
+  const visibleOrders = useRef(shown);
+  const rememberVisibleOrders = useCallback((rows: SoBatchOrderRow[]) => {
+    visibleOrders.current = rows;
+  }, []);
   const toggleTiming = useCallback((s: PurchaseDemandTimingState) => {
     setFilter((prev) => ({ ...prev, timing: prev.timing === s ? null : s }));
   }, []);
@@ -619,6 +628,10 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
     () => [...live].map(([demandId, allocations]) => ({ demandId, allocations })),
     [live],
   );
+  const stock = useWholeRoundReadyStock(dropTicksForLines);
+  const stockOffers = (orderId: string) => stock.offers.filter(offer => offer.orderId === orderId);
+  const stockIds = (orderId: string) => stockOffers(orderId).flatMap(offer => offer.units.map(unit => unit.itemId));
+  const displayRows = stock.active ? [...shown].sort((a, b) => Number(stockIds(b.orderId).length > 0) - Number(stockIds(a.orderId).length > 0) || compareOrderBy(a, b)) : shown;
   const summary = useMemo(
     () => soBatchSelectionSummary(selections, leafById),
     [selections, leafById],
@@ -1221,6 +1234,13 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
 
   /* ── The expansion — the shared child table, and only it ──────────────── */
   const renderExpansion = (o: SoBatchOrderRow) => (
+    <>
+    {stock.active && stockOffers(o.orderId).map(offer => <Block key={offer.orderLineId} title="Ready Stock"
+      note={`${o.lines.find(line => line.orderLineId === offer.orderLineId)?.item ?? "Not recorded"} · ${offer.units.length}`}>
+      <ReadyStockTable layout="picker" label={`Ready Stock for SO-${o.so}, this item line`} rows={offer.units}
+        selection={{ isChosen: id => stock.chosen.has(id), onToggle: id => stock.toggle([id], !stock.chosen.has(id)),
+          isRefused: () => false, blockedWord: () => stock.busy ? "Not confirmed · Try again" : null }} />
+    </Block>)}
     <SoBatchOrderExpansion
       order={o}
       leafs={leafsByOrder.get(o.orderId) ?? []}
@@ -1235,6 +1255,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
       onReserved={dropTicksForLines}
       onStockPending={onStockPending}
     />
+    </>
   );
 
   /* ── The page ─────────────────────────────────────────────────────────── */
@@ -1452,7 +1473,19 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
             data-testid="so-batch-grid"
           >
             <DataGrid<SoBatchOrderRow>
-              toolbarEnd={onOpenPurchaseOrders ? <Button size="sm" onClick={onOpenPurchaseOrders}>Purchase Orders</Button> : undefined}
+              toolbarEnd={<span className="flex items-center gap-2">
+                {stock.active ? <><Select id="round-stock-location" toolbar label="Stock Location" value={stock.location}
+                  onValueChange={stock.setLocation} disabled={stock.busy} options={stock.locations} />
+                  <Button size="sm" disabled={stock.busy} onClick={stock.clear}>Cancel</Button></>
+                  : <Button size="sm" loading={stock.busy} onClick={() => {
+                    void stock.match(visibleOrders.current.filter(order => shown.some(row => row.orderId === order.orderId) && purchaseStatus(order) !== "Done"));
+                  }}>Match Ready Stock</Button>}
+                {onOpenPurchaseOrders ? <Button size="sm" loading={purchaseOrdersLoading} onClick={() => {
+                const visibleIds = new Set(shown.map(order => order.orderId));
+                onOpenPurchaseOrders([...new Set(visibleOrders.current.filter(order => visibleIds.has(order.orderId))
+                  .flatMap(order => order.pos.map(po => po.poId)))]);
+              }}>Purchase Orders</Button> : null}
+              </span>}
               appearance="reference"
               wrapToolbar
               palette="slate"
@@ -1461,8 +1494,18 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
                  stacked headers read as parent and child. */
               headerTone="paleBlue"
               searchPresentation="responsive"
-              rows={shown}
-              columns={columns}
+              rows={displayRows}
+              facetRows={shown}
+              onFacetRowsChange={rememberVisibleOrders}
+              columns={stock.active ? [...columns, {
+                key: "roundReadyStock", label: "Ready Stock", width: 168, minWidth: 140,
+                accessor: (order: SoBatchOrderRow) => <span className="block">
+                  {W.readyStockAvailable(stockIds(order.orderId).length)}
+                  {stockIds(order.orderId).length > 0 && <span className="block text-meta text-kit-slate-11">
+                    {stock.locations.find(location => location.value === stock.location)?.label ?? "Carres Klang"}
+                  </span>}
+                </span>,
+              }] : columns}
               storageKey={STORAGE_KEY}
               rowKey={(o) => o.orderId}
               rowTestId={(o) => `so-batch-row-${o.orderId}`}
@@ -1483,7 +1526,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
               /* MESSAGE KIND ② (§6.7): a real business blocker, between the
                  toolbar and the table, costing zero height while its fact is
                  false. */
-              warning={selectionHasPendingStock ? W.readyStockPendingBlocksIssue : undefined}
+              warning={stock.error ?? (selectionHasPendingStock ? W.readyStockPendingBlocksIssue : undefined)}
               emptyMessage={orders.length > 0 ? W.noMatch : W.empty}
               groupBanner={false}
               /* The owner's approved order opens with `Status`, then the
@@ -1511,7 +1554,14 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
                 renderExpansion,
                 testId: (o) => `so-batch-expand-${o.orderId}`,
               }}
-              selectable={{
+              selectable={stock.active ? {
+                selectedKeys: new Set(displayRows.filter(order => stockIds(order.orderId).some(id => stock.chosen.has(id))).map(order => order.orderId)),
+                onToggle: id => stock.toggle(stockIds(id), !stockIds(id).every(unit => stock.chosen.has(unit))),
+                onToggleAll: (ids, all) => stock.toggle(ids.flatMap(stockIds), !all),
+                isSelectable: (order: SoBatchOrderRow) => !stock.busy && stockIds(order.orderId).length > 0,
+                isIndeterminate: (order: SoBatchOrderRow) => stockIds(order.orderId).some(id => stock.chosen.has(id)) && !stockIds(order.orderId).every(id => stock.chosen.has(id)),
+                testId: (order: SoBatchOrderRow) => `so-batch-stock-select-${order.orderId}`,
+              } : {
                 selectedKeys: selectedOrderKeys,
                 onToggle: (orderId) =>
                   setOrderSelected(orderId, !orderSelection(orderId).checked),
@@ -1528,8 +1578,9 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
                   orderSelection(o.orderId).indeterminate,
                 testId: (o: SoBatchOrderRow) => `so-batch-select-${o.orderId}`,
               }}
-              selectionSummary={() => summary.text}
-              selectionPrimary={summary.lines > 0 ? (
+              selectionSummary={(count) => stock.active ? `${count} Sales Order${count === 1 ? "" : "s"} · Ready Stock` : summary.text}
+              selectionPrimary={stock.active ? <Button variant="primary" loading={stock.busy} disabled={stock.unknown || stock.chosen.size === 0}
+                onClick={() => void stock.proceed(new Set(visibleOrders.current.filter(order => shown.some(row => row.orderId === order.orderId)).map(order => order.orderId)))}>Proceed</Button> : summary.lines > 0 ? (
                 <span
                   className="flex shrink-0 items-center gap-2"
                   data-testid="so-batch-selection-actions"

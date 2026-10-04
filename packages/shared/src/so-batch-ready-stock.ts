@@ -38,9 +38,8 @@ import { z } from "zod";
 /** How a Unit is identified. `quantity` rows carry a key, never a Unit ID. */
 export const readyStockIdentityScopeSchema = z.enum(["unit", "quantity"]);
 
-/** Whose goods these are. Consignment stock is reservable (Purchasing MASTER
- *  §7.7 — reservation creates no supplier notice), but the operator has to be
- *  able to SEE that they are committing a supplier's property. */
+/** Whose goods these are. Supplier-owned display stock is not eligible for
+ * customer sale (Stock MASTER, owner 2026-10-02); ownership remains visible. */
 export const readyStockOwnershipSchema = z.enum(["carres_owned", "supplier_consignment"]);
 
 export const readyStockUnitSchema = z.object({
@@ -53,6 +52,8 @@ export const readyStockUnitSchema = z.object({
   /** Grade, and it is NOT availability: an Exhibition unit is fully available. */
   condition: z.string().nullable(),
   siteName: z.string().nullable(),
+  /** Stable source location identity; absent on older workers. */
+  warehouseId: z.string().nullable().optional(),
   holderName: z.string().nullable(),
   ownership: readyStockOwnershipSchema,
   supplier: z.string().nullable(),
@@ -96,7 +97,7 @@ export const readyStockUnitSchema = z.object({
   reservedForLineId: z.string().nullable().optional(),
   /** Why the Unit cannot be chosen, when it cannot. `null` = choosable. */
   blocked: z
-    .enum(["counted_stock", "no_line_needs_it"])
+    .enum(["counted_stock", "supplier_owned", "no_line_needs_it"])
     .nullable(),
 });
 export type ReadyStockUnit = z.infer<typeof readyStockUnitSchema>;
@@ -108,12 +109,12 @@ export const readyStockLineSchema = z.object({
   item: z.string(),
   /** What the customer ordered. Never reduced — the original demand stands. */
   qty: z.number().int(),
-  /** Units already bound to THIS line (reserved or delivered). */
+  /** Independent Unit coverage, excluding Units already counted by PO lineage. */
   reservedQty: z.number().int(),
   reservedUnitCodes: z.array(z.string()),
   /** Units on a non-cancelled purchase order sourced to this line. */
   onPoQty: z.number().int(),
-  /** `qty − reservedQty − onPoQty`. What Choose Ready Unit may still answer. */
+  /** Canonical SQL remainder, shared with the issue/reservation doors. */
   remainingQty: z.number().int(),
 });
 export type ReadyStockLine = z.infer<typeof readyStockLineSchema>;
@@ -218,6 +219,7 @@ export const READY_STOCK_BLOCKED_WORDS: Record<
      LAW, so its Unit ID cell is the absence dash and this column says what
      the goods are instead — never `No Unit ID`, which implies one is owed. */
   counted_stock: "Counted stock",
+  supplier_owned: "Supplier owned",
   /* `Covered` is RETIRED from SO Batch Purchase, never to return. The fact is
      that no item line still needs these goods, and that is what it says. */
   no_line_needs_it: "No item line needs it",

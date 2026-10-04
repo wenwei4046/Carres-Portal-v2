@@ -61,12 +61,32 @@ window.fetch = async (input, init) => {
   if (url.pathname.endsWith("issued-round")) return Response.json({ poIds: samplePos.map(po => po.id) });
   if (url.pathname.endsWith("issued-today")) return Response.json({ today: "2026-10-05", pos: samplePos });
   const id = decodeURIComponent(url.pathname.split("/").at(-2) ?? "");
+  if (url.pathname.endsWith("expansion")) {
+    const order = orders.find(row => row.orderId === id);
+    return Response.json({ defaultDeliverTo: destination, place: [],
+      lines: order?.lines.map(line => ({ lineId: line.orderLineId, sku: line.sku, unitIds: [], deliverTo: [] })) ?? [] });
+  }
+  if (url.pathname.endsWith("ready-stock")) {
+    const order = orders.find(row => row.orderId === id);
+    if (!order) return Response.json({ message: "Not found" }, { status: 404 });
+    return Response.json({ orderId: id, so: order.so, reference: `SO-${order.so}`,
+      lines: order.lines.map(line => ({ orderLineId: line.orderLineId, sku: line.sku, item: line.item,
+        qty: line.qty, reservedQty: line.stockTaken, reservedUnitCodes: [], onPoQty: line.pos.reduce((sum, po) => sum + po.qty, 0),
+        remainingQty: Math.max(0, line.qty - line.stockTaken - line.pos.reduce((sum, po) => sum + po.qty, 0)) })),
+      units: ["Carres Klang", "Carres PJ"].map((siteName, index) => ({
+        itemId: `33333333-3333-4333-8333-33333333333${index}`, unitCode: `SAMPLE-UNIT-${index + 1}`,
+        identityScope: "unit", sku: "SAMPLE-K", condition: "new", siteName, warehouseId: `sample-warehouse-${index}`,
+        holderName: null, ownership: "carres_owned", supplier: null, qty: 1, dateIn: "2026-09-01",
+        matchingLineIds: order.lines.map(line => line.orderLineId), blocked: null, reservedForLineId: null,
+      })),
+    });
+  }
   if (url.pathname.endsWith("issue-context")) return Response.json(samplePos.find(po => po.id === id));
   if (url.pathname.endsWith("print-data")) return Response.json(sampleDocuments.get(id));
   if (url.pathname.endsWith("sends")) return Response.json({ sends: id === "SAMPLE-PO-002" ? [{ kind: "confirmed_sent", channel: "email", po_version: 1, recipient: "orders@ohana.example", sent_at: "2026-10-05T02:20:00Z", sent_by_name: "Sample staff" }] : [] });
   return Response.json({ message: "Sample data · Local preview only" }, { status: 503 });
 };
-const client = new QueryClient({ defaultOptions: { queries: { enabled: false, retry: false } } });
+const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 function Preview() {
   const [open, setOpen] = useState(true);
   const [time, setTime] = useState<string | null>(null);

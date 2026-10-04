@@ -172,9 +172,8 @@ describe("the cell", () => {
   it("states the two counts for THIS item line", async () => {
     draw();
     const cell = await settled();
-    /* Two free exact Units match this line; the counted row is on the shelf and
-       is not bindable, so it is shown in the table and not counted here. */
-    expect(cell).toHaveTextContent("2 available");
+    /* Only Carres-owned exact stock is available for customer sale. */
+    expect(cell).toHaveTextContent("1 available");
     expect(cell).toHaveTextContent("0 reserved");
   });
 
@@ -314,7 +313,9 @@ describe("the stock table", () => {
     await openPicker();
     const row = screen.getByTestId(`ready-stock-unit-${UNIT_CONSIGNED}`);
     expect(within(row).getByText("Dorsettloft")).toBeInTheDocument();
-    expect(within(row).getByText("Supplier owned")).toBeInTheDocument();
+    expect(within(row).getAllByText("Supplier owned").length).toBeGreaterThan(0);
+    expect(within(row).queryByRole("checkbox")).toBeNull();
+    expect(row).toHaveTextContent("Supplier owned");
   });
 
   it("shows counted stock, refuses the choice, and never calls its key a Unit ID", async () => {
@@ -333,8 +334,23 @@ describe("the stock table", () => {
   it("asks for no item line, because the picker opened under one", async () => {
     draw();
     await openPicker();
-    expect(screen.queryByRole("combobox")).toBeNull();
+    expect(screen.getByRole("combobox", { name: "Stock Location" })).toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: /item line/i })).toBeNull();
     expect(screen.queryByText(/For item line/)).toBeNull();
+  });
+
+  it("defaults to Klang without hiding saved Units from another location or writing", async () => {
+    draw(response({ units: [
+      unit({ itemId: UNIT_A, siteName: "Carres Klang", warehouseId: "klang" }),
+      unit({ itemId: UNIT_CONSIGNED, unitCode: "U1-000-065", siteName: "PJ Showroom", warehouseId: "pj", reservedForLineId: LINE_A }),
+      unit({ itemId: UNIT_COUNTED, unitCode: "U1-000-002", siteName: "PJ Showroom", warehouseId: "pj" }),
+    ] }));
+    await openPicker();
+    expect(screen.getByRole("combobox", { name: "Stock Location" })).toHaveTextContent("Carres Klang");
+    expect(screen.getByTestId(`ready-stock-unit-${UNIT_A}`)).toBeInTheDocument();
+    expect(screen.getByTestId(`ready-stock-unit-${UNIT_CONSIGNED}`)).toBeInTheDocument();
+    expect(screen.queryByTestId(`ready-stock-unit-${UNIT_COUNTED}`)).toBeNull();
+    expect(apiFetch.mock.calls.every(([, options]) => !options || options.method == null || options.method === "GET")).toBe(true);
   });
 
   it("scrolls sideways inside its own box rather than widening the page", async () => {
@@ -615,7 +631,7 @@ describe("the selection journey", () => {
 describe("a refusal", () => {
   function drawRefusing(body: Record<string, unknown>, props: Parameters<typeof Harness>[0] = {}) {
     apiFetch.mockImplementation(async (path: string) => {
-      if (String(path).endsWith("/ready-stock")) return response();
+      if (String(path).endsWith("/ready-stock")) return response({ units: [unit({ itemId: UNIT_A }), unit({ itemId: UNIT_CONSIGNED, unitCode: "U1-000-065" })] });
       const { ApiError } = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
       throw new ApiError(409, "conflict", body);
     });

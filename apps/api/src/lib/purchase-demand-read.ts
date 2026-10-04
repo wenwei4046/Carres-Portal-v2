@@ -331,6 +331,7 @@ export type FreeStockUnit = {
   qty: number;
   condition: string | null;
   siteName: string | null;
+  warehouseId?: string | null;
   holderName: string | null;
   ownership: string;
   supplier: string | null;
@@ -342,7 +343,7 @@ export type FreeStockUnit = {
   poNo: string | null;
 };
 
-export async function readFreeStock(sb: ReturnType<typeof userClient>): Promise<{
+export async function readFreeStock(sb: ReturnType<typeof userClient>, required = false): Promise<{
   stockWarehouse: { id: string; name: string } | null;
   freeStock: Record<string, { id: string; qty: number }[]>;
   stockQtyById: Map<string, number>;
@@ -395,12 +396,17 @@ export async function readFreeStock(sb: ReturnType<typeof userClient>): Promise<
      * 2026-09-10) so nothing moves, but a second site would have been silently
      * unsellable and the fix costs a removed `.eq()`.
      */
-    const { data: itemRows, error: itemErr } = await sb
+    const stockQuery = () => sb
       .from("stock_unit_register_v")
       .select(
         "id, unit_code, sku, qty, date_in, condition, site_name, holder_name, ownership, supplier, identity_scope, warehouse_id, po_no",
       )
       .eq("availability", "available");
+    const complete = required ? await readAllPages<Record<string, unknown>>((from, to) =>
+      stockQuery().order("id").range(from, to)) : null;
+    if (complete && !("rows" in complete)) throw new Error("stock_candidates_unavailable");
+    const { data: itemRows, error: itemErr } = complete && "rows" in complete
+      ? { data: complete.rows, error: null } : await stockQuery();
     if (itemErr) throw new Error(itemErr.message);
 
     /**
@@ -444,6 +450,7 @@ export async function readFreeStock(sb: ReturnType<typeof userClient>): Promise<
         qty,
         condition: (it.condition as string | null) ?? null,
         siteName: (it.site_name as string | null) ?? null,
+        warehouseId: (it.warehouse_id as string | null) ?? null,
         holderName: (it.holder_name as string | null) ?? null,
         ownership: (it.ownership as string | null) ?? "carres_owned",
         supplier: (it.supplier as string | null) ?? null,
@@ -460,6 +467,7 @@ export async function readFreeStock(sb: ReturnType<typeof userClient>): Promise<
       stockQtyById.set(id, qty);
     }
   } catch (e) {
+    if (required) throw e;
     console.error("ready stock unavailable — no offer made", (e as Error).message);
   }
   return { stockWarehouse, freeStock, stockQtyById, freeUnitsByKey };
