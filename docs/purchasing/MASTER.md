@@ -2009,7 +2009,9 @@ with dated rounds, 23 September → SO-1365 exact scope and toggle-back, 1–13 
 supplier communication was executed. The original raw-demand round count overcounted
 completed historical orders; the acceptance correction reuses the same Register planning
 helper and its completed-history regression passes. Its production count verification
-remains owed. Narrow-canvas authenticated verification remains owed.
+remains owed. Authenticated narrow-window inspection (763px window) verified the rail
+leaves table flow when open and hide/show preserves the original Register; the shared
+rail remembers an explicitly opened preference. The window and page were restored.
 
 Delivery process finding: `gh pr merge --auto --merge` merged #1872 immediately while
 CI was pending because the repository did not enforce waiting. This was an engineering
