@@ -3808,6 +3808,20 @@ two presentations of one register, not duplicate facts on one screen. Exact item
 promise batches are inspected on the selected PO; do not repeat a full item table inside every card.
 Full PO information/edit + actual PDF remains the approved 50/50 surface under §9.3.
 
+**OWNER CONFIRMED 2026-10-04 — round placement, safe retry and editable timing.**
+Operation places the eligible prepared buying scope for the selected round together. The system
+creates separate POs according to supplier and existing compatible destination/document rules;
+staff then send each current PO to its corresponding supplier. A round is not one cross-supplier
+PO or a single transmission to every supplier. Preserve successful issue results after partial
+failure; retries target only the remaining unissued scope and must not duplicate existing PO
+coverage. This confirms the operating outcome, not implementation mechanics.
+
+The daily round times are editable through the existing governed Purchasing Settings door under
+§5.6.1, by authorised settings users. 10:15 AM and 4:00 PM are the current defaults, not hard-coded
+permanent times. Existing issued documents and recorded/missed round occurrences retain their
+original identity/time/scope when the schedule changes; no retroactive reassignment or duplicate
+purchase is permitted. Settings approval here does not mean live settings were changed.
+
 ### SO Batch Purchase Blueprint — owner-confirmed steps, 2026-10-04
 
 **RULING / APPROVED OPERATING FLOW; target, not production proof.** Jess corrected the
