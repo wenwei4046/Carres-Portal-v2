@@ -734,8 +734,8 @@ and calls only `warehouse_confirm_receipt`; a missing function or failed call ca
 back to the old Operation-review queue. It returns the engine's posted result or preserved-report
 blockers, and refuses an empty success result. Thirty-one Warehouse route tests pass, including non-PO source/Unit transport, unknown
 facts, correction identity, role refusal, authority injection, bounded lines and no fallback.
-API and Shared typechecks pass. This transport is not connected to the Warehouse form yet and must
-not deploy ahead of its reviewed database engine. No live final-confirmation claim is made.
+API and Shared typechecks pass. The Warehouse form connection below is now built on branch; neither may deploy ahead of its
+reviewed database engine. No live final-confirmation claim is made.
 
 **Non-PO arrival convergence — LOCAL SQL DRAFT / NOT APPROVED / NOT DEPLOYED, 2026-10-05.**
 The candidate extracts the existing arrival receipt body behind its guarded Operation wrapper;
@@ -748,6 +748,24 @@ isolation and the own-report source identity. The shared transport carries arriv
 without inventing a PO. Existing arrival business transitions are retained; this does not prove
 all repair/return/replacement lifecycle fixtures or production function reconciliation. SQL stays
 only in chat and the isolated local database. API typecheck passes after this extension.
+
+**Warehouse confirmation form — BUILT ON BRANCH / NOT DEPLOYED, 2026-10-05.**
+The PO form now calls the final-confirmation API with a stable save key. It uses kit Modal, Button,
+Checkbox and TableScroller, preserves unknown quantities/date, retains missing Unit outcomes,
+and requires confirmation of the exact displayed draft. Any edit clears confirmation; saving locks
+fields. Only an actual posted result with a GRN closes the form. An unposted result displays its
+blockers and retains its receipt/revision for correction. An uncertain response retries the same
+key. Expected Units match their exact PO-line binding; the SKU fallback is removed. Warehouse reads
+and Receiving/Stock/Calendar projections invalidate after the result. COPY now follows the approved
+Warehouse final-confirmation flow rather than the old routine Operation-review wording.
+Web typecheck and design-standard checks pass. Nineteen actual-component tests pass for this
+form/Incoming surface, including blocked correction,
+unknown facts, network retry, confirmation invalidation and posted-GRN closure. Local 390×844
+preview with illustrative API responses verified the blocked message and edit-clears-confirmation.
+It exposed 403px item content in a 354px container; the shared TableScroller now contains its
+404px content within a 356px region. Screenshot: `/tmp/carres-warehouse-confirmation-phone-local.png`.
+This is local UI/transport evidence, not a real Warehouse login, upload or stock receipt. Reopening
+persisted reports after closing/reloading, non-PO UI and broader page/keyboard acceptance remain owed.
 
 Still required before an exact SQL review/release: remaining non-PO lifecycle and source read/form coverage; remaining quantity/issue/extra and authority boundaries; complete source contracts and
 Warehouse form and report history, Operation blocked-report/Work readers; exact reviewed SQL

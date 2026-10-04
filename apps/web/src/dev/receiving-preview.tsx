@@ -387,10 +387,10 @@ const WAREHOUSE_INCOMING = {
         },
       ],
       expected_units: [
-        { id: "eu1", unit_code: "U1-000-201", sku: "BF02-Q Queen Bedframe", status: "incoming" },
-        { id: "eu2", unit_code: "U1-000-202", sku: "BF02-Q Queen Bedframe", status: "incoming" },
-        { id: "eu3", unit_code: "U1-000-203", sku: "BF02-Q Queen Bedframe", status: "incoming" },
-        { id: "eu4", unit_code: "U1-000-204", sku: "BF02-Q Queen Bedframe", status: "incoming" },
+        { id: "eu1", unit_code: "U1-000-201", sku: "BF02-Q Queen Bedframe", status: "incoming", po_line_id: "l2" },
+        { id: "eu2", unit_code: "U1-000-202", sku: "BF02-Q Queen Bedframe", status: "incoming", po_line_id: "l2" },
+        { id: "eu3", unit_code: "U1-000-203", sku: "BF02-Q Queen Bedframe", status: "incoming", po_line_id: "l2" },
+        { id: "eu4", unit_code: "U1-000-204", sku: "BF02-Q Queen Bedframe", status: "incoming", po_line_id: "l2" },
       ],
     },
   ],
@@ -426,6 +426,10 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   if (PAGE.startsWith("calendar") && url.includes("/api/operation/orders")) return json({ orders: [] });
   if (PAGE.startsWith("calendar") && url.includes("/api/operation/partners")) return json({ partners: [] });
   if (url.includes("/api/operation/workspace-duties")) return json(WORKSPACE_DUTIES);
+  if (url.includes("/api/warehouse/receipts/confirm")) return json({
+    id: SUBMITTED, receipt_id: SUBMITTED, status: "draft", grn_no: null, revision: 0,
+    blockers: [{ code: "do_file_required", message: "Delivery note is missing" }], already_saved: false,
+  });
   if (url.includes("/api/warehouse/incoming")) return json(WAREHOUSE_INCOMING);
   if (url.includes("/api/operation/warehouse-receipts/duty")) return json(DUTY);
   if (url.includes(`/api/operation/warehouse-receipts/${POSTED}`)) return json(DETAIL);

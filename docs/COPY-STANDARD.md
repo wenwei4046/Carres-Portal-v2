@@ -1925,27 +1925,27 @@ delivery date` · `Call {logistics}` over `Arrange a new delivery date` ·
 `Upload delivery photo` · `Upload payment proof` · `Return count to Carres` ·
 `Return count to {warehouse}`.
 
-### The warehouse count words (Loo, 2026-07-28)
+### Warehouse physical receiving — approved flow alignment, 2026-10-05
 
-**One verb, two directions, and the party is always named.** `Send back` is retired: `Send`
-is pinned to raising a purchase order to a factory and is never reused (rule 8).
+Purchasing MASTER §7.3's owner-approved 2026-10-04 flow governs Warehouse as well as Office.
+A valid final Warehouse confirmation posts through Receiving without routine Operation approval.
+Operation owns supplier follow-up; Warehouse owns physical evidence and results.
 
-| Who does it | Queue tile | Row line | Button | Done message | Empty state |
-|---|---|---|---|---|---|
-| the warehouse files its count | `Return count` | `Return count to Carres` | `Return count to Carres` | `Count returned to Carres` | `Nothing counted and waiting.` |
-| Carres sends it back to be redone | `Return count` | `Return count to {warehouse}` | `Return count to {warehouse}` | `Count returned to {warehouse}` | `No count is waiting for a check.` |
+| Fact or action | Words | Boundary |
+|---|---|---|
+| Final physical confirmation | `I checked the goods and confirm these receiving results.` | Applies to this exact draft; an edit requires confirmation again. |
+| Unconfirmed draft | `Prefilled results are not confirmed. Check the goods before saving.` | A prefilled outcome is not receipt evidence. |
+| Final save | `Save Receiving` | The engine either creates the GRN or preserves the report with its exact blockers. |
+| Confirmation still missing | `Save — confirm receiving results` | Disabled until the individual confirms the displayed report. |
+| Posted successfully | `Receiving saved · {GRN No}` | Only after the engine returns a posted receipt and its actual GRN. |
+| Preserved but unposted report | `Receiving report saved. No GRN created.` | Show the returned blockers; keep the same session for correction. Never describe this as received stock. |
+| Existing returned report | `Return count to {warehouse}` · `Count returned to {warehouse}` | A specific physical correction request; never mandatory approval of a normal Warehouse receipt. |
 
-The queue word is the same for both because a queue holds many and names no party — which is
-the dictionary's own rule, and here it is load-bearing rather than incidental: the two rows
-are the same act seen from the two ends.
-
-**This replaces R6's `Save count` on the warehouse form, and that is deliberate.** The form
-law says a button that merely stores what you typed is `Save` — but this one does not merely
-store: it hands the count to Carres and the state becomes `Waiting Carres check`. A button
-that changes whose problem something is has never been a `Save`.
-
-**These four strings cover the WAREHOUSE RECEIPT and nothing else** (Loo, 2026-07-28). See the
-rule directly below — a different business line does not inherit them by looking similar.
+Do not use `Return count to Carres`, `Count returned to Carres`, `Waiting Carres check` or
+`Nothing moves yet. Carres checks this in, and the stock is booked then.` for the new final
+confirmation flow. Those labels encode the removed routine second approval. An unknown physical
+quantity remains blank/unknown, never zero; an unknown physical date is not seeded from now.
+This dictionary alignment changes no supplier, amendment, void, Finance or account authority.
 
 ### One business, one dictionary (Loo, 2026-07-28)
 
@@ -2039,7 +2039,7 @@ do not take the five-string shape.
 | `Signed DO photo` | field | The evidence, named by what it is a photo OF. |
 | `Received Qty` | per-line GOOD count | **Correction 2026-09-23 — one definition, because three disagreed.** `Received Qty` is the CORRECT, ACCEPTED goods this receiving session takes in: it is what the shipped code counts (`warehouse-receipt.ts`: *"Good units this receipt claims"*), what `Pending Delivery Qty = Order Qty − Received Qty` subtracts, and what Stock makes available. **Damaged and wrong goods are NOT in it** — the earlier wording "per-line physical count … what physically arrived" contradicted its own neighbours (`Correct and accepted quantity posted through Receiving`) and the Warehouse pair below, and is retired. The physical arrival total keeps its own word: **`Physical arrived Qty` = `Received Qty` + `Damaged Qty` + `Wrong Item Qty`**. A per-Unit **`Received with issue`** outcome is a physical arrival that counts in `Damaged Qty`, never in `Received Qty`; `Extra Qty` is outside all of it. Never use one receipt’s accepted count as the cumulative PO count. |
 | `What kind of wrong?` | per-line picker | Plain words. The claim needs the kind before it can be filed. |
-| `Save Receiving` | the Save button, when nothing is missing | |
+| `Save Receiving` | saves the confirmed physical report | Creates a GRN only when the engine validates it; otherwise preserves the report with blockers. |
 | `Prefilled results are not confirmed. Check the goods before saving.` | active receiving form | Proposed input is not proof of physical verification; owner-approved operator-flow review, 2026-09-16. |
 | `Receiving results confirmed. Not saved yet.` | confirmed receiving draft | Explicit review is distinct from saved receipt/GRN. |
 | `Proposed results · not saved` | live Receiving Summary | These quantities describe the draft, not a completed receipt. |

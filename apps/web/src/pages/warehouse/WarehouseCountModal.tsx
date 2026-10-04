@@ -1,7 +1,10 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
   RECEIVING_UNIT_OUTCOME_LABEL,
+  documentDisplayNumber,
+  type WarehouseConfirmationResult,
+  type WarehouseConfirmationReportInput,
   warehouseReceiptProblems,
   warehouseReceiptProblemText,
   wrongItemClaimTypesFor,
@@ -10,52 +13,22 @@ import {
   type WarehouseIncomingPo,
   type WarehouseReceiptLineDraft,
 } from "@carres/shared";
+import TableScroller from "@/components/TableScroller";
+import Checkbox from "@/components/kit/Checkbox";
 import { ApiError } from "@/lib/api";
 import { appDateTimeInput, appDateTimeInputToIso } from "@/lib/fmt-date";
-import { useWarehouseSubmitReceiptMutation } from "@/lib/queries";
+import { useWarehouseConfirmReceiptMutation } from "@/lib/queries";
 import ArrivalEvidenceUploadField from "@/components/ArrivalEvidenceUploadField";
 import ClaimPhotoUploadField from "@/components/ClaimPhotoUploadField";
 import DOFileUploadField from "@/components/DOFileUploadField";
-import {
-  INPUT_CLS,
-  Modal,
-  ModalActions,
-} from "@/pages/operation/components/Modal";
+import Modal from "@/components/kit/Modal";
+import Button from "@/components/kit/Button";
+import { controlClass } from "@/components/kit/field-recipe";
+const INPUT_CLS = controlClass(false, "single");
 
-/**
- * WarehouseCountModal — R6: the receiving form, in the warehouse's own hands.
- *
- * This is R1's inspection, unchanged: three numbers per line under a
- * **Pending delivery** column, and a claim panel that appears the moment a
- * problem is reported (R2's evidence law, asked by R2's own shared function).
- * The card says the inspection form must exist and be proven by ops first —
- * it does, so this screen ASSEMBLES it rather than inventing a second one.
- *
- * ── What is different from the ops modal, and why ────────────────────────────
- *
- * 1. **Nothing moves when this is saved.** The count is filed; Carres checks it
- *    in, and that check-in is what replays it through the receive engine. The
- *    footer says so in one sentence, because a warehouse clerk who believes the
- *    stock has moved will not chase the PO that is still open.
- * 2. **No "goods inspected" tick-box.** COPY-STANDARD's no-decorative-checkbox
- *    law: a box that only records "I say I did it" is banned. The photo of the
- *    signed DO is the evidence, and it is required.
- * 3. **`receivedNow` is a DELTA.** The warehouse counts THIS truck; the running
- *    total is worked out at check-in, against the line as it stands then.
- *    Storing a total would be right when it was typed and wrong when it was
- *    replayed.
- *
- * The word `Receive` does not appear as a verb anywhere on this screen —
- * COPY-STANDARD pins the arrival of goods to `Check in`, and that is ops's move,
- * not this one.
- *
- * **R8 (2026-07-28): the footer button is `Return count to Carres`, not
- * `Save count`.** R6 reached for the form law ("a button that merely stores what
- * you typed is `Save`") and reported it; Loo ruled that this one does not merely
- * store — it hands the count to Carres and the state becomes `Waiting Carres
- * check`. A button that changes whose problem something is has never been a
- * `Save`. The four strings are in COPY-STANDARD's "warehouse count words".
- */
+/** Warehouse-owned physical report. The same Receiving engine either posts a
+ * GRN or retains this exact session with blockers; normal receipt has no second
+ * Operation approval. Confirmation applies to the exact displayed draft. */
 interface Props {
   po: WarehouseIncomingPo;
   onClose: () => void;
@@ -82,17 +55,15 @@ export default function WarehouseCountModal({ po, onClose }: Props) {
   const [wrongType, setWrongType] = useState<Record<string, string>>({});
   const [wrongPhotos, setWrongPhotos] = useState<Record<string, string[]>>({});
   const [doNumber, setDoNumber] = useState("");
-  /** 0601 · when the goods physically arrived — captured HERE, at the count,
-   *  never derived from when Carres files it. Seeded with now in Kuala
-   *  Lumpur; the server refuses a future time. */
-  const [receivedAt, setReceivedAt] = useState(() => appDateTimeInput());
+  /** Physical arrival is explicit. Unknown is not the time this form opened. */
+  const [receivedAt, setReceivedAt] = useState("");
   const [note, setNote] = useState("");
   const [doFilePath, setDoFilePath] = useState<string | null>(null);
   const [arrivalEvidence, setArrivalEvidence] = useState<
     ReceivingArrivalEvidence[]
   >([]);
 
-  const submit = useWarehouseSubmitReceiptMutation();
+  const submit = useWarehouseConfirmReceiptMutation();
 
   /** What the line still owes. Derived, never stored — the same arithmetic R1
    *  uses, so this form and the PO row can never disagree. */
@@ -109,7 +80,7 @@ export default function WarehouseCountModal({ po, onClose }: Props) {
       m.set(
         l.id,
         (po.expected_units ?? []).filter(
-          (u) => u.status === "incoming" && (u.po_line_id ? u.po_line_id === l.id : u.sku === l.sku),
+          (u) => u.status === "incoming" && u.po_line_id === l.id,
         ),
       );
     }
@@ -123,7 +94,7 @@ export default function WarehouseCountModal({ po, onClose }: Props) {
     const o: Record<string, UnitState> = {};
     for (const l of po.lines ?? []) {
       const units = (po.expected_units ?? []).filter(
-        (u) => u.status === "incoming" && (u.po_line_id ? u.po_line_id === l.id : u.sku === l.sku),
+        (u) => u.status === "incoming" && u.po_line_id === l.id,
       );
       const cap = Math.max(0, Number(l.qty || 0) - Number(l.received_qty || 0));
       units.forEach((u, i) => {
@@ -198,7 +169,36 @@ export default function WarehouseCountModal({ po, onClose }: Props) {
     () => warehouseReceiptProblems({ doNumber, doFilePath, lines: draftLines }),
     [doNumber, doFilePath, draftLines],
   );
-  const ready = problems.length === 0 && !submit.isPending;
+  const [saveKey] = useState(() => crypto.randomUUID());
+  const [savedReport, setSavedReport] = useState<WarehouseConfirmationResult | null>(null);
+  const [confirmed, setConfirmed] = useState(false);
+  const saving = useRef(false);
+  const report: WarehouseConfirmationReportInput = {
+    poId: po.po_id, doNumber: doNumber.trim(), doFilePath,
+    goodsReceivedTime: receivedAt ? appDateTimeInputToIso(receivedAt) : null,
+    note: note.trim() || undefined, arrivalEvidence,
+    lines: draftLines.filter((line) => {
+      const source = lines.find((item) => item.id === line.id);
+      return (source && pendingOf(source) > 0) || (unitsByLine.get(line.id)?.length ?? 0) > 0;
+    }).map((line) => ({
+      id: line.id,
+      receivedNow: (unitsByLine.get(line.id)?.length ?? 0) ? line.receivedNow : recv[line.id] ?? null,
+      damagedQty: (unitsByLine.get(line.id)?.length ?? 0) ? line.damagedQty : dmg[line.id] ?? null,
+      wrongItemQty: (unitsByLine.get(line.id)?.length ?? 0) ? line.wrongItemQty : wrong[line.id] ?? null,
+      damagedPhotos: [...line.damagedPhotos], wrongItemPhotos: [...line.wrongItemPhotos],
+      wrongItemClaimType: line.wrongItemClaimType ?? undefined,
+      units: (unitsByLine.get(line.id) ?? []).map((unit) => {
+        const state = unitStates[unit.id];
+        return { unitCode: unit.unit_code, outcome: state?.outcome ?? "not_received",
+          ...(state?.outcome === "received_with_issue" ? { issueKind: state.issueKind } : {}) };
+      }),
+    })),
+  };
+  const quantitiesKnown = (report.lines ?? []).every((line) =>
+    line.receivedNow != null && line.damagedQty != null && line.wrongItemQty != null);
+  const reportSnapshot = JSON.stringify(report);
+  useEffect(() => { setConfirmed(false); }, [reportSnapshot]);
+  const ready = confirmed && !submit.isPending;
 
   /** The ONE per-line view the rows, the claim panels and the payload read. */
   const viewBy = new Map(draftLines.map((d) => [d.id, d]));
@@ -211,7 +211,7 @@ export default function WarehouseCountModal({ po, onClose }: Props) {
     }),
     { good: 0, damaged: 0, wrong: 0 },
   );
-  const issueTotal = totals.damaged + totals.wrong;
+
 
   /** The three numbers share ONE budget: a delivery may never account for more
    *  units than the line still owes. `field` is the box being typed into. */
@@ -229,81 +229,46 @@ export default function WarehouseCountModal({ po, onClose }: Props) {
 
   function setNum(
     setter: (fn: (prev: Record<string, number>) => Record<string, number>) => void,
-    id: string,
-    val: number,
-    max: number,
+    id: string, value: string, max: number,
   ) {
-    setter((prev) => ({ ...prev, [id]: Math.max(0, Math.min(max, val)) }));
+    setter((prev) => {
+      const next = { ...prev };
+      if (value === "" || !Number.isFinite(Number(value))) delete next[id];
+      else next[id] = Math.max(0, Math.min(max, Math.trunc(Number(value))));
+      return next;
+    });
   }
 
   async function save() {
-    if (!ready || !doFilePath) return;
+    if (!ready || saving.current) return;
+    saving.current = true;
     try {
-      await submit.mutateAsync({
-        poId: po.po_id,
-        doNumber: doNumber.trim(),
-        doFilePath,
-        ...(receivedAt ? { goodsReceivedTime: appDateTimeInputToIso(receivedAt) } : {}),
-        note: note.trim() || undefined,
-        ...(arrivalEvidence.length > 0 ? { arrivalEvidence } : {}),
-        lines: draftLines
-          .filter(
-            (l) => l.receivedNow > 0 || l.damagedQty > 0 || l.wrongItemQty > 0,
-          )
-          .map((l) => {
-            const units = unitsByLine.get(l.id) ?? [];
-            return {
-              id: l.id,
-              receivedNow: l.receivedNow,
-              // The unit outcomes ride the line — the derived numbers above
-              // and this list can never disagree (one arithmetic).
-              ...(units.length > 0
-                ? {
-                    units: units.map((u) => {
-                      const st = unitStates[u.id] ?? {
-                        outcome: "not_received" as const,
-                        issueKind: "damaged" as const,
-                      };
-                      return {
-                        unitCode: u.unit_code,
-                        outcome: st.outcome,
-                        ...(st.outcome === "received_with_issue"
-                          ? { issueKind: st.issueKind }
-                          : {}),
-                      };
-                    }),
-                  }
-                : {}),
-              ...(l.damagedQty > 0
-                ? {
-                    damagedQty: l.damagedQty,
-                    damagedPhotos: [...l.damagedPhotos],
-                  }
-                : {}),
-              ...(l.wrongItemQty > 0
-                ? {
-                    wrongItemQty: l.wrongItemQty,
-                    wrongItemClaimType: l.wrongItemClaimType ?? undefined,
-                    wrongItemPhotos: [...l.wrongItemPhotos],
-                  }
-                : {}),
-            };
-          }),
+      const result = await submit.mutateAsync({ saveKey, report,
+        ...(savedReport ? { receiptId: savedReport.id, revision: savedReport.revision } : {}),
       });
-      // COPY-STANDARD's done message for this direction of the pair, with the
-      // PO and the DO it is about.
-      toast.success(
-        `Count returned to Carres · ${po.po_id} · DO ${doNumber.trim()}`,
-      );
-      onClose();
+      setSavedReport(result);
+      if (result.status === "posted" && result.grn_no) {
+        toast.success(`Receiving saved · ${documentDisplayNumber(result.grn_no)}`);
+        onClose();
+      }
     } catch (e: unknown) {
       if (e instanceof ApiError) toast.error(e.message || "Could not save the count");
       else toast.error(e instanceof Error ? e.message : "Could not save the count");
+    } finally {
+      saving.current = false;
     }
   }
 
   return (
-    <Modal title={`Count ${po.po_id}`} onClose={onClose} size="lg">
+    <Modal open title={`Count ${documentDisplayNumber(po.po_id)}`} width="wide"
+      onOpenChange={(open) => { if (!open && !saving.current) onClose(); }}
+      footer={<>
+        <Button onClick={onClose} disabled={submit.isPending}>Cancel</Button>
+        <Button variant="primary" onClick={save} disabled={!ready} loading={submit.isPending}>
+          {confirmed ? "Save Receiving" : "Save — confirm receiving results"}
+        </Button>
+      </>}>
+      <fieldset disabled={submit.isPending} className="min-w-0 border-0 p-0 m-0">
       <div className="text-meta text-base-600 mb-3.5 font-body">
         Goods from <strong>{po.supplier_name ?? "the factory"}</strong>. For each
         item: how many arrived good, how many arrived damaged, how many are the
@@ -311,6 +276,7 @@ export default function WarehouseCountModal({ po, onClose }: Props) {
         <strong>pending delivery</strong> on the PO.
       </div>
 
+      <TableScroller label="Items" testId="warehouse-count-scroller">
       <div className="card p-0 mb-3.5" data-testid="warehouse-count-lines">
         <div
           className="grid items-center gap-2 px-3.5 py-2.5 bg-base-50 border-b border-base-100"
@@ -366,13 +332,13 @@ export default function WarehouseCountModal({ po, onClose }: Props) {
                       type="number"
                       min={0}
                       max={allowance(l.id, pending, "recv")}
-                      value={recv[l.id] || 0}
+                      value={recv[l.id] ?? ""}
                       disabled={disabled}
                       onChange={(e) =>
                         setNum(
                           setRecv,
                           l.id,
-                          parseInt(e.target.value, 10) || 0,
+                          e.target.value,
                           allowance(l.id, pending, "recv"),
                         )
                       }
@@ -384,13 +350,13 @@ export default function WarehouseCountModal({ po, onClose }: Props) {
                       type="number"
                       min={0}
                       max={allowance(l.id, pending, "dmg")}
-                      value={dmg[l.id] || 0}
+                      value={dmg[l.id] ?? ""}
                       disabled={disabled}
                       onChange={(e) =>
                         setNum(
                           setDmg,
                           l.id,
-                          parseInt(e.target.value, 10) || 0,
+                          e.target.value,
                           allowance(l.id, pending, "dmg"),
                         )
                       }
@@ -402,13 +368,13 @@ export default function WarehouseCountModal({ po, onClose }: Props) {
                       type="number"
                       min={0}
                       max={allowance(l.id, pending, "wrong")}
-                      value={wrong[l.id] || 0}
+                      value={wrong[l.id] ?? ""}
                       disabled={disabled}
                       onChange={(e) =>
                         setNum(
                           setWrong,
                           l.id,
-                          parseInt(e.target.value, 10) || 0,
+                          e.target.value,
                           allowance(l.id, pending, "wrong"),
                         )
                       }
@@ -558,13 +524,16 @@ export default function WarehouseCountModal({ po, onClose }: Props) {
             className="font-mono text-label font-semibold"
             data-testid="warehouse-count-totals"
           >
-            Σ {totals.good} good
-            {totals.damaged > 0 ? ` · ${totals.damaged} damaged` : ""}
-            {totals.wrong > 0 ? ` · ${totals.wrong} wrong item` : ""}
+            {quantitiesKnown ? <>
+              Σ {totals.good} good
+              {totals.damaged > 0 ? ` · ${totals.damaged} damaged` : ""}
+              {totals.wrong > 0 ? ` · ${totals.wrong} wrong item` : ""}
+            </> : "Not recorded"}
           </div>
         </div>
       </div>
 
+      </TableScroller>
       <div className="grid gap-3 mb-4">
         <div>
           <label className="label mb-1.5 block" htmlFor="wh-received-at">
@@ -635,22 +604,19 @@ export default function WarehouseCountModal({ po, onClose }: Props) {
         </div>
       </div>
 
-      {/* Say what pressing the button does — and, just as importantly, what it
-          does NOT do. A clerk who believes the stock has moved will not chase
-          the PO that is still open. */}
-      <div
-        className="text-label text-base-600 mb-3.5 font-body px-3 py-2 border border-dashed border-base-300 rounded-[4px]"
-        data-testid="warehouse-count-note"
-      >
-        Nothing moves yet. Carres checks this in, and the stock is booked then.
-        {issueTotal > 0 && (
-          <>
-            {" "}
-            The damaged and wrong-item units open a{" "}
-            <strong>claim against the factory</strong> with the photos above.
-          </>
-        )}
+      <div className="text-body text-kit-slate-11 mb-3" data-testid="warehouse-count-note">
+        {!confirmed ? "Prefilled results are not confirmed. Check the goods before saving."
+          : !savedReport ? "Receiving results confirmed. Not saved yet." : null}
       </div>
+      <Checkbox id="warehouse-confirm-results"
+        label="I checked the goods and confirm these receiving results."
+        checked={confirmed} onCheckedChange={setConfirmed} disabled={submit.isPending} />
+      {savedReport?.status === "draft" && (
+        <div role="status" className="text-body text-kit-red-9 my-3">
+          <p>Receiving report saved. No GRN created.</p>
+          {savedReport.blockers.map((blocker) => <p key={blocker.code}>{blocker.message}</p>)}
+        </div>
+      )}
 
       {problems.length > 0 && (
         <div
@@ -661,13 +627,8 @@ export default function WarehouseCountModal({ po, onClose }: Props) {
         </div>
       )}
 
-      <ModalActions
-        onCancel={onClose}
-        onPrimary={save}
-        primary="Return count to Carres"
-        primaryDisabled={!ready}
-        primaryPending={submit.isPending}
-      />
+      </fieldset>
+
     </Modal>
   );
 }

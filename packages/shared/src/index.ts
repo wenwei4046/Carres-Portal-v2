@@ -1264,6 +1264,7 @@ export {
   warehouseConfirmReceiptInput,
   warehouseConfirmationReportInput,
   type WarehouseConfirmReceiptInput,
+  type WarehouseConfirmationResult,
   type WarehouseConfirmationReportInput,
   warehouseReceiptReturnInput,
   type WarehouseSubmitReceiptInput,

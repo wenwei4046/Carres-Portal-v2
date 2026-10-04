@@ -145,3 +145,15 @@ export const warehouseConfirmReceiptInput = z.object({
 });
 export type WarehouseConfirmationReportInput = z.infer<typeof warehouseConfirmationReportInput>;
 export type WarehouseConfirmReceiptInput = z.infer<typeof warehouseConfirmReceiptInput>;
+
+
+/** Confirmation either produces a GRN or preserves the physical report. */
+export interface WarehouseConfirmationResult {
+  id: string;
+  receipt_id: string;
+  status: "draft" | "posted";
+  grn_no: string | null;
+  revision: number;
+  blockers: Array<{ code: string; message: string }>;
+  already_saved: boolean;
+}

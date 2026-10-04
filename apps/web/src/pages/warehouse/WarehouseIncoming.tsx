@@ -74,8 +74,7 @@ export default function WarehouseIncoming() {
         className="mb-3"
       />
       <div className="text-body text-base-600 mb-[18px]">
-        Goods on their way here. Count what the driver brings, then Carres checks
-        it in.
+        Goods on their way here. Count what the driver brings.
       </div>
 
       <div className="bg-white border border-base-200 rounded overflow-auto">

@@ -8,8 +8,8 @@ import WarehouseIncoming from "./WarehouseIncoming";
  * it files.
  *
  * The claims under test: a PO whose count is already waiting offers no second
- * form, the count cannot be sent until it is complete, and the form says
- * plainly that saving it moves nothing.
+ * form, the report requires explicit physical confirmation; unknown facts survive and
+ * the returned engine result decides whether a GRN exists.
  */
 
 const apiFetchMock = vi.fn();
@@ -96,8 +96,8 @@ const UNIT_PO = {
   ...PO,
   po_id: "PO-3001",
   expected_units: [
-    { id: "u-1", unit_code: "U-260904-0001", sku: "MS01-K", status: "incoming" },
-    { id: "u-2", unit_code: "U-260904-0002", sku: "MS01-K", status: "incoming" },
+    { id: "u-1", unit_code: "U-260904-0001", sku: "MS01-K", status: "incoming", po_line_id: PO.lines[0]!.id },
+    { id: "u-2", unit_code: "U-260904-0002", sku: "MS01-K", status: "incoming", po_line_id: PO.lines[0]!.id },
   ],
 };
 
@@ -160,10 +160,10 @@ describe("the count form", () => {
     return screen.findByTestId("warehouse-count-lines");
   }
 
-  it("states that saving moves nothing — Carres checks it in", async () => {
+  it("explains that prefilled results require physical confirmation", async () => {
     await openForm();
     expect(screen.getByTestId("warehouse-count-note")).toHaveTextContent(
-      "Nothing moves yet",
+      "Prefilled results are not confirmed",
     );
   });
 
@@ -175,9 +175,8 @@ describe("the count form", () => {
 
   it("refuses to save until the count is complete, and says what is missing", async () => {
     await openForm();
-    // R8 — `Save count` is retired: this button hands the count to Carres and
-    // the state becomes `Waiting Carres check`, so it is the `Return` verb.
-    const save = screen.getByRole("button", { name: "Return count to Carres" });
+    // A final confirmation must belong to the actual displayed physical report.
+    const save = screen.getByRole("button", { name: /^Save/ });
     expect(save).toBeDisabled();
     expect(screen.getByTestId("warehouse-count-problems")).toHaveTextContent(
       "Type the DO number",
@@ -336,7 +335,7 @@ describe("the count form — per-unit scanning (0426)", () => {
       "Add a photo of the damage",
     );
     expect(
-      screen.getByRole("button", { name: "Return count to Carres" }),
+      screen.getByRole("button", { name: /^Save/ }),
     ).toBeDisabled();
   });
 
@@ -348,21 +347,22 @@ describe("the count form — per-unit scanning (0426)", () => {
     fireEvent.click(screen.getByTestId("mock-do-upload"));
     fireEvent.click(screen.getByTestId("warehouse-arrival-evidence"));
 
-    const save = screen.getByRole("button", { name: "Return count to Carres" });
+    const save = screen.getByRole("button", { name: /^Save/ });
+    fireEvent.click(screen.getByRole("checkbox", { name: "I checked the goods and confirm these receiving results." }));
     await waitFor(() => expect(save).toBeEnabled());
     fireEvent.click(save);
 
     await waitFor(() =>
       expect(
         apiFetchMock.mock.calls.some(
-          (c) => c[0] === "/api/warehouse/receipts",
+          (c) => c[0] === "/api/warehouse/receipts/confirm",
         ),
       ).toBe(true),
     );
     const call = apiFetchMock.mock.calls.find(
-      (c) => c[0] === "/api/warehouse/receipts",
+      (c) => c[0] === "/api/warehouse/receipts/confirm",
     )!;
-    const body = JSON.parse((call[1] as { body: string }).body);
+    const body = JSON.parse((call[1] as { body: string }).body).report;
     expect(body.arrivalEvidence).toEqual([
       { path: "PO-3001/arrival.mp4", kind: "video" },
     ]);
@@ -374,22 +374,79 @@ describe("the count form — per-unit scanning (0426)", () => {
     ]);
   });
 
-  it("the count carries when the goods arrived — a KL date AND time, now by default (0601)", async () => {
+  it("the count carries when the goods arrived — an explicit KL date and time, never invented from now", async () => {
     await openUnitForm();
     const when = screen.getByLabelText("Goods Received Date *");
     expect(when).toHaveAttribute("type", "datetime-local");
-    expect((when as HTMLInputElement).value).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/);
+    expect((when as HTMLInputElement).value).toBe("");
     fireEvent.change(when, { target: { value: "2026-09-04T08:40" } });
     fireEvent.change(screen.getByLabelText("DO number *"), { target: { value: "DO-9001" } });
     fireEvent.click(screen.getByTestId("mock-do-upload"));
-    const save = screen.getByRole("button", { name: "Return count to Carres" });
+    const save = screen.getByRole("button", { name: /^Save/ });
+    fireEvent.click(screen.getByRole("checkbox", { name: "I checked the goods and confirm these receiving results." }));
     await waitFor(() => expect(save).toBeEnabled());
     fireEvent.click(save);
     await waitFor(() =>
-      expect(apiFetchMock.mock.calls.some((c) => c[0] === "/api/warehouse/receipts")).toBe(true),
+      expect(apiFetchMock.mock.calls.some((c) => c[0] === "/api/warehouse/receipts/confirm")).toBe(true),
     );
-    const call = apiFetchMock.mock.calls.find((c) => c[0] === "/api/warehouse/receipts")!;
-    const body = JSON.parse((call[1] as { body: string }).body);
+    const call = apiFetchMock.mock.calls.find((c) => c[0] === "/api/warehouse/receipts/confirm")!;
+    const body = JSON.parse((call[1] as { body: string }).body).report;
     expect(body.goodsReceivedTime).toBe("2026-09-04T08:40:00+08:00");
+  });
+});
+
+describe("final physical confirmation", () => {
+  const confirmLabel = "I checked the goods and confirm these receiving results.";
+  async function open(respond: (body: unknown) => Promise<unknown>) {
+    mockIncoming([PO]);
+    const read = apiFetchMock.getMockImplementation()!;
+    apiFetchMock.mockImplementation((path: string, init?: { body: string }) =>
+      path === "/api/warehouse/receipts/confirm" ? respond(JSON.parse(init!.body)) : read(path));
+    wrap(<WarehouseIncoming />);
+    fireEvent.click(await screen.findByTestId("warehouse-count-PO-2001"));
+    await screen.findByTestId("warehouse-count-lines");
+  }
+  const calls = () => apiFetchMock.mock.calls.filter((call) => call[0] === "/api/warehouse/receipts/confirm")
+    .map((call) => JSON.parse((call[1] as { body: string }).body));
+  const blocked = { id: "11111111-1111-4111-8111-111111111199", revision: 0, status: "draft", grn_no: null,
+    blockers: [{ code: "do_file_required", message: "Delivery note is missing" }] };
+
+  it("preserves unknown counts/date, keeps a blocked form open and corrects the same saved session", async () => {
+    await open(async () => blocked);
+    fireEvent.click(screen.getByRole("checkbox", { name: confirmLabel }));
+    fireEvent.click(screen.getByRole("button", { name: "Save Receiving" }));
+    await screen.findByText("Receiving report saved. No GRN created.");
+    expect(screen.getByText("Delivery note is missing")).toBeInTheDocument();
+    expect(screen.getByTestId("warehouse-count-totals")).toHaveTextContent("Not recorded");
+    expect(calls()[0].report.goodsReceivedTime).toBeNull();
+    expect(calls()[0].report.lines[0]).toMatchObject({ receivedNow: null, damagedQty: null, wrongItemQty: null });
+    fireEvent.change(screen.getByLabelText("DO number *"), { target: { value: "DO-CORRECTED" } });
+    expect(screen.getByRole("checkbox", { name: confirmLabel })).not.toBeChecked();
+    expect(screen.getByRole("button", { name: /^Save/ })).toBeDisabled();
+    fireEvent.click(screen.getByRole("checkbox", { name: confirmLabel }));
+    fireEvent.click(screen.getByRole("button", { name: "Save Receiving" }));
+    await waitFor(() => expect(calls()).toHaveLength(2));
+    expect(calls()[1]).toMatchObject({ saveKey: calls()[0].saveKey, receiptId: blocked.id, revision: 0 });
+  });
+
+  it("reuses the save key after an uncertain network response", async () => {
+    let attempts = 0;
+    await open(async () => { if (++attempts === 1) throw new Error("Connection lost"); return blocked; });
+    fireEvent.click(screen.getByRole("checkbox", { name: confirmLabel }));
+    fireEvent.click(screen.getByRole("button", { name: "Save Receiving" }));
+    await waitFor(() => expect(calls()).toHaveLength(1));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Save Receiving" })).toBeEnabled());
+    fireEvent.click(screen.getByRole("button", { name: "Save Receiving" }));
+    await screen.findByText("Receiving report saved. No GRN created.");
+    expect(calls()).toHaveLength(2);
+    expect(calls()[1]).toEqual(calls()[0]);
+  });
+
+  it("closes only for an actual posted GRN and refreshes Warehouse reads", async () => {
+    await open(async () => ({ ...blocked, status: "posted", grn_no: "GRN-20261005-1234", blockers: [] }));
+    fireEvent.click(screen.getByRole("checkbox", { name: confirmLabel }));
+    fireEvent.click(screen.getByRole("button", { name: "Save Receiving" }));
+    await waitFor(() => expect(screen.queryByTestId("warehouse-count-lines")).not.toBeInTheDocument());
+    expect(apiFetchMock.mock.calls.filter((call) => call[0] === "/api/warehouse/incoming").length).toBeGreaterThan(1);
   });
 });

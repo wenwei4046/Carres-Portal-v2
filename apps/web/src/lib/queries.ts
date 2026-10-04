@@ -305,6 +305,8 @@ import {
   type WarehouseReceiptLine,
   type WarehouseReceiptRow,
   type WarehouseSubmitReceiptInput,
+  type WarehouseConfirmReceiptInput,
+  type WarehouseConfirmationResult,
   type StockRegisterUnit,
   // 0379 — Delivery's own arrangement (owner correction 2026-08-24).
   type DeliveryArrangementRow,
@@ -4256,6 +4258,29 @@ export function useWarehouseSubmitReceiptMutation(
     onSuccess: async (...args) => {
       await qc.invalidateQueries({ queryKey: ["warehouse-portal"] });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+/** Final physical confirmation. A blocked report is a saved result too; refresh
+ * both Warehouse reads and Receiving/Stock projections after either outcome. */
+export function useWarehouseConfirmReceiptMutation() {
+  const qc = useQueryClient();
+  return useMutation<WarehouseConfirmationResult, ApiError, WarehouseConfirmReceiptInput>({
+    mutationFn: (body) => apiFetch<WarehouseConfirmationResult>("/api/warehouse/receipts/confirm", {
+      method: "POST", body: JSON.stringify(body),
+    }),
+    onSuccess: async () => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: qk.warehousePortal.incoming() }),
+        qc.invalidateQueries({ queryKey: qk.warehousePortal.receipts() }),
+        qc.invalidateQueries({ queryKey: ["operation", "warehouse-receipts"] }),
+        qc.invalidateQueries({ queryKey: ["operation", "warehouse-inbound"] }),
+        qc.invalidateQueries({ queryKey: ["operation", "warehouse-schedule"] }),
+        qc.invalidateQueries({ queryKey: qk.operation.warehouse(), exact: true }),
+        qc.invalidateQueries({ queryKey: ["operation", "pos"] }),
+        qc.invalidateQueries({ queryKey: ["operation", "supplier-claims"] }),
+      ]);
     },
   });
 }
