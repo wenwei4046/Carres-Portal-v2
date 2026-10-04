@@ -48,4 +48,36 @@ describe("Warehouse report history",()=>{
     expect(screen.getByRole("alert")).toHaveTextContent("Not available. Go back and reload.");
     expect(screen.queryByText("invalid")).not.toBeInTheDocument();
   });
+  it("reads the selected event's proof and opens saved photo evidence with its Unit binding",async()=>{
+    const path="PO-20261005-1234/condition.jpg";
+    api.mockImplementation((url:string)=>url.includes("/evidence?")?Promise.resolve({url:"https://example.test/proof.jpg"}):Promise.resolve({events:[{...event,payload:{report:{...event.payload.report,do_file_path:"PO-20261005-1234/do.pdf",lines:[{id,damaged_photos:[{path,unit_code:"U1-000-001"}]}]}}}]}));
+    show();fireEvent.click(await screen.findByRole("button",{name:"View"}));
+    expect(await screen.findByRole("link",{name:"View handover proof"})).toHaveAttribute("href","https://example.test/proof.jpg");
+    fireEvent.click(screen.getByRole("button",{name:"Photo 1"}));
+    const viewer=await screen.findByRole("dialog",{name:"Photo 1"});
+    expect(viewer).toHaveTextContent("U1-000-001");
+    expect(await within(viewer).findByRole("img",{name:"Photo 1"})).toHaveAttribute("src","https://example.test/proof.jpg");
+    expect(api).toHaveBeenCalledWith(`/api/warehouse/receipts/${id}/history/event-1/evidence?path=${encodeURIComponent(path)}`);
+  });
+  it("loads each next file on demand without treating an unopened video as failed",async()=>{
+    api.mockImplementation((url:string)=>url.includes("/evidence?")?Promise.resolve({url:"https://example.test/clip.mp4"}):Promise.resolve({events:[{...event,payload:{report:{...event.payload.report,arrival_evidence:[{path:"PO-20261005-1234/photo.jpg",kind:"photo"},{path:"PO-20261005-1234/clip.mp4",kind:"video"}]}}}]}));
+    show();fireEvent.click(await screen.findByRole("button",{name:"View"}));
+    fireEvent.click(screen.getByRole("button",{name:"Photo 1"}));
+    await screen.findByRole("img",{name:"Photo 1"});
+    expect(api.mock.calls.filter(([url])=>url.includes("/evidence?"))).toHaveLength(1);
+    fireEvent.click(screen.getByRole("button",{name:"Next"}));
+    const viewer=await screen.findByRole("dialog",{name:"Video 2"});
+    await vi.waitFor(()=>expect(viewer.querySelector("video")).toHaveAttribute("src","https://example.test/clip.mp4"));
+    expect(within(viewer).queryByRole("alert")).not.toBeInTheDocument();
+    expect(api).toHaveBeenCalledWith(`/api/warehouse/receipts/${id}/history/event-1/evidence?path=${encodeURIComponent("PO-20261005-1234/clip.mp4")}`);
+  });
+  it("keeps failed saved evidence visible and retries through the same report door",async()=>{
+    let read=0;
+    api.mockImplementation((url:string)=>url.includes("/evidence?")?(++read===1?Promise.reject(new Error("Denied")):Promise.resolve({url:"https://example.test/renewed.jpg"})):Promise.resolve({events:[{...event,payload:{report:{...event.payload.report,arrival_evidence:[{path:"PO-20261005-1234/photo.jpg",kind:"photo"}]}}}]}));
+    show();fireEvent.click(await screen.findByRole("button",{name:"View"}));fireEvent.click(screen.getByRole("button",{name:"Photo 1"}));
+    const viewer=await screen.findByRole("dialog",{name:"Photo 1"});
+    expect(await within(viewer).findByRole("alert")).toHaveTextContent("Photo 1 could not be loaded");
+    fireEvent.click(within(viewer).getByRole("button",{name:"Try again"}));
+    expect(await within(viewer).findByRole("img",{name:"Photo 1"})).toHaveAttribute("src","https://example.test/renewed.jpg");
+  });
 });

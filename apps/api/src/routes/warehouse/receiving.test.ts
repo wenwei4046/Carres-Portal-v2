@@ -211,6 +211,33 @@ describe("GET Warehouse receipt history", () => {
   });
 });
 
+describe("Warehouse report evidence",()=>{
+  const receipt="11111111-1111-4111-8111-111111111111";
+  const event="22222222-2222-4222-8222-222222222222";
+  const path="PO-1001/proof.jpg";
+  const url=`/api/warehouse/receipts/${receipt}/history/${event}/evidence?path=${encodeURIComponent(path)}`;
+  function client(bucket:unknown){
+    const sign=vi.fn().mockResolvedValue({data:{signedUrl:"https://example.test/proof.jpg"},error:null});
+    const sb={...makeSb({data:bucket}),storage:{from:vi.fn(()=>({createSignedUrl:sign}))}};
+    vi.mocked(userClient).mockReturnValue(sb as never);return {sb,sign};
+  }
+  it.each(["delivery-orders","arrival-proofs"])("signs the exact recorded path with user authority in %s",async(bucket)=>{
+    const {sb,sign}=client(bucket);
+    const res=await req(url,"GET",await warehouseJwt());
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("warehouse_receipt_evidence_bucket",{p_receipt_id:receipt,p_event_id:event,p_path:path});
+    expect(sb.storage.from).toHaveBeenCalledWith(bucket);expect(sign).toHaveBeenCalledWith(path,3600);
+  });
+  it.each([null,"private-bucket"])("refuses absent or unexpected evidence authority %s",async(bucket)=>{
+    const {sb,sign}=client(bucket);const res=await req(url,"GET",await warehouseJwt());
+    expect(res.status).toBe(403);expect(sb.storage.from).not.toHaveBeenCalled();expect(sign).not.toHaveBeenCalled();
+  });
+  it("keeps Storage denial visible after successful source validation",async()=>{
+    const {sign}=client("delivery-orders");sign.mockResolvedValue({data:null,error:{message:"Denied"}} as never);
+    const res=await req(url,"GET",await warehouseJwt());expect(res.status).toBe(502);expect(await res.json()).not.toHaveProperty("url");
+  });
+});
+
 describe("POST /api/warehouse/receipts", () => {
   it("files the count through warehouse_submit_receipt and answers 201", async () => {
     const sb = makeSb({ data: { id: "r1", po_id: "PO-1001", status: "submitted" } });

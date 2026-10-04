@@ -439,10 +439,13 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
       { id: "99999999-9999-4999-8999-999999999999", unit_code: "U1-000-202", sku: "BF02-Q Queen Bedframe" }],
   }] });
   if (url.includes("/api/warehouse/incoming")) return json(WAREHOUSE_INCOMING);
+  if (url.includes(`/api/warehouse/receipts/${POSTED}/history/report-history/evidence`)) return json({url:url.includes("clip")?"/ui-evidence-example.mp4":"/carres-wordmark.png"});
   if (url.includes(`/api/warehouse/receipts/${POSTED}/history`)) return json({events:[{
     id:"report-history",receipt_id:POSTED,event:"submitted",event_at:"2026-10-04T17:30:00Z",actor_name:"Aina",
     line_labels:{[WH]:"MS01-K"},unit_labels:{},payload:{report:{po_id:"PO-20261005-1234",do_number:"DO-1234",
-      goods_received_at:"2026-10-05",goods_received_time:null,note:"Driver reported a shortage",lines:[{id:WH,received_now:6,damaged_qty:2,wrong_item_qty:null}]}}
+      goods_received_at:"2026-10-05",goods_received_time:null,note:"Driver reported a shortage",do_file_path:"PO-20261005-1234/document.png",
+      arrival_evidence:[{path:"PO-20261005-1234/photo.jpg",kind:"photo"},{path:"PO-20261005-1234/clip.mp4",kind:"video"}],
+      lines:[{id:WH,received_now:6,damaged_qty:2,wrong_item_qty:null}]}}
   }]});
   if (url.includes("/api/operation/warehouse-receipts/duty")) return json(DUTY);
   if (url.includes(`/api/operation/warehouse-receipts/${POSTED}`)) return json(PAGE === "blocked-report" ? {

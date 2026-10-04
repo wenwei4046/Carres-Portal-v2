@@ -802,7 +802,7 @@ The initial local projection incorrectly stripped nested nulls; the regression t
 the candidate now preserves the original report JSON. A 202-event tied-timestamp case verifies
 complete traversal. Together, 45 local receipt transaction tests and 49 Warehouse API tests pass.
 This supplies the history read contract; the Warehouse history UI is connected as recorded below,
-while evidence viewing remains outstanding. SQL remains unapproved, chat-only and unapplied to production.
+while evidence viewing is connected on branch below. SQL remains unapproved, chat-only and unapplied to production.
 
 **Warehouse saved-report facts — BUILT ON BRANCH / NOT DEPLOYED, 2026-10-05.**
 Every My receiving row has a History door independent of the current Incoming list. The kit Modal
@@ -816,7 +816,34 @@ Four history component tests plus 27 existing Warehouse flow tests pass; 45 loca
 pass with own-source label and foreign-Site label-isolation checks. Local illustrative 390×844
 preview shows the report facts, keyboard return to History and a 388px dialog with no horizontal
 overflow: `/tmp/carres-warehouse-history-facts-local.jpg`. This is report-fact inspection, not
-completed evidence viewing, real Warehouse login acceptance or production delivery.
+real Warehouse login acceptance or production delivery. Saved evidence is connected below.
+
+**Warehouse saved-report evidence — BUILT ON BRANCH / LOCAL SQL DRAFT, 2026-10-05.**
+The report History snapshot opens its handover proof and saved photos/videos through the existing
+SavedEvidenceViewer. Each request names the exact receipt, event and recorded path. The local
+SQL helper checks the active individual, Site, source and exact event membership, returning only
+one of the two allowed buckets. The API signs with the caller's own Storage permissions; it never
+uses an administrative signing bypass. Original unknown facts and Unit evidence bindings remain.
+Photo/video navigation resolves each file on demand; unopened files show Loading, actual failures
+retain Try again. No new component, approval, receipt writer or stock authority is introduced.
+
+Local evidence exposed an existing PO Storage policy mismatch: Warehouse could not read the PO
+row used by its old policy. The candidate adds bounded PO evidence insert/read policies through
+an active-individual, effective-destination-Site helper. Reads additionally require current uploader
+ownership or an exact saved own-Site report reference. Unrelated other-uploader files, forged
+uploaders, inactive/shared actors and other Sites are refused. Current Storage `owner_id` is used,
+with deprecated `owner` fallback for legacy rows; current ownership takes precedence. This follows
+[Supabase's ownership contract](https://supabase.com/docs/guides/storage/security/ownership).
+No Storage schema change, update/delete permission or production policy change is included.
+
+50 real local receipt transaction tests, 54 Warehouse API route tests and 12 targeted history/shared
+viewer tests pass. Both application typechecks pass, including the final navigation extension. Local illustrative 390×844 acceptance opens
+Photo 1 then Next to Video 2 without a false error; video metadata/media loads (readyState 4,
+no media error), and native controls are present. Playback itself and real uploaded-file transport
+are not claimed. Screenshot: `/tmp/carres-warehouse-evidence-phone-local.jpg`.
+SQL remains chat-only, unapproved and unapplied to production. This does not close Operation's
+per-revision evidence inspector, source-resolution workflow, downstream repair-return Work closure,
+legacy fixture convergence, full Warehouse listing acceptance or the production release gate.
 
 **Warehouse confirmation form — BUILT ON BRANCH / NOT DEPLOYED, 2026-10-05.**
 The PO form now calls the final-confirmation API with a stable save key. It uses kit Modal, Button,

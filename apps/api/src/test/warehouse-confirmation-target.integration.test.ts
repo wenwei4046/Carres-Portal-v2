@@ -192,6 +192,62 @@ describe.skipIf(!databaseUrl)("authorised Warehouse final receipt (approved targ
     expect(page2[0]!.payload.report).toEqual({received_qty:null});
   });
 
+  it("authorises evidence only from the exact saved event and source",async()=>{
+    const first=await confirm(report({do_file_path:null}));
+    if(!first.ok)throw new Error(first.reason);
+    const corrected=await confirm(report(),uid("90"),first.result.id,first.result.revision);
+    if(!corrected.ok)throw new Error(corrected.reason);
+    const events=(await q("select warehouse_receipt_history_page($1) result",[first.result.id])).rows[0]!.result;
+    const original=events.find((e:{event:string})=>e.event==="submitted");
+    const revision=events.find((e:{event:string})=>e.event==="resubmitted");
+    const allowed=async(eventId:string,path:string)=>(await q("select warehouse_receipt_evidence_bucket($1,$2,$3) bucket",[first.result.id,eventId,path])).rows[0]!.bucket;
+    expect(await allowed(original.id,doPath)).toBeNull();
+    expect(await allowed(revision.id,doPath)).toBe("delivery-orders");
+    expect((await q("select name from storage.objects where bucket_id='delivery-orders' and name=$1",[doPath])).rows).toHaveLength(1);
+    expect(await allowed(revision.id,`${po}/unrecorded.jpg`)).toBeNull();
+    expect(await allowed(revision.id,`${po}/../proof.jpg`)).toBeNull();
+    expect(await allowed(uid("999"),doPath)).toBeNull();
+    await q("reset role");await q("update warehouse_receipts set warehouse_id=$2 where id=$1",[first.result.id,otherSite]);await as(person);
+    expect(await allowed(revision.id,doPath)).toBeNull();
+    await as(disabled);
+    expect((await request("select warehouse_receipt_evidence_bucket($1,$2,$3) result",[first.result.id,revision.id,doPath])).ok).toBe(false);
+  });
+
+  it("limits PO evidence Storage access to own uploads and recorded report evidence",async()=>{
+    await q("reset role");
+    await q("update storage.objects set owner=$2 where bucket_id='delivery-orders' and name=$1",[doPath,group]);
+    const privatePath=`${po}/unrelated.pdf`;
+    await q("insert into storage.objects(id,bucket_id,name,owner) values($1,'delivery-orders',$2,$3)",[uid("151"),privatePath,group]);
+    await as(person);
+    expect((await q("select name from storage.objects where bucket_id='delivery-orders' and name=$1",[privatePath])).rows).toEqual([]);
+    const ownPath=`${po}/my-proof.jpg`;
+    expect((await request("insert into storage.objects(id,bucket_id,name,owner) values($1,'delivery-orders',$2,$3) returning name as result",[uid("152"),ownPath,person])).ok).toBe(true);
+    expect((await q("select name from storage.objects where bucket_id='delivery-orders' and name=$1",[ownPath])).rows).toHaveLength(1);
+    expect((await request("insert into storage.objects(id,bucket_id,name,owner) values($1,'delivery-orders',$2,$3) returning name as result",[uid("153"),`${po}/forged.jpg`,group])).ok).toBe(false);
+    const answer=await confirm(report());if(!answer.ok)throw new Error(answer.reason);
+    expect(answer.result.status).toBe("posted");
+    expect((await q("select name from storage.objects where bucket_id='delivery-orders' and name=$1",[doPath])).rows).toHaveLength(1);
+    await q("reset role");await q("update purchasing_destinations set warehouse_id=$2 where id=$1",[destination,otherSite]);await as(person);
+    expect((await q("select name from storage.objects where bucket_id='delivery-orders' and name=$1",[ownPath])).rows).toEqual([]);
+    expect((await request("insert into storage.objects(id,bucket_id,name,owner) values($1,'delivery-orders',$2,$3) returning name as result",[uid("154"),`${po}/foreign.jpg`,person])).ok).toBe(false);
+  });
+
+  it.each([group,disabled])("refuses PO proof upload by a shared or inactive actor %s",async(actor)=>{
+    await as(actor);
+    expect((await request("insert into storage.objects(id,bucket_id,name,owner) values($1,'delivery-orders',$2,$3) returning name as result",[uid("155"),`${po}/blocked.jpg`,actor])).ok).toBe(false);
+  });
+
+  it("honours current Storage owner_id without relying on the deprecated owner field",async()=>{
+    await q("reset role");
+    // This local replay has a minimal legacy Storage stub. The DDL rolls back
+    // with this case; application migrations do not own Supabase's schema.
+    await q("alter table storage.objects add column if not exists owner_id text");
+    await as(person);
+    expect((await request("insert into storage.objects(id,bucket_id,name,owner_id) values($1,'delivery-orders',$2,$3) returning name as result",[uid("156"),`${po}/modern.jpg`,person])).ok).toBe(true);
+    expect((await q("select name from storage.objects where bucket_id='delivery-orders' and name=$1",[`${po}/modern.jpg`])).rows).toHaveLength(1);
+    expect((await request("insert into storage.objects(id,bucket_id,name,owner,owner_id) values($1,'delivery-orders',$2,$3,$4) returning name as result",[uid("157"),`${po}/wrong-owner.jpg`,person,group])).ok).toBe(false);
+  });
+
   it("lists only this Site's open arrival Units and removes only physically posted Units", async () => {
     const body = await setupArrival();
     const arrivals = async () => (await q("select warehouse_incoming_arrivals() as result")).rows[0]!.result;

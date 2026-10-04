@@ -429,6 +429,10 @@ integrations remain separate work and must reuse this component.
 Unit associations. The viewer never fetches a storage list, widens permissions, uploads,
 deletes, or rewrites evidence. Retry calls the owning reader again. Empty evidence has
 no opening control; a known file without a readable URL remains visible as a failure.
+The optional per-file `loadOnOpen` flag lets an owning reader resolve an unopened file
+on selection through the same authorised retry callback. This branch-only extension
+shows Loading before that read; a refusal remains an explicit retryable failure.
+Existing consumers without the flag retain their existing unreadable-file behaviour.
 
 **Behaviour.** Existing Modal viewer width, focus trap, Escape/Close, focus restoration
 and scroll lock; photo zoom, drag, Reset, Previous/Next; native video playback, seeking

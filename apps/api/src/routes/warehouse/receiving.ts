@@ -127,6 +127,22 @@ warehouseReceivingRouter.get("/receipts/:id/history", requireWarehouse, async (c
   return c.json({error:"Receiving history could not be loaded"},502);
 });
 
+warehouseReceivingRouter.get("/receipts/:id/history/:eventId/evidence", requireWarehouse, async (c) => {
+  const parsed=z.object({id:z.string().uuid(),eventId:z.string().uuid(),path:z.string().min(1).max(500)})
+    .safeParse({id:c.req.param("id"),eventId:c.req.param("eventId"),path:c.req.query("path")});
+  if(!parsed.success) return c.json({message:"Invalid evidence"},422);
+  const sb=userClient(c.env,c.var.auth.jwt);
+  const {data:bucket,error}=await sb.rpc("warehouse_receipt_evidence_bucket",{
+    p_receipt_id:parsed.data.id,p_event_id:parsed.data.eventId,p_path:parsed.data.path,
+  });
+  if(error){const mapped=mapPgError(error);return c.json(mapped.body,mapped.status);}
+  if(bucket!=="delivery-orders" && bucket!=="arrival-proofs") return c.json({message:"Evidence could not be loaded"},403);
+  // User JWT Storage RLS is the second boundary; never elevate signing to admin.
+  const signed=await sb.storage.from(bucket).createSignedUrl(parsed.data.path,3600);
+  if(signed.error || !signed.data?.signedUrl) return c.json({message:"Evidence could not be loaded"},502);
+  return c.json({url:signed.data.signedUrl});
+});
+
 /**
  * File a count.
  *
