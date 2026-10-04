@@ -411,42 +411,39 @@ Evidence: `/tmp/so-batch-live-supplier-address-refusal.png`. No destination addr
 reservation or supplier transmission was changed for this verification. Missing source addresses
 and actual sender/provider verification remain operational gaps, not successful transmissions.
 
-**Supplier preparation return correction, 2026-10-04 — local build, production acceptance owed.**
-The authenticated Nice Future result opened exact `PO-20260903-7907` read-only with its original
-facts and PDF. Back retained `time=11:00` and PO result scope, but incorrectly selected the first
-supplier (Ohana) again. The corrected object return carries the chosen supplier, exact selected
-PO identities, channel, subject and message introduction as presentation state. Documents,
-current versions and sending evidence are read again from their owning endpoints; presentation
-state supplies no authority to issue or send. Returning from Today refreshes its current membership
-and drops selections no longer in that scope without automatically selecting replacement POs.
-Failed refresh blocks preparation; repeated retries preserve the supplier, subset and editable
-draft. Round and Today loading gates are independent so one completed read cannot prematurely
-enable preparation while the other is unresolved. Register URL/context retention remains shared
-kit behavior. No live PO, stock reservation, transmission or supplier address was changed for this
-verification. Local journey tests cover bundle restoration with fresh versions, removed Today
-membership, repeated failed-read recovery and both sides of the exact object return. Release and
-authenticated end-to-end return verification are still required. A restored undated Round also
-refreshes every exact PO's owning issue context before preparation becomes available, so the
-current supplier contact replaces cached routing state. A mismatched or failed source read blocks
-preparation; Try again retains the chosen subset and editable draft. The fresh-contact and
-failed-source retry regressions passed with the complete 54 bundle/page tests on 2026-10-05.
+**Supplier preparation return and Batch document display — PRODUCTION-VERIFIED bounded scope,
+2026-10-05.** PR1900 exact head `81ea80c66766bf415dfbf697637ff5a290f5c48e` passed complete
+CI 37215990410. Main merge `719653ea01df0b03901c2b9e890e53be8cb68b00` passed production
+deployment 37216102072 and the independent five-entry convergence check recorded in
+`/tmp/so-batch-return-live-smoke.log`. All 274 integrated Batch Register/details, supplier bundle,
+Batch page and formal PO page tests passed; the upstream test-only date-clock correction retains
+all business assertions and passed the complete 95 Manual Purchase API tests.
 
-**SO Batch document display adoption, 2026-10-04 — local build, production proof owed.**
-The Register PO cell/context door, its exact-source Quick View lineage and expanded PO details
-reuse `documentDisplayNumber` for Carres-owned dated PO display. Original and shortened numbers
-both find the same retained SO. Navigation, lineage keys, API inputs and exported original identities
-remain unchanged; Unit IDs and supplier-owned references are not formatted. The older tests that
-forbade short-year presentation have been replaced by the approved global ruling and checks that
-the displayed short number opens the original stored PO. 164 Register/detail tests pass locally.
-Supplier preparation checkbox/evidence/history labels and the supplier PDF viewer heading reuse
-the same formatter with their actual version suffix. The formal PO heading and current-action
-number follow the same display. API identities, the message's original issued document references,
-official PDF content and filenames remain unchanged; no historical paper is regenerated. Supplier,
-Batch page and formal PO object journeys, Register and detail tests passed 271 cases after main
-integration; subsequent actual-version lineage coverage passed 165 Register/detail cases and one
-additional Register version/navigation test. Missing versions remain unclaimed. This adoption
-does not claim every Purchasing surface migrated. Full production release and
-the remaining governed display surfaces are still owed.
+Authenticated production acceptance selected Nice Future and only `PO-20260903-7907`, leaving
+4585 and 6426 unticked. Its exact full PO opened read-only with original supplier/destination,
+goods/source facts and the actual Document preview. Back restored Nice Future, the one-PO subset,
+WhatsApp channel and editable introduction. A second pass restored Email, the edited subject and
+introduction. Preparation remained disabled during fresh source reads and became available only
+after current PO/version/context evidence completed. Closing the panel retained search `7907`,
+Table, Supplier grouping, `time=11:00`, and the same 12-of-32 population. Evidence:
+`/tmp/so-batch-live-return-retained-draft.png`, `/tmp/so-batch-live-return-email-draft.png` and
+`/tmp/so-batch-live-return-formal-po.png`. No live issue, reservation or supplier transmission was
+performed. Send Email remained disabled because actual provider/sender availability is unverified.
+
+Returned presentation state supplies no issue/send authority. Today refreshes current membership
+and drops removed selections without replacement. A restored undated Round refreshes each exact
+PO's owning issue context and supplier contact. A failed or mismatched source blocks preparation;
+Try again retains the supplier, subset and editable draft. Round and Today loading gates remain
+independent. Fresh-version/contact, removed-membership and repeated failed-source retry behavior
+is verified by controlled component tests, not by deliberately corrupting production records.
+
+Batch Register/context, Quick View lineage, expanded PO detail, supplier preparation/evidence/PDF
+headings and the formal PO heading/current action reuse `documentDisplayNumber` with actual known
+versions. Production showed `PO-260903-7907-V1` while navigation used exact stored identity
+`PO-20260903-7907`; supplier message references and official PDF content/filenames retained their
+original issued references. Search accepts original and shortened forms. Missing versions remain
+unclaimed; Unit IDs and supplier references are unchanged. This verifies the Batch adoption only,
+not every Purchasing display surface or the complete SO Batch delivery boundary above.
 
 **Quick View and Cards production acceptance, 2026-10-04.** PR1891's exact head
 `49f838c700a57bc9d996c287d378676757ffdc0e` passed full CI 37211199979. Its main merge
