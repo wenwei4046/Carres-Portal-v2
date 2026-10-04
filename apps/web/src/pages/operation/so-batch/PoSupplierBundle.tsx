@@ -56,6 +56,7 @@ export default function PoSupplierBundle({ pos, onPreview, roundWindow, onEviden
   const [selected, setSelected] = useState<Set<string>>(() => new Set(pos.filter(po => po.supplierId === supplier).map(po => po.id)));
   const [documents, setDocuments] = useState<Record<string, PoTemplateData>>({});
   const [sendHistory, setSendHistory] = useState<Record<string, PoSendEvidence[]>>({});
+  const [historyLoading, setHistoryLoading] = useState(true);
   const [historyRefresh, setHistoryRefresh] = useState(0);
   const [historyFailed, setHistoryFailed] = useState<string[]>([]);
   const [channel, setChannel] = useState(pos[0]?.poSendChannel === "email" ? "email" : "whatsapp");
@@ -106,19 +107,38 @@ export default function PoSupplierBundle({ pos, onPreview, roundWindow, onEviden
 
   useEffect(() => {
     let cancelled = false;
+    setHistoryLoading(true);
     setSendHistory({});
     setHistoryFailed([]);
     void Promise.allSettled(supplierPos.map(async po => {
       const result = await apiFetch<{ sends: PoSendEvidence[] }>(`/api/operation/pos/${encodeURIComponent(po.id)}/sends`);
       if (!Array.isArray(result.sends)) throw new Error("invalid_send_history");
-      return [po.id, result.sends] as const;
+      const recovery = emailConfigured
+        ? await apiFetch<{ attempts: EmailAttempt[] }>(`/api/operation/pos/${encodeURIComponent(po.id)}/email-attempts`)
+        : { attempts: [] };
+      const attempts = recovery.attempts.map(attempt => ({ ...attempt,
+        documents: attempt.documents.map(document => ({ ...document,
+          recorded: result.sends.some(event => event.kind === "confirmed_sent" && event.po_version === document.version && event.note?.includes(`po-email/${attempt.id}`)) })) }));
+      return [po.id, result.sends, attempts] as const;
     })).then(results => {
       if (cancelled) return;
-      setSendHistory(Object.fromEntries(results.flatMap(result => result.status === "fulfilled" ? [result.value] : [])));
+      setSendHistory(Object.fromEntries(results.flatMap(result => result.status === "fulfilled" ? [[result.value[0], result.value[1]]] : [])));
+      const restored = results.flatMap(result => result.status === "fulfilled" ? result.value[2] : []);
+      setEmailAttempts(previous => {
+        const merged = new Map(previous.map(attempt => [attempt.id, attempt]));
+        for (const attempt of restored) {
+          const existing = merged.get(attempt.id);
+          const documents = new Map((existing?.documents ?? []).map(document => [document.id, document]));
+          for (const document of attempt.documents) documents.set(document.id, document);
+          merged.set(attempt.id, { ...attempt, documents: [...documents.values()] });
+        }
+        return [...merged.values()];
+      });
+      setHistoryLoading(false);
       setHistoryFailed(results.flatMap((result, index) => result.status === "rejected" ? [supplierPos[index].id] : []));
     });
     return () => { cancelled = true; };
-  }, [supplierPos, historyRefresh]);
+  }, [supplierPos, historyRefresh, emailConfigured]);
 
   useEffect(() => {
     if (!roundWindow) return;
@@ -187,7 +207,7 @@ export default function PoSupplierBundle({ pos, onPreview, roundWindow, onEviden
   }
 
   async function sendEmail() {
-    if (!ready || !emailConfigured || !contact?.contactEmail || emailOutcome) return;
+    if (!ready || !emailConfigured || !contact?.contactEmail || emailOutcome || historyLoading || historyFailed.length) return;
     setBusy(true);
     setError(null);
     const attemptId = crypto.randomUUID();
@@ -235,7 +255,7 @@ export default function PoSupplierBundle({ pos, onPreview, roundWindow, onEviden
       if (document.recorded) return document;
       try {
         await apiFetch(`/api/operation/pos/${encodeURIComponent(document.id)}/confirm-sent`, { method: "POST", body: JSON.stringify({
-          channel: "email", recipient: emailEvidence.recipient, poVersion: document.version, note: `Email dispatch ${emailEvidence.providerId}`,
+          channel: "email", recipient: emailEvidence.recipient, poVersion: document.version, note: `Email dispatch ${emailEvidence.providerId}; po-email/${emailEvidence.id}`,
         }) });
         return { ...document, recorded: true };
       } catch { return document; }
@@ -288,7 +308,7 @@ export default function PoSupplierBundle({ pos, onPreview, roundWindow, onEviden
         }}>Copy message</Button>
         {channel === "whatsapp" ? <Button variant="neutral" size="sm" disabled={!ready || !doors?.whatsapp}
           onClick={() => { if (doors?.whatsapp) window.open(doors.whatsapp.url, "_blank", "noopener,noreferrer"); }}>Open WhatsApp</Button>
-          : <Button variant="primary" size="sm" disabled={!ready || !emailConfigured || !contact?.contactEmail || !subject.trim() || Boolean(emailOutcome)} loading={busy}
+          : <Button variant="primary" size="sm" disabled={!ready || !emailConfigured || !contact?.contactEmail || !subject.trim() || Boolean(emailOutcome) || historyLoading || historyFailed.length > 0} loading={busy}
             title={!emailConfigured ? "Not available" : undefined} onClick={() => void sendEmail()}>Send Email</Button>}
       </div>
       {emailOutcome === "unknown" && <p role="status" className="text-meta text-kit-amber-11">Sending not confirmed</p>}

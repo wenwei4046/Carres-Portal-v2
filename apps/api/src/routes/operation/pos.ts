@@ -1,5 +1,6 @@
 import { Hono, type Context } from "hono";
 import { bodyLimit } from "hono/body-limit";
+import { preparePoEmailAttempt, recordPoEmailOutcome, readPoEmailAttempts } from "../../lib/po-email-attempts";
 import { sendSupplierPoEmail } from "../../lib/supplier-email";
 import { purchasingActorMayIssue } from "../../lib/purchasing-po-authority";
 import { arrivalConfirmationWorkCompletion, poSentWorkCompletion, supplierReplyWorkCompletion } from "../../lib/purchasing-work-completion";
@@ -1553,6 +1554,23 @@ function supplierEmailConfigured(c: Context<AppEnv>): boolean {
 
 operationPosRouter.get("/email-capability", requireOperation, c => c.json({ configured: supplierEmailConfigured(c) }));
 
+operationPosRouter.get("/:id/email-attempts", requireOperation, async c => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const visible = await sb.from("purchase_orders").select("id").eq("id", c.req.param("id")).maybeSingle();
+  if (visible.error) { const m = mapPgError(visible.error); return c.json(m.body, m.status); }
+  if (!visible.data) return c.json({ code: "not_found" }, 404);
+  const read = await readPoEmailAttempts(c.env, visible.data.id);
+  if (read.error) return c.json({ code: "email_history_unavailable" }, 503);
+  const attempts = (read.data ?? []).flatMap(row => {
+    const evidence = row.po_email_attempts as unknown as { id: string; outcome: string; provider_id: string | null; recipient: string };
+    if (evidence.outcome === "failed") return [];
+    return [{ id: evidence.id, status: evidence.outcome === "dispatched" ? "dispatched" : "unknown",
+      providerId: evidence.provider_id ?? undefined, recipient: evidence.recipient,
+      documents: [{ id: row.po_id, version: row.po_version }] }];
+  });
+  return c.json({ attempts });
+});
+
 operationPosRouter.post("/supplier-email", requireOperation,
   bodyLimit({ maxSize: 30 * 1024 * 1024 }), async (c) => {
   if (!supplierEmailConfigured(c)) return c.json({ code: "email_not_configured", message: "Not available" }, 503);
@@ -1588,10 +1606,27 @@ operationPosRouter.post("/supplier-email", requireOperation,
   if (differentlySent.length && !input.resend) return c.json({ code: "already_sent", message: "PO sent to supplier", pos: differentlySent.map(document => document.id) }, 409);
   // The mandatory listing comes from the server-validated document set, never a second UI selection.
   const listing = input.documents.map(document => `${document.id} · V${document.version}`).join("\n");
-  const result = await sendSupplierPoEmail({ apiKey: c.env.RESEND_API_KEY, from: c.env.PO_EMAIL_FROM }, {
+  const reservation = await preparePoEmailAttempt(c.env, c.var.auth.id, input);
+  if (reservation.error) {
+    // No provider call without a durable reservation. Existing/uncertain attempts
+    // remain blocked even when this request cannot recover their result.
+    return c.json({ code: "email_unknown", status: "unknown" }, 502);
+  }
+  const reserved = reservation.data as { created: boolean; status: string; providerId?: string };
+  if (reserved?.created !== true && (reserved?.created !== false || reserved.status !== "dispatched" || !reserved.providerId))
+    return c.json({ code: "email_unknown", status: "unknown" }, 502);
+  const result = !reserved.created && reserved.providerId
+    ? { status: "dispatched" as const, providerId: reserved.providerId }
+    : await sendSupplierPoEmail({ apiKey: c.env.RESEND_API_KEY, from: c.env.PO_EMAIL_FROM }, {
     recipient: input.recipient, subject: input.subject, message: `${input.message}\n\n${listing}`,
     attachments: input.documents.map(({ filename, content }) => ({ filename, content })), attemptKey: attempt,
   });
+  if (reserved.created) {
+    const saved = await recordPoEmailOutcome(c.env, input.attemptId,
+      result.status === "invalid_payload" || result.status === "not_configured" ? "failed" : result.status,
+      result.status === "dispatched" ? result.providerId : undefined);
+    if (saved.error) return c.json({ code: "email_unknown", status: "unknown" }, 502);
+  }
   if (result.status !== "dispatched") return c.json({ code: `email_${result.status}`, status: result.status }, result.status === "invalid_payload" ? 422 : 502);
   // Reuse the one existing evidence/Work-completion door. No second po_sends writer.
   const internal = new Hono<AppEnv>();

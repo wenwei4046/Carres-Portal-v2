@@ -151,6 +151,7 @@ describe("human-triggered supplier email", () => {
   function configured(outcome: unknown) {
     api.mockImplementation(async (path: string, init?: RequestInit) => {
       if (path.endsWith("email-capability")) return { configured: true };
+      if (path.endsWith("/email-attempts")) return { attempts: [] };
       if (path.endsWith("/sends")) return { sends: [] };
       if (path.endsWith("supplier-email")) {
         if (outcome instanceof Error) throw outcome;
@@ -198,6 +199,33 @@ describe("human-triggered supplier email", () => {
     await ready();
     expect(screen.getByRole("button", { name: "Send Email" })).toBeDisabled();
     expect(api.mock.calls.filter(call => call[0].endsWith("supplier-email"))).toHaveLength(1);
+  });
+  it("restores server success after browser storage is cleared without resending", async () => {
+    configured({});
+    const configuredRead = api.getMockImplementation()!;
+    api.mockImplementation(async (path: string, init?: RequestInit) => path.endsWith("/email-attempts")
+      ? { attempts: [{ id: "server-attempt", status: "dispatched", providerId: "saved-email", recipient: "supplier@example.invalid",
+        documents: [{ id: path.split("/").at(-2), version: 1 }] }] }
+      : configuredRead(path, init));
+    render(<PoSupplierBundle pos={pos} onPreview={() => {}} />);
+    await screen.findByText("PO sent to supplier · Email");
+    expect(screen.getByRole("button", { name: "Send Email" })).toBeDisabled();
+    expect(api.mock.calls.filter(call => call[0].endsWith("supplier-email"))).toHaveLength(0);
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(screen.queryByRole("button", { name: "Save" })).not.toBeInTheDocument());
+    expect(api.mock.calls.filter(call => call[0].endsWith("confirm-sent"))).toHaveLength(2);
+  });
+  it("blocks dispatch while server attempt history cannot be read", async () => {
+    configured({});
+    const configuredRead = api.getMockImplementation()!;
+    api.mockImplementation(async (path: string, init?: RequestInit) => {
+      if (path.endsWith("/email-attempts")) throw new Error("history offline");
+      return configuredRead(path, init);
+    });
+    render(<PoSupplierBundle pos={pos} onPreview={() => {}} />);
+    await screen.findAllByRole("alert");
+    expect(screen.getByRole("button", { name: "Send Email" })).toBeDisabled();
+    expect(api.mock.calls.filter(call => call[0].endsWith("supplier-email"))).toHaveLength(0);
   });
   it("a definite permission refusal leaves no uncertain dispatch record", async () => {
     configured(new ApiError(403, "forbidden", { code: "forbidden" }));

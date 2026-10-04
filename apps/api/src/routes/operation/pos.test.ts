@@ -11,6 +11,8 @@ vi.mock("../../lib/supabase", () => ({
   userClient: vi.fn(),
 }));
 
+vi.mock("../../lib/po-email-attempts", () => ({ preparePoEmailAttempt: vi.fn(), recordPoEmailOutcome: vi.fn(), readPoEmailAttempts: vi.fn() }));
+import { preparePoEmailAttempt, recordPoEmailOutcome, readPoEmailAttempts } from "../../lib/po-email-attempts";
 vi.mock("../../lib/supplier-email", () => ({ sendSupplierPoEmail: vi.fn() }));
 import { sendSupplierPoEmail } from "../../lib/supplier-email";
 import { userClient } from "../../lib/supabase";
@@ -3208,6 +3210,8 @@ describe("supplier email dispatch", () => {
   let work: typeof import("./work");
   beforeAll(async () => { work = await import("./work"); });
   beforeEach(() => {
+    vi.mocked(preparePoEmailAttempt).mockReset().mockResolvedValue({ data: { created: true, status: "prepared" }, error: null } as never);
+    vi.mocked(recordPoEmailOutcome).mockReset().mockResolvedValue({ data: null, error: null } as never);
     vi.mocked(sendSupplierPoEmail).mockReset().mockResolvedValue({ status: "dispatched", providerId: "email-provider-1" });
     vi.spyOn(work, "poWindowKeysServing").mockResolvedValue([]);
     vi.spyOn(work, "manualPurchaseRequestsServing").mockResolvedValue([]);
@@ -3284,6 +3288,42 @@ describe("supplier email dispatch", () => {
       p_po_id: document.id, p_expected_version: 1, p_channel: "email", p_recipient: body.recipient,
       p_note: `Email dispatch email-provider-1; po-email/${attemptId}`,
     })));
+  });
+  it("does not expose server attempt evidence for a PO hidden by user visibility", async () => {
+    database();
+    // Override the RLS-visible PO read independently of the server ledger.
+    vi.mocked(userClient).mockReturnValue({ from: () => ({ select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: null, error: null }) }) }) }) } as never);
+    vi.mocked(readPoEmailAttempts).mockReset();
+    const response = await app.fetch(new Request("http://localhost/api/operation/pos/PO-hidden/email-attempts", { headers: { Authorization: `Bearer ${await makeJwt("operation")}` } }), enabledEnv);
+    expect(response.status).toBe(404);
+    expect(readPoEmailAttempts).not.toHaveBeenCalled();
+  });
+  it("never dispatches when the durable reservation fails", async () => {
+    database();
+    vi.mocked(preparePoEmailAttempt).mockResolvedValue({ data: null, error: { message: "unavailable" } } as never);
+    expect((await post()).status).toBe(502);
+    expect(sendSupplierPoEmail).not.toHaveBeenCalled();
+  });
+  it("recovers a persisted provider success without sending another email", async () => {
+    database();
+    vi.mocked(preparePoEmailAttempt).mockResolvedValue({ data: { created: false, status: "dispatched", providerId: "saved-provider" }, error: null } as never);
+    const response = await post();
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ providerId: "saved-provider" });
+    expect(sendSupplierPoEmail).not.toHaveBeenCalled();
+  });
+  it("an uncertain attempt blocks a second provider call", async () => {
+    database();
+    vi.mocked(preparePoEmailAttempt).mockResolvedValue({ data: { created: false, status: "unknown" }, error: null } as never);
+    expect((await post()).status).toBe(502);
+    expect(sendSupplierPoEmail).not.toHaveBeenCalled();
+  });
+  it("does not confirm sent when persisting the provider outcome fails", async () => {
+    const db = database();
+    vi.mocked(recordPoEmailOutcome).mockResolvedValue({ data: null, error: { message: "unavailable" } } as never);
+    expect((await post()).status).toBe(502);
+    expect(sendSupplierPoEmail).toHaveBeenCalledOnce();
+    expect(db.rpc.mock.calls.filter(call => call[0] === "purchasing_confirm_po_sent")).toHaveLength(0);
   });
   it("a failed evidence write preserves known dispatch and the other PO's successful record", async () => {
     database({ refusedRecord: "PO-002" });
