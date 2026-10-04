@@ -4683,6 +4683,8 @@ export function useOperationWarehouseReceipts(
 /** The paged GRN Register's ask and answer (owner correction 2026-09-06). */
 export interface GrnRegisterFilters {
   offset: number;
+  /** Shared grid column filters and sort, encoded for the authorised reader. */
+  columns?: string;
   category: string | null;
   supplier: string | null;
   site: string | null;
@@ -4697,6 +4699,7 @@ export interface GrnRegisterFilters {
   q: string;
 }
 export interface GrnRegisterResponse {
+  column_values?: Record<string, string[]>;
   receipts: WarehouseReceiptQueueRow[];
   page: { offset: number; limit: number; total: number };
   facets: {
@@ -4728,6 +4731,7 @@ export function useOperationGrnRegister(
   opts?: Partial<UseQueryOptions<GrnRegisterResponse>>,
 ) {
   const params = new URLSearchParams({ scope: "grn" });
+  if (filters.columns) params.set("columns", filters.columns);
   if (filters.offset > 0) params.set("offset", String(filters.offset));
   if (filters.category) params.set("category", filters.category);
   if (filters.supplier) params.set("supplier", filters.supplier);
@@ -4740,6 +4744,7 @@ export function useOperationGrnRegister(
   return useQuery({
     queryKey: qk.operation.grnRegister({
       ...filters,
+      columns: filters.columns ?? null,
       cancelled: filters.cancelled ? "1" : null,
     }),
     queryFn: () =>

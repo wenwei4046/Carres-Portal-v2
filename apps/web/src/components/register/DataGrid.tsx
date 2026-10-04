@@ -1,3 +1,4 @@
+import { matchesRegisterColumnFilters, type DatePreset, type RegisterColumnQuery } from "@carres/shared";
 // DataGrid — THE REGISTER ENGINE (Law 13: one engine for every Carres
 // register — Sales Orders · Delivery Orders · Purchase Orders · Receiving ·
 // Claims · Payments. A module may configure columns · filters · exports ·
@@ -327,6 +328,12 @@ export type DataGridProps<T> = {
    * setter.
    */
   onSearchChange?: (q: string) => void;
+  /** Paged registers keep filtering/sorting on the authorised full population.
+   * The module supplies server-owned choices, while this kit owns the controls. */
+  serverColumns?: {
+    values: Record<string, string[]>;
+    onChange: (query: RegisterColumnQuery) => void;
+  };
   /** Restores a destination URL search when returning from an owned object. */
   initialSearch?: string;
   /** Optional destination composition. `reference` changes geometry/chrome
@@ -691,7 +698,8 @@ const coerceSearchString = (v: ReactNode): string => {
    2026-06-16). Evaluated in MYT (UTC+8) to match the rest of the app — a Date
    shifted by +8h has its UTC fields equal to the MYT wall clock, so date-only
    math via the getUTCDate / setUTCDate family is correct. */
-export type DatePreset = "today" | "tomorrow" | "thisWeek" | "thisMonth" | "lastMonth" | "overdue";
+export { dateMatchesPreset } from "@carres/shared";
+export type { DatePreset } from "@carres/shared";
 const DATE_PRESETS: { key: DatePreset; label: string }[] = [
   { key: "today", label: "Today" },
   { key: "tomorrow", label: "Tomorrow" },
@@ -702,42 +710,6 @@ const DATE_PRESETS: { key: DatePreset; label: string }[] = [
 ];
 /** Exported so a page's rail answers `Today` / `This week` / `This month` with
  *  the engine's ONE date arithmetic (Mon to Sun week, Malaysia time). */
-export const dateMatchesPreset = (iso: string | null | undefined, preset: DatePreset): boolean => {
-  if (!iso) return false;
-  const d = String(iso).slice(0, 10);
-  if (d.length < 10) return false;
-  const nowMyt = new Date(Date.now() + 8 * 3600 * 1000);
-  const today = nowMyt.toISOString().slice(0, 10);
-  switch (preset) {
-    case "today":
-      return d === today;
-    case "overdue":
-      return d < today;
-    case "tomorrow": {
-      const t = new Date(nowMyt);
-      t.setUTCDate(t.getUTCDate() + 1);
-      return d === t.toISOString().slice(0, 10);
-    }
-    case "thisWeek": {
-      const dow = (nowMyt.getUTCDay() + 6) % 7; // 0 = Monday
-      const mon = new Date(nowMyt);
-      mon.setUTCDate(mon.getUTCDate() - dow);
-      const sun = new Date(mon);
-      sun.setUTCDate(sun.getUTCDate() + 6);
-      return d >= mon.toISOString().slice(0, 10) && d <= sun.toISOString().slice(0, 10);
-    }
-    case "thisMonth":
-      return d.slice(0, 7) === today.slice(0, 7);
-    case "lastMonth": {
-      const lm = new Date(nowMyt);
-      lm.setUTCDate(1);
-      lm.setUTCMonth(lm.getUTCMonth() - 1);
-      return d.slice(0, 7) === lm.toISOString().slice(0, 7);
-    }
-    default:
-      return false;
-  }
-};
 
 /* Task #99 (UI perf) — Inner implementation, kept generic. Exported
    `DataGrid` below is the same function wrapped in React.memo so a parent
@@ -766,6 +738,7 @@ function DataGridInner<T>({
   rowHighlight,
   onFilteredRowsChange,
   onSearchChange,
+  serverColumns,
   initialSearch,
   renderResults, presentationTools = false, pageToolsItems, toolbarSummary, searchScope, facetRows, onFacetRowsChange, sessionKey, presentationKey = "table",
   appearance = "default",
@@ -1410,45 +1383,14 @@ function DataGridInner<T>({
 
   const filterRow = useMemo(() => {
     const q = debouncedSearch.trim().toLowerCase();
-    const active = Object.entries(filters).filter(([, vals]) => vals.length > 0);
-    const activeDates = Object.entries(dateFilters);
-    const activeNumbers = Object.entries(numberFilters);
-    const activeDateRanges = Object.entries(dateRangeFilters);
+    const query: RegisterColumnQuery = { filters, dateFilters, numberFilters, dateRangeFilters, sort: null };
     return (row: T) => {
       if (q && !(searchBlobs.get(row) ?? "").includes(q)) return false;
-      for (const [colKey, vals] of active) {
-        const c = columns.find((cc) => cc.key === colKey);
-        if (!c) continue;
-        if (!vals.includes(filterColValue(c, row))) return false;
-      }
-      // Date-preset filters — match on the column's raw ISO dateValue (falls
-      // back to the displayed value if a date column didn't supply one).
-      for (const [colKey, preset] of activeDates) {
-        const c = columns.find((cc) => cc.key === colKey);
-        if (!c) continue;
-        const iso = c.dateValue ? c.dateValue(row) : filterColValue(c, row);
-        if (!dateMatchesPreset(iso, preset)) return false;
-      }
-      // Custom date range (from/to inclusive, ISO YYYY-MM-DD string compare).
-      for (const [colKey, range] of activeDateRanges) {
-        const c = columns.find((cc) => cc.key === colKey);
-        if (!c) continue;
-        const raw = c.dateValue ? c.dateValue(row) : filterColValue(c, row);
-        const d = String(raw ?? "").slice(0, 10);
-        if (!d) return false;
-        if (range.from && d < range.from) return false;
-        if (range.to && d > range.to) return false;
-      }
-      // Number range (min/max inclusive).
-      for (const [colKey, range] of activeNumbers) {
-        const c = columns.find((cc) => cc.key === colKey);
-        if (!c) continue;
-        const n = c.numberValue ? c.numberValue(row) : Number(filterColValue(c, row));
-        if (n == null || Number.isNaN(n)) return false;
-        if (range.min != null && n < range.min) return false;
-        if (range.max != null && n > range.max) return false;
-      }
-      return true;
+      return matchesRegisterColumnFilters(query, key => {
+        const column = columns.find(c => c.key === key);
+        if (!column) return undefined;
+        return { text: filterColValue(column, row), date: column.dateValue ? column.dateValue(row) ?? null : undefined, number: column.numberValue ? column.numberValue(row) ?? null : undefined };
+      });
     };
   }, [
     columns,
@@ -1461,7 +1403,12 @@ function DataGridInner<T>({
     searchBlobs,
   ]);
 
-  const filteredRows = useMemo(() => rows.filter(filterRow), [rows, filterRow]);
+  const onServerColumnsChange = serverColumns?.onChange;
+  useEffect(() => {
+    onServerColumnsChange?.({ filters, dateFilters, numberFilters, dateRangeFilters, sort: layout.sort ?? null });
+  }, [filters, dateFilters, numberFilters, dateRangeFilters, layout.sort, onServerColumnsChange]);
+  const remoteRows = Boolean(serverColumns);
+  const filteredRows = useMemo(() => remoteRows ? rows : rows.filter(filterRow), [rows, filterRow, remoteRows]);
   const facetCandidates = useMemo(() => facetRows?.filter(filterRow), [facetRows, filterRow]);
   useEffect(() => { if (facetCandidates) onFacetRowsChange?.(facetCandidates); }, [facetCandidates, onFacetRowsChange]);
 
@@ -1470,13 +1417,14 @@ function DataGridInner<T>({
     if (!filterMenu) return [];
     const c = columns.find((cc) => cc.key === filterMenu.colKey);
     if (!c) return [];
+    if (serverColumns) return serverColumns.values[c.key] ?? [];
     const set = new Set<string>();
     for (const row of rows) set.add(filterColValue(c, row));
     return [...set].sort((a, b) => (a || "~").localeCompare(b || "~"));
-  }, [filterMenu, columns, rows, filterColValue]);
+  }, [filterMenu, columns, rows, filterColValue, serverColumns]);
 
   const sortedRows = useMemo(() => {
-    if (!layout.sort) return filteredRows;
+    if (remoteRows || !layout.sort) return filteredRows;
     const col = columns.find((c) => c.key === layout.sort!.key);
     if (!col) return filteredRows;
     const dir = layout.sort.dir === "asc" ? 1 : -1;
@@ -1510,7 +1458,7 @@ function DataGridInner<T>({
         return va.localeCompare(vb);
       });
     return [...filteredRows].sort((a, b) => cmp(a, b) * dir);
-  }, [filteredRows, columns, layout.sort, colValue]);
+  }, [filteredRows, columns, layout.sort, colValue, remoteRows]);
 
   useEffect(() => {
     onSortChange?.(layout.sort);
