@@ -801,8 +801,22 @@ Original and corrected report snapshots compare exactly, including explicit null
 The initial local projection incorrectly stripped nested nulls; the regression test caught it and
 the candidate now preserves the original report JSON. A 202-event tied-timestamp case verifies
 complete traversal. Together, 45 local receipt transaction tests and 49 Warehouse API tests pass.
-This supplies the history read contract; the Warehouse history UI and evidence viewer are still
-outstanding. SQL remains unapproved, chat-only and unapplied to production.
+This supplies the history read contract; the Warehouse history UI is connected as recorded below,
+while evidence viewing remains outstanding. SQL remains unapproved, chat-only and unapplied to production.
+
+**Warehouse saved-report facts — BUILT ON BRANCH / NOT DEPLOYED, 2026-10-05.**
+Every My receiving row has a History door independent of the current Incoming list. The kit Modal
+uses the governed three-rank history grammar; View opens that event's bounded report snapshot.
+The kit DocumentTable displays reported quantity counts, exact Unit outcomes/notes and extra goods.
+Null counts remain `Not recorded`, explicit zero remains zero, and date-only reports retain unknown
+time. No receiving/approval control appears. The local SQL reader resolves only the report's
+source/Site-authorised SKU and Unit labels, never displaying technical UUIDs as Unit IDs or reading
+another Site's item labels. Original saved facts are not replaced with current Incoming quantities.
+Four history component tests plus 27 existing Warehouse flow tests pass; 45 local transaction tests
+pass with own-source label and foreign-Site label-isolation checks. Local illustrative 390×844
+preview shows the report facts, keyboard return to History and a 388px dialog with no horizontal
+overflow: `/tmp/carres-warehouse-history-facts-local.jpg`. This is report-fact inspection, not
+completed evidence viewing, real Warehouse login acceptance or production delivery.
 
 **Warehouse confirmation form — BUILT ON BRANCH / NOT DEPLOYED, 2026-10-05.**
 The PO form now calls the final-confirmation API with a stable save key. It uses kit Modal, Button,

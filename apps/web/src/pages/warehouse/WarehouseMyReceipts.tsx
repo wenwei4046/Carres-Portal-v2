@@ -3,6 +3,7 @@ import { warehouseConfirmationReportFromWire } from "@carres/shared/adapters";
 import Button from "@/components/kit/Button";
 import WarehouseCountModal from "./WarehouseCountModal";
 import WarehouseArrivalModal from "./WarehouseArrivalModal";
+import WarehouseReceiptHistory from "./WarehouseReceiptHistory";
 import {
   supplierClaimTypeLabel,
   documentDisplayNumber,
@@ -41,6 +42,7 @@ const STATUS_PILL: Record<WarehouseReceiptStatus, string> = {
 export default function WarehouseMyReceipts() {
   const { data, isLoading, isError, error, refetch } = useWarehouseMyReceipts();
   const receipts = data?.receipts ?? [];
+  const [historyId,setHistoryId] = useState<string|null>(null);
   const incoming = useWarehouseIncoming();
   const arrivals = useWarehouseArrivals();
   const [editing, setEditing] = useState<{
@@ -161,6 +163,7 @@ export default function WarehouseMyReceipts() {
                   {fmtDate(r.submitted_at)}
                 </td>
                 <td className="px-4 py-3">
+                  <Button onClick={()=>setHistoryId(r.id)}>History</Button>
                   <span className={`pill ${STATUS_PILL[r.status] ?? "pill-neutral"}`}>
                     {warehouseReceiptStatusLabel(r.status)}
                   </span>
@@ -197,6 +200,7 @@ export default function WarehouseMyReceipts() {
           </tbody>
         </table>
       </div>
+      {historyId && <WarehouseReceiptHistory receiptId={historyId} onClose={()=>setHistoryId(null)}/>}
       {editing?.source && <WarehouseArrivalModal key={editing.saved.result.id} source={editing.source} saved={editing.saved} onClose={() => setEditing(null)} />}
       {editing?.po && <WarehouseCountModal key={editing.saved.result.id} po={editing.po}
         saved={editing.saved} onClose={() => setEditing(null)} />}

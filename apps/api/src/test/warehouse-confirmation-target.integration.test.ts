@@ -165,6 +165,7 @@ describe.skipIf(!databaseUrl)("authorised Warehouse final receipt (approved targ
       expect.objectContaining({event:"resubmitted",payload:expect.objectContaining({report:expect.objectContaining({note:"Corrected count",do_file_path:doPath})})}),
     ]));
     expect(events.find((e:{event:string})=>e.event==="submitted").payload.report).toEqual(report({do_file_path:null,note:"Original count"}));
+    expect(events.find((e:{event:string})=>e.event==="submitted").line_labels).toEqual({[line]:sku});
     expect(events.find((e:{event:string})=>e.event==="resubmitted").payload.report).toEqual(report({note:"Corrected count"}));
     expect(events.some((e:{payload:Record<string,unknown>})=>"before_units" in e.payload || "after_units" in e.payload || "duty" in e.payload)).toBe(false);
     await q("reset role");
@@ -266,6 +267,10 @@ describe.skipIf(!databaseUrl)("authorised Warehouse final receipt (approved targ
     expect(row.arrival_source_id).toBe(body.arrival_source_id);
     expect(row.po_id).toBeNull();
     expect(row.posted_authority).toBe("warehouse_confirmation");
+    await as(person);
+    const history=(await q("select warehouse_receipt_history_page($1) result",[row.id])).rows[0]!.result;
+    expect(history.find((e:{event:string})=>e.event==="submitted").unit_labels).toEqual({[unitIds[0]!]:codes[0],[unitIds[1]!]:codes[1]});
+    await q("reset role");
     expect(new Date(row.goods_received_time).toISOString()).toBe(arrived);
     const units = (await q("select status,warehouse_id from ops_stock_items where id=any($1::uuid[]) order by id", [unitIds])).rows;
     expect(units).toEqual([{ status: "free", warehouse_id: site }, { status: "free", warehouse_id: otherSite }]);
@@ -374,6 +379,9 @@ describe.skipIf(!databaseUrl)("authorised Warehouse final receipt (approved targ
     expect(answer.result.blockers).toEqual([expect.objectContaining({ code: "source_not_available" })]);
     await receipt(answer.result.id);
     expect((await q("select warehouse_id from ops_stock_items where id=$1", [unitIds[0]])).rows[0]!.warehouse_id).toBe(otherSite);
+    await as(person);
+    const history=(await q("select warehouse_receipt_history_page($1) result",[answer.result.id])).rows[0]!.result;
+    expect(history.find((e:{event:string})=>e.event==="submitted").unit_labels).toEqual({});
   });
 
   it("keeps issue goods on hold when Warehouse confirms a transfer", async () => {

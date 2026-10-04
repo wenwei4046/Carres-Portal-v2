@@ -1,0 +1,52 @@
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { documentDisplayNumber, RECEIVING_UNIT_OUTCOME_LABEL } from "@carres/shared";
+import { warehouseConfirmationReportFromWire } from "@carres/shared/adapters";
+import { apiFetch } from "@/lib/api";
+import { fmtDate } from "@/lib/fmt-date";
+import Modal from "@/components/kit/Modal";
+import Button from "@/components/kit/Button";
+import DocumentTable from "@/components/kit/DocumentTable";
+import { receivingEventLabel } from "@/pages/operation/components/receiving-event-label";
+import type { ReceivingEvent } from "@/lib/queries";
+
+type Event = ReceivingEvent & { line_labels?: Record<string,string>; unit_labels?: Record<string,string>; payload: ReceivingEvent["payload"] & {report?:unknown} };
+
+/** Read-only composition of the shared modal, document table and history grammar. */
+export default function WarehouseReceiptHistory({receiptId,onClose}:{receiptId:string;onClose:()=>void}) {
+  const [selected,setSelected]=useState<string|null>(null);
+  const query=useQuery({queryKey:["warehouse-portal","receipt-history",receiptId],
+    queryFn:()=>apiFetch<{events:Event[]}>(`/api/warehouse/receipts/${receiptId}/history`)});
+  const event=query.data?.events.find(e=>e.id===selected);
+  const report=warehouseConfirmationReportFromWire(event?.payload.report);
+  const facts=report ? [
+    ...(report.poId ? [["PO No",documentDisplayNumber(report.poId)]] : []),
+    ["Document No",report.doNumber || "Not recorded"],
+    ["Goods Received Date",fmtDate(report.goodsReceivedTime ?? report.goodsReceivedAt) || "Not recorded"],
+    ["Time",report.goodsReceivedTime ? fmtDate(report.goodsReceivedTime,{timeOnly:true}) : "Time not recorded"],
+    ["Handover person",report.handoverPerson || "Not recorded"],
+    ["Note",report.note || "Not recorded"],
+  ] : [];
+  const unitRows=report ? [
+    ...(report.lines ?? []).flatMap(l=>(l.units ?? []).map(u=>({key:`${l.id}:${u.unitCode}`,cells:{unit:u.unitCode,result:RECEIVING_UNIT_OUTCOME_LABEL[u.outcome],problem:u.issueKind==="damaged"?"Damaged":u.issueKind==="wrong_item"?"Wrong item":"",note:u.note ?? ""}}))),
+    ...(report.arrivalUnits ?? []).map(u=>({key:u.stockItemId,cells:{unit:event?.unit_labels?.[u.stockItemId] ?? "Not recorded",result:RECEIVING_UNIT_OUTCOME_LABEL[u.outcome],problem:u.issueKind==="damaged"?"Damaged":u.issueKind==="wrong_item"?"Wrong item":"",note:u.note ?? ""}})),
+  ] : [];
+  return <Modal open title="History" width="wide" onOpenChange={open=>{if(!open)onClose();}}
+    footer={selected ? <Button onClick={()=>setSelected(null)}>History</Button> : undefined}>
+    {query.isLoading ? <p role="status">Loading…</p> : query.isError ? <div role="alert">Could not be loaded <Button onClick={()=>void query.refetch()}>Try again</Button></div>
+      : selected ? !report ? <p role="alert">Not available. Go back and reload.</p> : <div className="min-w-0 space-y-3">
+        <p className="text-body font-semibold text-kit-slate-12">{event ? receivingEventLabel(event.event) : "History"}</p>
+        <p className="text-meta text-kit-slate-11">{event?.actor_name ?? "Staff identity not recorded"} · {fmtDate(event?.event_at,{time:true})}</p>
+        <dl className="grid grid-cols-2 gap-2 text-body">{facts.map(([label,value])=><div key={label} className="min-w-0"><dt className="text-meta text-kit-slate-11">{label}</dt><dd className="break-words text-kit-slate-12">{value}</dd></div>)}</dl>
+        {unitRows.length>0 && <DocumentTable label="Units" columns={[{key:"unit",label:"Unit ID"},{key:"result",label:"Receiving"},{key:"problem",label:"Problem"},{key:"note",label:"Note"}]} rows={unitRows}/>}
+        {(report.lines ?? []).some(l=>!l.units?.length) && <DocumentTable label="Items" columns={[{key:"sku",label:"SKU"},{key:"received",label:"Received Qty",numeric:true},{key:"damaged",label:"Damaged Qty",numeric:true},{key:"wrong",label:"Wrong Item Qty",numeric:true}]}
+          rows={(report.lines ?? []).filter(l=>!l.units?.length).map((l,i)=>({key:l.id ?? String(i),cells:{sku:l.id ? event?.line_labels?.[l.id] ?? "Not recorded" : "Not recorded",received:l.receivedNow ?? "Not recorded",damaged:l.damagedQty ?? "Not recorded",wrong:l.wrongItemQty ?? "Not recorded"}}))}/>}
+        {!!report.extraLines?.length && <DocumentTable label="Extra goods" columns={[{key:"sku",label:"SKU"},{key:"qty",label:"Qty",numeric:true},{key:"note",label:"Note"}]} rows={report.extraLines.map((l,i)=>({key:String(i),cells:{sku:l.sku,qty:l.qty,note:l.note ?? ""}}))}/>}
+      </div> : !query.data?.events.length ? <p>No receiving activity yet.</p> : <ul className="space-y-3">{query.data.events.map(e=><li key={e.id}>
+        <p className="text-body font-semibold text-kit-slate-12">{receivingEventLabel(e.event)}</p>
+        <p className="text-meta text-kit-slate-11">{e.actor_name ?? "Staff identity not recorded"} · {fmtDate(e.event_at,{time:true})}</p>
+        {e.payload.reason && <p className="text-label text-kit-slate-11">{e.payload.reason}</p>}
+        {e.payload.report != null && <Button onClick={()=>setSelected(e.id)}>View</Button>}
+      </li>)}</ul>}
+  </Modal>;
+}
