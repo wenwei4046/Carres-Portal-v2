@@ -154,6 +154,22 @@ describe.skipIf(!databaseUrl)("authorised Warehouse final receipt (approved targ
     await expectVisibleReport(answer.result.id);
   });
 
+  it.each(["received_now", "damaged_qty", "wrong_item_qty"])("preserves an unknown %s without silently converting it to zero", async (missing) => {
+    await q("reset role");
+    await q("update purchase_order_lines set identity_mode='quantity' where id=$1", [line]);
+    await as(person);
+    const counts: Record<string, unknown> = { id: line, received_now: 1, damaged_qty: 0, wrong_item_qty: 0 };
+    delete counts[missing];
+    const answer = await confirm(report({ lines: [counts] }));
+    if (!answer.ok) throw new Error(answer.reason);
+    expect(answer.result.blockers).toEqual([expect.objectContaining({ code: "receipt_quantity_unknown" })]);
+    const row = await receipt(answer.result.id);
+    expect(row.status).toBe("draft");
+    expect(row.grn_no).toBeNull();
+    expect(row.raw_report.lines[0]).not.toHaveProperty(missing);
+    expect((await q("select received_qty from purchase_order_lines where id=$1", [line])).rows[0]!.received_qty).toBe(0);
+  });
+
   it("preserves an out-of-scope source report without receiving that other Site's stock", async () => {
     await q("reset role");
     await q("update purchase_orders set warehouse_id = $1 where id = $2", [otherSite, po]);

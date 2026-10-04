@@ -700,7 +700,7 @@ physical date or quantity is fabricated. Effective line Deliver To is checked as
 actual Site. This candidate currently exercises PO/CO-backed intake, not the complete source
 lifecycle, and is implementation evidence rather than a new approved business/schema ruling.
 
-The opt-in `warehouse-confirmation-target.integration.test.ts` now passes 20 local cases: valid
+The opt-in `warehouse-confirmation-target.integration.test.ts` now passes 23 local cases: valid
 automatic GRN and accepted/missing split; shared/disabled actor refusal; preserved missing-DO,
 unknown-source, unknown-Unit, all-missing and cross-Site reports; same-key replay; duplicate DO including a fully fulfilled PO; consignment ownership;
 same-session correction/history; stale and post-completion correction refusal; unknown physical
@@ -709,7 +709,12 @@ direct stock/check-in/amend authority. Restoring the old Warehouse submit functi
 original target gaps fail again; restoring the draft returned all 18 then-current cases to green.
 The two additional cases subsequently passed, including a fully fulfilled PO duplicate regression
 that failed before moving duplicate detection ahead of the closed-PO guard. This suite rolls back
-its fixtures. The separate `warehouse-confirmation-concurrency.integration.test.ts` passes two real
+its fixtures. Three additional unknown-quantity regressions failed against the initial candidate:
+missing damage/wrong counts could be treated as zero and post. The candidate now requires all
+three explicit category counts for quantity-mode lines, preserves the incomplete report and
+returns `receipt_quantity_unknown` without stock movement. Unit-mode counts remain derived from
+explicit Unit outcomes. All 23 transaction cases and both concurrency cases pass together.
+The separate `warehouse-confirmation-concurrency.integration.test.ts` passes two real
 concurrent-connection cases: the second connection demonstrably waits on the first transaction,
 then a same-key retry returns the original GRN, while a different-key duplicate DO remains an
 unposted report. Both prove one stock movement and one posted receipt. Its committed fixtures
