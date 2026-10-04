@@ -14,6 +14,13 @@
 
 ---
 
+**SYSTEM-WIDE DOCUMENT NUMBER DISPLAY — Jess 2026-10-04, APPROVED TARGET / NOT BUILT.**
+All Carres date-bearing document numbers display a two-digit year, across modules and surfaces.
+This is not PO-only. COPY-STANDARD's “System-wide document number display” owns the exact contract:
+recognised year segment only; existing identity/history preserved; no borrowed PO version suffix,
+no changes to supplier-owned references or Unit IDs. Every module reads the same identity and
+presentation rule. Allocation and production adoption remain separately evidenced.
+
 # §0 · Why this document exists — the lesson in one page
 
 Nine engineering-debt items were found by reading Orders V1 end to end and measuring

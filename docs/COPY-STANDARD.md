@@ -11,6 +11,24 @@
 
 ---
 
+## System-wide document number display — owner-confirmed 2026-10-04
+
+**APPROVED TARGET / NOT BUILT across all surfaces.** The owner clarified that the two-digit
+year applies throughout the system, not only to PO. Every Carres date-bearing document number
+uses `YY` in its displayed date segment: for example `GRN-20261004-1234` displays as
+`GRN-261004-1234`, and `SCN-20261004-1234` as `SCN-261004-1234`. Already-short dates stay short;
+non-date legacy numbers acquire no invented date. Only the recognised year segment changes:
+never remove `20` from arbitrary serials, Unit IDs or supplier-provided invoice/DO references.
+
+Apply consistently to registers, cards, Working Panels, full details, related records, Work,
+Calendar links, search results, exports and newly rendered document previews. Preserve each
+family's governed prefix, separators, date granularity, serial and revision rules; PO's `-V{n}`
+is not a system-wide suffix. This presentation rule does not rewrite stored identities, source
+links, issued historical files or allocator policy. Search resolves original and displayed
+identities to the same record; any ambiguous result must retain source context, never guess.
+Cross-module adoption needs verification; no module may treat the rule as PO-only. Formal-number
+allocation continues to follow each family's approved numbering law.
+
 ## Why this exists
 
 Every screen the operations team uses must let a no-experience operator do
@@ -2261,7 +2279,7 @@ No new document or duplicated dictionary is required. Code may lag; approval is 
 | `Items` | Recorded goods summary; expansion preserves all items and their exact references. |
 | `SO No / MPR No` | PO combined-reference header (owner ruling 2026-09-18: no `CO No` — consignment marking is not a CO link; the header changes only by a deliberate Blueprint update); actual linked references only, not invented mandatory relationships. |
 | `SO No / MPR No / CO No / RO No` | GRN combined-reference header. PO No remains separate. Preserve multiple references and per-line attribution; do not select one arbitrary source. |
-| `MPR No` | Manual Purchase Request number `MPRYYMMDD-NNNN` (owner ruling 2026-09-18) — **APPROVED TARGET; the allocator still mints `MPR-YYYYMMDD-RRRR`.** Migration 0574 moved `PO` alone onto the short form; every other prefix keeps its current shape until its own scope, and existing numbers of either shape are permanent: each Manual Purchase request has one; CO, RO and other documents keep their own numbers. `MPR` = Manual Purchase Request. Never `MP` (Mattress Protector SKU code) and never `Manual Purchase No.` |
+| `MPR No` | Manual Purchase Request number `MPRYYMMDD-NNNN` (owner ruling 2026-09-18) — **APPROVED TARGET; the allocator still mints `MPR-YYYYMMDD-RRRR`.** Migration 0574 moved `PO` alone onto the short form; other stored prefixes await their allocation scope; the system-wide two-digit-year display rule above applies to every module now as approved target. Stored numbers remain permanent: each Manual Purchase request has one; CO, RO and other documents keep their own numbers. `MPR` = Manual Purchase Request. Never `MP` (Mattress Protector SKU code) and never `Manual Purchase No.` |
 | `Received by {company or staff name}` | GRN receiver (owner ruling 2026-09-28): the partner company at a partner-run warehouse (e.g. `Received by NETS`), the saving Carres staff member at a Carres site. No person name is asked at a partner warehouse; the signed Supplier DO photo is the proof. Never the posting actor relabelled. |
 | `Damaged Qty` · `Wrong Item Qty` · `Extra Qty` | Separate existing receipt-result quantities; this naming does not change receipt arithmetic. |
 | SO Batch `PO Status` | `Pending` · `Partial` · `Done`. Actual remaining quantity and exact non-cancelled PO lineage decide purchase completion. Free stock suggestions never complete a purchase; sending and receiving remain separate. Plain text, one line. |
@@ -4126,7 +4144,7 @@ with where it appears.
 | `Advance applied` · `Advance taken off` · `Money back recorded` · `Money back cancelled` | History lines (event words) and toasts. |
 | `Applied` · `Taken off` | A knock-off's status (database `applied` / `cancelled`). |
 | `Recorded` · `Cancelled` | A money back's status (database `posted` / `voided`) — same pair as Other receipts. |
-| `Money back No` · `SMB-YYYYMMDD-NNNN` | The money back number. Prefix SMB = supplier money back, **APPROVED** (YH, 14 Sep 2026); it is one line, `supplier_money_back_prefix()` in 0485. |
+| `Money back No` · `SMB-YYMMDD-NNNN` | The money back number. Prefix SMB = supplier money back, **APPROVED** (YH, 14 Sep 2026); it is one line, `supplier_money_back_prefix()` in 0485. |
 | `This money back was already recorded as {No} with different details. Open the form again to record another.` | Refusal (`idempotency_mismatch`) when a key is re-sent with a different voucher, amount, account or date. |
 | `Received into` | Reused from 0478: the bank or cash account the money back came into. |
 | `Advance from {PV No}` | A knock-off row on a bill's Payments card. |
@@ -4159,7 +4177,7 @@ payment voucher's Approve.
 | `Money moves` | Sidebar row, page header and export name: Finance moving its own money between its own accounts. |
 | `New money move` · `Prepare money move` | Toolbar button that opens the form; the form's press (prepares, posts nothing). |
 | `Bank transfer` · `Card payout` | The two kinds (`TRANSFER` · `CARD_PAYOUT`), and the Journal's Source for `MONEY_TRANSFER` / `CARD_PAYOUT` (with ` reversal`). `Bank transfer` is already a pay-method word. |
-| `Move No` · `MM-YYYYMMDD-NNNN` | The number column and the number (prefix MM = money move). |
+| `Move No` · `MM-YYMMDD-NNNN` | The number column and the number (prefix MM = money move). |
 | `Kind` · `Date` · `Paid from` · `Paid into` · `Amount` · `Fee` · `Reference` · `Note` · `Status` | Register columns and form labels. `Paid into` is new; the rest are reused. |
 | `Amount (RM)` · `Paid into the bank (RM)` · `Card company fee (RM)` · `{RM} leaves {code}` | Form amount label for a transfer · for a card payout · the fee · the gross hint under the fee. |
 | `Prepared` · `Approved` · `Reversed` · `Cancelled` | Status (database `prepared` · `approved` · `reversed` · `cancelled`). |
@@ -5087,7 +5105,7 @@ These words are on screen in the branch and are not approved yet. `Credit Note` 
 |---|---|
 | Menu | `Credit Notes`, under `Payables` after `Payment Vouchers` |
 | Register | Title `Credit Notes`. `New Credit Note` · `Search credit notes…`. Columns `Credit Note No` (a draft: `Draft, no number yet`) · `Date` · `Supplier` · `Supplier's credit note` · `Status` (the bill's `Draft` · `Confirmed` · `Cancelled`) · `Total` · `Knocked off` · `Left to knock off` (both empty until confirmed) · `Files`. Footer `{n} credit notes · {money} left to knock off`. Empty: `No credit note yet. A supplier's credit note appears here once it is entered.` |
-| Number | `SCN-YYYYMMDD-RRRR`, drawn when the credit note is confirmed, like a bill's number |
+| Number | `SCN-YYMMDD-RRRR` display; stored allocation occurs when the credit note is confirmed, like a bill's number |
 | Credit note page | Header `{SCN No}` or `Draft credit note` · `Edit` · `Cancel credit note` · `Confirm credit note`. Card `Credit note facts`: `Supplier` (`{name} · {creditor type}`) · `Supplier's credit note` · `Date` · `Payables account` · `Total` · `Knocked off` · `Left to knock off` (`Not confirmed` before it is) · `Note` · `Ledger entry` (`None yet. Confirming the credit note makes it` · ` · reversed by {JE No}`) · `Cancelled` (`{date and time} · {name} · {reason}`). Card `Lines`: `Description` · `Account` · `Department` · `Amount` · `Total`; empty `This credit note has no lines.` Card `Knocked off bills`: `Knock off a bill`; a row `{Bill No} · Applied · {date} · {money}` with `Take off the bill`, or `{Bill No} · Taken off · {date} · {money} · {reason}`; empty `Not knocked off any bill yet.` or, before confirming, `A credit note is knocked off bills once it is confirmed.` Files and History are the bill's own cards. |
 | Confirm | `Confirm this credit note?` · `{money} comes off what Carres owes {supplier}, dated {date}. A confirmed credit note cannot be edited.` · `Check the lines against the supplier's credit note first.` · `Back` · `Confirm credit note` |
 | Cancel | `Cancel this credit note?` · confirmed: `The ledger entry is reversed on the credit note's date. A credit note still knocked off a bill cannot be cancelled.` · draft: `The draft is kept, marked cancelled.` · `Cancel credit note` (a reason is asked, as on a bill) |

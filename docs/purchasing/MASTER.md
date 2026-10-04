@@ -1459,6 +1459,13 @@ owners. UI and implementation must preserve that boundary rather than changing a
 
 ### 6.1 Formal document numbers
 
+**System-wide display clarification — Jess 2026-10-04.** The `YY` date segment applies to every
+Carres document family, including GRN, CO, RO, claims, returns and Finance documents, not only PO.
+Follow COPY-STANDARD's global display contract. Existing allocator shapes described below are
+implementation evidence, never exemptions from the approved display target. Preserve each
+family's other numbering rules and stored identity; do not append PO versions to other documents.
+
+
 **PO stored identity — migration 0574 BUILT; current display — owner ruling 2026-10-01,
 APPROVED TARGET / NOT BUILT (§9.3).** Allocation and display are separate facts.
 
@@ -1490,8 +1497,9 @@ After revision: PO-260924-4827-V2
   `PO-260904-4665-V{actual version}`; this is a presentation of that same record, not a new PO.
   Resolve/search the original identity and approved display. Non-date legacy numbers retain
   their identity and never acquire an invented date. Migration 0574's allocation evidence below
-  does not prove the 2026-10-01 display change has shipped. No GRN or other prefix is implicitly
-  migrated by the PO display ruling.
+  does not prove the 2026-10-01 display change has shipped. Jess clarified on 2026-10-04 that
+  two-digit-year display applies to ALL document families under COPY-STANDARD; this does not
+  migrate stored GRN or other prefix identities.
 
 **HOW IT IS BUILT — migration 0574 + `poDocumentNumberOf`, 2026-09-23. DELIVERED:** PR #1551
 squash-merged as `e9bc40a0a`, that SHA reported by both Pages projects, both canonical hosts and
@@ -4288,7 +4296,8 @@ Invalid scope → preserve report and show blocker; no false GRN or Inventory po
   month by month. Automation must establish the authoritative assignment; a page must still never
   display a recommendation as a recorded holder.
 - **The GRN number is STORED at posting** — `warehouse_receipts.grn_no`, drawn from the daily
-  formal-document pool (0381), `GRN-YYYYMMDD-RRRR`. Sessions posted before 0426 keep their
+  formal-document pool (0381), stored `GRN-YYYYMMDD-RRRR`; approved display is
+  `GRN-YYMMDD-RRRR` under the global 2026-10-04 rule. Sessions posted before 0426 keep their
   derived display through `receivingDisplayNo`. `Jump to…` matches the stored number first.
 - **Save Receiving is idempotent** (`save_key`): a retried uncertain response returns the first
   posting — never a second GRN, Unit receipt or stock movement. A retried check-in of a posted
