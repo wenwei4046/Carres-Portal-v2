@@ -23,10 +23,16 @@ export function useWholeRoundReadyStock(onReserved: (orderId: string, lines: rea
   const candidates = (rows: Array<{ stock: ReadyStockResponse }>) => rows.flatMap(row =>
     row.stock.units.filter(unit => unit.blocked !== "no_line_needs_it"));
   const units = useMemo(() => snapshot ? candidates(snapshot) : [], [snapshot]);
-  const locations = useMemo(() => [...new Map(units.map(unit => [
-    unit.warehouseId ? `warehouse:${unit.warehouseId}` : `site:${unit.siteName ?? ""}`,
-    unit.siteName ?? "Not recorded",
-  ])).entries()].map(([value, label]) => ({ value, label })), [units]);
+  const locations = useMemo(() => {
+    const places = new Map(units.map(unit => [
+      unit.warehouseId ? `warehouse:${unit.warehouseId}` : `site:${unit.siteName ?? ""}`,
+      unit.siteName ?? "Not recorded",
+    ]));
+    // An empty candidate read still has the default location. Keep its
+    // readable label in Select rather than exposing the internal scope key.
+    if (location === "site:Carres Klang" && !places.has(location)) places.set(location, "Carres Klang");
+    return [...places.entries()].map(([value, label]) => ({ value, label }));
+  }, [units, location]);
   const offers = useMemo(() => {
     if (!snapshot) return [];
     const demands = snapshot.flatMap(({ order, stock }) => stock.lines.map(line => ({

@@ -330,6 +330,33 @@ it("refuses manual whole-round matching when the persisted priority source is un
   expect(apiFetch).not.toHaveBeenCalled();
 });
 
+it("does not match or recover POs from an unfinished Register load", () => {
+  renderRegister({ readyStockPriority: "customer_delivery" }, false, true);
+  const match = screen.getByRole("button", { name: "Match Ready Stock" });
+  const pos = screen.getByRole("button", { name: "Purchase Orders" });
+  expect(match).toBeDisabled();
+  expect(pos).toBeDisabled();
+  fireEvent.click(match);
+  fireEvent.click(pos);
+  expect(apiFetch).not.toHaveBeenCalled();
+  expect(onOpenPurchaseOrders).not.toHaveBeenCalled();
+});
+
+it("keeps an empty-stock match at the readable default location and Cancel restores Listing", async () => {
+  apiFetch.mockResolvedValueOnce({ orderId: "o1", so: ORDER_O1.so, reference: "SO-1318",
+    lines: [{ orderLineId: "l1", sku: "A", item: "A", qty: 2, reservedQty: 0,
+      reservedUnitCodes: [], onPoQty: 0, remainingQty: 2 }], units: [] } as unknown as SalesOrderExpansionResponse);
+  renderRegister({ readyStockPriority: "customer_delivery", registerRows: [ORDER_O1], rows: [LEAF_O1] });
+  fireEvent.click(screen.getByRole("button", { name: "Match Ready Stock" }));
+  await waitFor(() => expect(screen.getByRole("combobox", { name: "Stock Location" })).toHaveTextContent("Carres Klang"));
+  expect(screen.getByText("0 available")).toBeInTheDocument();
+  expect(screen.queryByText("site:Carres Klang")).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+  expect(screen.queryByRole("combobox", { name: "Stock Location" })).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Match Ready Stock" })).toBeEnabled();
+  expect(apiFetch.mock.calls.every(([, options]) => (options as { method?: string } | undefined)?.method !== "POST")).toBe(true);
+});
+
 it("matches through actual Listing controls and ticking exposes Proceed without a reservation write", async () => {
   apiFetch.mockResolvedValueOnce({ orderId: "o1", so: ORDER_O1.so, reference: "SO-1318",
     lines: [{ orderLineId: "l1", sku: "A", item: "A", qty: 2, reservedQty: 0, reservedUnitCodes: [], onPoQty: 0, remainingQty: 2 }],
