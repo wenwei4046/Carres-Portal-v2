@@ -57,6 +57,7 @@ import {
   GOODS_ABSENCE_WORDS,
   parsePoWindowKey,
   poWindowTimeWord,
+  documentDisplayNumber,
 } from "@carres/shared";
 import { REGISTER_FIELD_WIDTH } from "@/components/register/register-field-widths";
 import {
@@ -204,6 +205,7 @@ function PoNumbersCell({ order }: { order: SoBatchOrderRow }) {
   if (numbers.length === 0) return null;
   if (numbers.length === 1) {
     const number = numbers[0]!;
+    const version = order.pos.find(po => po.poId === number)?.version;
     return (
       <button
         type="button"
@@ -214,7 +216,7 @@ function PoNumbersCell({ order }: { order: SoBatchOrderRow }) {
           navigate(`/operation/procurement?po=${encodeURIComponent(number)}`);
         }}
       >
-        {number}
+        {documentDisplayNumber(`${number}${version == null ? "" : `-V${version}`}`)}
       </button>
     );
   }
@@ -457,7 +459,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
         ...(po.kind === "one"
           ? [
               {
-                label: `Open ${po.value}`,
+                label: `Open ${documentDisplayNumber(po.value)}`,
                 onClick: () =>
                   navigate(`/operation/procurement?po=${encodeURIComponent(po.value)}`),
               },
@@ -900,7 +902,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
             o.customer ?? "",
             ...o.lines.map((l) => l.sku),
             ...o.outstandingSuppliers,
-            ...o.pos.map((p) => `${p.poId} ${p.supplierName ?? ""}`),
+            ...o.pos.map((p) => `${p.poId} ${documentDisplayNumber(p.poId)} ${p.supplierName ?? ""}`),
           ].join(" "),
         sortFn: (a, b) => (a.so ?? 0) - (b.so ?? 0),
         exportValue: (o) => (o.so == null ? "" : `SO-${o.so}`),
@@ -1154,9 +1156,9 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
             {o.pos.length ? <PoNumbersCell order={o} /> : <Absent>Not ordered yet</Absent>}
           </span>
         ),
-        searchValue: (o) => o.pos.map((p) => p.poId).join(" "),
+        searchValue: (o) => o.pos.map((p) => `${p.poId} ${documentDisplayNumber(p.poId)}`).join(" "),
         filterValue: (o) =>
-          summaryText(soBatchCellSummary(o.pos.map((p) => p.poId)), (n) => `${n} POs`) ?? "",
+          summaryText(soBatchCellSummary(o.pos.map((p) => documentDisplayNumber(`${p.poId}${p.version == null ? "" : `-V${p.version}`}`))), (n) => `${n} POs`) ?? "",
         exportValue: (o) => o.pos.map((p) => p.poId).join(" · "),
       },
       {
@@ -1292,7 +1294,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
         { key: "po", label: "PO No" }, { key: "supplier", label: "Supplier" },
         { key: "destination", label: "Supplier Deliver To" }, { key: "date", label: "PO Default Delivery Date" },
       ]} rows={o.pos.map(po => ({ key: po.poId, onOpen: () => navigate(`/operation/procurement?po=${encodeURIComponent(po.poId)}`),
-        openLabel: `Open ${po.poId}`, cells: { po: `${po.poId} · ${po.version == null ? "Not recorded" : `V${po.version}`}`, supplier: po.supplierName ?? "Supplier not set",
+        openLabel: `Open ${documentDisplayNumber(po.poId)}`, cells: { po: `${documentDisplayNumber(po.poId)}${po.version == null ? " · Not recorded" : `-V${po.version}`}`, supplier: po.supplierName ?? "Supplier not set",
           destination: destinationName(po.destinationId), date: po.officialDeliveryDate ? fmtDate(po.officialDeliveryDate) : "Not recorded" } }))} />}
       actions={<>
         <Checkbox id={`so-batch-card-select-${o.orderId}`} ariaLabel={`Select ${o.so == null ? "Not recorded" : `SO-${o.so}`}`} checked={checked}

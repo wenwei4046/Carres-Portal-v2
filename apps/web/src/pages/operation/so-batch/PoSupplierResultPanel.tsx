@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { documentDisplayNumber } from "@carres/shared";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -11,7 +12,7 @@ import { apiFetch } from "@/lib/api";
 import { renderPoPdf } from "@/lib/pdf/render";
 import type { PoTemplateData } from "@/lib/pdf/types";
 import PoIssueEvidence, { type IssuedPo, type PoSendEvidence } from "../components/PoIssueEvidence";
-import PoSupplierBundle from "./PoSupplierBundle";
+import PoSupplierBundle, { type PoSupplierPreparation } from "./PoSupplierBundle";
 
 /** Recover exact Register lineage after a reload. One failed or mismatched
  * source refuses the entire preparation; it cannot masquerade as no POs. */
@@ -32,12 +33,13 @@ export function useVisiblePoResults(onLoaded: (pos: IssuedPo[]) => void, onOpeni
 }
 
 /** Issued result scope, beside the retained register. Each PO keeps its own document/evidence. */
-export default function PoSupplierResultPanel({ open, onOpenChange, pos, roundWindow, onChanged }: {
+export default function PoSupplierResultPanel({ open, onOpenChange, pos, roundWindow, onChanged, initialPreparation }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   pos: readonly IssuedPo[];
   roundWindow?: string;
   onChanged: () => void;
+  initialPreparation?: PoSupplierPreparation;
 }) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -70,9 +72,9 @@ export default function PoSupplierResultPanel({ open, onOpenChange, pos, roundWi
   return <>
     <Drawer open={open} onOpenChange={onOpenChange} title="Purchase Orders">
       <div className="flex flex-col gap-3" data-testid="po-supplier-result-panel">
-        <PoSupplierBundle pos={pos} roundWindow={roundWindow} onEvidenceChanged={changed}
-          onOpenObject={id => { onOpenChange(false); navigate(`/operation/procurement?po=${encodeURIComponent(id)}`, { state: { soBatchReturn: { path: `${location.pathname}${location.search}`, pos } } }); }} onPreview={(_id, po) => { setCurrent(po); setPdfOpen(true); }} />
-        {current && <Block title={document?.po_number ?? current.id} note={document ? `V${document.version}` : undefined}>
+        <PoSupplierBundle pos={pos} roundWindow={roundWindow} onEvidenceChanged={changed} initialPreparation={initialPreparation}
+          onOpenObject={(id, preparation, sourcePos) => { onOpenChange(false); navigate(`/operation/procurement?po=${encodeURIComponent(id)}`, { state: { soBatchReturn: { path: `${location.pathname}${location.search}`, pos: sourcePos, preparation } } }); }} onPreview={(_id, po) => { setCurrent(po); setPdfOpen(true); }} />
+        {current && <Block title={document ? documentDisplayNumber(`${document.po_number}-V${document.version}`) : documentDisplayNumber(current.id)}>
           {document && <><p className="text-body">{document.supplier.name} · {document.destination.name}</p>
             {document.so_refs?.length ? <p className="text-body">SO {document.so_refs.join(", ")}</p> : null}
           </>}
@@ -83,7 +85,7 @@ export default function PoSupplierResultPanel({ open, onOpenChange, pos, roundWi
         </Block>}
       </div>
     </Drawer>
-    <Modal open={open && pdfOpen} onOpenChange={setPdfOpen} title={document?.po_number ?? current?.id ?? "Purchase Orders"} width="viewer">
+    <Modal open={open && pdfOpen} onOpenChange={setPdfOpen} title={document ? documentDisplayNumber(`${document.po_number}-V${document.version}`) : current ? documentDisplayNumber(current.id) : "Purchase Orders"} width="viewer">
       {pdfUrl ? <PdfPreview src={pdfUrl} title={document?.po_number ?? current?.id ?? "Purchase Orders"} onReady={setPdfReady} />
         : <p className="text-body">{error ?? "Loading PDF…"}</p>}
     </Modal>

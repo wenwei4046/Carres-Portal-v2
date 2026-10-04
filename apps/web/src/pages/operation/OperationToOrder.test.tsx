@@ -311,8 +311,21 @@ describe("the whole journey — tick, arrange, issue, prove it arrived", () => {
     await screen.findByTestId("po-supplier-result-panel");
     fireEvent.click(screen.getByRole("button", { name: "Open full page" }));
     expect(navigate).toHaveBeenCalledWith("/operation/procurement?po=PO-2041", {
-      state: { soBatchReturn: { path: "/operation?tab=purchase&time=11%3A00", pos } },
+      state: { soBatchReturn: { path: "/operation?tab=purchase&time=11%3A00", pos,
+        preparation: expect.objectContaining({ supplierId: "s-hooka", selectedIds: ["PO-2041"], scope: "round" }) } },
     });
+  });
+  it("restores the supplier preparation draft from the exact PO object return", async () => {
+    const pos = [{ id: "PO-2041", supplierId: "s-hooka", supplierName: "Hooka", destinationId: KLANG, destination: "Carres Klang" }];
+    const preparation = { supplierId: "s-hooka", selectedIds: ["PO-2041"], channel: "email", scope: "round", subject: "Prepared", messageIntroduction: "Please confirm." };
+    apiFetch.mockImplementation(async (path: string) => path.endsWith("/issue-context") ? pos[0] : path.includes("print-data") ? officialDocument()
+      : path.endsWith("/sends") ? { sends: [] } : path.endsWith("email-capability") ? { configured: false } : payload());
+    renderPage({ pathname: "/operation", search: "?tab=purchase&time=11%3A00", state: { soBatchIssuedPos: pos, soBatchPreparation: preparation } });
+    await screen.findByTestId("po-supplier-result-panel");
+    expect(screen.getByLabelText("Subject")).toHaveValue("Prepared");
+    expect(screen.getByLabelText("Message")).toHaveValue("Please confirm.");
+    await waitFor(() => expect(screen.getByLabelText("PO-2041-V1")).toBeChecked());
+    expect(apiFetch.mock.calls.some(([, options]) => options?.method === "POST")).toBe(false);
   });
   it("walks from a ticked line to confirmed supplier evidence", async () => {
     apiFetch.mockResolvedValue(payload());

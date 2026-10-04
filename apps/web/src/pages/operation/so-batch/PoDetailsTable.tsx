@@ -73,7 +73,7 @@
  * own numbers would stop adding up. Its quantity stays inside the remainder
  * row, where it is honestly described as not yet allocated.
  */
-import { GOODS_ABSENCE_WORDS } from "@carres/shared";
+import { GOODS_ABSENCE_WORDS, documentDisplayNumber } from "@carres/shared";
 import {
   soBatchPoDocumentState,
   unitIdOf,
@@ -108,8 +108,9 @@ const COUNTED_STOCK = "Counted stock";
 export interface PoDetailRow {
   /** Stable identity for React and for the test that counts these rows. */
   key: string;
-  /** The document. Full number, never shortened. */
+  /** Stored identity, unchanged by presentation formatting. */
   poNo: string;
+  version?: number | null;
   /** The document's own state, in the one Purchasing vocabulary. */
   poStatus: string;
   /** The exact Unit, when one is evidenced for this document line. */
@@ -228,6 +229,7 @@ export function poDetailRowsForLine(input: {
        destination the line actually records. */
     const destination = destinationId !== undefined ? destinationId : (p?.destinationId ?? null);
     return {
+      version: p?.version ?? null,
       poStatus: p ? soBatchPoDocumentState(p) : "Not recorded",
       deliverTo: destinationName(destination) || null,
       supplier: p?.supplierName ?? null,
@@ -411,10 +413,10 @@ export default function PoDetailsTable({
                       onPoClick(r.poNo);
                     }}
                   >
-                    {r.poNo}
+                    {documentDisplayNumber(`${r.poNo}${r.version == null ? "" : `-V${r.version}`}`)}
                   </button>
                 ) : (
-                  r.poNo
+                  documentDisplayNumber(`${r.poNo}${r.version == null ? "" : `-V${r.version}`}`)
                 )}
               </td>
               <td className="px-2 py-2 tabular-nums">
