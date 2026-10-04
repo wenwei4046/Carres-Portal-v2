@@ -4958,15 +4958,16 @@ The words of UI MASTER §4.3's card, as confirmed on the owner's reference pages
 | Header | accessible names `Order details` (the ▾/▴, no visible words) · `Delivery address` · `Open order` · `Close panel`; sales facts `Order date` · `Sales Location` · `Salesperson` |
 | Module bar | `Order modules` · icon names `Communication` · `Items` · `Show timeline` / `Hide timeline` |
 | Info summary | `Total` · `Paid` · `Outstanding`; order items `Item` · `Qty` · `Unit price` · `Amount` |
-| Delivery summary | `Stock` · `Logistics ▾` · `Confirmed Delivery ▾` · `DO`; empty values `No logistics picked` · `No confirmed date` · `Data not loaded`; editors `Assign logistics` · `Choose company` · `Record delivery arrangement` · `Customer Requested Delivery Date` · `Contact result` · `Choose result` · `Next follow-up` · `Confirmed Time · optional` · `Not specified` · `Morning` · `Afternoon` · `Specific time` · `Delivery Order` · `Stock ready` · `Payment cleared` · `Customer confirmed date`; buttons `Cancel` · `Save` |
+| Delivery summary | `Stock` (value `{ready}/{goods}`, status `Ready`; service lines are not goods and read `Service` in the item list) · `Logistics ▾` (empty `Not assigned`) · `Customer ▾` (before agreement `Date not confirmed`; after agreement `{d Mon}` · `{d Mon} · Morning` · `{d Mon} · Afternoon` · `{d Mon} · {h:mm AM/PM}` with status `Date confirmed`; final customer leg only — a warehouse leg names its receiver) · `DO`, empty `Data not loaded`; editors `Assign logistics` · `Choose company` · `Record delivery arrangement` · `Customer Requested Delivery Date` · `Contact result` · `Choose result` · `Next follow-up` · `Confirmed Delivery` · `Confirmed Time · optional` · `Not specified` · `Morning` · `Afternoon` · `Specific time` · `Choose time` · `Delivery Order` · `Stock ready` · `Payment cleared` · `Customer confirmed date`; buttons `Cancel` · `Save`; refusals `Choose the contact result.` · `Choose the confirmed date.` · `Choose the time.` · `Choose the company.`; save failed `Customer date not recorded · Try again` (the input stays) |
 | Communication | `Communication` · `Communication channel` · `WhatsApp` · `Email` · `To` · `Subject` · `Message` · `Message options` · `Find template…` · `Save as template…` · `Manage templates…` · `Find template` · `Search templates` · `Choose template` · `Save template` · `Name` · `Saved templates` · `No saved templates yet.` · `Attach evidence` · `Evidence · none attached` · `Evidence · {n} attached (preview only)` · `Copy message` · `Open WhatsApp` · `Open email` |
 | Communication placeholders | `Choose contact or enter phone (+country code)` · `Enter email address` · `Enter email subject` · `Draft a message` |
 | Communication answers | `Copied. Contact result is unchanged.` · `Select the message and copy it.` · `Template saved in this browser.` · `Enter a template name.` · `Write a message first.` · `This name is already used. Choose another name.` · `Could not save in this browser.` · `Replace the current draft with this template?` |
 | Accessible names and small controls | `Close communication` · `Close timeline` · `Close save template` · `Message template` · `Remove {file name}` · `Close` · `Delete` (a saved template) |
 | Timeline | `Timeline` · `Recorded by {name}` (avatar label) · time `{d Mon} · {h:mm AM/PM}` with no zone suffix, title `Recorded {d Mon yyyy}, {h:mm:ss AM/PM}` · date only: `{d Mon yyyy}` and `· Time unavailable`, title `{d Mon yyyy} · Exact time unavailable` |
 
-Never on this card: `Order info` as visible text, `MYT`, a "saved" completion note, a repeated
-explanation under the DO conditions.
+Never on this card: `Order info` as visible text, `MYT`, a "saved" completion note or recorded-at
+stamp, a repeated explanation under the DO conditions, `No logistics picked` (retired 2026-09-24), a dash
+for a service line.
 
 ## Finance (Chew)
 

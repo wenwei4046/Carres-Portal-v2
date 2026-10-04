@@ -208,7 +208,7 @@ export default function CompactCardExample() {
                 /* Goods only: the two disposal services are not goods and are not counted. */
                 { key: "stock", label: "Stock", value: "1/1", status: "Ready", opensItems: true },
                 {
-                  key: "logistics", label: "Logistics", value: logistics || "No logistics picked", editable: true,
+                  key: "logistics", label: "Logistics", value: logistics || "Not assigned", editable: true,
                   editor: (close) => <LogisticsEditor saved={logistics} close={close} onSave={(c) => { setLogistics(c); addEvent("Delivery · Logistics assigned", c); }} />,
                 },
                 customerFact,

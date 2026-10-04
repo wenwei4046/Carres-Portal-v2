@@ -3569,7 +3569,8 @@ complete rules, the sample-data boundary and the deviations from the reference p
 In one line each: one shared customer header with sales facts behind a ▾/▴ (no words), address with
 its own toggle, target date, Open and Close; Info opens sales facts and address, other modules start
 closed; summary cells are label above value, left aligned, only the module's own facts (Info
-`Total · Paid · Outstanding`, Delivery `Stock · Logistics · Confirmed Delivery · DO`); values take the
+`Total · Paid · Outstanding`, Delivery `Stock · Logistics · Customer · DO`, the Customer cell ruled by Delivery MASTER); title row, value
+and optional status line are top aligned on common baselines with the ▾ at the right; values take the
 fewest lines, four at most; one editor at a time, folded on success, kept on failure, `Cancel` then
 `Save` at right; DO one condition per line; items, Communication and Timeline start closed; times show
 without a zone suffix while the full instant is kept; nothing in a module repeats the header, a date,

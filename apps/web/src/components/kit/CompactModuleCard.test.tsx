@@ -120,6 +120,23 @@ describe("CompactModuleCard — summary and editors", () => {
     expect(total.firstElementChild?.textContent).toBe("Total");
   });
 
+  it("puts the ▾ at the right of the title row and an optional status on its own line", () => {
+    card({ initialModule: "delivery", modules: [{ key: "delivery", label: "Delivery", summary: [{ key: "s", label: "Stock", value: "1/1", status: "Ready", opensItems: true }, { key: "c", label: "Customer", value: "{date}", editable: true, editor: () => null }] }] });
+    const stock = screen.getByRole("button", { name: /Stock/ });
+    expect([...stock.querySelectorAll("strong > span")].map((e) => e.textContent)).toEqual(["1/1", "Ready"]);
+    const title = screen.getByRole("button", { name: /Customer/ }).querySelector("small") as HTMLElement;
+    expect(title.lastElementChild?.textContent).toBe("▾");
+    expect(title.lastElementChild?.getAttribute("aria-hidden")).toBe("true");
+    expect(screen.getByRole("button", { name: /Customer/ }).querySelectorAll("strong > span")).toHaveLength(0);
+  });
+
+  it("shows an editor error line above Cancel and Save", () => {
+    render(<CardEditorButtons onSave={() => {}} onCancel={() => {}} error="{why}" />);
+    const alert = screen.getByRole("alert");
+    expect(alert.textContent).toBe("{why}");
+    expect(alert.nextElementSibling?.querySelectorAll("button")).toHaveLength(2);
+  });
+
   it("opens one editor at a time", () => {
     card({ initialModule: "delivery" });
     fireEvent.click(screen.getByRole("button", { name: /Logistics/ }));

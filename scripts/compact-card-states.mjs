@@ -89,6 +89,7 @@ const APPROVED = {
 };
 const INFO_LEFT = "Info summary values stay left aligned and keep the Paid | Outstanding divider (reference centres them through a leftover flex rule and drops the divider on narrow cards)";
 const INFO_CELLS = /"(Total|Paid|Outstanding|RM2,759\.00|RM1,380\.00|RM1,379\.00)": /;
+const LOGISTICS_WORD = "Logistics empty value `Not assigned` (reference prints `No logistics picked`, retired in COPY-STANDARD 2026-09-24)";
 const ADDRESS_ARROW = "The address arrow shows ▴ while the address is open (reference shows ▾ on first load)";
 
 function snap(keys) {
@@ -141,6 +142,7 @@ for (const [refW, cardW] of Object.entries(WIDTHS)) {
     for (const l of diffs) {
       const body = l.replace(/^#\d+ \S+ "[^"]*": /, "");
       if (/^text "▾"→"▴"$/.test(body)) reasons.add(ADDRESS_ARROW);
+      else if (/^text "No logistics picked"→"Not assigned"(; h [\d.]+→[\d.]+)?$/.test(body)) reasons.add(LOGISTICS_WORD);
       else if (INFO_CELLS.test(l) && /^(x [\d.]+→[\d.]+(; )?)?(w [\d.]+→[\d.]+)?$/.test(body)) reasons.add(INFO_LEFT);
       else open.push(l);
     }

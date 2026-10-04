@@ -29,6 +29,15 @@ describe("compact module card authority", () => {
     expect(missing).toEqual([]);
   });
 
+  it("every Delivery word used by the /ui example is in that section, and retired words are gone", () => {
+    for (const w of ["Customer", "Date not confirmed", "Date confirmed", "Not assigned", "Ready", "Service", "Morning", "Afternoon",
+      "Choose the contact result.", "Choose the confirmed date.", "Choose the time.", "Choose the company.", "Customer date not recorded · Try again"]) {
+      expect(section, w).toContain(w);
+    }
+    const example = read("apps/web/src/pages/dev/CompactCardExample.tsx").replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+    expect(example).not.toMatch(/No logistics picked|Confirmed Delivery ▾|No confirmed date|<td>—<\/td>/);
+  });
+
   it("the words the owner banned never appear in the component", () => {
     const src = read("apps/web/src/components/kit/CompactModuleCard.tsx").replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
     expect(src).not.toMatch(/MYT|Order info|Saved in this preview/);
@@ -44,8 +53,15 @@ describe("compact module card authority", () => {
     expect(read("AGENTS.md")).toMatch(/§0 Current kit index first/);
   });
 
+  it("the retired reference link redirects to the shared card with its query string", () => {
+    const redirects = read("apps/web/public/_redirects");
+    expect(redirects).toMatch(/^\/ui-kit\/delivery-card\.html\s+\/ui-kit\/module-card\s+301$/m);
+    expect(redirects).toMatch(/^\/ui-kit\/delivery-card\s+\/ui-kit\/module-card\s+301$/m);
+    expect(redirects.indexOf("/ui-kit/delivery-card")).toBeLessThan(redirects.indexOf("/*"));
+  });
+
   it("no document still points at the retired Delivery-only reference", () => {
-    for (const p of ["docs/ui/MASTER.md", "docs/02-components.md", "docs/ui-reference/MODULE-CARD-TEMPLATE.md", "CLAUDE.md", "AGENTS.md", "docs/COPY-STANDARD.md"]) {
+    for (const p of ["docs/ui/MASTER.md", "docs/02-components.md", "docs/ui-reference/MODULE-CARD-TEMPLATE.md", "CLAUDE.md", "AGENTS.md", "docs/COPY-STANDARD.md", "docs/delivery/MASTER.md"]) {
       expect(read(p), p).not.toMatch(/delivery-card-approved|DELIVERY-CARD-TEMPLATE|delivery-card-measurements|compact-card-parity/);
     }
   });

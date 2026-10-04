@@ -2706,4 +2706,5 @@ Clicking the cell opens the existing inline arrangement operation. The title doe
 Requested delivery, ETA, contact evidence, next follow-up, source write ownership or DO gates.
 Only the final customer leg uses `Customer`; an intermediate warehouse leg must name its actual
 receiving destination under the Journey model, never pretend it confirms a customer appointment.
-Shared composition and alignment continue to come from `docs/ui-reference/DELIVERY-CARD-TEMPLATE.md`.
+Shared composition and alignment come from the kit `CompactModuleCard` and its one contract,
+`docs/ui-reference/MODULE-CARD-TEMPLATE.md`; the /ui Delivery example is a UI example, not order data.
