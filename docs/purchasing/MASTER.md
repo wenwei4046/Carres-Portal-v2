@@ -411,42 +411,74 @@ Evidence: `/tmp/so-batch-live-supplier-address-refusal.png`. No destination addr
 reservation or supplier transmission was changed for this verification. Missing source addresses
 and actual sender/provider verification remain operational gaps, not successful transmissions.
 
-**Supplier preparation return correction, 2026-10-04 — local build, production acceptance owed.**
-The authenticated Nice Future result opened exact `PO-20260903-7907` read-only with its original
-facts and PDF. Back retained `time=11:00` and PO result scope, but incorrectly selected the first
-supplier (Ohana) again. The corrected object return carries the chosen supplier, exact selected
-PO identities, channel, subject and message introduction as presentation state. Documents,
-current versions and sending evidence are read again from their owning endpoints; presentation
-state supplies no authority to issue or send. Returning from Today refreshes its current membership
-and drops selections no longer in that scope without automatically selecting replacement POs.
-Failed refresh blocks preparation; repeated retries preserve the supplier, subset and editable
-draft. Round and Today loading gates are independent so one completed read cannot prematurely
-enable preparation while the other is unresolved. Register URL/context retention remains shared
-kit behavior. No live PO, stock reservation, transmission or supplier address was changed for this
-verification. Local journey tests cover bundle restoration with fresh versions, removed Today
-membership, repeated failed-read recovery and both sides of the exact object return. Release and
-authenticated end-to-end return verification are still required. A restored undated Round also
-refreshes every exact PO's owning issue context before preparation becomes available, so the
-current supplier contact replaces cached routing state. A mismatched or failed source read blocks
-preparation; Try again retains the chosen subset and editable draft. The fresh-contact and
-failed-source retry regressions passed with the complete 54 bundle/page tests on 2026-10-05.
+**Supplier preparation return and Batch document display — PRODUCTION-VERIFIED bounded scope,
+2026-10-05.** PR1900 exact head `81ea80c66766bf415dfbf697637ff5a290f5c48e` passed complete
+CI 37215990410. Main merge `719653ea01df0b03901c2b9e890e53be8cb68b00` passed production
+deployment 37216102072 and the independent five-entry convergence check recorded in
+`/tmp/so-batch-return-live-smoke.log`. All 274 integrated Batch Register/details, supplier bundle,
+Batch page and formal PO page tests passed; the upstream test-only date-clock correction retains
+all business assertions and passed the complete 95 Manual Purchase API tests.
 
-**SO Batch document display adoption, 2026-10-04 — local build, production proof owed.**
-The Register PO cell/context door, its exact-source Quick View lineage and expanded PO details
-reuse `documentDisplayNumber` for Carres-owned dated PO display. Original and shortened numbers
-both find the same retained SO. Navigation, lineage keys, API inputs and exported original identities
-remain unchanged; Unit IDs and supplier-owned references are not formatted. The older tests that
-forbade short-year presentation have been replaced by the approved global ruling and checks that
-the displayed short number opens the original stored PO. 164 Register/detail tests pass locally.
-Supplier preparation checkbox/evidence/history labels and the supplier PDF viewer heading reuse
-the same formatter with their actual version suffix. The formal PO heading and current-action
-number follow the same display. API identities, the message's original issued document references,
-official PDF content and filenames remain unchanged; no historical paper is regenerated. Supplier,
-Batch page and formal PO object journeys, Register and detail tests passed 271 cases after main
-integration; subsequent actual-version lineage coverage passed 165 Register/detail cases and one
-additional Register version/navigation test. Missing versions remain unclaimed. This adoption
-does not claim every Purchasing surface migrated. Full production release and
-the remaining governed display surfaces are still owed.
+Authenticated production acceptance selected Nice Future and only `PO-20260903-7907`, leaving
+4585 and 6426 unticked. Its exact full PO opened read-only with original supplier/destination,
+goods/source facts and the actual Document preview. Back restored Nice Future, the one-PO subset,
+WhatsApp channel and editable introduction. A second pass restored Email, the edited subject and
+introduction. Preparation remained disabled during fresh source reads and became available only
+after current PO/version/context evidence completed. Closing the panel retained search `7907`,
+Table, Supplier grouping, `time=11:00`, and the same 12-of-32 population. Evidence:
+`/tmp/so-batch-live-return-retained-draft.png`, `/tmp/so-batch-live-return-email-draft.png` and
+`/tmp/so-batch-live-return-formal-po.png`. No live issue, reservation or supplier transmission was
+performed. Send Email remained disabled because actual provider/sender availability is unverified.
+
+Returned presentation state supplies no issue/send authority. Today refreshes current membership
+and drops removed selections without replacement. A restored undated Round refreshes each exact
+PO's owning issue context and supplier contact. A failed or mismatched source blocks preparation;
+Try again retains the supplier, subset and editable draft. Round and Today loading gates remain
+independent. Fresh-version/contact, removed-membership and repeated failed-source retry behavior
+is verified by controlled component tests, not by deliberately corrupting production records.
+
+Batch Register/context, Quick View lineage, expanded PO detail, supplier preparation/evidence/PDF
+headings and the formal PO heading/current action reuse `documentDisplayNumber` with actual known
+versions. Production showed `PO-260903-7907-V1` while navigation used exact stored identity
+`PO-20260903-7907`; supplier message references and official PDF content/filenames retained their
+original issued references. Search accepts original and shortened forms. Missing versions remain
+unclaimed; Unit IDs and supplier references are unchanged. This verifies the Batch adoption only,
+not every Purchasing display surface or the complete SO Batch delivery boundary above.
+
+**PO issuance/retry — current production transaction proof, 2026-10-05.** The existing
+`purchasing_issue_pos_batch` was exercised as an eligible active Operation actor against SO-1368's
+exact line, current Catalog cost and its governed Nice Future → NETS → Carres Klang arrangement.
+Inside mandatory-rollback blocks it produced one exact source and one line-bound incoming Unit,
+reduced remaining demand to zero and refused duplicate issue with `unknown_demand`. Deferred
+constraints were checked explicitly. A second document's `unresolved_supplier` refusal rolled
+back the first document, its Unit and numbering; retry added exactly one source commitment.
+The final deliberate exception rolled back the complete probe. Separate fresh reads proved zero
+probe POs, formal-code claims, Units, sources and audit rows; the Unit series remained 1/328 and
+the buying remainder remained one. Evidence: `/tmp/so-batch-issue-rollback-proof.json`.
+No committed purchase, supplier transmission or lasting number allocation was made. This proves
+the current database issue/retry door; exact-head CI 37215990410's 100 API and 41 actual-component
+issue cases cover the route and guided interaction, with their transport boundaries explicit.
+
+**Deployed display acceptance, 2026-10-05.** At a controlled 1200px viewport, the actual formal
+PO document contained two equal 516px panes and one rendered PDF canvas. The 390px Cards check
+retained search `7907`, Supplier grouping and 12-of-32 records; Match Ready Stock ended at
+333px and the header Purchase Orders action at 142px, both inside the viewport. Normal browser
+sizing was restored. Screenshots: `/tmp/so-batch-live-formal-po-desktop.png` and
+`/tmp/so-batch-live-cards-390.png`. This is the deployed composition, not a preview fixture.
+
+**Ready Stock save — current production transaction proof, 2026-10-05.** The exact existing
+`so_batch_reserve_ready_units` door was exercised with eligible `U1-000-180` and SO-1368's exact
+item line inside a deliberately failing atomic SQL statement. It reserved one Unit, bound that
+exact line, wrote one usage record and reduced the line's remaining buying requirement from one
+to zero. Repeating the pick returned `unit_no_longer_free`. The mandatory final exception rolled
+back the entire statement; a separate fresh read proved the Unit free, its line binding null,
+remaining buying quantity one and no verification usage row. Evidence is
+`/tmp/so-batch-stock-save-rollback-proof.json`. This is database-door proof, not a claim that an
+operator saved a production reservation. No PO number or permanent Unit identity was minted.
+Current production draw/batch definition MD5s remain
+`72864ee598da7659dbd01281875edb8b` / `fde9ffbfcdd4472e29a6cac8aaebf395`.
+Exact-head CI 37215990410 also passed 45 isolated reservation SQL cases, 36 Ready Stock route
+cases and nine whole-round component cases; their boundaries remain distinct from this probe.
 
 **Quick View and Cards production acceptance, 2026-10-04.** PR1891's exact head
 `49f838c700a57bc9d996c287d378676757ffdc0e` passed full CI 37211199979. Its main merge
@@ -2228,7 +2260,8 @@ It does not approve legacy PR #1859 or completion of the Workspace Working Panel
 - **Entry and action clarity.** Loading must not flash a missing-Deliver-To warning. Status and selectable remaining demand must agree; a disabled choice explains the actual reason. Selection summary names Sales Orders, items, units and POs rather than an ambiguous selected count. The final action explicitly states how many POs the atomic batch creates, even while viewing document 1 of several. These are approved presentation corrections, not changes to grouping, MPR approval or issue/send authority.
 - **Implementation and readback, 2026-09-24 — DEPLOYED #1573 (`913ef00897e5da27bd4aa7be819a7e1f871dad3a`).** Shared review paints actual PDF pages with the Sales Order renderer, zoom/fit and decode retry; issuance waits for painting, and the final action names the whole batch. Both lanes carry server-projected provisional dates and supplier/destination facts. SO split draft quantities reuse the allocated-part quantity helper used by `composeDocumentLines`: an 11-item 10/1 allocation previews 10/1 rather than 11/11. Loading no longer asserts missing destinations; selection names Sales Orders, items, units and POs. Full CI `35961742802` passed on `d97ab18f3` (12,596 tests passed, 100 existing skips), as did deployment `35962708358`; all five canonical SHA endpoints converged. Negative controls caught a dropped PDF page and the old split quantities. Bundle fingerprints prove the old draft iframe disappeared, provisional-date copy appeared and preview/Back controls survived.
 - **Authenticated SO read-only proof.** Operation selected SO-1365 + SO-1363: 2 Sales Orders, 3 items, 3 units, 3 POs. All three draft selections changed their document facts and actual paper. At 1074px the two panes were 481px each; 150% paper measured 674px inside a 449px independently scrolling pane. At 390px the page stayed 390px wide and stacked 278px panes; Back retained both selections and the summary plus all actions remained visible. Server destination addresses and supplier-specific delivery dates were shown; missing supplier addresses linked to Suppliers, never invented. The temporary selection was cleared afterward. No final Issue, sending, upload, receiving or stock write occurred.
-- **DELIVERY FACT — 2026-10-04; PARTIAL PRODUCTION DELIVERY, COMPLETE TARGET STILL OPEN.** PR1875 deployed at `2ecc32c6b8ba4e43547cd3cee8dd9315b85a1967`; all five canonical deployment probes converged and authenticated production read-only acceptance confirmed exactly 11:00 AM (4 unfinished SOs) and 4:00 PM (1 unfinished SO), retained 32 SO records with Pending/Partial/Done, and 26 matching records after selecting 11:00 AM. Screenshot: `/tmp/so-batch-two-cutoff-production-2ecc32.png`. The historical 27 July scope contained two Done SOs but its supplier-result read returned no selectable POs; this is not proof of the actual issue/send lifecycle. No order or supplier transmission was created for testing. Selected Register PDF download, explicit resend and definite-failure recovery below are follow-on local work, not yet deployed. SO Batch supplier composition supports individual PO selection, same-set/version message and independent PDF ZIP download, current-round projection through Work, and Malaysia-date Today scope. A human-triggered Email route validates authority, saved recipient, supplier membership/current versions and prior sending before the adapted Resend transport. Each successful dispatch reuses the existing current-version confirmation/Work-completion door. Per-PO evidence failures retain known dispatch; the UI retries only those evidence writes, never the Email. An unknown transport outcome blocks silent resend and persists minimal attempt metadata in account-scoped browser session storage. No PDF bytes or credentials are stored there. 95 web issue/evidence/bundle/journey tests and 148 PO-route/provider tests passed. Subsequent Listing/cutoff coverage passed 150 web and 99 demand-route tests; supplier composition now passes 18 tests, including unreadable round refusal/retry and copying the editable message with precisely the selected PO versions. Issuance returns to the retained Listing and opens a supplier result Drawer; individual official PDF review uses the existing viewer Modal, not a Full Page object. Each result also provides Open full page into the existing exact PO object route; the PDF and object doors remain distinct. The object Back action restores the SO Batch cutoff URL and issued supplier-result scope; 73 combined SO Batch/PO object journey tests pass locally. Other Register-local presentation state across this object navigation remains a separate verification boundary. Close/reopen and rendered-version confirmation are covered by the journey tests. Readable supplier sending history survives another PO history read failure, with explicit unavailable evidence and retry. Configured real sender/provider verification, authenticated production lifecycle, complete shared object placement and rollout remain incomplete. Email remains unavailable without explicit verified configuration. This is not production completion or proof of an actual supplier transmission; migration 0649 and its server-only attempt RPCs now reserve the exact PO/version set and payload digest before provider dispatch, retain unknown outcomes, and recover known provider success without resending. The isolated local PostgreSQL verification passes 7 tests, the API route passes 144 tests, and supplier composition covers recovery after browser storage loss plus failed history reads. Migration 0649 was applied to Carres project kfprgpjpaffedghytstl on 2026-10-04 (tracker 20261004110741); both new tables have RLS enabled, authenticated browser INSERT denied and service-role reads allowed. Production function bodies match committed source MD5s da24f4aeda80e18fc6bb9061f7005352 / 77747b78bd6c05605b00d885796e1dee; authenticated RPC execution is denied and service-role execution allowed. The base API/UI release is deployed through PR1875; real-sender verification remains outstanding, so the complete production email lifecycle is still unverified. The Purchase Orders Register now prepares selected visible current-version PDFs through the same per-supplier preparation capability, packages independent PDFs into one ZIP, and refuses the whole download if any document fails or changes. Its register/preparation suites pass 64 tests locally. Explicit Send again requires a deliberate choice for known dispatch; unknown outcomes still block resend. A definite server failure clears a lost-response local reservation without sending automatically.
+- **DELIVERY FACT — 2026-10-05; VERIFIED BOUNDED PRODUCTION FLOWS, COMPLETE TARGET STILL OPEN.** The current deployment and authenticated acceptance proofs in §2 replace earlier local-only status: two configured cutoff aggregates; retained Listing/Table/Cards/Supplier grouping; own-source Quick View/PDF/issue preparation; supplier-selected current-version PDF ZIP; exact full-PO return preserving supplier, subset, channel and editable draft; and the mandatory-rollback Ready Stock save probe. The complete acceptance boundary remains §2. No live PO issue or supplier transmission was performed merely for testing. Issue retry/concurrency and permissions have controlled API/component/SQL evidence in §9.1; this is distinct from an authenticated production final-issue act.
+  Supplier composition preserves individual PO/version selection, same-set message and independent PDFs, current-round Work projection and Malaysia-date Today scope. Real Email is unavailable until actual sender/provider configuration and dispatch capability are verified. The implemented route validates authority, saved recipient, supplier/current-version membership and previous sending. Migration 0649 is applied (tracker `20261004110741`); its server-only attempt RPC reserves the exact document/version set and payload digest before dispatch, retains unknown outcomes and recovers known provider success without resending. Both tables have RLS; browser INSERT/RPC execution is denied and service-role execution allowed. Applied bodies match committed MD5s `da24f4aeda80e18fc6bb9061f7005352` / `77747b78bd6c05605b00d885796e1dee`, with seven isolated PostgreSQL cases. Per-PO evidence failure retries the evidence write only. Unknown transport outcome blocks silent resend; explicit Send again is deliberate for known dispatch. No PDF bytes or credentials enter browser attempt storage. Actual configured sender and external production email dispatch remain unverified, and are not represented as completed by the delivered preparation flow.
 - **Verification boundary.** The authenticated MPR register has `Need PO 0`, so its issue walk was not manufactured; 189 full-page SO/MPR journey tests cover selection, refusals and preview readiness. No test or read-only view proves real issuance/receiving/sending. The exact-source versus generic PO-pool coverage discrepancy, remaining MPR composition/requester check, database-dependent work and the rest of the module remain open.
 
 - **ONE COMMUNICATION AREA PER DOCUMENT.** The doors out of the Portal (`Copy message`,
