@@ -229,8 +229,8 @@
 .editor label { display: block; font-size: 11px; color: var(--cc-muted); margin: 7px 0 3px; }
 .editor > strong + select { margin-top: 8px; }
 .buttons { display: flex; gap: 6px; margin-top: 8px; }
-.editor > .buttons { margin-top: 10px; justify-content: flex-end; }
-.panel .editor > .buttons .btn:first-child { order: 2; background: var(--cc-brand); color: white; border-color: var(--cc-brand); }
+.editor > .buttons, .editor .editorButtons { margin-top: 10px; justify-content: flex-end; }
+.panel .editor > .buttons .btn:first-child, .panel .editor .editorButtons .btn:first-child { order: 2; background: var(--cc-brand); color: white; border-color: var(--cc-brand); }
 .panel .btn { padding: 6px 10px; border: 1px solid var(--cc-line); border-radius: var(--cc-radius-control); min-height: 32px; font-size: 12px; }
 .panel .primary { background: var(--cc-brand); color: var(--cc-surface); padding: 6px 10px; border-radius: var(--cc-radius-control); min-height: 32px; font-size: 12px; }
 .panel .primary:hover { background: var(--cc-brand); filter: brightness(0.94); }

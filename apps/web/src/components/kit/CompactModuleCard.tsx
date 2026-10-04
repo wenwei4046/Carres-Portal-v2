@@ -349,7 +349,7 @@ export function CardEditorButtons({ onSave, onCancel, error, disabled }: { onSav
   return (
     <>
     {error ? <p className={s.editorError} role="alert">{error}</p> : null}
-    <div className={s.buttons}>
+    <div className={`${s.buttons} ${s.editorButtons}`}>
       <button type="button" className={s.btn} disabled={disabled} onClick={onSave}>{CARD_WORDS.save}</button>
       <button type="button" className={s.btn} onClick={onCancel}>{CARD_WORDS.cancel}</button>
     </div>

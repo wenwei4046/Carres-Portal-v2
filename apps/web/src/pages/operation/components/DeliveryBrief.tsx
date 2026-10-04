@@ -264,7 +264,7 @@ export function DeliveryDatesEdit({
       {layout === "stack" ? (
         <Fact label={MONITOR_COPY.customerRequested} value={requestedDeliveryText({ iso: requestedIso, tbd: row.customerDateTbd })} />
       ) : null}
-      <div className={layout === "grid" ? "grid grid-cols-3 gap-3" : "flex flex-col gap-3"}>
+      <div className={layout === "grid" && !compact ? "grid grid-cols-3 gap-3" : "flex flex-col gap-3"}>
       <DatePicker
         id={`delivery-brief-date-${card.scopeId}`}
         label={MONITOR_COPY.confirmedDateField}
