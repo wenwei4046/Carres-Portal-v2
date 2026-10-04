@@ -1290,6 +1290,20 @@ describe("Card 02-B · one permanent row per proceeded Sales Order", () => {
     expect(o1.outstandingSuppliers).toEqual(["Nice Future"]);
   });
 
+  it("keeps a completed historical round navigable with zero unfinished orders", async () => {
+    const tables = registerTables();
+    Object.assign(tables.purchasing_settings.data as Record<string, unknown>, {
+      po_window_first: "11:30:00", po_window_second: "16:00:00", po_window_second_enabled: true,
+    });
+    const orders = tables.orders.data as Record<string, unknown>[];
+    Object.assign(orders.find(order => order.id === "o8")!, { proceeded_at: "2026-09-01T08:00:00+08:00" });
+    const { body } = await rowsOf(tables);
+    expect(registerRow(body, "o8")!.status).toBe("ordered");
+    const key = body.registerRows.find(order => order.orderId === "o8")!.pos[0].poWindow;
+    expect(key).toBeTruthy();
+    expect(body.poRounds?.find(round => round.key === key)?.unfinishedSoCount).toBe(0);
+  });
+
   it("a received PO with current-version confirmed-send stays Ordered — and the row stays", async () => {
     const { body } = await rowsOf(registerTables());
     const o8 = registerRow(body, "o8")!;

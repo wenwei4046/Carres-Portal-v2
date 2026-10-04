@@ -15,6 +15,7 @@ import {
   isPurchaseDemandTimingState,
   soBatchAction,
   soBatchOrderLineOutstandingQty,
+  soBatchOrderPlanning,
   soBatchOrderStatusOf,
   stockMatchKey,
   PURCHASE_DEMAND_OWNER_DUTY,
@@ -876,10 +877,15 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
     const first = poWindowFor(new Date().toISOString(), windows.settings, null, calendar);
     const next = poWindowFor(first.dueAt, windows.settings, null, calendar);
     for (const window of [first, next]) rounds.set(poWindowKeyOf(window), new Set());
+    // Read the Register's canonical remaining-demand judgement, including
+    // completed PO/Stock coverage and blocked or unverified demand.
+    const unfinishedOrders = new Set(registerRes.registerRows
+      .filter(order => soBatchOrderPlanning(order, rows.filter(row => row.orderId === order.orderId)).group === "to-buy")
+      .map(order => order.orderId));
     for (const row of rows) {
       if (!row.poWindow) continue;
       if (!rounds.has(row.poWindow)) rounds.set(row.poWindow, new Set());
-      if (row.toBuy == null || row.toBuy > 0) rounds.get(row.poWindow)!.add(row.orderId);
+      if (unfinishedOrders.has(row.orderId)) rounds.get(row.poWindow)!.add(row.orderId);
     }
     for (const reg of registerRes.registerRows) {
       for (const po of reg.pos) {
