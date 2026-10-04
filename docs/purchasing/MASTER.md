@@ -404,20 +404,27 @@ original/short register search shipped in #1890 (`0b2b37ba4`). Exact-head full C
 Authenticated browser acceptance on 2026-10-04 found the same receipt using both
 `GRN-20260904-1064` and `GRN-260904-1064`, with the short number in the register and full
 record heading. Supplier DO `DO-SMOKE-B` and Unit `U1-000-064` remained unchanged.
-The historical event display still used the original number; its presentation-only correction
-is in the pending Working Panel slice. Issued historical PDFs were not changed.
+The saved PDF preview canvas also showed the short number. Download completion was not verified.
+Issued historical PDFs were not changed.
 Stored identities, supplier references and Unit IDs are unchanged; other modules still need
 explicit adoption, so this does not establish system-wide completion.
 
 The Receiving Working Panel merged in #1894 (`c335716a1`), with full exact-head CI
-`37211169952` passed; it is **NOT PRODUCTION VERIFIED**: row selection
+`37211169952` passed. Its receipt-panel journey is **PRODUCTION VERIFIED** on covering deployment
+`37212252302`, commit `6ce2f07f24c46bbb543bf77f0f21e4890a801b08`, with independent five-surface
+convergence. Authenticated browser acceptance opened `GRN-260904-1064` from a filtered list,
+verified 0 received / 1 damaged, exact Unit `U1-000-064`, original supplier DO, physical arrival
+facts, source PO link and actor-stamped timeline with the short GRN. Unavailable saved evidence
+remained explicitly unavailable. Closing returned the same one-record search; Open full page
+opened the same GRN and its history also used the short number. Row selection
 uses the existing `Drawer` + `CompactModuleCard`, receipt-only quantities, actual arrival facts,
 source-owned evidence and history, and `Open full page` to the existing GRN/PDF/edit object.
 Local shared-kit preview verified the receipt header, cancellation indicator and details
-disclosure at 366px; authenticated panel acceptance still awaits delivery.
+disclosure at 366px. This verifies the read-only panel journey, not Warehouse posting or claims.
 The list remains mounted. Refreshed quantities and goods use the same receipt payload; old Unit
 results without a source-line identity remain unavailable rather than being joined by SKU.
-Cancelled receipts retain their indicator; ordinary GRNs gain no Completed/Valid badge.
+The live `GRN-260904-0210` panel retained its Cancelled indicator; ordinary GRNs gain no
+Completed/Valid badge. No receipt, stock or supplier action was submitted during these checks.
 Related-record coverage currently includes the PO and recorded source references; Claim/Return
 handling links and the Receiving Differences view are not delivered by this panel slice.
 
@@ -430,7 +437,9 @@ searched/rail-filtered population. Filtered totals and rail facets use the same 
 The source/PO references in this Receiving register also adopt the shared two-digit-year display;
 original identities and supplier DO references stay unchanged. No local filter engine is admitted.
 Tests cover a match beyond the first 50 records, numeric sorting, invalid query rejection and
-clearing the filter. Full CI and authenticated acceptance remain owed. Full-result export and
+clearing the filter. The shared preview browser found record 61 through Supplier B with only five
+rows loaded, then restored all 61 on Clear. After merging current main, 106 Receiving/shared-card/
+Sales Order/SO Batch regressions passed. Full CI and authenticated filter acceptance remain owed. Full-result export and
 the approved two-view/Table-Cards composition remain separate unfinished work.
 
 **Read-only production evidence, 2026-10-04:** `warehouse_submit_receipt` still files a report;
