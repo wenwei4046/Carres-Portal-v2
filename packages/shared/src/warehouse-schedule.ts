@@ -704,6 +704,7 @@ export interface WarehouseCalendarArrival {
   physicalQty: number | null;
   extraQty: number | null;
   receiptId: string | null;
+  receiptRef: string | null;
   href: string;
 }
 
@@ -727,7 +728,7 @@ export function warehouseCalendarArrivals(
       sourceId: arrival.sourceId, sourceRef: arrival.documentNo,
       siteId: arrival.siteId || null, siteName: arrival.siteMapped ? arrival.site : null,
       expectedQty: arrival.quantities.known ? arrival.quantities.pendingDeliveryQty : null,
-      physicalQty: null, extraQty: null, receiptId: null,
+      physicalQty: null, extraQty: null, receiptId: null, receiptRef: null,
       href: arrivalOpenHref(arrival),
     });
   }
@@ -752,7 +753,7 @@ export function warehouseCalendarArrivals(
       expectedQty: null,
       physicalQty: totals ? totals.received + totals.damaged + totals.wrongItem : null,
       extraQty,
-      receiptId: receipt.id,
+      receiptId: receipt.id, receiptRef: receipt.grn_no ?? null,
       href: `/operation?tab=receiving&session=${encodeURIComponent(receipt.id)}`,
     });
   }

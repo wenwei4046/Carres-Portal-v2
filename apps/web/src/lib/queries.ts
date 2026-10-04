@@ -71,6 +71,7 @@ import {
   type DeliveryAttemptRow,
   type DeliveryAttemptRecordInput,
   type DeliveryWarehouseScheduleEvent,
+  type WarehouseCalendarArrival,
   type AutocountImportInput,
   type AutocountImportResponse,
   type SpecialAddonDto,
@@ -573,6 +574,7 @@ export const qk = {
     supplierClaimPhotos: (id: string) =>
       ["operation", "supplier-claims", "photos", id] as const,
     warehouse: () => ["operation", "warehouse"] as const,
+    warehouseCalendar: () => ["operation", "warehouse-schedule", "calendar"] as const,
     /** Pipeline v2 (C4) — reserve drill-down per (warehouse, sku). Nested under
      *  warehouse so future blunt invalidations on `["operation","warehouse"]`
      *  fan out to drill-down caches too. */
@@ -12524,4 +12526,22 @@ export function useSaveWorkActivitySettings() {
 
 export function useSetSupplierChannel() {
   return usePurchasingSettingsMutation<PurchasingSetSupplierChannelInput>("/supplier-channel");
+}
+
+
+/** Shared Calendar reads Warehouse's complete authorised date projection,
+ * never the first page of GRNs or the purchasing action queue. */
+export function useWarehouseCalendar() {
+  return useQuery({
+    queryKey: qk.operation.warehouseCalendar(),
+    queryFn: async () => {
+      const data = await apiFetch<{
+        arrivalCalendar?: { events: WarehouseCalendarArrival[]; undatedReceipts: number };
+        sites: Array<{ id: string; name: string }>;
+      }>("/api/operation/warehouse/inbound?calendar=1&limit=1");
+      if (!data.arrivalCalendar) throw new Error("The schedule could not be read for this date.");
+      return { ...data.arrivalCalendar, sites: data.sites };
+    },
+    staleTime: 30_000,
+  });
 }

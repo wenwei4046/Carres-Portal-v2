@@ -133,9 +133,10 @@ describe("Supplier Claims register — the confirmed twelve columns (§9.5, 2026
     expect(screen.queryByTestId("claim-inspector")).not.toBeInTheDocument();
   });
   it("keeps GRN in its own column and Items on two lines; a Catalog-silent SKU says so", () => {
-    claimsQuery.mockReturnValue({ data: { claims: [row({ warehouse_receipt_id: "r1", grn_no: "GRN-20260907-1" }), row({ id: "c9", claim_no: "SC-9", product_description: null, product_variant: null, sku: "SMOKE King" })] }, isLoading: false });
+    claimsQuery.mockReturnValue({ data: { claims: [row({ warehouse_receipt_id: "r1", grn_no: "GRN-20260907-1001" }), row({ id: "c9", claim_no: "SC-9", product_description: null, product_variant: null, sku: "SMOKE King" })] }, isLoading: false });
     show();
-    expect(screen.getAllByRole("link", { name: "PO-2050" })[0]!.closest("td")).not.toBe(screen.getByRole("link", { name: "GRN-20260907-1" }).closest("td"));
+    expect(screen.getAllByRole("link", { name: "PO-2050" })[0]!.closest("td")).not.toBe(screen.getByRole("link", { name: "GRN-260907-1001" }).closest("td"));
+    expect(screen.getByRole("link", { name: "GRN-260907-1001" })).toHaveAttribute("href", "/operation?tab=receiving&session=r1");
     expect(screen.getByText("Carres Cloud").closest("td")).toBe(screen.getAllByText("King")[0]!.closest("td"));
     expect(screen.getByText("Recorded SKU").closest("td")).toHaveTextContent("SMOKE King");
   });

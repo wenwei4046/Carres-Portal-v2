@@ -547,17 +547,16 @@ results without a source-line identity remain unavailable rather than being join
 The live `GRN-260904-0210` panel retained its Cancelled indicator; ordinary GRNs gain no
 Completed/Valid badge. No receipt, stock or supplier action was submitted during these checks.
 Related-record PO and recorded source references are production verified. Claim/Return links
-are now implemented, awaiting delivery: the existing authenticated receipt detail reader loads
+are deployed in #1907: the existing authenticated receipt detail reader loads
 all claims by exact `warehouse_receipt_id`, direct receipt-linked returns and returns linked
 through those claims, deduplicated by return identity. Reads use the actor's existing RLS scope;
 no new permission or write door. The shared Working Panel links each returned identity to its
 existing owning object. Failed reads show Unavailable/retry, never a false empty list.
-The Receiving Differences view is implemented on branch, not deployed. Local relationship validation passed 64 receipt API tests
-(including the full-page boundary, exact receipt/claim scopes, deduplication and failure preservation),
-83 Receiving panel/register tests, both type checks and design checks. This is branch evidence,
-not production acceptance; carry this reader into the approved two-view/Differences delivery.
+Local relationship validation covered full-page reads, exact receipt/claim scopes, deduplication
+and failure preservation. Production verified the exact SC-1019 link from its receipt; no current
+Return fixture was available, so Return navigation retains automated evidence only.
 
-**Two-view rail / Differences — BUILT ON BRANCH, NOT PRODUCTION VERIFIED, 2026-10-05.**
+**Two-view rail / Differences — DEPLOYED, BOUNDED LIVE ACCEPTANCE, 2026-10-05.**
 The existing Receiving rail selects GRN Records or Receiving Differences. Category, Received with
 and Cancelled GRNs use the shared list Popover; supplier, Site and dates use existing column
 filters. Old URL filters and clear actions remain supported. Differences uses recorded receipt
@@ -569,11 +568,14 @@ records; this view does not decide Claim/Return completion or provide manual Don
 Explicit unposted reports have no generated GRN identity; the Working Panel says Receiving /
 Not issued, retains the record ID for navigation, and shows recorded Unit outcomes/recount reason.
 Existing posted/cancelled historical GRN identities remain unchanged. View changes do not borrow
-the other view's cached population. Full UI/production acceptance remains owed. Full CI run
-37224938706 passed shared/API suites but exposed one obsolete dictionary test requiring the
-retired Supplier rail group. That guard now verifies the shared Supplier column filter and rejects
-the retired rail placement; the 101-test Receiving/dictionary/panel run passes. The same PR now
-includes the missed-arrival ownership correction below and requires fresh exact-head full CI.
+the other view's cached population. PR #1907 passed full CI 37225888964 and deployed as
+`629ece995237d8a48c28c725d0d7e339507038bd` through successful run 37226814237; all five production
+proof endpoints converged. Authenticated live acceptance verified seven GRN Records, two Receiving
+Differences, shared Received with/Category filters, exact receipt GRN-260904-1064 → SC-1019 and
+browser Back retaining Differences; the same two receipts also rendered in Cards. No test
+transaction was created. A raw eight-digit GRN date on the linked Claim page was found and its
+shared display-format adoption is corrected on the Calendar continuation branch, not yet deployed. Live unposted/Return fixtures
+were unavailable; those cases retain automated evidence only. Whole Receiving is not complete.
 
 Complete server-side column filtering and sorting are
 **PRODUCTION VERIFIED, 2026-10-05** through the shared `DataGrid serverColumns` contract and
@@ -632,7 +634,8 @@ were preserved. The PDF list renderer is covered by tests; its live download is 
 
 **Shared Calendar continuation — branch only, 2026-10-05.** Stock MASTER §7 records the new
 Warehouse-owned full-population arrival read. Its expected/actual receipt separation is locally
-tested; Calendar UI, complete source-date convergence and production acceptance remain open.
+tested and wired to the existing Quick Rail on branch. Complete source-date convergence, mobile
+entry and production acceptance remain open; no second Calendar page is introduced.
 
 **Read-only production evidence, 2026-10-04:** `warehouse_submit_receipt` still files a report;
 `warehouse_receipt_check_in` calls Operation's post-authority gate. The only current active
@@ -642,7 +645,7 @@ shipment's shortage from today's cumulative PO balance. Warehouse automatic post
 report preservation and individual actor/Site controls remain approved targets, not built.
 NETS account activation/cutover still requires its separate explicit authorisation.
 
-**Missed-arrival Work ownership — BUILT ON BRANCH, NOT PRODUCTION VERIFIED, 2026-10-05.**
+**Missed-arrival Work ownership — DEPLOYED, LIVE WORK SCENARIO NOT VERIFIED, 2026-10-05.**
 A supplier date without a physical report no longer creates Receiving Check in work. The existing
 Purchasing supplier-date-passed action owns that follow-up under PO Duty and opens the exact PO.
 It now reads the same per-line/split arrival authority as the register and day-before check,
@@ -652,7 +655,8 @@ Today's/future arrivals, fully received goods and unsent revisions do not create
 Existing submitted physical reports retain their exact-session action and GRN Duty cover. This
 correction does not implement individual Warehouse automatic confirmation or remove its database
 approval boundary. Local validation: 61 API Work/probe tests and 84 shared receipt/PO/Work tests;
-API typecheck passed. Production readback and full release checks remain owed.
+API typecheck and full CI passed. The correction deployed with #1907 and all five production
+proof endpoints converged; an authenticated missed-arrival Work scenario remains unverified.
 
 ### 2.5 Receiving end-to-end assurance review — 2026-10-04
 
@@ -677,13 +681,13 @@ Purchase Invoice engine. No receipt, amendment, void, invoice or return was exec
 | Capability / lifecycle | Resolution and recommended Carres treatment | Acceptance or remaining uncertainty |
 |---|---|---|
 | Source and expected arrival | RESOLVED: PO/CO and other admitted sources own expected goods; supplier dates stay Purchasing-owned. A supplier dispatch/DO is evidence of supplier statement, not GRN. | Prove source-line and split-batch dates remain separate from actual arrival. No duplicate PO/Receiving ETA writer. |
-| Daily ownership and missed arrival | RESOLVED: Operation checks missing arrivals and contacts suppliers; Warehouse performs physical work. | CONTRADICTION FOUND: Workspace's older action table instructed check-in merely because a date passed. Its target is corrected. The Work feed correction is built on branch (2026-10-05), awaiting production acceptance: actual submitted reports alone create Receiving work; missed arrivals use Purchasing/PO Duty and the existing per-line arrival authority. |
+| Daily ownership and missed arrival | RESOLVED: Operation checks missing arrivals and contacts suppliers; Warehouse performs physical work. | CONTRADICTION FOUND: Workspace's older action table instructed check-in merely because a date passed. Its target is corrected. The Work feed correction is deployed in #1907 (2026-10-05), with live scenario acceptance still owed: actual submitted reports alone create Receiving work; missed arrivals use Purchasing/PO Duty and the existing per-line arrival authority. |
 | Warehouse identities and permissions | APPROVED TARGET / NOT BUILT: individually authenticated, source/Site-authorised confirmation, company receiver and individual actor distinct. | Existing role gates do not deliver the new rule. No broad Warehouse finance, adjustment, amend or void rights. |
 | Receipt entry and evidence | KEEP the source-prefilled one engine; confirm actual Unit outcomes or counted quantities, actual date/Site, DO and evidence. | No blank unrelated receipt, identity minting or supplier-reported automatic receipt. Missing evidence preserves an unposted report. |
 | Partial receipt and remaining quantity | RESOLVED: valid received scope completes; remaining acceptable supply stays outstanding. | Example: ordered 10, physically arrived 8 including 1 damaged means Received Qty 7, Damaged Qty 1, physically missing 2, Pending Delivery Qty 3. Never add damage to the 3 again. |
 | Automatic GRN and retries | APPROVED TARGET / NOT BUILT: valid Warehouse confirmation posts through Receiving and creates the formal GRN once. | Existing submit/review split is a real implementation gap. Prove no duplicate receipt/stock after retries or concurrent confirmation, and no false success on failure. |
 | Condition, custody and eligibility | RESOLVED: physical custody, accepted quantity and saleability differ. Damage/wrong goods retain hold; rejected goods remain with supplier. | Existing reservations survive valid arrival; extra goods cannot silently satisfy expected lines or create available stock. |
-| Register, cards and working detail | APPROVED TARGET / NOT BUILT: GRN Records / Receiving Differences, shared list and Working Panel; one expansion job. | Retain existing GRN full-page/PDF and history; no new top-level page or local kit. A normal GRN has no new Completed badge. |
+| Register, cards and working detail | DEPLOYED with bounded acceptance in §2.4: GRN Records / Receiving Differences, shared list and Working Panel; one expansion job. | Retain existing GRN full-page/PDF and history; no new top-level page or local kit. A normal GRN has no new Completed badge. |
 | Completion | RESOLVED: receipt posting, complete source fulfilment, resolved discrepancy and supplier bill settlement are separate facts. | PO 10, receipt 6 creates one GRN for 6; balance 4 remains. GRN creation must not close shortage or Claim actions. |
 | Corrections, cancellation and history | KEEP governed Amend/ Void, reason, evidence, revision checks, downstream blockers and immutable document identity. | Later physical arrivals create new GRNs; later defects use Claim, not rewriting the old receipt. No generic Copy action that duplicates a physical event. |
 | Source version / historical document | KEEP source identity and historical evidence. | Current live walkthrough did not establish an explicit receipt-bound PO revision on the GRN. Verify version lineage and historical PDF consistency before claiming complete; do not infer from a PO number alone. |

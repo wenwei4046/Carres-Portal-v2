@@ -1,12 +1,15 @@
 import { useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { Link, useSearchParams } from "react-router-dom";
+import Select from "@/components/kit/Select";
+import MonthCalendar from "@/components/kit/MonthCalendar";
 import {
+  documentDisplayNumber,
+  type WarehouseCalendarArrival,
   carrierDayLoads,
   carrierDayNote,
   daysInRange,
   deliveryRange,
   DELIVERY_RANGE_KEYS,
-  inRange,
   partnerDeliveryRules,
   type CarrierDayLoad,
   type DayBooking,
@@ -15,57 +18,19 @@ import {
 } from "@carres/shared";
 import {
   useOperationOrders,
-  usePurchaseToday,
-  useOperationSuppliers,
+  useWarehouseCalendar,
   useDeliveryPartners,
   type operationOrderListRow,
 } from "@/lib/queries";
 import { orderBookingDay } from "@/lib/order-booking";
 import { cjkClassName } from "@/lib/cjk";
 import { locationForAddress } from "@/lib/region";
-import { fmtDate, fmtDateShort } from "@/lib/fmt-date";
-import { toIso } from "@/components/kit/DatePicker";
+import { appTodayIso, fmtDate, fmtDateShort } from "@/lib/fmt-date";
 import { displayCustomerName } from "@/lib/customer-name";
 
-/**
- * CalendarPanel — right-rail Calendar (Jess COO ask, extended 2026-07-23):
- * a month grid with tab-filtered activity from BOTH the customer-delivery
- * side and the supplier procurement side (Send POs by order-by · confirm by
- * expected-ready · Receive by ETA). Tabs let the operator see a single lens
- * without leaving the panel. Read-only — no new API (reuses purchase-today +
- * orders queries already cached by their pages).
- *
- * **T10 (delivery calendar as single source, 2026-07-27):** the Deliveries lens
- * used to bucket orders by `orders.delivery_date` — the date we PROMISED the
- * customer. That is not when a truck moves. Since D1 (0277) the truck's day is
- * the BOOKING (`booking_stage` + `confirmed_date`, with `logistic_eta` as the
- * logistics company's provisional word), and the two diverge the moment anything is
- * rescheduled — which is the entire reason D1 split them. So the lens now reads
- * the booking through the same `orderBookingDay` adapter the Orders list's
- * Delivery column reads: never a second store.
- *
- * The promise did not disappear from the screen. A day with an order promised
- * on it and nothing booked is real work — it is simply not a delivery, so it
- * never counts as one. It is listed as what it is, under the call that fixes it.
- *
- * The three range chips select a RANGE of days; clicking a day in the grid
- * selects that one day. Exactly one of the two is active at a time.
- *
- * **NO RELATIVE DATE WORDS (owner ruling 2026-08-15).** The two single-day
- * chips and every day heading name the actual weekday + date. `Today` and
- * `Tomorrow` are only true on the day they are read — they rot in a
- * screenshot and re-sort themselves overnight — so the delivery word table's
- * existing ban now reaches the rail as well. `This week` stays: it is a SPAN,
- * not a day, and no date can spell it.
- *
- * **The chip now carries the SAME string as every other date (owner ruling
- * 2026-08-15, THE YEAR RULE).** It used to need its own compact spelling
- * because the year would not fit; the year is no longer printed for a
- * current-year date, so the chip's form and the portal's form are one string
- * and `fmtDayChip` is deleted.
- */
-const WEEKDAYS = ["S", "M", "T", "W", "T", "F", "S"];
-
+/** Shared Calendar reads owning-module dates. Expected Warehouse arrangements
+ * and actual receipts are separate event types; Receiving never republishes
+ * the same arrival. Module, location and day survive the record round trip. */
 /** The chip's own text. A single-day range names its day; the span keeps the
  *  one ruled span word. This is the only place the three chips are worded. */
 function rangeChipLabel(key: DeliveryRangeKey, fromIso: string): string {
@@ -82,18 +47,31 @@ interface DayDelivery extends DayBooking {
 }
 
 export default function CalendarPanel() {
-  const { data } = useOperationOrders();
+  const deliveryQuery = useOperationOrders();
+  const data = deliveryQuery.data;
   const orders = useMemo(() => data?.orders ?? [], [data]);
-  const { data: purchase } = usePurchaseToday();
-  const { data: suppliersData } = useOperationSuppliers();
+  const warehouseQuery = useWarehouseCalendar();
   const { data: partnersData } = useDeliveryPartners();
-  const supplierNameById = useMemo(() => {
-    const m = new Map<string, string>();
-    for (const s of suppliersData?.suppliers ?? []) m.set(s.id, s.name);
-    return m;
-  }, [suppliersData]);
-  const supplierName = (id: string, fallback: string | null) =>
-    fallback?.trim() || supplierNameById.get(id) || id.slice(0, 8);
+  const [params, setParams] = useSearchParams();
+  const moduleValue = params.get("calendarModule");
+  const module = moduleValue === "delivery" || moduleValue === "warehouse" ? moduleValue : "all";
+  const location = module === "warehouse" ? params.get("calendarLocation") : null;
+  const setCalendarFilter = (key: string, value: string | null) => {
+    setParams((previous) => {
+      const next = new URLSearchParams(previous);
+      if (value) next.set(key, value); else next.delete(key);
+      if (key === "calendarModule" && value !== "warehouse") next.delete("calendarLocation");
+      return next;
+    }, { replace: true });
+  };
+  const calendarHref = (href: string, day: string) => {
+    const [path, query = ""] = href.split("?");
+    const next = new URLSearchParams(query);
+    for (const key of ["calendarModule", "calendarLocation", "calendarDay", "calendarRange"])
+      if (params.get(key)) next.set(key, params.get(key)!);
+    next.set("calendarDay", day);
+    return `${path}?${next}`;
+  };
 
   // T9 logistics rules, keyed by company. A row that has never been
   // edited normalises to DEFAULT — zero warnings, which is every live company
@@ -151,34 +129,36 @@ export default function CalendarPanel() {
     return m;
   }, [orders]);
 
-  // Receiving is a dated business event. Procurement action queues stay in My Work.
+  // One Warehouse-owned read, with expected arrangements and physical receipt
+  // events kept distinct. No second arrival is published by Receiving.
   const receiveByDay = useMemo(() => {
-    const m = new Map<string, Array<{ poId: string; supplierId: string; units: number }>>();
-    for (const r of purchase?.receive ?? []) {
-      const iso = r.etaDate ?? r.expectedReadyDate;
-      if (!iso) continue;
-      const key = iso.slice(0, 10);
-      const arr = m.get(key) ?? [];
-      const units = r.items.reduce((s, it) => s + it.outstanding, 0);
-      arr.push({ poId: r.poId, supplierId: r.supplierId, units });
-      m.set(key, arr);
+    const map = new Map<string, WarehouseCalendarArrival[]>();
+    if (module === "delivery") return map;
+    for (const event of warehouseQuery.data?.events ?? []) {
+      if (location && location !== "all" && event.siteId !== location) continue;
+      const rows = map.get(event.date) ?? [];
+      rows.push(event); map.set(event.date, rows);
     }
-    return m;
-  }, [purchase]);
+    return map;
+  }, [warehouseQuery.data, module, location]);
+  const activeCount = (key: string): number =>
+    (receiveByDay.get(key)?.length ?? 0) + (module === "warehouse" ? 0 : deliveriesByDay.get(key)?.length ?? 0);
+  const loading = (module !== "delivery" && warehouseQuery.isPending) || (module !== "warehouse" && deliveryQuery.isPending);
+  const failed = (module !== "delivery" && warehouseQuery.error) || (module !== "warehouse" && deliveryQuery.error);
 
-  // Calendar counts only authoritative dated events, never action queues.
-  const activeCount = (key: string): number => {
-    return (receiveByDay.get(key)?.length ?? 0) + (deliveriesByDay.get(key)?.length ?? 0);
-  };
-
-  const today = new Date();
-  const todayKey = toIso(today);
-  const [view, setView] = useState({ y: today.getFullYear(), m: today.getMonth() });
+  const todayKey = appTodayIso();
+  const savedDay = params.get("calendarDay");
+  const picked = savedDay && /^\d{4}-\d{2}-\d{2}$/.test(savedDay)
+    && !Number.isNaN(Date.parse(savedDay))
+    && new Date(savedDay).toISOString().slice(0, 10) === savedDay ? savedDay : null;
+  const initialDay = picked ?? todayKey;
+  const [view, setView] = useState({ y: Number(initialDay.slice(0, 4)), m: Number(initialDay.slice(5, 7)) - 1 });
   // T10: exactly ONE of these is active. A range chip clears the picked day; a
   // grid click clears the range. Default = Today, so the panel opens on the
   // question an operator actually has.
-  const [range, setRange] = useState<DeliveryRangeKey | null>("today");
-  const [picked, setPicked] = useState<string | null>(null);
+  const savedRange = params.get("calendarRange");
+  const range: DeliveryRangeKey | null = picked ? null
+    : DELIVERY_RANGE_KEYS.includes(savedRange as DeliveryRangeKey) ? savedRange as DeliveryRangeKey : "today";
 
   const activeRange = range ? deliveryRange(range, todayKey) : null;
   const shownDays = activeRange
@@ -187,49 +167,38 @@ export default function CalendarPanel() {
       ? [picked]
       : [];
 
-  // Build the calendar grid (weeks of the current view month, padded).
-  const cells = useMemo(() => {
-    const first = new Date(view.y, view.m, 1);
-    const startPad = first.getDay(); // 0=Sun
-    const daysInMonth = new Date(view.y, view.m + 1, 0).getDate();
-    const out: ({ day: number; key: string } | null)[] = [];
-    for (let i = 0; i < startPad; i++) out.push(null);
-    for (let d = 1; d <= daysInMonth; d++) {
-      out.push({ day: d, key: toIso(new Date(view.y, view.m, d)) });
-    }
-    while (out.length % 7 !== 0) out.push(null);
-    return out;
-  }, [view]);
-
-  const monthLabel = new Date(view.y, view.m, 1).toLocaleDateString(undefined, {
-    month: "long",
-    year: "numeric",
-  });
-
-  // Is there anything to show for this day UNDER THE ACTIVE LENS? The
-  // "promised, no date yet" block only exists on a lens that shows deliveries,
-  // so it must not make a Send-lens day count as occupied — otherwise the range
-  // renders neither the day nor the empty line.
   const dayIsEmpty = (d: string) => activeCount(d) === 0;
   const hasAnything = shownDays.some((d) => !dayIsEmpty(d));
 
   return (
     <div className="flex flex-col h-full">
+      <div className="mb-3 space-y-2">
+        <Select id="calendar-module" label="Filter by module" value={module}
+          onValueChange={(value) => setCalendarFilter("calendarModule", value)}
+          options={[{ value: "all", label: "All modules" }, { value: "delivery", label: "Delivery" }, { value: "warehouse", label: "Warehouse" }]} />
+        {module === "warehouse" && <Select id="calendar-location" label="Filter by location" value={location ?? "all"}
+          onValueChange={(value) => setCalendarFilter("calendarLocation", value)}
+          options={[{ value: "all", label: "All" }, ...(warehouseQuery.data?.sites ?? []).map((site) => ({ value: site.id, label: site.name }))]} />}
+      </div>
+      {loading && <p role="status" className="text-meta text-base-500">Loading…</p>}
+      {failed && <p role="alert" className="text-meta text-danger">The schedule could not be read for this date.</p>}
+      {module !== "delivery" && (warehouseQuery.data?.undatedReceipts ?? 0) > 0 && <p className="text-meta text-base-500">Goods Received Date · Not recorded · {warehouseQuery.data!.undatedReceipts}</p>}
       {/* T10 range chips — Today / Tomorrow / This week. "This week" is the
           REST of the week, ending Saturday (Sunday is not a delivery day). */}
       <div className="flex gap-1 mb-2" data-testid="calendar-ranges">
         {DELIVERY_RANGE_KEYS.map((key) => {
           const r = deliveryRange(key, todayKey);
           const active = range === key;
-          const n = daysInRange(r.fromIso, r.toIso).reduce((s, d) => s + activeCount(d), 0);
           return (
             <button
               key={key}
               type="button"
               data-testid={`calendar-range-${key}`}
               onClick={() => {
-                setRange(key);
-                setPicked(null);
+                setParams((previous) => {
+                  const next = new URLSearchParams(previous);
+                  next.set("calendarRange", key); next.delete("calendarDay"); return next;
+                }, { replace: true });
                 // Jump the grid to the month the range lives in.
                 const [y, m] = r.fromIso.split("-").map(Number);
                 if (y && m) setView({ y, m: m - 1 });
@@ -250,88 +219,21 @@ export default function CalendarPanel() {
               }`}
             >
               <span className="truncate">{rangeChipLabel(key, r.fromIso)}</span>
-              {n > 0 && <span className="tabular-nums font-semibold">{n > 99 ? "99+" : n}</span>}
             </button>
           );
         })}
       </div>
 
-      {/* Month nav */}
-      <div className="flex items-center justify-between px-1 mb-2">
-        <button
-          type="button"
-          onClick={() => setView((v) => (v.m === 0 ? { y: v.y - 1, m: 11 } : { y: v.y, m: v.m - 1 }))}
-          className="p-1 rounded text-base-500 hover:bg-base-100"
-          aria-label="Previous month"
-        >
-          <ChevronLeft size={16} />
-        </button>
-        <div className="text-strong text-base-900">{monthLabel}</div>
-        <button
-          type="button"
-          onClick={() => setView((v) => (v.m === 11 ? { y: v.y + 1, m: 0 } : { y: v.y, m: v.m + 1 }))}
-          className="p-1 rounded text-base-500 hover:bg-base-100"
-          aria-label="Next month"
-        >
-          <ChevronRight size={16} />
-        </button>
-      </div>
-
-      {/* Weekday header */}
-      <div className="grid grid-cols-7 mb-1">
-        {WEEKDAYS.map((w, i) => (
-          <div key={i} className="text-center text-label font-semibold text-base-400 uppercase">
-            {w}
-          </div>
-        ))}
-      </div>
-
-      {/* Day grid */}
-      <div className="grid grid-cols-7 gap-0.5">
-        {cells.map((cell, i) => {
-          if (!cell) return <div key={i} />;
-          const count = activeCount(cell.key);
-          const isToday = cell.key === todayKey;
-          const isSel = activeRange
-            ? inRange(cell.key, activeRange)
-            : cell.key === picked;
-          const countTone =
-            count === 0
-              ? "text-transparent"
-              : "bg-base-100 text-base-800";
-          return (
-            <button
-              key={i}
-              type="button"
-              onClick={() => {
-                setPicked(cell.key);
-                setRange(null);
-              }}
-              title={count > 0 ? `${count} dated event${count === 1 ? "" : "s"}` : undefined}
-              className={`aspect-square flex flex-col items-center justify-center gap-0.5 rounded-lg transition-colors ${
-                isSel ? "bg-base-100" : "hover:bg-base-100"
-              }`}
-            >
-              <span
-                className={`w-6 h-6 grid place-items-center rounded-full text-meta ${
-                  isToday
-                    ? "ring-1 ring-primary text-primary font-semibold"
-                    : isSel
-                      ? "ring-1 ring-base-900 text-base-900 font-semibold"
-                      : "text-base-700"
-                }`}
-              >
-                {cell.day}
-              </span>
-              <span
-                className={`h-3.5 min-w-[16px] px-1 grid place-items-center rounded-full text-label font-semibold leading-none ${countTone}`}
-              >
-                {count > 0 ? count : "0"}
-              </span>
-            </button>
-          );
-        })}
-      </div>
+      <MonthCalendar
+        month={`${view.y}-${String(view.m + 1).padStart(2, "0")}`}
+        onMonthChange={(month) => {
+          const [y, m] = month.split("-").map(Number);
+          setView({ y, m: m - 1 });
+        }}
+        selected={picked ?? (activeRange?.fromIso === activeRange?.toIso ? activeRange?.fromIso ?? null : null)}
+        onSelect={(day) => setCalendarFilter("calendarDay", day)}
+        testId="shared-calendar-month"
+      />
 
       {/* The days themselves — one block per day in the active range (or the
           one picked day). Content adapts to the active tab. */}
@@ -341,13 +243,13 @@ export default function CalendarPanel() {
             Pick a day, or Today / Tomorrow / This week.
           </div>
         )}
-        {shownDays.length > 1 && !hasAnything && (
+        {shownDays.length > 1 && !hasAnything && !loading && !failed && (
           <div className="text-meta text-base-400 text-center py-4">
             Nothing on the books for these days.
           </div>
         )}
         {shownDays.map((day) => {
-          const dayDeliveries = deliveriesByDay.get(day) ?? [];
+          const dayDeliveries = module === "warehouse" ? [] : deliveriesByDay.get(day) ?? [];
           const dayReceive = receiveByDay.get(day) ?? [];
           // On a multi-day range an empty day is noise; on ONE day it is the
           // answer ("nothing that day") and must still be said out loud.
@@ -362,28 +264,26 @@ export default function CalendarPanel() {
                 {fmtDate(day)}
               </div>
 
-              {dayIsEmpty(day) && shownDays.length === 1 && (
+              {dayIsEmpty(day) && shownDays.length === 1 && !loading && !failed && (
                 <div className="text-meta text-base-400 text-center py-3">No dated events this day.</div>
               )}
-              {dayReceive.length > 0 && (
-                <DaySection
-                  title="Receiving"
-                  tone="text-success"
-                  // `· ETA today` used to close this line. It was a banned
-                  // word AND false: the row renders under whichever day it
-                  // falls on, so on a multi-day range it said "today" about
-                  // tomorrow. The day heading above already states the day.
-                  items={dayReceive.map((r) => ({
-                    key: `r-${r.poId}`,
-                    main: `${r.poId} · ${supplierName(r.supplierId, null)}`,
-                    sub: `${r.units} unit${r.units === 1 ? "" : "s"}`,
-                  }))}
-                />
-              )}
+              {(["expected_arrival", "actual_arrival"] as const).map((kind) => {
+                const rows = dayReceive.filter((row) => row.kind === kind);
+                if (!rows.length) return null;
+                return <DaySection key={kind}
+                  title={kind === "expected_arrival" ? `Warehouse · ${rows.length} arriving` : `Warehouse · GRN Records · ${rows.length}`}
+                  tone="text-base-700"
+                  items={rows.map((row) => ({
+                    key: row.id,
+                    main: documentDisplayNumber(row.receiptRef ?? row.sourceRef ?? "Not recorded"),
+                    sub: `${row.siteName ?? "Not recorded"} · ${kind === "expected_arrival" ? "Pending Delivery Qty" : "Physical arrived Qty"} ${row.expectedQty ?? row.physicalQty ?? "Not recorded"}${row.extraQty ? ` · Extra Qty ${row.extraQty}` : ""}`,
+                    href: calendarHref(row.href, day),
+                  }))} />;
+              })}
               {dayDeliveries.length > 0 && (
                 <div className="space-y-1.5">
-                  <div className="text-label uppercase tracking-[0.05em] text-info">Deliveries</div>
-                  {dayDeliveries.map((d) => <DeliveryRow key={d.orderId} d={d} />)}
+                  <div className="text-label uppercase tracking-[0.05em] text-info">Delivery · {dayDeliveries.length} scheduled {dayDeliveries.length === 1 ? "delivery" : "deliveries"}</div>
+                  {dayDeliveries.map((d) => <DeliveryRow key={d.orderId} d={d} href={calendarHref(`/operation?tab=delivery&view=day&date=${day}`, day)} />)}
                   {loads.map((l) => (
                     <CarrierLoadRow key={l.partnerId ?? "none"} load={l} />
                   ))}
@@ -399,13 +299,13 @@ export default function CalendarPanel() {
 
 /** One booked delivery. Confirmed is the ONLY green (T1): the customer said
  *  yes. The carrier's own date is amber — a date nobody has agreed to. */
-function DeliveryRow({ d }: { d: DayDelivery }) {
+function DeliveryRow({ d, href }: { d: DayDelivery; href: string }) {
   const confirmed = d.kind === "confirmed";
   const loc = locationForAddress(d.address);
   const carrier = d.partnerName?.trim() || "Logistics not assigned";
   return (
-    <div
-      className="flex gap-2 rounded bg-base-50 hover:bg-base-100 px-2 py-1.5 transition-colors"
+    <Link to={href}
+      className="flex gap-2 rounded bg-base-50 hover:bg-base-100 px-2 py-1.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9"
       title={
         confirmed
           ? "The customer confirmed this date."
@@ -430,7 +330,7 @@ function DeliveryRow({ d }: { d: DayDelivery }) {
           {loc.label ? ` · ${loc.label}` : ""}
         </div>
       </div>
-    </div>
+    </Link>
   );
 }
 
@@ -471,21 +371,21 @@ function DaySection({
 }: {
   title: string;
   tone: string;
-  items: Array<{ key: string; main: string; sub: string }>;
+  items: Array<{ key: string; main: string; sub: string; href: string }>;
 }) {
   return (
     <div className="mb-3">
       <div className={`text-label uppercase tracking-[0.05em] mb-1.5 ${tone}`}>{title}</div>
       <div className="space-y-1.5">
           {items.map((it) => (
-            <div key={it.key} className="flex gap-2 rounded bg-base-50 hover:bg-base-100 px-2 py-1.5 transition-colors">
+            <Link key={it.key} to={it.href} className="flex gap-2 rounded bg-base-50 hover:bg-base-100 px-2 py-1.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9">
               <div className="min-w-0 flex-1">
-                <div className="font-mono text-meta font-semibold text-base-900 truncate">
+                <div className="font-mono text-meta font-semibold text-base-900 break-words">
                   {it.main}
                 </div>
-                <div className="text-label text-base-500 truncate">{it.sub}</div>
+                <div className="text-label text-base-500">{it.sub}</div>
               </div>
-            </div>
+            </Link>
           ))}
       </div>
     </div>

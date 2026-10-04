@@ -470,7 +470,7 @@ approval. It is not a stock adjustment. No physical event or submitted report is
 
 ## 7 · Pages and daily journeys
 
-**Receiving Calendar source — BUILT ON BRANCH, NOT WIRED OR PRODUCTION VERIFIED, 2026-10-05.**
+**Receiving Calendar source and UI — BUILT ON BRANCH, NOT PRODUCTION VERIFIED, 2026-10-05.**
 The existing authorised Inbound reader supports an opt-in `calendar=1` response using the shared
 `warehouseCalendarArrivals` projection over its complete source population, before register paging.
 Expected arrangements use Inbound's source-owned date and outstanding accepted requirement. Actual
@@ -479,8 +479,11 @@ creation time never substitutes for physical arrival. Physical arrived Qty is th
 accepted + damaged + wrong quantity; Extra Qty stays separate. Unknown receipt quantities/sites
 remain unknown, undated receipts are reported separately, and voided/unposted reports never become
 actual arrivals. An all-missing report with recorded zero physical/extra quantities is not an arrival.
-No write, permission, stock or event store is added. Calendar UI adoption, per-line/split-date
-convergence of the existing Warehouse arrangement projection, source links and full browser/release
+No write, permission, stock or event store is added. The shared Quick Rail now reads this source
+on branch, reuses MonthCalendar and Select, separates expected/actual groups without mixed totals,
+and preserves explicit Calendar day/module/location in source links. A local illustrative preview
+verified the module/location selectors, quantities and selected-date contrast. Per-line/split-date
+convergence of the existing Warehouse arrangement projection, mobile entry and full production
 acceptance remain open. Local evidence: 54 shared schedule tests, 14 Inbound API tests, API typecheck;
 the 201-receipt fixture verifies register paging does not clip Calendar history. This is not a
 claim that the shared Calendar or Warehouse automatic GRN posting has shipped.

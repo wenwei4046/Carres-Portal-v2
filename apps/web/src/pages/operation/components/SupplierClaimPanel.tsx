@@ -27,6 +27,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
+  documentDisplayNumber,
   SUPPLIER_CLAIM_DECISIONS,
   supplierClaimDecision,
   ISSUE_PURCHASE_RETURN,
@@ -202,11 +203,11 @@ function ItemSection({ claim, record }: { claim: SupplierClaimListRow; record: S
       <Fact idPrefix="claim-fact" own={false} framed label="Qty" value={claim.qty} />
       <Fact idPrefix="claim-fact" own={false} framed label="Units" value={units == null ? "Units could not be loaded" : tracked.length ? tracked.map((u) => u.unit_code).join(" · ") : supplierClaimUnitLine(units)} />
       <Fact idPrefix="claim-fact" own={false} framed label="PO No" value={claim.po_id
-        ? <><Link className="text-kit-blue-11 hover:underline" to={`/operation/procurement/${encodeURIComponent(claim.po_id)}`}>{claim.po_id}</Link><span className="block text-meta text-kit-slate-11">{supplierClaimUnitLine(units)}</span></>
+        ? <><Link className="text-kit-blue-11 hover:underline" to={`/operation/procurement/${encodeURIComponent(claim.po_id)}`}>{documentDisplayNumber(claim.po_id)}</Link><span className="block text-meta text-kit-slate-11">{supplierClaimUnitLine(units)}</span></>
         : absent} />
       <Fact idPrefix="claim-fact" own={false} framed label="GRN No" value={claim.grn_no && claim.warehouse_receipt_id
-        ? <Link className="text-kit-blue-11 hover:underline" to={`/operation?tab=receiving&session=${encodeURIComponent(claim.warehouse_receipt_id)}`}>{claim.grn_no}</Link>
-        : claim.grn_no || absent} />
+        ? <Link className="text-kit-blue-11 hover:underline" to={`/operation?tab=receiving&session=${encodeURIComponent(claim.warehouse_receipt_id)}`}>{documentDisplayNumber(claim.grn_no ?? "")}</Link>
+        : documentDisplayNumber(claim.grn_no ?? "") || absent} />
     </Facts>
   </Block>;
 }
