@@ -722,9 +722,29 @@ then a same-key retry returns the original GRN, while a different-key duplicate 
 unposted report. Both prove one stock movement and one posted receipt. Its committed fixtures
 remain only in the disposable local database so independent connections can observe them. No production receipt, stock, storage upload or account
 was changed. Ordinary CI skips this suite without `CARRES_RECEIVING_TARGET_DATABASE_URL`; that
-skip is not acceptance. Existing 0601 baseline was 13/13 before the candidate and is now 12/13:
-its legacy Warehouse-count/Operation-check-in case still uses the old contract and does not prove
-the new flow. Existing Operation direct receipt/amendment checks continue to pass.
+skip is not acceptance. The 0601 receipt-closure suite now passes 13/13 against the local candidate,
+together with all 50 target transaction cases (63 total). Its former Warehouse-count/Operation-check-in
+expectation is replaced by the approved final-confirmation contract: a posted GRN, actual Warehouse
+actor, recorded physical time, partner-company receiver and received Unit stock state before any
+Operation call. Legacy reviewed-by audit fields mirror that same physical actor, not an Operation
+approval. Fixture POs use explicit destinations at their test Sites and an actual local proof object;
+they no longer inherit an unrelated default destination. The Office-door Warehouse refusal,
+Operation direct receipts, time validation, exact-Unit amendments and version checks remain intact.
+All fixture writes roll back; `/tmp/receiving-closure-target-convergence.log` records the run.
+
+**Repair-return Work consequence — VERIFIED GAP / NOT BUILT, 2026-10-05.**
+The existing RO reader derives returned Units from posted source-linked GRNs; the Work projection
+removes the return-date follow-up only when all required Units are back. Operation arrival posting
+wraps that write with `repairOrderReturnWorkCompletion`, but Warehouse final confirmation currently
+does not record the Completed occurrence. The existing wrapper is not directly reusable: its RO
+read enters the Operation-only router, and its Work history read uses caller RLS. Warehouse would
+be refused or unable to resolve the correct occurrence generation. The Workspace chat independently
+confirmed both boundaries. Required convergence is a source-authorised, server-only minimal return
+fact/history read, reusing the common projection and Completed writer with the actual Warehouse
+actor. No RO page/read grant or commercial payload belongs in the Warehouse response. Partial return,
+blocked report, failed confirmation and concurrent RO cancellation must not count as Warehouse
+completion; only this successful GRN's return fact may do so. This remains an implementation gap,
+not an unresolved owner business decision or a reason to reintroduce Operation approval.
 
 **Confirmation transport — BUILT ON BRANCH / NOT DEPLOYED, 2026-10-05.**
 The bounded shared confirmation schema and `/api/warehouse/receipts/confirm` preserve absent/null
@@ -746,8 +766,11 @@ custody, unchanged commercial PO count, same-key retry, same-session missing-pro
 other-Site refusal, issue hold, Operation-door refusal, duplicate handover note, foreign proof
 isolation and the own-report source identity. The shared transport carries arrival source/Units
 without inventing a PO. Existing arrival business transitions are retained; this does not prove
-all repair/return/replacement lifecycle fixtures or production function reconciliation. SQL stays
-only in chat and the isolated local database. API typecheck passes after this extension.
+all downstream repair/return/replacement completion. Read-only production reconciliation on
+2026-10-05 confirms `receiving_arrival_post(uuid,jsonb)` has normalised body MD5
+`94f32438418de444dc3f62c7fd70e0b8`, exactly the retained original used for this extraction and the
+draft's precondition guard. This verifies the starting engine, not the new candidate in production.
+SQL stays only in chat and the isolated local database. API typecheck passes after this extension.
 The candidate now also supplies a scoped Warehouse non-PO arrival reader and proof-access helper.
 Only active individual Warehouse accounts at the destination's active Site/company may read pending
 source Units; posted physical Units and cancelled sources leave the pending read. Its API exposes
@@ -844,7 +867,7 @@ no media error), and native controls are present. Playback itself and real uploa
 are not claimed. Screenshot: `/tmp/carres-warehouse-evidence-phone-local.jpg`.
 SQL remains chat-only, unapproved and unapplied to production. This does not close
 source-resolution workflow, downstream repair-return Work closure,
-legacy fixture convergence, full Warehouse listing acceptance or the production release gate.
+full Warehouse listing acceptance or the production release gate.
 
 **Operation saved-report inspection — BUILT ON BRANCH / NOT DEPLOYED, 2026-10-05.**
 Operation's existing receipt History opens any saved report event through the same ReceivingReportHistory
