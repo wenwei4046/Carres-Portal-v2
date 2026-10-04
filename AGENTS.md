@@ -5,3 +5,8 @@ Claude-only policy. Before UI work, follow its Mandatory UI cold-start: UI MASTE
 the owning module MASTER and COPY-STANDARD. Reuse its kit components and run its complete-page acceptance checks. Do not create another UI guide or versioned MASTER.
 Approved SO Batch stock-selection UI is in Purchasing MASTER §9.1, BUILT 2026-09-18; the
 authenticated production walk is still owed, and approval is never build proof.
+
+Purchasing chats start with [docs/purchasing/MASTER.md](docs/purchasing/MASTER.md),
+“Current approved Purchasing Blueprint — start here”. It is the only module Blueprint;
+read its current owner rulings before older implementation evidence. Do not create another
+Purchasing Blueprint, checkpoint or planning queue.
