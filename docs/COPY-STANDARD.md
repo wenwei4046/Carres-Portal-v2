@@ -1387,7 +1387,9 @@ Manual Purchase uses its own request groups and remainder arithmetic.
 
 | Heading | Rail rows |
 |---|---|
-| `ORDER TIMING` | `Can order early` · `14 safety days left` · `1 to 13 safety days left` · `No safety days left` · `Not enough production days` |
+| SO Batch local view navigation (owner-approved 2026-10-04) | `Listing` · `Report`. Report replaces Monthly demand on SO Batch only; contents remain undecided and deferred. Other modules retain Monthly demand. |
+| SO Batch daily cutoff heading (owner-approved 2026-10-04) | `Order time`; rows print configured clock times, currently `10:15 AM` / `4:00 PM`. |
+| SO Batch planning heading (owner-approved 2026-10-04) | `PO Safety Days`: `Order early` · `{N} days left` · `1–{N−1} days left` · `0 days left` · `Production late`. N is configured Safety days. No inner Safety days paragraph. Naming preserves keys, calendars and calculations. |
 | `PRODUCT` | `All products` · `Mattress` · `Bedframe` · `Sofa` |
 | `SUPPLIER` | `All suppliers` · actual supplier names, alphabetical — never hardcoded, never a placeholder, and no `No supplier` row |
 

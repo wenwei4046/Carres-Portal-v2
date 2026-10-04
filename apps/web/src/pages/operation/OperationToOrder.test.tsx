@@ -178,6 +178,21 @@ describe("the page reads the ONE projection and draws the Register", () => {
     expect(apiFetch.mock.calls[0]![0]).toBe("/api/operation/purchase/demands");
   });
 
+  it("opens the server's exact dated round and retains navigation without a business write", async () => {
+    apiFetch.mockResolvedValue({ ...payload(), poRounds: [
+      { key: "2026-10-05T10:15", unfinishedSoCount: 2 },
+      { key: "2026-10-05T16:00", unfinishedSoCount: 0 },
+    ] });
+    renderPage();
+    const round = await screen.findByTestId("so-batch-round-2026-10-05T10:15");
+    expect(round).toHaveTextContent("10:15 AM");
+    fireEvent.click(round);
+    await waitFor(() => expect(apiFetch).toHaveBeenCalledWith("/api/operation/purchase/demands?window=2026-10-05T10%3A15"));
+    expect(screen.getByTestId("so-batch-round-2026-10-05T16:00")).toBeVisible();
+    expect(screen.queryByTestId("so-batch-product-select")).not.toBeInTheDocument();
+    expect(apiFetch.mock.calls.every(call => call[1] == null)).toBe(true);
+  });
+
   it("keeps the Sales Order scope when the direct to-order URL is reloaded", async () => {
     apiFetch.mockResolvedValue(payload());
     renderPage("/operation/to-order?so=1204");

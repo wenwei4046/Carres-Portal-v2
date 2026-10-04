@@ -969,19 +969,26 @@ describe("the rail — purchasing fact sections, navigation not selection", () =
     expect(rail().parentElement?.className).toContain("relative");
   });
 
+  it("keeps Report unavailable while its content is undecided", () => {
+    renderRegister();
+    expect(screen.getByRole("tab", { name: "Listing" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tab", { name: "Report" })).toBeDisabled();
+    expect(screen.getByTestId("so-batch-page")).toBeVisible();
+  });
+
   it("renders Region immediately after Supplier", () => {
     renderRegister();
     const text = rail().textContent ?? "";
-    const order = ["Order timing", "Product", "Supplier", "Region", "Setup to fix"];
+    const order = ["PO Safety Days", "Product", "Supplier", "Region", "Setup to fix"];
     const positions = order.map((h) => text.indexOf(h));
     expect(positions.every((p) => p >= 0)).toBe(true);
     expect([...positions].sort((a, b) => a - b)).toEqual(positions);
     for (const word of [
-      "Can order early",
-      "14 safety days left",
-      "1 to 13 safety days left",
-      "No safety days left",
-      "Not enough production days",
+      "Order early",
+      "14 days left",
+      "1–13 days left",
+      "0 days left",
+      "Production late",
       "All products",
       "Mattress",
       "Bedframe",
@@ -1034,7 +1041,7 @@ describe("the rail — purchasing fact sections, navigation not selection", () =
     const long = screen.getByTestId("so-batch-state-not_enough_production_time");
     const label = long.querySelector("span.break-words");
     expect(label).not.toBeNull();
-    expect(label!.textContent).toBe("Not enough production days");
+    expect(label!.textContent).toBe("Production late");
     expect(label!.className).not.toContain("truncate");
   });
 
@@ -2290,7 +2297,7 @@ describe("approved PO Safety Days column", () => {
     }));
     renderRegister({ rows });
     const cell = screen.getByTestId("so-batch-safety-days-o1");
-    expect(cell).toHaveTextContent("Not enough production days");
+    expect(cell).toHaveTextContent("Production late");
     expect(cell).not.toHaveTextContent("-2");
   });
 

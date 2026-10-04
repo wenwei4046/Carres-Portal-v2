@@ -27,6 +27,39 @@ Git history keeps superseded designs. A screen or earlier chat cannot create a s
 
 ---
 
+### SO Batch left rail — owner-approved 2026-10-04; delivery in progress
+
+The bounded rail delivery uses the shared Sales Orders rail composition with local `Listing` /
+`Report` navigation. `Report` is a deferred destination: its contents are undecided, it remains
+unavailable, and no monthly report is built. Other modules retain Monthly demand.
+
+`Order time` prints the configured daily cutoffs; the approved default target is `10:15 AM` /
+`4:00 PM`, never a hardcoded override of Settings. Authenticated read-only Settings inspection on
+2026-10-04 measured production `11:00 AM` / `4:00 PM`, all Monday–Friday PO Days and 14 Safety days;
+this delivery does not change configuration or live business records. The separate
+planning group is `PO Safety Days`, with `Order early`, `{N} days left`, `1–{N−1} days left`,
+`0 days left`, and `Production late`; N comes from configured Safety days. There is no inner
+Safety days paragraph. This changes wording, not timing keys, quantities, eligibility or calendars.
+
+**Measured baseline:** `apps/api/src/routes/operation/purchase-demands.ts` derives each demand's
+`poWindow` from actual Proceed time through shared `poWindowFor`, governed PO Days and the Office
+calendar/holidays. Work and the existing `?window=` destination use the same stamps. Authority resolution: §§5.6.1 and 9.1 explicitly approve actual Proceed admission; Order By is
+planning arithmetic, never an unlock/admission gate. The contrary "still under review" sentence
+in the page-content draft (`e8eb0c826`) is superseded residue, not a new business decision.
+This delivery preserves the existing server stamps and Work linkage.
+The local preview's illustrative clocks, counts and statuses are not production evidence.
+
+**Delivery state:** isolated branch `codex/so-batch-rail-delivery` starts from `origin/main`, leaving
+the original preview and primary dirty checkout intact. The server now returns dated rounds using its existing window stamps plus the next two configured
+standard occurrences, with unique unfinished-SO counts (blocked uncovered demand remains counted).
+The entire round projection survives a `?window=` read; the left rail selects that existing exact
+source scope without another API or admission engine. Date support text distinguishes repeated
+clock times. Product/Supplier/Region duplicate rail controls are removed from this adopter; shared
+column filters remain. The governed setup exception remains reachable. Planning calculations,
+PO/Stock writers and Work completion are unchanged. Local targeted API and web regression suites
+passed; production deployment and authenticated acceptance remain owed. Whole-round Ready Stock matching, Quick View issuance, supplier communication and full
+SO Batch completion remain separate.
+
 ## 1 · Mission and boundary
 
 Purchasing answers five questions:

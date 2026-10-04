@@ -1564,6 +1564,16 @@ describe("the daily PO window of every demand line (Purchasing §5.6.1, owner ru
     expect(body.registerRows.map((r) => r.orderId)).toEqual(["o5"]);
   });
 
+  it("keeps complete dated round navigation when the register is scoped", async () => {
+    const { body: all } = await rowsOf(windowTables());
+    const { res } = await getDemands(windowTables(), "operation", "/api/operation/purchase/demands?window=2026-09-02T16:00");
+    const scoped = await res.json() as SoBatchPurchaseResponse;
+    expect(scoped.poRounds).toEqual(all.poRounds);
+    expect(all.poRounds?.find(r => r.key === "2026-09-02T11:30")?.unfinishedSoCount).toBe(1);
+    expect(all.poRounds?.some(r => r.key.startsWith("2026-09-03T"))).toBe(false);
+    expect(all.poRounds?.some(r => r.key === "2026-09-04T11:30")).toBe(true);
+  });
+
   it("refuses a malformed window", async () => {
     const { res } = await getDemands(windowTables(), "operation", "/api/operation/purchase/demands?window=today");
     expect(res.status).toBe(400);
