@@ -3580,23 +3580,20 @@ fewest lines, four at most; one editor at a time, folded on success, kept on fai
 without a zone suffix while the full instant is kept; nothing in a module repeats the header, a date,
 the sales facts or a completion note.
 
-**2026-10-04 scoped acceptance correction — production proof bounded to086f23d:** PR #1878, exact CI37198797912 and Deploy37199668418 succeeded; independent verification matched all five revision surfaces. Real Orders entry proved shared source details, date/countdown, phone pair, building/access facts, current Payment template with actual SO reference, canonical Timeline recorder, corrected service/null facts, four-view Register return, unfiltered monthly reconciliation and five widths. The owning `docs/orders/MASTER.md` acceptance matrix records the actual identities and remaining boundaries. A completed-order Delivery projection defect found on SO-1362 remains BUILD in PR #1881; the initial adoption does not certify that path. PR #1879 separately governs the shared header/Balance due correction. Workspace and other-module adoption remain outside this release.
-
-**Initial adoption production evidence — 2026-10-04:** PR #1871 merged as `a9dbb6b8918e9337328eefccebe547ee1d2f4ab6`;
-exact-head CI `37189941545` and production Deploy `37190758212` passed. Independent
-`verify-production.mjs` confirmed that SHA on both Pages projects, both ERP/POS canonical domains
-and API health. Sara · Principal opened the actual Listing Cards quick view, with truthful Info
-money and Delivery source facts, Customer form/Cancel and read-only DO checks. Saved SO document
-rendered from its number; no Print or Download was invoked. Info and Delivery were photographed at
-1146/480/440/420/390px without page overflow. The existing full page rendered equal752px panes at
-1800px, retained the formal PDF through Edit/Cancel, and Back restored search1368 and Cards.
-Successful/refused-save behavior is tested; no live business record was changed to test a save.
-This change also removes the hidden duplicate Close from the compact Drawer: its sr-only region
-holds title/description only, so first focus reaches a visible card control. The regression covers
-visible initial focus, Escape and return to the opener; other Drawer/Modal headers retain Close.
-Address facts use governed explicit Floor and lift/stair wording rather than bare1/No values.
-This evidence covers card content and its Register Drawer, not Workspace Working Panel or
-other-module adoption. The sole contract records the reusable API and verification boundary.
+**Current bounded production acceptance — 2026-10-04:** PR #1881 exact head
+`ee8cf695cb9790321efeeaa5fbaac0e05e43ce1e` passed CI37201089568 and deployed as
+`f7857f6af3f1b6b7870b927db32d2bd9bc3f4232` (Deploy37202073286). Independent verification matched
+all five revision surfaces. The owning Orders MASTER acceptance matrix carries the earlier086f23d
+fact/template/context/monthly proof and the finalf7857f6 completed/open-order comparison: completed
+Delivery retains the final carrier/date/DO without writers or re-entering Monitor, while the open
+order retains its forms and Cancel truth. Five completed-Delivery widths have no page overflow;
+the final formal page has equal752px panes and retains its PDF through Edit/Cancel/Back. The target
+also contains PR #1879's approved header and Balance due correction. Visible document focus,
+Escape/opener return, source facts and explicit loading/error remain covered by shared guards.
+This proof is card content plus its Register Drawer and existing formal object paths. Workspace
+Working Panel and other-module adoption, live business saves/sends, Print/Download completion and
+all-role historical/exception variants are not certified. The sole contract defines reuse; Orders
+MASTER carries the concrete acceptance and remaining module boundaries.
 
 **Open, recorded, not approved:** palette, font, radius and glyphs are the reference's own (token
 decision pending); 40px phone touch targets shown for review only; the editable `To` differs from the

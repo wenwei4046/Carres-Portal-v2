@@ -106,24 +106,18 @@ Workspace Working Panel and other modules have not adopted this adapter. Their p
 contact channels, domain headers and approved full-page composition remain module-owned; customer/SO
 header assumptions must not be imposed on supplier POs or source-free purchasing objects.
 
-**Current bounded acceptance — 2026-10-04:** Orders MASTER owns the existing-path matrix. PR #1878 deployed086f23d with exact CI/deploy and independent five-surface proof; real entry verified its fact/template/context repairs and five widths. Completed SO-1362 Delivery still needs PR #1881 target proof. PR #1879 governs the subsequent header and Balance due correction. No complete-module claim follows from the card proof.
-
-**Initial production evidence — scoped Sales Orders adoption, 2026-10-04.** PR #1871 merged as
-`a9dbb6b8918e9337328eefccebe547ee1d2f4ab6`. CI `37189941545`, Deploy `37190758212` and independent five-surface
-revision verification passed. Sara · Principal used the real Listing Cards entry: Info showed the
-saved money; Delivery showed actual0/1 goods, Not assigned, Date not confirmed and No DO yet.
-Customer form opened and Cancel preserved those facts; DO conditions remained non-interactive.
-The SO number rendered the saved formal document. Info/Delivery were photographed at
-1146/480/440/420/390px with no page overflow. Full-page navigation produced equal752px panes at
-1800px, formal PDF remained visible through Edit/Cancel, and Back restored search1368 and Cards.
-137 targeted card/Register tests and105 existing full-page checks passed before release.
-No live record was changed for a save test; success/failure/Cancel are covered by tests, not claimed
-as a live save. No Print/Download was invoked; physical printing remains unverified.
-The compact Drawer's accessible hidden identity contains no focusable duplicate Close; its visible
-card controls own initial focus and Close. The regression covers initial focus, Escape and return;
-its targeted kit/dialog suite passed23 checks. Source-backed address facts name Floor, No lift/Has
-lift (shared LIFT_OPTIONS) and Items needing stair carry rather than presenting bare numbers or Yes/No.
-A /ui result alone still does not prove a business entry.
+**Current bounded production acceptance — 2026-10-04:** PR #1881 deployed
+`f7857f6af3f1b6b7870b927db32d2bd9bc3f4232` after exact CI37201089568, Deploy37202073286 and
+independent five-surface convergence. Orders MASTER owns the existing-path acceptance matrix,
+including086f23d's source/template/context/monthly proof. Onf7857f6 completed SO-1362 retains AL,
+customer date and its final DO as read-only facts; open SO-1368 keeps its existing forms and Cancel
+truth. Monitor remains96 open work records and does not admit completed1362. Five completed-Delivery
+widths have no page overflow; the formal object has equal752px panes and retains PDF through
+Edit/Cancel/Back. The target includes the separately approved PR #1879 header/Balance due correction.
+Initial focus is a visible document control; hidden identity has no duplicate Close. Shared guards
+cover focus/Escape/opener return and read failures. Live Save/send, Print/Download completion,
+Workspace adoption and all exceptional/role/historical variants remain outside this proof.
+A /ui result alone does not prove a business entry; the actual Orders entry supplies this evidence.
 
 ## Differences from the reference page (125 checks: 25 states × 5 widths)
 

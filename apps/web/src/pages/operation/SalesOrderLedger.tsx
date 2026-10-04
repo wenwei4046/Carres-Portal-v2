@@ -4,6 +4,7 @@ import type { SalesOrderRevisionRow } from "@/lib/queries";
 import { fmtDate } from "@/lib/fmt-date";
 import { isToday, isYesterday } from "./components/activity-display";
 import { describeRevisionChanges } from "./sales-order-revisions";
+import { OverflowText } from "@/components/register/DataGrid";
 
 /**
  * ⭐ THE THREE-RANK RECORD GRAMMAR (CARD 2026-08-27, owner-approved).
@@ -297,7 +298,19 @@ export function groupHistoryChronology<T extends { occurred_at: string }>(
  *  Before → After list); an empty rank renders nothing at all. Exported so
  *  every object History (Manual Purchase, Card 05) draws the SAME record —
  *  one implementation, never a lookalike (Law C). */
-export function RecordRanks({ words, index }: { words: LedgerRecordWords; index?: number }) {
+function recordDetails(words: LedgerRecordWords, index?: number, overflow = false) {
+  return words.detail.length > 0 ? (
+    <span className="flex min-w-0 w-full flex-col gap-0.5" {...(index != null ? { "data-testid": `history-detail-${index}` } : {})}>
+      {words.detail.map((line, d) => (
+        <span key={d} className="min-w-0 text-label font-normal text-base-600 break-words">
+          {overflow ? <OverflowText text={line} label={words.title} /> : line}
+        </span>
+      ))}
+    </span>
+  ) : null;
+}
+
+export function RecordRanks({ words, index, overflow = false }: { words: LedgerRecordWords; index?: number; overflow?: boolean }) {
   return (
     <>
       <span
@@ -312,18 +325,7 @@ export function RecordRanks({ words, index }: { words: LedgerRecordWords; index?
       >
         {words.identity}
       </span>
-      {words.detail.length > 0 && (
-        <span
-          className="flex flex-col gap-0.5"
-          {...(index != null ? { "data-testid": `history-detail-${index}` } : {})}
-        >
-          {words.detail.map((line, d) => (
-            <span key={d} className="text-label font-normal text-base-600 break-words">
-              {line}
-            </span>
-          ))}
-        </span>
-      )}
+      {recordDetails(words, index, overflow)}
     </>
   );
 }
@@ -388,15 +390,19 @@ export default function SalesOrderLedger({
               const words = revisionRecordWords(r, currentRevision, orderReference);
               return (
                 <li key={r.revision} className="py-1 first:pt-0 last:pb-0">
-                  <button
-                    type="button"
-                    onClick={() => onViewRevision(current ? null : r.revision)}
-                    aria-current={selected ? "true" : undefined}
-                    data-testid={`revision-record-${r.revision}`}
-                    className={`flex w-full min-w-0 flex-col items-start gap-0.5 rounded-control px-2 py-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9 focus-visible:ring-offset-1 ${selected ? "bg-kit-blue-3" : "hover:bg-hovertint"}`}
-                  >
-                    <RecordRanks words={words} />
-                  </button>
+                  <div className={`flex w-full min-w-0 flex-col items-start gap-0.5 rounded-control px-2 py-2 ${selected ? "bg-kit-blue-3" : "hover:bg-hovertint"}`}>
+                    <button
+                      type="button"
+                      onClick={() => onViewRevision(current ? null : r.revision)}
+                      aria-current={selected ? "true" : undefined}
+                      data-testid={`revision-record-${r.revision}`}
+                      aria-label={[words.title, words.identity, ...words.detail].join(" · ")}
+                      className="flex w-full min-w-0 flex-col items-start gap-0.5 rounded-control text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9 focus-visible:ring-offset-1"
+                    >
+                      <RecordRanks words={{ ...words, detail: words.detail.slice(0, 1) }} />
+                    </button>
+                    {recordDetails({ ...words, detail: words.detail.slice(1) }, undefined, true)}
+                  </div>
                   {!current && onProposeRevision && (
                     <button
                       type="button"
@@ -431,7 +437,7 @@ export default function SalesOrderLedger({
                   const words = historyRecordWords(event, revisions);
                   return (
                     <li key={index} className="flex min-w-0 flex-col gap-0.5 py-2 first:pt-0 last:pb-0">
-                      <RecordRanks words={words} index={index} />
+                      <RecordRanks words={words} index={index} overflow />
                     </li>
                   );
                 })}
