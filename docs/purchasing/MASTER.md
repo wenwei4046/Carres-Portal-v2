@@ -528,8 +528,12 @@ original identities and supplier DO references stay unchanged. No local filter e
 Tests cover a match beyond the first 50 records, numeric sorting, invalid query rejection and
 clearing the filter. The shared preview browser found record 61 through Supplier B with only five
 rows loaded, then restored all 61 on Clear. After merging current main, 106 Receiving/shared-card/
-Sales Order/SO Batch regressions passed. Full CI and authenticated filter acceptance remain owed. Full-result export and
-the approved two-view/Table-Cards composition remain separate unfinished work.
+Sales Order/SO Batch regressions passed. Production deployment `37215036695` failed before publishing:
+a Manual Purchase test compared its wall-clock Settings result with fixed requested dates, which
+coincided after MYT midnight. The shared test-only repair fixes the PO test clock and preserves
+all date-ownership assertions; all 95 tests in that file passed locally. A covering production
+deployment and authenticated filter acceptance remain owed. Full-result export and the approved
+two-view/Table-Cards composition remain separate unfinished work.
 
 **Read-only production evidence, 2026-10-04:** `warehouse_submit_receipt` still files a report;
 `warehouse_receipt_check_in` calls Operation's post-authority gate. The only current active

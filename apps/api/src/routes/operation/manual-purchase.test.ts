@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, afterAll, vi } from "vitest";
 import { signTestJwt, useTestJwks } from "../../test/jwt";
 import { poDeliveryDateOf, purchasingRefusal } from "@carres/shared";
 import { todayIsoMYT } from "../../lib/delivery-order-issue";
@@ -59,6 +59,8 @@ const env = {
 async function makeJwt(role: string) {
   return signTestJwt("11111111-1111-1111-1111-000000000999", { email: `${role}@carres.com`, app_metadata: { role } });
 }
+
+afterEach(() => vi.useRealTimers());
 
 beforeEach(() => {
   useTestJwks();
@@ -1533,6 +1535,9 @@ describe("Card 06 · POST /issue — Delivery Date joins the document partition"
   }
 
   it("two Delivery Dates still create two POs — and neither prints the requested date", async () => {
+    // A real October clock can legitimately calculate one of the fixture dates.
+    // Fix the PO date so this tests date ownership rather than calendar coincidence.
+    vi.useFakeTimers({ now: new Date("2026-09-22T04:00:00Z"), toFake: ["Date"] });
     /**
      * ⭐ THE OWNER CORRECTION OF 2026-09-22, IN ONE TEST.
      *
