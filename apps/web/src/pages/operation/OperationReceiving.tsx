@@ -330,7 +330,7 @@ export default function OperationReceiving() {
         sortable: true,
         /* Every Register row IS a GRN (the boundary above) — the formal
            number exists by construction (purchasing/MASTER.md §7.3). */
-        searchValue: (r) => receivingDisplayNo(r),
+        searchValue: (r) => `${r.grn_no ?? ""} ${receivingDisplayNo(r)}`,
         exportValue: (r) =>
           r.status === "voided"
             ? `${receivingDisplayNo(r)} · Cancelled`

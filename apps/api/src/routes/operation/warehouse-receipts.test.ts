@@ -414,6 +414,23 @@ describe("GET /?scope=grn — the paged GRN Register", () => {
     goods_received_at: "2026-09-01",
   };
 
+  it.each(["GRN-20260906-1234", "GRN-260906-1234"])(
+    "resolves original and displayed GRN search %s to the same stored receipt",
+    async (number) => {
+      vi.mocked(userClient).mockReturnValue(makeSb({
+        warehouse_receipts: { list: { data: [POSTED], error: null }, count: 0 },
+      }) as never);
+      const response = await req(
+        `/api/operation/warehouse-receipts?scope=grn&q=${encodeURIComponent(number)}`,
+        "GET", await makeJwt("operation"),
+      );
+      expect(response.status).toBe(200);
+      const body = await response.json() as { receipts: Array<{ id: string; grn_no: string }>; page: { total: number } };
+      expect(body.page.total).toBe(1);
+      expect(body.receipts[0]).toMatchObject({ id: POSTED.id, grn_no: POSTED.grn_no });
+    },
+  );
+
   it("answers a PAGE — rows, facets, the whole-set total — with the governed supplier date and product words attached", async () => {
     const sb = makeSb({
       warehouse_receipts: { list: { data: [POSTED], error: null }, count: 0 },
