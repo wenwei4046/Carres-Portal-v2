@@ -3808,6 +3808,16 @@ two presentations of one register, not duplicate facts on one screen. Exact item
 promise batches are inspected on the selected PO; do not repeat a full item table inside every card.
 Full PO information/edit + actual PDF remains the approved 50/50 surface under §9.3.
 
+**OWNER CONFIRMED 2026-10-04 — post-placement sending in the round panel.**
+After round placement, keep its issued POs in the right-side task panel, identified by supplier,
+PO number and current version. Each unsent PO exposes its source-bound Send PO action. Open the
+same Purchasing Communication action with that supplier's verified recipient and actual current
+PO PDF; never invent a missing contact or bind to the first unrelated PO. Retain sent results
+and keep remaining unsent actions visible so Operation need not return to the register to find
+its next PO. Opening WhatsApp/email or copying a message is not confirmed sending; record actual
+sending evidence through the existing authority. This is approved placement/interaction truth,
+not proof that the panel or external-channel sending is implemented.
+
 **OWNER CONFIRMED 2026-10-04 — round placement, safe retry and editable timing.**
 Operation places the eligible prepared buying scope for the selected round together. The system
 creates separate POs according to supplier and existing compatible destination/document rules;
