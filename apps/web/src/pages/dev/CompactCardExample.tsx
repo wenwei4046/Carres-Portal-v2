@@ -192,7 +192,7 @@ export default function CompactCardExample() {
               summary: [
                 { key: "total", label: "Total", value: "RM2,759.00" },
                 { key: "paid", label: "Paid", value: "RM1,380.00" },
-                { key: "outstanding", label: "Outstanding", value: "RM1,379.00" },
+                { key: "outstanding", label: "Balance due", value: "RM1,379.00" },
               ],
               items: (
                 <table className={s.orderItems}>

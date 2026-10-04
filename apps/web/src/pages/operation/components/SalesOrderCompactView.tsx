@@ -82,7 +82,7 @@ export default function SalesOrderCompactView({ row, salesLocation, items, docum
     target={row.customerDelivery ? { date: fmtDateShort(row.customerDelivery), badge: `${Math.round((Date.parse(row.customerDelivery.slice(0, 10)) - Date.parse(appTodayIso())) / 86400000)}d` } : undefined}
     openLabel="Open full page" onOpen={onOpen} onClose={onClose}
     initialModule="info" modules={[
-      { key: "info", label: "Info", opensHeaderDetails: true, summary: [{ key: "total", label: "Total", value: money(row.total) }, { key: "paid", label: "Paid", value: money(row.paid) }, { key: "outstanding", label: "Outstanding", value: money(row.balance) }], items, details },
+      { key: "info", label: "Info", opensHeaderDetails: true, summary: [{ key: "total", label: "Total", value: money(row.total) }, { key: "paid", label: "Paid", value: money(row.paid) }, { key: "outstanding", label: "Balance due", value: money(row.balance) }], items, details },
       { key: "delivery", label: "Delivery", summary: [stock, logistics, customer, doFact], items, communication: deliveryCommunication },
     ]}
     communication={{ recipients: [{ value: row.phone, label: row.customer, phone: row.phone }], templates: customerTemplates }}

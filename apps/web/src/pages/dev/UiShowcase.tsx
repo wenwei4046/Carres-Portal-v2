@@ -639,7 +639,7 @@ export default function UiShowcase() {
           </Grid>
         </Section>
 
-        <Section id="compact-card" title="Compact module card — §4.3" note="Owner-confirmed 3 Oct 2026. One component for every module card: header, module tabs, four facts with inline editors, items, Communication and Timeline. Filled here with the confirmed Delivery sample; each module passes its own facts. Palette, font and radius await the owner's token decision.">
+        <Section id="compact-card" title="Compact module card — §4.3" note="Owner-confirmed 3 Oct 2026. One component for every module card: header, module tabs, four facts with inline editors, items, Communication and Timeline. Filled here with the confirmed Delivery sample; each module passes its own facts. Dark identity Header approved 4 Oct 2026; remaining body palette, font and radius await the owner's token decision.">
           <CompactCardExample />
         </Section>
 
