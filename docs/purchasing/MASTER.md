@@ -1034,8 +1034,15 @@ the note read policy is Operation-only, keeping supplier/commercial investigatio
 access. An Operation API checks the exact receipt/custody pair, rejects disposition fields and calls
 the guarded writer with the user's JWT. The custody reader includes complete bounded note history;
 a failed history read fails explicitly. Saving a note changes no custody quantity, Stock, PO, Claim,
-acceptance or return result. No supplier message is sent. The UI note editor and formal resolution
-journey remain unfinished. SQL is retained in the chat-only draft and disposable local database.
+acceptance or return result. No supplier message is sent. The shared Modal/Textarea editor now opens from the exact extra-goods row. It preserves text and
+save key across uncertain save, close/reopen and retry; only a matching confirmed response clears
+the draft. History shows the actual recorder/time and wrapped note, with unknown names explicit.
+The 82 Receiving UI/component tests and 92 API receipt-route tests pass. The 390×844 illustrative
+preview saved a note and displayed its recorder/history; the initial horizontally scrolling history
+was replaced by the existing wrapped history grammar. Screenshot:
+`/tmp/carres-extra-custody-note-phone-local.png`. This proves sample UI behavior only; no supplier
+message or production write occurred. Formal resolution remains unfinished. SQL is retained in
+the chat-only draft and disposable local database.
 
 **Missed-arrival Work ownership — DEPLOYED, BOUNDED LIVE ACCEPTANCE, 2026-10-05.**
 A supplier date without a physical report no longer creates Receiving Check in work. The existing

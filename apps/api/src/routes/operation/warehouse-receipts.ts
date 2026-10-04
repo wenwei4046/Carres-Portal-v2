@@ -1232,7 +1232,12 @@ warehouseReceiptsRouter.get("/:id/extra-custody", requireOperation, async (c) =>
     .from("receiving_extra_custody_notes").select("id,custody_id,note,actor_id,recorded_at")
     .in("custody_id", custodyIds).order("recorded_at").order("id").range(from, to)) : { rows: [] };
   if (!("rows" in notes)) return c.json({ message: "Custody notes could not be read completely" }, 503);
+  const actorIds = [...new Set(notes.rows.map(row => row.actor_id).filter((id): id is string => typeof id === "string"))];
+  const actors = actorIds.length ? await readAllPages<{ id: string; name: string }>((from, to) => sb
+    .from("app_users").select("id,name").in("id", actorIds).order("id").range(from, to)) : { rows: [] };
+  if (!("rows" in actors)) return c.json({ message: "Note recorders could not be read completely" }, 503);
   return c.json({ receipt, custody: result.rows, notes: notes.rows,
+    actorNames: Object.fromEntries(actors.rows.map(actor => [actor.id, actor.name])),
     siteNames: Object.fromEntries(sites.rows.map(site => [site.id, site.name])) });
 });
 

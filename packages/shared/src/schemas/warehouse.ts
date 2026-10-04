@@ -158,9 +158,16 @@ export interface WarehouseConfirmationResult {
   already_saved: boolean;
 }
 
+export const receivingExtraCustodyNote = z.object({
+  id: z.string(), custody_id: z.string(), note: z.string(), actor_id: z.string(),
+  recorded_at: z.string(), request_key: z.string(),
+});
+
 /** Read-only physical custody evidence; no inventory identity or disposition. */
 export const receivingExtraCustodyEvidence = z.object({
   custody: z.array(z.object({ id: z.string(), reported_sku: z.string(), reported_qty: z.number().int().positive(),
     reported_note: z.string().nullable(), actual_site_id: z.string(), goods_received_at: z.string() })),
   siteNames: z.record(z.string()),
+  notes: z.array(receivingExtraCustodyNote.omit({ request_key: true })),
+  actorNames: z.record(z.string()),
 });

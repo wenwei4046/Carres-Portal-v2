@@ -409,6 +409,7 @@ const PO_RECEIVING = {
   ],
 };
 
+const custodyNotes: Record<string, string>[] = [];
 const realFetch = window.fetch.bind(window);
 window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   const url =
@@ -418,7 +419,13 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });
-  if (url.includes("/extra-custody")) return json({ siteNames: { [WH]: "Carres Klang" }, custody: PAGE === "custody" ? [
+  if (url.includes("/extra-custody/") && url.endsWith("/notes") && init?.method === "POST") {
+    const body = JSON.parse(String(init.body));
+    const note = { id: "preview-note", custody_id: "preview-custody", note: body.note,
+      request_key: body.key, actor_id: "preview-actor", recorded_at: new Date().toISOString() };
+    custodyNotes.push(note); return json(note);
+  }
+  if (url.includes("/extra-custody")) return json({ notes: custodyNotes, actorNames: { "preview-actor": "Shasha" }, siteNames: { [WH]: "Carres Klang" }, custody: PAGE === "custody" ? [
     { id: "preview-custody", reported_sku: "Unordered pillow", reported_qty: 2,
       reported_note: "Supplier sent two extra pieces", actual_site_id: WH, goods_received_at: "2026-10-05" },
   ] : [] });

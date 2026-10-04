@@ -1262,6 +1262,7 @@ export {
 } from "./receiving-register";
 export {
   receivingExtraCustodyEvidence,
+  receivingExtraCustodyNote,
   warehouseSubmitReceiptInput,
   warehouseConfirmReceiptInput,
   warehouseConfirmationReportInput,
