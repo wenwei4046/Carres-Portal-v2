@@ -2035,7 +2035,7 @@ dictionary with the approved Receiving build; each is registered here so no chat
 
 | Word | Where | Why this word |
 |---|---|---|
-| `Goods arrived at` | Receiving Details field · Register column · rail heading `GOODS ARRIVED AT` | Where the goods PHYSICALLY arrived — a warehouse, showroom or any other real site, never assumed to be a warehouse. It never overwrites `Supplier Deliver To` (where the PO instructed the supplier to deliver; `Deliver To` on other surfaces) — the instruction and the physical truth are two facts, both preserved. **Owner correction 2026-09-06:** the retired labels `Actual Site`, `Delivery Location` and `Goods Received At` may not appear on Receiving surfaces; `Delivery Location` stays reserved for the CUSTOMER's delivery address. |
+| `Goods arrived at` | Receiving Details field · Register column · shared list location filter | Where the goods PHYSICALLY arrived — a warehouse, showroom or any other real site, never assumed to be a warehouse. It never overwrites `Supplier Deliver To` (where the PO instructed the supplier to deliver; `Deliver To` on other surfaces) — the instruction and the physical truth are two facts, both preserved. **Owner correction 2026-09-06:** the retired labels `Actual Site`, `Delivery Location` and `Goods Received At` may not appear on Receiving surfaces; `Delivery Location` stays reserved for the CUSTOMER's delivery address. |
 | `Extra Qty` | Receiving Summary · Register column | Goods that were not on the source PO/CO, recorded SEPARATELY. Extra goods never enter Inventory and never alter ordered/pending-delivery arithmetic. |
 | `Extra goods` | session section | The section that records `Extra Qty` lines. First check whether the goods belong to another PO or CO. |
 | `Arrival evidence` | Receiving Details field | Photo AND video of the physical arrival — beside, never instead of, the `Signed DO photo`. |
@@ -2043,7 +2043,6 @@ dictionary with the approved Receiving build; each is registered here so no chat
 | `Amend Receiving` | the posted GRN's correction door | A posted GRN has no ordinary Edit. The original is preserved; the correction carries its reason, before/after, and an append-only `amended` event. |
 | `Void Receiving` | the GRN object's `More ▾` menu | Only for a GRN that should never have existed — not a normal primary action (owner correction 2026-09-06). Distinct from an order's `Cancel`: the record and its evidence survive; the consequences reverse, or the door refuses with the exact downstream blocker. |
 | `Cancelled` | GRN document status — shown only under the GRN No of a cancelled GRN, the object pill and the GRN paper | **Owner ruling 2026-09-17 (APPROVED / NOT BUILT):** a normal GRN shows no status label; `Valid` and the Status column are retired. `Posted` and `Voided` remain internal database statuses and never reach a normal user's screen. A cancelled GRN keeps its number and prints `CANCELLED` on the document. |
-| `GRN date` · `Received with` · `Damaged goods` · `Wrong items` · `Extra goods` · `Goods arrived at` · `Cancelled GRNs` · `Choose dates…` · `{d} – {d} {Mon}` | Receiving rail (owner ruling 2026-09-17, APPROVED / NOT BUILT) | The month calendar is retired from Receiving. `GRN date` is the GRN creation date; the arrow expands a week into days without filtering; pressing a week, month or day filters. No explanatory sentences in the rail. |
 | `Someone changed this GRN. Check it again.` · `{Unit ID} cannot change.` + `Reserved for {SO No}` · `On {DO No}` · `On {Claim No}` · `Delivered` · `Time not recorded` | Amend Receiving (owner ruling 2026-09-17; BUILT ON BRANCH, 0601) | Named-Unit amend refusals, one per locked Unit, and the unknown-time state of an older GRN. |
 | `GOODS RECEIVED NOTE` | the formal GRN document's title | The A4 document (SO-PDF-STANDARD chrome, money-free). A GRN number without this formal document is not sufficient. |
 | `No GRN yet` | `Reports → Receiving & Inbound` cell for an unposted session | The formal GRN exists only from the posted session (purchasing/MASTER.md §7.3) — an honest absence, never `—`. The GRN REGISTER never needs it: a Register row exists only once the GRN does (owner correction 2026-09-06). |
@@ -5176,3 +5175,15 @@ These words are on screen in the branch and are not approved yet. `Net result` i
 | Toasts | `Forecast saved` · `Plan copied from {Mon YYYY}. Save to keep it.` |
 | States | `Loading the forecast…` · `The forecast could not be loaded. Try again.` · `No income or expense account is in the chart.` |
 | Refusals | `Only Finance plans a forecast.` · `Choose the month.` · `The plan could not be read.` · `Account {code} cannot be planned: it is not an income or expense account.` · `{code} {name}: plan an amount or a share, not both.` · `{code} {name}: the amount is not a number.` · `{code} {name}: type the amount in ringgit and sen.` · `{code} {name}: an income account is planned as an amount.` · `{code} {name}: the share is not a number.` · `{code} {name}: a share is 0% or more, to two decimals.` · `Someone else saved this month after you opened it. Open it again to see their plan.` · `The forecast could not be saved. Try again.` |
+
+### Receiving and shared Calendar — owner-approved target, 2026-10-04
+
+These words are approved target copy, not deployment evidence. Purchasing MASTER §9.4 owns
+Receiving placement; UI MASTER owns Calendar. No posting/permission change is implied.
+
+| Surface | Approved words | Meaning |
+|---|---|---|
+| Receiving left-rail views | `GRN Records` · `Receiving Differences` | Formal receipts; source-linked discrepancy view, not a second Work queue |
+| Shared list toolbar | `Search` · `Table` · `Cards` · `Page tools` · `Columns` | Reuse shared controls and existing action availability |
+| Right Working Panel sections | `Receipt details` · `Items & quantities` · `Evidence` · `Related records` · `History` | Receiving-owned facts and permitted actions |
+| Shared Calendar | `All modules` · `Filter by module` · `Filter by location` | Authorised implemented dated events; one owner/event/count; no duplicate Receiving arrival |

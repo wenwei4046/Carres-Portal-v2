@@ -4061,42 +4061,43 @@ Warehouse submits count                (or Operation enters goods directly)
 → Inventory updated automatically at Goods arrived at
 ```
 
-- **ONE RECEIVING DESTINATION (owner correction 2026-09-06, second ruling).** `Purchasing →
-  Receiving` is the only Receiving page. No Receiving Monitor, no `Calendar View / GRN Register
-  View` switch, no permanent tabs, no second Receiving destination — the earlier two-view
-  proposal is superseded. The page is: left, the 240px factual rail (GRN date and the business
-  filters, portal-wide rail style); right, always the complete GRN Register. The right side never becomes a weekly calendar and never shows work cards —
-  daily Receiving actions stay in My Work / Team Work.
-- **THE REGISTER BOUNDARY (owner correction 2026-09-06 §1).** `Receiving` is the formal GRN
-  Register, not the daily work queue: `My Work` / `Team Work` hold what staff must receive or
-  review; the Register holds formal GRN records. A Warehouse count awaiting Carres action appears
-  in Work and deep-links to its Receiving review; it becomes a Register row only when
-  `Save Receiving` creates the GRN. The old permanent state rows (`All receiving` · `Count
-  waiting for check` · `Sent back to recount` · `Posted` · `Voided`) are retired.
+- **RECEIVING PRESENTATION — OWNER-APPROVED TARGET / NOT BUILT, 2026-10-04.**
+  One existing Receiving page; its left rail has `GRN Records` (default) and
+  `Receiving Differences`. These are views, not new sidebar destinations or top tabs.
+  `GRN Records` contains formal GRNs, one row per receipt. `Receiving Differences`
+  presents source-linked receipt discrepancies and their existing related handling records;
+  it is not another task ledger, supplier ETA chase list or manual Done mechanism.
+  Preserve the identity of an unposted report: no GRN number or posted result is invented.
+  My Work / Team Work retain assignment, deadlines and completion ownership.
+  A Warehouse count becomes a formal GRN only through the governed posting door.
+  This presentation approval does NOT approve NETS automatic posting: Warehouse submission,
+  Operation posting, stock consequences and amendment/void permissions remain governed by
+  §7.3 and the Receiving engine below. Automatic GRN generation after NETS confirmation
+  remains an unapproved operating-model proposal, not a hidden consequence of this UI ruling.
+- **SHARED LIST AND WORKING PANEL — same approval scope.** Use the accepted shared
+  `Search · Table / Cards · Page tools · Columns` grammar, column filters and source-owned
+  facts; never copy reference HTML/CSS into this module. Expansion has one read-only job:
+  this receipt's goods, Unit identities and quantities. The right Working Panel presents
+  `Receipt details · Items & quantities · Evidence · Related records · History`, using
+  existing shared components with the PO/GRN identity and permitted owning actions.
+  Keep current full-page GRN/PDF composition. Separate this receipt's physical/accepted
+  results from cumulative PO fulfilment; a completed receipt does not mean a completed PO.
+  Missing shared capability returns to shared UI maintenance; no local substitute component.
 - **Document status — APPROVED / NOT BUILT (Jess, 2026-09-17).** A normal GRN shows no status label.
   A cancelled GRN shows `Cancelled` beneath its GRN No — `Valid` and the Status column are retired.
   `Posted`/`Voided` remain internal database statuses and never reach a normal user's screen;
   `Void Receiving` stays the act's name.
-- **THE RECEIVING RAIL — APPROVED / NOT BUILT (Jess, 2026-09-17).** The month calendar is removed;
-  the expected-arrival view lives in Warehouse Arrival Schedule. The rail uses the portal-wide rail
-  style (UI MASTER §6.7) and carries no explanatory sentences. Groups, in order:
-  - `GRN date` — the date each GRN was created: weeks (e.g. `14 – 20 Sep`), months and
-    `Choose dates…`. The arrow beside a week only expands it into its days and never filters;
-    pressing a week, month or day filters. Only days with GRNs are listed, Sunday included.
-  - `Received with` — `Damaged goods` · `Wrong items` · `Extra goods`. A record of what was found
-    at receiving, not a to-do list. Counted by GRN; one GRN may appear in more than one row.
-  - `Category` — only the governed categories present, in the shared display order (`Mattress` ·
-    `Bedframe` · `Sofa` · `Pillow` · `Mattress protector`); counted by GRN, a GRN with several
-    categories counts in each. Category comes from the ONE shared ladder (`goodsCategoryWordOf`).
-  - `Goods arrived at` — the receiving locations present.
-  - `Supplier` — the suppliers present.
-  - last row `Cancelled GRNs`.
-  One choice per group; no `Any` or `All …` rows; pressing the chosen row again clears it. Rail
-  counts, table rows and the footer (`Showing 1–{n} of {total}`) come from the same complete
-  server-side filtered set, never the loaded page. **There is NO permanent `Clear filters` button
-  at the foot of the rail (owner correction 2026-09-18)** — the toolbar's active-condition chips
-  name what is on and clear it, one condition at a time or all of them. The earlier reading that
-  this removal was a Purchase Orders correction only is superseded.
+- **RECEIVING FILTER PLACEMENT — OWNER-APPROVED TARGET / NOT BUILT, 2026-10-04.**
+  The rail contains only the two views above. Supplier, Category, location, date and receipt
+  result filtering belong to the shared list controls, not duplicate rail groups. Preserve
+  cancelled records and their governed indicator/filter. Counts describe their own record
+  unit and the complete authorised filtered result, never just a loaded page or an invented
+  overdue bucket. The existing implementation still needs migration and runtime verification.
+  Calendar belongs to the existing shared right Quick Rail, not a new Receiving calendar.
+  Use UI MASTER's all-module calendar: authorised built dated events, module/location filters,
+  and a deep-link to the owning page with explicit date/scope. Supplier arrival is counted
+  once under Warehouse from its schedule projection; a GRN is evidence of that arrival,
+  not a second arrival event. Expected and actual dates remain distinct.
 - **SERVER-SIDE PAGINATION (owner correction 2026-09-06, second ruling).** The Register never
   renders the whole GRN history: the server pages it (default `Showing 1–50 of {total}`,
   Previous/Next), and the footer total plus every rail count speak for the COMPLETE filtered

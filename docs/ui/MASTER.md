@@ -1626,6 +1626,17 @@ Payment       2 promised payments         ›  Payment Monitor ?day=
 Subscription  1 service visit             ›  Rental (no date/record door yet — build gap)
 ```
 
+**OWNER-APPROVED TARGET / NOT BUILT, 2026-10-04 — shared all-module calendar.**
+Use the existing right Quick Rail Calendar, never a separate calendar page per module.
+`All modules` shows only authorised, implemented dated event types; provide `Filter by module`
+and `Filter by location` where the source supports location. Do not expose empty/unbuilt module
+entries or turn undated Work into calendar events. Each summary names its module/event and
+count unit, distinguishes expected arrangements from actual occurrence, and opens the owning
+page with the explicit selected date and scope. Return preserves the Calendar day. Receiving
+reads Warehouse arrival facts rather than publishing a duplicate arrival count. This approval
+adds presentation/filter target truth, not new event writers, automatic GRN posting or a claim
+that filters and Receiving adoption are deployed.
+
 1. **Each module reports its own dated arrangements; Calendar only summarises.** Every row names
    what it counts in the module's own words; never a mixed total such as `5 jobs`. A zero prints
    nothing.
