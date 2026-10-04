@@ -169,11 +169,12 @@ export default function OperationToOrder() {
         } : undefined}
         roundNavigation={{
           rounds: railData?.poRounds ?? [],
-          selected: windowParts ? scopeWindow : null,
+          selected: searchParams.get("time") ?? (windowParts ? windowParts.time : null),
           onSelect: key => {
             const next = new URLSearchParams(searchParams);
-            if (scopeWindow === key) next.delete("window");
-            else next.set("window", key);
+            next.delete("window");
+            if (searchParams.get("time") === key) next.delete("time");
+            else next.set("time", key);
             setSearchParams(next, { replace: true });
           },
         }}

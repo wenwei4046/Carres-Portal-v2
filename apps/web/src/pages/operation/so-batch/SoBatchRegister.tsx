@@ -513,9 +513,12 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
   const [filterRailOpen, setFilterRailVisible] = useFilterRailOpen(FILTER_RAIL_STORAGE_KEY, canvasRef);
   const railFacts = useMemo(() => soBatchRailFacts(orders, leafs), [orders, leafs]);
   const rail = useMemo(() => soBatchRailModel(railFacts, filter), [railFacts, filter]);
+  const orderMatchesTime = useCallback((order: SoBatchOrderRow, time: string) =>
+    [...(leafsByOrder.get(order.orderId) ?? []).map(leaf => leaf.poWindow), ...order.pos.map(po => po.poWindow)]
+      .some(key => key && parsePoWindowKey(key)?.time === time), [leafsByOrder]);
   const shown = useMemo(
-    () => orders.filter((o) => rail.visibleOrderIds.has(o.orderId)).sort(compareOrderBy),
-    [orders, rail.visibleOrderIds, compareOrderBy],
+    () => orders.filter(order => rail.visibleOrderIds.has(order.orderId) && (!roundNavigation?.selected || orderMatchesTime(order, roundNavigation.selected))).sort(compareOrderBy),
+    [orders, rail.visibleOrderIds, compareOrderBy, roundNavigation?.selected, orderMatchesTime],
   );
   const toggleTiming = useCallback((s: PurchaseDemandTimingState) => {
     setFilter((prev) => ({ ...prev, timing: prev.timing === s ? null : s }));
@@ -1275,13 +1278,13 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
               the tick and the Ready Stock door. */}
           {roundNavigation && <FilterRailGroup title="Order time" icon="date" defaultOpen>
             {data.poWindowsUnavailable && <p className="px-2 py-2 text-meta text-kit-slate-11">Data not loaded</p>}
-            {roundNavigation.rounds.map(round => {
+            {(data.poCutoffTimes ?? [...new Set(roundNavigation.rounds.flatMap(round => {
               const window = parsePoWindowKey(round.key);
-              return window ? <FilterRailRow key={round.key} testId={`so-batch-round-${round.key}`}
-                label={poWindowTimeWord(window.time)} supportingText={fmtDate(window.date)}
-                count={round.unfinishedSoCount} title={`${round.unfinishedSoCount} unfinished Sales Orders`} active={roundNavigation.selected === round.key}
-                onClick={() => roundNavigation.onSelect(round.key)} /> : null;
-            })}
+              return window ? [window.time] : [];
+            }))]).map(time => <FilterRailRow key={time}
+              label={poWindowTimeWord(time)}
+              count={orders.filter(order => purchaseStatus(order) !== "Done" && orderMatchesTime(order, time)).length}
+              active={roundNavigation.selected === time} onClick={() => roundNavigation.onSelect(time)} />)}
           </FilterRailGroup>}
           <FilterRailGroup title="PO Safety Days" icon="date" defaultOpen={!!roundNavigation}>
             {SO_BATCH_RAIL.timing.states.map((s) => (

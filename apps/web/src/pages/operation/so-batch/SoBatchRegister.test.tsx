@@ -2612,3 +2612,24 @@ describe("the two-line Status rule", () => {
     expect(within(status).getByRole("button", { name: "Fix in Catalog" })).toBeInTheDocument();
   });
 });
+
+describe("Order time contains configured cutoffs, not dated occurrence records", () => {
+  it("shows two times once despite repeated dates and selects the time", () => {
+    const onSelect = vi.fn();
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(<QueryClientProvider client={client}><MemoryRouter>
+      <SoBatchRegister data={data({ poCutoffTimes: ["11:00", "16:00"], rows: data().rows.map(leaf => ({ ...leaf, poWindow: leaf.orderId === "o1" ? "2026-09-01T11:00" : leaf.orderId === "o3" ? "2026-09-04T11:00" : "2026-09-04T16:00" })) })} isLoading={false} onIssue={onIssue}
+        roundNavigation={{ selected: null, onSelect, rounds: [
+          { key: "2026-09-01T11:00", unfinishedSoCount: 1 },
+          { key: "2026-09-04T11:00", unfinishedSoCount: 2 },
+          { key: "2026-09-04T16:00", unfinishedSoCount: 1 },
+        ] }} />
+    </MemoryRouter></QueryClientProvider>);
+    expect(screen.getAllByText("11:00 AM")).toHaveLength(1);
+    expect(screen.getAllByText("4:00 PM")).toHaveLength(1);
+    expect(screen.getByText("11:00 AM").closest("button")).toHaveTextContent("2");
+    expect(screen.queryByText("Tue, 1 Sep")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText("11:00 AM"));
+    expect(onSelect).toHaveBeenCalledWith("11:00");
+  });
+});

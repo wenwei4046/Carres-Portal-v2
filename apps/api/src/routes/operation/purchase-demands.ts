@@ -847,9 +847,11 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
    * disagree. An unreadable setting stamps nothing and SAYS so — buying still
    * works, and Work reports its Purchasing source instead of an empty day. */
   let poWindowsUnavailable = false;
+  let poCutoffTimes: string[] | undefined;
   let poRounds: SoBatchPurchaseResponse["poRounds"];
   try {
     const windows = await loadPoWindows(sb);
+    poCutoffTimes = [...new Set([windows.settings.first, ...(windows.settings.secondEnabled && windows.settings.second ? [windows.settings.second] : [])].map(time => time.slice(0, 5)))];
     const calendar = poWindowCalendarOf(windows.poDays, holidays);
     const memo = new Map<string, string | null>();
     const stamp = (orderId: string, supplierId: string | null): string | null => {
@@ -935,6 +937,7 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
        the one setting. The browser prints it; the arithmetic stayed here. */
     safetyDays: settings.orderByBufferDays,
     ...(poWindowsUnavailable ? { poWindowsUnavailable: true } : {}),
+    ...(poCutoffTimes ? { poCutoffTimes } : {}),
     ...(poRounds ? { poRounds } : {}),
   };
   return c.json(body);

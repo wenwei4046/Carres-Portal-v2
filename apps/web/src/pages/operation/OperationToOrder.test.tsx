@@ -192,17 +192,18 @@ describe("the page reads the ONE projection and draws the Register", () => {
     expect(apiFetch.mock.calls[0]![0]).toBe("/api/operation/purchase/demands");
   });
 
-  it("opens the server's exact dated round and retains navigation without a business write", async () => {
+  it("selects a cutoff time without navigating to a historical dated occurrence", async () => {
     apiFetch.mockResolvedValue({ ...payload(), poRounds: [
       { key: "2026-10-05T10:15", unfinishedSoCount: 2 },
       { key: "2026-10-05T16:00", unfinishedSoCount: 0 },
     ] });
     renderPage();
-    const round = await screen.findByTestId("so-batch-round-2026-10-05T10:15");
+    const round = await screen.findByText("10:15 AM");
     expect(round).toHaveTextContent("10:15 AM");
     fireEvent.click(round);
-    await waitFor(() => expect(apiFetch).toHaveBeenCalledWith("/api/operation/purchase/demands?window=2026-10-05T10%3A15"));
-    expect(screen.getByTestId("so-batch-round-2026-10-05T16:00")).toBeVisible();
+    expect(apiFetch).toHaveBeenCalledWith("/api/operation/purchase/demands");
+    expect(apiFetch.mock.calls.some(call => String(call[0]).includes("?window="))).toBe(false);
+    expect(screen.getByText("4:00 PM")).toBeVisible();
     expect(screen.queryByTestId("so-batch-product-select")).not.toBeInTheDocument();
     expect(apiFetch.mock.calls.every(call => call[1] == null)).toBe(true);
   });

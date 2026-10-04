@@ -968,6 +968,7 @@ export const soBatchPurchaseResponseSchema = z.object({
    * than showing an empty buying day (Purchasing §5.6.1).
    */
   poWindowsUnavailable: z.boolean().optional(),
+  poCutoffTimes: z.array(z.string()).optional(),
   /** Read-only dated rounds from the same window stamps as Work. Counts are SOs, not units. */
   poRounds: z.array(z.object({ key: z.string(), unfinishedSoCount: z.number().int().nonnegative() })).optional(),
 });

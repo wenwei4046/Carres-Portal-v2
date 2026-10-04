@@ -176,6 +176,8 @@ message sent; do not promote that report to a full live issue-to-send journey.
 
 ---
 
+**Order time — owner correction 2026-10-04.** The left rail lists the configured daily cutoffs once each, without dates or historical occurrence rows. A time choice filters retained SO records across dated occurrences of that time. Counts are unique unfinished SOs, never sums that duplicate an SO across dates or supplier lines. Dated Work deep-links retain their exact occurrence scope; this correction does not change admission arithmetic or saved cutoff settings.
+
 ### SO Batch PO Status — owner-approved 2026-10-04
 
 Column/filter title: `PO Status`. In that named context use `Pending`, `Partial`, `Done`.
