@@ -16,6 +16,7 @@ import {
   type SoBatchRailFilter,
   SO_BATCH_ORDER_STATUS_WORDS,
   soBatchOrderStatusOf,
+  soBatchPurchaseStatus,
   soBatchCellSummary,
   soBatchOrderSelection,
   soBatchOrderPlanning,
@@ -1395,5 +1396,24 @@ describe("the Use this PO offer never blocks buying (owner ruling 2026-09-28)", 
     expect(isSelectableForBuying(pool)).toBe(true);
     expect(isSelectableForOrder(pool, "blank")).toBe(true);
     expect(soBatchToBuyState(pool, "blank")).toEqual({ kind: "buy", qty: 1 });
+  });
+});
+
+
+describe("approved purchase-task status across supplier lines", () => {
+  const order = (lines: SoBatchOrderRow["lines"]): SoBatchOrderRow => ({ orderId: "so", so: 1, customer: "Customer", status: "blank", proceededAt: null, requestedDeliveryDate: null, deliveryCity: null, deliveryState: null, pos: [], outstandingSuppliers: [], lines });
+  const line = (qty: number, stockTaken = 0, pos: Array<{ poId: string; qty: number }> = []) => ({ orderLineId: "line", sku: "SKU", item: "Item", variant: null, category: "mattress" as const, qty, stockTaken, pos });
+  it("one purchased supplier does not complete another supplier's demand", () => {
+    expect(soBatchPurchaseStatus(order([line(2, 0, [{ poId: "PO", qty: 2 }]), line(1)]), [])).toBe("Partial");
+  });
+  it("unconfirmed stock offers do not count; committed stock does", () => {
+    expect(soBatchPurchaseStatus(order([line(2)]), [])).toBe("Pending");
+    expect(soBatchPurchaseStatus(order([line(2, 2)]), [])).toBe("Done");
+  });
+  it("exact PO lineage completes quantities irrespective of communication", () => {
+    expect(soBatchPurchaseStatus(order([line(2, 0, [{ poId: "PO", qty: 2 }])]), [])).toBe("Done");
+  });
+  it("missing line facts cannot complete purchase work", () => {
+    expect(soBatchPurchaseStatus(order([]), [])).toBe("Pending");
   });
 });

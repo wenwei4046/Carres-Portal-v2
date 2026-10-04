@@ -1657,6 +1657,17 @@ export function soBatchOrderPlanning(order: SoBatchOrderRow, leaves: readonly Pu
   };
 }
 
+/** Owner-approved 2026-10-04: quantity placement across all supplier lines.
+ * Only committed stock/PO reservations and exact PO lineage count; offers do not.
+ * Unknown or blocked demand cannot be reported as complete.
+ */
+export function soBatchPurchaseStatus(order: SoBatchOrderRow, leaves: readonly PurchaseDemandRow[]): "Pending" | "Partial" | "Done" {
+  const remaining = soBatchOrderRemainingQty(order);
+  if (order.lines.length > 0 && remaining <= 0 && soBatchOrderPlanning(order, leaves).group === "no-purchase-needed") return "Done";
+  const placed = order.lines.some(line => line.pos.some(po => po.qty > 0) || (line.poReserved ?? []).some(po => po.qty > 0));
+  return placed ? "Partial" : "Pending";
+}
+
 /** Explain the same eligibility facts that the checkbox and planning cell read. */
 export function soBatchOrderUnselectableReason(
   order: SoBatchOrderRow,

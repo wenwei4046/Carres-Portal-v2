@@ -176,6 +176,24 @@ message sent; do not promote that report to a full live issue-to-send journey.
 
 ---
 
+### SO Batch PO Status — owner-approved 2026-10-04
+
+Column/filter title: `PO Status`. In that named context use `Pending`, `Partial`, `Done`.
+Standalone cards, other pages and notifications use `PO Pending`, `PO Partial`, `PO Done`.
+Always spell `PO`, not `P.O.`. `Issue PO` remains the action verb.
+Calculate across every SO item and its exact supplier/PO lineage, not the presence of one PO.
+Exclude successfully confirmed eligible Ready Stock reservations from quantity requiring purchase.
+`Pending`: purchasing quantity remains and none of that required purchase quantity has been issued.
+`Partial`: some required purchase quantity has valid PO lineage and some remains unissued.
+`Done`: no required purchase quantity remains unissued, including an SO fully fulfilled by confirmed
+Ready Stock. Done expresses purchase-task quantity completion, not a claim that a PO exists, was
+sent or was received. Unconfirmed matches never qualify; failed/unknown coverage reads cannot
+produce Done. Pending/Partial remain above Done in the retained listing, ordered by Proceed Date.
+This overwrites the earlier SO Batch parent/item `Need PO` / `No PO needed` presentation;
+Manual Purchase's independent approval/request grouping is unchanged. Target approval is not build
+or production verification. Supplier communication evidence and Receiving remain separate facts.
+
+
 ## 3 · Whole-domain research audit
 
 ### 3.1 What was mined from 2990
@@ -1958,16 +1976,11 @@ This document approves presentation, not unverified new storage fields, identifi
 **OWNER RULINGS R1–R8 — SO BATCH ROUND 1, APPROVED / LOCKED 2026-09-16.** Built in PR #1395.
 Fixture-walked in the real portal shell; the authenticated production walk is recorded in Card 11.
 
-- **R1 · One table, two groups.** `To buy` sits first, always open, and is a HEADING, never a
-  control; it stays visible with `0` while the Register holds records. `No purchase needed` sits
-  below, initially collapsed, and is a real disclosure button (`aria-expanded`). Grouping reads
-  REMAINING purchasing demand from the shared projection (`soBatchOrderPlanning` over
-  `soBatchOrderLineOutstandingQty`: customer quantity less current Ready Stock coverage less exact,
-  non-cancelled PO lineage), never the raw blank/partial/ordered status. Blocked, unverified and
-  pool-covered demand is never assumed bought, so it stays in `To buy`. PO-covered and
-  Ready-Stock-only orders (including orders that never had a PO) need no purchase. Search, column
-  filters and rail filters cover both groups; while any narrowing is active every group opens, and
-  clearing it returns the groups to the state the operator had before.
+- **R1 · One retained register — current owner ruling 2026-10-04.** Unfinished purchase work
+  appears first; completed work remains below. Default ordering uses Proceed Date within unfinished
+  work, with optional Supplier grouping. Free warehouse stock is an optional offer, never automatic
+  purchase exclusion. Deduct only actual SO-bound eligible Units and exact non-cancelled PO lineage.
+  Search and filters cover retained records. The earlier automatic non-purchase group is retired.
 - **R2 · Planning fact.** Order By remains the engine/detail date, not a parent column; the parent
   displays `PO Safety Days` under the shared dictionary. The planning date is the earliest over exactly the
   leaves the parent checkbox would tick; blank when nothing is left to buy. An undated `To buy`
@@ -1975,9 +1988,9 @@ Fixture-walked in the real portal shell; the authenticated production walk is re
   `Not planned` only when a leaf is blocked by missing setup (or an eligible leaf has no derivable
   date); `Coverage not checked` when whether an open PO covers a leaf could not be verified;
   `Already on a PO` when another open PO covers the remaining leaf. Setup is named first; an
-  unverified leaf is named before a covered one, because unknown must never read as covered. `To buy` reads selectable Order By ascending → `Not planned` →
-  SO No descending; `No purchase needed` reads SO No descending. Header sorting orders rows inside
-  each group, never across them. No client calendar arithmetic is admitted.
+  unverified leaf is named before a covered one, because unknown must never read as covered. Default ordering follows the current approved Blueprint: unfinished first, Proceed Date first;
+  optional stock-match results put proposed matches first within the selected round. Header sorting
+  and selectable grouping use the shared register grammar. No client calendar arithmetic is admitted.
 - **R3 · Columns** — see the column paragraph below; the saved layout key is
   `carres.soBatchPurchase.register.v5`, and only this register's key moved.
 - **R4 · Search** follows UI MASTER §6.7 (the responsive Register Search rule), adopted here first.

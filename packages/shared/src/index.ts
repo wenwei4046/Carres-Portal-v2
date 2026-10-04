@@ -2470,6 +2470,7 @@ export {
   soBatchCellSummary,
   soBatchOrderSelection,
   soBatchOrderPlanning,
+  soBatchPurchaseStatus,
   soBatchOrderUnselectableReason,
   soBatchOrderStatusWhy,
   soBatchLeafStatusWhy,
