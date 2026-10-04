@@ -213,7 +213,6 @@ describe("operation Work response composition", () => {
           goods_received_at: "2026-09-05",
           submitted_at: "2026-09-05T09:00:00Z",
         }],
-        arrivalsDue: [],
       },
       duty: {
         dutyKey: "grn_duty",
@@ -480,7 +479,7 @@ describe("operation Work response composition", () => {
     expect(inputs[0]?.context).toContain("Ready Stock");
   });
 
-  it("derives Receiving source only from submitted counts and open PO arrival facts", () => {
+  it("derives Receiving source only from actual submitted physical reports", () => {
     const source = receivingWorkSourceFromModuleFacts({
       receipts: [{
         id: "receipt-1",
@@ -497,43 +496,10 @@ describe("operation Work response composition", () => {
         goods_received_at: "2026-09-05",
         submitted_at: "2026-09-05T08:00:00Z",
       }],
-      pos: [{
-        id: "PO-3",
-        status: "open",
-        supplier_id: "supplier-3",
-        eta_date: "2026-09-06",
-        version: 1,
-        sends: [{ kind: "confirmed_sent", po_version: 1 }],
-        purchase_order_lines: [{ qty: 5, received_qty: 2 }],
-      }, {
-        /* Never marked sent: the supplier never got it, so it cannot arrive (segment 2). */
-        id: "PO-5",
-        status: "open",
-        supplier_id: "supplier-3",
-        eta_date: "2026-09-06",
-        version: 1,
-        sends: [],
-        purchase_order_lines: [{ qty: 5, received_qty: 0 }],
-      }, {
-        id: "PO-4",
-        status: "received",
-        supplier_id: "supplier-4",
-        eta_date: "2026-09-06",
-        purchase_order_lines: [{ qty: 5, received_qty: 0 }],
-      }],
-      suppliers: [
-        { id: "supplier-3", name: "Arrival Supplier" },
-        { id: "supplier-4", name: "Closed Supplier" },
-      ],
     });
 
     expect(source.submitted.map((row) => row.id)).toEqual(["receipt-1"]);
-    expect(source.arrivalsDue).toEqual([{
-      po_id: "PO-3",
-      supplier_name: "Arrival Supplier",
-      eta_date: "2026-09-06",
-      pending_qty: 3,
-    }]);
+    expect(Object.keys(source)).toEqual(["submitted"]);
   });
 
   it("projects an Orders route row through shared signals and per-action owners", () => {

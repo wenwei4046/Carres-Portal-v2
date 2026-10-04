@@ -634,6 +634,18 @@ shipment's shortage from today's cumulative PO balance. Warehouse automatic post
 report preservation and individual actor/Site controls remain approved targets, not built.
 NETS account activation/cutover still requires its separate explicit authorisation.
 
+**Missed-arrival Work ownership — BUILT ON BRANCH, NOT PRODUCTION VERIFIED, 2026-10-05.**
+A supplier date without a physical report no longer creates Receiving Check in work. The existing
+Purchasing supplier-date-passed action owns that follow-up under PO Duty and opens the exact PO.
+It now reads the same per-line/split arrival authority as the register and day-before check,
+including the source PO date when no evidenced supplier answer supersedes it. The earliest passed
+outstanding arrival anchors its Office work date; a later answer on another line cannot hide it.
+Today's/future arrivals, fully received goods and unsent revisions do not create a passed-date task.
+Existing submitted physical reports retain their exact-session action and GRN Duty cover. This
+correction does not implement individual Warehouse automatic confirmation or remove its database
+approval boundary. Local validation: 61 API Work/probe tests and 84 shared receipt/PO/Work tests;
+API typecheck passed. Production readback and full release checks remain owed.
+
 ### 2.5 Receiving end-to-end assurance review — 2026-10-04
 
 **PLAN evidence and recommendation; not production acceptance.** Scope is the entire Receiving
@@ -657,7 +669,7 @@ Purchase Invoice engine. No receipt, amendment, void, invoice or return was exec
 | Capability / lifecycle | Resolution and recommended Carres treatment | Acceptance or remaining uncertainty |
 |---|---|---|
 | Source and expected arrival | RESOLVED: PO/CO and other admitted sources own expected goods; supplier dates stay Purchasing-owned. A supplier dispatch/DO is evidence of supplier statement, not GRN. | Prove source-line and split-batch dates remain separate from actual arrival. No duplicate PO/Receiving ETA writer. |
-| Daily ownership and missed arrival | RESOLVED: Operation checks missing arrivals and contacts suppliers; Warehouse performs physical work. | CONTRADICTION FOUND: Workspace's older action table instructed check-in merely because a date passed. Its target has been corrected in the same change; the existing Work feed still needs alignment. |
+| Daily ownership and missed arrival | RESOLVED: Operation checks missing arrivals and contacts suppliers; Warehouse performs physical work. | CONTRADICTION FOUND: Workspace's older action table instructed check-in merely because a date passed. Its target is corrected. The Work feed correction is built on branch (2026-10-05), awaiting production acceptance: actual submitted reports alone create Receiving work; missed arrivals use Purchasing/PO Duty and the existing per-line arrival authority. |
 | Warehouse identities and permissions | APPROVED TARGET / NOT BUILT: individually authenticated, source/Site-authorised confirmation, company receiver and individual actor distinct. | Existing role gates do not deliver the new rule. No broad Warehouse finance, adjustment, amend or void rights. |
 | Receipt entry and evidence | KEEP the source-prefilled one engine; confirm actual Unit outcomes or counted quantities, actual date/Site, DO and evidence. | No blank unrelated receipt, identity minting or supplier-reported automatic receipt. Missing evidence preserves an unposted report. |
 | Partial receipt and remaining quantity | RESOLVED: valid received scope completes; remaining acceptable supply stays outstanding. | Example: ordered 10, physically arrived 8 including 1 damaged means Received Qty 7, Damaged Qty 1, physically missing 2, Pending Delivery Qty 3. Never add damage to the 3 again. |

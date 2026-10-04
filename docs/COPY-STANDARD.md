@@ -2241,7 +2241,7 @@ the same name (Purchase Orders rail uses `Confirm tomorrow's supplier delivery`)
 | Bulk answer bar | `{n} selected · Apply to selected` · `Choose answer` · `Apply` |
 | Split sub-row | `└ batch {n}` · `{n} pcs` |
 | Read-state absences | `Not confirmed` · `None recorded yet` · `All received` · `Supplier DO · Not recorded` |
-| Receiving Work card, date-derived (Purchasing §9.4, segment 2) | fact `Supplier date passed · nothing received yet` (a submitted Warehouse count keeps `Goods arrived · GRN not posted`) · action `Check in {PO No} from {Supplier}` |
+| Receiving Work card, physical report (Purchasing §9.4, owner correction 2026-10-04) | fact `Goods arrived · GRN not posted` · action `Check in {PO No} from {Supplier}`. A passed date without a physical report belongs to Purchasing: `Supplier delivery date passed` · `Ask {Supplier} when the goods will arrive`. Never instruct Receiving to check in missing goods. |
 | Day-before Work card (Purchasing §5.7) | fact `Confirm tomorrow's supplier delivery` · action `Click WhatsApp, ask {Supplier} for the Supplier DO for {PO No}` · `Click Email, …` · no channel recorded: `Ask {Supplier} for the Supplier DO for {PO No}` · button `Record supplier answer` |
 | Read failure | `Supplier answers could not be loaded` + `Try again` |
 

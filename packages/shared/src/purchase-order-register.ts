@@ -294,7 +294,9 @@ export function purchaseOrderReplyWorkItems(
   const copy = purchaseOrderWork(input, facts)!;
   // A passed promise starts on that date. Move only the computed work day
   // to the next Office working day.
-  let due = input.supplierDate ?? null;
+  let due = input.expectedArrivals != null
+    ? [...input.expectedArrivals].filter((date) => date < today).sort()[0] ?? null
+    : input.supplierDate ?? null;
   const options = { offDays: PURCHASING_OFFICE_OFF_DAYS, holidays };
   if (due && (PURCHASING_OFFICE_OFF_DAYS.includes(new Date(`${due}T00:00:00Z`).getUTCDay()) || holidays.has(due))) {
     due = addWorkingDays(due, 1, options);
