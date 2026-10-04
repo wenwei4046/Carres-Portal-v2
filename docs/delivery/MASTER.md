@@ -2690,3 +2690,20 @@ PR #1295 is deployed and authenticated on all-five-converged `12d1a264bcf17cd9c8
 **Acceptance boundaries retained:** Card 12 manager Settings save was persisted, re-opened and restored. Card 18 office form has both missing-fact refusals and a complete draft reaching enabled Create; no new post-gate order was submitted. Dealer POS remains blocked before the wizard by first-time staff PIN setup and needs an existing test staff login whose setup is complete. Responsive smoke measured 582×704 only; requested 375/1130 overrides did not change the actual browser width, so exact-width acceptance is not claimed. SO-1362 is completed and correctly absent from Monitor, so an active intermediate Monitor row was not recreated for this walk. Loan offer/acceptance and the Journey’s exact Unit handovers use the earlier recorded production evidence; actual loan Unit issue/collection, returned-goods arrival and every split/conditional/postpone variant were not newly replayed end to end in this convergence pass. The prior Card probes and automated coverage remain evidence at their stated level. These boundaries prevent this checkpoint from being read as a completed exhaustive production matrix.
 
 **Separate observed Orders follow-up:** number/UUID fan-in now loads Order Route, but the completed Journey’s existing whole-order route still displays unchosen logistics/date and a not-ready gate beside its Delivered result. Card 19 intentionally changes identity resolution only. The Journey-aware Order Route projection needs its own scoped correction; this convergence record does not certify that unrelated arithmetic.
+
+### Customer summary cell — owner-approved 2026-10-04
+
+APPROVED UI TARGET / NOT BUILT. In the confirmed compact Delivery card, the final customer
+leg's third summary title is `Customer`, replacing `Confirmed Delivery`. Its primary value is
+the customer-agreed operational date and, only when recorded, the agreed time/period on the
+same line: `31 Oct · 3:00 PM` or `31 Oct · Afternoon`. With no agreed time show only the date;
+never render `No time`, an empty time placeholder or a new row. The supplementary status is
+`Date confirmed`; before agreement show `Date not confirmed`, without inventing a date.
+Long date/time values may wrap within the existing compact primary-value area, preserving
+all four title/value baselines and not widening or vertically centring one cell.
+
+Clicking the cell opens the existing inline arrangement operation. The title does not change
+Requested delivery, ETA, contact evidence, next follow-up, source write ownership or DO gates.
+Only the final customer leg uses `Customer`; an intermediate warehouse leg must name its actual
+receiving destination under the Journey model, never pretend it confirms a customer appointment.
+Shared composition and alignment continue to come from `docs/ui-reference/DELIVERY-CARD-TEMPLATE.md`.
