@@ -1379,6 +1379,8 @@ and Selangor public holidays are excluded.
 
 **SO Batch supplier bundle — owner-approved 2026-10-04.** After issue, keep separate numbered POs grouped by Supplier. Selected PO/version set controls both message and independent PDF attachments. Words: `This round` · `Today` · `Supplier` · `Select all` · `Download PDFs` · `Copy message` · `Open WhatsApp` · `Send Email` · `Send again`. Send again is an explicit choice before repeating a known successful dispatch; an unknown outcome never permits it. Download PDFs produces a ZIP of separate PDFs, never a merged PDF. Real Email execution is exposed only after verified configuration and dispatch capability; preparation alone never records sending. Monthly Report remains deferred.
 
+**SO Batch optional whole-round stock — owner-approved capability, 2026-10-04.** `Match Ready Stock` computes read-only suggestions in the current Listing scope. Reuse `Stock Location`, `Ready Stock`, `{n} available`, `Proceed`, `Cancel` and `Not confirmed · Try again`. Only Proceed saves exact Unit reservations. An unknown write outcome blocks Proceed until the actual source has been checked; the interface never calls it a failed reservation merely because the response was lost.
+
 **The SO Batch Purchase rail — owner-approved 2026-10-04.** Local navigation is Listing / deferred
 Report; factual groups are Order time and PO Safety Days. The existing Purchasing-owned Setup to
 fix exception appears only when affected SOs exist. Product, Supplier and Region filtering stays

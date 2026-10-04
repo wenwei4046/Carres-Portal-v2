@@ -255,15 +255,23 @@ are reusable authorities, not permission to infer whole-round or shared-panel co
 |---|---|---|
 | Compatible available Unit candidates | `readFreeStock` reads the authoritative stock register availability; per-order Ready Stock supplies compatible line IDs | Reuse; candidate location identity, ownership filtering and canonical remainder integration must be verified |
 | Non-overlapping whole-record suggestions | Existing To Order P10 allocation and 113 tests; READY for reuse | Extracted `allocateWholeStockRecords` is shared by existing To Order and the new round matcher, not a second allocation implementation |
-| Customer-date / Proceed priority, site scope, FIFO | New `matchSoBatchReadyStock` adapts that proven allocation, with 8 tests | Read-only local logic only; site choice and priority Settings are not wired |
-| Exact Unit acceptance | Existing Sales Order-owned `/ready-stock/save` / reserve doors | Reuse with fresh validation; whole-scope selection, partial success recovery and unknown-outcome readback are not yet wired |
+| Customer-date / Proceed priority, site scope, FIFO | New `matchSoBatchReadyStock` adapts that proven allocation, with 9 tests | Actual Listing now offers manual matching and Stock Location; persisted priority Settings and production acceptance remain open |
+| Exact Unit acceptance | Existing Sales Order-owned `/ready-stock/save` / reserve doors | Actual Listing selection/Proceed now reuses this door; local tests prove exact confirmation, visible-scope restriction, partial success retention and lost-response readback; production acceptance remains open |
 
 122 combined old/new allocation tests and shared type checking pass locally. Stable warehouse
 identity is carried on candidate reads and used for location matching; two locations sharing a
 display name cannot borrow each other's stock. Suggestions do not
 change original demand or saved reservations. The matcher excludes supplier-owned, counted,
 already-reserved and blocked stock; it refuses conflicting repeated Unit facts and duplicate
-source lines. API/UI integration and authenticated production acceptance remain open. The per-order Ready Stock read now obtains remaining demand from the existing
+source lines. The actual Listing now shows suggested quantities and location, places rows with
+suggestions first, and accepts chosen exact Units through the existing reservation door. Matching
+and ticking write nothing. Definite refusal retains remaining choices; an unknown outcome reads
+back exact held Units and blocks replay when that read cannot confirm the result. Eight hook
+tests and 154 existing Register/page tests pass locally. Candidate reads now page the complete
+available-stock source and fail closed on unreadable data; 36 route tests include the 1,001st
+candidate and source failure. Order-relative `no_line_needs_it` rows do not falsely conflict with
+another customer's compatible candidate. Persisted priority Settings and authenticated production
+acceptance remain open. The per-order Ready Stock read now obtains remaining demand from the existing
 `so_line_remaining_requirement` RPC, shared with issue/reservation. Source-linked Units are not
 counted again in independent stock coverage. 34 route tests include linked-PO overlap and
 fail-closed canonical-read errors. The individual picker also excludes supplier-owned goods from

@@ -187,7 +187,9 @@ soBatchReadyStockRouter.get("/:orderId/ready-stock", requireOperation, async (c)
 
   /* The offer, off the authoritative register view — every available Unit,
      at whatever site holds it. */
-  const { freeUnitsByKey } = await readFreeStock(sb);
+  let freeUnitsByKey: Awaited<ReturnType<typeof readFreeStock>>["freeUnitsByKey"];
+  try { ({ freeUnitsByKey } = await readFreeStock(sb, true)); }
+  catch { return c.json({ code: "stock_candidates_unavailable", error: "stock_candidates_unavailable" }, 503); }
 
   /**
    * ⭐ THE PROVENANCE THE PICKER PRINTS (owner ruling 2026-09-18).

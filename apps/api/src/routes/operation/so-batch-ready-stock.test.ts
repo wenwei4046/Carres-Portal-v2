@@ -91,6 +91,10 @@ function client(tables: Record<string, { data: unknown; error: unknown }>) {
       data: Array.isArray(result.data) ? (result.data[0] ?? null) : result.data,
       error: result.error,
     });
+    b.range = vi.fn((from: number, to: number) => Promise.resolve({
+      data: Array.isArray(result.data) ? result.data.slice(from, to + 1) : result.data,
+      error: result.error,
+    }));
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     b.then = (res: any, rej: any) => Promise.resolve(result).then(res, rej);
     return b;
@@ -128,6 +132,19 @@ async function read(tables = fixture()) {
 beforeEach(() => vi.mocked(userClient).mockReset());
 
 describe("GET …/:orderId/ready-stock", () => {
+  it("reads available candidates beyond the first server page", async () => {
+    const sample = fixture().stock_unit_register_v.data[0];
+    const { res, body } = await read(fixture({ stock_unit_register_v: {
+      data: Array.from({ length: 1001 }, (_, index) => ({ ...sample, id: `unit-${index}`, unit_code: `U1-${index}` })), error: null,
+    } }));
+    expect(res.status).toBe(200);
+    expect(body.units).toHaveLength(1001);
+    expect(body.units.some(unit => unit.itemId === "unit-1000")).toBe(true);
+  });
+  it("refuses an unreadable candidate pool instead of reporting no stock", async () => {
+    const { res } = await read(fixture({ stock_unit_register_v: { data: null, error: { message: "unavailable" } } }));
+    expect(res.status).toBe(503);
+  });
   it("uses canonical remainder and counts a Unit on its own linked PO only once", async () => {
     const tables = fixture({
       order_lines: { data: [{ id: LINE_A, sku: QUEEN, qty: 2, attrs: null }], error: null },
