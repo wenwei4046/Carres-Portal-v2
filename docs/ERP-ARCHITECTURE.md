@@ -155,7 +155,9 @@ authoritative business rule and current roster:
 ```
 missing customer commitment       → responsible salesperson
 issue PO / confirm supplier date  → current PO Duty
-receive goods                     → current GRN Duty
+confirm physical warehouse receipt → authorised Warehouse individual (2026-10-04 target)
+receipt exceptions / direct receipt → GRN Duty ownership / authorised Operation capability
+missing arrival / supplier chasing → current PO Duty (Operation)
 order/customer/delivery follow-up → Work assignment, initially Sales Order PIC
 collect customer balance          → Work assignment, initially Sales Order PIC
 ```
