@@ -74,6 +74,20 @@ another operating model. Approved target is not proof that the current page impl
    actual accepted/rejected quantities and evidence; partial receipt retains outstanding quantities.
    Date-specific pre-arrival coordination, Claims and Finance obligations retain their own owners.
 
+### Left-rail naming — owner-approved 2026-10-04
+
+`Order time` is the approved heading for daily cutoff rows `10:15 AM` / `4:00 PM`.
+Do not display `PO rounds`, `Order rounds` or `Daily orders` as competing names.
+Retain the existing `Order timing` capability separately: it describes early purchasing and
+production/safety margin, not a clock round. The owner explicitly requires these planning filters
+to remain. Suggested shortened planning labels (`Order early`, `14 days left`, `1–13 days left`,
+`0 days left`, `Production late`) remain PROPOSAL / NOT LAW; their approval was not given by
+accepting Order time. Proceed-based automatic round admission versus planned Order By admission
+is still under review; this naming approval does not resolve that scheduling contradiction or
+approve the earlier clock-only preview as the complete rail. Do not retire timing filters to
+simplify the preview. Apply existing holiday/calendar authority to whichever scheduling policy is
+finally approved.
+
 ### SO Batch PO Status — owner-approved 2026-10-04
 
 Column/filter title: `PO Status`. In that named context use `Pending`, `Partial`, `Done`.

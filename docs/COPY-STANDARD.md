@@ -1387,6 +1387,7 @@ Manual Purchase uses its own request groups and remainder arithmetic.
 
 | Heading | Rail rows |
 |---|---|
+| SO Batch daily cutoff heading (owner-approved 2026-10-04) | `Order time`, with configured clock rows currently `10:15 AM` / `4:00 PM`. Separate from `Order timing` planning/safety filters; do not use `PO rounds`, `Order rounds` or `Daily orders`. |
 | `ORDER TIMING` | `Can order early` · `14 safety days left` · `1 to 13 safety days left` · `No safety days left` · `Not enough production days` |
 | `PRODUCT` | `All products` · `Mattress` · `Bedframe` · `Sofa` |
 | `SUPPLIER` | `All suppliers` · actual supplier names, alphabetical — never hardcoded, never a placeholder, and no `No supplier` row |
