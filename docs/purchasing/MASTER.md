@@ -3729,6 +3729,18 @@ Sales Order source and purchase quantity; supplier grouping never erases lineage
 existing destination/document grouping rules. The owner approved this grouping, not all remaining
 card, register or full-page composition.
 
+**OWNER-DESIGNATED LATEST MODULE CARD REFERENCE — 2026-10-04.** Jess explicitly designated
+`http://127.0.0.1:5459/confirmed-module-card-handoff.html` as the latest confirmed reference.
+The exact self-contained source is retained at `docs/ui-reference/confirmed-module-card-handoff.html`
+(SHA-256 `fca84f58d7a4687fe00fa79ba2e137d18d8983d3721d96a4667b3742ce2ce487`). For Purchasing module-card composition, use this source instead of earlier
+Delivery-card snapshots: shared identity/header and summary grammar, module navigation, Items,
+Communication and Timeline, preserving the complete stylesheet/cascade and interaction states.
+Translate only module-owned facts/actions. The reference opens Info with order facts/address visible;
+Delivery opens these collapsed; Items, Communication and Timeline initially collapse. Example
+Delivery stock is explicitly a layout sample. Do not claim this source proves production kit
+integration, real purchase-task completion or live data. This module-card reference does not
+replace the approved Sales Orders register/left-rail template or the PO full-page real-PDF law.
+
 **OWNER CORRECTION 2026-10-04 — complementary left rail and column filters.**
 The SO Batch left rail presents useful aggregate information and round access not already
 supplied by listing columns. Do not repeat the page title inside the rail or duplicate Product/
