@@ -76,6 +76,10 @@ or failed reads stay explicit. Customer date and optional time remain separate f
 Existing Delivery-owned `DeliveryDatesEdit` / `LogisticsDetailsEdit` forms are reused through their
 governed arrangement door, including reason/evidence rules, permission checks and server refusals.
 Their compact action row uses Cancel then Save; failure retains input and exposes its reason.
+Embedded kit controls keep the shared field skin (including visible dropdown/date borders); the
+card button reset must not override `data-kit` controls. Compact Customer fields use two columns
+above 400px card width and one below, without reserved blank rows. Compact condo input uses its
+two natural rows and omits the long instructional hint; evidence and all save gates remain.
 The compact Customer editor starts with no inferred information source and requires an actual choice;
 the existing save door records contact/proxy separately from the logged-in recorder. Coverage-based
 Logistics preselection remains an unsaved assignment draft, labelled `Assign logistics`; the summary
@@ -108,17 +112,22 @@ Workspace Working Panel and other modules have not adopted this adapter. Their p
 contact channels, domain headers and approved full-page composition remain module-owned; customer/SO
 header assumptions must not be imposed on supplier POs or source-free purchasing objects.
 
-**Current bounded production acceptance — 2026-10-04:** PR1883 deployed
-`7f662b505c0e1c64853a295a587218626046cd7e` after exact CI37204713835, Deploy37205596250 and
-independent five-surface convergence. Orders MASTER owns the measured existing-path matrix,
-including priorf7857f6 completed/open Delivery, Monitor, widths and formal-object proof and086f23d's
-source/template/context/monthly evidence. The new target verifies real390px History long-note
-expansion/Escape without nested buttons or page overflow, original/current Revisions and return to
-Cards/search1368. A live Revisions long-note sample was absent;136 functional checks prove that
-cut-note variant and no accidental version selection. PR1879's approved header/Balance due law
-remains preserved. Live Save/send, Print/Download, Workspace/other-module adoption and exceptional
-role/historical variants remain outside this proof. Orders' separately observed filtered monthly
-drill-down defect is BUILD until its own release; this card proof does not certify the whole module.
+**Current bounded production acceptance — 2026-10-04:** PR1888 exact head
+`dd581fb3139b9539216f1f1c9ddc25b107e3d4a5` passed full CI37207794735 and deployed as
+`36d96ac427f059901f6fdf2d623bd6277adeb611` (Deploy37208534384); independent verification matched
+all five revision surfaces. Orders MASTER owns the measured existing-path matrix and boundaries.
+On that release, the real Carres Kota Damansara + Mattress October door opens only SO-1368;
+loaded reload and Table → Cards retain its visible conditions and blank search. At390px removing
+only category opens SO-1368 + SO-1358 while retaining the same location/month.121 Register/monthly
+UI checks and16 shared arithmetic checks cover additional combinations;45 baseline report checks
+remain fixture evidence. Purchasing retains responsibility for its equivalent month door.
+Supporting PR1883/7f662b5 proof verifies real390px History long-note expansion/Escape without nested
+buttons or page overflow, original/current Revisions and Cards/search return. A live Revisions
+long-note sample was absent;136 functional checks prove its cut-note/no-version-action variant.
+Priorf7857f6 retains completed/open Delivery, Monitor, widths and formal-object proof;086f23d retains
+source/template/context/monthly evidence. PR1879's approved header/Balance due law remains preserved.
+Live Save/send, Print/Download, Workspace/other-module adoption and all-role historical/exception
+variants remain outside this proof. This acceptance does not certify the whole module.
 A /ui result alone does not prove a business entry; the actual Orders entry supplies this evidence.
 
 ## Differences from the reference page (125 checks: 25 states × 5 widths)

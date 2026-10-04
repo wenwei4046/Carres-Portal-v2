@@ -3614,19 +3614,23 @@ fewest lines, four at most; one editor at a time, folded on success, kept on fai
 without a zone suffix while the full instant is kept; nothing in a module repeats the header, a date,
 the sales facts or a completion note.
 
-**Current bounded production acceptance — 2026-10-04:** PR1883 exact head
-`016dd27f22c9eb1f891a6b01a4bcb66c69a2dc60` passed CI37204713835 and deployed as
-`7f662b505c0e1c64853a295a587218626046cd7e` (Deploy37205596250); independent verification matched
-all five revision surfaces. Orders MASTER carries the actual path matrix and evidence boundaries.
-Its priorf7857f6 proof retains final customer Delivery without writers or re-entering Monitor, open
-forms/Cancel, five widths and formal PDF/Back;086f23d covers earlier source/template/monthly checks.
-The new target adds real390px History note expansion/Escape without nested buttons or page overflow,
-existing Revisions entry and Cards/search return. No live Revisions long-note sample was present;
-its cut-note/no-version-action variant is covered by136 functional checks. PR1879's approved header
-and Balance due correction remains preserved. Workspace/other-module adoption, live business
-saves/sends, Print/Download and all-role historical/exception variants are outside this proof.
-The separately measured filtered monthly drill-down defect remains BUILD in Orders MASTER until
-its own target verification; ledger proof does not close that gap.
+**Current bounded production acceptance — 2026-10-04:** PR1888 exact head
+`dd581fb3139b9539216f1f1c9ddc25b107e3d4a5` passed full CI37207794735 and deployed as
+`36d96ac427f059901f6fdf2d623bd6277adeb611` (Deploy37208534384); independent verification matched
+all five revision surfaces. Orders MASTER owns the measured existing-path matrix and boundaries.
+On that release, the real Carres Kota Damansara + Mattress October door opens only SO-1368;
+loaded reload and Table → Cards retain its visible conditions and blank search. At390px removing
+only category opens SO-1368 + SO-1358 while retaining the same location/month.121 Register/monthly
+UI checks and16 shared arithmetic checks cover additional combinations;45 baseline report checks
+remain fixture evidence. Purchasing retains responsibility for its equivalent month door.
+Supporting PR1883/7f662b5 proof verifies real390px History long-note expansion/Escape without nested
+buttons or page overflow, original/current Revisions and Cards/search return. A live Revisions
+long-note sample was absent;136 functional checks prove its cut-note/no-version-action variant.
+Priorf7857f6 retains completed/open Delivery, Monitor, widths and formal-object proof;086f23d retains
+source/template/context/monthly evidence. PR1879's approved header/Balance due law remains preserved.
+Live Save/send, Print/Download, Workspace/other-module adoption and all-role historical/exception
+variants remain outside this proof. This acceptance does not certify the whole module.
+A /ui result alone does not prove a business entry; the actual Orders entry supplies this evidence.
 
 **Open, recorded, not approved:** palette, font, radius and glyphs are the reference's own (token
 decision pending); 40px phone touch targets shown for review only; the editable `To` differs from the

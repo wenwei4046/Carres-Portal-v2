@@ -256,6 +256,7 @@ export function DeliveryDatesEdit({
       className="flex flex-col gap-3"
       data-layout={layout}
       data-testid="delivery-brief-dates-edit"
+      data-compact={compact || undefined}
       onSubmit={(e) => {
         e.preventDefault();
         void submit();
@@ -264,7 +265,7 @@ export function DeliveryDatesEdit({
       {layout === "stack" ? (
         <Fact label={MONITOR_COPY.customerRequested} value={requestedDeliveryText({ iso: requestedIso, tbd: row.customerDateTbd })} />
       ) : null}
-      <div className={layout === "grid" && !compact ? "grid grid-cols-3 gap-3" : "flex flex-col gap-3"}>
+      <div data-compact-fields={compact || undefined} className={layout === "grid" && !compact ? "grid grid-cols-3 gap-3" : "flex flex-col gap-3"}>
       <DatePicker
         id={`delivery-brief-date-${card.scopeId}`}
         label={MONITOR_COPY.confirmedDateField}
@@ -461,6 +462,7 @@ export function LogisticsDetailsEdit({
     <form
       className="flex flex-col gap-3"
       data-testid="delivery-brief-logistics-edit"
+      data-compact={compact || undefined}
       onSubmit={(e) => {
         e.preventDefault();
         void submit();
@@ -518,7 +520,7 @@ export function LogisticsDetailsEdit({
           id={`delivery-brief-condo-${card.scopeId}`}
           label={MONITOR_COPY.condoRegistration}
           rows={compact ? 2 : 3}
-          hint={MONITOR_COPY.condoRegistrationHint}
+          hint={compact ? undefined : MONITOR_COPY.condoRegistrationHint}
           value={condo}
           onChange={(e) => setCondo(e.target.value)}
         />

@@ -2702,7 +2702,11 @@ never render `No time`, an empty time placeholder or a new row. The supplementar
 Long date/time values may wrap within the existing compact primary-value area, preserving
 all four title/value baselines and not widening or vertically centring one cell.
 
-Clicking the cell opens the existing inline arrangement operation. The title does not change
+Clicking the cell opens the existing inline arrangement operation. Compact Customer fields use
+two columns above 400px card width and one below; kit dropdown/date controls keep their visible
+field borders. Logistics keeps its required partner, crew, ETA, condo and reply evidence fields,
+but uses the compact two-row condo input without the explanatory paragraph. Both editors retain
+Cancel/Save, source/evidence requirements, permissions and server validation. The title does not change
 Requested delivery, ETA, contact evidence, next follow-up, source write ownership or DO gates.
 Only the final customer leg uses `Customer`; an intermediate warehouse leg must name its actual
 receiving destination under the Journey model, never pretend it confirms a customer appointment.
