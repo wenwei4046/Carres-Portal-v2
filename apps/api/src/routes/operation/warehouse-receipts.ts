@@ -363,6 +363,7 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
         cancelled: r.status === "voided",
         // The Search box's own promise: GRN, PO, supplier or DO number.
         searchText: [
+          r.grn_no ?? "",
           receivingDisplayNo({
             id: r.id,
             grn_no: r.grn_no,

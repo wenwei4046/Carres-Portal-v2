@@ -57,6 +57,13 @@ and measurements.
 
 # §1 · Overview
 
+**Shared document display implementation — 2026-10-04, branch only / NOT PRODUCTION VERIFIED.**
+`packages/shared/src/document-display.ts` provides `documentDisplayNumber` for known Carres-owned
+numbers. It validates the date segment, preserves prefix/serial/version and leaves short or
+non-date identities alone. Monthly granularity must be explicit, avoiding reinterpretation of
+legacy six-digit daily dates. Receiving adopts this through its existing number reader;
+other modules are not claimed migrated. Never call it on supplier-owned document references.
+
 **Document numbers — owner clarification 2026-10-04 / APPROVED TARGET.** Every module follows
 COPY-STANDARD's system-wide two-digit-year document display contract. Reuse one shared formatting
 rule across lists, Working Panels, full pages, related records, search, Work and document previews;

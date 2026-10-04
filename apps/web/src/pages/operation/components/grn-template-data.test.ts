@@ -119,7 +119,7 @@ function detail(over?: {
 describe("grnTemplateDataOf — the saved document", () => {
   it("carries the number, source, supplier and the three location/date facts", () => {
     const d = grnTemplateDataOf(detail());
-    expect(d.grn_no).toBe("GRN-20260901-1234");
+    expect(d.grn_no).toBe("GRN-260901-1234");
     expect(d.status_label).toBe("Valid");
     expect(d.source.po_number).toBe("PO-2001");
     expect(d.supplier.name).toBe("Nice Future");
@@ -189,7 +189,7 @@ describe("grnTemplateDataOf — the saved document", () => {
       }),
     );
     expect(d.status_label).toBe("Cancelled");
-    expect(d.grn_no).toBe("GRN-20260901-1234");
+    expect(d.grn_no).toBe("GRN-260901-1234");
     expect(d.cancelled).toEqual({
       date: "2026-09-02",
       reason: "Duplicate entry",
@@ -239,7 +239,7 @@ describe("grnTemplateDataOf — the Amend LIVE preview", () => {
       todayIso: "2026-09-06",
     });
     // The number NEVER changes.
-    expect(d.grn_no).toBe("GRN-20260901-1234");
+    expect(d.grn_no).toBe("GRN-260901-1234");
     expect(d.goods_received_on).toBe("2026-08-30");
     expect(d.supplier_do_no).toBe("DO-9999");
     expect(d.goods_arrived_at).toBe("Carres Setia");

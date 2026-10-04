@@ -29,6 +29,7 @@
  * PURE — no I/O, no clock.
  */
 import { docNumber } from "./doc-number";
+import { documentDisplayNumber } from "./document-display";
 import { catalogCategoryWordOf } from "./line-category";
 import {
   receiveLineClaimProblems,
@@ -444,7 +445,7 @@ export function receivingDisplayNo(r: {
   submitted_at?: string;
 }): string {
   const stored = (r.grn_no ?? "").trim();
-  if (stored) return stored;
+  if (stored) return documentDisplayNumber(stored);
   return receivingRecordNo(r);
 }
 

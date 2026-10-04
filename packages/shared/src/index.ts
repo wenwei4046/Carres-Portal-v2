@@ -3352,3 +3352,5 @@ export {
 export { evaluateWorkspaceActivityCheck, type WorkspaceActivityEvidence, type WorkspaceActivityCheck } from "./workspace-activity-check";
 
 export { decideWorkspaceReassignment, type WorkspaceCheckpointIdentity, type WorkspaceReassignmentDecision } from "./workspace-reassignment";
+
+export { documentDisplayNumber } from "./document-display";

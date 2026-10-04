@@ -347,6 +347,17 @@ Manual Purchase's independent approval/request grouping is unchanged. Target app
 or production verification. Supplier communication evidence and Receiving remain separate facts.
 
 
+### Receiving delivery state — 2026-10-04
+
+**BUILD IN PROGRESS; not production-verified.** The shared `documentDisplayNumber` formatter
+has been added without changing any stored identity or allocation. Receiving's existing
+`receivingDisplayNo` reader adopts it for the Register, record, report and newly rendered GRN
+preview. The Register search retains original and short number matching at both API and client.
+Supplier DO references and Unit IDs are untouched. Other modules still need explicit adoption;
+this is not evidence of system-wide completion. The two-view rail, differences presentation,
+Working Panel and Warehouse automatic posting/permissions remain undelivered. Runtime deployment
+and authenticated checks for this numbering change remain owed.
+
 ### 2.5 Receiving end-to-end assurance review — 2026-10-04
 
 **PLAN evidence and recommendation; not production acceptance.** Scope is the entire Receiving

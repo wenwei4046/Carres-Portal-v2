@@ -669,9 +669,9 @@ describe("OperationReceiving — the formal GRN Register", () => {
   it("lists ONLY GRNs — a submitted count is Work, never a Register row", () => {
     renderPage();
     // Valid GRN: the formal stored number, never re-derived.
-    expect(screen.getAllByText("GRN-20260901-1234").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("GRN-260901-1234").length).toBeGreaterThan(0);
     // Cancelled GRN: history is never deleted; the record keeps its number.
-    expect(screen.getAllByText("GRN-20260830-7777").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("GRN-260830-7777").length).toBeGreaterThan(0);
     // The submitted count does NOT appear — no row, no `No GRN yet` cell.
     expect(screen.queryByText("No GRN yet")).not.toBeInTheDocument();
     expect(screen.queryByText("PO-2002")).not.toBeInTheDocument();
@@ -755,14 +755,14 @@ describe("OperationReceiving — the formal GRN Register", () => {
     renderPage();
     fireEvent.click(screen.getByTestId("rail-category-Sofa"));
     await waitFor(() =>
-      expect(screen.queryByText("GRN-20260901-1234")).not.toBeInTheDocument(),
+      expect(screen.queryByText("GRN-260901-1234")).not.toBeInTheDocument(),
     );
-    expect(screen.getAllByText("GRN-20260830-7777").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("GRN-260830-7777").length).toBeGreaterThan(0);
 
     // Re-clicking the active row clears that section.
     fireEvent.click(screen.getByTestId("rail-category-Sofa"));
     await waitFor(() =>
-      expect(screen.getAllByText("GRN-20260901-1234").length).toBeGreaterThan(0),
+      expect(screen.getAllByText("GRN-260901-1234").length).toBeGreaterThan(0),
     );
 
     // The rail lost its Clear filters button; the toolbar's active
@@ -770,13 +770,13 @@ describe("OperationReceiving — the formal GRN Register", () => {
     fireEvent.click(screen.getByTestId("rail-category-Mattress"));
     fireEvent.click(screen.getByTestId("rail-supplier-Nice Future"));
     await waitFor(() =>
-      expect(screen.queryByText("GRN-20260830-7777")).not.toBeInTheDocument(),
+      expect(screen.queryByText("GRN-260830-7777")).not.toBeInTheDocument(),
     );
     expect(screen.getByText("Category: Mattress")).toBeInTheDocument();
     expect(screen.getByText("Supplier: Nice Future")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /clear all/i }));
     await waitFor(() =>
-      expect(screen.getAllByText("GRN-20260830-7777").length).toBeGreaterThan(0),
+      expect(screen.getAllByText("GRN-260830-7777").length).toBeGreaterThan(0),
     );
   });
 
@@ -811,7 +811,7 @@ describe("OperationReceiving — the formal GRN Register", () => {
     // Pressing the WEEK is what filters, as one inclusive range.
     fireEvent.click(rail.getByTestId("rail-grn-week-2026-08-24"));
     await waitFor(() =>
-      expect(screen.queryByText("GRN-20260901-1234")).not.toBeInTheDocument(),
+      expect(screen.queryByText("GRN-260901-1234")).not.toBeInTheDocument(),
     );
     const ask = h.registerAsks[h.registerAsks.length - 1]!;
     expect(ask.from).toBe("2026-08-24");
@@ -819,7 +819,7 @@ describe("OperationReceiving — the formal GRN Register", () => {
     // Pressing it again clears the choice.
     fireEvent.click(rail.getByTestId("rail-grn-week-2026-08-24"));
     await waitFor(() =>
-      expect(screen.getAllByText("GRN-20260901-1234").length).toBeGreaterThan(0),
+      expect(screen.getAllByText("GRN-260901-1234").length).toBeGreaterThan(0),
     );
   });
 
@@ -829,7 +829,7 @@ describe("OperationReceiving — the formal GRN Register", () => {
     fireEvent.click(rail.getByTestId("rail-grn-week-2026-08-31-expand"));
     fireEvent.click(await rail.findByTestId("rail-grn-day-2026-09-01"));
     await waitFor(() =>
-      expect(screen.queryByText("GRN-20260830-7777")).not.toBeInTheDocument(),
+      expect(screen.queryByText("GRN-260830-7777")).not.toBeInTheDocument(),
     );
     const ask = h.registerAsks[h.registerAsks.length - 1]!;
     expect(ask.from).toBe("2026-09-01");
@@ -849,7 +849,7 @@ describe("OperationReceiving — the formal GRN Register", () => {
       target: { value: "31/08/2026" },
     });
     await waitFor(() =>
-      expect(screen.queryByText("GRN-20260901-1234")).not.toBeInTheDocument(),
+      expect(screen.queryByText("GRN-260901-1234")).not.toBeInTheDocument(),
     );
     const ask = h.registerAsks[h.registerAsks.length - 1]!;
     expect(ask.from).toBe("2026-08-01");
@@ -871,13 +871,13 @@ describe("OperationReceiving — the formal GRN Register", () => {
 
     fireEvent.click(rail.getByTestId("rail-received-damaged"));
     await waitFor(() =>
-      expect(screen.queryByText("GRN-20260830-7777")).not.toBeInTheDocument(),
+      expect(screen.queryByText("GRN-260830-7777")).not.toBeInTheDocument(),
     );
     expect(screen.getByText("Received with: Damaged goods")).toBeInTheDocument();
     // Selected facets toggle off.
     fireEvent.click(rail.getByTestId("rail-received-damaged"));
     await waitFor(() =>
-      expect(screen.getAllByText("GRN-20260830-7777").length).toBeGreaterThan(0),
+      expect(screen.getAllByText("GRN-260830-7777").length).toBeGreaterThan(0),
     );
   });
 
@@ -886,11 +886,11 @@ describe("OperationReceiving — the formal GRN Register", () => {
     const rail = within(screen.getByTestId("receiving-rail"));
     expect(rail.getByTestId("rail-cancelled")).toHaveTextContent("1");
     // Both are listed before anything is chosen.
-    expect(screen.getAllByText("GRN-20260901-1234").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("GRN-20260830-7777").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("GRN-260901-1234").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("GRN-260830-7777").length).toBeGreaterThan(0);
     fireEvent.click(rail.getByTestId("rail-cancelled"));
     await waitFor(() =>
-      expect(screen.queryByText("GRN-20260901-1234")).not.toBeInTheDocument(),
+      expect(screen.queryByText("GRN-260901-1234")).not.toBeInTheDocument(),
     );
     // The rail row AND the toolbar's active condition both say it.
     expect(screen.getAllByText("Cancelled GRNs").length).toBe(2);
@@ -1005,7 +1005,7 @@ describe("OperationReceiving — the formal GRN Register", () => {
   it("a row opens the record, and the register stays MOUNTED but invisible", async () => {
     h.sessionDetail = postedDetail();
     renderPage();
-    fireEvent.click(screen.getAllByText("GRN-20260901-1234")[0]);
+    fireEvent.click(screen.getAllByText("GRN-260901-1234")[0]);
     await screen.findByTestId("receiving-record");
     // Never display:none — `invisible` keeps rail filters, search, sort and
     // scroll alive for Back (the Manual Purchase / SO object law).
@@ -1159,8 +1159,8 @@ describe("OperationReceiving — one destination and the paged register", () => 
       "Showing 1 to 1 of 2",
     );
     // Page 1 holds only the newest record; the second is NOT rendered.
-    expect(screen.getAllByText("GRN-20260901-1234").length).toBeGreaterThan(0);
-    expect(screen.queryByText("GRN-20260830-7777")).not.toBeInTheDocument();
+    expect(screen.getAllByText("GRN-260901-1234").length).toBeGreaterThan(0);
+    expect(screen.queryByText("GRN-260830-7777")).not.toBeInTheDocument();
     expect(screen.getByTestId("grn-page-previous")).toBeDisabled();
 
     fireEvent.click(screen.getByTestId("grn-page-next"));
@@ -1172,8 +1172,8 @@ describe("OperationReceiving — one destination and the paged register", () => 
     expect(
       h.registerAsks.some((a) => a.offset === 1),
     ).toBe(true);
-    expect(screen.getAllByText("GRN-20260830-7777").length).toBeGreaterThan(0);
-    expect(screen.queryByText("GRN-20260901-1234")).not.toBeInTheDocument();
+    expect(screen.getAllByText("GRN-260830-7777").length).toBeGreaterThan(0);
+    expect(screen.queryByText("GRN-260901-1234")).not.toBeInTheDocument();
     expect(screen.getByTestId("grn-page-next")).toBeDisabled();
 
     fireEvent.click(screen.getByTestId("grn-page-previous"));
@@ -1455,7 +1455,7 @@ describe("ReceivingRecord — the posted GRN, the review, the two doors", () => 
     renderRecord();
     fireEvent.click(screen.getByTestId("arrival-evidence-view"));
     expect(await screen.findByRole("dialog", { name: "Photo 1" })).toBeVisible();
-    expect(screen.getByText("GRN-20260901-1234 · Arrival evidence")).toBeVisible();
+    expect(screen.getByText("GRN-260901-1234 · Arrival evidence")).toBeVisible();
     expect(screen.getByRole("alert")).toHaveTextContent("Photo 1 could not be loaded");
     expect(screen.getByRole("button", { name: "Try again" })).toBeVisible();
     h.sessionDetail = postedDetail({ receipt: {
@@ -1470,7 +1470,7 @@ describe("ReceivingRecord — the posted GRN, the review, the two doors", () => 
     h.sessionDetail = postedDetail();
     renderRecord();
     expect(
-      screen.getByRole("heading", { name: "GRN-20260901-1234" }),
+      screen.getByRole("heading", { name: "GRN-260901-1234" }),
     ).toBeInTheDocument();
     // Normal GRNs have no status badge; only cancellation is exceptional.
     expect(screen.queryByTestId("receiving-record-state")).not.toBeInTheDocument();
@@ -1510,7 +1510,7 @@ describe("ReceivingRecord — the posted GRN, the review, the two doors", () => 
       "Download PDF",
     );
     // ONE Object Header — the preview pane repeats no title.
-    expect(screen.getAllByRole("heading", { name: "GRN-20260901-1234" })).toHaveLength(1);
+    expect(screen.getAllByRole("heading", { name: "GRN-260901-1234" })).toHaveLength(1);
   });
 
   it("a submitted count under review is full width — no GRN, no document pane", () => {
