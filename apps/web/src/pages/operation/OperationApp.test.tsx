@@ -103,12 +103,12 @@ vi.mock("./DeliveryOrderPage", () => ({
 // did not include it, so the main pane rendered nothing.
 // The right rail self-fetches (tasks/notes) — stub it; this suite tests routing.
 vi.mock("./components/rail/CalendarPanel", () => ({
-  default: () => {
+  default: ({ onOpenRecord }: { onOpenRecord?: () => void }) => {
     const [params, setParams] = useSearchParams();
     return <div data-testid="calendar-stub">
       <button onClick={() => { const next = new URLSearchParams(params); next.set("calendarDay", "2026-10-12"); setParams(next); }}>Pick fixture day</button>
       <span>{params.get("calendarDay")}</span>
-      <Link to="/operation/orders?calendarDay=2026-10-12">Open fixture source</Link>
+      <Link to="/operation/orders?calendarDay=2026-10-12" onClick={onOpenRecord}>Open fixture source</Link>
     </div>;
   },
 }));
@@ -572,6 +572,9 @@ describe("OperationApp — the phone shell (owner review 2026-09-25, round 2)", 
       expect(screen.getByTestId("register-stub")).toBeVisible();
       fireEvent.click(screen.getByRole("button", { name: /^Calendar$/ }));
       expect(screen.getByTestId("calendar-stub")).toHaveTextContent("2026-10-12");
+      // The destination is already current: no URL change can close this.
+      fireEvent.click(screen.getByText("Open fixture source"));
+      expect(screen.queryByRole("dialog", { name: "Calendar" })).toBeNull();
     } finally { restore(); }
   });
 

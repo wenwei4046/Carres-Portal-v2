@@ -636,10 +636,25 @@ Actual production Excel files contained all seven receipts and exactly the three
 when exported from filtered Cards. Short Carres numbers and original supplier DO references
 were preserved. The PDF list renderer is covered by tests; its live download is not claimed here.
 
-**Shared Calendar continuation — branch only, 2026-10-05.** Stock MASTER §7 records the new
-Warehouse-owned full-population arrival read. Its expected/actual receipt separation is locally
-tested and wired to the existing Quick Rail on branch. Line/batch date convergence and phone
-entry are also built on branch; production acceptance remains open; no second Calendar page is introduced.
+**Shared Calendar — DEPLOYED / BOUNDED LIVE ACCEPTANCE, 2026-10-05.** PR #1908 passed exact-head
+CI 37229951282 and production run 37230876813. An independent check found both Pages projects,
+both custom domains and the API at `eeedfe361083717c97c701fa33075c1398b5aa88`. Stock MASTER §7
+owns the full-population arrival read and quantity/date rules. Authenticated desktop acceptance
+showed three actual GRNs on 4 September (physical quantities 1, 2 and 1), with the cancelled GRN
+absent; its exact GRN link opened the existing receipt/PDF page. On 17 August, expected PO-2053
+showed Pending Delivery Qty 1 and opened its exact Inbound source/Site/date. The selected day,
+Warehouse module and Carres Klang filter survived navigation. Phone 390×844 displayed the same
+Calendar and kept it open while selecting a date. One phone edge remains open: tapping a source
+already current leaves the Calendar covering it. The continuation adds an explicit record-open
+callback; the regression failed before the fix and 82 Calendar/shell tests pass afterward.
+That correction still requires its own production verification. No second Calendar page was
+introduced and no receipt/stock write was made. Current module choices cover Warehouse and
+Delivery; broader module-event admission and automatic Warehouse posting are not claimed complete.
+The same phone preview exposed a full-GRN header/Linked PO display bypassing the shared short-year
+formatter. The continuation corrects both display sites; stored source IDs and historical PDFs
+remain unchanged. The existing full-page regression checks the short PO at both positions.
+Downloaded predecessor/current bundles prove `Filter by module` 0→1, the old
+`title:"Receiving",tone:"text-success"` block 1→0, and `Receiving Differences` control 1→1.
 
 **Read-only production evidence, 2026-10-04:** `warehouse_submit_receipt` still files a report;
 `warehouse_receipt_check_in` calls Operation's post-authority gate. The only current active

@@ -292,6 +292,15 @@ describe("shared Calendar Warehouse arrival source", () => {
   function event(over: Record<string, unknown> = {}) {
     return { id: "expected:PO", kind: "expected_arrival", date: TODAY, sourceId: "PO", sourceRef: "PO-20260727-0001", siteId: "klang", siteName: "Klang", expectedQty: 3, physicalQty: null, extraQty: null, receiptId: null, href: "/operation?tab=warehouse-inbound&source=PO&date=2026-07-27", ...over };
   }
+  it("notifies the phone shell when opening either an arrival or a GRN", () => {
+    const onOpenRecord = vi.fn();
+    h.warehouse.data.events = [event(), event({ id: "receipt:r", kind: "actual_arrival", expectedQty: null, physicalQty: 1, receiptRef: "GRN-20260727-0002", href: "/operation?tab=receiving&session=r" })];
+    render(<CalendarPanel onOpenRecord={onOpenRecord} />);
+    fireEvent.click(screen.getByRole("link", { name: /PO-260727-0001/ }));
+    expect(onOpenRecord).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole("link", { name: /GRN-260727-0002/ }));
+    expect(onOpenRecord).toHaveBeenCalledTimes(2);
+  });
   it("separates expected goods from actual receipt quantities and links the owning records", () => {
     h.warehouse.data = { sites: [], undatedReceipts: 0, events: [event(), event({ id: "receipt:r", kind: "actual_arrival", date: TOMORROW, expectedQty: null, physicalQty: 8, extraQty: 2, receiptId: "r", receiptRef: "GRN-20260728-0002", href: "/operation?tab=receiving&session=r" })] };
     render(<CalendarPanel />);
@@ -339,6 +348,15 @@ describe("shared Calendar Warehouse arrival source", () => {
 
 
 describe("shared Calendar navigation", () => {
+  it("opens records explicitly without treating a date selection as navigation", () => {
+    h.orders = [confirmed(TOMORROW)];
+    const onOpenRecord = vi.fn();
+    render(<CalendarPanel onOpenRecord={onOpenRecord} />);
+    fireEvent.click(screen.getByTestId(`month-day-${TOMORROW}`));
+    expect(onOpenRecord).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("link", { name: /SO-1207/ }));
+    expect(onOpenRecord).toHaveBeenCalledOnce();
+  });
   it("uses the kit day picker and keeps a clicked date on the delivery door", () => {
     h.orders = [confirmed(TOMORROW)];
     render(<CalendarPanel />);
