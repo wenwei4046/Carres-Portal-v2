@@ -362,6 +362,10 @@ After mainline integration the saved-source document preview uses the kit's curr
 PDF close restores focus to the same source entry and reopening retains the SO panel. Its four
 adapter tests and four actual saved-document tests pass; the earlier CI type rejection is not
 accepted as delivery proof.
+The full CI then passed 4,030 API and 6,311 web tests but rejected one internal stock callback
+parameter as a visible banned word. The flag is now named `isPending`; approved PO Status copy
+and the guard remain unchanged. All 126 copy-guard tests and four compact-view tests pass locally;
+the fresh full CI is still required before release.
 
 **Additional authenticated stock acceptance, 2026-10-04.** In the actual `time=11:00` scope,
 manual whole-round matching offered SO-1368 exact Unit `U1-000-180` at Carres Klang (New,

@@ -1234,11 +1234,11 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
    * a button the operator cannot connect it to would be worse than losing it.
    */
   const [pendingStock, setPendingStock] = useState<ReadonlySet<string>>(new Set());
-  const onStockPending = useCallback((orderId: string, pending: boolean) => {
+  const onStockPending = useCallback((orderId: string, isPending: boolean) => {
     setPendingStock((prev) => {
-      if (prev.has(orderId) === pending) return prev;
+      if (prev.has(orderId) === isPending) return prev;
       const next = new Set(prev);
-      if (pending) next.add(orderId);
+      if (isPending) next.add(orderId);
       else next.delete(orderId);
       return next;
     });
@@ -1819,7 +1819,7 @@ function SoBatchOrderExpansion({
   /** Ready Stock answered these item lines — every tick on them is now stale. */
   onReserved: (orderId: string, orderLineIds: readonly string[]) => void;
   /** This order has a Ready Stock edit nobody has saved or cancelled yet. */
-  onStockPending: (orderId: string, pending: boolean) => void;
+  onStockPending: (orderId: string, isPending: boolean) => void;
 }) {
   /* Its own handle on the router: this box is a top-level component, not a
      closure inside the register, so the multi-PO door below cannot borrow the
