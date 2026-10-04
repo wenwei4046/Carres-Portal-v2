@@ -1837,3 +1837,67 @@ describe("GET /duty — posting and amend/void are two answers (0601)", () => {
     expect(res.status).toBe(403);
   });
 });
+
+describe("Operation saved report evidence",()=>{
+  const EVENT="55555555-5555-4555-8555-555555555555";
+  const path="PO-1001/saved.jpg";
+  function evidenceClient(report:unknown, overrides:{receipt?:boolean;eventReceipt?:string;storageError?:boolean}={}) {
+    const sb=makeSb({
+      warehouse_receipts:{single:{data:overrides.receipt===false?null:{id:RECEIPT},error:null}},
+      receiving_events:{single:{data:{id:EVENT,receipt_id:overrides.eventReceipt ?? RECEIPT,payload:{report}},error:null}},
+    });
+    const createSignedUrl=vi.fn().mockResolvedValue(overrides.storageError?{data:null,error:{message:"Denied"}}:{data:{signedUrl:"https://example.test/saved"},error:null});
+    const storage={from:vi.fn(()=>({createSignedUrl}))};
+    vi.mocked(userClient).mockReturnValue({...sb,storage} as never);
+    return {storage,createSignedUrl};
+  }
+  const url=(file=path)=>`/api/operation/warehouse-receipts/${RECEIPT}/history/${EVENT}/evidence?path=${encodeURIComponent(file)}`;
+  it.each(["do", "photo", "condition"])("signs the exact saved %s using the caller",async kind=>{
+    const report={po_id:"PO-1001",...(kind==="do"?{do_file_path:path}:kind==="photo"?{arrival_evidence:[{path,kind:"photo"}]}:{lines:[{id:LINE,damaged_photos:[{path,unit_code:"U1-000-001"}]}]})};
+    const client=evidenceClient(report);
+    const result=await req(url(),"GET",await makeJwt("operation"));
+    expect(result.status).toBe(200);expect(await result.json()).toEqual({url:"https://example.test/saved"});
+    expect(client.storage.from).toHaveBeenCalledWith("delivery-orders");
+    expect(client.createSignedUrl).toHaveBeenCalledWith(path,3600);
+  });
+  it("uses the non-PO source bucket for recorded arrival proof",async()=>{
+    const file=`${SITE}/proof.pdf`;const client=evidenceClient({arrival_source_id:SITE,do_file_path:file});
+    expect((await req(url(file),"GET",await makeJwt("operation"))).status).toBe(200);
+    expect(client.storage.from).toHaveBeenCalledWith("arrival-proofs");
+  });
+  it.each(["unrecorded", "wrong-source", "foreign-event", "unreadable-receipt"])("refuses %s before signing",async reason=>{
+    const client=evidenceClient({po_id:reason==="wrong-source"?"PO-OTHER":"PO-1001",do_file_path:path},
+      {eventReceipt:reason==="foreign-event"?SITE:undefined,receipt:reason!=="unreadable-receipt"});
+    const result=await req(url(reason==="unrecorded"?"PO-1001/other.jpg":path),"GET",await makeJwt("operation"));
+    expect(result.status).toBe(reason==="unreadable-receipt"?404:403);
+    expect(client.storage.from).not.toHaveBeenCalled();
+  });
+  it("retains Storage denial instead of signing as administrator",async()=>{
+    const client=evidenceClient({po_id:"PO-1001",do_file_path:path},{storageError:true});
+    expect((await req(url(),"GET",await makeJwt("operation"))).status).toBe(502);
+    expect(client.createSignedUrl).toHaveBeenCalledTimes(1);
+  });
+  it("refuses Warehouse at the Operation door",async()=>{
+    const client=evidenceClient({po_id:"PO-1001",do_file_path:path});
+    expect((await req(url(),"GET",await makeJwt("warehouse"))).status).toBe(403);
+    expect(client.storage.from).not.toHaveBeenCalled();
+  });
+});
+
+describe("Operation original report labels",()=>{
+  it.each([false,true])("preserves report facts and fails a label read honestly (failure=%s)",async failure=>{
+    const report={arrival_source_id:SITE,arrival_units:[{stock_item_id:LINE,outcome:"not_received"}],goods_received_time:null,note:"Original facts"};
+    const sb=makeSb({
+      warehouse_receipts:{single:{data:{...RECEIPT_ROW,po_id:null,do_file_path:null,lines:[],status:"draft"},error:null}},
+      receiving_events:{list:{data:[{id:SAVE_KEY,receipt_id:RECEIPT,event:"submitted",payload:{report}}],error:null}},
+      ops_stock_items:{list:{data:failure?null:[{id:LINE,unit_code:"U1-000-123"}],error:failure?{code:"XX000",message:"Unavailable"}:null}},
+    });
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const result=await req(`/api/operation/warehouse-receipts/${RECEIPT}`,"GET",await makeJwt("operation"));
+    if(failure){expect(result.status).toBeGreaterThanOrEqual(400);return;}
+    expect(result.status).toBe(200);
+    const body=await result.json() as {events:Array<{payload:{report:unknown};unit_labels:Record<string,string>}>};
+    expect(body.events[0]?.payload.report).toEqual(report);
+    expect(body.events[0]?.unit_labels).toEqual({[LINE]:"U1-000-123"});
+  });
+});

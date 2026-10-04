@@ -1380,6 +1380,20 @@ describe("ReceivingRecord — the posted GRN, the review, the two doors", () => 
     expect(screen.getByTestId("record-history")).toHaveTextContent("Mon, 5 Oct 01:30");
   });
 
+  it("opens the original Warehouse revision from a blocked report without an approval action", async () => {
+    h.sessionDetail={...postedDetail({receipt:{status:"draft",grn_no:null,raw_report:{po_id:"PO-1001"},lines:[]}}),
+      events:[{id:"original",receipt_id:"r-posted",event:"submitted",event_at:"2026-10-04T17:30:00Z",actor_name:"Warehouse individual",
+        payload:{report:{po_id:"PO-1001",note:"Original shortage",lines:[]}}}]};
+    renderRecord();
+    fireEvent.click(within(screen.getByTestId("record-history")).getByRole("button",{name:"View"}));
+    const dialog=await screen.findByRole("dialog",{name:"History"});
+    expect(within(dialog).getByText("Original shortage")).toBeVisible();
+    expect(within(dialog).getByText("Time not recorded")).toBeVisible();
+    expect(within(dialog).queryByRole("button",{name:"Save Receiving"})).not.toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole("button",{name:"Close"}));
+    expect(screen.getByTestId("record-history")).toBeVisible();
+  });
+
   it("keeps an unreadable saved arrival photo visible and opens the shared viewer with its GRN source", async () => {
     h.sessionDetail = postedDetail({ receipt: {
       arrival_evidence: [{ path: "stored/photo.jpg", kind: "photo" }],

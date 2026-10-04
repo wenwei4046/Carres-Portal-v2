@@ -32,6 +32,8 @@ import {
 import { renderGrnPdf } from "@/lib/pdf/render";
 import { usePdfCanvases } from "@/lib/pdf/use-pdf-canvases";
 import DropdownMenu from "@/components/kit/DropdownMenu";
+import ReceivingReportHistory from "@/components/receiving/ReceivingReportHistory";
+import Button from "@/components/kit/Button";
 import SavedEvidenceViewer from "@/components/kit/SavedEvidenceViewer";
 import DOFileUploadField from "@/components/DOFileUploadField";
 import ArrivalEvidenceUploadField from "@/components/ArrivalEvidenceUploadField";
@@ -75,6 +77,7 @@ export default function ReceivingRecord({
   const q = useReceivingSessionDetail(sessionId);
   const dutyQ = useReceivingDuty();
   const [amending, setAmending] = useState(false);
+  const [reportEventId, setReportEventId] = useState<string | null>(null);
   const [evidenceId, setEvidenceId] = useState<string | null>(null);
   const [voiding, setVoiding] = useState(false);
   const [draft, setDraft] = useState<AmendFormDraft | null>(null);
@@ -542,6 +545,9 @@ export default function ReceivingRecord({
           )}
         </>
       )}
+      {reportEventId && <ReceivingReportHistory receiptId={sessionId} events={events}
+        initialEventId={reportEventId} evidenceBasePath={`/api/operation/warehouse-receipts/${sessionId}`}
+        onClose={()=>setReportEventId(null)}/>}
       {/* ── History — the three-rank record grammar, append-only ──── */}
       <Section title="History">
         {events.length === 0 ? (
@@ -571,6 +577,7 @@ export default function ReceivingRecord({
                       : ""}
                   </div>
                 ) : null}
+                {e.payload?.report != null && <Button onClick={()=>setReportEventId(e.id)}>View</Button>}
                 {e.event === "amended" && e.payload?.before ? (
                   /* Only the AFFECTED facts compare side by side. */
                   <div className="mt-1 grid max-w-md grid-cols-2 gap-2 rounded-card border border-kit-slate-5 p-2 text-label">

@@ -447,12 +447,13 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
       arrival_evidence:[{path:"PO-20261005-1234/photo.jpg",kind:"photo"},{path:"PO-20261005-1234/clip.mp4",kind:"video"}],
       lines:[{id:WH,received_now:6,damaged_qty:2,wrong_item_qty:null}]}}
   }]});
+  if (url.includes(`/api/operation/warehouse-receipts/${POSTED}/history/`) && url.includes("/evidence?")) return json({url:"/carres-wordmark.png"});
   if (url.includes("/api/operation/warehouse-receipts/duty")) return json(DUTY);
   if (url.includes(`/api/operation/warehouse-receipts/${POSTED}`)) return json(PAGE === "blocked-report" ? {
     ...DETAIL, receipt: {...DETAIL.receipt,status:"draft",grn_no:null,lines:[],raw_report:{note:"Driver reported two goods"},
       blockers:[{code:"receipt_evidence_not_available",message:"Delivery note is missing"}]},
     events:[{id:"report-corrected",receipt_id:POSTED,event:"resubmitted",event_at:"2026-10-04T17:30:00Z",actor_name:"Warehouse operator",payload:{}},
-      {id:"report-saved",receipt_id:POSTED,event:"submitted",event_at:"2026-10-04T17:00:00Z",actor_name:"Warehouse operator",payload:{}}],
+      {id:"report-saved",receipt_id:POSTED,event:"submitted",event_at:"2026-10-04T17:00:00Z",actor_name:"Warehouse operator",line_labels:{[WH]:"MS01-K"},payload:{report:{po_id:"PO-20261005-1234",note:"Original supplier delivery report",goods_received_at:"2026-10-05",goods_received_time:null,lines:[{id:WH,received_now:2,damaged_qty:0,wrong_item_qty:null}],arrival_evidence:[{path:"PO-20261005-1234/photo.jpg",kind:"photo"}]}}}],
   } : DETAIL);
   if (url.includes(`/api/operation/warehouse-receipts/${SUBMITTED}`))
     return json({

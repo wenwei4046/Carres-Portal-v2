@@ -790,7 +790,8 @@ an unreadable later page fails the detail rather than claiming a complete histor
 Local illustrative 390×844 preview verifies visible correction/submission history, correct local
 time, no duplicate status badge and 390px document/scroll width. Evidence:
 `/tmp/carres-blocked-receiving-history-local.jpg`. This is event-list visibility, not yet complete
-per-revision physical-fact/evidence inspection or Warehouse-side report-history acceptance.
+live per-revision evidence transport or Warehouse-side authenticated report-history acceptance.
+Operation snapshot inspection is connected on branch below.
 
 **Warehouse report snapshot reader — BUILT API / LOCAL SQL DRAFT, 2026-10-05.**
 `/api/warehouse/receipts/:id/history` uses an active-individual, exact-Site SQL reader and stable
@@ -841,9 +842,28 @@ viewer tests pass. Both application typechecks pass, including the final navigat
 Photo 1 then Next to Video 2 without a false error; video metadata/media loads (readyState 4,
 no media error), and native controls are present. Playback itself and real uploaded-file transport
 are not claimed. Screenshot: `/tmp/carres-warehouse-evidence-phone-local.jpg`.
-SQL remains chat-only, unapproved and unapplied to production. This does not close Operation's
-per-revision evidence inspector, source-resolution workflow, downstream repair-return Work closure,
+SQL remains chat-only, unapproved and unapplied to production. This does not close
+source-resolution workflow, downstream repair-return Work closure,
 legacy fixture convergence, full Warehouse listing acceptance or the production release gate.
+
+**Operation saved-report inspection — BUILT ON BRANCH / NOT DEPLOYED, 2026-10-05.**
+Operation's existing receipt History opens any saved report event through the same ReceivingReportHistory
+composition as Warehouse. The original report supplies quantities, physical date/time, notes and
+Unit outcomes; current source quantities never replace it. Source labels are read only for report
+IDs through Operation RLS; failures fail the detail read. Evidence names the exact receipt/event/path,
+checks readable receipt and event membership/source prefix, then signs using the caller's Storage
+permissions. No administrative signing bypass, Warehouse access to the Operation door, receipt
+approval or stock action is added. The shared viewer's query cache separates audience endpoints.
+
+83 Operation receipt-route tests pass, including exact saved proof/photo/condition access, non-PO
+bucket selection, foreign-event/unrecorded-path/unreadable-receipt refusal, Warehouse refusal,
+Storage-denial handling, original Unit labels and failed label reads. 76 Receiving UI and eight
+shared report-history tests pass, including opening the saved event from a blocked report and
+using the Operation evidence endpoint without calling Warehouse. API and Web typechecks and
+design-standard checks pass. A local illustrative 390px walk opens the original saved report,
+loads its photo and closes back through report to receipt with focus restored. Screenshot:
+`/tmp/carres-operation-report-snapshot-local.jpg`. Real signed-file transport and production
+acceptance remain unverified; this is not permission to merge the SQL-dependent draft.
 
 **Warehouse confirmation form — BUILT ON BRANCH / NOT DEPLOYED, 2026-10-05.**
 The PO form now calls the final-confirmation API with a stable save key. It uses kit Modal, Button,

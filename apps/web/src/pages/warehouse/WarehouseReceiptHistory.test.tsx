@@ -2,14 +2,27 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import WarehouseReceiptHistory from "./WarehouseReceiptHistory";
+import ReceivingReportHistory from "@/components/receiving/ReceivingReportHistory";
 const api=vi.hoisted(()=>vi.fn());
 vi.mock("@/lib/api",()=>({apiFetch:api}));
 const id="11111111-1111-4111-8111-111111111111";
 const unit="22222222-2222-4222-8222-222222222222";
-const event={id:"event-1",receipt_id:id,event:"submitted",event_at:"2026-10-04T17:30:00Z",actor_name:"Aina",line_labels:{[id]:"SKU-A"},unit_labels:{[unit]:"U1-000-001"},payload:{report:{po_id:"PO-20261005-1234",do_number:"DO-1",goods_received_at:"2026-10-05",goods_received_time:null,note:"Original report",lines:[{id,received_now:null,damaged_qty:0,wrong_item_qty:null}]}}};
+const event={id:"event-1",receipt_id:id,event:"submitted" as const,event_at:"2026-10-04T17:30:00Z",actor_name:"Aina",line_labels:{[id]:"SKU-A"},unit_labels:{[unit]:"U1-000-001"},payload:{report:{po_id:"PO-20261005-1234",do_number:"DO-1",goods_received_at:"2026-10-05",goods_received_time:null,note:"Original report",lines:[{id,received_now:null,damaged_qty:0,wrong_item_qty:null}]}}};
 function show(){render(<QueryClientProvider client={new QueryClient({defaultOptions:{queries:{retry:false}}})}><WarehouseReceiptHistory receiptId={id} onClose={vi.fn()}/></QueryClientProvider>);}
 beforeEach(()=>{api.mockReset();api.mockResolvedValue({events:[event]});});
 describe("Warehouse report history",()=>{
+  it("uses supplied Operation snapshots and its own evidence door without calling Warehouse",async()=>{
+    api.mockResolvedValue({url:"https://example.test/operation-proof.jpg"});
+    const original={...event,payload:{report:{...event.payload.report,arrival_evidence:[{path:"PO-20261005-1234/photo.jpg",kind:"photo"}]}}};
+    render(<QueryClientProvider client={new QueryClient()}><ReceivingReportHistory receiptId={id}
+      events={[original]} initialEventId={original.id} evidenceBasePath={`/api/operation/warehouse-receipts/${id}`} onClose={vi.fn()}/></QueryClientProvider>);
+    expect(screen.getByText("Original report")).toBeVisible();
+    expect(api).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button",{name:"Photo 1"}));
+    expect(await screen.findByRole("img",{name:"Photo 1"})).toHaveAttribute("src","https://example.test/operation-proof.jpg");
+    expect(api).toHaveBeenCalledWith(`/api/operation/warehouse-receipts/${id}/history/event-1/evidence?path=${encodeURIComponent("PO-20261005-1234/photo.jpg")}`);
+  });
+
   it("opens the original reported facts with unknown counts and time preserved",async()=>{
     show();fireEvent.click(await screen.findByRole("button",{name:"View"}));
     expect(screen.getByText("Original report")).toBeVisible();

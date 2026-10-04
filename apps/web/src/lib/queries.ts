@@ -8715,6 +8715,8 @@ export interface ReceivingSession {
 
 /** One entry of the ONE history (RECEIVING-INFORMATION-MODEL §6). */
 export interface ReceivingEvent {
+  line_labels?: Record<string, string>;
+  unit_labels?: Record<string, string>;
   id: string;
   receipt_id: string;
   event:
@@ -8727,6 +8729,7 @@ export interface ReceivingEvent {
   event_at: string;
   actor_name: string | null;
   payload: {
+    report?: unknown;
     do_number?: string;
     goods_received_at?: string;
     units_counted?: number;

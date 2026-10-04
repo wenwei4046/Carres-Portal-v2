@@ -22,6 +22,7 @@ import {
   type PoDatePromise,
   type WarehouseReceiptLine,
 } from "@carres/shared";
+import { warehouseConfirmationReportFromWire } from "@carres/shared/adapters";
 import { requireOperation } from "../../lib/auth-guards";
 import { mapPgError, parseJsonBody, readAllPages } from "../../lib/route-helpers";
 import { isMissingRelationError } from "../../lib/optional-relation";
@@ -1161,10 +1162,34 @@ warehouseReceiptsRouter.get("/receiver", requireOperation, async (c) => {
   });
 });
 
-/**
- * GET /:id — one Receiving Session / GRN record: the row, its per-Unit
- * results and its append-only events, names resolved.
- */
+/** Original saved event evidence, authorised through the caller at every read. */
+warehouseReceiptsRouter.get("/:id/history/:eventId/evidence", requireOperation, async (c) => {
+  const parsed=z.object({id:z.string().uuid(),eventId:z.string().uuid(),path:z.string().min(1).max(500)})
+    .safeParse({id:c.req.param("id"),eventId:c.req.param("eventId"),path:c.req.query("path")});
+  if(!parsed.success || parsed.data.path.split("/").some(part=>!part || part===".."))
+    return c.json({message:"Invalid evidence"},422);
+  const {id,eventId,path}=parsed.data;
+  const sb=userClient(c.env,c.var.auth.jwt);
+  const receipt=await sb.from("warehouse_receipts").select("id").eq("id",id).maybeSingle();
+  if(receipt.error){const mapped=mapPgError(receipt.error);return c.json(mapped.body,mapped.status);}
+  if(!receipt.data) return c.json({message:"Receipt not found"},404);
+  const event=await sb.from("receiving_events").select("id, receipt_id, payload")
+    .eq("id",eventId).eq("receipt_id",id).maybeSingle();
+  if(event.error){const mapped=mapPgError(event.error);return c.json(mapped.body,mapped.status);}
+  if(!event.data || event.data.receipt_id!==id || event.data.id!==eventId)
+    return c.json({message:"Evidence could not be loaded"},403);
+  const report=warehouseConfirmationReportFromWire(event.data.payload?.report);
+  const source=report?.poId ?? report?.arrivalSourceId;
+  const recorded=report && (report.doFilePath===path || report.arrivalEvidence?.some(file=>file.path===path) ||
+    report.lines?.some(line=>[...(line.damagedPhotos ?? []),...(line.wrongItemPhotos ?? [])]
+      .some(file=>(typeof file==="string"?file:file.path)===path)));
+  if(!source || !path.startsWith(`${source}/`) || !recorded)
+    return c.json({message:"Evidence could not be loaded"},403);
+  const signed=await sb.storage.from(report.poId?"delivery-orders":"arrival-proofs").createSignedUrl(path,3600);
+  if(signed.error || !signed.data?.signedUrl) return c.json({message:"Evidence could not be loaded"},502);
+  return c.json({url:signed.data.signedUrl});
+});
+
 warehouseReceiptsRouter.get("/:id", requireOperation, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
   const id = c.req.param("id");
@@ -1250,6 +1275,22 @@ warehouseReceiptsRouter.get("/:id", requireOperation, async (c) => {
   const { data: units } = unitsRead;
   const { data: evs } = eventsRead;
   const { data: po } = poRead;
+  // Resolve only IDs actually present in saved reports, through Operation RLS.
+  // Labels supplement the original snapshot; they never replace its quantities.
+  const reports=(evs ?? []).map(e=>warehouseConfirmationReportFromWire((e as {payload?:{report?:unknown}}).payload?.report));
+  const reportLineIds=[...new Set(reports.flatMap(report=>(report?.lines ?? []).flatMap(line=>line.id?[line.id]:[])))];
+  const reportUnitIds=[...new Set(reports.flatMap(report=>(report?.arrivalUnits ?? []).map(unit=>unit.stockItemId)))];
+  let reportLines: Array<{id:string;sku:string}> = [];
+  let reportUnits: Array<{id:string;unit_code:string}> = [];
+  try {
+    [reportLines,reportUnits]=await Promise.all([
+      readByIds(reportLineIds,ids=>sb.from("purchase_order_lines").select("id, sku").in("id",ids)),
+      readByIds(reportUnitIds,ids=>sb.from("ops_stock_items").select("id, unit_code").in("id",ids)),
+    ]);
+  } catch(error) {const mapped=mapPgError(error as never);return c.json(mapped.body,mapped.status);}
+  const reportLineLabels=Object.fromEntries(reportLines.map(line=>[line.id,line.sku]));
+  const reportUnitLabels=Object.fromEntries(reportUnits.map(unit=>[unit.id,unit.unit_code]));
+
   const itemIds = [...new Set((units ?? []).map((u) => u.stock_item_id as string))];
   let items: Array<{ id: string; po_line_id: string | null; identity_scope: string | null }> = [];
   try {
@@ -1419,9 +1460,13 @@ warehouseReceiptsRouter.get("/:id", requireOperation, async (c) => {
     related_records: await relatedRead,
     line_info: lineInfo,
     po: po ?? null,
-    events: ((evs ?? []) as Array<Record<string, unknown>>).map((e) => ({
+    events: ((evs ?? []) as Array<Record<string, unknown>>).map((e,index) => ({
       ...e,
       actor_name: name(e.actor_id),
+      line_labels: Object.fromEntries((reports[index]?.lines ?? []).flatMap(line=>
+        line.id && reportLineLabels[line.id] ? [[line.id,reportLineLabels[line.id]]] : [])),
+      unit_labels: Object.fromEntries((reports[index]?.arrivalUnits ?? []).flatMap(unit=>
+        reportUnitLabels[unit.stockItemId] ? [[unit.stockItemId,reportUnitLabels[unit.stockItemId]]] : [])),
     })),
   });
 });
