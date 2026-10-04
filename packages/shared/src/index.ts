@@ -2162,6 +2162,8 @@ export {
 export {
   salesOrderParamOf,
   salesOrderNumberWord,
+  customerOrderReferenceOf,
+  customerOrderReferenceWord,
   type SalesOrderParam,
 } from "./sales-order-identity";
 // THE DELIVERY ARRANGEMENT (0379) — Delivery's own record of how a scope

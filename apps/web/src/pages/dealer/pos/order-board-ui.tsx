@@ -1,3 +1,4 @@
+import { customerOrderReferenceWord } from "@carres/shared";
 import {
   AlertCircle,
   Calendar,
@@ -116,7 +117,7 @@ export function OrderCard({
     >
       <div className="os-card__head">
         <div>
-          <div className="os-card__id">SO-{order.so}</div>
+          <div className="os-card__id">{customerOrderReferenceWord(order)}</div>
           <div className="os-card__name">{order.customer.name || "Walk-in"}</div>
         </div>
         {pieces > 0 && (

@@ -41,7 +41,7 @@ import {
   PRODUCT_MODELS,
   PRODUCT_SKUS,
 } from "@carres/shared";
-import { parseJsonBody, fail } from "../lib/route-helpers";
+import { parseJsonBody, fail, customerOrderCreationRefusalOf } from "../lib/route-helpers";
 import { ensureFixedTermSchedule, ensureRentalPlanStripeObjects, CARRES_SOURCE } from "../lib/rental-stripe";
 import { stripeClient, stripeConfigured } from "../lib/stripe";
 import { adminClient, userClient } from "../lib/supabase";
@@ -1624,6 +1624,30 @@ rentalRouter.post("/agreements", async (c) => {
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
   const d = parsed.data;
 
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const effectiveDealerId = c.var.auth.dealerId ?? d.dealerId ?? null;
+  if (d.requestKey && !effectiveDealerId) throw new HTTPException(403, { message: "Forbidden" });
+  const creationInput = { ...d, dealerId: effectiveDealerId };
+  const agreementResponse = (out: CreateAgreementRpcResult) => ({
+    agreement: Adapters.rentalAgreementFromRow(out.agreement),
+    customer: Adapters.customerFromRow(out.customer),
+    unit: out.unit ? Adapters.rentalStockUnitFromRow(out.unit) : null,
+    entitlementId: out.entitlementId, visitsTotal: out.visitsTotal,
+    pendingApproval: out.pendingApproval ?? true, orderId: out.orderId ?? null, so: out.so ?? null,
+  });
+  if (d.requestKey) {
+    const { data: replay, error: replayError } = await sb.rpc("customer_order_creation_replay", {
+      p_series: "SUB", p_request_key: d.requestKey, p_input: creationInput, p_dealer_id: effectiveDealerId,
+    });
+    if (replayError) {
+      const refusal = customerOrderCreationRefusalOf(replayError);
+      if (refusal) throw new HTTPException(refusal.status, { message: refusal.message });
+      return fail(c, replayError);
+    }
+    const saved = replay as CreateAgreementRpcResult | null;
+    if (saved?.agreement) return c.json(agreementResponse(saved), 201);
+  }
+
   // The object key is SERVER-generated end to end — no client string reaches
   // the path. No traversal, no collision, no guessing another store's evidence.
   // The agreement row is the index into this bucket, not the filename.
@@ -1641,8 +1665,7 @@ rentalRouter.post("/agreements", async (c) => {
   }
   const signaturePath = `${SIGNATURE_BUCKET}/${objectKey}`;
 
-  const sb = userClient(c.env, c.var.auth.jwt);
-  const { data, error } = await sb.rpc("create_rental_agreement", {
+  const payload = {
     p_plan_id: d.planId,
     p_customer_name: d.customerName,
     p_customer_phone: d.customerPhone,
@@ -1658,13 +1681,25 @@ rentalRouter.post("/agreements", async (c) => {
     p_signature_path: signaturePath,
     p_signed_name: d.signedName,
     p_signed_nric: d.signedNric ?? null,
-  });
+  };
+  const { data, error } = d.requestKey
+    ? await sb.rpc("customer_order_submit", {
+        p_series: "SUB", p_request_key: d.requestKey, p_input: creationInput,
+        p_dealer_id: effectiveDealerId, p_payload: payload,
+      })
+    : await sb.rpc("create_rental_agreement", payload);
   if (error) {
     // No agreement was created, so this blob indexes nothing. Leaving it would
     // accumulate orphan customer signatures in a bucket that cannot be cleaned
     // out through the app. Best-effort: a failed cleanup must not mask the real
     // error the store needs to read.
-    await admin.storage.from(SIGNATURE_BUCKET).remove([objectKey]).catch(() => {});
+    // A transport failure may follow a commit. Preserve uncertain evidence;
+    // the durable request will resolve it on retry.
+    if (!d.requestKey || /^[0-9A-Z]{5}$/.test(error.code ?? "")) {
+      await admin.storage.from(SIGNATURE_BUCKET).remove([objectKey]).catch(() => {});
+    }
+    const refusal = customerOrderCreationRefusalOf(error);
+    if (refusal) throw new HTTPException(refusal.status, { message: refusal.message });
     const detail = (error as { details?: string | null }).details ?? "";
     // 23514 = 0296's `orders_salesperson_required`. A rental mints a Sales
     // Order (0275) and p_salesperson_id defaults to NULL, so this is the one
@@ -1714,21 +1749,11 @@ rentalRouter.post("/agreements", async (c) => {
   if (!out?.agreement) {
     return c.json({ error: "rpc_failed", code: "rpc_failed", message: "signup returned no agreement" }, 500);
   }
-  return c.json(
-    {
-      agreement: Adapters.rentalAgreementFromRow(out.agreement),
-      customer: Adapters.customerFromRow(out.customer),
-      // null until finance approves (0268) — never adapt a null row
-      unit: out.unit ? Adapters.rentalStockUnitFromRow(out.unit) : null,
-      entitlementId: out.entitlementId,
-      visitsTotal: out.visitsTotal,
-      pendingApproval: out.pendingApproval ?? true,
-      // 0275 — the Sales Order this rental now has, so the POS can show it.
-      orderId: out.orderId ?? null,
-      so: out.so ?? null,
-    },
-    201,
-  );
+  if (d.requestKey && out.agreement.signature_path !== signaturePath) {
+    // Another simultaneous retry won. Only remove this unused blob, never its evidence.
+    await admin.storage.from(SIGNATURE_BUCKET).remove([objectKey]).catch(() => {});
+  }
+  return c.json(agreementResponse(out), 201);
 });
 
 // ── Stripe subscription checkout for an agreement ──────────────────────────

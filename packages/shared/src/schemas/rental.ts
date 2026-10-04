@@ -354,6 +354,7 @@ export type CustomerInput = z.infer<typeof customerInputSchema>;
  */
 export const createRentalAgreementInputSchema = z
   .object({
+    requestKey: z.string().min(1).max(200).optional(),
     planId: z.string().uuid(),
     customerName: z.string().trim().min(1).max(120),
     customerPhone: z.string().trim().min(5).max(32),

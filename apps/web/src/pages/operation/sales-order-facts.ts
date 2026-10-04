@@ -128,6 +128,7 @@ export function digits(s: string): string {
 export function searchHaystack(o: operationOrderListRow): string {
   const items = (o.order_lines ?? []).flatMap((l) => [lineName(l), l.sku]).join(" ");
   return [
+    o.public_reference ?? "",
     `so-${o.so}`,
     String(o.so),
     o.customer_name,

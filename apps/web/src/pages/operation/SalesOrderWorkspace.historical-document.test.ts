@@ -69,6 +69,14 @@ const REV2_SNAPSHOT = {
 } as any;
 
 describe("a historical Sales Order version's document", () => {
+  it("a new numbered order keeps its permanent public identity when rebuilding an old version", () => {
+    const base = { ...SIGNED_BASE, so_number: "SO2610-0007", order_code: "SO2610-0007" };
+    const before = JSON.stringify(base);
+    const doc = snapshotTemplateData(REV2_SNAPSHOT, base);
+    expect(doc.so_number).toBe("SO2610-0007");expect(doc.order_code).toBe("SO2610-0007");
+    expect(doc.signature_url).toBeNull();expect(JSON.stringify(base)).toBe(before);
+  });
+
   it("does not reproduce a signature it cannot attribute — which is NOT a claim of unsigned", () => {
     const doc = snapshotTemplateData(REV2_SNAPSHOT, SIGNED_BASE);
     expect(doc.signed).toBe(false);

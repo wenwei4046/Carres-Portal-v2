@@ -1,3 +1,4 @@
+import { customerOrderReferenceWord } from "@carres/shared";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { QRCodeSVG } from "qrcode.react";
@@ -23,6 +24,7 @@ import { qk, useCreateStripeCheckout, useStripeCheckoutStatus } from "@/lib/quer
 interface Props {
   orderId: string;
   so: number;
+  publicReference?: string | null;
   /** Live balance figures from the drawer (server re-validates on create). */
   total: number;
   paid: number;
@@ -59,6 +61,7 @@ function waNumber(phone: string): string {
 export default function StripeCollectModal({
   orderId,
   so,
+  publicReference,
   total,
   paid,
   initialAmount,
@@ -160,10 +163,10 @@ export default function StripeCollectModal({
   const waHref = useMemo(() => {
     if (!session || !customerPhone) return null;
     const text =
-      `Hi ${customerName || "there"}, here is your secure payment link for Carres order SO-${so} ` +
+      `Hi ${customerName || "there"}, here is your secure payment link for Carres order ${customerOrderReferenceWord({ so, publicReference })} ` +
       `(RM ${rm2(session.amount)}): ${session.url}`;
     return `https://wa.me/${waNumber(customerPhone)}?text=${encodeURIComponent(text)}`;
-  }, [session, customerName, customerPhone, so]);
+  }, [session, customerName, customerPhone, so, publicReference]);
 
   const stage: "amount" | "link" | "paid" | "expired" = !session
     ? "amount"
@@ -180,7 +183,7 @@ export default function StripeCollectModal({
           <X size={16} strokeWidth={1.75} />
         </button>
 
-        <div className="os-stripe__eyebrow">Collect online · SO-{so}</div>
+        <div className="os-stripe__eyebrow">Collect online · {customerOrderReferenceWord({ so, publicReference })}</div>
 
         {stage === "amount" && lockAmount && (
           <>

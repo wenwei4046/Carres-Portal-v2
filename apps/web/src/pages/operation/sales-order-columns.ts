@@ -1,3 +1,4 @@
+import { customerOrderReferenceWord } from "@carres/shared";
 /**
  * THE REGISTER'S FIELD CATALOG — STAGE 1 (BUILD-QUEUE, 2026-08-09).
  *
@@ -177,6 +178,7 @@ export interface RegisterRow {
   o: operationOrderListRow;
   id: string;
   so: number;
+  reference: string;
   customer: string;
   phone: string;
   items: string;
@@ -216,6 +218,7 @@ export function buildRegisterRow(
     o,
     id: o.id,
     so: o.so,
+    reference: customerOrderReferenceWord({ publicReference: o.public_reference, so: o.so }),
     /* ⭐ CAPITALIZE UP — owner ruling 2026-08-15. Cased ONCE here, at the
        row, so the Customer column, the guidance sentence, the search, the
        filter and the CSV export cannot print the name four ways. Display
@@ -324,7 +327,7 @@ export const REGISTER_FIELDS: readonly RegisterField[] = [
     text: (r) => fmtDate(r.ordered), sortBy: (r) => r.ordered,
     kind: "date", iso: (r) => r.ordered },
   { key: "so", label: "SO No", width: W.soNo, group: "Document", on: true,
-    text: (r) => `SO-${r.so}`, sortBy: (r) => r.so },
+    text: (r) => r.reference, sortBy: (r) => r.so },
   /* `Sales Location` is read with the identity: where it was sold. */
   { key: "sales_location", label: "Sales Location", width: W.salesLocation, group: "Sales ownership", on: true,
     text: (r) => salesLocationOf(r.o) },

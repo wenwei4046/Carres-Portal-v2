@@ -1,3 +1,5 @@
+import { customerOrderCreationRefusalOf } from "../lib/route-helpers";
+import { customerOrderReferenceWord } from "@carres/shared";
 import { Hono, type Context } from "hono";
 import { salesOrderWorkCompletion } from "../lib/sales-order-work-completion";
 import { HTTPException } from "hono/http-exception";
@@ -563,6 +565,57 @@ ordersRouter.post("/", async (c) => {
     }
   }
 
+  // Replay only after today's dealer/staff authorization, before pricing or claims.
+  const creationInput = {
+    ...parsed.data,
+    dealerId: effectiveDealerId,
+    salespersonId: attributedSalespersonId,
+    outletId: attributedOutletId,
+  };
+  const loadCreatedOrder = async (id: string) => {
+    const { data: full, error: fetchErr } = await sb
+      .from("orders")
+      .select("*, order_lines(*), order_addons(*), order_history(*)")
+      .eq("id", id)
+      .maybeSingle();
+    if (fetchErr) throw new HTTPException(500, { message: fetchErr.message });
+    if (!full) throw new HTTPException(500, { message: "Order created but not readable" });
+    const row = full as DB.OrderRow & {
+      order_lines?: DB.OrderLineRow[];
+      order_addons?: DB.OrderAddonRow[];
+      order_history?: DB.OrderHistoryRow[];
+    };
+    return orderSchema.parse(Adapters.orderFromRow(row, {
+      lines: row.order_lines ?? [], addons: row.order_addons ?? [], history: row.order_history ?? [],
+    }));
+  };
+  const replayCreatedOrder = async () => {
+    if (!parsed.data.requestKey) return null;
+    const { data: saved, error: replayError } = await sb.rpc("customer_order_creation_replay", {
+      p_series: "SO", p_request_key: parsed.data.requestKey,
+      p_input: creationInput, p_dealer_id: effectiveDealerId,
+    });
+    if (replayError) {
+      const refusal = customerOrderCreationRefusalOf(replayError);
+      if (refusal) throw new HTTPException(refusal.status, { message: refusal.message });
+      throw new HTTPException(replayError.code === "42501" ? 403 : 500, { message: replayError.message });
+    }
+    const id = (saved as { id?: string } | null)?.id;
+    if (!id) return null;
+    const order = await loadCreatedOrder(id);
+    // Current persisted goods, never replayed client prices, own the remaining sweep.
+    const sweep = await sweepReservedForSubmit(sb, {
+      ownerStaffId: auth.id, ownerDealerId: effectiveDealerId, orderId: id,
+      customerPhone: order.customer.phone, customerName: order.customer.name,
+      finalLines: order.lines ?? [], clientCartLineKeys: parsed.data.pwpCartLineKeys ?? [],
+    });
+    if (sweep.status === "server_error") console.error("pwp replay sweep failed (non-fatal):", sweep.message);
+    else if (sweep.softWarning) c.header("X-Pwp-Carry-Forward-Warning", encodeURIComponent(sweep.softWarning));
+    return order;
+  };
+  const replayedOrder = await replayCreatedOrder();
+  if (replayedOrder) return c.json(replayedOrder, 201);
+
   // 0219 — config-driven payment methods. The DB whitelist is gone; the key
   // must match an ACTIVE method from order_entry_config (code defaults incl.
   // "cash" when the config list is empty), and per-method rules apply:
@@ -732,6 +785,8 @@ ordersRouter.post("/", async (c) => {
     throw new HTTPException(500, { message: pwpClaim.message });
   }
   if (pwpClaim.status === "bad_request") {
+    const replayed = await replayCreatedOrder();
+    if (replayed) return c.json(replayed, 201);
     return c.json(
       {
         error: "rule_violation",
@@ -752,6 +807,13 @@ ordersRouter.post("/", async (c) => {
   const crossPwpCodes = pwpClaim.claimed.filter((cc) => cc.crossOrder).map((cc) => cc.code);
   const pwpClaimGroup = pwpClaim.claimGroup;
   const rollbackPwpClaims = async (): Promise<void> => {
+    if (parsed.data.requestKey && pwpClaimGroup && claimedPwpCodes.length > 0) {
+      await sb.rpc("customer_order_creation_release", {
+        p_request_key: parsed.data.requestKey, p_input: creationInput,
+        p_dealer_id: effectiveDealerId, p_codes: claimedPwpCodes, p_claim_group: pwpClaimGroup,
+      });
+      return;
+    }
     if (ownPwpCodes.length > 0) await sb.rpc("pwp_release_codes", { p_codes: ownPwpCodes });
     if (crossPwpCodes.length > 0 && pwpClaimGroup) {
       await sb.rpc("pwp_release_available_code", { p_codes: crossPwpCodes, p_claim_group: pwpClaimGroup });
@@ -955,13 +1017,21 @@ ordersRouter.post("/", async (c) => {
   // an incomplete order stays in Place with its blocker, while a complete one
   // reaches Purchasing without a second salesperson action. `/raw` below uses
   // the separate, draft-capable `create_raw_order` wrapper deliberately.
-  const { data: created, error } = await sb.rpc("create_order_from_sales_portal", { payload });
+  const { data: created, error } = parsed.data.requestKey
+    ? await sb.rpc("customer_order_submit", {
+        p_series: "SO", p_request_key: parsed.data.requestKey,
+        p_input: creationInput, p_dealer_id: effectiveDealerId,
+        p_payload: { ...payload, _creation_context: { codes: claimedPwpCodes, claim_group: pwpClaimGroup } },
+      })
+    : await sb.rpc("create_order_from_sales_portal", { payload });
   if (error) {
     // exit 10 (§4.5) — the create_order TX rolled back, so the claimed voucher
     // codes must un-claim. Placed as the FIRST line of the error block so ALL FOUR
     // sub-exits below (403 throw / mixed_category_lines 422 return / 400 throw /
     // 500 throw) inherit the rollback before any branch runs.
     await rollbackPwpClaims();
+    const refusal = customerOrderCreationRefusalOf(error);
+    if (refusal) throw new HTTPException(refusal.status, { message: refusal.message });
     // 42501 = manual cross-dealer check inside the RPC. We map to 403 so the
     // client sees the same code as RLS-denied reads.
     if (error.code === "42501" || /forbidden/i.test(error.message ?? "")) {
@@ -1011,7 +1081,11 @@ ordersRouter.post("/", async (c) => {
     throw new HTTPException(500, { message: "RPC did not return an order id" });
   }
 
-  // 0187/0188 (PWP VOUCHER) — the CONFIRM-PASS, now in TWO independent blocks
+  if (parsed.data.requestKey) await rollbackPwpClaims(); // redundant concurrent claims only; committed stamps stay locked
+
+  // Legacy submissions keep the two post-commit PWP steps. Keyed submissions
+  // bind their codes inside creation; only the idempotent sweep remains.
+  // 0187/0188 (PWP VOUCHER) — the legacy CONFIRM-PASS in TWO independent blocks
   // (P8d §3.1, the BLOCKER fix). At claim time the order had no id (create_order
   // DB-generates it — a caller-minted id can't be threaded in without touching the
   // RPC), so each claimed code is USED with redeemed_order_id NULL but claim_group
@@ -1024,7 +1098,7 @@ ordersRouter.post("/", async (c) => {
   // order USED code the owner-scoped table UPDATE could not (§4.4). FAIL-CLOSED:
   // a stamp error OR a short row (fewer stamped than claimed) → release the claims
   // + 500 (the order committed but the lock record is inconsistent → clean retry).
-  if (claimedPwpCodes.length > 0 && pwpClaimGroup) {
+  if (!parsed.data.requestKey && claimedPwpCodes.length > 0 && pwpClaimGroup) {
     const { data: stampedN, error: stampErr } = await sb.rpc("pwp_stamp_redeemed", {
       p_codes: claimedPwpCodes,
       p_claim_group: pwpClaimGroup,
@@ -1077,24 +1151,7 @@ ordersRouter.post("/", async (c) => {
   // exit 12 (§4.5): a re-fetch failure here does NOT rollback — the order
   // COMMITTED and the Confirm-pass already stamped the codes; only the 201
   // response failed. The codes stay USED + stamped (correct); the client re-GETs.
-  const { data: full, error: fetchErr } = await sb
-    .from("orders")
-    .select("*, order_lines(*), order_addons(*), order_history(*)")
-    .eq("id", id)
-    .maybeSingle();
-  if (fetchErr) throw new HTTPException(500, { message: fetchErr.message });
-  if (!full) throw new HTTPException(500, { message: "Order created but not readable" });
-
-  const row = full as DB.OrderRow & {
-    order_lines?: DB.OrderLineRow[];
-    order_addons?: DB.OrderAddonRow[];
-    order_history?: DB.OrderHistoryRow[];
-  };
-  const order = Adapters.orderFromRow(row, {
-    lines: row.order_lines ?? [],
-    addons: row.order_addons ?? [],
-    history: row.order_history ?? [],
-  });
+  const order = await loadCreatedOrder(id);
   // P8d (§3.3): surface the carry-forward soft-warning as a RESPONSE HEADER (NOT a
   // body field — the 201 body stays a bare `orderSchema` so the POS parse is byte-
   // identical). The POS reads the header to toast "N earned voucher(s) were not
@@ -3994,7 +4051,7 @@ ordersRouter.get("/:id/sales-order-data", async (c) => {
   const { data, error } = await sb
     .from("orders")
     .select(
-      "id, so, status, channel, customer_name, customer_phone, customer_address, " +
+      "id, so, public_reference, status, channel, customer_name, customer_phone, customer_address, " +
         "customer_email, customer_emergency, proceed_date, " +
         "delivery_date, delivery_date_tbd, delivery_floor, delivery_has_lift, " +
         "paid, payment_method, approval_code, signature_url, placed_at, " +
@@ -4267,9 +4324,8 @@ ordersRouter.get("/:id/sales-order-data", async (c) => {
     /* vouchers stay [] */
   }
 
-  // Golden SO (STAGE 2, BUILD-QUEUE): the canonical format is `SO-1256` —
-  // NO zero-padding, no second format, header · ORDER DETAILS · footer alike.
-  const so_number = `SO-${o.so}`;
+  // The stored public reference is shared by header, body and footer; legacy numbers are preserved.
+  const so_number = customerOrderReferenceWord({ publicReference: o.public_reference, so: o.so });
   const issue_date = (o.placed_at as string | null)?.slice(0, 10) ?? "";
   const statusLabel =
     o.status === "place"
@@ -4296,7 +4352,7 @@ ordersRouter.get("/:id/sales-order-data", async (c) => {
     ordered_date: (o.placed_at as string | null) ?? null,
     proceed_date: o.proceed_date ?? null,
     order_id: id,
-    order_code: `SO-${o.so}`,
+    order_code: so_number,
     status_label: statusLabel,
     channel,
     customer: {
@@ -4368,7 +4424,7 @@ ordersRouter.get("/:id/invoice-pdf-data", async (c) => {
   const { data: order, error: ordErr } = await sb
     .from("orders")
     .select(
-      "id, so, status, invoice_no, invoiced_at, customer_name, customer_phone, customer_address, dealer_id, dealers(name, contact)",
+      "id, so, public_reference, status, invoice_no, invoiced_at, customer_name, customer_phone, customer_address, dealer_id, dealers(name, contact)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -4431,7 +4487,7 @@ ordersRouter.get("/:id/invoice-pdf-data", async (c) => {
     invoice_no: String(i.invoice_no),
     issue_date: String(i.issued_at).slice(0, 10),
     order_id: String(ord.id),
-    order_code: `SO-${ord.so}`,
+    order_code: customerOrderReferenceWord({ so: ord.so, publicReference: ord.public_reference }),
     customer: {
       name: String(ord.customer_name ?? ""),
       address: String(ord.customer_address ?? ""),

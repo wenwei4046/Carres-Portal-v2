@@ -20,11 +20,14 @@ const NUMBER_RE = /^(?:so-?)?(\d{1,9})$/i;
 export type SalesOrderParam =
   | { kind: "id"; id: string }
   | { kind: "number"; so: number }
+  | { kind: "reference"; reference: string }
   | { kind: "invalid"; raw: string };
 
 export function salesOrderParamOf(param: string | null | undefined): SalesOrderParam {
   const raw = (param ?? "").trim();
   if (UUID_RE.test(raw)) return { kind: "id", id: raw.toLowerCase() };
+  const reference = customerOrderReferenceOf(raw);
+  if (reference) return { kind: "reference", reference };
   const m = NUMBER_RE.exec(raw);
   if (m) {
     const so = Number(m[1]);
@@ -36,4 +39,21 @@ export function salesOrderParamOf(param: string | null | undefined): SalesOrderP
 /** The document word the portal prints for a number (`SO No`). */
 export function salesOrderNumberWord(so: number): string {
   return `SO-${so}`;
+}
+
+/** Stored customer-facing identity. Never derive a public number from UUID, SO integer or revision. */
+const PUBLIC_REFERENCE = /^(SO(?:\d{2})(?:0[1-9]|1[0-2])-\d{4}|SUB(?:\d{2})(?:0[1-9]|1[0-2])-\d{5})(?:\(([1-9]\d*)\))?$/i;
+
+/** Accept the approved external series and optional printed revision; resolve by the base identity. */
+export function customerOrderReferenceOf(value: string | null | undefined): string | null {
+  return PUBLIC_REFERENCE.exec((value ?? "").trim())?.[1]?.toUpperCase() ?? null;
+}
+
+/** Preserve stored historical identity verbatim. New public references must already exist in storage. */
+export function customerOrderReferenceWord(input: {
+  publicReference?: string | null;
+  legacyReference?: string | null;
+  so: number;
+}): string {
+  return input.publicReference || input.legacyReference || `SO-${input.so}`;
 }

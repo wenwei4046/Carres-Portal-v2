@@ -456,3 +456,11 @@ describe("linked document identity", () => {
     expect(text("receipt_no", {})).toBe("Unavailable");
   });
 });
+
+it("stored public identity is shared by Register display/filter/export without changing internal links", () => {
+  const row = buildRegisterRow(order({ public_reference: "SO2609-0007" }));
+  const field = REGISTER_FIELDS.find(f => f.key === "so")!;
+  expect(row.reference).toBe("SO2609-0007");
+  expect(field.text(row)).toBe("SO2609-0007");
+  expect(row.so).toBe(order().so);
+});

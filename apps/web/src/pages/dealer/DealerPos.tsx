@@ -571,7 +571,7 @@ export default function DealerPos({
       .filter((x): x is { line: (typeof draft.lines)[number]; rental: RentalLineAttrs } =>
         x.rental !== null,
       );
-    if (plans.length === 0) return;
+    if (plans.length === 0 || !draft.wizardSessionId) return;
 
     setSubmitError(null);
     const done: { agreementNo: string; label: string; so: number | null }[] = [];
@@ -588,10 +588,11 @@ export default function DealerPos({
       // tracked asset) survives. Sequential on purpose, same as the outer loop:
       // a mid-way failure names exactly which RA numbers already exist.
       const units = plans.flatMap(({ line, rental }) =>
-        Array.from({ length: Math.max(1, line.qty) }, () => ({ line, rental })),
+        Array.from({ length: Math.max(1, line.qty) }, (_, unitIndex) => ({ line, rental, unitIndex })),
       );
-      for (const { line, rental } of units) {
+      for (const { line, rental, unitIndex } of units) {
         const res = await createRentalAgreement.mutateAsync({
+          requestKey: `${draft.wizardSessionId}:${line.localId}:${unitIndex}`,
           planId: rental.planId,
           customerName: draft.customer.name.trim(),
           customerPhone: draft.customer.phone.trim(),
@@ -709,6 +710,7 @@ export default function DealerPos({
         postcode: draft.customer.billingPostcode,
       });
       const input: CreateOrderInput = {
+        requestKey: draft.wizardSessionId,
         // Only an internal role (principal) sends a body dealerId; the API honors
         // it only when the JWT carries no dealer. A dealer omits it → JWT wins.
         ...(bodyDealerId ? { dealerId: bodyDealerId } : {}),
@@ -834,7 +836,7 @@ export default function DealerPos({
         stripePendingOrderRef.current = created;
         setDraft((d) => ({
           ...d,
-          stripePending: { orderId: created.id, so: created.so, amount: draft.paid },
+          stripePending: { orderId: created.id, so: created.so, publicReference: created.publicReference, amount: draft.paid },
         }));
         return;
       }
@@ -1401,7 +1403,7 @@ export default function DealerPos({
                 {rentalDone.map((r) => (
                   <div key={r.agreementNo} className="text-[13px] text-muted-foreground">
                     <span className="font-mono">{r.agreementNo}</span>
-                    {r.so ? <> · <span className="font-mono">SO-{r.so}</span></> : null}
+                    {r.so && !r.agreementNo.startsWith("SUB") ? <> · <span className="font-mono">SO-{r.so}</span></> : null}
                     {" · "}
                     {r.label}
                   </div>
@@ -1657,6 +1659,7 @@ export default function DealerPos({
         <StripeCollectModal
           orderId={stripePending.orderId}
           so={stripePending.so}
+          publicReference={stripePending.publicReference}
           total={stripePending.amount}
           paid={0}
           initialAmount={stripePending.amount}

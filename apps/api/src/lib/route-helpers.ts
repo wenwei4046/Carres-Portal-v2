@@ -179,3 +179,17 @@ export async function parseBody<S extends ZodTypeAny>(c: Context, schema: S): Pr
   }
   return parsed.data;
 }
+
+/** Only new creation-envelope diagnostics. Older business refusals retain their own mapping. */
+export function customerOrderCreationRefusalOf(error: { details?: string | null }) {
+  if (error.details === "creation_request_changed") {
+    return { status: 409 as const, message: "Action changed · Review again" };
+  }
+  if (error.details === "customer_order_number_pool_exhausted") {
+    return { status: 409 as const, message: "Not available" };
+  }
+  if (error.details === "pwp_code_stamp_incomplete" || error.details === "order_number_policy_missing") {
+    return { status: 503 as const, message: "Try again" };
+  }
+  return null;
+}

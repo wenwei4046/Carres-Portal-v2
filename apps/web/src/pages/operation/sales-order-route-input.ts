@@ -46,6 +46,7 @@ export function salesOrderRouteInputOf(a: SalesOrderRouteInputArgs): SalesOrderR
       order: {
         id: a.orderId,
         so: a.detail.order.so,
+        publicReference: a.detail.order.public_reference,
         customerName: displayCustomerName(a.detail.order.customer_name),
         placedAt: a.detail.order.placed_at,
         deliveryDate: a.detail.order.delivery_date,

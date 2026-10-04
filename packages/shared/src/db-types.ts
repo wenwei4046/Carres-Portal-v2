@@ -701,6 +701,8 @@ export interface OrderChangeRequestRow {
 export interface OrderRow {
   id: string;
   so: number;
+  /** Stored public identity; absent before the governed numbering migration. Internal so stays unchanged. */
+  public_reference?: string | null;
   status: OrderStatus;
   channel: string;
   dealer_id: string;

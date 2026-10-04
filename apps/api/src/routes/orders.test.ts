@@ -288,6 +288,8 @@ type ReservedRow = {
 };
 
 function buildSbForCreatePwp(opts: {
+  replayResult?: { id: string };
+  replayError?: { code?: string; message: string; details?: string };
   rpcResult?: { id: string; so: number; placed_at: string };
   /** Force the final-submit RPC to error (to test the exit-10 rollback). */
   createOrderError?: { code?: string; message?: string; details?: string };
@@ -393,7 +395,9 @@ function buildSbForCreatePwp(opts: {
     }),
     rpc: async (name: string, args: unknown) => {
       rpcCalls.push({ name, args });
-      if (name === "create_order_from_sales_portal") {
+      if (name === "customer_order_creation_replay") return { data: opts.replayResult ?? null, error: opts.replayError ?? null };
+      if (name === "customer_order_creation_release") return { data: 0, error: null };
+      if (name === "create_order_from_sales_portal" || name === "customer_order_submit") {
         if (opts.createOrderError) return { data: null, error: opts.createOrderError };
         return { data: opts.rpcResult ?? null, error: null };
       }
@@ -878,6 +882,19 @@ describe("GET /api/orders/:id/sales-order-data", () => {
     };
   }
 
+  it("uses the stored public SO/SUB identity on every newly rendered customer document field", async () => {
+    for (const public_reference of ["SO2610-0007", "SUB2610-00007"]) {
+      vi.mocked(userClient).mockReturnValue(buildSb({ one: makeJoinedRow({ public_reference }) }));
+      const jwt = await makeJwt("dealer", DEALER_A);
+      const res = await app.fetch(new Request(`http://t/api/orders/${ORDER_ID}/sales-order-data`, {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }), env);
+      expect(res.status).toBe(200);
+      const body = await res.json() as { so_number: string; order_code: string };
+      expect(body.so_number).toBe(public_reference);expect(body.order_code).toBe(public_reference);
+    }
+  });
+
   it("returns JSON payload for dealer role (browser does the render)", async () => {
     const sb = buildSb({ one: makeJoinedRow() });
     vi.mocked(userClient).mockReturnValue(sb);
@@ -1234,6 +1251,51 @@ describe("GET /api/orders/:id/sales-order-data", () => {
 
 describe("POST /api/orders", () => {
   const NEW_ORDER_ID = "11111111-1111-1111-1111-111111111111";
+
+  it("replays a saved request before pricing or claiming and reloads the persisted order", async () => {
+    const sb = buildSbForCreatePwp({ replayResult: { id: NEW_ORDER_ID },
+      fetchedRow: makeOrderRow({ id: NEW_ORDER_ID, public_reference: "SO2610-0007", order_lines: [], order_addons: [], order_history: [] }),
+    });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(new Request("http://t/api/orders", { method: "POST",
+      headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+      body: JSON.stringify(validCreateBody({ requestKey: "wizard-retry" })),
+    }), env);
+    expect(res.status).toBe(201);
+    expect((await res.json() as { publicReference: string }).publicReference).toBe("SO2610-0007");
+    expect(sb._rpcCalls.map((r: { name: string }) => r.name)).toEqual(["customer_order_creation_replay"]);
+  });
+
+  it("a changed completed request is refused before pricing, claiming or creation", async () => {
+    const sb = buildSbForCreatePwp({ replayError: { code: "22023", details: "creation_request_changed", message: "changed" } });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(new Request("http://t/api/orders", { method: "POST",
+      headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+      body: JSON.stringify(validCreateBody({ requestKey: "wizard-retry" })),
+    }), env);
+    expect(res.status).toBe(409);
+    expect(sb._rpcCalls.map((r: { name: string }) => r.name)).toEqual(["customer_order_creation_replay"]);
+  });
+
+  it("keyed creation uses the atomic writer without a second post-commit voucher stamp", async () => {
+    const sb = buildSbForCreatePwp({ rpcResult: { id: NEW_ORDER_ID, so: 1251, placed_at: "2026-05-02T10:00:00Z" },
+      fetchedRow: makeOrderRow({ id: NEW_ORDER_ID, order_lines: [], order_addons: [], order_history: [] }),
+    });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(new Request("http://t/api/orders", { method: "POST",
+      headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ ...pwpClaimBody(), requestKey: "wizard-atomic" }),
+    }), env);
+    expect(res.status).toBe(201);
+    const names = sb._rpcCalls.map((r: { name: string }) => r.name);
+    expect(names).toContain("customer_order_submit");expect(names).not.toContain("pwp_stamp_redeemed");
+    expect(names).not.toContain("pwp_release_codes");
+    const call = sb._rpcCalls.find((r: { name: string }) => r.name === "customer_order_submit");
+    expect((call.args as { p_payload: { _creation_context: { codes: string[] } } }).p_payload._creation_context.codes).toHaveLength(1);
+  });
 
   it("happy path → calls RPC, then refetches order with rels, returns 201 + full order", async () => {
     const sb = buildSbForCreate({

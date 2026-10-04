@@ -1,3 +1,4 @@
+import { customerOrderReferenceOf } from "@carres/shared";
 import { Hono } from "hono";
 import { bodyTouchesDeliveryDate, salesOrderWorkCompletion } from "../../lib/sales-order-work-completion";
 import { actorKindOf, actorRoleWord, resolveActorIdentities, resolveActorNames } from "../../lib/actor-names";
@@ -318,7 +319,7 @@ operationOrdersRouter.get("/", requireOperation, async (c) => {
       // of. Voided DOs are NOT filtered here - the delivery register does not
       // filter them either, and this column must not start counting differently
       // from the surface it links to.
-      "id, so, status, operation_stage, warehouse_id, customer_name, customer_phone, customer_address, customer_email, customer_billing, customer_billing_same, customer_emergency, customer_address_line1, customer_address_line2, customer_address_city, customer_address_state, customer_address_postcode, building_type:entry_data->fields->>building_type, customer_race, customer_gender, customer_birthday, delivery_floor, delivery_has_lift, delivery_stair_items, channel, placed_at, proceeded_at, delivery_date, delivery_date_tbd, proceed_date, source_system, source_ref, ops_assigned_logistic, delivery_partner_id, delivery_stops, request_for_delivery_at, partner_accepted_at, partner_rejected_at, partner_rejected_reason, do_number, do_file_path, do_uploaded_at, invoice_no, invoiced_at, payment_method, installment_months, dispatched_at, delivered_at, outlet_id, salesperson_id, dealer_id, paid, dealers(name), outlets(name), salespersons(name), delivery_partners!orders_delivery_partner_id_fkey(id, name), order_lines(id, sku, qty, unit_price, attrs, source_po), order_addons(addon_key, qty, unit_price), ops_delivery_orders(do_number), invoice_documents:invoices(id,invoice_no), receipt_documents:order_payments(id,receipt_no), allocated_receipts:payment_allocations(order_payments(id,receipt_no)), amendment_documents:sales_order_amendments(id), order_supplier_threads(id, supplier_id, category, operation_stage, po_id, delivery_partner_id, delivery_partners(id, name), confirm_delivery_date, request_for_delivery_at, partner_accepted_at, partner_rejected_at, purchase_orders(placed_at)), order_finance_exceptions(status), order_delivery_payment_approvals(status), ops_sofa_loans(status, item_id, loan_note_no, ops_stock_items(unit_code, identity_scope)), order_annotations(content, tag, created_at), ops_order_control(line_received, customer_request, action_for_logistic, carres_remark, warehouse_remark, logistic_eta, balance, payment_status, storage_from, storage_fee_override, storage_fee_msbf, storage_fee_sof, storage_paid, storage_collected_at, storage_waiver_status, called_customer, line_etas, line_stock_status, assigned_staff, booking_stage, confirmed_date, confirmed_time_slot, delivery_photos, booking_groups, delay_decision, delay_decision_eta, delay_decision_at, delay_detected_at, delay_detected_eta)",
+      "id, so, public_reference, status, operation_stage, warehouse_id, customer_name, customer_phone, customer_address, customer_email, customer_billing, customer_billing_same, customer_emergency, customer_address_line1, customer_address_line2, customer_address_city, customer_address_state, customer_address_postcode, building_type:entry_data->fields->>building_type, customer_race, customer_gender, customer_birthday, delivery_floor, delivery_has_lift, delivery_stair_items, channel, placed_at, proceeded_at, delivery_date, delivery_date_tbd, proceed_date, source_system, source_ref, ops_assigned_logistic, delivery_partner_id, delivery_stops, request_for_delivery_at, partner_accepted_at, partner_rejected_at, partner_rejected_reason, do_number, do_file_path, do_uploaded_at, invoice_no, invoiced_at, payment_method, installment_months, dispatched_at, delivered_at, outlet_id, salesperson_id, dealer_id, paid, dealers(name), outlets(name), salespersons(name), delivery_partners!orders_delivery_partner_id_fkey(id, name), order_lines(id, sku, qty, unit_price, attrs, source_po), order_addons(addon_key, qty, unit_price), ops_delivery_orders(do_number), invoice_documents:invoices(id,invoice_no), receipt_documents:order_payments(id,receipt_no), allocated_receipts:payment_allocations(order_payments(id,receipt_no)), amendment_documents:sales_order_amendments(id), order_supplier_threads(id, supplier_id, category, operation_stage, po_id, delivery_partner_id, delivery_partners(id, name), confirm_delivery_date, request_for_delivery_at, partner_accepted_at, partner_rejected_at, purchase_orders(placed_at)), order_finance_exceptions(status), order_delivery_payment_approvals(status), ops_sofa_loans(status, item_id, loan_note_no, ops_stock_items(unit_code, identity_scope)), order_annotations(content, tag, created_at), ops_order_control(line_received, customer_request, action_for_logistic, carres_remark, warehouse_remark, logistic_eta, balance, payment_status, storage_from, storage_fee_override, storage_fee_msbf, storage_fee_sof, storage_paid, storage_collected_at, storage_waiver_status, called_customer, line_etas, line_stock_status, assigned_staff, booking_stage, confirmed_date, confirmed_time_slot, delivery_photos, booking_groups, delay_decision, delay_decision_eta, delay_decision_at, delay_detected_at, delay_detected_eta)",
     )
     ;
 
@@ -353,6 +354,8 @@ operationOrdersRouter.get("/", requireOperation, async (c) => {
     // The ref term is sanitised to invoice chars [A-Z0-9/-] so it can't break
     // the PostgREST or()/cs.{} grammar.
     const clauses = [`customer_name.ilike.%${search}%`];
+    const publicReference = customerOrderReferenceOf(search);
+    if (publicReference) clauses.push(`public_reference.eq.${publicReference}`);
     const refTerm = search.toUpperCase().replace(/[^A-Z0-9/-]/g, "");
     if (refTerm) clauses.push(`source_ref.cs.{${refTerm}}`);
     if (refTerm) {
@@ -765,18 +768,17 @@ operationOrdersRouter.get("/", requireOperation, async (c) => {
 // never a second fan-in).
 operationOrdersRouter.get("/by-number/:so", requireOperation, async (c) => {
   const ident = salesOrderParamOf(c.req.param("so"));
-  if (ident.kind !== "number") {
+  if (ident.kind !== "number" && ident.kind !== "reference") {
     return c.json(
       { error: "invalid_so_number", code: "invalid_so_number", message: "Sales Order not found." },
       400,
     );
   }
   const sb = userClient(c.env, c.var.auth.jwt);
-  const { data, error } = await sb
-    .from("orders")
-    .select("id, so")
-    .eq("so", ident.so)
-    .maybeSingle();
+  const q = sb.from("orders").select("id, so");
+  const { data, error } = await (ident.kind === "reference"
+    ? q.eq("public_reference", ident.reference)
+    : q.eq("so", ident.so)).maybeSingle();
   if (error) {
     const m = mapPgError(error);
     return c.json(m.body, m.status);
@@ -787,12 +789,12 @@ operationOrdersRouter.get("/by-number/:so", requireOperation, async (c) => {
         error: "not_found",
         code: "not_found",
         message: "Sales Order not found.",
-        so: salesOrderNumberWord(ident.so),
+        so: ident.kind === "reference" ? ident.reference : salesOrderNumberWord(ident.so),
       },
       404,
     );
   }
-  return c.json({ id: (data as { id: string }).id, so: ident.so });
+  return c.json({ id: (data as { id: string }).id, so: (data as { so: number }).so });
 });
 
 // ----- GET /:id detail -----

@@ -1,3 +1,4 @@
+import { customerOrderReferenceWord } from "./sales-order-identity";
 /**
  * Sales Order Route — ONE NODE MAP, and no second surface.
  *
@@ -394,6 +395,7 @@ export interface SalesOrderRouteInput {
   order: {
     id: string;
     so: number;
+    publicReference?: string | null;
     customerName: string | null;
     /** `orders.placed_at` — printed as `SO Doc Date:`. */
     placedAt: string | null;
@@ -1751,7 +1753,7 @@ export function resolveSalesOrderRoute(given: SalesOrderRouteInput): SalesOrderR
   const input = anchor ? scopedInput(given, anchor) : given;
   const laneScopes = scopes.length > 1 ? scopes : [];
   const soleScope = scopes.length === 1 ? scopes[0]! : null;
-  const soNumber = `SO-${input.order.so}`;
+  const soNumber = customerOrderReferenceWord(input.order);
   const goodsById = new Map((input.goods ?? []).map((line) => [line.lineId, line]));
   const lines: LineFacts[] = input.goods
     ? input.goods.map((line) => ({
