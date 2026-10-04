@@ -1335,6 +1335,16 @@ describe("the Sales Orders rail and its two views", () => {
     expect(within(grid).queryByText("SO-1401")).not.toBeInTheDocument();
   });
 
+  it("a monthly drill-down clears the prior list search instead of restoring it from session", async () => {
+    mount("/operation/orders?search=Kimmy");
+    expect(screen.getByRole("searchbox")).toHaveValue("Kimmy");
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "Monthly demand" }));
+    fireEvent.click(screen.getByRole("button", { name: "Open Sales Orders for Oct 2026" }));
+    await waitFor(() => expect(screen.getByRole("searchbox")).toHaveValue(""));
+    expect(screen.getByTestId("location").textContent).not.toContain("search=");
+    await waitFor(() => expect(useOperationOrdersSpy.mock.calls.map(call => call[0] as { stage?: string; search?: string }).filter(input => input.stage === "proceeded").at(-1)).toEqual({ stage: "proceeded" }));
+  });
+
   it("Monthly demand's filters never carry into the Order list", () => {
     mount("/operation/orders?view=monthly&dealer=%7Bdealer%201%7D&months=3");
     fireEvent.mouseDown(screen.getByRole("tab", { name: "Listing" }));

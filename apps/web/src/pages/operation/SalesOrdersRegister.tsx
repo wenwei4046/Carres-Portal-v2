@@ -929,6 +929,8 @@ export default function SalesOrdersRegister() {
      filters the rows it holds for instant feedback; `keepPreviousData` in the
      query hook keeps the list on screen while the server answers. */
   const [serverSearch, setServerSearch] = useState(seededSearch);
+  // A URL-owned blank (including monthly drill-down) clears an old server search.
+  useEffect(() => { setServerSearch(seededSearch); }, [seededSearch]);
   const searchChanged = useCallback((query: string) => { setServerSearch(query); if (query !== seededSearch) setParam("search", query); }, [setParam, seededSearch]);
   /* The register still writes nothing itself. `Cancel SO` opens the ONE
      governed cancellation door and that door owns the act — the row is only

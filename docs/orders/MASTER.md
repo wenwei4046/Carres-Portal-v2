@@ -6845,6 +6845,8 @@ this module owns the following business-specific application. Delivered evidence
   when present, otherwise the real SO number; the protected {ref} is not left empty on a known order.
   Query/view changes and number-to-id resolution preserve the register return state, so Revisions,
   History and Order Route cannot drop search/view context.
+  Monthly-demand drill-down clears an earlier list search in both the server request and shared
+  register session; an explicit empty initial search outranks a remembered one.
   These latest repairs await exact-revision production
   acceptance; successful/refused business saves have automated evidence only. Live Save/send and
   Print/Download completion are not claimed.
