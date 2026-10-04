@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { ApiError, apiFetch } from "@/lib/api";
@@ -8,6 +8,10 @@ import Icon from "@/components/kit/Icon";
 import Tabs from "@/components/kit/Tabs";
 import Select from "@/components/kit/Select";
 import Block from "@/components/kit/Block";
+import Drawer from "@/components/kit/Drawer";
+import Checkbox from "@/components/kit/Checkbox";
+import DocumentTable from "@/components/kit/DocumentTable";
+import SoBatchCompactView from "./SoBatchCompactView";
 import ReadyStockTable from "../components/ReadyStockTable";
 import { useWholeRoundReadyStock } from "./useWholeRoundReadyStock";
 import {
@@ -361,6 +365,8 @@ function summaryText(
 export interface SoBatchRegisterProps {
   data: SoBatchPurchaseResponse;
   isLoading: boolean;
+  /** Distinct buying destinations can preserve their own volatile Register context. */
+  sessionKey?: string;
   initialSearch?: string;
   roundNavigation?: {
     rounds: NonNullable<SoBatchPurchaseResponse["poRounds"]>;
@@ -378,8 +384,19 @@ export interface SoBatchRegisterProps {
   scope?: { label: string; onClear: () => void; preselectKey?: string };
 }
 
-export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurchaseOrders, purchaseOrdersLoading = false, initialSearch, hidden = false, scope, roundNavigation }: SoBatchRegisterProps) {
+export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurchaseOrders, purchaseOrdersLoading = false, initialSearch, hidden = false, scope, roundNavigation, sessionKey = "carres.soBatchPurchase.register" }: SoBatchRegisterProps) {
   const navigate = useNavigate();
+  const [presentationParams, setPresentationParams] = useSearchParams();
+  const presentation = presentationParams.get("view") === "cards" ? "cards" : "table";
+  const supplierGrouping = presentationParams.get("group") === "supplier";
+  const changePresentationParam = (key: string, value: string | null) => setPresentationParams(current => {
+    const next = new URLSearchParams(current);
+    if (value) next.set(key, value); else next.delete(key);
+    return next;
+  }, { replace: true });
+  const setPresentation = (value: string) => changePresentationParam("view", value === "cards" ? "cards" : null);
+  const setSupplierGrouping = (value: boolean) => changePresentationParam("group", value ? "supplier" : null);
+  const [quickOrderId, setQuickOrderId] = useState<string | null>(null);
   /* R8 — a `display:none` box forgets its scroll offset, and by the time a
      render hides it the offset already reads 0. So the offset is remembered
      from the grid's own scroll events while visible, and put back the moment
@@ -429,8 +446,8 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
    * the order has exactly one, which is the same test the PO No cell makes;
    * the exact numbers for a multi-PO order live in the expansion. */
   const openOrder = useCallback(
-    (o: SoBatchOrderRow) => navigate(`/operation/orders/so/${o.orderId}`),
-    [navigate],
+    (o: SoBatchOrderRow) => setQuickOrderId(o.orderId),
+    [],
   );
   const rowMenu = useCallback(
     (o: SoBatchOrderRow): DataGridContextMenuItem[] => {
@@ -869,7 +886,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
                 data-testid={`so-batch-so-link-${o.orderId}`}
                 onClick={(e) => {
                   e.stopPropagation();
-                  navigate(`/operation/orders/so/${o.orderId}`);
+                  openOrder(o);
                 }}
               >
                 {`SO-${o.so}`}
@@ -1191,7 +1208,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
       },
     ],
     [orderByFacts, safetyDaysFacts, compareOrderBy, purchaseStatus, stateWords,
-      navigate,
+      navigate, openOrder,
       data.destinations,
       leafsByOrder,
       leafAllocations,
@@ -1233,7 +1250,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
   );
 
   /* ── The expansion — the shared child table, and only it ──────────────── */
-  const renderExpansion = (o: SoBatchOrderRow) => (
+  const renderExpansion = (o: SoBatchOrderRow, itemsOnly = false) => (
     <>
     {stock.active && stockOffers(o.orderId).map(offer => <Block key={offer.orderLineId} title="Ready Stock"
       note={`${o.lines.find(line => line.orderLineId === offer.orderLineId)?.item ?? "Not recorded"} · ${offer.units.length}`}>
@@ -1242,6 +1259,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
           isRefused: () => false, blockedWord: () => stock.busy ? "Not confirmed · Try again" : null }} />
     </Block>)}
     <SoBatchOrderExpansion
+      itemsOnly={itemsOnly}
       order={o}
       leafs={leafsByOrder.get(o.orderId) ?? []}
       selectedIds={new Set(live.keys())}
@@ -1258,6 +1276,42 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
     </>
   );
 
+  const supplierOf = (o: SoBatchOrderRow) => summaryText(soBatchCellSummary(soBatchOrderSupplierNames(o)), n => `${n} suppliers`) ?? "Supplier not set";
+  const supplierGroupOf = (o: SoBatchOrderRow) => [...new Set(soBatchOrderSupplierNames(o).filter(Boolean))].sort().join(" · ") || "Supplier not set";
+  const compactView = (o: SoBatchOrderRow, close?: () => void) => {
+    const ownSelections = selections.filter(selection => leafById.get(selection.demandId)?.orderId === o.orderId);
+    const stockSelected = stockIds(o.orderId).some(id => stock.chosen.has(id));
+    const stockSelectable = !stock.busy && stockIds(o.orderId).length > 0;
+    const checked = stock.active ? stockSelected && !stockIds(o.orderId).every(id => stock.chosen.has(id)) ? "indeterminate" : stockSelected
+      : orderSelection(o.orderId).indeterminate ? "indeterminate" : orderSelection(o.orderId).checked;
+    const canSelect = stock.active ? stockSelectable : (eligibleByOrder.get(o.orderId) ?? []).length > 0;
+    return <SoBatchCompactView row={o} status={purchaseStatus(o)} supplier={supplierOf(o)}
+      safetyDays={safetyDaysWord(safetyDaysFacts.get(o.orderId))}
+      items={renderExpansion(o, true)}
+      details={<DocumentTable label="Purchase order details" columns={[
+        { key: "po", label: "PO No" }, { key: "supplier", label: "Supplier" },
+        { key: "destination", label: "Supplier Deliver To" }, { key: "date", label: "PO Default Delivery Date" },
+      ]} rows={o.pos.map(po => ({ key: po.poId, onOpen: () => navigate(`/operation/procurement?po=${encodeURIComponent(po.poId)}`),
+        openLabel: `Open ${po.poId}`, cells: { po: `${po.poId} · ${po.version == null ? "Not recorded" : `V${po.version}`}`, supplier: po.supplierName ?? "Supplier not set",
+          destination: destinationName(po.destinationId), date: po.officialDeliveryDate ? fmtDate(po.officialDeliveryDate) : "Not recorded" } }))} />}
+      actions={<>
+        <Checkbox id={`so-batch-card-select-${o.orderId}`} ariaLabel={`Select ${o.so == null ? "Not recorded" : `SO-${o.so}`}`} checked={checked}
+          disabled={!canSelect} onCheckedChange={next => stock.active ? stock.toggle(stockIds(o.orderId), next) : setOrderSelected(o.orderId, next)} />
+        {stock.active ? <Button variant="primary" disabled={stock.busy || stock.unknown || !stockSelected}
+          onClick={() => void stock.proceed(new Set([o.orderId]))}>Proceed</Button>
+          : data.mayIssue && ownSelections.length > 0 ? <Button variant="primary" disabled={pendingStock.has(o.orderId)}
+            onClick={() => { setQuickOrderId(null); onIssue(ownSelections); }}>{W.issuePo}</Button>
+          : ownSelections.length > 0 ? <span className="text-meta text-kit-slate-11">{W.issueNeedsPoDuty}</span> : null}
+        {onOpenPurchaseOrders && o.pos.length > 0 ? <Button loading={purchaseOrdersLoading} onClick={() => {
+          setQuickOrderId(null); onOpenPurchaseOrders([...new Set(o.pos.map(po => po.poId))]);
+        }}>Purchase Orders</Button> : null}
+      </>}
+      onOpen={() => navigate(`/operation/orders/so/${o.orderId}`)} onClose={close ?? (() => setPresentation("table"))} />;
+  };
+  const quickOrder = quickOrderId ? orders.find(order => order.orderId === quickOrderId) : null;
+  const viewSwitch = <Tabs variant="segmented" label="SO Batch Purchase view" value={presentation} onValueChange={setPresentation}
+    tabs={[{ value: "table", label: "Table", icon: "table" }, { value: "cards", label: "Cards", icon: "cards" }]} />;
+
   /* ── The page ─────────────────────────────────────────────────────────── */
   return (
     <div
@@ -1267,6 +1321,10 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
       aria-hidden={hidden || undefined}
     >
       <PurchasingTabs />
+      {quickOrder && <Drawer open variant="compact-card" title={`${quickOrder.so == null ? "Not recorded" : `SO-${quickOrder.so}`} · SO Batch Purchase`}
+        onOpenChange={open => { if (!open) setQuickOrderId(null); }}>
+        {compactView(quickOrder, () => setQuickOrderId(null))}
+      </Drawer>}
       {/* `relative` is what lets the rail LEAVE the flow on a narrow window —
           see the rail's own class below. */}
       <div ref={canvasRef} className={`${styles.canvas} relative flex min-h-0 flex-1 overflow-hidden`}>
@@ -1473,7 +1531,20 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
             data-testid="so-batch-grid"
           >
             <DataGrid<SoBatchOrderRow>
-              toolbarEnd={<span className="flex items-center gap-2">
+              presentationTools
+              allowColumnGrouping={false}
+              sessionKey={sessionKey}
+              presentationKey={presentation}
+              pageToolsItems={[
+                { key: "group-none", label: `Group by: None${!supplierGrouping ? " ✓" : ""}`, separatorBefore: true, onSelect: () => setSupplierGrouping(false) },
+                { key: "group-supplier", label: `Group by: Supplier${supplierGrouping ? " ✓" : ""}`, onSelect: () => setSupplierGrouping(true) },
+              ]}
+              fixedGroups={supplierGrouping ? { groups: [...new Set(displayRows.map(supplierGroupOf))].sort().map(label => ({ key: label, label })), groupOf: supplierGroupOf } : undefined}
+              renderResults={presentation === "cards" ? visible => <div className="grid grid-cols-1 gap-3 p-3 xl:grid-cols-2" data-testid="so-batch-cards">
+                {visible.map(o => <div key={o.orderId} data-row-key={o.orderId}>{compactView(o)}</div>)}
+              </div> : undefined}
+              toolbarEnd={<span className="flex min-w-0 flex-wrap items-center gap-2">
+                {viewSwitch}
                 {stock.active ? <><Select id="round-stock-location" toolbar label="Stock Location" value={stock.location}
                   onValueChange={stock.setLocation} disabled={stock.busy} options={stock.locations} />
                   <Button size="sm" disabled={stock.busy} onClick={stock.clear}>Cancel</Button></>
@@ -1579,7 +1650,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
                 testId: (o: SoBatchOrderRow) => `so-batch-select-${o.orderId}`,
               }}
               selectionSummary={(count) => stock.active ? `${count} Sales Order${count === 1 ? "" : "s"} · Ready Stock` : summary.text}
-              selectionPrimary={stock.active ? <Button variant="primary" loading={stock.busy} disabled={stock.unknown || stock.chosen.size === 0}
+              selectionPrimary={<>{viewSwitch}{stock.active ? <Button variant="primary" loading={stock.busy} disabled={stock.unknown || stock.chosen.size === 0}
                 onClick={() => void stock.proceed(new Set(visibleOrders.current.filter(order => shown.some(row => row.orderId === order.orderId)).map(order => order.orderId)))}>Proceed</Button> : summary.lines > 0 ? (
                 <span
                   className="flex shrink-0 items-center gap-2"
@@ -1601,7 +1672,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
                     </Button>
                   ) : <span className="text-meta text-kit-slate-11">{W.issueNeedsPoDuty}</span>}
                 </span>
-              ) : null}
+              ) : null}</>}
               statusSummary={(filtered) => {
                 /* ⭐ THE FOOTER ANSWERS *WHAT AM I LOOKING AT* — owner
                    correction 2026-09-11. It used to tally `0 Partial ·
@@ -1732,7 +1803,9 @@ function SoBatchOrderExpansion({
   safetyDays,
   onReserved,
   onStockPending,
+  itemsOnly = false,
 }: {
+  itemsOnly?: boolean;
   order: SoBatchOrderRow;
   leafs: PurchaseDemandRow[];
   selectedIds: ReadonlySet<string>;
@@ -2095,7 +2168,7 @@ function SoBatchOrderExpansion({
    */
   const sections: ConnectedSection[] = [
     { key: "goods", connectAt: CONNECT_AT_TABLE_HEADER, node: goodsTable },
-    ...(poRows.length > 0
+    ...(!itemsOnly && poRows.length > 0
       ? [
           {
             key: "po-details",

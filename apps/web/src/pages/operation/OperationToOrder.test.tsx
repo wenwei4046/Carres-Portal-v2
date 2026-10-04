@@ -50,6 +50,14 @@ vi.mock("@/lib/pdf/render", () => ({
 
 import OperationToOrder from "./OperationToOrder";
 
+// Each journey is a distinct browser session; remounts within it still retain
+// the real DataGrid's search, filters and presentation scroll state.
+vi.mock("./so-batch/SoBatchRegister", async () => {
+  const actual = await vi.importActual<typeof import("./so-batch/SoBatchRegister")>("./so-batch/SoBatchRegister");
+  return { ...actual, default: (props: React.ComponentProps<typeof actual.default>) =>
+    <actual.default {...props} sessionKey={`so-batch-page-test:${expect.getState().currentTestName}`} /> };
+});
+
 /**
  * SO BATCH PURCHASE — the whole page, end to end
  * (CARD-2026-08-22-purchasing-02).
