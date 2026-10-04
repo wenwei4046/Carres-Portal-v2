@@ -47,6 +47,8 @@ export default function PoSupplierBundle({ pos, onPreview, roundWindow, onEviden
   const [roundPos, setRoundPos] = useState<readonly IssuedPo[] | null>(null);
   const [todayPos, setTodayPos] = useState<readonly IssuedPo[]>([]);
   const [scopeLoading, setScopeLoading] = useState(false);
+  const [roundUnavailable, setRoundUnavailable] = useState(false);
+  const [roundRefresh, setRoundRefresh] = useState(0);
   const activePos = scope === "today" ? todayPos : roundPos ?? pos;
   const groups = useMemo(() => [...new Map(activePos.map(po => [po.supplierId, po.supplierName ?? "Supplier"])).entries()], [activePos]);
   const [supplier, setSupplier] = useState(pos[0]?.supplierId ?? "");
@@ -67,8 +69,9 @@ export default function PoSupplierBundle({ pos, onPreview, roundWindow, onEviden
   const picked = supplierPos.filter(po => selected.has(po.id));
   const contact = supplierPos[0];
   const message = picked.filter(po => documents[po.id]).map(po => `${documents[po.id].po_number} · V${documents[po.id].version}`).join("\n");
-  const doors = contact ? doorsForIssuedPo(contact, message) : null;
-  const ready = picked.length > 0 && picked.every(po => documents[po.id]) && !busy && !scopeLoading;
+  const preparedMessage = [messageIntroduction.trim(), message].filter(Boolean).join("\n\n");
+  const doors = contact ? doorsForIssuedPo(contact, preparedMessage) : null;
+  const ready = picked.length > 0 && picked.every(po => documents[po.id]) && !busy && !scopeLoading && !(scope === "round" && roundUnavailable);
   const selectedAttempts = emailAttempts.filter(attempt => attempt.documents.some(document => picked.some(po => po.id === document.id && documents[po.id]?.version === document.version)));
   const emailOutcome = selectedAttempts.some(attempt => attempt.status === "unknown") ? "unknown" : selectedAttempts.length ? "dispatched" : null;
 
@@ -120,13 +123,14 @@ export default function PoSupplierBundle({ pos, onPreview, roundWindow, onEviden
     if (!roundWindow) return;
     let cancelled = false;
     setScopeLoading(true);
+    setRoundUnavailable(false);
     apiFetch<{ poIds: string[] }>(`/api/operation/pos/issued-round?window=${encodeURIComponent(roundWindow)}`)
       .then(result => Promise.all(result.poIds.map(id => apiFetch<IssuedPo>(`/api/operation/pos/${encodeURIComponent(id)}/issue-context`))))
       .then(rows => { if (!cancelled) setRoundPos(rows); })
-      .catch(() => { if (!cancelled) setError("Could not load the preview. Try again on the document."); })
+      .catch(() => { if (!cancelled) setRoundUnavailable(true); })
       .finally(() => { if (!cancelled) setScopeLoading(false); });
     return () => { cancelled = true; };
-  }, [roundWindow]);
+  }, [roundWindow, roundRefresh]);
 
   function changeSupplier(id: string) {
     setSupplier(id);
@@ -245,6 +249,10 @@ export default function PoSupplierBundle({ pos, onPreview, roundWindow, onEviden
       <Select id="po-bundle-scope" label="Purchase orders" value={scope} disabled={busy || scopeLoading} onValueChange={value => void changeScope(value)} options={[{ value: "round", label: roundWindow ? "This round" : "Purchase orders" }, { value: "today", label: "Today" }]} />
       <Select id="po-bundle-supplier" label="Supplier" value={supplier} onValueChange={changeSupplier}
         disabled={busy || scopeLoading} options={groups.map(([value, label]) => ({ value, label }))} />
+      {scope === "round" && roundUnavailable && <div role="alert" className="flex flex-col gap-2">
+        <p className="text-meta text-kit-red-11">Evidence could not be loaded</p>
+        <Button disabled={scopeLoading} onClick={() => setRoundRefresh(value => value + 1)}>Try again</Button>
+      </div>}
       <Checkbox id="po-bundle-all" label="Select all" disabled={busy || scopeLoading || !supplierPos.length} checked={supplierPos.length > 0 && picked.length === supplierPos.length ? true : picked.length ? "indeterminate" : false}
         onCheckedChange={checked => { setSelected(new Set(checked ? supplierPos.map(po => po.id) : [])); setCopied(false); }} />
       {supplierPos.map(po => <div key={po.id} className="flex flex-col gap-2 border-t border-kit-slate-5 pt-3">
@@ -267,14 +275,14 @@ export default function PoSupplierBundle({ pos, onPreview, roundWindow, onEviden
       <Input id="po-bundle-recipient" label="To" readOnly value={channel === "email" ? contact?.contactEmail ?? "" : contact?.whatsappGroupUrl ?? contact?.contact ?? ""} />
       {channel === "email" && <>
         <Input id="po-bundle-subject" label="Subject" value={subject} disabled={busy || Boolean(emailOutcome)} onChange={event => setSubject(event.target.value)} />
-        <Textarea id="po-bundle-introduction" label="Message" value={messageIntroduction} disabled={busy || Boolean(emailOutcome)} onChange={event => setMessageIntroduction(event.target.value)} />
       </>}
-      <Textarea id="po-bundle-message" label={channel === "email" ? "PO No" : "Message"} value={message} readOnly />
+      <Textarea id="po-bundle-introduction" label="Message" value={messageIntroduction} disabled={busy || Boolean(emailOutcome)} onChange={event => { setMessageIntroduction(event.target.value); setCopied(false); }} />
+      <Textarea id="po-bundle-message" label="PO No" value={message} readOnly />
       {channel === "email" && picked.map(po => documents[po.id] && <p key={po.id} className="text-meta text-kit-slate-11">{documents[po.id].po_number.replace(/[^a-zA-Z0-9._-]/g, "_")}-V{documents[po.id].version}.pdf</p>)}
       <div className="flex flex-wrap gap-2">
         <Button variant="neutral" size="sm" disabled={!ready} loading={busy} onClick={() => void download()}>Download PDFs</Button>
         <Button variant="neutral" size="sm" disabled={!ready} onClick={() => {
-          void navigator.clipboard.writeText(message).then(() => setCopied(true)).catch(() => setError("Select the message and copy it."));
+          void navigator.clipboard.writeText(preparedMessage).then(() => setCopied(true)).catch(() => setError("Select the message and copy it."));
         }}>Copy message</Button>
         {channel === "whatsapp" ? <Button variant="neutral" size="sm" disabled={!ready || !doors?.whatsapp}
           onClick={() => { if (doors?.whatsapp) window.open(doors.whatsapp.url, "_blank", "noopener,noreferrer"); }}>Open WhatsApp</Button>

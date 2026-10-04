@@ -68,6 +68,16 @@ describe("issued supplier bundle", () => {
     expect(zip.mock.calls[0][0].map((po: { id: string }) => po.id)).toEqual(["PO-001"]);
     expect(api.mock.calls.every(call => call.length === 1)).toBe(true);
   });
+  it("copies the editable message with only the selected current PO versions", async () => {
+    const copy = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText: copy } });
+    render(<PoSupplierBundle pos={pos} onPreview={() => {}} />);
+    await ready();
+    fireEvent.change(screen.getByLabelText("Message"), { target: { value: "Please confirm delivery." } });
+    fireEvent.click(screen.getByLabelText("PO-002 · V1"));
+    fireEvent.click(screen.getByRole("button", { name: "Copy message" }));
+    await waitFor(() => expect(copy).toHaveBeenCalledWith("Please confirm delivery.\n\nPO-001 · V1"));
+  });
   it("opens the selected independent PO preview", async () => {
     const open = vi.fn();
     render(<PoSupplierBundle pos={pos} onPreview={open} />);
@@ -86,6 +96,23 @@ describe("issued supplier bundle", () => {
     fireEvent.click(screen.getByRole("combobox", { name: "Purchase orders" }));
     fireEvent.click(await screen.findByRole("option", { name: "Purchase orders" }));
     await waitFor(() => expect(screen.getByLabelText("PO No")).toHaveValue("PO-001 · V1\nPO-002 · V1"));
+  });
+  it("blocks preparation when This round cannot be read and retries without a business write", async () => {
+    let unavailable = true;
+    api.mockImplementation(async (path: string) => {
+      if (path.includes("issued-round")) { if (unavailable) throw new Error("unavailable"); return { poIds: ["PO-001"] }; }
+      if (path.endsWith("issue-context")) return pos[0];
+      if (path.endsWith("/sends")) return { sends: [] };
+      if (path.endsWith("email-capability")) return { configured: false };
+      return data(path.split("/").at(-2)!);
+    });
+    render(<PoSupplierBundle pos={[pos[0]]} roundWindow="2026-10-05T10:15" onPreview={() => {}} />);
+    expect(await screen.findByRole("alert")).toHaveTextContent("Evidence could not be loaded");
+    expect(screen.getByRole("button", { name: "Download PDFs" })).toBeDisabled();
+    unavailable = false;
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    await ready();
+    expect(api.mock.calls.every(call => call.length === 1)).toBe(true);
   });
   it("shows earlier issued POs in the selected round without selecting them for sending", async () => {
     api.mockImplementation(async (path: string) => {
