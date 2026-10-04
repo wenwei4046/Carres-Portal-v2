@@ -758,14 +758,22 @@ blockers and retains its receipt/revision for correction. An uncertain response 
 key. Expected Units match their exact PO-line binding; the SKU fallback is removed. Warehouse reads
 and Receiving/Stock/Calendar projections invalidate after the result. COPY now follows the approved
 Warehouse final-confirmation flow rather than the old routine Operation-review wording.
-Web typecheck and design-standard checks pass. Nineteen actual-component tests pass for this
-form/Incoming surface, including blocked correction,
+Web typecheck and design-standard checks pass. Twenty-one actual-component tests pass for this
+form/Incoming/own-report surface, including blocked correction,
 unknown facts, network retry, confirmation invalidation and posted-GRN closure. Local 390×844
 preview with illustrative API responses verified the blocked message and edit-clears-confirmation.
 It exposed 403px item content in a 354px container; the shared TableScroller now contains its
 404px content within a 356px region. Screenshot: `/tmp/carres-warehouse-confirmation-phone-local.png`.
-This is local UI/transport evidence, not a real Warehouse login, upload or stock receipt. Reopening
-persisted reports after closing/reloading, non-PO UI and broader page/keyboard acceptance remain owed.
+This is local UI/transport evidence, not a real Warehouse login, upload or stock receipt.
+Own unposted PO reports now reopen with the same save key, receipt and revision. The bounded
+shared decoder preserves unknown counts, exact Unit photo bindings, arrival proof and extra goods;
+six decoder tests pass. A reopened form requires fresh confirmation. Previously reported goods
+missing from the current source are retained and saving is disabled, preventing confirmation of
+invisible facts. Loading, read failure and unavailable correction sources are distinguished beside
+the action; source failures offer retry. The rendered reopen/correct test proves the same session
+and evidence are sent again. Source-disappearance resolution, complete report history, non-PO UI,
+and broader page/keyboard acceptance remain owed. The own-report list still has its legacy table
+and PageHeader; this bounded correction does not claim complete shared-template adoption.
 
 Still required before an exact SQL review/release: remaining non-PO lifecycle and source read/form coverage; remaining quantity/issue/extra and authority boundaries; complete source contracts and
 Warehouse form and report history, Operation blocked-report/Work readers; exact reviewed SQL

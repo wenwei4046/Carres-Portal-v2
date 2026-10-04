@@ -1,10 +1,18 @@
+import { useState } from "react";
+import { warehouseConfirmationReportFromWire } from "@carres/shared/adapters";
+import Button from "@/components/kit/Button";
+import WarehouseCountModal from "./WarehouseCountModal";
 import {
   supplierClaimTypeLabel,
+  documentDisplayNumber,
+  type WarehouseIncomingPo,
+  type WarehouseConfirmationReportInput,
+  type WarehouseConfirmationResult,
   warehouseReceiptStatusLabel,
   warehouseReceiptSummary,
   type WarehouseReceiptStatus,
 } from "@carres/shared";
-import { useWarehouseMyReceipts } from "@/lib/queries";
+import { useWarehouseMyReceipts, useWarehouseIncoming } from "@/lib/queries";
 import { fmtDate } from "@/lib/fmt-date";
 import PageHeader from "@/components/PageHeader";
 
@@ -31,6 +39,11 @@ const STATUS_PILL: Record<WarehouseReceiptStatus, string> = {
 export default function WarehouseMyReceipts() {
   const { data, isLoading, isError, error, refetch } = useWarehouseMyReceipts();
   const receipts = data?.receipts ?? [];
+  const incoming = useWarehouseIncoming();
+  const [editing, setEditing] = useState<{
+    po: WarehouseIncomingPo;
+    saved: { saveKey: string; report: WarehouseConfirmationReportInput; result: WarehouseConfirmationResult };
+  } | null>(null);
 
   if (isLoading) {
     return (
@@ -73,9 +86,6 @@ export default function WarehouseMyReceipts() {
   return (
     <div className="px-9 py-8 pb-14" data-testid="warehouse-receipts">
       <PageHeader kicker="Warehouse" title="My receiving" className="mb-3" />
-      <div className="text-body text-base-600 mb-[18px]">
-        Every count we sent, and what Carres did with it.
-      </div>
 
       <div className="bg-white border border-base-200 rounded overflow-auto">
         <table
@@ -106,16 +116,16 @@ export default function WarehouseMyReceipts() {
                 data-testid="warehouse-receipt-row"
               >
                 <td className="px-4 py-3 whitespace-nowrap font-mono font-semibold text-base-900">
-                  {r.po_id}
+                  {documentDisplayNumber(r.po_id ?? r.source_no ?? warehouseConfirmationReportFromWire(r.raw_report)?.poId ?? "") || "Not recorded"}
                   <div className="font-normal text-label text-base-600 mt-0.5">
                     {r.supplier_name ?? ""}
                   </div>
                 </td>
                 <td className="px-4 py-3 whitespace-nowrap font-mono text-meta">
-                  {r.do_number}
+                  {r.do_number ?? warehouseConfirmationReportFromWire(r.raw_report)?.doNumber ?? "Not recorded"}
                 </td>
                 <td className="px-4 py-3 text-base-800">
-                  <div>{warehouseReceiptSummary(r.lines)}</div>
+                  <div>{r.status === "draft" && !r.lines.length ? "Not recorded" : warehouseReceiptSummary(r.lines)}</div>
                   {r.note && (
                     <div className="text-label text-base-600 mt-1">{r.note}</div>
                   )}
@@ -150,6 +160,23 @@ export default function WarehouseMyReceipts() {
                   <span className={`pill ${STATUS_PILL[r.status] ?? "pill-neutral"}`}>
                     {warehouseReceiptStatusLabel(r.status)}
                   </span>
+                  {(r.blockers ?? []).map((blocker) => <p key={blocker.code} className="text-body text-kit-red-9">{blocker.message}</p>)}
+                  {r.status === "draft" && r.save_key && r.revision != null && (() => {
+                    const report = warehouseConfirmationReportFromWire(r.raw_report);
+                    const po = incoming.data?.pos.find((item) => item.po_id === report?.poId);
+                    const unavailable = incoming.isLoading ? "Loading…"
+                      : incoming.isError ? "Could not be loaded"
+                      : !report || !po ? "Not available. Go back and reload." : null;
+                    return <><Button disabled={Boolean(unavailable)} aria-describedby={unavailable ? `receipt-unavailable-${r.id}` : undefined} onClick={() => {
+                      if (!report || !po || !r.save_key || r.revision == null) return;
+                      setEditing({ po, saved: { saveKey: r.save_key, report,
+                        result: { id: r.id, receipt_id: r.id, status: "draft", revision: r.revision,
+                          grn_no: null, blockers: r.blockers ?? [], already_saved: true } } });
+                    }}>Open Receiving</Button>
+                      {unavailable && <p id={`receipt-unavailable-${r.id}`} className="text-body text-base-700">{unavailable}</p>}
+                      {incoming.isError && <Button onClick={() => void incoming.refetch()}>Try again</Button>}
+                    </>;
+                  })()}
                   {r.status === "returned" && r.return_reason && (
                     <div
                       className="text-label text-danger mt-1 max-w-[280px]"
@@ -164,6 +191,8 @@ export default function WarehouseMyReceipts() {
           </tbody>
         </table>
       </div>
+      {editing && <WarehouseCountModal key={editing.saved.result.id} po={editing.po}
+        saved={editing.saved} onClose={() => setEditing(null)} />}
     </div>
   );
 }

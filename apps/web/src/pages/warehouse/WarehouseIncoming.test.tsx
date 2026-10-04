@@ -2,6 +2,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import WarehouseIncoming from "./WarehouseIncoming";
+import WarehouseMyReceipts from "./WarehouseMyReceipts";
+import WarehouseCountModal from "./WarehouseCountModal";
 
 /**
  * R6 (warehouse half) — what a warehouse login sees, and the gate on the count
@@ -448,5 +450,68 @@ describe("final physical confirmation", () => {
     fireEvent.click(screen.getByRole("button", { name: "Save Receiving" }));
     await waitFor(() => expect(screen.queryByTestId("warehouse-count-lines")).not.toBeInTheDocument());
     expect(apiFetchMock.mock.calls.filter((call) => call[0] === "/api/warehouse/incoming").length).toBeGreaterThan(1);
+  });
+});
+
+
+describe("reopening a preserved Warehouse report", () => {
+  it("restores evidence and corrects the same receipt/revision after the previous form is gone", async () => {
+    const id = "11111111-1111-4111-8111-111111111199";
+    const key = "11111111-1111-4111-8111-111111111198";
+    const report = { po_id: PO.po_id, do_number: "DO-SAVED", do_file_path: "PO-2001/saved.jpg",
+      note: "Original warehouse observation", goods_received_time: null,
+      arrival_evidence: [{ path: "PO-2001/arrival.mp4", kind: "video" }],
+      extra_lines: [{ sku: "Unplanned item", qty: 1 }],
+      lines: [{ id: PO.lines[0]!.id, received_now: 2, damaged_qty: null, wrong_item_qty: 0,
+        damaged_photos: [{ path: "PO-2001/damage.jpg", unit_code: "U1-000-007" }],
+      }],
+    };
+    const blocked = { id, revision: 2, status: "draft", grn_no: null,
+      blockers: [{ code: "receipt_quantity_unknown", message: "The damaged quantity is not recorded" }] };
+    apiFetchMock.mockImplementation((path: string) => {
+      if (path === "/api/warehouse/incoming") return Promise.resolve({ warehouse: { id: "wh-klang", name: "Carres Klang" }, pos: [PO] });
+      if (path === "/api/warehouse/receipts") return Promise.resolve({ receipts: [{
+        ...blocked, save_key: key, raw_report: report, po_id: null, supplier_name: null,
+        lines: [], note: null, do_number: null, submitted_at: "2026-10-05T01:00:00Z",
+      }] });
+      if (path === "/api/warehouse/receipts/confirm") return Promise.resolve(blocked);
+      return Promise.resolve({});
+    });
+    wrap(<WarehouseMyReceipts />);
+    const open = await screen.findByRole("button", { name: "Open Receiving" });
+    await waitFor(() => expect(open).toBeEnabled());
+    fireEvent.click(open);
+    expect(screen.getByLabelText("DO number *")).toHaveValue("DO-SAVED");
+    expect(screen.getByLabelText("Note for Carres (optional)")).toHaveValue("Original warehouse observation");
+    expect(screen.getByTestId("warehouse-good-MS01-K")).toHaveValue(2);
+    expect(screen.getByTestId("warehouse-damaged-MS01-K")).toHaveValue(null);
+    expect(screen.getByRole("checkbox", { name: "I checked the goods and confirm these receiving results." })).not.toBeChecked();
+    fireEvent.change(screen.getByTestId("warehouse-damaged-MS01-K"), { target: { value: "0" } });
+    fireEvent.click(screen.getByRole("checkbox", { name: "I checked the goods and confirm these receiving results." }));
+    fireEvent.click(screen.getByRole("button", { name: "Save Receiving" }));
+    await waitFor(() => expect(apiFetchMock.mock.calls.some((call) => call[0] === "/api/warehouse/receipts/confirm")).toBe(true));
+    const call = apiFetchMock.mock.calls.find((call) => call[0] === "/api/warehouse/receipts/confirm")!;
+    const sent = JSON.parse(call[1].body);
+    expect(sent).toMatchObject({ saveKey: key, receiptId: id, revision: 2 });
+    expect(sent.report.doFilePath).toBe(report.do_file_path);
+    expect(sent.report.extraLines).toEqual(report.extra_lines);
+    expect(sent.report.arrivalEvidence).toEqual(report.arrival_evidence);
+    expect(sent.report.lines[0].damagedPhotos).toEqual([{ path: "PO-2001/damage.jpg", unitCode: "U1-000-007" }]);
+  });
+});
+
+
+describe("reopened report source changes", () => {
+  it("prevents confirmation when saved goods disappeared from the current source", () => {
+    const id = "11111111-1111-4111-8111-111111111199";
+    wrap(<WarehouseCountModal po={PO} onClose={vi.fn()} saved={{
+      saveKey: "11111111-1111-4111-8111-111111111198",
+      result: { id, receipt_id: id, revision: 2, status: "draft", grn_no: null, blockers: [], already_saved: true },
+      report: { poId: PO.po_id, lines: [{ id: "no-longer-in-source", receivedNow: 1, damagedQty: 0, wrongItemQty: 0 }] },
+    }} />);
+    expect(screen.getByRole("alert")).toHaveTextContent("Not available. Go back and reload.");
+    expect(screen.getByRole("checkbox", { name: "I checked the goods and confirm these receiving results." })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /^Save/ })).toBeDisabled();
+    expect(apiFetchMock.mock.calls.some((call) => call[0] === "/api/warehouse/receipts/confirm")).toBe(false);
   });
 });

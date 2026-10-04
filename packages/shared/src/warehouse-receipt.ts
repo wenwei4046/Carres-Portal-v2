@@ -301,6 +301,11 @@ export function warehouseReceiptOpensClaims(
  *  `claims` is present only once ops has checked it in. */
 export interface WarehouseReceiptRow {
   id: string;
+  raw_report?: unknown;
+  save_key?: string | null;
+  blockers?: Array<{ code: string; message: string }>;
+  arrival_source_id?: string | null;
+  source_no?: string | null;
   po_id: string;
   supplier_name: string | null;
   do_number: string;

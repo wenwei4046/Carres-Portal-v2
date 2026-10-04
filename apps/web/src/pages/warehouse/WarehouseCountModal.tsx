@@ -32,6 +32,7 @@ const INPUT_CLS = controlClass(false, "single");
 interface Props {
   po: WarehouseIncomingPo;
   onClose: () => void;
+  saved?: { saveKey: string; result: WarehouseConfirmationResult; report: WarehouseConfirmationReportInput };
 }
 
 const GRID = "1fr 76px 78px 72px 76px";
@@ -45,23 +46,30 @@ type UnitState = {
 
 type ExpectedUnit = NonNullable<WarehouseIncomingPo["expected_units"]>[number];
 
-export default function WarehouseCountModal({ po, onClose }: Props) {
+export default function WarehouseCountModal({ po, onClose, saved }: Props) {
   const lines = po.lines ?? [];
 
-  const [recv, setRecv] = useState<Record<string, number>>({});
-  const [dmg, setDmg] = useState<Record<string, number>>({});
-  const [wrong, setWrong] = useState<Record<string, number>>({});
-  const [dmgPhotos, setDmgPhotos] = useState<Record<string, string[]>>({});
-  const [wrongType, setWrongType] = useState<Record<string, string>>({});
-  const [wrongPhotos, setWrongPhotos] = useState<Record<string, string[]>>({});
-  const [doNumber, setDoNumber] = useState("");
+  const storedLines = saved?.report.lines ?? [];
+  const storedNumbers = (key: "receivedNow" | "damagedQty" | "wrongItemQty") =>
+    Object.fromEntries(storedLines.filter((line) => line.id && typeof line[key] === "number")
+      .map((line) => [line.id!, line[key] as number]));
+  const storedPhotos = (key: "damagedPhotos" | "wrongItemPhotos") =>
+    Object.fromEntries(storedLines.filter((line) => line.id).map((line) =>
+      [line.id!, (line[key] ?? []).filter((photo): photo is string => typeof photo === "string")]));
+  const [recv, setRecv] = useState<Record<string, number>>(() => storedNumbers("receivedNow"));
+  const [dmg, setDmg] = useState<Record<string, number>>(() => storedNumbers("damagedQty"));
+  const [wrong, setWrong] = useState<Record<string, number>>(() => storedNumbers("wrongItemQty"));
+  const [dmgPhotos, setDmgPhotos] = useState<Record<string, string[]>>(() => storedPhotos("damagedPhotos"));
+  const [wrongType, setWrongType] = useState<Record<string, string>>(() => Object.fromEntries(storedLines.filter((line) => line.id && line.wrongItemClaimType).map((line) => [line.id!, line.wrongItemClaimType!])));
+  const [wrongPhotos, setWrongPhotos] = useState<Record<string, string[]>>(() => storedPhotos("wrongItemPhotos"));
+  const [doNumber, setDoNumber] = useState(saved?.report.doNumber ?? "");
   /** Physical arrival is explicit. Unknown is not the time this form opened. */
-  const [receivedAt, setReceivedAt] = useState("");
-  const [note, setNote] = useState("");
-  const [doFilePath, setDoFilePath] = useState<string | null>(null);
+  const [receivedAt, setReceivedAt] = useState(() => saved?.report.goodsReceivedTime ? appDateTimeInput(saved.report.goodsReceivedTime) : "");
+  const [note, setNote] = useState(saved?.report.note ?? "");
+  const [doFilePath, setDoFilePath] = useState<string | null>(saved?.report.doFilePath ?? null);
   const [arrivalEvidence, setArrivalEvidence] = useState<
     ReceivingArrivalEvidence[]
-  >([]);
+  >(saved?.report.arrivalEvidence ?? []);
 
   const submit = useWarehouseConfirmReceiptMutation();
 
@@ -98,9 +106,10 @@ export default function WarehouseCountModal({ po, onClose }: Props) {
       );
       const cap = Math.max(0, Number(l.qty || 0) - Number(l.received_qty || 0));
       units.forEach((u, i) => {
+        const previous = storedLines.find((line) => line.id === l.id)?.units?.find((item) => item.unitCode === u.unit_code);
         o[u.id] = {
-          outcome: i < cap ? "received" : "not_received",
-          issueKind: "damaged",
+          outcome: previous?.outcome ?? (saved ? "not_received" : i < cap ? "received" : "not_received"),
+          issueKind: previous?.issueKind ?? "damaged",
         };
       });
     }
@@ -169,11 +178,12 @@ export default function WarehouseCountModal({ po, onClose }: Props) {
     () => warehouseReceiptProblems({ doNumber, doFilePath, lines: draftLines }),
     [doNumber, doFilePath, draftLines],
   );
-  const [saveKey] = useState(() => crypto.randomUUID());
-  const [savedReport, setSavedReport] = useState<WarehouseConfirmationResult | null>(null);
+  const [saveKey] = useState(() => saved?.saveKey ?? crypto.randomUUID());
+  const [savedReport, setSavedReport] = useState<WarehouseConfirmationResult | null>(saved?.result ?? null);
   const [confirmed, setConfirmed] = useState(false);
   const saving = useRef(false);
   const report: WarehouseConfirmationReportInput = {
+    ...saved?.report,
     poId: po.po_id, doNumber: doNumber.trim(), doFilePath,
     goodsReceivedTime: receivedAt ? appDateTimeInputToIso(receivedAt) : null,
     note: note.trim() || undefined, arrivalEvidence,
@@ -185,20 +195,34 @@ export default function WarehouseCountModal({ po, onClose }: Props) {
       receivedNow: (unitsByLine.get(line.id)?.length ?? 0) ? line.receivedNow : recv[line.id] ?? null,
       damagedQty: (unitsByLine.get(line.id)?.length ?? 0) ? line.damagedQty : dmg[line.id] ?? null,
       wrongItemQty: (unitsByLine.get(line.id)?.length ?? 0) ? line.wrongItemQty : wrong[line.id] ?? null,
-      damagedPhotos: [...line.damagedPhotos], wrongItemPhotos: [...line.wrongItemPhotos],
+      damagedPhotos: [...line.damagedPhotos, ...(storedLines.find((item) => item.id === line.id)?.damagedPhotos ?? []).filter((photo) => typeof photo !== "string")],
+      wrongItemPhotos: [...line.wrongItemPhotos, ...(storedLines.find((item) => item.id === line.id)?.wrongItemPhotos ?? []).filter((photo) => typeof photo !== "string")],
       wrongItemClaimType: line.wrongItemClaimType ?? undefined,
       units: (unitsByLine.get(line.id) ?? []).map((unit) => {
         const state = unitStates[unit.id];
-        return { unitCode: unit.unit_code, outcome: state?.outcome ?? "not_received",
+        return { unitCode: unit.unit_code, note: storedLines.find((item) => item.id === line.id)?.units?.find((item) => item.unitCode === unit.unit_code)?.note, outcome: state?.outcome ?? "not_received",
           ...(state?.outcome === "received_with_issue" ? { issueKind: state.issueKind } : {}) };
       }),
     })),
   };
+  // A changed source read must never silently erase previously reported goods.
+  // Unmatched facts stay on the same report for the engine/Operation to resolve.
+  let sourceChanged = false;
+  for (const original of storedLines) {
+    const current = report.lines?.find((line) => line.id === original.id);
+    if (!current) { sourceChanged = true; report.lines?.push(original); }
+    else for (const unit of original.units ?? []) {
+      if (!current.units?.some((item) => item.unitCode === unit.unitCode)) {
+        sourceChanged = true;
+        current.units?.push(unit);
+      }
+    }
+  }
   const quantitiesKnown = (report.lines ?? []).every((line) =>
     line.receivedNow != null && line.damagedQty != null && line.wrongItemQty != null);
   const reportSnapshot = JSON.stringify(report);
   useEffect(() => { setConfirmed(false); }, [reportSnapshot]);
-  const ready = confirmed && !submit.isPending;
+  const ready = confirmed && !sourceChanged && !submit.isPending;
 
   /** The ONE per-line view the rows, the claim panels and the payload read. */
   const viewBy = new Map(draftLines.map((d) => [d.id, d]));
@@ -608,9 +632,10 @@ export default function WarehouseCountModal({ po, onClose }: Props) {
         {!confirmed ? "Prefilled results are not confirmed. Check the goods before saving."
           : !savedReport ? "Receiving results confirmed. Not saved yet." : null}
       </div>
+      {sourceChanged && <p role="alert" className="text-body text-kit-red-9">Not available. Go back and reload.</p>}
       <Checkbox id="warehouse-confirm-results"
         label="I checked the goods and confirm these receiving results."
-        checked={confirmed} onCheckedChange={setConfirmed} disabled={submit.isPending} />
+        checked={confirmed} onCheckedChange={setConfirmed} disabled={submit.isPending || sourceChanged} />
       {savedReport?.status === "draft" && (
         <div role="status" className="text-body text-kit-red-9 my-3">
           <p>Receiving report saved. No GRN created.</p>

@@ -1939,6 +1939,7 @@ Operation owns supplier follow-up; Warehouse owns physical evidence and results.
 | Confirmation still missing | `Save — confirm receiving results` | Disabled until the individual confirms the displayed report. |
 | Posted successfully | `Receiving saved · {GRN No}` | Only after the engine returns a posted receipt and its actual GRN. |
 | Preserved but unposted report | `Receiving report saved. No GRN created.` | Show the returned blockers; keep the same session for correction. Never describe this as received stock. |
+| Reopen own unposted report | `Open Receiving` | Reuse `Open {object}`. Restore the same report and revision, with fresh physical confirmation. Loading/read failure use `Loading…` / `Could not be loaded` + `Try again`; a source that cannot support correction uses `Not available. Go back and reload.` |
 | Existing returned report | `Return count to {warehouse}` · `Count returned to {warehouse}` | A specific physical correction request; never mandatory approval of a normal Warehouse receipt. |
 
 Do not use `Return count to Carres`, `Count returned to Carres`, `Waiting Carres check` or
