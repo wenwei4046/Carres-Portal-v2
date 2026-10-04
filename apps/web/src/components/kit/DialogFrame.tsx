@@ -189,7 +189,7 @@ export default function DialogFrame({
                 </Dialog.Description>
               )}
             </div>
-            <div className={`flex items-center gap-2 ${variant === "quick-view" ? "shrink-0" : ""}`}>{headerActions}
+            {variant !== "compact-card" && <div className={`flex items-center gap-2 ${variant === "quick-view" ? "shrink-0" : ""}`}>{headerActions}
             <Dialog.Close
               aria-label="Close"
               title="Close"
@@ -197,7 +197,7 @@ export default function DialogFrame({
               className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-control text-kit-slate-11 hover:bg-kit-slate-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9 md:h-8 md:w-8"
             >
               <Icon name="close" size={16} />
-            </Dialog.Close></div>
+            </Dialog.Close></div>}
           </header>
 
           <div className={variant === "compact-card" ? "flex-1 overflow-y-auto" : "flex-1 overflow-y-auto p-4"}>{children}</div>

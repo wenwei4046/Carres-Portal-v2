@@ -6806,8 +6806,18 @@ this module owns the following business-specific application. Delivered evidence
   Workspace Working Panel. Full-page navigation keeps `/operation/orders/so/:id`; existing
   SalesOrderWorkspace supplies the responsive 50/50 form/document view, deliberate Edit and source
   refresh after saving. Existing full-page contract/document checks105 passed; authenticated
-  card→full page→edit/preview→save→return proof remains pending. This release does not claim
-  Workspace or other-module adoption. Implemented in this BUILD branch; release acceptance pending.
+  card→full page→Edit/formal preview→Cancel→Back is verified below. Live successful-save testing
+  is not claimed; tests cover successful/refused saves without altering a live business record. This release does not claim
+  Workspace or other-module adoption. Production verified2026-10-04: PR #1871, merge
+  `a9dbb6b8918e9337328eefccebe547ee1d2f4ab6`, CI37189941545, Deploy37190758212; independent verification
+  matched all five revision surfaces. Sara · Principal saw real Info money, Delivery0/1 goods,
+  Not assigned, Date not confirmed and No DO yet; Customer Cancel preserved facts and DO checks
+  were read-only. SO number rendered the saved formal document. Info/Delivery were checked at
+  1146/480/440/420/390px with no page overflow. Existing full page had equal752px panes at1800px,
+  formal PDF remained visible through Edit/Cancel, and Back restored search1368 and Cards.
+  No Print/Download or live business-data write was performed. This change removes the compact
+  frame's hidden duplicate Close and names address facts explicitly; kit/dialog regression23
+  checks cover visible initial focus, Escape and opener return.
 - Full page opens read-only until deliberate Edit. Fixed white identity header and slate-2 tabs
   sit above one scrolling left form and independent right PDF. Back preserves register context.
 - Items has five columns Item, Qty, Unit (RM), Disc (RM), Amount (RM). Name, code and config share
