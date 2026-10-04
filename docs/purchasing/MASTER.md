@@ -281,6 +281,25 @@ when present and keeps chosen/saved Units from other locations visible; location
 nothing. 44 picker tests pass, including a saved Unit outside the default location. These stock
 changes are local build facts, not production proof.
 
+**Ready Stock priority Settings — LOCAL BUILD, production proof pending.** The approved default
+Customer Requested Delivery Date priority and optional Proceed Date priority now share one
+persisted `purchasing_settings.ready_stock_priority` value. Migration 0650 adds the default and
+the existing manager-gated, row-locked, audited Settings write door. The Settings page preserves
+the chosen value on failure; SO Batch receives that source value and refuses Match when it is
+unreadable. A match retains the priority read when it started, so changing Settings cannot move
+already-ticked Units onto another customer's order. Subsequent manual matches use the new value.
+The new Settings UI/route and allocation behavior are local implementation. Migration 0650 was
+applied to the existing production project through the governed migration tool at tracker version
+`20261004132354`. A rolled-back SQL proof confirmed that an unauthenticated write is refused,
+an authorised principal can change the value and produces the exact old/new actor audit, and the
+original `customer_delivery` value remains after rollback. Anonymous execution is revoked;
+authenticated execution intentionally uses the same internal manager gate as other Purchasing
+Settings writes. The advisor's exposed-definer notice is intentional for this guarded RPC, not
+an unguarded grant. Nine loader, 30 Settings route, 39 Settings UI, 133 Register and nine hook
+tests passed; API/web type checks and design/migration guards passed. Full CI/deployment and
+authenticated production acceptance of the new Settings UI remain required. This does not close
+the full SO Batch boundary above.
+
 Authenticated production acceptance also found that the Batch Purchase Orders toolbar opened
 an empty result panel after a fresh mount because it relied only on browser-held issue results.
 The local correction loads the exact deduplicated PO lineage of visible Register rows through
@@ -309,6 +328,84 @@ This overwrites the earlier SO Batch parent/item `Need PO` / `No PO needed` pres
 Manual Purchase's independent approval/request grouping is unchanged. Target approval is not build
 or production verification. Supplier communication evidence and Receiving remain separate facts.
 
+
+### 2.5 Receiving end-to-end assurance review — 2026-10-04
+
+**PLAN evidence and recommendation; not production acceptance.** Scope is the entire Receiving
+journey from a committed source and expected arrival through physical receipt, GRN, differences,
+replacement/return and Finance handoff. It does not reopen the whole Purchasing business model.
+The 2026-10-04 owner rulings in §§7.3/9.4 bind this review. This section adds no approval of new
+business rules, UI words or external cutover. Existing authority answers ordinary workflow choices.
+
+**Resolution and evidence.** Purchasing §§7.1–7.4/9.4–9.7, Stock §7 and receipt blueprint,
+Workspace §6.1 action catalogue, UI §0/§5, COPY Receiving dictionary and Finance §§1–3.2 were
+cross-checked with the following implementation. `OperationReceiving.tsx` still has date,
+condition, category, Site and supplier rail groups, not the approved two-view rail.
+`apps/api/src/routes/warehouse/receiving.ts` submits a count; the Operation receipt route still
+provides the separate guarded check-in. Migration 0619's `receiving_actor_context()` admits an
+active individual Operation/Principal poster, not the newly approved Warehouse confirmation.
+This is source evidence, not proof of production migration state. `SupplierBills.tsx` already
+selects GRN lines and keeps supplier invoice preparation/confirmation in Finance. Migration 0477
+contains receipt-line billable quantity checks and rejects consignment GRNs; do not invent a second
+Purchase Invoice engine. No receipt, amendment, void, invoice or return was executed for this audit.
+
+| Capability / lifecycle | Resolution and recommended Carres treatment | Acceptance or remaining uncertainty |
+|---|---|---|
+| Source and expected arrival | RESOLVED: PO/CO and other admitted sources own expected goods; supplier dates stay Purchasing-owned. A supplier dispatch/DO is evidence of supplier statement, not GRN. | Prove source-line and split-batch dates remain separate from actual arrival. No duplicate PO/Receiving ETA writer. |
+| Daily ownership and missed arrival | RESOLVED: Operation checks missing arrivals and contacts suppliers; Warehouse performs physical work. | CONTRADICTION FOUND: Workspace's older action table instructed check-in merely because a date passed. Its target has been corrected in the same change; the existing Work feed still needs alignment. |
+| Warehouse identities and permissions | APPROVED TARGET / NOT BUILT: individually authenticated, source/Site-authorised confirmation, company receiver and individual actor distinct. | Existing role gates do not deliver the new rule. No broad Warehouse finance, adjustment, amend or void rights. |
+| Receipt entry and evidence | KEEP the source-prefilled one engine; confirm actual Unit outcomes or counted quantities, actual date/Site, DO and evidence. | No blank unrelated receipt, identity minting or supplier-reported automatic receipt. Missing evidence preserves an unposted report. |
+| Partial receipt and remaining quantity | RESOLVED: valid received scope completes; remaining acceptable supply stays outstanding. | Example: ordered 10, physically arrived 8 including 1 damaged means Received Qty 7, Damaged Qty 1, physically missing 2, Pending Delivery Qty 3. Never add damage to the 3 again. |
+| Automatic GRN and retries | APPROVED TARGET / NOT BUILT: valid Warehouse confirmation posts through Receiving and creates the formal GRN once. | Existing submit/review split is a real implementation gap. Prove no duplicate receipt/stock after retries or concurrent confirmation, and no false success on failure. |
+| Condition, custody and eligibility | RESOLVED: physical custody, accepted quantity and saleability differ. Damage/wrong goods retain hold; rejected goods remain with supplier. | Existing reservations survive valid arrival; extra goods cannot silently satisfy expected lines or create available stock. |
+| Register, cards and working detail | APPROVED TARGET / NOT BUILT: GRN Records / Receiving Differences, shared list and Working Panel; one expansion job. | Retain existing GRN full-page/PDF and history; no new top-level page or local kit. A normal GRN has no new Completed badge. |
+| Completion | RESOLVED: receipt posting, complete source fulfilment, resolved discrepancy and supplier bill settlement are separate facts. | PO 10, receipt 6 creates one GRN for 6; balance 4 remains. GRN creation must not close shortage or Claim actions. |
+| Corrections, cancellation and history | KEEP governed Amend/ Void, reason, evidence, revision checks, downstream blockers and immutable document identity. | Later physical arrivals create new GRNs; later defects use Claim, not rewriting the old receipt. No generic Copy action that duplicates a physical event. |
+| Source version / historical document | KEEP source identity and historical evidence. | Current live walkthrough did not establish an explicit receipt-bound PO revision on the GRN. Verify version lineage and historical PDF consistency before claiming complete; do not infer from a PO number alone. |
+| Difference, Claim, replacement and repair | RESOLVED: receipt evidence routes stock problems to Purchasing; customer Service Case is not prerequisite. | Operation owns supplier outcome; warehouse only observes physical work. Replacement/repair-return receipt must close the right source leg, not create a second purchase need. |
+| Purchase Return | RESOLVED: authorised Claim outcome creates return; actual collector, Unit/count and handover evidence change custody. | Return paper is not collection, refund or permission to rewrite original receipt. Partial collection keeps balance open. |
+| Supplier invoice and payment | RESOLVED: Finance records supplier invoice against eligible GRN lines/PO price; Finance owns bill, credit and voucher. | A GRN is not the supplier invoice and never auto-pays. Consignment arrival does not become AP. Runtime duplicate/overbilling and cancellation consequences remain unverified. |
+| Calendar, Work, alerts and mobile checks | KEEP one Calendar with authorised module/location filters; one arrival event under Warehouse. Operation can inspect remotely; My Work owns dated follow-up. | A date-only calendar cannot guarantee missed work is seen. Preserve unresolved source-owned Work and explicit due reasons; loading failure is not zero. Do not claim push alerts or new escalation thresholds without actual capability evidence. |
+| Search, filters, export and reports | KEEP shared search/column filters/pagination/export and source links. Filters do not become new work ledgers. | Totals/counts must cover the authorised filtered result, not one loaded page; no invented receiver, time or historical snapshot for legacy data. |
+| Settings and external transition | KEEP governed Sites, partner scopes, individual identities, working calendars and Staff & Duties; no second local roster. | Account activation and external cutover remain separate from this PLAN. Do not hard-code NETS or alter current operations. |
+
+**Reference-to-Carres capability matrix.** Houzs source inspected in
+`/tmp/houzs-erp-review-20261001`: `GrnFromPo.tsx`, `GrnNew.tsx`,
+`GoodsReceivedDetailV2.tsx`, `PurchaseInvoiceFromGrn.tsx`, backend `scm/routes/grns.ts`.
+Earlier browser review exercised PO-line selection and unsaved GRN/invoice/return forms only;
+it did not post a document. Houzs-derived functionality is not proof of original 2990 behavior.
+
+| Reference capability | Current Carres equivalent / owner | Decision | Why / dependency |
+|---|---|---|---|
+| Houzs outstanding PO-line selection and partial quantity | Source-linked Receiving / Purchasing | KEEP + ADAPT | Reuse source identity and remaining scope; do not rebuild an independent purchase document. |
+| Houzs standalone GRN detail, source link and downstream document links | GRN object/PDF, Related records / Receiving | ADAPT | Reuse proven document navigation inside Carres's approved Working Panel/full-page grammar. |
+| Houzs `qtyAccepted = qtyReceived`, rejected zero in new-form construction | Per-Unit condition and accepted quantity / Receiving + Stock | REJECT | Carres explicitly distinguishes damaged/wrong physical arrival from accepted supply. |
+| Houzs transfer to invoice and return | Supplier Bills / Finance; authorised Claim-to-Return / Purchasing | RELOCATE + KEEP | A convenient link is useful; it cannot transfer Finance permissions or bypass Claim authorisation. |
+| Houzs posting response can carry movement/recount errors | One validated Carres receipt engine | REJECT blind copy | GRN and stock failure/retry consistency must be proven, not inferred from a success-looking document. |
+| Odoo partial receipt retains remaining demand; received-quantity billing | Existing partial receipt and GRN-billable lines | KEEP | Confirms useful separation of receipt, remaining supply and bill; foreign policies are not Carres authority. |
+
+Primary benchmark: [Odoo partial receipt](https://www.odoo.com/documentation/13.0/applications/inventory_and_mrp/purchase/purchases/rfq/reception.html)
+and [Odoo vendor bills](https://www.odoo.com/documentation/saas-16.3/applications/inventory_and_mrp/purchase/manage_deals/manage.html).
+These versioned references support workflow principles only, not current Carres behavior.
+
+**Recommended full operator journey (approved business truth, delivery still owed).** Operation
+starts with its due Work and Calendar, checks the expected date/batch and follows up with suppliers
+through PO; Warehouse opens its authorised Inbound scope, records the actual physical facts and
+confirms. Valid receipt creates GRN and Stock consequences once. Operation reads GRN Records for
+what arrived and Receiving Differences for source-linked unresolved issues, continuing through
+PO/Claim/Return as applicable. Finance uses its existing bill door for the supplier's actual
+invoice. End-of-day review keeps unresolved missing arrivals, unposted reports and Claims visible
+under their proper Operation/Warehouse/Finance owner rather than declaring a whole PO complete
+because one GRN exists. Shared Calendar, list, Working Panel and full-page GRN serve different
+jobs; no new page, second work ledger or Receiving-specific calendar is required.
+
+**Review conclusion.** No new owner business decision is required to resolve the findings above.
+The target is sufficiently explicit to explain the complete journey, but this is not a declaration
+of PLAN MISSION COMPLETE or production completion. Main-branch documentation integration alone
+does not deliver the warehouse posting/identity model, Work projections, two-view presentation or
+runtime lifecycle proofs; these remain open. Do not turn these known gaps into new questions for Jess.
+
+---
 
 ## 3 · Whole-domain research audit
 
@@ -1381,15 +1478,25 @@ owners. UI and implementation must preserve that boundary rather than changing a
 
 ### 6.1 Formal document numbers
 
-**PO — OWNER RULING 2026-09-23 (Jess) · APPROVED / LOCKED · BUILT, migration 0574.**
+**System-wide display clarification — Jess 2026-10-04.** The `YY` date segment applies to every
+Carres document family, including GRN, CO, RO, claims, returns and Finance documents, not only PO.
+Follow COPY-STANDARD's global display contract. Existing allocator shapes described below are
+implementation evidence, never exemptions from the approved display target. Preserve each
+family's other numbering rules and stored identity; do not append PO versions to other documents.
+
+
+**PO stored identity — migration 0574 BUILT; current display — owner ruling 2026-10-01,
+APPROVED TARGET / NOT BUILT (§9.3).** Allocation and display are separate facts.
 
 ```text
-PO260924-4827(1)     PO · YYMMDD of first issue · 4 random digits · version
-PO260924-4827(2)     the same PO after one revision
+Stored base identity example: PO260924-4827
+Current approved version display: PO-260924-4827-V1
+After revision: PO-260924-4827-V2
 ```
 
-- The date is the day the PO was **first issued** (supplier production lead time counts from it);
-  a revision never changes the date or the number. Version marker has no space, as on the SO.
+- The date is the day the PO was **first issued**; a revision changes neither that date nor
+  the stored base identity. Display uses the two-digit year and the actual document version,
+  with no spaces or parentheses, under §9.3 and COPY's `PO Version` entry.
 - Four random digits, leading zeros allowed: **10,000 PO numbers a day, for PO alone** — the PO
   draws from its OWN daily pool, never sharing codes with GRN, SB, PV or any other prefix. One PO
   of any number of lines uses one number.
@@ -1404,12 +1511,14 @@ PO260924-4827(2)     the same PO after one revision
   (`purchasing_issue_pos_batch`'s caller) and `manualPurchaseIssueDocuments` at once — and the
   request/demand rows need a business fact to partition by, which does not exist yet. A supplier
   serving both businesses receives separate POs.
-- **Permanence:** existing `PO-…` numbers (e.g. `PO-20260904-4665`, `PO-2054`) keep their form forever
-  and are never renumbered — they live in supplier hands, `po_sends`, GRNs and Claim lineage. Register
-  and search match BOTH shapes while pre-cutover POs exist. The new form and `(n)` change the
-  ALLOCATOR (0381 mints `PREFIX-YYYYMMDD-RRRR`), so they need a migration; the `(n)` comes from the
-  PO's own version, never from the code pool.
-- This replaces `PO-YYYYMMDD-RRRR` and `V{n}` for NEW POs only.
+- **Permanence:** stored legacy identities (for example `PO-20260904-4665` and `PO-2054`)
+  and historical issued PDFs remain unchanged. The approved display may render the dated PO as
+  `PO-260904-4665-V{actual version}`; this is a presentation of that same record, not a new PO.
+  Resolve/search the original identity and approved display. Non-date legacy numbers retain
+  their identity and never acquire an invented date. Migration 0574's allocation evidence below
+  does not prove the 2026-10-01 display change has shipped. Jess clarified on 2026-10-04 that
+  two-digit-year display applies to ALL document families under COPY-STANDARD; this does not
+  migrate stored GRN or other prefix identities.
 
 **HOW IT IS BUILT — migration 0574 + `poDocumentNumberOf`, 2026-09-23. DELIVERED:** PR #1551
 squash-merged as `e9bc40a0a`, that SHA reported by both Pages projects, both canonical hosts and
@@ -1689,16 +1798,40 @@ the spot remain with the supplier; accepted goods retain their actual condition 
 The Claim preserves the receipt/source, affected quantity and evidence without re-entry. A customer
 order waiting for these goods does not by itself require a customer Service Case.
 
-Office direct receiving and Warehouse submission are two entry doors to one Receiving Session and
-one posting engine. A Warehouse submission moves no Stock until GRN Duty posts it. Office direct
-receiving posts one `posted` event because one person performed one business act. `GRN-…` is the
-formal Receiving Record number and exists from the posted session; a draft/submitted count is not a
-formal GRN.
+**WAREHOUSE-CONFIRMED RECEIPT — OWNER-APPROVED TARGET / NOT BUILT, Jess 2026-10-04.**
+**Supplier follow-up ownership — owner clarification, same date.** Operation checks missing
+arrivals, chases supplier ETA and handles all supplier communication, including shortages, damage,
+wrong goods and claim/return arrangements. Warehouse performs physical receiving, checks and
+records actual goods/evidence and reports differences; it never chases or negotiates with suppliers.
+Warehouse / Inbound / Calendar placement identifies the arrival data surface, not the person
+responsible for supplier follow-up. Operation can inspect those same arrival facts and follows up
+through the owning PO/Claim record and its Operation action.
 
-Normal GRN Duty, dated cover and actual actor remain separate evidence. Jess and the governed
-Operations Superuser may perform the operational act without becoming GRN Duty. **Owner ruling 2026-09-25 (Stock §7): every active Operation staff member may post a
-receipt** — receiving is never blocked by the GRN Duty holder's absence; GRN Duty keeps the Work
-card, the GRN records the actual receiver. The former duty/cover-only refusal is overwritten.
+Office direct receiving and authorised Warehouse confirmation are entry doors to one Receiving
+Session and one posting engine. An individually authenticated Warehouse operator (NETS today),
+authorised for the source and actual receiving Site, confirms the physical quantities, Unit
+identities, condition and required evidence. When those checks pass, the system posts the receipt,
+creates its formal GRN and projects the accepted stock consequences automatically. Operation does
+not approve a normal receipt a second time. Supplier declarations, delivery notes, drafts and
+unconfirmed counts alone never create a GRN or Stock.
+
+Valid accepted goods post without waiting for a supplier claim to be settled. Physically arrived
+issue goods retain their observed condition and hold controls; they are never silently accepted
+or made available. Missing goods remain outstanding. Unknown source, identity or Site mismatch,
+duplicate receipt and missing required evidence preserve the report without posting the invalid
+scope. Independently valid receipt scope may complete only when it can be separated safely;
+otherwise preserve the session unposted and show the exact blocker. Retry never duplicates a GRN
+or stock movement. Operation handles the source-linked differences and their authorised outcomes,
+not a mandatory second confirmation of normal goods. Receiving owns GRN creation; Warehouse never
+writes Inventory directly. Corrections follow the existing amendment/void and downstream guards.
+
+Every active Operation staff member and the authorised Principal retain the existing direct
+receipt door. Normal GRN Duty, dated cover, actual confirming individual and receiving company
+remain separate evidence. GRN Duty owns unresolved receipt handling, not an approval required for
+every Warehouse receipt. At partner-run Sites the receiver company remains NETS (or the actual
+operator); the individually signed-in confirmer is separately recorded. A draft or unposted report
+has no formal GRN number. This target requires delivery and production proof; it does not claim
+NETS permissions, external accounts or automatic posting are live and does not authorise cutover.
 
 The user-facing gate uses two lines:
 
@@ -2449,8 +2582,10 @@ PO-20260904-4665   Not allocated        JAGER-SS  Jager · SS         1   Carres
 - **`PO No`, not `Covered by` and not `ON PO`**, and `PO No` and `Unit ID` are NEIGHBOURS: they are
   the two identifiers a person copies, and a reader who must look across four columns to pair a
   document with its goods pairs them wrongly. Both print in FULL and stay selectable.
-  **`PO-20260904-4665` is never shortened to `PO-260904-4665`** — no numbering change is approved,
-  and a shortened number names a document that does not exist.
+  Stored PO identity remains unchanged. Where the current official version is presented,
+  apply §9.3's approved two-digit-year `PO Version` display and resolve it to the same source PO;
+  do not restore the retired blanket prohibition on removing `20`. Never invent a version for
+  a source link whose version is unknown.
 - **Ordinary readable rows, no control, no grey block.** A record cannot be bought again, so it
   carries no checkbox and no destination editor; what makes it read-only is the ABSENCE of controls,
   not a disabled-looking wash over the module's own audit evidence.
@@ -4051,52 +4186,55 @@ server-side pagination — is PRODUCTION-VERIFIED 2026-09-07: PR #1117 merged `0
 both canonical surfaces on that exact SHA, served bundle carrying every new governed word and
 zero retired/view-switch words, and a read-only authenticated walk proving the fixed calendar,
 the date-pick filter round-trip, only-present categories, `Showing 1–7 of 7` server paging and
-the intact 50/50 GRN object (evidence in CARD-2026-09-04-receiving-01).** The operating rule is:
+the intact 50/50 GRN object (evidence in CARD-2026-09-04-receiving-01).**
+The following operating rule is the 2026-10-04 APPROVED TARGET / NOT BUILT; the earlier
+production evidence does not verify Warehouse automatic posting:
 
 ```text
-Warehouse submits count                (or Operation enters goods directly)
-→ Operation reviews Receiving
-→ Save Receiving
-→ GRN created (allocate_formal_document_code('GRN'), stored grn_no)
-→ Inventory updated automatically at Goods arrived at
+Authorised Warehouse confirms physical receipt (or authorised Operation receives directly)
+→ Validate source, Site, identities, quantities, condition and required evidence
+→ Valid receipt scope posts once; formal GRN is created automatically
+→ Accepted Inventory updates at Goods arrived at; issue goods retain hold controls
+→ Operation handles differences; missing goods remain outstanding
+Invalid scope → preserve report and show blocker; no false GRN or Inventory posting
 ```
 
-- **ONE RECEIVING DESTINATION (owner correction 2026-09-06, second ruling).** `Purchasing →
-  Receiving` is the only Receiving page. No Receiving Monitor, no `Calendar View / GRN Register
-  View` switch, no permanent tabs, no second Receiving destination — the earlier two-view
-  proposal is superseded. The page is: left, the 240px factual rail (GRN date and the business
-  filters, portal-wide rail style); right, always the complete GRN Register. The right side never becomes a weekly calendar and never shows work cards —
-  daily Receiving actions stay in My Work / Team Work.
-- **THE REGISTER BOUNDARY (owner correction 2026-09-06 §1).** `Receiving` is the formal GRN
-  Register, not the daily work queue: `My Work` / `Team Work` hold what staff must receive or
-  review; the Register holds formal GRN records. A Warehouse count awaiting Carres action appears
-  in Work and deep-links to its Receiving review; it becomes a Register row only when
-  `Save Receiving` creates the GRN. The old permanent state rows (`All receiving` · `Count
-  waiting for check` · `Sent back to recount` · `Posted` · `Voided`) are retired.
+- **RECEIVING PRESENTATION — OWNER-APPROVED TARGET / NOT BUILT, 2026-10-04.**
+  One existing Receiving page; its left rail has `GRN Records` (default) and
+  `Receiving Differences`. These are views, not new sidebar destinations or top tabs.
+  `GRN Records` contains formal GRNs, one row per receipt. `Receiving Differences`
+  presents source-linked receipt discrepancies and their existing related handling records;
+  it is not another task ledger, supplier ETA chase list or manual Done mechanism.
+  Preserve the identity of an unposted report: no GRN number or posted result is invented.
+  My Work / Team Work retain assignment, deadlines and completion ownership.
+  A Warehouse count becomes a formal GRN only through the governed posting door.
+  The separately approved warehouse-confirmed posting rule in §7.3 governs automatic
+  GRN creation after valid final Warehouse confirmation. Both the presentation and this
+  operating-model change remain APPROVED TARGET / NOT BUILT until separately verified.
+- **SHARED LIST AND WORKING PANEL — same approval scope.** Use the accepted shared
+  `Search · Table / Cards · Page tools · Columns` grammar, column filters and source-owned
+  facts; never copy reference HTML/CSS into this module. Expansion has one read-only job:
+  this receipt's goods, Unit identities and quantities. The right Working Panel presents
+  `Receipt details · Items & quantities · Evidence · Related records · History`, using
+  existing shared components with the PO/GRN identity and permitted owning actions.
+  Keep current full-page GRN/PDF composition. Separate this receipt's physical/accepted
+  results from cumulative PO fulfilment; a completed receipt does not mean a completed PO.
+  Missing shared capability returns to shared UI maintenance; no local substitute component.
 - **Document status — APPROVED / NOT BUILT (Jess, 2026-09-17).** A normal GRN shows no status label.
   A cancelled GRN shows `Cancelled` beneath its GRN No — `Valid` and the Status column are retired.
   `Posted`/`Voided` remain internal database statuses and never reach a normal user's screen;
   `Void Receiving` stays the act's name.
-- **THE RECEIVING RAIL — APPROVED / NOT BUILT (Jess, 2026-09-17).** The month calendar is removed;
-  the expected-arrival view lives in Warehouse Arrival Schedule. The rail uses the portal-wide rail
-  style (UI MASTER §6.7) and carries no explanatory sentences. Groups, in order:
-  - `GRN date` — the date each GRN was created: weeks (e.g. `14 – 20 Sep`), months and
-    `Choose dates…`. The arrow beside a week only expands it into its days and never filters;
-    pressing a week, month or day filters. Only days with GRNs are listed, Sunday included.
-  - `Received with` — `Damaged goods` · `Wrong items` · `Extra goods`. A record of what was found
-    at receiving, not a to-do list. Counted by GRN; one GRN may appear in more than one row.
-  - `Category` — only the governed categories present, in the shared display order (`Mattress` ·
-    `Bedframe` · `Sofa` · `Pillow` · `Mattress protector`); counted by GRN, a GRN with several
-    categories counts in each. Category comes from the ONE shared ladder (`goodsCategoryWordOf`).
-  - `Goods arrived at` — the receiving locations present.
-  - `Supplier` — the suppliers present.
-  - last row `Cancelled GRNs`.
-  One choice per group; no `Any` or `All …` rows; pressing the chosen row again clears it. Rail
-  counts, table rows and the footer (`Showing 1–{n} of {total}`) come from the same complete
-  server-side filtered set, never the loaded page. **There is NO permanent `Clear filters` button
-  at the foot of the rail (owner correction 2026-09-18)** — the toolbar's active-condition chips
-  name what is on and clear it, one condition at a time or all of them. The earlier reading that
-  this removal was a Purchase Orders correction only is superseded.
+- **RECEIVING FILTER PLACEMENT — OWNER-APPROVED TARGET / NOT BUILT, 2026-10-04.**
+  The rail contains only the two views above. Supplier, Category, location, date and receipt
+  result filtering belong to the shared list controls, not duplicate rail groups. Preserve
+  cancelled records and their governed indicator/filter. Counts describe their own record
+  unit and the complete authorised filtered result, never just a loaded page or an invented
+  overdue bucket. The existing implementation still needs migration and runtime verification.
+  Calendar belongs to the existing shared right Quick Rail, not a new Receiving calendar.
+  Use UI MASTER's all-module calendar: authorised built dated events, module/location filters,
+  and a deep-link to the owning page with explicit date/scope. Supplier arrival is counted
+  once under Warehouse from its schedule projection; a GRN is evidence of that arrival,
+  not a second arrival event. Expected and actual dates remain distinct.
 - **SERVER-SIDE PAGINATION (owner correction 2026-09-06, second ruling).** The Register never
   renders the whole GRN history: the server pages it (default `Showing 1–50 of {total}`,
   Previous/Next), and the footer total plus every rail count speak for the COMPLETE filtered
@@ -4154,18 +4292,18 @@ Warehouse submits count                (or Operation enters goods directly)
   `Void Receiving` and a fresh Receiving from the correct source. Every amendment preserves
   original facts, before/after, reason, evidence, the duty trio, time, and the append-only
   history; every amendment prints on the document.
-- **One engine, three doors, one authority.** Office direct receiving (`office_receive_post`),
-  the external Warehouse two-step (`warehouse_submit_receipt` → GRN Duty review), and the review
-  doors (`warehouse_receipt_check_in` / `_return`) all pass `warehouse_receipt_validate_lines`
-  and `operation_receive_po_with_do`. **Who may post (owner ruling 2026-09-25, recorded in §7.3):** every
-  active Operation staff member may post a receipt; receiving is never blocked because the GRN
-  Duty holder is absent. GRN Duty keeps the Work card; the GRN records the actual actor. The
-  earlier GRN-Duty/cover/Superuser-only gate (`receiving_actor_context()`, 0425) is overwritten for POSTING only. MERGED (#1738), 0601
-  APPLIED 2026-09-28: `allowed` means an active Operation staff member or the principal; a non-duty saver is
-  labelled `Operation staff`. **Amend Receiving and Void Receiving authority is unchanged:** GRN
-  Duty, its dated cover or an Operations Superuser (`may_amend`, `receiving_require_amend_authority`,
-  refusals `no_grn_duty_holder` / `not_grn_duty`), in page, API and SQL. The Warehouse role still
-  cannot post, amend or void. The posting stores the duty-evidence trio (normal holder · dated cover ·
+- **One receipt engine; scoped confirmation authority (owner ruling 2026-10-04).**
+  Authorised Warehouse final confirmation and authorised Operation direct receiving use the
+  same validated receipt authority under §7.3. No routine GRN Duty review stands between valid
+  Warehouse confirmation and posting. **Measured implementation, not the approved target:** the
+  existing `warehouse_submit_receipt` → `warehouse_receipt_check_in` / `_return` review path and
+  `office_receive_post` share `warehouse_receipt_validate_lines` and
+  `operation_receive_po_with_do`; migration 0601 (#1738, applied 2026-09-28) admits active
+  Operation staff and the Principal. This does not prove scoped Warehouse automatic posting is
+  implemented. **Amend Receiving and Void Receiving authority is unchanged:** GRN Duty,
+  its dated cover or an Operations Superuser through the existing guarded doors. Warehouse
+  confirmation grants no amendment, void, Stock Adjustment or Finance authority. The posting
+  stores the duty-evidence trio (normal holder · dated cover ·
   actual actor), never one overwritten name. GRN Duty resolves through the ONE Shared Duty
   Resolver `workspace_resolve_duty()` (Law F.1): an effective-dated `workspace_duty_assignments`
   record, or an honest `not_assigned` answer — **a rota recommendation is never silently turned
@@ -4177,7 +4315,8 @@ Warehouse submits count                (or Operation enters goods directly)
   month by month. Automation must establish the authoritative assignment; a page must still never
   display a recommendation as a recorded holder.
 - **The GRN number is STORED at posting** — `warehouse_receipts.grn_no`, drawn from the daily
-  formal-document pool (0381), `GRN-YYYYMMDD-RRRR`. Sessions posted before 0426 keep their
+  formal-document pool (0381), stored `GRN-YYYYMMDD-RRRR`; approved display is
+  `GRN-YYMMDD-RRRR` under the global 2026-10-04 rule. Sessions posted before 0426 keep their
   derived display through `receivingDisplayNo`. `Jump to…` matches the stored number first.
 - **Save Receiving is idempotent** (`save_key`): a retried uncertain response returns the first
   posting — never a second GRN, Unit receipt or stock movement. A retried check-in of a posted
@@ -4238,27 +4377,32 @@ Warehouse submits count                (or Operation enters goods directly)
   reversal when safe, a named blocker otherwise (`claims_block_void` · `threads_block_void` ·
   `units_block_void`), the record and number preserved forever. Every physical arrival creates a
   NEW session and a NEW GRN — a later arrival is never edited into an earlier one.
-- **Work**: the `Goods to receive` queue projects into My Work / Team Work from two triggers only
-  — a submitted Warehouse count, and an arrived supplier date with goods still owed (outstanding
-  quantity alone never makes a row). **Blueprint segment 2 (BUILT 2026-09-26):** the date trigger
-  fires only for a PO whose CURRENT version is marked `PO sent to supplier` — an unsent PO cannot
-  arrive — and reads the earliest expected arrival per line/batch; its card says `Supplier date
-  passed · nothing received yet`, never `Goods arrived`, which stays the submitted count's fact. Owner = the resolved GRN Duty; completion = the posted
-  session; lateness counts on the Warehouse calendar (Mon–Sat).
+- **Work:** valid final Warehouse confirmation completes the receipt action through the
+  posted session; never create a redundant Operation approval action. Unconfirmed reports or
+  validation failures remain visible with their exact blocker and the responsible action owner.
+  Source-linked differences route to the existing GRN/PO Duty or Claim action as applicable.
+  The existing supplier-date check remains a dated monitoring fact, never evidence of arrival:
+  only a current sent PO with goods still owed qualifies; outstanding quantity alone does not
+  create an action. `Supplier date passed · nothing received yet` must not become `Goods arrived`.
+  Operation owns checking missing arrivals and all supplier follow-up; PO owns supplier promises
+  and Claim owns supplier issue handling. Inbound supplies arrival/calendar facts, never an
+  assignment for Warehouse to chase the supplier. My Work / Team Work project the Operation-owned
+  follow-up and Warehouse-owned physical receipt separately and close from their real outcomes,
+  not manual Done or a second receipt.
 - **`Settings → Staff & Duties`** is the ONE assignment surface: the resolution today
   (holder / `{cover} covering for {holder}` / `Nobody holds GRN Duty.`), effective-dated
   assignment, dated cover, immutable history; the manager gate mirrors the SQL door and the page
   never offers a control the server would refuse. **`Reports → Receiving & Inbound`** is the
   central report: every non-draft session with its GRN, source, site facts, totals from the
   shared arithmetics, submitter/poster, and the `Still owed by suppliers` pending section.
-- **The Warehouse boundary (owner correction §7).** The 50/50 GRN screen belongs to
-  Operation / GRN Duty. Warehouse may only scan Units, record count/outcomes, upload arrival
-  photo/video, and return the count to Carres. Warehouse cannot create, amend or void the GRN,
-  and cannot directly update Inventory — enforced at web, API (`requireOperation`) and SQL
-  (`receiving_require_post_authority`).
-- The GRN Duty reviewer may verify/correct `Goods arrived at` on a submitted Warehouse count at
-  check-in; `Supplier Deliver To` is never overwritten. No Manual receipt lane exists; no approved
-  Receiving scope is deferred to a later card.
+- **Warehouse and Operation boundary — approved target 2026-10-04 (§7.3).** Warehouse
+  scans/checks the actual goods, records quantities, condition, Site and evidence, then confirms
+  its authorised physical receipt. Valid confirmation automatically creates the GRN through
+  Receiving. Operation reviews differences and follows the owning correction/claim process;
+  it does not repeat every normal receipt. Existing Operation-only posting guards are an
+  implementation gap against this target, not the target authority. Warehouse cannot directly
+  update Inventory or amend/void a GRN. `Supplier Deliver To` is never overwritten by actual
+  receipt Site. Any correction preserves the original report, reason, actor and history.
 
 ### 9.5 Supplier Claims — approved complete Blueprint
 

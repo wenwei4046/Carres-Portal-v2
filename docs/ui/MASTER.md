@@ -57,6 +57,13 @@ and measurements.
 
 # §1 · Overview
 
+**Document numbers — owner clarification 2026-10-04 / APPROVED TARGET.** Every module follows
+COPY-STANDARD's system-wide two-digit-year document display contract. Reuse one shared formatting
+rule across lists, Working Panels, full pages, related records, search, Work and document previews;
+no PO-only exception or page-local formatter. Stored identities and historical issued documents
+remain unchanged; verify adoption per surface before calling it built.
+
+
 ## Reuse-first shared page templates — owner ruling 2026-10-01
 
 ### Reference geometry with Carres colour — owner direction, 2026-10-01
@@ -1625,6 +1632,17 @@ Payment       2 promised payments         ›  Payment Monitor ?day=
               1 free storage ends         ›  Payment Monitor ?day=
 Subscription  1 service visit             ›  Rental (no date/record door yet — build gap)
 ```
+
+**OWNER-APPROVED TARGET / NOT BUILT, 2026-10-04 — shared all-module calendar.**
+Use the existing right Quick Rail Calendar, never a separate calendar page per module.
+`All modules` shows only authorised, implemented dated event types; provide `Filter by module`
+and `Filter by location` where the source supports location. Do not expose empty/unbuilt module
+entries or turn undated Work into calendar events. Each summary names its module/event and
+count unit, distinguishes expected arrangements from actual occurrence, and opens the owning
+page with the explicit selected date and scope. Return preserves the Calendar day. Receiving
+reads Warehouse arrival facts rather than publishing a duplicate arrival count. This approval
+adds presentation/filter target truth, not new event writers, automatic GRN posting or a claim
+that filters and Receiving adoption are deployed.
 
 1. **Each module reports its own dated arrangements; Calendar only summarises.** Every row names
    what it counts in the module's own words; never a mixed total such as `5 jobs`. A zero prints
@@ -3229,7 +3247,7 @@ resizing remains available.
 | Goods arrived at | 150 | prototype | Receiving, 2026-09-18. A receiving SITE name — deliberately NOT `Stock Location` (160), which names a stock position; §9.4 keeps the two facts apart. Same class of value as `Supplier Deliver To`, so the same number. **Owed:** the rendered-portal measurement against the longest live site name |
 | Received Qty · Damaged Qty · Wrong Item Qty · Extra Qty | 112 | prototype | Receiving, 2026-09-18. Four adjacent quantity columns read as ONE family and share one width. The `Qty` role's 64 cannot hold them: their headers are two lines and the widest first line, `Wrong Item`, is about 63px at 11px/600 before the sort and filter affordances the engine draws beside it. **Owed:** the rendered-portal measurement |
 | Supplier DO No | 150 | prototype | Receiving, 2026-09-18. The SUPPLIER's own reference, which obeys no Carres format and has no upper bound the registry can prove; a longer one wraps rather than truncating. **Owed:** the rendered-portal measurement against the longest live DO number |
-| RO No | 170 | prototype | Repair Orders, 2026-09-20. Same 16-character `PREFIX-YYYYMMDD-RRRR` shape as `PO No` / `GRN No`, which the mono face measured at 170; it shares that number rather than inventing one. **Owed:** the rendered-portal measurement |
+| RO No | 170 | prototype | Repair Orders, 2026-09-20. Historical width measurement used the former four-digit-year shape. Apply the system-wide two-digit-year display rule; remeasure actual content before changing governed width. **Owed:** the rendered-portal measurement |
 | Supplier Claim No | 150 | prototype | Repair Orders, 2026-09-20, reading §9.5's measurement of `SC-20260916-0007` at 122.8px of text plus header chrome. **Owed:** the rendered-portal measurement on a page that actually ships the column |
 | Cost Responsibility | 144 | prototype | Repair Orders, 2026-09-20. Holds `Supplier pays` and the governed absence `Not decided`. It is a responsibility WORD, never an amount — no money field joins this registry through it |
 

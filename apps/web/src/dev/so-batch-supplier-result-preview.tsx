@@ -34,7 +34,7 @@ const orders: SoBatchOrderRow[] = leaves.map((leaf, i) => ({
   lines: [{ orderLineId: leaf.lineIds[0]!, sku: "SAMPLE-K", item: leaf.item, variant: leaf.variant, category: leaf.category, qty: leaf.qtyNeeded, stockTaken: 0, pos: i === 2 ? [{ poId: "Sample PO A", qty: 1 }] : [] }],
 }));
 orders.push({ orderId: "sample-done", so: 1006, customer: "Sample customer 6", status: "ordered", proceededAt: "2026-10-05T09:00:00+08:00", requestedDeliveryDate: "2026-11-10", deliveryCity: "Klang", deliveryState: "Selangor", outstandingSuppliers: [], pos: [], lines: [{ orderLineId: "sample-done-line", sku: "SAMPLE-K", item: "Sample mattress", variant: "King", category: "mattress", qty: 1, stockTaken: 1, pos: [] }] });
-const base: SoBatchPurchaseResponse = { today: "2026-10-05", rows: leaves, registerRows: orders, destinations: [{ id: destination, name: "Carres Klang", isDefault: true, active: true }], defaultDestinationId: destination, currentPoDuty: null, actingPoDuty: null, poDutyNameUnavailable: false, poDutyUnavailable: false, mayIssue: false, procurementPartners: [], safetyDays: 14 };
+const base: SoBatchPurchaseResponse = { readyStockPriority: "customer_delivery", today: "2026-10-05", rows: leaves, registerRows: orders, destinations: [{ id: destination, name: "Carres Klang", isDefault: true, active: true }], defaultDestinationId: destination, currentPoDuty: null, actingPoDuty: null, poDutyNameUnavailable: false, poDutyUnavailable: false, mayIssue: false, procurementPartners: [], safetyDays: 14 };
 
 const supplierOne = "11111111-2222-4333-8444-555555555555";
 const supplierTwo = "22222222-2222-4333-8444-555555555555";

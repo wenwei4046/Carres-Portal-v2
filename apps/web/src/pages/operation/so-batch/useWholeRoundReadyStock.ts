@@ -6,7 +6,8 @@ import { matchSoBatchReadyStock } from "@carres/shared/so-batch-stock-match";
 import { ApiError, apiFetch } from "@/lib/api";
 
 /** Suggestions are session-only; the existing Sales Order door owns saving. */
-export function useWholeRoundReadyStock(onReserved: (orderId: string, lines: readonly string[]) => void) {
+export function useWholeRoundReadyStock(onReserved: (orderId: string, lines: readonly string[]) => void,
+  priority: "customer_delivery" | "proceed_date" = "customer_delivery") {
   const queryClient = useQueryClient();
   const lock = useRef(false);
   const [busy, setBusy] = useState(false);
@@ -16,6 +17,7 @@ export function useWholeRoundReadyStock(onReserved: (orderId: string, lines: rea
   const [saved, setSaved] = useState<ReadonlySet<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const [unknown, setUnknown] = useState(false);
+  const [matchedPriority, setMatchedPriority] = useState(priority);
   // `no_line_needs_it` is relative to one Sales Order, not a physical
   // stock restriction. Another order may legitimately need the same Unit.
   const candidates = (rows: Array<{ stock: ReadyStockResponse }>) => rows.flatMap(row =>
@@ -32,10 +34,10 @@ export function useWholeRoundReadyStock(onReserved: (orderId: string, lines: rea
       requestedDeliveryDate: order.requestedDeliveryDate, proceededAt: order.proceededAt,
     })));
     return matchSoBatchReadyStock(demands, units, location.startsWith("warehouse:")
-      ? { warehouseId: location.slice(10) } : { siteName: location.slice(5) })
+      ? { warehouseId: location.slice(10), priority: matchedPriority } : { siteName: location.slice(5), priority: matchedPriority })
       .map(offer => ({ ...offer, units: offer.units.filter(unit => !saved.has(unit.itemId)) }))
       .filter(offer => offer.units.length > 0);
-  }, [snapshot, units, location, saved]);
+  }, [snapshot, units, location, saved, matchedPriority]);
 
   async function match(orders: readonly SoBatchOrderRow[]) {
     if (lock.current) return;
@@ -59,8 +61,8 @@ export function useWholeRoundReadyStock(onReserved: (orderId: string, lines: rea
         orderId: order.orderId, orderLineId: line.orderLineId, remainingQty: line.remainingQty,
         requestedDeliveryDate: order.requestedDeliveryDate, proceededAt: order.proceededAt,
       }))), candidates(rows), defaultLocation.startsWith("warehouse:")
-        ? { warehouseId: defaultLocation.slice(10) } : { siteName: defaultLocation.slice(5) });
-      setLocation(defaultLocation); setSnapshot(rows);
+        ? { warehouseId: defaultLocation.slice(10), priority } : { siteName: defaultLocation.slice(5), priority });
+      setMatchedPriority(priority); setLocation(defaultLocation); setSnapshot(rows);
     } catch { setError(W.readyStockFailed); }
     finally { lock.current = false; setBusy(false); }
   }

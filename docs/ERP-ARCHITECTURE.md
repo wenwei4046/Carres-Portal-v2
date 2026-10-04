@@ -14,6 +14,13 @@
 
 ---
 
+**SYSTEM-WIDE DOCUMENT NUMBER DISPLAY — Jess 2026-10-04, APPROVED TARGET / NOT BUILT.**
+All Carres date-bearing document numbers display a two-digit year, across modules and surfaces.
+This is not PO-only. COPY-STANDARD's “System-wide document number display” owns the exact contract:
+recognised year segment only; existing identity/history preserved; no borrowed PO version suffix,
+no changes to supplier-owned references or Unit IDs. Every module reads the same identity and
+presentation rule. Allocation and production adoption remain separately evidenced.
+
 # §0 · Why this document exists — the lesson in one page
 
 Nine engineering-debt items were found by reading Orders V1 end to end and measuring
@@ -80,6 +87,20 @@ identities and write no completion. Module filter rails do not copy those action
 `WORK TO DO` panel; SO Batch Purchase is the ruled example. The complete contract is
 [`purchasing/MASTER.md` §2.3 and §7](purchasing/MASTER.md) and its approved design record.
 
+**WAREHOUSE-CONFIRMED RECEIVING — OWNER-APPROVED TARGET / NOT BUILT, Jess 2026-10-04.**
+The authorised, individually identified Warehouse operator confirms the actual receipt at its
+permitted Site/source. Receiving validates source, identities, quantities, condition and required
+evidence, posts once and automatically creates the GRN; Stock projects the accepted consequences
+with its existing holds, reservations and eligibility rules. Operation retains direct receiving
+and handles differences; normal Warehouse receipts need no second Operation approval. Operation
+also checks missing arrivals and owns all supplier communication and follow-up. Warehouse only
+performs physical receipt/checks and reports evidence/differences; it never chases suppliers.
+Inbound/Calendar placement does not transfer that responsibility. Invalid
+scope remains an unposted report; supplier declarations alone never create stock. Warehouse gets
+no direct Inventory writer, amendment/void, adjustment approval or Finance authority. The complete
+receipt contract is Purchasing §7.3, mirrored by Stock §7. Approval is business target truth, not
+proof of implementation or permission for external NETS cutover.
+
 ---
 
 **SHOWROOM DOCUMENT PURPOSE — APPROVED TARGET / NOT BUILT, Jess 2026-09-29.**
@@ -141,7 +162,9 @@ authoritative business rule and current roster:
 ```
 missing customer commitment       → responsible salesperson
 issue PO / confirm supplier date  → current PO Duty
-receive goods                     → current GRN Duty
+confirm physical warehouse receipt → authorised Warehouse individual (2026-10-04 target)
+receipt exceptions / direct receipt → GRN Duty ownership / authorised Operation capability
+missing arrival / supplier chasing → current PO Duty (Operation)
 order/customer/delivery follow-up → Work assignment, initially Sales Order PIC
 collect customer balance          → Work assignment, initially Sales Order PIC
 ```

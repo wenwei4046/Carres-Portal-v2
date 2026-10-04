@@ -17,19 +17,29 @@ function stock(reserved = false): ReadyStockResponse {
       qty: 1, dateIn: "2026-09-01", matchingLineIds: [LINE], blocked: null, reservedForLineId: reserved ? LINE : null }] };
 }
 const changed = vi.fn();
-function Harness({ orders = [order], visible = ["o1"] }: { orders?: SoBatchOrderRow[]; visible?: string[] }) {
-  const model = useWholeRoundReadyStock(changed);
+function Harness({ orders = [order], visible = ["o1"], priority }: { orders?: SoBatchOrderRow[]; visible?: string[]; priority?: "customer_delivery" | "proceed_date" }) {
+  const model = useWholeRoundReadyStock(changed, priority);
   return <><button onClick={() => void model.match(orders)}>Match</button>
     <button onClick={() => model.toggle(model.offers.flatMap(offer => offer.units.map(unit => unit.itemId)), true)}>Choose</button>
     <button onClick={() => void model.proceed(new Set(visible))}>Proceed</button>
     <output data-testid="state">{JSON.stringify({ active: model.active, count: model.offers.length,
-      chosen: model.chosen.size, unknown: model.unknown, busy: model.busy, error: model.error })}</output></>;
+      orderIds: model.offers.map(offer => offer.orderId), chosen: model.chosen.size, unknown: model.unknown, busy: model.busy, error: model.error })}</output></>;
 }
-function draw(orders?: SoBatchOrderRow[], visible?: string[]) {
-  render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><Harness orders={orders} visible={visible} /></QueryClientProvider>);
+function draw(orders?: SoBatchOrderRow[], visible?: string[], priority?: "customer_delivery" | "proceed_date") {
+  render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><Harness orders={orders} visible={visible} priority={priority} /></QueryClientProvider>);
 }
 const state = () => JSON.parse(screen.getByTestId("state").textContent!);
 beforeEach(() => { api.mockReset(); changed.mockClear(); });
+it("uses the persisted Proceed Date priority for scarce stock instead of the earlier customer date", async () => {
+  const second = stock(); second.orderId = "o2";
+  second.lines[0]!.orderLineId = "44444444-4444-4444-8444-444444444444";
+  second.units[0]!.matchingLineIds = [second.lines[0]!.orderLineId];
+  api.mockImplementation(async path => path.includes("/o2/") ? second : stock());
+  draw([order, { ...order, orderId: "o2", proceededAt: "2026-09-02", requestedDeliveryDate: "2026-10-05" }], ["o1", "o2"], "proceed_date");
+  await choose();
+  expect(state().orderIds).toEqual(["o1"]);
+  expect(api.mock.calls.every(([, options]) => options?.method !== "POST")).toBe(true);
+});
 async function choose() {
   fireEvent.click(screen.getByText("Match"));
   await waitFor(() => expect(state().active).toBe(true));

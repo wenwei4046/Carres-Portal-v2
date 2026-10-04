@@ -5668,6 +5668,7 @@ function usePurchasingSettingsMutation<TInput>(path: string) {
       }),
     onSuccess: (data) => {
       qc.setQueryData(qk.operation.purchasingSettings(), data);
+      if (path === "/ready-stock-priority") void qc.invalidateQueries({ queryKey: ["so-batch-purchase"] });
       if (path === "/supplier-channel") {
         void qc.invalidateQueries({ queryKey: qk.operation.suppliers() });
         void qc.invalidateQueries({ queryKey: qk.operation.work() });
@@ -5683,6 +5684,9 @@ export function useSetPurchasingNumber() {
 }
 export function useSetPurchasingPoDays() {
   return usePurchasingSettingsMutation<PurchasingSetPoDaysInput>("/po-days");
+}
+export function useSetReadyStockPriority() {
+  return usePurchasingSettingsMutation<{ priority: "customer_delivery" | "proceed_date" }>("/ready-stock-priority");
 }
 /** 0585 · `First PO window` · `Second PO window` + its switch (MASTER §5.6.1). */
 export function useSetPurchasingPoWindows() {
