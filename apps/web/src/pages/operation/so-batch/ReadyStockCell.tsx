@@ -18,6 +18,7 @@ import {
   type ReadyStockUnit,
 } from "@carres/shared";
 import Button from "@/components/kit/Button";
+import Select from "@/components/kit/Select";
 import { ApiError, apiFetch } from "@/lib/api";
 import { toast } from "sonner";
 import ReadyStockTable, { type ReadyStockTableRow } from "../components/ReadyStockTable";
@@ -532,6 +533,16 @@ function SoBatchStockDetail({
   showCancel: boolean;
   act: ActResult | undefined;
 }) {
+  const locationKey = (row: ReadyStockUnit) => row.warehouseId ?? row.siteName ?? "not-recorded";
+  const locations = [...new Map(rows.map(row => [locationKey(row), {
+    value: locationKey(row), label: row.siteName ?? GOODS_ABSENCE_WORDS.notRecorded,
+  }])).values()];
+  const [location, setLocation] = useState(() =>
+    rows.find(row => row.siteName === "Carres Klang") ? locationKey(rows.find(row => row.siteName === "Carres Klang")!) : "all",
+  );
+  // Location changes are read-only. Keep every chosen Unit visible so a filter
+  // cannot hide a saved reservation or silently remove it from the replacement.
+  const visibleRows = rows.filter(row => location === "all" || locationKey(row) === location || chosen.has(row.itemId));
   return (
     <div className="pb-2" data-testid={`ready-stock-detail-${orderLineId}`}>
       {/* The connector that reaches this frame's TOP BORDER is drawn by
@@ -542,6 +553,16 @@ function SoBatchStockDetail({
           <div className="px-3 py-2 text-meta text-kit-slate-11">{W.readyStockEmpty}</div>
         ) : (
           <>
+            <div className="border-b border-kit-slate-5 px-3 py-2">
+              <Select
+                id={`ready-stock-location-${orderLineId}`}
+                label={W.stockColLocation}
+                value={location}
+                onValueChange={setLocation}
+                disabled={busy}
+                options={[{ value: "all", label: "All" }, ...locations]}
+              />
+            </div>
             <ReadyStockTable
               layout="picker"
               label={
@@ -549,7 +570,7 @@ function SoBatchStockDetail({
                   ? "Ready Stock for this item line"
                   : `Ready Stock for SO-${so}, this item line`
               }
-              rows={rows as ReadyStockTableRow[]}
+              rows={visibleRows as ReadyStockTableRow[]}
               selection={{
                 isChosen: (itemId) => chosen.has(itemId),
                 onToggle,

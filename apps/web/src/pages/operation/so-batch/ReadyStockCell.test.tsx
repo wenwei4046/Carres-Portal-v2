@@ -334,8 +334,23 @@ describe("the stock table", () => {
   it("asks for no item line, because the picker opened under one", async () => {
     draw();
     await openPicker();
-    expect(screen.queryByRole("combobox")).toBeNull();
+    expect(screen.getByRole("combobox", { name: "Stock Location" })).toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: /item line/i })).toBeNull();
     expect(screen.queryByText(/For item line/)).toBeNull();
+  });
+
+  it("defaults to Klang without hiding saved Units from another location or writing", async () => {
+    draw(response({ units: [
+      unit({ itemId: UNIT_A, siteName: "Carres Klang", warehouseId: "klang" }),
+      unit({ itemId: UNIT_CONSIGNED, unitCode: "U1-000-065", siteName: "PJ Showroom", warehouseId: "pj", reservedForLineId: LINE_A }),
+      unit({ itemId: UNIT_COUNTED, unitCode: "U1-000-002", siteName: "PJ Showroom", warehouseId: "pj" }),
+    ] }));
+    await openPicker();
+    expect(screen.getByRole("combobox", { name: "Stock Location" })).toHaveTextContent("Carres Klang");
+    expect(screen.getByTestId(`ready-stock-unit-${UNIT_A}`)).toBeInTheDocument();
+    expect(screen.getByTestId(`ready-stock-unit-${UNIT_CONSIGNED}`)).toBeInTheDocument();
+    expect(screen.queryByTestId(`ready-stock-unit-${UNIT_COUNTED}`)).toBeNull();
+    expect(apiFetch.mock.calls.every(([, options]) => !options || options.method == null || options.method === "GET")).toBe(true);
   });
 
   it("scrolls sideways inside its own box rather than widening the page", async () => {

@@ -248,6 +248,24 @@ describe("the page reads the ONE projection and draws the Register", () => {
 });
 
 describe("the whole journey — tick, arrange, issue, prove it arrived", () => {
+  it("reloads a retained SO's linked PO before opening supplier preparation", async () => {
+    const po = { id: "PO-2041", supplierId: "s-hooka", supplierName: "Hooka", destinationId: KLANG, destination: "Carres Klang" };
+    const read = payload({ registerRows: [orderRow({ status: "ordered", pos: [{
+      poId: po.id, status: "open", supplierId: po.supplierId, supplierName: po.supplierName,
+      destinationId: KLANG, officialDeliveryDate: "2026-09-18",
+      sentCurrentVersion: false,
+    }] })] });
+    apiFetch.mockImplementation(async (path: string) => path.endsWith("/issue-context") ? po
+      : path.includes("print-data") ? officialDocument() : path.endsWith("/sends") ? { sends: [] }
+      : path.endsWith("email-capability") ? { configured: false } : read);
+    renderPage();
+    await screen.findByTestId("so-batch-row-o1");
+    fireEvent.click(screen.getByRole("button", { name: /^Purchase Orders$/ }));
+    await screen.findByTestId("po-supplier-result-panel");
+    expect(apiFetch).toHaveBeenCalledWith("/api/operation/pos/PO-2041/issue-context");
+    await screen.findByRole("button", { name: "Open full page" });
+    expect(apiFetch.mock.calls.some(([path, options]) => String(path).includes("issue-batch") || options?.method === "POST")).toBe(false);
+  });
   it("restores issued PO scope and carries the cutoff when opening its full page", async () => {
     const pos = [{ id: "PO-2041", supplierId: "s-hooka", supplierName: "Hooka", destinationId: KLANG, destination: "Carres Klang" }];
     apiFetch.mockImplementation(async (path: string) => path.includes("print-data") ? officialDocument()

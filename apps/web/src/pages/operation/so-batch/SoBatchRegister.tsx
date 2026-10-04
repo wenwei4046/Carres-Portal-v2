@@ -367,13 +367,14 @@ export interface SoBatchRegisterProps {
   hidden?: boolean;
   /** Hands the arrangement to the issue journey. This page creates nothing. */
   onIssue: (selections: SoBatchSelection[]) => void;
-  onOpenPurchaseOrders?: () => void;
+  onOpenPurchaseOrders?: (poIds: readonly string[]) => void;
+  purchaseOrdersLoading?: boolean;
   /** The PO window Work opened this page on (Purchasing §5.6.1): its name,
    *  and the way back to every window's demand. */
   scope?: { label: string; onClear: () => void; preselectKey?: string };
 }
 
-export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurchaseOrders, initialSearch, hidden = false, scope, roundNavigation }: SoBatchRegisterProps) {
+export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurchaseOrders, purchaseOrdersLoading = false, initialSearch, hidden = false, scope, roundNavigation }: SoBatchRegisterProps) {
   const navigate = useNavigate();
   /* R8 — a `display:none` box forgets its scroll offset, and by the time a
      render hides it the offset already reads 0. So the offset is remembered
@@ -520,6 +521,10 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
     () => orders.filter(order => rail.visibleOrderIds.has(order.orderId) && (!roundNavigation?.selected || orderMatchesTime(order, roundNavigation.selected))).sort(compareOrderBy),
     [orders, rail.visibleOrderIds, compareOrderBy, roundNavigation?.selected, orderMatchesTime],
   );
+  const visibleOrders = useRef(shown);
+  const rememberVisibleOrders = useCallback((rows: SoBatchOrderRow[]) => {
+    visibleOrders.current = rows;
+  }, []);
   const toggleTiming = useCallback((s: PurchaseDemandTimingState) => {
     setFilter((prev) => ({ ...prev, timing: prev.timing === s ? null : s }));
   }, []);
@@ -1452,7 +1457,11 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
             data-testid="so-batch-grid"
           >
             <DataGrid<SoBatchOrderRow>
-              toolbarEnd={onOpenPurchaseOrders ? <Button size="sm" onClick={onOpenPurchaseOrders}>Purchase Orders</Button> : undefined}
+              toolbarEnd={onOpenPurchaseOrders ? <Button size="sm" loading={purchaseOrdersLoading} onClick={() => {
+                const visibleIds = new Set(shown.map(order => order.orderId));
+                onOpenPurchaseOrders([...new Set(visibleOrders.current.filter(order => visibleIds.has(order.orderId))
+                  .flatMap(order => order.pos.map(po => po.poId)))]);
+              }}>Purchase Orders</Button> : undefined}
               appearance="reference"
               wrapToolbar
               palette="slate"
@@ -1462,6 +1471,8 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
               headerTone="paleBlue"
               searchPresentation="responsive"
               rows={shown}
+              facetRows={shown}
+              onFacetRowsChange={rememberVisibleOrders}
               columns={columns}
               storageKey={STORAGE_KEY}
               rowKey={(o) => o.orderId}

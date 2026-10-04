@@ -309,13 +309,14 @@ function data(over: Partial<SoBatchPurchaseResponse> = {}): SoBatchPurchaseRespo
 }
 
 const onIssue = vi.fn();
+const onOpenPurchaseOrders = vi.fn();
 
 function renderRegister(over: Partial<SoBatchPurchaseResponse> = {}, expandHistory = true, isLoading = false) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const rendered = render(
     <QueryClientProvider client={client}>
       <MemoryRouter initialEntries={["/operation?tab=purchase"]}>
-        <SoBatchRegister data={data(over)} isLoading={isLoading} onIssue={onIssue} />
+        <SoBatchRegister data={data(over)} isLoading={isLoading} onIssue={onIssue} onOpenPurchaseOrders={onOpenPurchaseOrders} />
       </MemoryRouter>
     </QueryClientProvider>,
   );
@@ -326,8 +327,18 @@ function renderRegister(over: Partial<SoBatchPurchaseResponse> = {}, expandHisto
 beforeEach(() => {
   navigate.mockClear();
   onIssue.mockClear();
+  onOpenPurchaseOrders.mockClear();
   apiFetch.mockClear();
   localStorage.clear();
+});
+
+it("recovers only visible linked POs for supplier preparation after a fresh mount", async () => {
+  renderRegister({ registerRows: [ORDER_O3, ORDER_O5] });
+  fireEvent.change(screen.getByRole("searchbox"), { target: { value: "ANNE" } });
+  await waitFor(() => expect(screen.queryByTestId("so-batch-row-o5")).toBeNull());
+  fireEvent.click(screen.getByRole("button", { name: /^Purchase Orders$/ }));
+  expect(onOpenPurchaseOrders).toHaveBeenCalledWith(["PO-20260820-4827"]);
+  expect(apiFetch.mock.calls.some(([path]) => String(path).includes("issue-batch"))).toBe(false);
 });
 
 const HERE = dirname(fileURLToPath(import.meta.url));

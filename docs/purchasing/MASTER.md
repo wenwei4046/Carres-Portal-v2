@@ -229,13 +229,23 @@ execution. Missing implementation does not reopen these decisions.
 **MEASURED OPEN TARGETS, 2026-10-04.** Whole-round non-overlapping stock suggestions/location/
 priority/bulk acceptance, SO Batch shared Table/Cards/Page tools presentation, complete source
 Quick View actions still require implementation or direct proof. Formal PO read-only 50/50
-original-information/current-PDF composition is now built locally using existing facts and PDF
+original-information/current-PDF composition is now deployed using existing facts and PDF
 components; 54 PO Register/object tests pass, including the actual shared DataGrid opening a PO,
 read-only opening, separate explicit issue
 work and cancelled-document refusal. Desktop actual-component sample acceptance shows equal facts/PDF panes with the real PDF renderer
 (`/tmp/so-batch-po-readonly-split-preview.png`); the local fixture rejects all writes. At 390px the original facts stack above the PDF and the complete paper fits the pane
 (`/tmp/so-batch-po-readonly-mobile-preview.png`). The shared canvas hook now retains paper aspect
-ratio while fitting the current pane across resize. Production proof remains open. A real-grid facet callback render loop found during
+ratio while fitting the current pane across resize. PR #1880 merged as
+`50c548ae985cf6094d14712d278ff1f0703e85b2`; production run `37201311503` succeeded and
+independent ERP/POS/Worker SHA convergence passed on all five destinations. Authenticated
+production PO `PO-20260902-8370` opens read-only V1 with its actual PDF; at a 1400px viewport
+the two panes each measure 530px. Evidence: `/tmp/so-batch-po-live-desktop-split.png`.
+Browser return retains the original `time=11:00` Batch scope. The authenticated PO Register
+selected-download action produced `/Users/chaichiewlim/Downloads/Purchase-orders.zip` at
+2026-10-04 20:35 MYT: one selected PO, exactly one `PO-20260902-8370-V1.pdf` entry (26,847
+bytes). The browser download-event observation timed out, but the actual filesystem archive
+proves completion. Result-group return, multiple selected live POs and the remaining complete
+workflow still require direct acceptance. A real-grid facet callback render loop found during
 this walk was corrected by retaining unchanged membership, with a real-grid integration regression. Existing individual stock reservation, guarded issue and current-version evidence
 are reusable authorities, not permission to infer whole-round or shared-panel completion.
 
@@ -258,7 +268,18 @@ source lines. API/UI integration and authenticated production acceptance remain 
 counted again in independent stock coverage. 34 route tests include linked-PO overlap and
 fail-closed canonical-read errors. The individual picker also excludes supplier-owned goods from
 available customer-sale quantity and choice while retaining readable ownership facts and existing
-saved-choice removal; 43 picker tests pass. These are local build facts, not production proof.
+saved-choice removal. The individual picker now selects Stock Location, defaults to Carres Klang
+when present and keeps chosen/saved Units from other locations visible; location changes write
+nothing. 44 picker tests pass, including a saved Unit outside the default location. These stock
+changes are local build facts, not production proof.
+
+Authenticated production acceptance also found that the Batch Purchase Orders toolbar opened
+an empty result panel after a fresh mount because it relied only on browser-held issue results.
+The local correction loads the exact deduplicated PO lineage of visible Register rows through
+the existing permission-bound issue-context reads, including retained completed rows. Shared
+DataGrid search and column filters determine membership; no broader supplier pool is substituted.
+All reads must succeed with matching PO identities before the panel opens. A failed read refuses
+preparation rather than presenting an empty PO answer. Direct production acceptance remains open.
 
 ### SO Batch PO Status — owner-approved 2026-10-04
 
