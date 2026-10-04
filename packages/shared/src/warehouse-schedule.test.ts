@@ -1010,7 +1010,7 @@ describe("Warehouse Calendar arrival evidence", () => {
 
   it("does not invent an actual arrival from a draft, void, posting date or absent quantities", () => {
     const row = { id: "r", po_id: "PO", status: "posted", posted_at: "2026-09-22T00:00:00Z" };
-    const result = warehouseCalendarArrivals([], [row, { ...row, id: "draft", status: "draft", goods_received_at: "2026-09-21" }, { ...row, id: "voided", status: "voided", goods_received_at: "2026-09-21" }, { ...row, id: "known-date", goods_received_at: "2026-09-21" }], []);
+    const result = warehouseCalendarArrivals([], [row, { ...row, id: "draft", status: "draft", goods_received_at: "2026-09-21" }, { ...row, id: "voided", status: "voided", goods_received_at: "2026-09-21" }, { ...row, id: "known-date", goods_received_at: "2026-09-21", lines: [] }], []);
     expect(result.undatedReceipts).toBe(1);
     expect(result.events).toHaveLength(1);
     expect(result.events[0]).toMatchObject({ id: "receipt:known-date", siteId: null, physicalQty: null, extraQty: null });

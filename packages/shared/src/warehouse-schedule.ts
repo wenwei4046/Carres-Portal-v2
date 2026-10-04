@@ -737,7 +737,8 @@ export function warehouseCalendarArrivals(
     seen.add(`receipt:${receipt.id}`);
     // GRN creation time is not the date the goods physically arrived.
     if (!receipt.goods_received_at) { undatedReceipts += 1; continue; }
-    const totals = Array.isArray(receipt.lines) ? warehouseReceiptTotals(receipt.lines) : null;
+    const totals = Array.isArray(receipt.lines) && receipt.lines.length > 0
+      ? warehouseReceiptTotals(receipt.lines) : null;
     const extraQty = receipt.extra_lines == null ? null : receivingExtraQty(receipt.extra_lines);
     // A report recording no physical goods is not an actual arrival event.
     if (totals && totals.received + totals.issue === 0 && extraQty === 0) continue;
