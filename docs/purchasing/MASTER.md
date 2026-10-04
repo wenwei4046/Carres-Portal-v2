@@ -121,6 +121,16 @@ successful results, so retry cannot silently resend every document. Use governed
 ownership, permissions and actual supplier contact authority; this approval commissions target
 truth, not a live external email, supplier-settings write or production transmission.
 
+**REFERENCE FINDING — Houzs live PO, read-only check 2026-10-04.** The owner identified
+`https://erp.houzscentury.com/scm/purchase-orders/068c294e-1b44-400c-9338-2a5223912d63`
+(HC-PO-2610-059). The current page exposes Send to supplier; opening it on this supplier produced
+“No supplier email” and instructed staff to add email to the supplier record. This establishes a
+live supplier-email sending entry with contact validation, contradicting an earlier overly broad
+conclusion from another page/older source that Houzs has no such entry. It does not establish
+attachment shape, automatic dispatch, delivery evidence, batch support or Carres implementation.
+No email/contact was changed and no supplier message was sent. Reuse research must inspect the
+actual current implementation behind this entry before declaring COPY REQUIRED or READY.
+
 ### Manual Purchase — when needed
 
 Showroom's complete arrangement stays in Display Request. Only the Carres-buying portion enters
