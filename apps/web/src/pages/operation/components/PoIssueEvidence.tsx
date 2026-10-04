@@ -180,6 +180,7 @@ export default function PoIssueEvidence({
   layout = "panel",
   documentNo,
   onCancel,
+  hidePreparationTools = false,
 }: {
   po: IssuedPo;
   /** The version of the document rendered beside this form. */
@@ -204,6 +205,8 @@ export default function PoIssueEvidence({
   /** The ruled document number (`PO260903-4316`), for the card's PO fact. */
   documentNo?: string;
   onCancel?: () => void;
+  /** A supplier bundle owns the one channel-preparation area; keep individual PDF and evidence. */
+  hidePreparationTools?: boolean;
 }) {
   /* The supplier's RECORDED channel is the default — the Work send line says
      `Click Email, send …` for an email-only supplier, so the form must not
@@ -425,6 +428,7 @@ export default function PoIssueEvidence({
           Every door out of the Portal for this document lives here. They OPEN
           things; they record nothing and they complete nothing. */}
       <div className="mt-3 flex flex-wrap items-center gap-2">
+        {!hidePreparationTools && <>
         {wa ? (
           <a
             data-testid="po-open-whatsapp"
@@ -467,6 +471,7 @@ export default function PoIssueEvidence({
             Copy message
           </button>
         ) : null}
+        </>}
         {/* ⭐ A REAL PDF, NOT THE PAYLOAD BEHIND IT (closure §6). This link used
             to point at `/print-data`, so `Download PDF` handed the operator —
             and any supplier they forwarded it to — a JSON response. The same

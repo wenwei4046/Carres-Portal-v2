@@ -138,6 +138,7 @@ export default function OperationToOrder() {
     <>
       {issuing && (
         <SoBatchIssueWorkspace
+          supplierBundle
           documents={documents}
           destinations={data.destinations}
           onBack={backToBuying}

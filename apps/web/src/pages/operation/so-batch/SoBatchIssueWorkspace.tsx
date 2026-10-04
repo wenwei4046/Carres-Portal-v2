@@ -1,4 +1,5 @@
 import layoutStyles from "./SoBatchRegister.module.css";
+import PoSupplierBundle from "./PoSupplierBundle";
 // design-standard: not-a-list-page — this is the 50/50 ISSUE surface
 // (CARD-2026-08-22-purchasing-02 §5), not a Register. Its table is the lines of
 // ONE purchase order being checked before it is sent, sitting beside that
@@ -68,6 +69,7 @@ export interface SoBatchIssueWorkspaceProps {
   onIssue?: () => Promise<{ pos: IssuedPo[] }>;
   /** The way back to the list this journey started from. Absent: SO Batch's. */
   backLabel?: string;
+  supplierBundle?: boolean;
 }
 
 type Mode = "review" | "evidence";
@@ -79,6 +81,7 @@ export default function SoBatchIssueWorkspace({
   onDone,
   onIssue,
   backLabel,
+  supplierBundle = false,
 }: SoBatchIssueWorkspaceProps) {
   const [at, setAt] = useState(0);
   const [mode, setMode] = useState<Mode>("review");
@@ -348,7 +351,7 @@ export default function SoBatchIssueWorkspace({
       void loadEvidence(poId);
       setConfirmed((prev) => {
         const next = new Set(prev).add(poId);
-        if (next.size >= pos.length && pos.length > 0) onDone();
+        if (next.size >= pos.length && pos.length > 0) { if (!supplierBundle) onDone(); }
         else {
           /* Move to the next document the supplier has not received. */
           const nextIdx = pos.findIndex((p) => !next.has(p.id));
@@ -357,7 +360,7 @@ export default function SoBatchIssueWorkspace({
         return next;
       });
     },
-    [pos, onDone, loadEvidence],
+    [pos, onDone, loadEvidence, supplierBundle],
   );
 
   const total = mode === "evidence" ? pos.length : documents.length;
@@ -578,12 +581,17 @@ export default function SoBatchIssueWorkspace({
             </>
           ) : currentPo ? (
             <>
+              {supplierBundle && <PoSupplierBundle pos={pos} onPreview={id => {
+                const index = pos.findIndex(po => po.id === id);
+                if (index >= 0) setAt(index);
+              }} />}
               {/* The form appears only once the official document has rendered:
                  until then there is no version to declare, and a confirmation
                  without one is the defect 0378 closes. */}
               {pdfVersion != null && pdfUrl != null && paintedUrl === pdfUrl ? (
                 <PoIssueEvidence
                   po={currentPo}
+                  hidePreparationTools={supplierBundle}
                   version={pdfVersion}
                   /* PERSISTED rows, never this tab's memory (closure §8). */
                   evidence={evidence[currentPo.id] ?? []}

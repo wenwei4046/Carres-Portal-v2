@@ -54,3 +54,16 @@ export async function preparePoBundle(
 export function poBundleDocumentList(documents: readonly PreparedPoDocument[]): string {
   return documents.map(po => `${po.number} · V${po.version}`).join("\n");
 }
+
+/** ZIP keeps each PO as an independent PDF, using the existing workbook ZIP library. */
+export async function zipPoBundle(documents: readonly PreparedPoDocument[]): Promise<Blob> {
+  if (!documents.length) throw new PoBundleError("empty_selection");
+  if (new Set(documents.map(po => po.filename)).size !== documents.length) throw new PoBundleError("duplicate_po");
+  const { CFB } = await import("xlsx");
+  const archive = CFB.utils.cfb_new();
+  for (const document of documents) {
+    CFB.utils.cfb_add(archive, document.filename, new Uint8Array(await document.pdf.arrayBuffer()));
+  }
+  const bytes = CFB.write(archive, { type: "array", fileType: "zip" });
+  return new Blob([new Uint8Array(bytes)], { type: "application/zip" });
+}
