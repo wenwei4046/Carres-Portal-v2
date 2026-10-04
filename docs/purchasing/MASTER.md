@@ -724,7 +724,18 @@ skip is not acceptance. Existing 0601 baseline was 13/13 before the candidate an
 its legacy Warehouse-count/Operation-check-in case still uses the old contract and does not prove
 the new flow. Existing Operation direct receipt/amendment checks continue to pass.
 
-Still required before an exact SQL review/release: non-PO source convergence; remaining quantity/issue/extra and authority boundaries; API/shared contracts,
+**Confirmation transport — BUILT ON BRANCH / NOT DEPLOYED, 2026-10-05.**
+The bounded shared confirmation schema and `/api/warehouse/receipts/confirm` preserve absent/null
+physical counts and dates instead of manufacturing zero or now. The caller supplies the save key;
+a correction supplies the same receipt and revision together. The route forwards the user's JWT
+and calls only `warehouse_confirm_receipt`; a missing function or failed call cannot silently fall
+back to the old Operation-review queue. It returns the engine's posted result or preserved-report
+blockers, and refuses an empty success result. Thirty Warehouse route tests pass, including unknown
+facts, correction identity, role refusal, authority injection, bounded lines and no fallback.
+API and Shared typechecks pass. This transport is not connected to the Warehouse form yet and must
+not deploy ahead of its reviewed database engine. No live final-confirmation claim is made.
+
+Still required before an exact SQL review/release: non-PO source convergence; remaining quantity/issue/extra and authority boundaries; complete source contracts and
 Warehouse form and report history, Operation blocked-report/Work readers; exact reviewed SQL
 approval followed by the governed production probe/apply and delivery proof. The draft exists only
 in chat and the isolated local database, not in `supabase/migrations/`. The historical replay had

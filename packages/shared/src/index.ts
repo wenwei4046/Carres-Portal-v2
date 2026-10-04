@@ -1261,6 +1261,10 @@ export {
 } from "./receiving-register";
 export {
   warehouseSubmitReceiptInput,
+  warehouseConfirmReceiptInput,
+  warehouseConfirmationReportInput,
+  type WarehouseConfirmReceiptInput,
+  type WarehouseConfirmationReportInput,
   warehouseReceiptReturnInput,
   type WarehouseSubmitReceiptInput,
   type WarehouseReceiptReturnInput,

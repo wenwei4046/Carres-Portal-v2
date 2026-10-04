@@ -1,33 +1,18 @@
 import { Hono } from "hono";
-import { claimPhotoWire, warehouseSubmitReceiptInput } from "@carres/shared";
+import { claimPhotoWire, warehouseSubmitReceiptInput, warehouseConfirmReceiptInput } from "@carres/shared";
+import { warehouseConfirmationReportToWire } from "@carres/shared/adapters";
 import { requireWarehouse } from "../../lib/auth-guards";
 import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 import { rpcWithArrivalTime } from "../../lib/receiving-time";
 
-/**
- * /api/warehouse — R6 of the receiving & claim queue
- * (docs/receiving-claim-execution-queue.md, Jess 2026-07-27).
- *
- * The third-party warehouse's whole surface. Three routes, and that is the
- * point: what a warehouse login sees is POs coming to THEIR warehouse, the R1
- * receive form, and what became of what they filed. Prices, stock adjustments,
- * settings, deletes and every other warehouse are not filtered out of a view
- * they can reach — there is no view they can reach.
- *
- *   GET  /incoming  → open POs bound for this warehouse, with R1's four numbers
- *   GET  /receipts  → what this warehouse filed, and what became of it
- *   POST /receipts  → file a count (goods do NOT move; ops check-in does that)
- *
- * Every route is a SECURITY DEFINER RPC gated on `app_role() = 'warehouse'` and
- * scoped by `app_warehouse_id()` (0302). Not one table policy names the role,
- * so this router cannot be walked around by talking to PostgREST directly — the
- * migration asserts that, and it is the strongest form of the card's "what it
- * can NEVER do".
- *
- * Per-route guards, never a blanket `use("*", ...)` — the Phase 4.5 Chunk 2
- * route-mount middleware leak.
+/** Warehouse-owned incoming sources, physical reports and final confirmation.
+ * The legacy count route remains available during the governed database rollout.
+ * The new final-confirmation route requires its matching SQL engine and never
+ * falls back to the legacy queue. Every route forwards the user's JWT; SQL owns
+ * active individual, source, actual Site, evidence and posting authority.
+ * Per-route guards avoid leaking middleware onto sibling routers.
  */
 const warehouseReceivingRouter = new Hono<AppEnv>();
 
@@ -110,6 +95,28 @@ warehouseReceivingRouter.post("/receipts", requireWarehouse, async (c) => {
     return c.json(m.body, m.status);
   }
   return c.json(data ?? {}, 201);
+});
+
+/** One final-confirmation RPC owns validation, preserved blockers and posting.
+ * Never fall back to the legacy queue after a timeout or missing function: that
+ * would silently change the promise made by the final confirmation control. */
+warehouseReceivingRouter.post("/receipts/confirm", requireWarehouse, async (c) => {
+  const parsed = await parseJsonBody(c, warehouseConfirmReceiptInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const body = parsed.data;
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("warehouse_confirm_receipt", {
+    p_report: warehouseConfirmationReportToWire(body.report),
+    p_save_key: body.saveKey,
+    p_receipt_id: body.receiptId ?? null,
+    p_revision: body.revision ?? null,
+  });
+  if (error) {
+    const mapped = mapPgError(error);
+    return c.json(mapped.body, mapped.status);
+  }
+  if (!data) return c.json({ error: "Receipt confirmation returned no result" }, 502);
+  return c.json(data, 200);
 });
 
 export default warehouseReceivingRouter;

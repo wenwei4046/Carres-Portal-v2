@@ -16,8 +16,8 @@ import { userClient } from "../../lib/supabase";
 /**
  * R6 — /api/warehouse/* (the third external portal).
  *
- * What these tests are really about: the warehouse's surface is THREE RPCs and
- * nothing else, and a login that is not a scoped warehouse never reaches them.
+ * Warehouse routes use their scoped RPCs; other roles never reach the writers.
+ * Confirmation transport tests do not substitute for real database authority tests.
  */
 
 const env = {
@@ -397,5 +397,80 @@ describe("POST /api/warehouse/receipts", () => {
     );
     expect(res.status).toBeGreaterThanOrEqual(400);
     expect(JSON.stringify(await res.json())).toContain("already waiting");
+  });
+});
+
+const confirmationKey = "11111111-1111-4111-8111-111111111190";
+describe("POST /api/warehouse/receipts/confirm", () => {
+  it("preserves incomplete evidence and returns the engine's blockers without guessing zero or today", async () => {
+    const blocked = { id: LINE, status: "draft", grn_no: null, revision: 0, blockers: [{ code: "receipt_quantity_unknown" }] };
+    const sb = makeSb({ data: blocked });
+    vi.mocked(userClient).mockReturnValue(sb as unknown as ReturnType<typeof userClient>);
+    const res = await req("/api/warehouse/receipts/confirm", "POST", await warehouseJwt(), {
+      saveKey: confirmationKey,
+      report: { poId: null, doNumber: "", lines: [{ id: LINE, receivedNow: 1, damagedQty: null }] },
+    });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual(blocked);
+    expect(sb.rpc).toHaveBeenCalledTimes(1);
+    expect(sb.rpc.mock.calls[0]![0]).toBe("warehouse_confirm_receipt");
+    // Check the actual serialised transport, where absent keys stay absent.
+    const args = JSON.parse(JSON.stringify(sb.rpc.mock.calls[0]![1]));
+    expect(args).toEqual({
+      p_save_key: confirmationKey, p_receipt_id: null, p_revision: null,
+      p_report: { po_id: null, do_number: "", lines: [{ id: LINE, received_now: 1, damaged_qty: null }] },
+    });
+  });
+
+  it("passes caller identity for retries and exact revision for a correction", async () => {
+    const sb = makeSb({ data: { id: LINE, status: "posted", grn_no: "GRN-261005-0001", revision: 2, blockers: [] } });
+    vi.mocked(userClient).mockReturnValue(sb as unknown as ReturnType<typeof userClient>);
+    const res = await req("/api/warehouse/receipts/confirm", "POST", await warehouseJwt(), {
+      saveKey: confirmationKey, receiptId: LINE, revision: 1,
+      report: { ...validBody, actualSiteId: WH, goodsReceivedTime: "2026-10-04T09:00:00+08:00" },
+    });
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("warehouse_confirm_receipt", expect.objectContaining({
+      p_save_key: confirmationKey, p_receipt_id: LINE, p_revision: 1,
+      p_report: expect.objectContaining({ actual_site_id: WH, goods_received_time: "2026-10-04T09:00:00+08:00" }),
+    }));
+  });
+
+  it.each([
+    { report: {} },
+    { saveKey: confirmationKey, receiptId: LINE, report: {} },
+    { saveKey: confirmationKey, revision: 0, report: {} },
+    { saveKey: confirmationKey, report: { postedBy: LINE } },
+    { saveKey: confirmationKey, report: { lines: Array.from({ length: 501 }, () => ({ id: LINE })) } },
+  ])("rejects malformed or authority-injecting input before any RPC", async (body) => {
+    const sb = makeSb();
+    vi.mocked(userClient).mockReturnValue(sb as unknown as ReturnType<typeof userClient>);
+    const res = await req("/api/warehouse/receipts/confirm", "POST", await warehouseJwt(), body);
+    expect(res.status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
+
+  it.each(["operation", "principal", "supplier", "dealer"])("refuses %s at the final-confirmation door", async (role) => {
+    const sb = makeSb();
+    vi.mocked(userClient).mockReturnValue(sb as unknown as ReturnType<typeof userClient>);
+    const res = await req("/api/warehouse/receipts/confirm", "POST", await makeJwt(role), { saveKey: confirmationKey, report: {} });
+    expect(res.status).toBe(403);
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
+
+  it("does not fall back to queued receiving when the final-confirmation RPC is unavailable", async () => {
+    const sb = makeSb({ error: { code: "PGRST202", message: "Could not find warehouse_confirm_receipt" } });
+    vi.mocked(userClient).mockReturnValue(sb as unknown as ReturnType<typeof userClient>);
+    const res = await req("/api/warehouse/receipts/confirm", "POST", await warehouseJwt(), { saveKey: confirmationKey, report: {} });
+    expect(res.status).toBeGreaterThanOrEqual(400);
+    expect(sb.rpc).toHaveBeenCalledTimes(1);
+    expect(sb.rpc.mock.calls[0]![0]).toBe("warehouse_confirm_receipt");
+  });
+
+  it("does not claim success when the engine returns no receipt", async () => {
+    const sb = makeSb();
+    vi.mocked(userClient).mockReturnValue(sb as unknown as ReturnType<typeof userClient>);
+    const res = await req("/api/warehouse/receipts/confirm", "POST", await warehouseJwt(), { saveKey: confirmationKey, report: {} });
+    expect(res.status).toBe(502);
   });
 });

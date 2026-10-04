@@ -1063,3 +1063,25 @@ export const rentalUnitEventFromRow = (r: DB.RentalUnitEventRow): D.RentalUnitEv
   actor: r.actor,
   occurredAt: r.occurred_at,
 });
+
+
+/** Receipt evidence preserves absent/null counts; neither means counted zero. */
+export function warehouseConfirmationReportToWire(r: import("./schemas/warehouse").WarehouseConfirmationReportInput) {
+  const photo = (p: string | { path: string; unitCode: string }) =>
+    typeof p === "string" ? p : { path: p.path, unit_code: p.unitCode };
+  return {
+    po_id: r.poId, actual_site_id: r.actualSiteId,
+    do_number: r.doNumber, do_file_path: r.doFilePath, note: r.note,
+    goods_received_time: r.goodsReceivedTime, goods_received_at: r.goodsReceivedAt,
+    arrival_evidence: r.arrivalEvidence, extra_lines: r.extraLines,
+    lines: r.lines?.map((line) => ({
+      id: line.id, received_now: line.receivedNow, damaged_qty: line.damagedQty,
+      wrong_item_qty: line.wrongItemQty, wrong_item_claim_type: line.wrongItemClaimType,
+      damaged_photos: line.damagedPhotos?.map(photo),
+      wrong_item_photos: line.wrongItemPhotos?.map(photo),
+      units: line.units?.map((unit) => ({
+        unit_code: unit.unitCode, outcome: unit.outcome, issue_kind: unit.issueKind, note: unit.note,
+      })),
+    })),
+  };
+}

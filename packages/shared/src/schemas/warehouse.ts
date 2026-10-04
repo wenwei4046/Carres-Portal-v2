@@ -108,3 +108,32 @@ export const warehouseReceiptReturnInput = z
 export type WarehouseReceiptReturnInput = z.infer<
   typeof warehouseReceiptReturnInput
 >;
+
+/** Final physical report. Missing business facts must reach the receipt engine
+ * unchanged so it can retain the report with blockers. Shape/size validation is
+ * still enforced here; actor, Site, source and posting authority remain in SQL. */
+export const warehouseConfirmationReportInput = warehouseSubmitReceiptInput.partial().extend({
+  poId: z.string().max(100).nullish(),
+  actualSiteId: z.string().uuid().nullish(),
+  doNumber: z.string().max(64).nullish(),
+  doFilePath: z.string().max(500).nullish(),
+  goodsReceivedTime: z.string().datetime({ offset: true }).nullish(),
+  goodsReceivedAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullish(),
+  lines: z.array(warehouseSubmitReceiptInput.shape.lines.element.extend({
+    id: z.string().max(100).nullish(),
+    receivedNow: z.number().int().nonnegative().nullish(),
+    damagedQty: z.number().int().nonnegative().nullish(),
+    wrongItemQty: z.number().int().nonnegative().nullish(),
+  }).strict()).max(500).optional(),
+}).strict();
+
+export const warehouseConfirmReceiptInput = z.object({
+  saveKey: z.string().uuid(),
+  receiptId: z.string().uuid().optional(),
+  revision: z.number().int().nonnegative().optional(),
+  report: warehouseConfirmationReportInput,
+}).strict().refine((value) => (value.receiptId === undefined) === (value.revision === undefined), {
+  message: "Receipt and revision must be supplied together",
+});
+export type WarehouseConfirmationReportInput = z.infer<typeof warehouseConfirmationReportInput>;
+export type WarehouseConfirmReceiptInput = z.infer<typeof warehouseConfirmReceiptInput>;
