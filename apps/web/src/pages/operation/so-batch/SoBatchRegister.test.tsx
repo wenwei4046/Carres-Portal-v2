@@ -341,7 +341,7 @@ it("matches through actual Listing controls and ticking exposes Proceed without 
   await waitFor(() => expect(screen.getByRole("combobox", { name: "Stock Location" })).toHaveTextContent("Carres Klang"));
   expect(screen.getByText("1 available")).toBeInTheDocument();
   fireEvent.click(screen.getByTestId("so-batch-stock-select-o1"));
-  expect(screen.getByRole("button", { name: "Proceed", exact: true })).toBeEnabled();
+  expect(screen.getByRole("button", { name: "Proceed" })).toBeEnabled();
   expect(apiFetch.mock.calls.every(([, options]) => (options as { method?: string } | undefined)?.method !== "POST")).toBe(true);
 });
 
