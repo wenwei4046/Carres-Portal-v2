@@ -152,5 +152,6 @@ The same card/Drawer accepts a supplier/source name and GRN reference, without c
 address fields. `modulesLabel` supplies domain-specific accessible navigation; optional module
 `detailsLabel` supplies the owning object's disclosure name. Defaults remain unchanged for Sales
 Orders. `referenceStatus` places an exceptional document state below its reference using existing
-header tokens (`Cancelled` for a voided GRN); normal receipts omit it. Receipt quantities and
+header tokens (`Cancelled` for a voided GRN); normal receipts omit it. When address and target
+are both absent, their empty header slots collapse; Sales Order geometry is unchanged. Receipt quantities and
 evidence come from Receiving; the existing full-page object owns PDF, amendment and void actions.

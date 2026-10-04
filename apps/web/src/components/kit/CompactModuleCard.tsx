@@ -274,7 +274,7 @@ export default function CompactModuleCard(p: CompactModuleCardProps) {
   return (
     <div className={s.cq}>
       <section className={s.panel}>
-        <header className={s.header}>
+        <header className={s.header} data-layout={!p.address && !p.target ? "identity" : undefined}>
           <div className={s.identity}>
             <div className={s.identityTitle}><strong>{p.name}</strong></div>
             <small className={s.contactLine}><>{p.document ? <button ref={documentEntry} type="button" className={s.documentNumber} title={p.document.label} aria-label={p.document.label} aria-expanded={documentOpen} aria-controls={`${ids}-document`} onClick={() => setDocumentOpen((v) => !v)}>{p.reference}</button> : <span>{p.reference}</span>}</>{p.phone ? <span className={s.phonePair}><Glyph name="phone" />{p.phone}</span> : null}</small>

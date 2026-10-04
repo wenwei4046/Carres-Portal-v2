@@ -182,6 +182,8 @@
 .header .identity, .header .addressBox, .header .target { @apply border-kit-slate-11; }
 .header .contactLine { @apply text-kit-slate-4; }
 .referenceStatus { grid-column: 1; grid-row: 3; @apply text-label text-kit-slate-4; }
+.header[data-layout="identity"] { grid-template-columns: minmax(0, 1fr) auto; }
+.header[data-layout="identity"] .addressBox, .header[data-layout="identity"] .target { display: none; }
 .header .badge { @apply text-label text-white; background: transparent; }
 .panel .header .salesToggle { @apply text-kit-slate-4; }
 .panel .header button:hover, .panel .header button:active { @apply bg-kit-slate-11 text-white; }
