@@ -140,8 +140,25 @@ describe.skipIf(!databaseUrl)("authorised Warehouse final receipt (approved targ
     expect((await q("select received_qty from purchase_order_lines where id=$1", [line])).rows[0]!.received_qty).toBe(1);
     const stock = (await q("select status,identity_scope,qty from ops_stock_items where sku=$1", [extraSku])).rows;
     expect(stock.filter(row => ["free", "reserved"].includes(row.status))).toEqual([]);
-    // This proves preservation/non-availability only; the custody gap is audited separately.
-    console.info("Extra-goods custody observation", { savedExtraQty: 2, stockRows: stock.length });
+    const custody = (await q("select * from receiving_extra_custody where receipt_id=$1", [saved.id])).rows;
+    expect(custody).toHaveLength(1);
+    expect(custody[0]).toMatchObject({ extra_ordinal: 1, reported_sku: extraSku, reported_qty: 2,
+      actual_site_id: site, holder_party_id: company, recorded_by: person });
+    await as(person);
+    expect((await q("select id from receiving_extra_custody where receipt_id=$1", [saved.id])).rows).toHaveLength(1);
+    const retry = await confirm(report({ extra_lines: [{ sku: extraSku, qty: 2, note: "Unordered goods physically present" }] }));
+    expect(retry.ok).toBe(true);
+    expect((await q("select id from receiving_extra_custody where receipt_id=$1", [saved.id])).rows).toEqual([{ id: custody[0]!.id }]);
+    const directWrite = await request("update receiving_extra_custody set reported_qty=99 where receipt_id=$1 returning id as result", [saved.id]);
+    expect(directWrite.ok).toBe(false);
+    await q("reset role");
+    await q("update app_users set warehouse_id=$1 where id=$2", [otherSite, person]);
+    await as(person);
+    expect((await q("select id from receiving_extra_custody where receipt_id=$1", [saved.id])).rows).toEqual([]);
+    await as(disabled);
+    expect((await q("select id from receiving_extra_custody where receipt_id=$1", [saved.id])).rows).toEqual([]);
+    await as(group);
+    expect((await q("select id from receiving_extra_custody where receipt_id=$1", [saved.id])).rows).toEqual([]);
   });
 
   it("pages more than 200 reports at a tied timestamp without hiding old blockers or another Site", async () => {

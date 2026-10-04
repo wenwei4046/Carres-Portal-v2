@@ -981,20 +981,24 @@ Validation: 69 receipt-route tests (including 1,001 unresolved reports and permi
 50 Work projection tests, 12 Work probe tests, 79 shared Work/receipt tests and 75 Receiving UI
 tests pass. API/Web typechecks and design-standard checks pass. No production SQL or data changed.
 
-**Extra-goods custody audit — VERIFIED LOCAL GAP, 2026-10-05.**
-A real local Warehouse confirmation recorded two unordered pieces alongside one accepted PO Unit.
-The GRN preserved the extra SKU/quantity/note; PO fulfilment increased only by the accepted Unit;
-no extra goods became available. Querying Stock for that extra SKU returned zero rows. This confirms
-preservation and non-availability, but fails §2.4's controlled-custody target. The focused regression
-protects those existing invariants and is explicitly not proof of complete extra-goods handling.
-Current inputs carry only SKU/quantity/note, so they cannot establish an exact Unit identity.
-Completion must connect the governed custody/source-search path without inventing PO provenance,
-ownership, Unit IDs or a formal Claim for unmatched goods (§9.5). Warehouse chat independently confirmed the missing custody/source-search loop against Stock
-MASTER §§3–6: existing Unit/arrival primitives are reusable only with verified source identities;
-unknown goods require a separate custody record whose identity is not a Stock Unit ID. This is an
-approved implementation gap, not a new business-rule question. The full 53-case local target suite
-passes, including this bounded preservation regression; the release remains incomplete. All fixture
-writes rolled back; no production data changed.
+**Extra-goods custody — LOCAL SQL CANDIDATE / INCOMPLETE, 2026-10-05.**
+The original local reproduction saved two unordered pieces in receipt JSON with zero Stock rows.
+The candidate now captures a separate `receiving_extra_custody` record on posting: receipt and
+extra-line ordinal, reported SKU/quantity/note, evidenced actual Site, recorded Site holder,
+physical date and posting actor. The record ID is not a Stock Unit ID; it creates no ownership,
+PO fulfilment, available inventory or payable. Same-receipt retries preserve one record.
+Read access is Operation or active individual Warehouse staff at that Site; authenticated callers
+cannot write custody directly. These policies exist only in the disposable local database and
+unapproved chat draft, not production or a migration file.
+
+Warehouse chat independently confirmed that unknown goods cannot use source-linked arrival/Unit
+primitives until provenance is verified. The governing target remains §2.4 and §9.5, not a new
+business question. The complete custody lifecycle is **not finished**: source investigation,
+acceptance/hand-back evidence, correction/void consequences and operator presentation remain owed.
+The initial custody regression proves capture, Site/actor facts, retry uniqueness and refusal of
+shared/inactive readers while preserving PO and availability arithmetic. The full 53-case local
+receipt target run passes; all fixture writes roll back. This is bounded local proof, not release
+acceptance or a claim that the extra-goods workflow is complete.
 
 Still required before an exact SQL review/release: remaining non-PO downstream lifecycle and
 source-resolution audit, extra-goods custody and authority boundaries, full Warehouse
