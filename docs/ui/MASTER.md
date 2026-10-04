@@ -2713,25 +2713,43 @@ facts, permissions, complete-record populations or task ownership.
    live in **§6.10** — one truth, not a second copy here. A listing round reads it there and
    writes no page-local version of it.
 
-**Paged-register column controls — DEPLOYED / INTERACTIVE ACCEPTANCE INCOMPLETE, 2026-10-05.**
-`DataGrid serverColumns={{ values, onChange }}` reuses the same enum, date, number and clear
-controls for a server-paged population. The server supplies complete authorised value choices
-and applies the emitted filters/sort before pagination; the grid does not filter or sort the
-returned page again. Existing client-side registers retain their behaviour. Browser and server
-share `register-column-query` date/range/value matching; a module does not copy that arithmetic.
-The caller resets to page 1 and shows loading during replacement. Receiving is the first adapter.
-The `/ui` paged-register example exposes a supplier found only at record 61 while five rows are
-loaded. Filter/reset and numeric sorting must be proved beyond page 1; local tests and preview
-are not production acceptance. PR #1899 deployed through `719653ea0`; the live narrow-screen check found the shared filter outside the viewport. The correction on the current build branch anchors the menu to its button, constrains it within an 8px viewport inset and returns focus on Escape. The 366px preview placed it at 158–358px and selected/cleared the record-61 supplier successfully; production acceptance is still owed. This does not establish all-record Export or grouped pagination.
+**Paged-register column controls — PRODUCTION VERIFIED, 2026-10-05.**
+`DataGrid serverColumns={{ values, onChange }}` reuses the same enum/date/number/clear controls.
+The server supplies complete authorised choices and filters/sorts before pagination; the grid
+never applies those operations a second time to the returned page. Existing local registers keep
+their behaviour. Browser and server share `register-column-query`; modules do not copy it.
+The caller resets to page 1 and displays loading during replacement. Receiving is the first adapter.
+The shared menu anchors to its trigger, stays within an 8px viewport inset and returns focus on
+Escape. Actual production at 545px measured 337–537px; supplier selection, clear and numeric sort
+worked. The 366px preview separately measured 158–358px and found record 61 with five rows loaded.
 
-**Paged-register export — BUILT ON BRANCH / NOT PRODUCTION VERIFIED, 2026-10-05.**
+#1899/#1901 are covered by successful deployment `37218697773`; all five surfaces converged to
+`5c04b6625a0bd2f6bfc19f03400e7bfae0308195`. Exact-head CI `37217770861` passed before #1901 merged.
+Live Receiving also verified shared Table/Cards, full-GRN/Back preserving view/filter and the
+15-column Page tools surface. Predecessor own deployment `6be3a617.carres-portal.pages.dev`
+(`index-BkDrOL2X.js`) versus live `index-D7wV4aOD.js`: card marker 0→1, new filter clamp 0→1,
+old fixed filter style 1→0, `GRN Doc Date` control 6→6. This is not grouped-pagination or
+all-record-export acceptance; export has its separate state below.
+
+**Paged-register export — PRODUCTION VERIFIED (Excel), 2026-10-05.**
 `DataGrid loadExportRows` is the shared optional full-population reader for a paged register.
 It uses the existing Excel/PDF column derivation/renderers; the owning reader must return the
 complete authorised current filtered/sorted population. It does not change row-selection export.
 Read/render failure shows `The list could not be exported. Try again.` and produces no partial
 file. Export prevents duplicate in-flight starts and leaves the displayed page untouched.
 Receiving is the first adapter. The `/ui` paged example exported an actual 61-row workbook while
-five rows were loaded, then a one-row workbook for its record-61 supplier; live acceptance is owed.
+five rows were loaded, then a one-row workbook for its record-61 supplier. #1905 passed full CI
+`37219247916`; deployment `37219944735` converged across all five canonical surfaces to
+`a087fec9a`. Actual authenticated production exports contained seven receipts, then exactly three
+Ohana receipts from filtered Cards. Live PDF-list download is not claimed.
+
+**Compact card wrapped summary labels — LOCAL VERIFIED / DELIVERY PENDING, 2026-10-05.**
+The shared summary cells use two shared grid tracks per row so a wrapped label grows the label
+track and every value remains aligned below it. No token, label or module-specific CSS changed.
+The Receiving showcase now includes all four actual summary labels. At 416px, the old fixed
+16px track placed the value 13.59px inside the wrapped label; the correction leaves 4px clear
+space and aligns all four values. At 366px the existing two-column composition also clears
+all labels. Shared card/Receiving regression tests passed 102; design checks passed.
 
 🟡 **FACET COUNTS ARE SPELT THREE WAYS, AND THAT IS ONE FACT WITH THREE ANSWERS — found
 2026-09-20.** Purchase Orders §9.3 says a facet's number "describes the whole register, never what

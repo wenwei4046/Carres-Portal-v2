@@ -181,7 +181,7 @@ export default function CompactCardExample() {
           onOpen={() => window.open("/operation?tab=receiving", "_blank", "noopener")}
           onClose={() => setClosed(true)} modules={[{
             key: "receipt", label: "Receiving", detailsLabel: "Receipt details",
-            summary: [{ key: "received", label: "Received Qty", value: "2" }, { key: "damaged", label: "Damaged Qty", value: "1" }],
+            summary: [{ key: "received", label: "Received Qty", value: "2" }, { key: "damaged", label: "Damaged Qty", value: "1" }, { key: "wrong", label: "Wrong Item Qty", value: "0" }, { key: "extra", label: "Extra Qty", value: "0" }],
             details: <p>Preview only · sample receipt facts</p>,
           }]} /> : <CompactModuleCard
           key={`${preset}-${width}`}
