@@ -1,5 +1,5 @@
 import { GOODS_ABSENCE_WORDS } from "@carres/shared";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
   grnDateMonths,
@@ -39,6 +39,7 @@ import GoodsMiniTable, {
 import PoReceivingView from "./components/PoReceivingView";
 import ReceivingRecord from "./components/ReceivingRecord";
 import ReceivingCompactView from "./components/ReceivingCompactView";
+import Tabs from "@/components/kit/Tabs";
 import Drawer from "@/components/kit/Drawer";
 import PurchasingTabs from "./PurchasingTabs";
 import ArrivalSourceWorkspace from "./ArrivalSourceWorkspace";
@@ -47,63 +48,12 @@ import ArrivalSourceWorkspace from "./ArrivalSourceWorkspace";
 // Purchase / Manual Purchase / Purchase Orders, so one colour means
 // "section header" everywhere in Operations (manual-purchase-create.css).
 
-/**
- * OperationReceiving — the ONE Receiving destination
- * (owner corrections 2026-09-06; owner rulings 2026-09-17 / 2026-09-18;
- * purchasing/MASTER.md §9.4; UI MASTER §6.7–§6.9; PURCHASING CARD 12).
- *
- * ```
- * My Work / Team Work   =  what staff must receive or review
- * Receiving             =  the complete GRN Register, beside its rail
- * ```
- *
- * ONE PAGE. No Receiving Monitor, no `Calendar View / GRN Register View`
- * switch, no permanent tabs, no second Receiving destination.
- *
- * THE REGISTER BOUNDARY: a row exists only once `Save Receiving` created the
- * GRN. A Warehouse count awaiting Carres action lives in My Work / Team Work
- * and deep-links (`?session=`) to its Receiving review; it never becomes a
- * Register row. Partial or completed RECEIPT PROGRESS belongs to the purchase
- * order, not to a GRN: a GRN is a document, and a document is not half saved.
- *
- * ⭐ NO DATE HAS TO BE CHOSEN TO SEE RECORDS (owner ruling 2026-09-18). The
- * page opens on every GRN the operator may see, newest first, server-paged.
- * The rail's `GRN Doc Date` group is an OPTIONAL narrowing, and its counts are
- * counts of GRN RECORDS — never outstanding work and never pieces of goods.
- *
- * THE RAIL — six groups, in the owner's order (§9.4, 2026-09-17). The month
- * Calendar is RETIRED; the expected-arrival view lives in Warehouse Arrival
- * Schedule.
- *
- *   GRN Doc Date          weeks · their days (the arrow opens, it never filters)
- *                     · months · `Choose dates…`
- *   Received with     `Damaged goods` · `Wrong items` · `Extra goods` — a
- *                     record of what was FOUND, and three OVERLAPPING counts
- *                     that are never added into a total
- *   Category · Goods arrived at · Supplier      the facts present in the set
- *   Cancelled GRNs    the last row
- *
- * One choice per group; pressing the chosen row again clears it. There is no
- * `Clear filters` button at the foot of the rail (owner correction
- * 2026-09-18) — the toolbar's active-condition chips clear what is on.
- *
- * THE REGISTER PAGINATES ON THE SERVER: `Showing 1–50 of {total}` with
- * Previous/Next — the browser never renders the whole history, and every
- * rail count is computed over the COMPLETE filtered result set by the one
- * shared arithmetic (`buildGrnRegisterView`, behind `?scope=grn`).
- *
- *   [Start Receiving]  →  Find PO or CO  →  pre-start object  →  Session
- *   `?session=` (Work) →  the count review (Save Receiving / Return count)
- *   a Register row     →  the formal GRN object (50/50, Amend / More ▾)
- *
- * THE REGISTER STAYS MOUNTED under an open object (`invisible`, never
- * display:none) so Back restores rail filters, search, sort and scroll — the
- * Manual Purchase / SO object law.
- *
- * No `Work` column, no owner avatar on rows, no local duty arithmetic: the
- * resolved GRN authority comes from the ONE shared resolver
- * (`useReceivingDuty` → 0425 `receiving_actor_context`), and it appears only
- * where an action needs it.
+/** Receiving's existing destination, governed by Purchasing MASTER §9.4.
+ * Formal GRNs share the DataGrid and CompactModuleCard presentations. The
+ * register stays mounted beneath its full object, preserving the user's view.
+ * Receipt quantities belong to this receipt, not cumulative PO completion.
+ * The former facet rail remains until the approved Differences read-model and
+ * replacement controls are delivered; its presence is not target authority.
  */
 
 // design-standard: not-a-list-page — the Receiving Register renders through
@@ -165,6 +115,9 @@ export default function OperationReceiving() {
   const cancelledSel = params.get("cancelled") === "1";
   const [search, setSearch] = useState("");
   const [offset, setOffset] = useState(0);
+  const [presentation, setPresentation] = useState("table");
+  const registerSessionKey = useId();
+  const changePresentation = (value: string) => { setPresentation(value); setOffset(0); };
   const [columnQuery, setColumnQuery] = useState<string>();
   const changeColumns = useCallback((query: RegisterColumnQuery) => {
     setColumnQuery(JSON.stringify(query)); setOffset(0);
@@ -192,6 +145,7 @@ export default function OperationReceiving() {
 
   const registerQ = useOperationGrnRegister({
     offset,
+    limit: presentation === "cards" ? 12 : 50,
     columns: columnQuery,
     category: categorySel,
     supplier: supplierSel,
@@ -1104,6 +1058,18 @@ export default function OperationReceiving() {
           ) : (
             <DataGrid<WarehouseReceiptQueueRow>
               appearance="reference"
+              presentationTools
+              presentationKey={presentation}
+              sessionKey={registerSessionKey}
+              toolbarEnd={<Tabs variant="segmented" label="Receiving view" value={presentation} onValueChange={changePresentation}
+                tabs={[{ value: "table", label: "Table", icon: "table" }, { value: "cards", label: "Cards", icon: "cards" }]} />}
+              renderResults={presentation === "cards" ? visible => <div className="grid grid-cols-1 gap-3 p-3 xl:grid-cols-2" data-testid="receiving-cards">
+                {visible.map(receipt => <div key={receipt.id} data-row-key={receipt.id}>
+                  <ReceivingCompactView row={receipt}
+                    items={current => <GoodsMiniTable label="Items & quantities" lines={expansionLines(current)} receivingLayout itemHeading="Items" />}
+                    onOpen={() => openSession(receipt.id)} onClose={() => changePresentation("table")} />
+                </div>)}
+              </div> : undefined}
               rows={rows}
               columns={columns}
               /* v2 — the approved sixteen-column, date-first register
