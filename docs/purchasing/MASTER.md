@@ -3723,6 +3723,12 @@ request/approval/PO issue and actual-sending rules remain unchanged. Do not pres
 as a third daily task or silently add its demand to a customer-only SO Batch round.
 This confirms round/list behaviour and domain separation, not the rest of the proposed page layout.
 
+**OWNER CONFIRMED 2026-10-04 — SO Batch supplier grouping.** After selecting a PO window,
+show its eligible customer-order buying lines grouped by supplier. Each line retains its original
+Sales Order source and purchase quantity; supplier grouping never erases lineage or overrides the
+existing destination/document grouping rules. The owner approved this grouping, not all remaining
+card, register or full-page composition.
+
 **PROPOSAL / NOT LAW — page composition for owner review.** Reuse the owner's supplied Sales Order
 page template. The left tray exposes the two current PO windows (10:15 AM and 4:00 PM), preserving
 existing required Listing/Monthly demand access and the approved PO follow-up filters. A window
