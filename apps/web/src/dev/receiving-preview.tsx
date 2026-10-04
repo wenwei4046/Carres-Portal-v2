@@ -418,6 +418,10 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });
+  if (url.includes("/extra-custody")) return json({ siteNames: { [WH]: "Carres Klang" }, custody: PAGE === "custody" ? [
+    { id: "preview-custody", reported_sku: "Unordered pillow", reported_qty: 2,
+      reported_note: "Supplier sent two extra pieces", actual_site_id: WH, goods_received_at: "2026-10-05" },
+  ] : [] });
   if (PAGE.startsWith("calendar") && url.includes("/api/operation/warehouse/inbound")) return json({
     sites: [{ id: WH, name: "Carres Klang" }, { id: WH2, name: "AL Sungai Buloh" }],
     arrivalCalendar: { undatedReceipts: 0, events: [
@@ -575,7 +579,7 @@ createRoot(document.getElementById("root")!).render(
                 <OperationReceivingReport />
               ) : PAGE === "warehouse-history" ? (
                 <WarehouseReceiptHistory receiptId={POSTED} onClose={()=>{}}/>
-              ) : PAGE === "blocked-report" ? (
+              ) : (PAGE === "blocked-report" || PAGE === "custody") ? (
                 <ReceivingRecord sessionId={POSTED} onBack={() => {}} />
               ) : PAGE === "warehouse" ? (
                 <WarehouseIncoming />

@@ -157,3 +157,10 @@ export interface WarehouseConfirmationResult {
   blockers: Array<{ code: string; message: string }>;
   already_saved: boolean;
 }
+
+/** Read-only physical custody evidence; no inventory identity or disposition. */
+export const receivingExtraCustodyEvidence = z.object({
+  custody: z.array(z.object({ id: z.string(), reported_sku: z.string(), reported_qty: z.number().int().positive(),
+    reported_note: z.string().nullable(), actual_site_id: z.string(), goods_received_at: z.string() })),
+  siteNames: z.record(z.string()),
+});

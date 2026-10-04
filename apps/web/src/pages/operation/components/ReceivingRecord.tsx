@@ -32,6 +32,7 @@ import {
 import { renderGrnPdf } from "@/lib/pdf/render";
 import { usePdfCanvases } from "@/lib/pdf/use-pdf-canvases";
 import DropdownMenu from "@/components/kit/DropdownMenu";
+import ReceivingExtraCustody from "@/components/receiving/ReceivingExtraCustody";
 import ReceivingReportHistory from "@/components/receiving/ReceivingReportHistory";
 import Button from "@/components/kit/Button";
 import SavedEvidenceViewer from "@/components/kit/SavedEvidenceViewer";
@@ -454,17 +455,19 @@ export default function ReceivingRecord({
                 ) : null}
               </div>
             ))}
-            {(r.extra_lines ?? []).map((x, i) => (
+            {(r.status !== "posted" && r.status !== "voided" ? r.extra_lines ?? [] : []).map((x, i) => (
               <div key={`x${i}`} className="receiving-item-row flex flex-wrap gap-2 py-1 text-body border-b border-kit-slate-4">
                 <span className="flex-1 min-w-0 font-mono text-kit-slate-12 break-words">
                   {x.sku}
                 </span>
                 <span className="w-40 text-right tabular-nums text-kit-amber-11">
-                  {x.qty} extra, not Inventory
+                  {x.qty} extra
                 </span>
               </div>
             ))}
           </Section>
+
+          {(r.status === "posted" || r.status === "voided") && <ReceivingExtraCustody receiptId={sessionId} />}
 
           {/* ── Consequences ──────────────────────────────────────────── */}
           {r.status === "posted" && (

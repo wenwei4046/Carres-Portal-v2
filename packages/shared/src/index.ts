@@ -1261,6 +1261,7 @@ export {
   type GrnRegisterView,
 } from "./receiving-register";
 export {
+  receivingExtraCustodyEvidence,
   warehouseSubmitReceiptInput,
   warehouseConfirmReceiptInput,
   warehouseConfirmationReportInput,

@@ -1005,7 +1005,16 @@ parent; no known holder is invented from a missing one. Inaccessible parents ret
 failed custody reads fail explicitly, and Warehouse cannot enter this Operation investigation door.
 A local structural check proves clearing/voiding the parent does not erase the custody observation;
 it is not a test of the production amendment/void business authorisation. The 53 local transaction
-and 87 Operation receipt-route tests pass together (140). UI and resolution writes remain owed.
+and 87 Operation receipt-route tests pass together (140).
+The Receiving record now renders original extra-goods custody through the shared DocumentTable,
+including quantity, recorded arrival Site/date and note. Posted/voided records use this evidence
+section instead of duplicating raw extra rows in Items. Unknown Site names stay Not recorded;
+failed or malformed reads show an explicit retry. The endpoint resolves readable Site labels
+without returning internal IDs as labels. Five component scenarios cover normal, unknown, failed,
+malformed and empty evidence; the 390×844 illustrative local preview has document client/scroll
+width 390/390. Evidence: `/tmp/carres-extra-custody-phone-local.png`. This is sample-data layout
+proof, not live evidence transport or complete Warehouse template acceptance. Resolution actions
+and the complete correction/acceptance/hand-back journey remain owed.
 
 Still required before an exact SQL review/release: remaining non-PO downstream lifecycle and
 source-resolution audit, extra-goods custody and authority boundaries, full Warehouse

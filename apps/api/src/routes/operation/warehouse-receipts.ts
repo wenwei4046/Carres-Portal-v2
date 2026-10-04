@@ -1206,7 +1206,11 @@ warehouseReceiptsRouter.get("/:id/extra-custody", requireOperation, async (c) =>
     .select("id,receipt_id,extra_ordinal,reported_sku,reported_qty,reported_note,actual_site_id,holder_party_id,recorded_by,recorded_at,goods_received_at")
     .eq("receipt_id", id.data).order("extra_ordinal").order("id").range(from, to));
   if (!("rows" in result)) return c.json({ message: "Custody records could not be read completely" }, 503);
-  return c.json({ receipt, custody: result.rows });
+  const siteIds = [...new Set(result.rows.map(row => row.actual_site_id).filter((id): id is string => typeof id === "string"))];
+  const sites = siteIds.length ? await readAllPages<{ id: string; name: string }>((from, to) => sb
+    .from("warehouses").select("id,name").in("id", siteIds).order("id").range(from, to)) : { rows: [] };
+  if (!("rows" in sites)) return c.json({ message: "Custody locations could not be read completely" }, 503);
+  return c.json({ receipt, custody: result.rows, siteNames: Object.fromEntries(sites.rows.map(site => [site.id, site.name])) });
 });
 
 warehouseReceiptsRouter.get("/:id", requireOperation, async (c) => {

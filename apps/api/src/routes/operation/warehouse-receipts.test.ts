@@ -1915,7 +1915,7 @@ describe("extra-goods custody evidence", () => {
     const response = await read({ warehouse_receipts: { single: { data: parent, error: null } },
       receiving_extra_custody: { list: { data: [observation], error: null } } });
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ receipt: parent, custody: [observation] });
+    expect(await response.json()).toEqual({ receipt: parent, custody: [observation], siteNames: {} });
   });
   it("does not expose custody when the parent is inaccessible", async () => {
     expect((await read({})).status).toBe(404);
