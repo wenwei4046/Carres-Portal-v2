@@ -55,6 +55,9 @@ export default function PoSupplierBundle({ pos, onPreview, roundWindow, onEviden
   const [supplier, setSupplier] = useState(pos[0]?.supplierId ?? "");
   const [selected, setSelected] = useState<Set<string>>(() => new Set(pos.filter(po => po.supplierId === supplier).map(po => po.id)));
   const [documents, setDocuments] = useState<Record<string, PoTemplateData>>({});
+  const [documentsLoading, setDocumentsLoading] = useState(true);
+  const [documentFailures, setDocumentFailures] = useState<Array<{ id: string; message: string }>>([]);
+  const [documentRefresh, setDocumentRefresh] = useState(0);
   const [sendHistory, setSendHistory] = useState<Record<string, PoSendEvidence[]>>({});
   const [historyLoading, setHistoryLoading] = useState(true);
   const [historyRefresh, setHistoryRefresh] = useState(0);
@@ -74,7 +77,7 @@ export default function PoSupplierBundle({ pos, onPreview, roundWindow, onEviden
   const message = picked.filter(po => documents[po.id]).map(po => `${documents[po.id].po_number} · V${documents[po.id].version}`).join("\n");
   const preparedMessage = [messageIntroduction.trim(), message].filter(Boolean).join("\n\n");
   const doors = contact ? doorsForIssuedPo(contact, preparedMessage) : null;
-  const ready = picked.length > 0 && picked.every(po => documents[po.id]) && !busy && !scopeLoading && !(scope === "round" && roundUnavailable);
+  const ready = picked.length > 0 && picked.every(po => documents[po.id]) && !documentsLoading && !busy && !scopeLoading && !(scope === "round" && roundUnavailable);
   const selectedAttempts = emailAttempts.filter(attempt => attempt.documents.some(document => picked.some(po => po.id === document.id && documents[po.id]?.version === document.version)));
   const emailOutcome = selectedAttempts.some(attempt => attempt.status === "unknown") ? "unknown" : selectedAttempts.length ? "dispatched" : null;
   const alreadySent = emailOutcome === "dispatched" || picked.some(po => documents[po.id] && confirmedSendFor(sendHistory[po.id] ?? [], documents[po.id].version));
@@ -102,12 +105,26 @@ export default function PoSupplierBundle({ pos, onPreview, roundWindow, onEviden
   useEffect(() => {
     let cancelled = false;
     setDocuments({});
+    setDocumentsLoading(true);
+    setDocumentFailures([]);
     setError(null);
-    Promise.all(supplierPos.map(async po => [po.id, await apiFetch<PoTemplateData>(`/api/operation/pos/${encodeURIComponent(po.id)}/print-data`)] as const))
-      .then(rows => { if (!cancelled) setDocuments(Object.fromEntries(rows)); })
-      .catch(() => { if (!cancelled) setError("Could not load the preview. Try again on the document."); });
+    Promise.allSettled(supplierPos.map(async po => {
+      const document = await apiFetch<PoTemplateData>(`/api/operation/pos/${encodeURIComponent(po.id)}/print-data`);
+      if (document.draft || document.po_id !== po.id || typeof document.po_number !== "string" || !document.po_number.trim()
+        || !Number.isInteger(document.version) || document.version < 1) throw new Error("invalid_po_document");
+      return [po.id, document] as const;
+    })).then(results => {
+      if (cancelled) return;
+      setDocuments(Object.fromEntries(results.flatMap(result => result.status === "fulfilled" ? [result.value] : [])));
+      setDocumentFailures(results.flatMap((result, index) => result.status === "rejected" ? [{
+        id: supplierPos[index].id,
+        message: result.reason instanceof ApiError && (result.reason.body as { code?: string } | null)?.code === "destination_address_missing"
+          ? "Address not recorded. Check Purchasing Settings." : "Could not be loaded",
+      }] : []));
+      setDocumentsLoading(false);
+    });
     return () => { cancelled = true; };
-  }, [supplierPos]);
+  }, [supplierPos, documentRefresh]);
 
   useEffect(() => {
     let cancelled = false;
@@ -198,7 +215,7 @@ export default function PoSupplierBundle({ pos, onPreview, roundWindow, onEviden
       url = URL.createObjectURL(await zipPoBundle(prepared));
       const link = document.createElement("a");
       link.href = url;
-      link.download = `Purchase-orders-${supplier}.zip`;
+      link.download = `Purchase-orders-${(contact?.supplierName ?? "Supplier").replace(/[^a-zA-Z0-9._-]/g, "_")}.zip`;
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -298,6 +315,10 @@ export default function PoSupplierBundle({ pos, onPreview, roundWindow, onEviden
           {confirmedSendFor(sendHistory[po.id], documents[po.id].version) ? "PO sent to supplier" : "Sending not confirmed"}
         </p>}
       </div>)}
+      {documentFailures.length > 0 && <div role="alert" className="flex flex-col gap-2">
+        {documentFailures.map(failure => <p key={failure.id} className="text-meta text-kit-red-11">{failure.id} · {failure.message}</p>)}
+        <Button disabled={documentsLoading || busy} onClick={() => setDocumentRefresh(value => value + 1)}>Try again</Button>
+      </div>}
       <Select id="po-bundle-channel" label="Communication channel" value={channel} onValueChange={setChannel}
         disabled={busy}
         options={[{ value: "whatsapp", label: "WhatsApp" }, { value: "email", label: "Email" }]} />

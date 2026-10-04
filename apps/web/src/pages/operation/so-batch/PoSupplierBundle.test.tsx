@@ -31,6 +31,55 @@ beforeEach(() => {
 });
 async function ready() { await waitFor(() => expect(screen.getByRole("button", { name: "Download PDFs" })).toBeEnabled()); }
 describe("issued supplier bundle", () => {
+  it("retains readable documents, refuses a selected failed source and retries the exact supplier set without writing", async () => {
+    let unavailable = true;
+    api.mockImplementation(async (path: string) => {
+      if (path.endsWith("email-capability")) return { configured: true };
+      if (path.endsWith("/email-attempts")) return { attempts: [] };
+      if (path.endsWith("/sends")) return { sends: [] };
+      if (path.endsWith("/print-data") && path.includes("PO-002") && unavailable) throw new Error("source unavailable");
+      return data(path.split("/").at(-2)!);
+    });
+    render(<PoSupplierBundle pos={pos} onPreview={() => {}} />);
+    expect(await screen.findByRole("alert")).toHaveTextContent("PO-002 · Could not be loaded");
+    expect(screen.getByLabelText("PO-001 · V1")).toBeChecked();
+    expect(screen.getByRole("button", { name: "Download PDFs" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Copy message" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Send Email" })).toBeDisabled();
+    fireEvent.click(screen.getByLabelText("PO-002"));
+    await ready();
+    expect(screen.getByLabelText("PO No")).toHaveValue("PO-001 · V1");
+    fireEvent.click(screen.getByLabelText("PO-002"));
+    unavailable = false;
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    await ready();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("PO No")).toHaveValue("PO-001 · V1\nPO-002 · V1");
+    expect(api.mock.calls.filter(call => call[0].endsWith("/print-data")).map(call => call[0]))
+      .toEqual(["/api/operation/pos/PO-001/print-data", "/api/operation/pos/PO-002/print-data", "/api/operation/pos/PO-001/print-data", "/api/operation/pos/PO-002/print-data"]);
+    expect(api.mock.calls.every(call => call.length === 1)).toBe(true);
+    expect(renderPdf).not.toHaveBeenCalled();
+  });
+  it("names an original destination-address refusal instead of implying transient PDF trouble", async () => {
+    api.mockImplementation(async (path: string) => path.endsWith("email-capability") ? { configured: false }
+      : path.endsWith("/sends") ? { sends: [] }
+      : (() => { throw new ApiError(422, "No address", { code: "destination_address_missing" }); })());
+    render(<PoSupplierBundle pos={[pos[0]]} onPreview={() => {}} />);
+    expect(await screen.findByRole("alert")).toHaveTextContent("PO-001 · Address not recorded. Check Purchasing Settings.");
+    expect(screen.getByRole("button", { name: "Download PDFs" })).toBeDisabled();
+  });
+  it.each([
+    { ...data("another-po") }, { ...data("PO-001"), draft: true },
+    { ...data("PO-001"), version: 0 }, { ...data("PO-001"), po_number: "" },
+  ])("refuses malformed or mismatched document facts before message preparation: %j", async document => {
+    api.mockImplementation(async (path: string) => path.endsWith("email-capability") ? { configured: true }
+      : path.endsWith("/sends") ? { sends: [] } : path.endsWith("/email-attempts") ? { attempts: [] } : document);
+    render(<PoSupplierBundle pos={[pos[0]]} onPreview={() => {}} />);
+    expect(await screen.findByRole("alert")).toHaveTextContent("PO-001 · Could not be loaded");
+    expect(screen.getByLabelText("PO No")).toHaveValue("");
+    expect(screen.getByRole("button", { name: "Copy message" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Send Email" })).toBeDisabled();
+  });
   it("shows exactly one supplier's separate POs and saved preferred channel", async () => {
     render(<PoSupplierBundle pos={pos} onPreview={() => {}} />);
     await ready();
