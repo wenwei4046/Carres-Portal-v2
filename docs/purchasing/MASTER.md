@@ -76,6 +76,13 @@ another operating model. Approved target is not proof that the current page impl
 
 ### Left-rail naming — owner-approved 2026-10-04
 
+SO Batch local view navigation is `Listing` / `Report`. Owner browser correction replaces
+`Monthly demand` with `Report` on this surface only. Report is a later monthly reporting
+capability: its contents and measures are not yet decided and are not approved for build.
+Deliver the approved left rail first through deployment; retain Report as a deferred destination
+without inventing report data or a monthly-demand implementation. Other modules retain their
+existing governed Monthly demand capability.
+
 `Order time` is the approved heading for daily cutoff rows `10:15 AM` / `4:00 PM`.
 Do not display `PO rounds`, `Order rounds` or `Daily orders` as competing names.
 Retain the existing `Order timing` capability separately: it describes early purchasing and
@@ -99,7 +106,7 @@ Sales FilterRail/Tabs composition and existing 12-column SoBatchRegister at
 identity, approved short planning labels, `Production late` in the table/filter/export,
 and no inner Safety days paragraph. The group heading is PO Safety Days under the latest owner browser correction. Desktop1280 and
 tablet820 inspection verified clock/independent planning samples, selected-row styling,
-hide/show and explicit Monthly demand not-connected content; tablet page width820 and rail240.
+hide/show; the latest owner correction replaces the deferred Monthly demand destination with Report; tablet page width820 and rail240.
 Preview types and 128 existing Register tests passed. Sample statuses/counts are illustrative;
 this does not prove real scheduling, whole-round stock matching, Quick View issue, Cards/grouping
 adoption or supplier communication. Production callers do not enable the inspection-preview option.
