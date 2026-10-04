@@ -66,10 +66,10 @@ function officialDocument(version = 1) {
 }
 async function openIssuedDocument() {
   await screen.findByTestId("po-supplier-result-panel");
-  fireEvent.click(screen.getByRole("button", { name: "Open PDF", exact: true }));
+  fireEvent.click(screen.getByRole("button", { name: "Open PDF" }));
   await screen.findByTestId("so-batch-evidence-PO-2041");
   await waitFor(() => expect(screen.getByTestId("so-batch-evidence-confirm")).toBeEnabled());
-  fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Close", exact: true }));
+  fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Close" }));
 }
 
 
@@ -329,7 +329,7 @@ describe("the whole journey — tick, arrange, issue, prove it arrived", () => {
     // document. (`Status` was retired as a presentation on 2026-09-11: the
     // document and the refused tick say what the word used to.)
     await waitFor(() => expect(screen.getByTestId("so-batch-page")).toBeInTheDocument());
-    fireEvent.click(screen.getByRole("button", { name: "Close", exact: true }));
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
     fireEvent.click(await screen.findByText("No purchase needed"));
     await waitFor(() =>
       expect(screen.getByTestId("so-batch-po-link-o1")).toHaveTextContent("PO-2041"),

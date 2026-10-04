@@ -46,8 +46,8 @@ const samplePos: Array<IssuedPo & { version: number }> = [
 ];
 const sampleDocuments = new Map(samplePos.map((po, index) => [po.id, {
   po_id: po.id, po_number: po.id, version: po.version, issue_date: "2026-10-05",
-  supplier: { name: po.supplierName, address: "Sample supplier address", contact: "Sample contact" },
-  destination: { name: po.destination, address: "Sample warehouse address" },
+  supplier: { name: po.supplierName ?? "Sample supplier", address: "Sample supplier address", contact: "Sample contact" },
+  destination: { name: po.destination ?? "Sample warehouse", address: "Sample warehouse address" },
   delivery_instructions: "Sample data only. Do not send this document.", eta_date: "2026-11-09",
   so_refs: index === 0 ? [1001, 1002] : [1003 + index], issued_by: "Sample staff",
   lines: [{ sku: "SAMPLE", description: "Sample mattress · King", qty: 1, unit: "pcs", identity_mode: "quantity" as const }],
@@ -71,7 +71,7 @@ const client = new QueryClient({ defaultOptions: { queries: { enabled: false, re
 function Preview() {
   const [open, setOpen] = useState(true);
   return <div className="flex h-screen min-w-0 flex-col bg-kit-canvas">
-    <ModuleHeader word="SO Batch Purchase" docTitle="SO Batch Purchase · Supplier result preview" destinationHeader />
+    <ModuleHeader testId="so-batch-result-preview" word="SO Batch Purchase" docTitle="SO Batch Purchase · Supplier result preview" destinationHeader />
     <p className="border-b border-kit-slate-5 bg-white px-3 py-2 text-meta text-kit-slate-11">Sample data · Local preview only · No purchase was placed</p>
     <SoBatchRegister data={base} isLoading={false} onIssue={() => {}} onOpenPurchaseOrders={() => setOpen(true)} />
     <PoSupplierResultPanel open={open} onOpenChange={setOpen} pos={samplePos} roundWindow="2026-10-05T10:15" onChanged={() => {}} />
