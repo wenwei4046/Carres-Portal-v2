@@ -160,7 +160,9 @@ describe("issued supplier bundle", () => {
     const preparation = open.mock.calls[0][1] as PoSupplierPreparation;
     view.unmount();
     api.mockImplementation(async (path: string) => path.endsWith("email-capability") ? { configured: false }
-      : path.endsWith("/sends") ? { sends: [] } : { ...data(path.split("/").at(-2)!), version: 2 });
+      : path.endsWith("/sends") ? { sends: [] }
+      : path.endsWith("/issue-context") ? { ...pos.find(po => po.id === path.split("/").at(-2)), contactEmail: "current@example.invalid" }
+      : { ...data(path.split("/").at(-2)!), version: 2 });
     render(<PoSupplierBundle pos={[pos[2], pos[0], pos[1]]} initialPreparation={preparation} onPreview={() => {}} />);
     await ready();
     expect(screen.getByLabelText("Supplier")).toHaveTextContent("Hooka");
@@ -169,6 +171,32 @@ describe("issued supplier bundle", () => {
     expect(screen.getByLabelText("Subject")).toHaveValue("Delivery request");
     expect(screen.getByLabelText("Message")).toHaveValue("Please confirm.");
     expect(screen.getByLabelText("PO No")).toHaveValue("PO-002 · V2");
+    expect(screen.getByLabelText("To")).toHaveValue("current@example.invalid");
+    expect(api.mock.calls.every(call => call.length === 1)).toBe(true);
+  });
+  it("refuses a mismatched current supplier source on return and retries without losing the draft or selected subset", async () => {
+    let unavailable = true;
+    api.mockImplementation(async (path: string) => {
+      if (path.endsWith("/issue-context")) {
+        const id = path.split("/").at(-2);
+        if (unavailable && id === "PO-002") return { ...pos[1], id: "wrong-po" };
+        return pos.find(po => po.id === id);
+      }
+      return path.endsWith("email-capability") ? { configured: false } : path.endsWith("/sends") ? { sends: [] } : data(path.split("/").at(-2)!);
+    });
+    render(<PoSupplierBundle pos={pos} initialPreparation={{ supplierId: "s1", selectedIds: ["PO-002"],
+      channel: "email", scope: "round", subject: "Prepared", messageIntroduction: "Please confirm." }} onPreview={() => {}} />);
+    await screen.findByText("Evidence could not be loaded");
+    expect(screen.getByRole("button", { name: "Download PDFs" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Copy message" })).toBeDisabled();
+    unavailable = false;
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    await ready();
+    expect(screen.getByLabelText("PO-001-V1")).not.toBeChecked();
+    expect(screen.getByLabelText("PO-002-V1")).toBeChecked();
+    expect(screen.getByLabelText("Subject")).toHaveValue("Prepared");
+    expect(screen.getByLabelText("Message")).toHaveValue("Please confirm.");
+    expect(api.mock.calls.filter(([path]) => path.endsWith("/issue-context"))).toHaveLength(6);
     expect(api.mock.calls.every(call => call.length === 1)).toBe(true);
   });
   it("refreshes Today on return and drops a selected PO that no longer belongs to that scope", async () => {

@@ -425,7 +425,11 @@ enable preparation while the other is unresolved. Register URL/context retention
 kit behavior. No live PO, stock reservation, transmission or supplier address was changed for this
 verification. Local journey tests cover bundle restoration with fresh versions, removed Today
 membership, repeated failed-read recovery and both sides of the exact object return. Release and
-authenticated end-to-end return verification are still required.
+authenticated end-to-end return verification are still required. A restored undated Round also
+refreshes every exact PO's owning issue context before preparation becomes available, so the
+current supplier contact replaces cached routing state. A mismatched or failed source read blocks
+preparation; Try again retains the chosen subset and editable draft. The fresh-contact and
+failed-source retry regressions passed with the complete 54 bundle/page tests on 2026-10-05.
 
 **SO Batch document display adoption, 2026-10-04 — local build, production proof owed.**
 The Register PO cell/context door, its exact-source Quick View lineage and expanded PO details
