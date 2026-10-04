@@ -98,7 +98,7 @@ operationWarehouseRouter.get("/inbound", async (c) => {
         "purchase_order_lines",
         "id,po_id,qty,destination_id,sku,received_qty,damaged_qty,wrong_item_qty,identity_mode",
       ),
-      read("po_supplier_promises", "id,po_id,po_version,kind,answer,new_date,about_date,previous_date,reason,channel,recipient,evidence,reported_by,reported_at,recorded_by,recorded_at"),
+      read("po_supplier_promises", "id,po_id,po_line_id,about_qty,answer_group,po_version,kind,answer,new_date,about_date,previous_date,reason,channel,recipient,evidence,reported_by,reported_at,recorded_by,recorded_at"),
       optional("arrival_sources", "id,source_no,kind,claim_id,case_id,attempt_id,from_site_id,to_site_id,party_id,expected_date,collection_date,reason,cancelled_at,created_at,sales_order_ref"),
       optional("arrival_source_units", "source_id,stock_item_id,replaces_item_id"),
       optional("stock_operating_parties", "id,name"),

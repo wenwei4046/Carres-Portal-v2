@@ -473,7 +473,11 @@ approval. It is not a stock adjustment. No physical event or submitted report is
 **Receiving Calendar source and UI — BUILT ON BRANCH, NOT PRODUCTION VERIFIED, 2026-10-05.**
 The existing authorised Inbound reader supports an opt-in `calendar=1` response using the shared
 `warehouseCalendarArrivals` projection over its complete source population, before register paging.
-Expected arrangements use Inbound's source-owned date and outstanding accepted requirement. Actual
+Expected arrangements use Purchasing's existing current-version line/batch date authority,
+grouped by source and day; fully accepted lines are absent. A cumulative partial receipt without
+receipt-to-batch allocation leaves that batch's remaining quantity unknown, never guessed by FIFO.
+The Schedule and Calendar consume the same dated groups and their Inbound date doors match all
+source batch dates. The Inbound register remains one source record. Actual
 arrivals use each posted receipt's physical date and actual Site, once per receipt identity; GRN
 creation time never substitutes for physical arrival. Physical arrived Qty is the receipt's own
 accepted + damaged + wrong quantity; Extra Qty stays separate. Unknown receipt quantities/sites
@@ -482,9 +486,11 @@ actual arrivals. An all-missing report with recorded zero physical/extra quantit
 No write, permission, stock or event store is added. The shared Quick Rail now reads this source
 on branch, reuses MonthCalendar and Select, separates expected/actual groups without mixed totals,
 and preserves explicit Calendar day/module/location in source links. A local illustrative preview
-verified the module/location selectors, quantities and selected-date contrast. Per-line/split-date
-convergence of the existing Warehouse arrangement projection, mobile entry and full production
-acceptance remain open. Local evidence: 54 shared schedule tests, 14 Inbound API tests, API typecheck;
+verified the module/location selectors, quantities and selected-date contrast. Operation's phone
+header opens the same Calendar in the existing Drawer; picking a date keeps it open, opening a
+source closes it, and the selected day survives. This branch has not completed production
+acceptance or the broader Calendar event-source admission. Local evidence: 119 shared schedule/Inbound/PO-date tests, 15 Inbound API tests, 48 shell tests,
+32 Calendar tests, Web/API typechecks and design lint;
 the 201-receipt fixture verifies register paging does not clip Calendar history. This is not a
 claim that the shared Calendar or Warehouse automatic GRN posting has shipped.
 

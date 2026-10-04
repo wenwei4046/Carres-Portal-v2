@@ -409,3 +409,19 @@ describe("Warehouse Calendar reads the complete authorised receipt population", 
     expect((await app("dealer").request("/inbound?calendar=1")).status).toBe(403);
   });
 });
+
+
+it("Calendar keeps each evidenced line date while the Inbound record stays one PO", async () => {
+  const reply = { po_id: "PO-1", po_version: 1, kind: "tomorrow_delivery", answer: "confirmed", channel: "whatsapp", recipient: "Factory", evidence: "proof", reported_by: "Supplier", reported_at: "2026-09-10T00:00:00Z", recorded_by: "actor", recorded_at: "2026-09-10T00:01:00Z", about_date: null, previous_date: null, reason: null, po_line_id: "line-2", answer_group: "g" };
+  dbWithOnePo([
+    { ...reply, about_qty: 1, new_date: "2026-09-12" },
+    { ...reply, about_qty: 1, new_date: "2026-09-15" },
+  ]);
+  const response = await app().request("/inbound?calendar=1&date=2026-09-12&limit=1");
+  expect(response.status).toBe(200);
+  const body = await response.json() as any;
+  expect(body.arrivals.map((row: any) => row.sourceId)).toEqual(["PO-1"]);
+  expect(body.arrivalCalendar.events.map((row: any) => [row.date, row.expectedQty])).toEqual([
+    ["2026-09-12", 1], ["2026-09-15", 1], ["2026-09-20", 2],
+  ]);
+});

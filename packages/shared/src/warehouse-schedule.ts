@@ -5,7 +5,7 @@ import {
   type WarehouseActivity,
   type WarehouseScheduleInput as WarehouseSettingsScheduleInput,
 } from "./warehouse-settings";
-import type { InboundArrival, InboundInput } from "./warehouse-inbound";
+import { INBOUND_UNMAPPED_SITE, type InboundArrival, type InboundInput } from "./warehouse-inbound";
 import { warehouseReceiptTotals, receivingExtraQty, type WarehouseReceiptLine } from "./warehouse-receipt";
 import {
   WAREHOUSE_OFF_DAYS,
@@ -361,12 +361,39 @@ function arrivalLines(
 function arrivalOpenHref(arrival: InboundArrival): string {
   const p = new URLSearchParams({
     tab: "warehouse-inbound",
-    site: arrival.siteId,
+    site: arrival.siteMapped ? arrival.siteId : INBOUND_UNMAPPED_SITE,
     sourceType: arrival.sourceType,
     source: arrival.sourceId,
   });
   if (arrival.date) p.set("date", arrival.date);
   return `/operation?${p}`;
+}
+
+/** One shared dated projection for the Schedule and Calendar. The PO remains
+ * one Inbound record; each distinct source-owned batch date is an arrangement. */
+function expectedArrivalGroups(arrival: InboundArrival) {
+  if (!arrival.expectedArrivals?.length) return [{
+    id: arrival.id, date: arrival.date,
+    qty: arrival.quantities.known ? arrival.quantities.pendingDeliveryQty : null,
+    batches: null as InboundArrival["expectedArrivals"] | null,
+  }];
+  const byDay = new Map<string, NonNullable<InboundArrival["expectedArrivals"]>>();
+  for (const batch of arrival.expectedArrivals) {
+    const rows = byDay.get(batch.arrival) ?? [];
+    const sameLine = rows.find((row) => row.poLineId === batch.poLineId);
+    if (sameLine) {
+      sameLine.qty += batch.qty;
+      sameLine.quantityKnown = sameLine.quantityKnown && batch.quantityKnown;
+    } else rows.push({ ...batch });
+    byDay.set(batch.arrival, rows);
+  }
+  return [...byDay].map(([date, batches]) => ({
+    id: byDay.size === 1 ? arrival.id : `${arrival.id}:${date}`,
+    date,
+    qty: arrival.quantities.known && batches.every((batch) => batch.quantityKnown)
+      ? batches.reduce((total, batch) => total + batch.qty, 0) : null,
+    batches,
+  }));
 }
 
 /**
@@ -385,7 +412,7 @@ export function warehouseArrivalScheduleCards(
   categories?: WarehouseSkuCategories,
 ): WarehouseScheduleCard[] {
   const factsById = new Map(facts.map((f) => [f.sourceId, f]));
-  return arrivals.map((arrival) => {
+  return arrivals.flatMap((arrival) => expectedArrivalGroups(arrival).map((group) => {
     const fact = factsById.get(arrival.sourceId);
     const related: WarehouseScheduleRelatedRecord[] = [];
     for (const session of arrival.sessions)
@@ -398,7 +425,7 @@ export function warehouseArrivalScheduleCards(
           )}&receipt=${encodeURIComponent(session.id)}`,
         });
     return {
-      id: `arrival:${arrival.id}`,
+      id: `arrival:${group.id}`,
       direction: "arrival" as const,
       kind: arrival.sourceType,
       sourceId: arrival.sourceId,
@@ -409,28 +436,42 @@ export function warehouseArrivalScheduleCards(
       doRef: arrival.documentWord === "DO No" ? arrival.documentNo : null,
       partyName: arrival.party,
       siteId: arrival.siteId,
-      date: arrival.date,
-      dateStatus: arrival.date
-        ? fact
+      date: group.date,
+      dateStatus: group.date
+        ? group.batches
+          ? group.batches.every((batch) => batch.answer != null) ? "scheduled" as const : "expected" as const
+          : fact
           ? fact.dateStatus
           : /* A non-PO source carries `expected_date` and no agreement record
                of any kind — an estimate is all that exists to report. */
             ("expected" as const)
         : null,
-      lines: arrivalLines(arrival, fact, categories),
+      lines: group.batches ? group.batches.map((batch) => {
+        const line = fact?.lines.find((line) => line.id === batch.poLineId);
+        return {
+          id: `${batch.poLineId}:${batch.arrival}`,
+          categoryKey: categoryKeyOf(line?.sku, categories),
+          modelLabel: modelLabelOf(arrival, line?.sku ?? null),
+          sku: line?.sku ?? null,
+          plannedQty: batch.qty,
+          // Receipts belong to their exact receipt, not an unallocated dated
+          // promise batch. Actual arrival is published separately by receipt.
+          receivedQty: null, loadedQty: null, damagedQty: null,
+        };
+      }) : arrivalLines(arrival, fact, categories),
       driverConfirmedQty: null,
       logisticsName: null,
       relatedRecords: related,
-      openHref: arrivalOpenHref(arrival),
+      openHref: arrivalOpenHref({ ...arrival, date: group.date }),
       detailHref:
         arrival.sourceType === "supplier-delivery"
           ? `/operation/procurement/${encodeURIComponent(arrival.sourceId)}`
           : null,
       overdue: Boolean(
-        arrival.date && arrival.date < todayIso && arrival.remaining > 0,
+        group.date && group.date < todayIso && (group.qty === null || group.qty > 0),
       ),
     };
-  });
+  }));
 }
 
 // ── PICKUP cards ─────────────────────────────────────────────────────────────
@@ -719,18 +760,21 @@ export function warehouseCalendarArrivals(
   const events: WarehouseCalendarArrival[] = [];
   const seen = new Set<string>();
   for (const arrival of arrivals) {
-    if (!arrival.date || (arrival.quantities.known && arrival.quantities.pendingDeliveryQty <= 0)) continue;
-    const id = `expected:${arrival.id}`;
-    if (seen.has(id)) continue;
-    seen.add(id);
-    events.push({
-      id, kind: "expected_arrival", date: arrival.date,
-      sourceId: arrival.sourceId, sourceRef: arrival.documentNo,
-      siteId: arrival.siteId || null, siteName: arrival.siteMapped ? arrival.site : null,
-      expectedQty: arrival.quantities.known ? arrival.quantities.pendingDeliveryQty : null,
-      physicalQty: null, extraQty: null, receiptId: null, receiptRef: null,
-      href: arrivalOpenHref(arrival),
-    });
+    if (arrival.quantities.known && arrival.quantities.pendingDeliveryQty <= 0) continue;
+    for (const group of expectedArrivalGroups(arrival)) {
+      if (!group.date) continue;
+      const id = `expected:${group.id}`;
+      if (seen.has(id)) continue;
+      seen.add(id);
+      events.push({
+        id, kind: "expected_arrival", date: group.date,
+        sourceId: arrival.sourceId, sourceRef: arrival.documentNo,
+        siteId: arrival.siteId || null, siteName: arrival.siteMapped ? arrival.site : null,
+        expectedQty: group.qty,
+        physicalQty: null, extraQty: null, receiptId: null, receiptRef: null,
+        href: arrivalOpenHref({ ...arrival, date: group.date }),
+      });
+    }
   }
   let undatedReceipts = 0;
   for (const receipt of receipts) {

@@ -12,6 +12,7 @@ import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { buildGrnRegisterView } from "@carres/shared";
 import { useAuth } from "@/lib/auth";
+import OperationApp from "@/pages/operation/OperationApp";
 import OperationReceiving from "@/pages/operation/OperationReceiving";
 import OperationReceivingReport from "@/pages/operation/OperationReceivingReport";
 import CalendarPanel from "@/pages/operation/components/rail/CalendarPanel";
@@ -415,15 +416,15 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });
-  if (PAGE === "calendar" && url.includes("/api/operation/warehouse/inbound")) return json({
+  if (PAGE.startsWith("calendar") && url.includes("/api/operation/warehouse/inbound")) return json({
     sites: [{ id: WH, name: "Carres Klang" }, { id: WH2, name: "AL Sungai Buloh" }],
     arrivalCalendar: { undatedReceipts: 0, events: [
       { id: "expected:demo", kind: "expected_arrival", date: appTodayIso(), sourceId: "PO-20261005-4827", sourceRef: "PO-20261005-4827", siteId: WH, siteName: "Carres Klang", expectedQty: 12, physicalQty: null, extraQty: null, receiptId: null, receiptRef: null, href: "/operation?tab=warehouse-inbound&source=PO-20261005-4827" },
       { id: "receipt:demo", kind: "actual_arrival", date: appTodayIso(), sourceId: "PO-20261005-4827", sourceRef: "PO-20261005-4827", siteId: WH, siteName: "Carres Klang", expectedQty: null, physicalQty: 8, extraQty: 2, receiptId: POSTED, receiptRef: "GRN-20261005-1184", href: `/operation?tab=receiving&session=${POSTED}` },
     ] },
   });
-  if (PAGE === "calendar" && url.includes("/api/operation/orders")) return json({ orders: [] });
-  if (PAGE === "calendar" && url.includes("/api/operation/partners")) return json({ partners: [] });
+  if (PAGE.startsWith("calendar") && url.includes("/api/operation/orders")) return json({ orders: [] });
+  if (PAGE.startsWith("calendar") && url.includes("/api/operation/partners")) return json({ partners: [] });
   if (url.includes("/api/operation/workspace-duties")) return json(WORKSPACE_DUTIES);
   if (url.includes("/api/warehouse/incoming")) return json(WAREHOUSE_INCOMING);
   if (url.includes("/api/operation/warehouse-receipts/duty")) return json(DUTY);
@@ -536,7 +537,9 @@ createRoot(document.getElementById("root")!).render(
           <Route
             path="*"
             element={
-              PAGE === "calendar" ? (
+              PAGE === "calendar-shell" ? (
+                <PreviewFrame label="Receiving phone Calendar · illustrative data"><OperationApp /></PreviewFrame>
+              ) : PAGE === "calendar" ? (
                 <PreviewFrame label="Receiving Calendar · illustrative data">
                   <div className="h-full max-w-[340px] border-r border-kit-slate-5 p-3.5"><CalendarPanel /></div>
                 </PreviewFrame>

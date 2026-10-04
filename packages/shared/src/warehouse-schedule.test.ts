@@ -13,7 +13,7 @@ import {
 } from "./warehouse-schedule";
 import { warehouseOutboundCards } from "./warehouse-outbound";
 import { deliveryWarehouseScheduleEvents } from "./delivery-warehouse-schedule";
-import { inboundArrivals, type InboundInput } from "./warehouse-inbound";
+import { inboundArrivals, filterInbound, type InboundInput } from "./warehouse-inbound";
 
 const TODAY = "2026-09-14";
 
@@ -1030,5 +1030,66 @@ describe("Warehouse Calendar arrival evidence", () => {
     const result = warehouseCalendarArrivals(inboundArrivals(input), receipts, input.sites);
     expect(result.events).toHaveLength(201);
     expect(result.events.every((event) => event.kind === "actual_arrival")).toBe(true);
+  });
+});
+
+
+describe("Purchasing line/batch dates converge across Warehouse Schedule and Calendar", () => {
+  function splitInput(): InboundInput {
+    const reply = { po_id: "PO-SPLIT", kind: "tomorrow_delivery", po_version: 1, channel: "whatsapp", recipient: "Factory", evidence: "proof", reported_by: "Supplier", reported_at: "2026-09-10T02:00:00Z", recorded_by: "operator", recorded_at: "2026-09-10T02:05:00Z", about_date: null, previous_date: null, reason: null, answer: "confirmed", po_line_id: "L1", answer_group: "answer-1" };
+    return inboundInput({
+      pos: [po("PO-SPLIT", { official_delivery_date: "2026-09-15" })],
+      lines: [
+        { id: "L1", po_id: "PO-SPLIT", qty: 4, received_qty: 0, identity_mode: "quantity", destination_id: null, sku: "Same SKU" },
+        { id: "L2", po_id: "PO-SPLIT", qty: 2, received_qty: 0, identity_mode: "quantity", destination_id: null, sku: "Same SKU" },
+      ],
+      promises: [
+        { ...reply, about_qty: 3, new_date: "2026-09-14" },
+        { ...reply, about_qty: 1, new_date: "2026-09-20" },
+      ],
+    });
+  }
+
+  it("shows each batch day and the unanswered line's original date, with exact source scope", () => {
+    const input = splitInput();
+    const arrivals = inboundArrivals(input);
+    const events = warehouseCalendarArrivals(arrivals, [], input.sites).events;
+    expect(events.map((event) => [event.date, event.expectedQty])).toEqual([
+      ["2026-09-14", 3], ["2026-09-15", 2], ["2026-09-20", 1],
+    ]);
+    const cards = warehouseArrivalScheduleCards(arrivals, warehouseArrivalSourceFacts(input), TODAY);
+    expect(cards.map((card) => [card.date, card.lines.map((line) => line.plannedQty)]).sort()).toEqual([
+      ["2026-09-14", [3]], ["2026-09-15", [2]], ["2026-09-20", [1]],
+    ]);
+    expect(new Set(cards.map((card) => card.id)).size).toBe(3);
+    expect(cards.find((card) => card.date === "2026-09-15")?.dateStatus).toBe("expected");
+    expect(cards.find((card) => card.date === "2026-09-14")?.dateStatus).toBe("scheduled");
+    for (const event of events) {
+      const query = new URL(event.href, "https://example.test").searchParams;
+      expect(query.get("date")).toBe(event.date);
+      expect(filterInbound(arrivals, query).map((arrival) => arrival.sourceId)).toEqual(["PO-SPLIT"]);
+    }
+  });
+
+  it("does not allocate a cumulative partial receipt to a promised batch", () => {
+    const input = splitInput();
+    input.lines![0].received_qty = 1;
+    const arrivals = inboundArrivals(input);
+    const events = warehouseCalendarArrivals(arrivals, [], input.sites).events;
+    expect(events.filter((event) => event.date !== "2026-09-15").map((event) => event.expectedQty)).toEqual([null, null]);
+    expect(events.find((event) => event.date === "2026-09-15")?.expectedQty).toBe(2);
+    const cards = warehouseArrivalScheduleCards(arrivals, warehouseArrivalSourceFacts(input), TODAY);
+    expect(cards.filter((card) => card.date !== "2026-09-15").every((card) => card.lines.every((line) => line.receivedQty === null && line.plannedQty > 0))).toBe(true);
+  });
+
+  it("removes fulfilled lines and rejects a reply about an older PO revision", () => {
+    const input = splitInput();
+    input.lines![0].received_qty = 4;
+    let events = warehouseCalendarArrivals(inboundArrivals(input), [], input.sites).events;
+    expect(events.map((event) => [event.date, event.expectedQty])).toEqual([["2026-09-15", 2]]);
+    input.lines![0].received_qty = 0;
+    input.pos[0].version = 2;
+    events = warehouseCalendarArrivals(inboundArrivals(input), [], input.sites).events;
+    expect(events.map((event) => [event.date, event.expectedQty])).toEqual([["2026-09-15", 6]]);
   });
 });

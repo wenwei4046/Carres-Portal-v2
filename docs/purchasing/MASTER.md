@@ -634,8 +634,8 @@ were preserved. The PDF list renderer is covered by tests; its live download is 
 
 **Shared Calendar continuation — branch only, 2026-10-05.** Stock MASTER §7 records the new
 Warehouse-owned full-population arrival read. Its expected/actual receipt separation is locally
-tested and wired to the existing Quick Rail on branch. Complete source-date convergence, mobile
-entry and production acceptance remain open; no second Calendar page is introduced.
+tested and wired to the existing Quick Rail on branch. Line/batch date convergence and phone
+entry are also built on branch; production acceptance remains open; no second Calendar page is introduced.
 
 **Read-only production evidence, 2026-10-04:** `warehouse_submit_receipt` still files a report;
 `warehouse_receipt_check_in` calls Operation's post-authority gate. The only current active

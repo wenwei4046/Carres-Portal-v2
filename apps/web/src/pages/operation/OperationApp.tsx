@@ -1,5 +1,8 @@
 import { useEffect, useState } from "react";
 import { Menu } from "lucide-react";
+import Button from "@/components/kit/Button";
+import Drawer from "@/components/kit/Drawer";
+import CalendarPanel from "./components/rail/CalendarPanel";
 import {
   Navigate,
   Route,
@@ -123,6 +126,11 @@ export default function OperationApp() {
   const location = useLocation();
   const phone = usePhone();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [calendarOpen, setCalendarOpen] = useState(false);
+  const calendarDestination = new URLSearchParams(location.search);
+  for (const key of ["calendarModule", "calendarLocation", "calendarDay", "calendarRange"]) calendarDestination.delete(key);
+  const calendarDestinationKey = calendarDestination.toString();
+  useEffect(() => { setCalendarOpen(false); }, [location.pathname, calendarDestinationKey]);
   /* A chosen page closes the drawer. */
   useEffect(() => {
     setMenuOpen(false);
@@ -371,6 +379,12 @@ export default function OperationApp() {
               <Menu size={18} />
               Menu
             </button>
+            <div className="ml-auto">
+              <Button variant="ghost" icon="date" onClick={() => setCalendarOpen(true)} aria-expanded={calendarOpen}>Calendar</Button>
+            </div>
+            <Drawer open={calendarOpen} onOpenChange={setCalendarOpen} title="Calendar">
+              {calendarOpen && <CalendarPanel />}
+            </Drawer>
           </div>
         ) : null}
         {/* Site-wide utility bar (Alerts · Help · Settings) — pinned above the

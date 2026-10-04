@@ -5,6 +5,7 @@ import type {
   ArrivalSourceType,
 } from "./arrival-source";
 import { poSupplierDeliveryDateOf, type PoDatePromise } from "./po-workspace";
+import { poExpectedArrivalsOf, type ExpectedArrival } from "./po-windows";
 import { receivingSummaryOf } from "./warehouse-receipt";
 /** Read-only Receiving projection. Commercial balances and Stock status are never receipt evidence. */
 export interface InboundInput {
@@ -14,6 +15,7 @@ export interface InboundInput {
   parties?: Array<{ id: string; name: string }>;
   promises?: Array<PoDatePromise & { po_id: string }>;
   lines?: Array<{
+    id?: string;
     po_id: string;
     qty: number;
     destination_id: string | null;
@@ -149,6 +151,9 @@ export interface InboundArrival {
   /** The effective expected arrival — the supplier's evidenced answer where
    *  one exists, else the PO's own date. Filters and the Schedule read this. */
   date: string | null;
+  /** Purchasing-owned line/batch dates. Missing legacy line identities do not
+   * permit guessing a batch or assigning a cumulative receipt to it. */
+  expectedArrivals?: Array<ExpectedArrival & { quantityKnown: boolean }>;
   /** @deprecated Use `poIssued`. Kept only so an older consumer still reads. */
   poDate: string | null;
   /* THREE DATES, THREE QUESTIONS (COPY-STANDARD).
@@ -548,6 +553,23 @@ export function inboundArrivals(input: InboundInput): InboundArrival[] {
         input.promises?.filter((r) => r.po_id === p.id),
         p.version ?? 1,
       );
+      const expectedArrivals = poLines.length > 0 && poLines.every((line) => line.id)
+        ? poExpectedArrivalsOf({
+            version: p.version ?? 1,
+            officialDeliveryDate: p.official_delivery_date,
+            etaDate: p.eta_date,
+            promises: input.promises?.filter((reply) => reply.po_id === p.id) ?? [],
+            lines: poLines.map((line) => ({ id: line.id!, qty: line.qty, receivedQty: line.received_qty ?? 0 })),
+          }).map((batch, _, batches) => {
+            const line = poLines.find((line) => line.id === batch.poLineId)!;
+            // The source has no receipt-to-promise-batch allocation. Never
+            // repeat cumulative receipts across batches or invent FIFO.
+            const lineBatches = batches.filter((row) => row.poLineId === batch.poLineId);
+            const splitAfterReceipt = (line.received_qty ?? 0) > 0 && lineBatches.length > 1;
+            const withinOutstanding = lineBatches.reduce((total, row) => total + row.qty, 0) <= line.qty - (line.received_qty ?? 0);
+            return { ...batch, quantityKnown: !splitAfterReceipt && withinOutstanding };
+          })
+        : undefined;
       return [
         {
           id: p.id,
@@ -562,7 +584,8 @@ export function inboundArrivals(input: InboundInput): InboundArrival[] {
           siteMapped: Boolean(site),
           destinationId: p.destination_id,
           destinationName: destination?.name ?? null,
-          date: supplierDate ?? p.official_delivery_date ?? p.eta_date,
+          date: expectedArrivals?.map((batch) => batch.arrival).sort().at(-1) ?? supplierDate ?? p.official_delivery_date ?? p.eta_date,
+          expectedArrivals,
           poDate: p.placed_at,
           poIssued: p.placed_at,
           poDeliveryDate: p.official_delivery_date,
@@ -747,11 +770,8 @@ export function filterInbound(
     if (p.get("source") && p.get("source") !== r.sourceId) return false;
     const start = p.get("date") || p.get("from");
     const end = p.get("to") || start;
-    if (
-      (start || end) &&
-      (!r.date || (start && r.date < start) || (end && r.date > end))
-    )
-      return false;
+    const dates = r.expectedArrivals?.length ? r.expectedArrivals.map((row) => row.arrival) : r.date ? [r.date] : [];
+    if ((start || end) && !dates.some((date) => (!start || date >= start) && (!end || date <= end))) return false;
     return (
       !q ||
       [
