@@ -3355,6 +3355,30 @@ business facts and governed placement; acceptance does not claim all pages are m
 All listing pages follow **active filter chips → toolbar → table header/results**. Table and Cards share the same controls and order. This supersedes earlier instructions placing active conditions below the toolbar. The filter row is absent when there are no filters by default. Purchasing's owner-approved fixed placement (2026-10-02, Purchasing MASTER §9.3) opts into DataGrid `reserveConditionRow`: one 36px row remains when empty; multiple chips scroll horizontally, retaining all remove and Clear all controls without shifting the toolbar or results. Other registers retain their existing behaviour. Otherwise min-height36px, chips24px,6px vertical/12px horizontal padding,8px gap before the toolbar. No "Showing only" prefix. Each chip retains its accessible remove button; neutral slate-11 "Clear all" follows the chips, without a border or destructive red. The desktop toolbar is40px; search and Table/Cards and more tools right; SO count and quantity remain only in the footer and governed rail summary, directly above results. No divider between filters and toolbar. Narrow layouts may wrap controls and increase height to preserve accessibility. Shared DataGrid owns DOM/keyboard order; page-specific copies are not permitted. Existing pages using other listing engines still require migration; this ruling is not proof they are all deployed.
 
 
+## Shared module Columns contribution — owner ruling 2026-10-04
+
+**RULING / APPROVED TARGET, NOT BUILT.** All module registers use the accepted Sales Orders
+listing format and one shared Columns chooser/field catalogue. Operators select relevant fields;
+module pages supply appropriate defaults rather than inventing different listing engines.
+Purchasing contributes its owned fields first; other module owners propose their additions and
+accumulate approved contributions into the same catalogue. Do not wait for every module before
+admitting a coherent approved contribution. Suggested module group names are presentation
+proposals, not automatically admitted screen copy.
+
+Every contributed field declares its business meaning, authoritative owner/source, applicable
+record identity and relationship, display/default/optional choice, filter/sort/export behaviour,
+multiple-related-record representation and unknown/error/permission treatment. A shared SO number,
+Proceed Date, customer or other existing fact is reused once, not duplicated under each module.
+Expose only meaningfully related, authorised fields on the current record type; this is not a
+universal join between unrelated records and does not transfer write ownership. Table/Cards,
+search, header filters, Page tools, grouping, Columns and quick-view/full-page grammar remain
+shared; operational sorting and actions remain module-owned.
+
+Jess explicitly commissioned notification of the current ERP chats and each module's proposal
+for owner review: list already available/reusable facts, genuinely missing owned facts, recommended
+defaults/optional fields and dependencies. Proposal approval is separate from this shared direction;
+no automatic application build, deployment or resumption of paused work is authorised.
+
 ## Confirmed shared template — owner acceptance 2026-10-01
 
 Jess accepted the rendered Sales Orders pilot as the shared TEMPLATE and authorised a dedicated BUILD controller through testing and deployment. This supersedes earlier unapproved visual-composition restrictions for the accepted elements below; production evidence below bounds the delivered reference. Business facts, permissions and module workflows remain module-owned.

@@ -1285,12 +1285,12 @@ sidebar page. Existing implementation constants do not override these approved p
 | Rail headings | `ORDER TIMING` · `PRODUCT` · `SUPPLIER` · `REGION` · `SETUP TO FIX` |
 | Empty state | `No proceeded Sales Orders.` |
 | Register columns (owner ruling 2026-09-18 — exactly, in this order; overwrites R3 2026-09-16) | `Proceed Date` · `SO No` · `PO Safety Days` · `Customer Requested Delivery Date` · `Customer Delivery Location` · `Customer` · `Items` · `Supplier` · `Supplier Deliver To` · `PO No` · `PO Delivery Date` |
-| Table group headings (ruling R1 2026-09-16) | `To buy` (heading, count beside it) · `No purchase needed` (disclosure button, count beside it) |
+| SO Batch grouping (owner 2026-10-04) | Retire `No purchase needed`. Retain Pending/Partial work above Done; optional grouping does not change actual quantity or source lineage. |
 | Order By absence (ruling R2, split by S1 — BUILT 2026-09-17) | Three facts, three words, blank when nothing is left to buy: `Not planned` — ONLY missing setup blocks the date · `Already on a PO` — another open PO covers the remaining demand · `Coverage not checked` — whether an open PO covers it could not be verified. Never one word for all three. |
 | Footer (ruling R6) | `27 Sales Orders` · `5 of 27 Sales Orders` · `1 Sales Order` — one total, nothing else |
 | Search clear control (ruling R4) | `Clear search` |
 | `Proceed Date` on SO Batch Purchase | The actual date Sales handed the complete order to Operations (`orders.proceeded_at`). Never the planned production-start field (`orders.proceed_date`) |
-| Parent Status column | Retired. Do not restore `Partial` / `Ordered` as status pills or footer tallies. `To buy` / `No purchase needed` are the separately approved table group headings, not stored statuses. |
+| SO Batch PO Status (owner 2026-10-04) | Title `PO Status`; contextual values `Pending` · `Partial` · `Done`. Standalone: `PO Pending` · `PO Partial` · `PO Done`. Use `PO`, never `P.O.`. Aggregate all SO items/suppliers: no required buying quantity issued / partly issued / no required buying quantity remains. Confirmed eligible Ready Stock reduces required buying quantity; suggestions do not. Done proves neither sending nor receipt. Unknown coverage never means Done. |
 | A parent cell over several values | one value prints itself; several print `2 POs` · `2 suppliers` · `Multiple` — the exact mapping lives in the expansion |
 | Open local filter-rail control | `Hide filters` |
 | Hidden local filter-rail control | `Show filters` |
@@ -1387,7 +1387,9 @@ Manual Purchase uses its own request groups and remainder arithmetic.
 
 | Heading | Rail rows |
 |---|---|
-| `ORDER TIMING` | `Can order early` · `14 safety days left` · `1 to 13 safety days left` · `No safety days left` · `Not enough production days` |
+| SO Batch local view navigation (owner-approved 2026-10-04) | `Listing` · `Report`. Report replaces Monthly demand on SO Batch only; monthly report content is undecided and deferred until after left-rail delivery. Other modules retain Monthly demand. |
+| SO Batch daily cutoff heading (owner-approved 2026-10-04) | `Order time`, with configured clock rows currently `10:15 AM` / `4:00 PM`. Separate from `Order timing` planning/safety filters; do not use `PO rounds`, `Order rounds` or `Daily orders`. |
+| `ORDER TIMING` (owner correction 2026-10-04) | `Order early` · `14 days left` · `1–13 days left` · `0 days left` · `Production late`. No inner `Safety days` paragraph (latest owner correction). Owner browser correction approves `PO Safety Days` as the planning rail heading, replacing `Order timing`. Wording changes only; preserve governed calculations and keys. |
 | `PRODUCT` | `All products` · `Mattress` · `Bedframe` · `Sofa` |
 | `SUPPLIER` | `All suppliers` · actual supplier names, alphabetical — never hardcoded, never a placeholder, and no `No supplier` row |
 
@@ -1460,7 +1462,7 @@ These stock-picker words do not rename every Warehouse screen.
 | Where | The words |
 |---|---|
 | Actionable goods heads | `Status` · `Category` · `Qty` · `Item` · `Ready Stock` · `Supplier` · `Supplier Deliver To`; selection checkbox leads. Retire SKU, Ordered Qty, To buy and Order By from this table only. |
-| Need for a new PO, parent/item Status | `Need PO` · `No PO needed`. Not eligibility, PO completion, or a rename of the existing register groups. Never use `Not ordered yet` or `No purchase needed` for these status cells. |
+| SO Batch parent/item PO Status | `Pending` · `Partial` · `Done` under the SO Batch PO Status contract above. Manual Purchase retains its independently governed request states. |
 | Ready Stock cell | `{n} available` / `{n} reserved` on separate lines; reserved means this SO item line. `0` only for a successful empty read with no saved choice. |
 | Stock picker heads (BUILT — `components/StockPickerTable.tsx`, both purchasing surfaces) | `Goods Received Date` · `Stock Location` · `Supplier` · `PO No / Ref No` with `Unit ID` on line two · `Condition`; checkbox leads. Date only, physical receipt; current stock location. No Date In or Where on this picker. A two-line heading is ONE accessible name (`title`/`aria-label`), because two block spans concatenate in the DOM with no space. Consignment goods print the supplier's name with `Supplier-owned` beneath it; a counted row prints `{n} counted` beside its grade, since `Qty` is not one of the six columns. |
 | Stock picker actions | `Choose Ready Unit` · `Change selection` · `Save changes` · `Cancel`. No per-Unit Undo; save writes, checkbox alone does not. |
@@ -1545,7 +1547,7 @@ and the actor/time for withdrawal and line cancellation.
 
 | Heading | Rail rows |
 |---|---|
-| `ORDER TIMING` | `Can order early` · `Order date reached` · `Order date passed` |
+| `ORDER TIMING` | `Order early` · `Order date reached` · `Order date passed` |
 | `PURPOSE` | `All purposes` · the six governed purposes |
 | `PRODUCT` | `All products` · `Mattress` · `Bedframe` · `Sofa` |
 | `SUPPLIER` | `All suppliers` · actual supplier names, alphabetical |
@@ -2244,7 +2246,7 @@ No new document or duplicated dictionary is required. Code may lag; approval is 
 
 | Exact label | Meaning / boundary |
 |---|---|
-| `PO Safety Days` | Working-day margin remaining if the outstanding demand were ordered today, after supplier production (no transit leg, owner ruling 2026-09-29), relative to the applicable required date. Not the Order By date, not always 14, not days since creation. Use the one server calendar/planning engine. Parent shows the tightest outstanding line; none remaining is blank. Unknown setup/coverage is never 0. SO keeps its governed 14-working-day planning reserve. Manual Purchase also shows margin against its actual required arrival date; this does NOT approve adding a fixed 14-day reserve or relabelling its internal date as a customer promise. Validate the projection against the existing engine before build. **A DAYS COLUMN NEVER PRINTS A NEGATIVE NUMBER (BUILT 2026-09-18).** The signed count exists so the worst row sorts first; the cell prints the lane's own governed sentence for what the negative MEANS, and the two lanes mean different things — SO Batch `Not enough production days` (supplier production cannot make the customer's date), Manual Purchase `Order date passed` (the day to order by has gone). Never print one lane's sentence on the other, and never `-18`. Search, filter and export read the same word the cell prints. **MEASURED IN CHROMIUM 2026-09-18 — a Register cell clips with an ellipsis, and an ellipsis DESTROYS a fact rather than shortening it.** At 13px the sentences need `Not planned` 96px · `Already on a PO` 121px · `Order date passed` 137px · `Coverage not checked` 162px · `Not enough production days` 201px, against the cell's own padding. Manual Purchase's column is therefore 144 (min 120), which fits its widest word. SO Batch's column stays 120 and carries every sentence in `title` so nothing is lost at any width; whether that column should itself be wider is that listing's ruling to make. |
+| `PO Safety Days` | Working-day margin remaining if the outstanding demand were ordered today, after supplier production (no transit leg, owner ruling 2026-09-29), relative to the applicable required date. Not the Order By date, not always 14, not days since creation. Use the one server calendar/planning engine. Parent shows the tightest outstanding line; none remaining is blank. Unknown setup/coverage is never 0. SO keeps its governed 14-working-day planning reserve. Manual Purchase also shows margin against its actual required arrival date; this does NOT approve adding a fixed 14-day reserve or relabelling its internal date as a customer promise. Validate the projection against the existing engine before build. **A DAYS COLUMN NEVER PRINTS A NEGATIVE NUMBER (BUILT 2026-09-18).** The signed count exists so the worst row sorts first; the cell prints the lane's own governed sentence for what the negative MEANS, and the two lanes mean different things — SO Batch `Production late` (supplier production cannot make the customer's date), Manual Purchase `Order date passed` (the day to order by has gone). Never print one lane's sentence on the other, and never `-18`. Search, filter and export read the same word the cell prints. **MEASURED IN CHROMIUM 2026-09-18 — a Register cell clips with an ellipsis, and an ellipsis DESTROYS a fact rather than shortening it.** At 13px the sentences need `Not planned` 96px · `Already on a PO` 121px · `Order date passed` 137px · `Coverage not checked` 162px · `Production late` 201px, against the cell's own padding. Manual Purchase's column is therefore 144 (min 120), which fits its widest word. SO Batch's column stays 120 and carries every sentence in `title` so nothing is lost at any width; whether that column should itself be wider is that listing's ruling to make. |
 | `Customer Requested Delivery Date` | Actual customer's requested delivery date. No customer link means no invented date; never substitute Manual Purchase's internal required-arrival date. |
 | `Customer Delivery Location` | Actual customer's delivery address. Never substitute a warehouse or supplier destination. |
 | `Customer` | Actual linked customer, never Requested By. |

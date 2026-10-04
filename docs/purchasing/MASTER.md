@@ -27,6 +27,203 @@ Git history keeps superseded designs. A screen or earlier chat cannot create a s
 
 ---
 
+## Current approved Purchasing Blueprint — start here
+
+**OWNER RULING / APPROVED TARGET, 2026-10-04.** This is the single module entry point.
+Read this operating model first, then the relevant numbered section below for exact business,
+permission, document and exception rules. No old Card, separate design or earlier chat supplies
+another operating model. Approved target is not proof that the current page implements it.
+
+### SO Batch — daily operation
+
+1. Customer Sales Orders enter their purchase round using actual Proceed Date/time. Default daily
+   cutoffs are **10:15 AM and 4:00 PM**; authorised Settings can edit them. Owner reaffirmed
+   2026-10-04: Order timing uses configured PO Days intersected with the governed Office working
+   calendar and public holidays (§5.6.1). No round occurs on an excluded weekday or public holiday;
+   new demand rolls to the next eligible Purchasing day's first round. A skipped holiday creates no
+   missed occurrence. Previously incomplete eligible rounds remain incomplete across the holiday.
+   Use Asia/Kuala_Lumpur dates/times and existing calendar authority, not another holiday list.
+   Preserve missed work and exact SO/item lineage. Ordinary customer demand defaults to purchase; unassigned warehouse stock
+   must never make the system decide that purchase is unnecessary.
+2. Select the round in the left rail. The right side uses the shared Sales Orders Table/Cards
+   register, search, per-column filters and Columns selection. Default listing is date-first;
+   Supplier grouping is optional. Keep unfinished purchase work first, completed records below.
+   Do not show the rejected `No purchase needed` group or generic `Order summary` rail.
+3. Optionally select a stock location, default **Carres Klang**, and trigger whole-round Ready Stock
+   matching in this same listing. Allocate suggestions to the earliest Customer Requested Delivery
+   Date first, then earliest Proceed Date; undated demand follows dated demand. Settings can choose
+   the matching priority. Among compatible eligible Units, use FIFO. Never take another customer's
+   reservation, match incompatible specifications, or offer one Unit twice.
+4. Put matched suggestions first and show matched quantity, actual warehouse location and remaining
+   purchase quantity. Not checked is not zero stock. Select all or selected suggestions and Proceed
+   to accept them. Review is optional. A single customer's item can also choose an exact Unit and
+   location manually. Only successful, revalidated SO-owned reservations reduce purchase quantity;
+   merely computing an offer does not. Skip matching entirely to follow ordinary purchase.
+5. Place orders for remaining demand using prepared source information. No extra Operation review
+   gate or Jess approval is added to ordinary SO Batch. Compatible supplier/destination demand
+   creates the appropriate separate POs. Preserve partial success; retry only uncovered demand.
+6. Quick View supports the owning task. Optional full page is 50/50: before issue, prepared purchase
+   details and Draft PO PDF; after issue, formal PO/current version and its real PDF. Viewing is not
+   editing. Source SO links remain accessible. No formal PO number exists before successful issue.
+7. Use each actual current PO PDF for supplier communication. Copying a message or downloading
+   a PDF does not prove sending; manual sending declarations and any channel evidence remain separate
+   document facts. SO Batch PO Status Done depends only on the approved quantity/issue contract below,
+   never on inferred sending. Done records remain in the register.
+8. Normally await warehouse delivery; supplier reply is not a mandatory purchase-completion gate.
+   Supplier problems and overdue goods follow their specific exception rules. Receiving records
+   actual accepted/rejected quantities and evidence; partial receipt retains outstanding quantities.
+   Date-specific pre-arrival coordination, Claims and Finance obligations retain their own owners.
+
+### Left-rail naming — owner-approved 2026-10-04
+
+SO Batch local view navigation is `Listing` / `Report`. Owner browser correction replaces
+`Monthly demand` with `Report` on this surface only. Report is a later monthly reporting
+capability: its contents and measures are not yet decided and are not approved for build.
+Deliver the approved left rail first through deployment; retain Report as a deferred destination
+without inventing report data or a monthly-demand implementation. Other modules retain their
+existing governed Monthly demand capability.
+
+`Order time` is the approved heading for daily cutoff rows `10:15 AM` / `4:00 PM`.
+Do not display `PO rounds`, `Order rounds` or `Daily orders` as competing names.
+Retain the existing planning/safety capability separately: it describes early purchasing and
+production/safety margin, not a clock round. The owner explicitly requires these planning filters
+to remain. Owner correction 2026-10-04 approves the shortened planning labels for the current HTML and
+shared dictionary: `Order early`, `14 days left`, `1–13 days left`, `0 days left`,
+`Production late`. Latest owner correction removes the inner `Safety days` paragraph from the
+rail. Owner browser correction approves `PO Safety Days` as this planning group heading, replacing
+`Order timing`. This is naming only, not a scheduling change. Replace long labels throughout this SO Batch surface,
+including table absence text where it expresses the same production-shortfall fact. Keys,
+calculations, calendars and eligibility remain unchanged; icons never substitute for these words. Actual Proceed time governs round admission under the approved Blueprint and §5.6.1;
+Order By remains a planning fact, never an unlock gate (§9.1). Naming approval does not
+approve the earlier clock-only preview as the complete rail. Do not retire timing filters to
+simplify the preview. Apply existing holiday/calendar authority to whichever scheduling policy is
+finally approved.
+
+**LOCAL REVIEW MATERIAL / NOT PRODUCTION — 2026-10-04.** Isolated branch
+`codex/so-batch-local-rail-preview`, commit `155ceb717`, renders the real shared ModuleHeader,
+Sales FilterRail/Tabs composition and existing 12-column SoBatchRegister at
+`http://127.0.0.1:5178/so-batch-rail-preview.html`. It preserves one SO parent row, date-first
+identity, approved short planning labels, `Production late` in the table/filter/export,
+and no inner Safety days paragraph. The group heading is PO Safety Days under the latest owner browser correction. Desktop1280 and
+tablet820 inspection verified clock/independent planning samples, selected-row styling,
+hide/show; the latest owner correction replaces the deferred Monthly demand destination with Report; tablet page width820 and rail240.
+Preview types and 128 existing Register tests passed. Sample statuses/counts are illustrative;
+this does not prove real scheduling, whole-round stock matching, Quick View issue, Cards/grouping
+adoption or supplier communication. Production callers do not enable the inspection-preview option.
+No business write, merge or deployment occurred. Admission policy remains the explicit owner review
+above; preview completion is not whole-page completion.
+
+### SO Batch PO Status — owner-approved 2026-10-04
+
+Column/filter title: `PO Status`. In that named context use `Pending`, `Partial`, `Done`.
+Standalone cards, other pages and notifications use `PO Pending`, `PO Partial`, `PO Done`.
+Always spell `PO`, not `P.O.`. `Issue PO` remains the action verb.
+Calculate across every SO item and its exact supplier/PO lineage, not the presence of one PO.
+Exclude successfully confirmed eligible Ready Stock reservations from quantity requiring purchase.
+`Pending`: purchasing quantity remains and none of that required purchase quantity has been issued.
+`Partial`: some required purchase quantity has valid PO lineage and some remains unissued.
+`Done`: no required purchase quantity remains unissued, including an SO fully fulfilled by confirmed
+Ready Stock. Done expresses purchase-task quantity completion, not a claim that a PO exists, was
+sent or was received. Unconfirmed matches never qualify; failed/unknown coverage reads cannot
+produce Done. Pending/Partial remain above Done in the retained listing, ordered by Proceed Date.
+This overwrites the earlier SO Batch parent/item `Need PO` / `No PO needed` presentation;
+Manual Purchase's independent approval/request grouping is unchanged. Target approval is not build
+or production verification. Supplier communication evidence and Receiving remain separate facts.
+
+### Supplier documents and communication — owner-approved 2026-10-04
+
+After successful SO Batch Issue PO, the same right-side result/Quick View panel shows the issued
+bundle: separate numbered POs, current versions and suppliers. A bundle is a result scope, not a
+new formal document, merged supplier PDF or second issue authority. Default scope is This round;
+Today explicitly selects POs issued today across rounds. Filter by Supplier, select individual POs
+or Select all within that supplier/scope. Selection drives the exact same PO/version set for the
+message listing and PDF files. Refreshing or changing selection updates both; never include another
+supplier's document, a draft, superseded version or unselected PO silently.
+
+Each PO remains one independent PDF. Download PDFs packages selected files into a ZIP for one
+bulk download; it never merges the PDFs. A per-PO PDF action remains. Purchase Orders Register
+supports finding/re-downloading selected POs through supplier/date filters using the same capability.
+SO Batch gives immediate access without requiring a second trip to that register.
+
+Every supplier supports both Email and WhatsApp in the approved communication target. The panel
+provides a channel selector, initially using the supplier's saved preferred channel, and permits
+switching without restricting either channel by supplier identity. Ohana currently preferring Email
+is an operating example, not an Email-only rule; other suppliers may also use Email. Contact details
+for each channel come from supplier authority. This ruling does not silently overwrite production
+supplier settings. Email panel shows saved recipient, editable prepared subject/message listing
+selected PO numbers/versions, and each independent selected PDF as an attachment. Send Email is
+an approved target; expose it as executable only when the actual email/attachment capability is
+verified. Its result records actual dispatch evidence/failure, never supplier receipt by inference.
+WhatsApp panel shows the corresponding prepared message with Download PDFs, Copy message and
+Open WhatsApp. Staff attach the independent PDFs and send externally; copying/downloading/opening
+proves preparation only, never sending. No automatic WhatsApp attachment/transmission is promised.
+
+Scope labels: This round / Today. Shared action labels: Download PDFs / Copy message /
+Open WhatsApp / Send Email. PO Status Pending/Partial/Done still measures issue quantity only;
+communication and receipt are independent facts. Batch failures remain per PO/version and retain
+successful results, so retry cannot silently resend every document. Use governed communication
+ownership, permissions and actual supplier contact authority; this approval commissions target
+truth, not a live external email, supplier-settings write or production transmission.
+
+**OWNER RULING — copy and adapt Houzs supplier Email capability, 2026-10-04.**
+Use the inspected real-email/PDF pattern as the proven reference for Carres, adapted to its existing
+PO/version, communication, permissions and supplier contact authorities. Any supplier with a valid
+saved Email may use Email sending; no supplier-name restriction. Without an Email, keep WhatsApp
+preparation/download available and direct contact maintenance to the supplier record; never fabricate
+a recipient. Default to the saved preferred channel and retain channel switching. For the approved
+supplier bundle panel, selected PO numbers/versions, message listing and independent PDF attachments
+must be the same set. One supplier Email may carry the selected separate PO PDFs; never merge them
+into one PDF or silently omit an attachment. Confirm recipient and selected documents before actual
+send, record actual actor/channel/recipient/PO-version set and outcome, and expose failure/retry
+without duplicate issue. Reuse short duplicate-send protection adapted to explicit resend and version
+semantics; email success means dispatch, not supplier receipt. PDF preparation failure prevents this
+send, with no summary-only fallback. This is approved copy/adapt target, not proof of Carres build,
+production deployment or authorization to send a real supplier order during research.
+
+**REFERENCE FINDING — Houzs supplier Email, checked 2026-10-04.** Live PO
+`https://erp.houzscentury.com/scm/purchase-orders/068c294e-1b44-400c-9338-2a5223912d63`
+(HC-PO-2610-059) exposes Send to supplier; missing saved supplier email produced a named refusal.
+Correct current source is `hello-houzs/Houzs-ERP`, not the older `wenwei4046/2990s` checkout.
+Inspected `frontend/src/pages/scm-v2/PurchaseOrderDetailV2.tsx` and
+`backend/src/scm/routes/mfg-purchase-orders.ts` on fetched GitHub main: the operator confirms the
+supplier recipient, browser generates this PO's PDF and posts it to the single-PO
+`/:id/send-to-supplier` route, which invokes the actual email service with an attachment.
+This is a human-triggered real email capability, not unattended issue-time auto-send. Source
+contains recipient/status/channel/attachment validation, short resend protection, failed-send stamp
+rollback and real actor/outcome audit. Successful dispatch does not establish supplier receipt.
+The inspected endpoint handles one PO, not the proposed multi-PO/supplier bundle. Backend permits
+summary-only email without attachment; Carres's approved PO-PDF action must not silently adopt
+that fallback. Attachment retries in this implementation are manual, avoiding attachmentless
+outbox replay. Mapping: **COPY REQUIRED** for the proven single-PO email pattern; Carres has not
+been proved READY. Multi-PO independent attachments, versions, selected-set consistency and Carres
+permissions remain adaptation/verification work. No supplier email or settings were changed, and
+no real message was sent for this research. Findings establish source behavior, not production
+successful transmission or owner approval to copy foreign business rules.
+
+### Manual Purchase — when needed
+
+Showroom's complete arrangement stays in Display Request. Only the Carres-buying portion enters
+Manual Purchase, with source facts carried forward; moves/returns retain their owning modules.
+The left rail selects Showroom and which showroom. Select a request in the right register to open
+Quick View: **Operation review → submit to Jess → approval → PO → send → Receiving**. This approval
+loop belongs to Manual Purchase, not ordinary SO Batch. Other non-SO needs use the same request door.
+
+### One shared presentation; separate business truth
+
+All module listings reuse the shared UI register grammar. Columns is one owner-grouped catalogue:
+Purchasing contributes its own fields; other modules contribute theirs without duplicating common
+facts. Page defaults and record relationships govern which fields can appear. Quick View can finish
+ordinary tasks; full page provides optional detailed 50/50 inspection, with explicit Edit.
+PO numbers identify commitments; suppliers group/filter them. Sending completion, goods receipt,
+Claims and financial settlement remain distinct. Exact new labels follow the shared copy authority.
+
+**Build acceptance:** an operator can choose a round, optionally match stock in bulk or manually,
+place only the remainder, send each actual PO PDF and find both unfinished and completed records
+without Workspace or mandatory per-order review. This section is approved business target, not a
+claim of production delivery. The detailed governing sections below own exceptions and evidence.
+
+---
+
 ## 1 · Mission and boundary
 
 Purchasing answers five questions:
@@ -117,7 +314,7 @@ AUTHORITY**. No Owner Decision remains.
 **OWNER-APPROVED / LOCKED 2026-08-29.** Purchasing and Receiving execute in their owning
 modules while the shared Work Engine gives staff and managers one daily list. The governing design
 is recorded in
-[`docs/superpowers/specs/2026-08-29-purchasing-receiving-work-design.md`](../superpowers/specs/2026-08-29-purchasing-receiving-work-design.md).
+[Purchasing MASTER](MASTER.md).
 
 The six questions must be answerable for every open action: **who acts · which actual working day ·
 where they act · what proves completion · who supervises · what consequence follows**. `My Work`
@@ -663,9 +860,11 @@ revision capability is not added to the separately commissioned PO-placement unb
 #### 5.6.1 Daily PO windows — owner-approved 2026-09-24; MERGED (#1621) and DEPLOYED, 0584/0585 APPLIED; owner walk owed
 
 SO demand is accumulated for batch review; PO Duty does not issue one PO action per Sales Order.
-Purchasing Settings owns an editable first standard window, initially `11:30 AM` Malaysia time,
-and one optional editable second standard window, initially `4:00 PM`. The second window may be
-switched off. Demand admitted before a window belongs to that next valid window; demand after the
+**CURRENT WINDOW CONFIGURATION — OWNER RULING 2026-10-04 / APPROVED TARGET:** the first PO
+window is `10:15 AM` and the second is `4:00 PM`, Malaysia time, with both enabled. These are
+two consolidated buying/supplier-PO rounds on each governed PO working day. Purchasing Settings
+owns the editable times and second-window switch; a later authorised configuration change may
+change them. This document update does not claim that the live Settings values have been changed. Demand admitted before a window belongs to that next valid window; demand after the
 last enabled window belongs to the next Purchasing working day's first window. A supplier's
 governed earlier cut-off always wins and may never be placed in a later invalid window.
 
@@ -689,7 +888,8 @@ panel belong to Workspace (handed off to the Workspace lane the same day); Purch
 facts, the one send area and the completion fact below.
 
 - **Settings.** `Settings → Purchasing → PO windows` carries `PO Days` (day ticks), `First PO
-  window` (default `11:30 AM`), `Second PO window` with an on/off switch (default `4:00 PM`).
+  window` (current owner target `10:15 AM`), `Second PO window` with an on/off switch
+  (current owner target enabled, `4:00 PM`).
   Every change records actor, time, old value, new value and effective date; it never rewrites an
   issued PO. **BUILT 2026-09-28:** one `PO windows` card at the top of Purchasing Settings holds
   `PO Days`, `First PO window` and `Second PO window` with its switch. It reads through the same
@@ -755,7 +955,9 @@ facts, the one send area and the completion fact below.
   nothing. A received PO needs no sending; a PO serving two windows belongs to the earliest.
 - **Gap.** 0585 stores the window times (`purchasing_set_po_windows`) and supplier cut-offs
   (`purchasing_set_supplier_po_cutoff`), but Purchasing Settings has no editing screen for them yet;
-  until it ships the windows are the 11:30 AM / 4:00 PM defaults and no supplier has a cut-off.
+  this was an earlier implementation observation, not the current configuration authority.
+  The editing screen is now recorded above; current owner-requested times are 10:15 AM / 4:00 PM.
+  Live configured times and supplier exceptions require readback before claiming convergence.
 
 **HOW IT IS ENFORCED — BUILT, migrations 0378 / 0379 / 0380, PR #894.**
 
@@ -1674,7 +1876,7 @@ summary. Action ownership uses structured avatar metadata.
   The selected document is visible before Issue PO, using the PO template and its
   explicit draft treatment in `docs/pdf/PO-PDF-STANDARD.md`. Navigating documents
   changes the draft. Previewing creates nothing; Issue PO remains the creation action.
-- **Review Purchase Orders work pane and every Purchasing object surface wear the Sales Order card — owner instruction 2026-09-26 ("pls follow sales order ui kit … every page of purchasing"), BUILT 2026-09-26.** The work pane is two Sales Order cards: `Purchase order` (Supplier · Supplier Deliver To · Delivery Method · PO Doc Date with its `Provisional…` hint · `PO {n}-Day Delivery Date`, label over plain value, two to a row in the half-width pane) then `Items` (the Item · Source · Qty · Goods must arrive table). The same one chrome — black bold sentence-case title over a rule (ONE KIT LAW, owner 2026-09-27: never blue), the shared `Block` + `Fact` of `SalesOrderWorkspace.tsx` — now draws the PO object page (its facts three to a row; `Supplier reply` / `Record supplier answer` become in-card labels), the Manual Purchase saved-request detail, the Supplier Claim panel and Purchasing Settings; the retired mono-uppercase tone and the cream band no longer appear on any Purchasing page. Every fact prints in the Sales Order's bordered box (owner, 2026-09-26: "got box … I want follow"), whether or not that surface can change it. **No dash, the cell says why (owner, 2026-09-27):** every `—` on a Purchasing goods table is replaced by its reason from `GOODS_ABSENCE_WORDS` (COPY "A goods cell with nothing in it says why"); furniture always carries its Unit IDs from the official PO (measured 2026-09-27: 103 of 103 live PO lines), so `Counted by quantity` appears only on accessory lines. A table wider than its card scrolls inside it and says so (`TableScroller` — the Sales Order Items fade and step button) on the PO object's `Items` and `Supplier reply`. **Owner corrections the same day:** the PO object's `Purchase order` card drops `Source` (retired word; the sales-order lineage stays on the `Order Route` tab) and the page-level `Terms (days)` door (payment terms are read from the supplier's Settings; a PO-level override is no longer set on the object page). The Manual Purchase request detail keeps ONE TITLE, ONE BOX: `Delivery Date` · `Order By` · `Order timing` (`Can order early` / `Order date reached` / `Order date passed`) are three facts, never stacked; `Approval Status` is a fact on the `Request` card (the international pattern — Odoo, NetSuite, SAP release — keeps approval state as a field and the decision as an action), `Withdraw request` rides the Request card's header, and the `Approval` card appears only for the approver's decision or a decision record.
+- **Review Purchase Orders work pane and every Purchasing object surface wear the Sales Order card — owner instruction 2026-09-26 ("pls follow sales order ui kit … every page of purchasing"), BUILT 2026-09-26.** The work pane is two Sales Order cards: `Purchase order` (Supplier · Supplier Deliver To · Delivery Method · PO Doc Date with its `Provisional…` hint · `PO {n}-Day Delivery Date`, label over plain value, two to a row in the half-width pane) then `Items` (the Item · Source · Qty · Goods must arrive table). The same one chrome — black bold sentence-case title over a rule (ONE KIT LAW, owner 2026-09-27: never blue), the shared `Block` + `Fact` of `SalesOrderWorkspace.tsx` — now draws the PO object page (its facts three to a row; `Supplier reply` / `Record supplier answer` become in-card labels), the Manual Purchase saved-request detail, the Supplier Claim panel and Purchasing Settings; the retired mono-uppercase tone and the cream band no longer appear on any Purchasing page. Every fact prints in the Sales Order's bordered box (owner, 2026-09-26: "got box … I want follow"), whether or not that surface can change it. **No dash, the cell says why (owner, 2026-09-27):** every `—` on a Purchasing goods table is replaced by its reason from `GOODS_ABSENCE_WORDS` (COPY "A goods cell with nothing in it says why"); furniture always carries its Unit IDs from the official PO (measured 2026-09-27: 103 of 103 live PO lines), so `Counted by quantity` appears only on accessory lines. A table wider than its card scrolls inside it and says so (`TableScroller` — the Sales Order Items fade and step button) on the PO object's `Items` and `Supplier reply`. **Owner corrections the same day:** the PO object's `Purchase order` card drops `Source` (retired word; the sales-order lineage stays on the `Order Route` tab) and the page-level `Terms (days)` door (payment terms are read from the supplier's Settings; a PO-level override is no longer set on the object page). The Manual Purchase request detail keeps ONE TITLE, ONE BOX: `Delivery Date` · `Order By` · `Order timing` (`Order early` / `Order date reached` / `Order date passed`) are three facts, never stacked; `Approval Status` is a fact on the `Request` card (the international pattern — Odoo, NetSuite, SAP release — keeps approval state as a field and the decision as an action), `Withdraw request` rides the Request card's header, and the `Approval` card appears only for the approver's decision or a decision record.
 - **Review Purchase Orders desktop composition — owner approved 2026-09-24; BUILT + DEPLOYED (#1573); SO read-only production walk verified, MPR issue walk still owed.** SO Batch and Manual Purchase share one review. At the owner's 1074–1087px desktop viewport, retain side-by-side work and actual PDF preview, following the approved Sales Order composition. The former 1130px available-surface cutoff is not acceptance for this review. Use the governed document viewer with enlargement and explicit loading/error/retry states; do not force a whole A4 page into unreadably small text or depend on the browser's dark PDF viewer. Truly narrow/mobile layouts may stack; this does not change other document surfaces' responsive rules.
 - **Approved review sequence and scope.** Header: total PO count, goods quantity and an explicit whole-batch issue action. Work pane: current document selection → Supplier → Supplier Deliver To/address and Delivery Method → provisional PO Date and Settings-derived PO Delivery Date → source/items/quantity → actionable missing facts. Preview uses the same selected document and approved PO template. Switching documents updates its paper. Returning preserves selection; issuance is not sending.
 - **A complete draft before commitment.** Both lanes must carry server-resolved supplier/destination addresses, provisional dates and delivery method. The draft reserves no official number or Unit ID; successful issuance records the actual PO Date and revalidates the dates. Goods must arrive is an internal deadline, not a substitute for PO Delivery Date. Missing required document facts identify their owning Settings destination instead of silently disappearing. Unrendered/failed preview is not completed review. Do not invent addresses, prices, dates or identifiers.
@@ -1902,16 +2104,11 @@ This document approves presentation, not unverified new storage fields, identifi
 **OWNER RULINGS R1–R8 — SO BATCH ROUND 1, APPROVED / LOCKED 2026-09-16.** Built in PR #1395.
 Fixture-walked in the real portal shell; the authenticated production walk is recorded in Card 11.
 
-- **R1 · One table, two groups.** `To buy` sits first, always open, and is a HEADING, never a
-  control; it stays visible with `0` while the Register holds records. `No purchase needed` sits
-  below, initially collapsed, and is a real disclosure button (`aria-expanded`). Grouping reads
-  REMAINING purchasing demand from the shared projection (`soBatchOrderPlanning` over
-  `soBatchOrderLineOutstandingQty`: customer quantity less current Ready Stock coverage less exact,
-  non-cancelled PO lineage), never the raw blank/partial/ordered status. Blocked, unverified and
-  pool-covered demand is never assumed bought, so it stays in `To buy`. PO-covered and
-  Ready-Stock-only orders (including orders that never had a PO) need no purchase. Search, column
-  filters and rail filters cover both groups; while any narrowing is active every group opens, and
-  clearing it returns the groups to the state the operator had before.
+- **R1 · One retained register — current owner ruling 2026-10-04.** Unfinished purchase work
+  appears first; completed work remains below. Default ordering uses Proceed Date within unfinished
+  work, with optional Supplier grouping. Free warehouse stock is an optional offer, never automatic
+  purchase exclusion. Deduct only actual SO-bound eligible Units and exact non-cancelled PO lineage.
+  Search and filters cover retained records. The earlier automatic non-purchase group is retired.
 - **R2 · Planning fact.** Order By remains the engine/detail date, not a parent column; the parent
   displays `PO Safety Days` under the shared dictionary. The planning date is the earliest over exactly the
   leaves the parent checkbox would tick; blank when nothing is left to buy. An undated `To buy`
@@ -1919,9 +2116,9 @@ Fixture-walked in the real portal shell; the authenticated production walk is re
   `Not planned` only when a leaf is blocked by missing setup (or an eligible leaf has no derivable
   date); `Coverage not checked` when whether an open PO covers a leaf could not be verified;
   `Already on a PO` when another open PO covers the remaining leaf. Setup is named first; an
-  unverified leaf is named before a covered one, because unknown must never read as covered. `To buy` reads selectable Order By ascending → `Not planned` →
-  SO No descending; `No purchase needed` reads SO No descending. Header sorting orders rows inside
-  each group, never across them. No client calendar arithmetic is admitted.
+  unverified leaf is named before a covered one, because unknown must never read as covered. Default ordering follows the current approved Blueprint: unfinished first, Proceed Date first;
+  optional stock-match results put proposed matches first within the selected round. Header sorting
+  and selectable grouping use the shared register grammar. No client calendar arithmetic is admitted.
 - **R3 · Columns** — see the column paragraph below; the saved layout key is
   `carres.soBatchPurchase.register.v5`, and only this register's key moved.
 - **R4 · Search** follows UI MASTER §6.7 (the responsive Register Search rule), adopted here first.
@@ -1980,11 +2177,11 @@ Price resolution never disables ordinary selection or becomes an Operation cost 
 
 ```text
 ORDER TIMING
-  Can order early
-  14 safety days left
-  1–13 safety days left
-  No safety days left
-  Not enough production days
+  Order early
+  14 days left
+  1–13 days left
+  0 days left
+  Production late
 
 PRODUCT                   ▾ compact fact dropdown (owner ruling 2026-09-11)
   All products
@@ -2028,7 +2225,7 @@ SETUP TO FIX              ← the whole section renders only when at least one a
   `Issue PO` selection. One filter may be selected per section; filters from different
   sections combine; clicking a selected timing row again clears it; `All products`,
   `All suppliers` and `All regions` clear their sections; clearing every filter restores the
-  complete permanent Register in its two groups, including the collapsed `No purchase needed` group.
+  complete retained Register, including completed purchase records.
 - **Counts are UNIQUE Sales Orders** — never documents, notifications, leaf lines, SKU
   quantities or PO counts. Each section's counts update against the other selected sections,
   so the printed number predicts the resulting SO rows. The fixed rows (the five timing rows,
@@ -2055,8 +2252,8 @@ SETUP TO FIX              ← the whole section renders only when at least one a
 - **Region reads the server's recorded Delivery State** — never customer text, supplier address or
   a postcode guessed on this page. Kuala Lumpur, Selangor and Putrajaya group as `Klang Valley`;
   every outstation state keeps its own name; a missing state remains findable as `Others`.
-- Every timing row remains orderable. `Can order early`, `1–13 safety days left`,
-  `No safety days left` and `Not enough production days` express timing risk, never
+- Every timing row remains orderable. `Order early`, `1–13 days left`,
+  `0 days left` and `Production late` express timing risk, never
   `Cannot buy`. Order By is a planned date, never an unlock date.
 - `Production days not set` is the only normal setup blocker on this surface. It belongs to
   Purchasing Settings, and its lines are not selectable until the Supplier × Category
@@ -2140,11 +2337,11 @@ is Work scheduling, not planning arithmetic.
 Timing classification, derived by the same engine:
 
 ```text
-today < Order By                                                   → Can order early
-today = Order By                                                   → 14 safety days left
-today > Order By · completion lands 1–13 working days early        → 1–13 safety days left
-expected production completion = Requested Delivery Date            → No safety days left
-expected production completion > Requested Delivery Date            → Not enough production days
+today < Order By                                                   → Order early
+today = Order By                                                   → 14 days left
+today > Order By · completion lands 1–13 working days early        → 1–13 days left
+expected production completion = Requested Delivery Date            → 0 days left
+expected production completion > Requested Delivery Date            → Production late
 ```
 
 `Order By` stays fixed for a demand unless an authoritative source fact changes; `Safety days
@@ -2202,16 +2399,17 @@ PO Delivery Date
 ```
 
 `Items` shows `{first item} + {n} more`, with all items available in expansion.
-The default sort is unchanged — groups, then the Order By urgency, then SO No — and the `To buy` /
-`No purchase needed` groups stay. `PO Safety Days` reads the remaining working-day margin defined in the shared COPY dictionary; the Order By date is not a goods-table column; underlying timing calculations remain unchanged. `Proceed Date` and `SO No` pin at canvas ≥768px; below 768px only `SO No`
+The default sort follows the current approved Blueprint: unfinished purchase work first, then
+Proceed Date; completed purchase records remain below. Optional matching temporarily puts matched
+suggestions first in the selected round. `PO Safety Days` reads the remaining working-day margin defined in the shared COPY dictionary; the Order By date is not a goods-table column; underlying timing calculations remain unchanged. `Proceed Date` and `SO No` pin at canvas ≥768px; below 768px only `SO No`
 pins. `Proceed Date` reads `orders.proceeded_at` (the actual hand-off), never
 `orders.proceed_date`. The build bumps the saved layout key so no stored arrangement keeps the old
 order; `leadingColumns` still refuses to hide or move the pair. Widths are measured at 1440 in the
 shell with the rail open during the build.
 
-- **Status is the new-PO need, not a generic Partial/Ordered progress badge.** Use `Need PO` /
-  `No PO needed`; retain the authoritative selection and coverage gates. Neither a status word
-  nor an unknown coverage read authorizes purchasing. Partial/Ordered footer tallies stay retired.
+- **PO Status** uses the current owner-approved `Pending` / `Partial` / `Done` contract at
+  this MASTER's beginning. Retain authoritative selection and exact coverage gates; a status word
+  never authorizes purchase or turns unknown coverage into Done. Footer status tallies stay retired.
 - **Visible PO attribution comes ONLY from `po_line_sources`** — never `purchase_orders.so`,
   `so_refs`, or a global SKU/supplier/customer match. `PO Delivery Date` is
   `purchase_orders.official_delivery_date`, the ORIGINAL supplier-facing date stamped at birth and
@@ -2296,7 +2494,7 @@ No SKU, Ordered Qty, To buy, Order By or PO Safety Days column in this actionabl
 Qty remains the original SO quantity. Remaining purchasing quantity is shown in the selection
 bar and the issue review, using authoritative coverage; removing columns removes no duplicate-order
 protection. A matched set remains one purchasing demand, not one tick per physical display row.
-Status uses `Need PO` / `No PO needed` for the need for a new PO, not permission to buy:
+PO Status uses `Pending` / `Partial` / `Done` under the current owner-approved quantity contract;
 unknown coverage and other blockers still prevent selection and state their actual reason.
 
 The row-leading disclosure expands goods; it is separate from the SO No detail link.
@@ -2850,7 +3048,7 @@ in this exact order; fact sections use compact dropdowns:
 
 ```text
 ORDER TIMING
-  Can order early
+  Order early
   Order date reached
   Order date passed
 PURPOSE
@@ -2880,7 +3078,7 @@ The selected supplier remains visible with zero matches.
 
 `ORDER TIMING` counts requests with confirmed remaining procurement quantity and compares
 the earliest engine-derived Order By with the server date:
-`Can order early`, `Order date reached`, or `Order date passed`. These facts do not prohibit
+`Order early`, `Order date reached`, or `Order date passed`. These facts do not prohibit
 an otherwise authorised early purchase. Missing settings never invent a date.
 Banned rail rows remain `Supplier not selected`, `No supplier`, `Not in catalog`,
 `Need price`, `Ordered`, `Part received`, `Received`, `Arrived`, `Cancelled`, `My drafts`,
@@ -3699,6 +3897,175 @@ overdelivery, price change, cancellation and post-send destination change retain
 **Connections:** demand, supplier, GRN, Stock, claims and Finance retain their existing ownership.
 
 
+
+#### Purchase Order page recovery — owner mission and proposed content, 2026-10-04
+
+**OWNER MISSION / LOCKED:** start with the independent Purchase Order page and its complete
+Operation journey. Make module-owned operations understandable and usable before composing them
+in Workspace. Workspace remains a projection of the same source actions, not a prerequisite to
+placing or following a PO. Conversation is Chinese; reusable design blocks and interface text
+are English. Do not produce another HTML attempt before the content/action journey is reviewed.
+
+**OWNER CONFIRMED 2026-10-04 — SO Batch Purchase versus Manual Purchase.** The 10:15 AM and
+4:00 PM entries open SO Batch Purchase for the eligible customer-order buying demand in that round,
+with secured-stock and exact existing-PO coverage deducted. The owner confirmed that clicking a
+round displays its consolidated buying list. “Reserve customer” describes the customer-order buying
+scope; it does not mean buying again for goods already secured by an eligible reserved Unit.
+Manual Purchase is an as-needed authorised request, not a compulsory daily round. Its approved
+request/approval/PO issue and actual-sending rules remain unchanged. Do not present Manual Purchase
+as a third daily task or silently add its demand to a customer-only SO Batch round.
+This confirms round/list behaviour and domain separation, not the rest of the proposed page layout.
+
+**OWNER CONFIRMED 2026-10-04 — date-first SO Batch with selectable grouping.**
+Proceed Date remains the priority date fact and default chronological reading of SO Batch,
+preserving the existing date-first register authority. Reuse Sales Orders' Table/Cards segmented
+view and Page tools menu for choosing grouping; supplier grouping is an available view, not a
+mandatory replacement of date-first listing. The recommended default is Group by: None, with
+Group by: Supplier selectable from the same menu; each group preserves Proceed Date, original
+SO source and purchase quantity. Do not create a separate table per supplier. Grouping affects
+presentation only: window eligibility, secured-stock/exact-PO coverage, compatible supplier/
+destination document grouping and issue/sending rules remain unchanged. Additional purchasing
+status grouping and literal menu additions remain proposals pending review; Sales Orders'
+Delivery/Stock/Payment grouping labels are not automatically Purchasing truth. Completed records
+remain accessible under the established SO Batch register law. This replaces the earlier fixed
+supplier-group presentation in this recovery section.
+
+**SHARED MODULE CARD — current governed implementation.** Use `CompactModuleCard` and
+`docs/ui-reference/MODULE-CARD-TEMPLATE.md` under the current UI MASTER. Shared implementation
+was merged in `a9dbb6b8918e9337328eefccebe547ee1d2f4ab6`; a local reference HTML is not a second
+implementation or current design authority. Reuse the shared identity/header, summary, navigation,
+Items, Communication and Timeline grammar and its interactions. SO Batch keeps its source
+SO/customer identity; a formal PO keeps its PO/version, supplier and destination identity; an MPR
+keeps its request identity, requester and purpose. Do not fabricate a customer or Sales Order for
+an internal request. Translate only module-owned facts/actions. Shared kit delivery does not
+prove Purchasing page integration, business completion or live data. The card contract does not
+replace the approved Sales Orders register/left-rail grammar, the PO full-page real-PDF law or
+Workspace's separately governed Working Panel. Unaccepted legacy Quick View work remains unaccepted.
+
+**OWNER CORRECTION 2026-10-04 — complementary left rail and column filters.**
+The SO Batch left rail presents useful aggregate information and round access not already
+supplied by listing columns. Do not repeat the page title inside the rail or duplicate Product/
+Supplier column filters there. Each factual listing column retains its shared DataGrid filter;
+aggregate summaries use the same filtered result and distinguish record counts from quantities.
+The hand-drawn 5462 HTML is rejected review material, not an approved template or implementation.
+Reuse actual shared Sales Orders rail/grid components for the replacement review; the exact
+new summary selection remains a proposal until reviewed. SO Batch navigation is `Listing` / `Report`; monthly Report content is deferred under the
+latest owner ruling. Other modules retain their governed Monthly demand. A bounded round preview
+does not establish complete SO Batch delivery.
+
+**OWNER CORRECTION 2026-10-04 — optional warehouse Ready Stock matching.**
+Customer demand defaults to purchase. Unassigned warehouse stock is an offer, never authority to
+exclude a customer requirement automatically. Remove the misleading `No purchase needed` grouping
+and the rejected generic `Order summary` rail presentation. Only already bound exact Units and
+lawful existing PO coverage reduce uncovered demand before the owner chooses another allocation.
+Selecting a purchase round keeps its demand in the same listing. An optional manually triggered
+button calculates warehouse-specific Ready Stock offers there; it does not require a separate
+Warehouse page or compulsory per-order inspection. Exact goods compatibility, ownership,
+availability and existing reservation protection remain governed by Stock authority. The owner
+requests whole-round matching, matched results first, optional review and bulk selection/Proceed.
+**OWNER CONFIRMED 2026-10-04 — whole-round matching and location choice.** Default matching
+priority is earliest Customer Requested Delivery Date, with earliest Proceed Date breaking ties;
+undated demand follows dated demand. Matching priority is configurable in Settings. Stock selection
+uses FIFO among otherwise eligible exact Units. The matching location is selectable and defaults to
+Carres Klang; changing it changes the candidate stock scope, not the customer delivery address.
+The same listing shows whether goods have a matching offer and its quantity/location. One manual
+trigger computes non-overlapping whole-round suggestions and puts matched demand first. Bulk
+selection and Proceed accept chosen offers; detailed review is optional. Preserve the individual
+customer/item action to choose an eligible exact warehouse Unit manually, including location choice,
+without requiring whole-round matching. Neither browsing nor a computed suggestion reserves stock
+or reduces purchase quantity. Confirming uses the existing Sales Order-owned reservation door and
+revalidates eligibility/remaining demand; only successful reservations reduce purchase quantity.
+Existing reservations cannot be stolen or duplicated. Unmatched quantities continue to purchase.
+Exact new screen labels remain governed-copy proposals, not production implementation proof.
+
+**OWNER CONFIRMED 2026-10-04 — Manual Purchase and SO Batch inspection/actions.**
+Manual Purchase exposes Showroom as a left-rail category with individual showroom selection;
+the right listing shows the matching purchase requests and preserves their originating Display
+Request. Display Request retains the complete arrangement; only its Carres-buying scope enters
+Manual Purchase, reusing supplied information. Operation reviews the request first, then submits
+it to Jess for purchase approval. Operation review is not purchase approval; authorised approval
+still precedes PO creation.
+
+Both Manual Purchase and SO Batch use listing selection to open a right-side Quick View without
+requiring full-page navigation for ordinary tasks. Quick View contains the source facts/evidence
+and authorised owning actions needed to complete the current task. Manual Purchase supports
+Operation review/submission and Jess approval/return there. SO Batch supports placing the system-prepared order and handling its current PO sending
+action there. Ordinary SO Batch has no additional manual information-review checkpoint or new
+Jess approval round; source eligibility, lawful issue and actual-sending controls remain.
+
+Full page exposes the complete original form and supporting material in a 50/50 view; opening it
+is viewing, not entering edit mode. Explicit Edit enters information editing. The Purchase Order
+right half retains its real current PO PDF under §9.3. Manual Purchase is an internal request with
+no fabricated formal PO PDF; the preceding suggestion to place source/quotation evidence on its
+right half remains a presentation proposal pending specific confirmation. Full page is available
+for detailed inspection and editing; it is not a compulsory extra step before every Quick View
+completion. This is approved interaction truth, not evidence of production implementation.
+
+**PROPOSAL / NOT LAW — page composition for owner review.** Reuse the owner's supplied Sales Order
+page template. The left tray exposes the two current PO windows (10:15 AM and 4:00 PM), preserving
+existing required Listing/Monthly demand access and the approved PO follow-up filters. A window
+selects exact eligible uncovered source demand using §5.6.1/§9.1; it is not a PO-number filter that
+loses unissued demand. Its buying operation reuses SO Batch Purchase authority, never a second PO
+creation engine. Keep new, blocked, issued-but-unsent and missed-window quantities distinguishable.
+One round groups compatible source lines by supplier and the existing grouping constraints; it
+may issue several supplier POs. One batch action does not mean one cross-supplier PDF or one
+external transmission to all suppliers. Finish actual sending separately for each supplier/version.
+
+Record hierarchy: PO window -> supplier group -> numbered PO/current version -> goods line ->
+quantity/date delivery batch. A supplier is a communication/filter grouping; the numbered PO is
+the commitment tracked to closure. Multiple POs from one supplier remain individually identifiable.
+A summary box is a fact about its enclosing record; it is never a substitute PO object.
+
+Recommended PO card: one card per numbered PO, with supplier/current version in its header,
+accountable PIC and actual next action in the action region. Eight summary facts may use two rows:
+Supplier Deliver To; PO Doc Date; immutable PO Delivery Date; Supplier Confirmed Delivery Date
+(next outstanding batch date plus explicit additional-batch count); Order Qty; Received Qty;
+Pending Delivery Qty; current-version sending evidence. Confirmed date never substitutes a planned
+date; each additional quantity/date remains reachable beside its exact goods line. Cancelled,
+damaged, wrong and extra quantities remain distinct in goods detail under §5.8. Table/Cards are
+two presentations of one register, not duplicate facts on one screen. Exact items/Units and receipt/
+promise batches are inspected on the selected PO; do not repeat a full item table inside every card.
+Full PO information/edit + actual PDF remains the approved 50/50 surface under §9.3.
+
+**OWNER CONFIRMED 2026-10-04 — post-placement sending in the round panel.**
+After round placement, keep its issued POs in the right-side task panel, identified by supplier,
+PO number and current version. Each unsent PO exposes its source-bound Send PO action. Open the
+same Purchasing Communication action with that supplier's verified recipient and actual current
+PO PDF; never invent a missing contact or bind to the first unrelated PO. Retain sent results
+and keep remaining unsent actions visible so Operation need not return to the register to find
+its next PO. Opening WhatsApp/email or copying a message is not confirmed sending; record actual
+sending evidence through the existing authority. This is approved placement/interaction truth,
+not proof that the panel or external-channel sending is implemented.
+
+**OWNER CONFIRMED 2026-10-04 — round placement, safe retry and editable timing.**
+Operation places the eligible prepared buying scope for the selected round together. The system
+creates separate POs according to supplier and existing compatible destination/document rules;
+staff then send each current PO to its corresponding supplier. A round is not one cross-supplier
+PO or a single transmission to every supplier. Preserve successful issue results after partial
+failure; retries target only the remaining unissued scope and must not duplicate existing PO
+coverage. This confirms the operating outcome, not implementation mechanics.
+
+The daily round times are editable through the existing governed Purchasing Settings door under
+§5.6.1, by authorised settings users. 10:15 AM and 4:00 PM are the current defaults, not hard-coded
+permanent times. Existing issued documents and recorded/missed round occurrences retain their
+original identity/time/scope when the schedule changes; no retroactive reassignment or duplicate
+purchase is permitted. Settings approval here does not mean live settings were changed.
+
+**OWNER CONFIRMED 2026-10-04 — shared Columns catalogue and Purchasing-first contribution.**
+Follow UI MASTER “Shared module Columns contribution”. SOB retains SO source facts once and adds
+Purchasing-owned projections to the common chooser. Supplier, Supplier Deliver To, PO Safety Days,
+PO No and original PO delivery date already have existing SOB equivalents; purchase completion
+and exact current-version sending coverage need a source/meaning proposal rather than a second
+stored status. Each field/default proposal is reviewed by Jess before adoption. Other modules
+contribute their own facts to the same catalogue, preserving permissions, record relationship and
+one authoritative fact. The shared format direction is approved; the complete Purchasing default
+column set and literal completion/sending copy are not thereby approved.
+
+**SO Batch operating flow:** the single current sequence is in “Current approved Purchasing
+Blueprint — start here” at the beginning of this MASTER. The numbered SO Batch and PO sections
+supply its exact issue, sending, source-lineage, permission and exception contracts; they do not
+add a second routine review or approval loop.
+
 ### 9.4 Receiving / GRN — owner instruction 2026-09-04 + owner correction 2026-09-06, PRODUCTION-VERIFIED
 
 **Receiving Session narrow layout, 2026-09-24 — #1574 + #1577 DEPLOYED; controls, actions and header production-verified.**
@@ -3894,7 +4261,7 @@ is authorised by this documentation approval.
 
 **Listing UI acceptance — Jess, 2026-09-18 · APPROVED · BUILT 2026-09-18, PRODUCTION VERIFICATION
 OWED.** The Receiving Register proposal is accepted and implemented in
-[PURCHASING — CARD 12](../cards/CARD-2026-09-18-purchasing-12-receiving-register-ui.md).
+[Purchasing MASTER](MASTER.md).
 This approval concerns the Register and its read-only goods expansion, not replacement of the
 formal GRN object/receiving engine. Default entry shows all permitted GRNs with server pagination;
 date filtering is optional. Date and exception counts count GRNs, not units or unfinished work.
@@ -3917,7 +4284,7 @@ carries UI MASTER §6.8's parent-scope numbers plus the four Receiving fields it
 | Status | Evidence |
 |---|---|
 | **APPROVED** | Jess, 2026-09-18 — the Register composition and its read-only goods expansion. Not a replacement of the formal GRN object or the receiving engine. |
-| **BUILT 2026-09-18** | [PURCHASING — CARD 12](../cards/CARD-2026-09-18-purchasing-12-receiving-register-ui.md), merged as [#1467](https://github.com/wenwei4046/Carres-Portal-v2/pull/1467). CI `verify` green on the merged head; the same gate locally on the merged tree — 12,047 tests, typecheck, lint with no new design-standard violations, 541 migration filenames, build. |
+| **BUILT 2026-09-18** | [Purchasing MASTER](MASTER.md), merged as [#1467](https://github.com/wenwei4046/Carres-Portal-v2/pull/1467). CI `verify` green on the merged head; the same gate locally on the merged tree — 12,047 tests, typecheck, lint with no new design-standard violations, 541 migration filenames, build. |
 | **DEPLOYED 2026-09-19** | Merged to `main` as **`896a7b128b77dbb3dc0074005aaf81f9aa52cf1f`** and deployed by `deploy-production.yml` run 35415796625, which re-ran the whole gate on that exact SHA before shipping it. `pnpm ci:smoke` printed `Production converged to 896a7b12…` for all five canonical surfaces: `carres-portal.pages.dev` · `carres-pos.pages.dev` · `erp.carresofficial.com` · `pos.carresofficial.com` · `api.carresofficial.com/health`. **That is a SHA convergence proof, and nothing more.** No migration was involved; this listing added none. |
 | **RENDERED WALK — 2026-09-19, and it FOUND A DEFECT** | The register was driven in real Chromium at 1440 · 1180 · 820 · 767 · 390 and at 200% zoom, inside an emulated copy of `OperationApp`'s own container chain. **It caught a 🔴 that every unit test passed straight through:** `GRN Date` and `GRN No` did not pin at all. Scrolling right drove `GRN Date` to `left: −1022` — clean off the screen — while Purchase Orders held `PO Date` at 280 under the identical harness. The cause was not the engine: the register column beside the rail is a flex child, a flex item defaults to `min-width:auto`, and without `min-w-0` it refused to shrink below the sixteen columns' 2234px, so the grid's own scroller never engaged and sticky offsets were computed against a viewport that never moved. The same miss disabled the ≥768px canvas rule, because the grid measured 2234px even on a 390px phone. Every sibling rail+grid register already carried `min-w-0`; Receiving alone did not. **Fixed and re-measured:** `GRN Date` now holds at 288 under full scroll, and the pair pins on a canvas ≥768px while the number pins alone below it (measured 1176 · 916 → pair; 556 · 503 · 126 → identity). Also confirmed on the render: the sixteen columns in the approved order at their registry widths, no cell clipped, the six rail groups with no permanent `Clear filters`, a week's arrow toggling `aria-expanded` with the row count unchanged at 2, `Cancelled` under its GRN number, the expansion reading `Category · Supplier · Supplier Deliver To · PO No / Ref No · Items · Received Qty · Damaged Qty · Wrong Item Qty · Extra Qty` with the source number above its Unit ID and no checkbox, no `Ready Stock` and no reservation control, and a roving tabindex on the row. |
 | **PRODUCTION-VERIFIED** | **NOT YET**, and a converged SHA is not it: that proves the bundle shipped, not what the register draws. **The earlier claim that no walk could be run here was wrong and is withdrawn** — Chromium does start in the build environment (the full binary hangs; `headless_shell` does not), and the rendered walk above is what found the pinning defect. What genuinely cannot be reached from here is PRODUCTION: the network policy refuses `erp.carresofficial.com` and `api.carresofficial.com` at the proxy (403 on CONNECT), so no authenticated session against real data is possible. **What therefore still owes, and only this:** the sixteen columns against REAL GRN rows rather than a fixture · the rail's six counts matching the footer total on a real dataset · a real cancelled GRN · the expansion on a real receipt carrying both an exact-unit line and a counted line, the second reading `Counted stock` · a real receipt with genuine SO and MPR references beside one with none · and the widths re-measured signed in, where JetBrains Mono renders document numbers wider than the fixture font. Layout, pinning, expansion order, rail behaviour and keyboard reach are now MEASURED, not owed. |
