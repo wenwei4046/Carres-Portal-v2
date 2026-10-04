@@ -239,6 +239,23 @@ ratio while fitting the current pane across resize. Production proof remains ope
 this walk was corrected by retaining unchanged membership, with a real-grid integration regression. Existing individual stock reservation, guarded issue and current-version evidence
 are reusable authorities, not permission to infer whole-round or shared-panel completion.
 
+**Whole-round capability measurement, 2026-10-04 — LOCAL BUILD, NOT OPERATOR DELIVERY.**
+
+| Capability | Existing source / readiness | Delivery boundary |
+|---|---|---|
+| Compatible available Unit candidates | `readFreeStock` reads the authoritative stock register availability; per-order Ready Stock supplies compatible line IDs | Reuse; candidate location identity, ownership filtering and canonical remainder integration must be verified |
+| Non-overlapping whole-record suggestions | Existing To Order P10 allocation and 113 tests; READY for reuse | Extracted `allocateWholeStockRecords` is shared by existing To Order and the new round matcher, not a second allocation implementation |
+| Customer-date / Proceed priority, site scope, FIFO | New `matchSoBatchReadyStock` adapts that proven allocation, with 8 tests | Read-only local logic only; site choice and priority Settings are not wired |
+| Exact Unit acceptance | Existing Sales Order-owned `/ready-stock/save` / reserve doors | Reuse with fresh validation; whole-scope selection, partial success recovery and unknown-outcome readback are not yet wired |
+
+121 combined old/new allocation tests and shared type checking pass locally. Suggestions do not
+change original demand or saved reservations. The matcher excludes supplier-owned, counted,
+already-reserved and blocked stock; it refuses conflicting repeated Unit facts and duplicate
+source lines. API/UI integration and authenticated production acceptance remain open. The current
+per-order Ready Stock read subtracts bound incoming Units and PO lineage separately; before round
+integration its remainder must be reconciled with the canonical exact-line demand/coverage read,
+not assumed equivalent from a passing suggestion test.
+
 ### SO Batch PO Status — owner-approved 2026-10-04
 
 Column/filter title: `PO Status`. In that named context use `Pending`, `Partial`, `Done`.
