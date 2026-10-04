@@ -121,15 +121,25 @@ successful results, so retry cannot silently resend every document. Use governed
 ownership, permissions and actual supplier contact authority; this approval commissions target
 truth, not a live external email, supplier-settings write or production transmission.
 
-**REFERENCE FINDING — Houzs live PO, read-only check 2026-10-04.** The owner identified
+**REFERENCE FINDING — Houzs supplier Email, checked 2026-10-04.** Live PO
 `https://erp.houzscentury.com/scm/purchase-orders/068c294e-1b44-400c-9338-2a5223912d63`
-(HC-PO-2610-059). The current page exposes Send to supplier; opening it on this supplier produced
-“No supplier email” and instructed staff to add email to the supplier record. This establishes a
-live supplier-email sending entry with contact validation, contradicting an earlier overly broad
-conclusion from another page/older source that Houzs has no such entry. It does not establish
-attachment shape, automatic dispatch, delivery evidence, batch support or Carres implementation.
-No email/contact was changed and no supplier message was sent. Reuse research must inspect the
-actual current implementation behind this entry before declaring COPY REQUIRED or READY.
+(HC-PO-2610-059) exposes Send to supplier; missing saved supplier email produced a named refusal.
+Correct current source is `hello-houzs/Houzs-ERP`, not the older `wenwei4046/2990s` checkout.
+Inspected `frontend/src/pages/scm-v2/PurchaseOrderDetailV2.tsx` and
+`backend/src/scm/routes/mfg-purchase-orders.ts` on fetched GitHub main: the operator confirms the
+supplier recipient, browser generates this PO's PDF and posts it to the single-PO
+`/:id/send-to-supplier` route, which invokes the actual email service with an attachment.
+This is a human-triggered real email capability, not unattended issue-time auto-send. Source
+contains recipient/status/channel/attachment validation, short resend protection, failed-send stamp
+rollback and real actor/outcome audit. Successful dispatch does not establish supplier receipt.
+The inspected endpoint handles one PO, not the proposed multi-PO/supplier bundle. Backend permits
+summary-only email without attachment; Carres's approved PO-PDF action must not silently adopt
+that fallback. Attachment retries in this implementation are manual, avoiding attachmentless
+outbox replay. Mapping: **COPY REQUIRED** for the proven single-PO email pattern; Carres has not
+been proved READY. Multi-PO independent attachments, versions, selected-set consistency and Carres
+permissions remain adaptation/verification work. No supplier email or settings were changed, and
+no real message was sent for this research. Findings establish source behavior, not production
+successful transmission or owner approval to copy foreign business rules.
 
 ### Manual Purchase — when needed
 
