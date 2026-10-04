@@ -220,7 +220,7 @@
 .cell strong.clamp { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; overflow: hidden; }
 .status { display: block; font-size: 11px; line-height: 16px; font-weight: 400; color: var(--cc-muted); margin-top: 4px; }
 .readCell span { font-size: 12px; color: var(--cc-muted); }
-.panel .readCell strong { font-size: 13px; white-space: nowrap; display: block; }
+.panel .readCell strong { font-size: 13px; white-space: normal; display: block; }
 .editorError { font-size: 12px; line-height: 16px; color: var(--cc-error); margin: 8px 0 0; }
 .panel p.editorError { color: var(--cc-error); font-size: 12px; margin: 8px 0 0; }
 
@@ -229,8 +229,8 @@
 .editor label { display: block; font-size: 11px; color: var(--cc-muted); margin: 7px 0 3px; }
 .editor > strong + select { margin-top: 8px; }
 .buttons { display: flex; gap: 6px; margin-top: 8px; }
-.editor > .buttons { margin-top: 10px; justify-content: flex-end; }
-.panel .editor > .buttons .btn:first-child { order: 2; background: var(--cc-brand); color: white; border-color: var(--cc-brand); }
+.editor > .buttons, .editor .editorButtons { margin-top: 10px; justify-content: flex-end; }
+.panel .editor > .buttons .btn:first-child, .panel .editor .editorButtons .btn:first-child { order: 2; background: var(--cc-brand); color: white; border-color: var(--cc-brand); }
 .panel .btn { padding: 6px 10px; border: 1px solid var(--cc-line); border-radius: var(--cc-radius-control); min-height: 32px; font-size: 12px; }
 .panel .primary { background: var(--cc-brand); color: var(--cc-surface); padding: 6px 10px; border-radius: var(--cc-radius-control); min-height: 32px; font-size: 12px; }
 .panel .primary:hover { background: var(--cc-brand); filter: brightness(0.94); }
@@ -395,3 +395,5 @@ aside.section { background: var(--cc-surface); }
   .panel .readCell strong { font-size: 12px; }
   .readCell span { font-size: 11px; }
 }
+
+.panel .documentNumber { padding: 0; text-align: left; text-decoration: underline; text-underline-offset: 2px; }

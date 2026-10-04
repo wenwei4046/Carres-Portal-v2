@@ -1073,8 +1073,9 @@ describe("order view before editing", () => {
     mount();
     fireEvent.click(screen.getByRole("button", {name:"SO-1303"}));
     const summary=screen.getByTestId("sales-order-quick-view");
-    expect(summary).toHaveTextContent("Payment");
-    expect(summary).toHaveTextContent("Balance due");
+    expect(summary).toHaveTextContent("Outstanding");
+    expect(summary).toHaveTextContent("RM 1,249.00");
+    expect(within(summary).getByRole("button", { name: "Items" })).toHaveAttribute("aria-expanded", "false");
     expect(within(summary).queryByRole("button",{name:"Edit"})).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button",{name:"Open full page"}));
     expect(screen.getByTestId("location")).toHaveTextContent("/operation/orders/so/");
@@ -1591,6 +1592,7 @@ describe("approved solid SO status presentation", () => {
     check(screen.getByTestId("grid-parent-row"), String(paymentLabel), String(paymentTone));
     fireEvent.click(screen.getByRole("button", { name: "SO-1303" }));
     const drawer = screen.getByRole("dialog", { name: "SO-1303 · Kimmy" });
+    fireEvent.click(within(drawer).getByRole("button", { name: "Items" }));
     check(drawer, String(stockLabel), String(stockTone));
     check(drawer, String(paymentLabel), String(paymentTone));
     check(drawer, String(deliveryLabel), String(deliveryTone));

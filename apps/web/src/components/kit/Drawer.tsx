@@ -35,7 +35,7 @@ export default function Drawer({
   description?: string;
   headerActions?: ReactNode;
   /** Accepted read-only quick-view template. */
-  variant?: "quick-view";
+  variant?: "quick-view" | "compact-card";
   footer?: ReactNode;
   children: ReactNode;
 }) {
