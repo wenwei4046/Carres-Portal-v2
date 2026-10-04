@@ -72,7 +72,7 @@ describe("the Sales Order payment ledger", () => {
        number inside its line, and still fails if the number stops printing. */
     expect(screen.getByText(/Receipt RC-020926-0031/)).toBeTruthy();
     expect(screen.getByText("Shasha")).toBeTruthy();
-    expect(screen.getByText("View slip")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Slip" })).toBeTruthy();
   });
 
   it("keeps a VOIDED row in the history, stamped, and never silently drops it", () => {
@@ -97,7 +97,7 @@ describe("the Sales Order payment ledger", () => {
     expect(screen.getAllByText("Not recorded")).toHaveLength(2);
     expect(screen.getByText(/Receipt not recorded/)).toBeTruthy();
     expect(screen.getByText(/Slip not recorded/)).toBeTruthy();
-    expect(screen.queryByText("View slip")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Slip" })).toBeNull();
   });
 
   it("reports an empty transaction list without claiming the order has never been paid", () => {
@@ -114,7 +114,7 @@ describe("the Sales Order payment ledger", () => {
     render(<PaymentLedger orderId="o1" saved={{ paid: 1250, method: "online", reference: "BANK-1319", slip: "orders-attachments/slip.jpg" }} />);
     expect(screen.getByText("Online transfer")).toBeTruthy();
     expect(screen.getByText("BANK-1319")).toBeTruthy();
-    expect(screen.getByText("View slip")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Slip" })).toBeTruthy();
     expect(screen.getByText(/The order records a paid amount/)).toBeTruthy();
     expect(screen.queryByTestId("so-payments-empty")).toBeNull();
     expect(screen.queryByTestId("so-payment-row")).toBeNull();
