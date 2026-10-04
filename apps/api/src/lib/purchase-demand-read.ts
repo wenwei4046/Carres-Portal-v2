@@ -331,6 +331,7 @@ export type FreeStockUnit = {
   qty: number;
   condition: string | null;
   siteName: string | null;
+  warehouseId?: string | null;
   holderName: string | null;
   ownership: string;
   supplier: string | null;
@@ -444,6 +445,7 @@ export async function readFreeStock(sb: ReturnType<typeof userClient>): Promise<
         qty,
         condition: (it.condition as string | null) ?? null,
         siteName: (it.site_name as string | null) ?? null,
+        warehouseId: (it.warehouse_id as string | null) ?? null,
         holderName: (it.holder_name as string | null) ?? null,
         ownership: (it.ownership as string | null) ?? "carres_owned",
         supplier: (it.supplier as string | null) ?? null,

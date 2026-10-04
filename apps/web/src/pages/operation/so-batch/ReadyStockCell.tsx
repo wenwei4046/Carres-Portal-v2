@@ -181,7 +181,7 @@ export function useSoBatchReadyStock({
   const availableForLine = useCallback(
     (lineId: string) =>
       unitsForLine(lineId).filter(
-        (u) => u.reservedForLineId == null && u.identityScope === "unit",
+        (u) => u.reservedForLineId == null && u.identityScope === "unit" && u.ownership === "carres_owned",
       ),
     [unitsForLine],
   );
@@ -433,6 +433,7 @@ export function useSoBatchReadyStock({
             return READY_STOCK_BLOCKED_WORDS.counted_stock;
           }
           if (!unit) return GOODS_ABSENCE_WORDS.notRecorded;
+          if (unit.ownership === "supplier_consignment") return READY_STOCK_BLOCKED_WORDS.supplier_owned;
           /**
            * ⭐ A REPLACEMENT NEEDS ROOM THE DRAFT HAS ALREADY MADE.
            *

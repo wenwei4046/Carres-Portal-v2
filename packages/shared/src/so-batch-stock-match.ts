@@ -44,7 +44,7 @@ export function allocateWholeStockRecords<L, U extends { id: string; qty: number
 export function matchSoBatchReadyStock(
   demands: readonly SoBatchStockDemand[],
   candidates: readonly ReadyStockUnit[],
-  options: { siteName: string; priority?: "customer_delivery" | "proceed_date" },
+  options: ({ siteName: string; warehouseId?: never } | { warehouseId: string; siteName?: never }) & { priority?: "customer_delivery" | "proceed_date" },
 ): SoBatchStockOffer[] {
   const lines = new Set<string>();
   for (const demand of demands) {
@@ -66,7 +66,7 @@ export function matchSoBatchReadyStock(
     } else pool.set(unit.itemId, { ...unit, matchingLineIds: [...unit.matchingLineIds] });
   }
   const eligible = [...pool.values()].filter(unit =>
-    unit.siteName === options.siteName && unit.ownership === "carres_owned" &&
+    (options.warehouseId ? unit.warehouseId === options.warehouseId : unit.siteName === options.siteName) && unit.ownership === "carres_owned" &&
     unit.identityScope === "unit" && unit.qty === 1 && unit.blocked == null &&
     !unit.reservedForLineId,
   ).sort((a, b) =>

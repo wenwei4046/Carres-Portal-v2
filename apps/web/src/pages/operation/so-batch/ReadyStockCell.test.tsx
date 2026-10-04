@@ -172,9 +172,8 @@ describe("the cell", () => {
   it("states the two counts for THIS item line", async () => {
     draw();
     const cell = await settled();
-    /* Two free exact Units match this line; the counted row is on the shelf and
-       is not bindable, so it is shown in the table and not counted here. */
-    expect(cell).toHaveTextContent("2 available");
+    /* Only Carres-owned exact stock is available for customer sale. */
+    expect(cell).toHaveTextContent("1 available");
     expect(cell).toHaveTextContent("0 reserved");
   });
 
@@ -314,7 +313,9 @@ describe("the stock table", () => {
     await openPicker();
     const row = screen.getByTestId(`ready-stock-unit-${UNIT_CONSIGNED}`);
     expect(within(row).getByText("Dorsettloft")).toBeInTheDocument();
-    expect(within(row).getByText("Supplier owned")).toBeInTheDocument();
+    expect(within(row).getAllByText("Supplier owned").length).toBeGreaterThan(0);
+    expect(within(row).queryByRole("checkbox")).toBeNull();
+    expect(row).toHaveTextContent("Supplier owned");
   });
 
   it("shows counted stock, refuses the choice, and never calls its key a Unit ID", async () => {
@@ -615,7 +616,7 @@ describe("the selection journey", () => {
 describe("a refusal", () => {
   function drawRefusing(body: Record<string, unknown>, props: Parameters<typeof Harness>[0] = {}) {
     apiFetch.mockImplementation(async (path: string) => {
-      if (String(path).endsWith("/ready-stock")) return response();
+      if (String(path).endsWith("/ready-stock")) return response({ units: [unit({ itemId: UNIT_A }), unit({ itemId: UNIT_CONSIGNED, unitCode: "U1-000-065" })] });
       const { ApiError } = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
       throw new ApiError(409, "conflict", body);
     });

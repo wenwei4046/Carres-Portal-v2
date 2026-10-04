@@ -31,6 +31,10 @@ describe("whole-scope Ready Stock suggestions", () => {
     const candidates = [unit("other", { siteName: "Other" }), unit("supplier", { ownership: "supplier_consignment" }), unit("counted", { identityScope: "quantity" }), unit("blocked", { blocked: "no_line_needs_it" }), unit("saved", { reservedForLineId: "a" })];
     expect(matchSoBatchReadyStock([demand("a", "2026-10-10")], candidates, options)).toEqual([]);
   });
+  it("uses stable location identity even when two sites share a display name", () => {
+    const offers = matchSoBatchReadyStock([demand("a", null)], [unit("other", { warehouseId: "wh-other" }), unit("chosen", { warehouseId: "wh-chosen" })], { warehouseId: "wh-chosen" });
+    expect(offers[0]?.units.map(row => row.itemId)).toEqual(["chosen"]);
+  });
   it("does not change inputs or reinterpret confirmed demand coverage", () => {
     const inputs = [demand("a", "2026-10-10"), { ...demand("b", null), remainingQty: 0 }];
     const candidates = [unit("U1")];

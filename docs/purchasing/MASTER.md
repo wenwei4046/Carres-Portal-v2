@@ -248,13 +248,17 @@ are reusable authorities, not permission to infer whole-round or shared-panel co
 | Customer-date / Proceed priority, site scope, FIFO | New `matchSoBatchReadyStock` adapts that proven allocation, with 8 tests | Read-only local logic only; site choice and priority Settings are not wired |
 | Exact Unit acceptance | Existing Sales Order-owned `/ready-stock/save` / reserve doors | Reuse with fresh validation; whole-scope selection, partial success recovery and unknown-outcome readback are not yet wired |
 
-121 combined old/new allocation tests and shared type checking pass locally. Suggestions do not
+122 combined old/new allocation tests and shared type checking pass locally. Stable warehouse
+identity is carried on candidate reads and used for location matching; two locations sharing a
+display name cannot borrow each other's stock. Suggestions do not
 change original demand or saved reservations. The matcher excludes supplier-owned, counted,
 already-reserved and blocked stock; it refuses conflicting repeated Unit facts and duplicate
-source lines. API/UI integration and authenticated production acceptance remain open. The current
-per-order Ready Stock read subtracts bound incoming Units and PO lineage separately; before round
-integration its remainder must be reconciled with the canonical exact-line demand/coverage read,
-not assumed equivalent from a passing suggestion test.
+source lines. API/UI integration and authenticated production acceptance remain open. The per-order Ready Stock read now obtains remaining demand from the existing
+`so_line_remaining_requirement` RPC, shared with issue/reservation. Source-linked Units are not
+counted again in independent stock coverage. 34 route tests include linked-PO overlap and
+fail-closed canonical-read errors. The individual picker also excludes supplier-owned goods from
+available customer-sale quantity and choice while retaining readable ownership facts and existing
+saved-choice removal; 43 picker tests pass. These are local build facts, not production proof.
 
 ### SO Batch PO Status — owner-approved 2026-10-04
 
