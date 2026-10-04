@@ -636,6 +636,37 @@ describe.skipIf(!databaseUrl)("authorised Warehouse final receipt (approved targ
     expect(row.raw_report).toMatchObject(over);
   });
 
+  it("posts explicit counted quantities as bulk stock without inventing Unit identities",async()=>{
+    await q("reset role");
+    const bulkLine=uid("41");
+    await q("insert into purchase_order_lines(id,po_id,sku,qty,received_qty,identity_mode,destination_id) values($1,$2,$3,2,0,'quantity',null)",[bulkLine,po,`${sku}-BULK`]);
+    await as(person);
+    const answer=await confirm(report({lines:[{id:bulkLine,received_now:1,damaged_qty:0,wrong_item_qty:0}]}));
+    if(!answer.ok)throw new Error(answer.reason);
+    expect(answer.result.status,JSON.stringify(answer.result.blockers)).toBe("posted");
+    await q("reset role");
+    const stock=(await q("select identity_scope,qty as quantity,status,warehouse_id from ops_stock_items where po_line_id=$1",[bulkLine])).rows;
+    expect(stock).toEqual([{identity_scope:"quantity",quantity:1,status:"free",warehouse_id:site}]);
+    expect((await q("select received_qty from purchase_order_lines where id=$1",[bulkLine])).rows[0]!.received_qty).toBe(1);
+    expect((await q("select count(*)::int n from receiving_unit_results where receipt_id=$1",[answer.result.id])).rows[0]!.n).toBe(0);
+  });
+
+  it("keeps counted damaged goods controlled with a source-linked Claim",async()=>{
+    await q("reset role");
+    const bulkLine=uid("41");
+    await q("insert into purchase_order_lines(id,po_id,sku,qty,received_qty,identity_mode,destination_id) values($1,$2,$3,2,0,'quantity',null)",[bulkLine,po,`${sku}-BULK`]);
+    await as(person);
+    const answer=await confirm(report({lines:[{id:bulkLine,received_now:0,damaged_qty:1,wrong_item_qty:0,damaged_photos:[doPath]}]}));
+    if(!answer.ok)throw new Error(answer.reason);
+    expect(answer.result.status,JSON.stringify(answer.result.blockers)).toBe("posted");
+    await q("reset role");
+    const stock=(await q("select identity_scope,qty as quantity,status,hold_claim_id from ops_stock_items where po_line_id=$1",[bulkLine])).rows;
+    expect(stock).toHaveLength(1);expect(stock[0]).toMatchObject({identity_scope:"quantity",quantity:1,status:"on_hold"});
+    const claim=(await q("select warehouse_receipt_id,qty from supplier_claims where id=$1",[stock[0]!.hold_claim_id])).rows[0];
+    expect(claim).toMatchObject({warehouse_receipt_id:answer.result.id,qty:1});
+    expect((await q("select received_qty from purchase_order_lines where id=$1",[bulkLine])).rows[0]!.received_qty).toBe(0);
+  });
+
   it("puts physically damaged goods on hold and links their exact receipt Claim", async () => {
     const damaged = [{ ...lines[0], damaged_photos: [doPath], units: [
       { unit_code: codes[0], outcome: "received_with_issue", issue_kind: "damaged", note: "Dock damage" },

@@ -744,18 +744,32 @@ The full Work feed and this minimal receipt probe use the same extracted return 
 physical-return completion predicate. History resolves the current occurrence generation through
 the existing reader. The existing writer records the actual Warehouse actor only when the occurrence
 was open before the write, disappears afterward, all required Units have valid physical return facts,
-and this newly posted GRN belongs to that source/actor and contributes a required Unit. Cancellation,
+and this newly posted GRN belongs to that source/actor, contributes a required Unit and carries
+the server-generated repair-return completion marker. The arrival engine locks the RO before its
+source and records that marker only on the GRN making the physical return incomplete-to-complete
+transition. A partial receipt whose later read observes another actor's final receipt cannot claim
+completion. Cancellation,
 partial return, blocked/refused report, another actor/source, stale replay, absent GRN and unrelated
 receipt contribution cannot count as this Warehouse completion. A recorder failure is logged without
 undoing or misreporting a successfully posted receipt. The normal PO Duty task ownership is unchanged.
 
-117 targeted API checks pass across Warehouse routes, the new 18-case return adapter suite, original
+The original 117 targeted API checks passed across Warehouse routes, the then-18-case return adapter suite, original
 RO completion, Work lifecycle/generation, probes and route wiring. Nine shared projection tests pass,
 including equality between the minimal probe and the full feed. API and Shared typechecks pass.
 The source reader is tested with authorised/denied/cancelled/non-repair sources and filters foreign or
 not-received results; the actual generation resolver is exercised after an earlier completion. These
 are local adapter/projection checks alongside the real receipt-engine tests, not a production
-Warehouse repair-return write or full live Completed-ledger journey. Production acceptance remains.
+Warehouse repair-return write or full live Completed-ledger journey. The corrected adapter now passes
+19 cases, including another GRN completing between the write and follow-up read. Three real
+concurrent-connection cases pass: same-key retry, duplicate DO, and two actors returning separate
+Units through different sources for one RO. Only the final GRN carries the completion marker.
+Restoring the pre-marker engine makes that last test fail; restoring the candidate makes it pass.
+The target/closure/adapter combined run passes 84 cases (52 + 13 + 19). The two additional target
+cases prove counted goods enter free stock when accepted and held stock with a linked Claim when
+damaged. The local replay required restoration of the existing quantity-key function and Unit-code
+constraint/trigger from migration 0453; the function body was reconciled read-only to production
+MD5 `7b6e70d7cfee68be65bef8c783404b2e`. This is a local test dependency repair, not a new production
+change or a clean whole-chain replay. Production acceptance remains.
 
 **Confirmation transport — BUILT ON BRANCH / NOT DEPLOYED, 2026-10-05.**
 The bounded shared confirmation schema and `/api/warehouse/receipts/confirm` preserve absent/null
@@ -956,9 +970,12 @@ Validation: 69 receipt-route tests (including 1,001 unresolved reports and permi
 50 Work projection tests, 12 Work probe tests, 79 shared Work/receipt tests and 75 Receiving UI
 tests pass. API/Web typechecks and design-standard checks pass. No production SQL or data changed.
 
-Still required before an exact SQL review/release: remaining non-PO lifecycle and source read/form coverage; remaining quantity/issue/extra and authority boundaries; complete source contracts and
-Warehouse form and report history, Operation blocked-report/Work readers; exact reviewed SQL
-approval followed by the governed production probe/apply and delivery proof. The draft exists only
+Still required before an exact SQL review/release: remaining non-PO downstream lifecycle and
+source-resolution audit, extra-goods custody and authority boundaries, Operation arrival completion
+causality, full Warehouse listing/keyboard acceptance and real evidence transport. Source forms,
+preserved report history and Operation blocked-report/Work readers are implemented on the branch;
+they still require authenticated production acceptance. Exact reviewed SQL approval must precede
+the governed production probe/apply and dependent delivery proof. The draft exists only
 in chat and the isolated local database, not in `supabase/migrations/`. The historical replay had
 seven failures (0149, 0317, 0339, 0398a, 0453, 0561, 0588); the relevant original receipt bodies
 were reconciled to production before drafting, not a clean whole-chain replay.

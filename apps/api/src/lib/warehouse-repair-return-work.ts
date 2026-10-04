@@ -15,6 +15,7 @@ export type RepairReturnFacts = Omit<RepairOrderReturnWorkSource,"units"> & {
   units: Array<{unit_id:string;goods_received_date:string|null;grn_no:string|null}>;
   receipts: Array<{id:string;arrival_source_id:string;posted_by:string;posted_at:string;grn_no:string|null}>;
   acceptedReceiptIds: string[];
+  completionReceiptIds: string[];
 };
 
 /** All rows are server-only, scoped first by the caller's source permission. */
@@ -51,6 +52,10 @@ export async function readWarehouseRepairReturn(c: Context<AppEnv>, sourceId: st
   for(let i=0;i<receipts.length;i+=100) results.push(...await all((from,to)=>sb.from("receiving_unit_results")
     .select("receipt_id,stock_item_id").in("receipt_id",receipts.slice(i,i+100).map(row=>row.id))
     .in("outcome",["received","received_with_issue"]).order("id").range(from,to)));
+  const completionEvents:Row[]=[];
+  for(let i=0;i<receipts.length;i+=100) completionEvents.push(...await all((from,to)=>sb.from("receiving_events")
+    .select("receipt_id,completed_ro:payload->>repair_return_completed_ro")
+    .in("receipt_id",receipts.slice(i,i+100).map(row=>row.id)).eq("event","posted").order("id").range(from,to)));
   const receiptById=new Map(receipts.map(row=>[row.id,row]));
   const required=new Set(units.map(unit=>unit.stock_item_id));
   const returned=new Map<string,Row>();
@@ -64,7 +69,7 @@ export async function readWarehouseRepairReturn(c: Context<AppEnv>, sourceId: st
     supplier_received_at:ro.data.supplier_received_at,return_target_date:ro.data.return_target_date,cancelled_at:ro.data.cancelled_at,
     units:units.map(unit=>({unit_id:unit.unit_code,goods_received_date:returned.get(unit.stock_item_id)?.goods_received_at ?? null,
       grn_no:returned.get(unit.stock_item_id)?.grn_no ?? null})),
-    receipts:receipts as RepairReturnFacts["receipts"],acceptedReceiptIds:[...accepted]};
+    receipts:receipts as RepairReturnFacts["receipts"],acceptedReceiptIds:[...accepted],completionReceiptIds:completionEvents.filter(event=>event.completed_ro===roId).map(event=>event.receipt_id)};
 }
 
 /** Resolves only this source-linked RO return occurrence and its generations. */
@@ -105,7 +110,7 @@ export async function withWarehouseRepairReturnCompletion(c:Context<AppEnv>,sour
       const facts=await deps.read(c,sourceId);
       const own=facts?.receipts.find(receipt=>receipt.id===postedId && receipt.arrival_source_id===sourceId && receipt.posted_by===c.var.auth.id);
       if(!facts || facts.id!==before!.id || !own || !own.grn_no || !own.posted_at || new Date(own.posted_at).getTime()<new Date(since).getTime()
-        || !facts.acceptedReceiptIds.includes(postedId)) return null;
+        || !facts.acceptedReceiptIds.includes(postedId) || !facts.completionReceiptIds.includes(postedId)) return null;
       return facts;
     },
     result:(_rule,facts)=>facts?repairOrderReturnReceiptResult(facts):null,

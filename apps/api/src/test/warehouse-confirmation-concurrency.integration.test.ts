@@ -119,4 +119,55 @@ describe.skipIf(!databaseUrl)("Warehouse confirmation against concurrent transac
     expect((await admin!.query("select received_qty from purchase_order_lines where id=$1", [c.line])).rows[0]!.received_qty).toBe(1);
     expect((await admin!.query("select count(*)::int n from receiving_unit_results where receipt_id=$1", [a.id])).rows[0]!.n).toBe(2);
   }, 15000);
+  it("credits only the transaction receiving the final repair Unit across different sources and actors",async()=>{
+    const ro=randomUUID(),party=randomUUID(),away=randomUUID(),secondActor=randomUUID();
+    const legs=[{source:randomUUID(),unit:randomUUID(),key:randomUUID(),actor},
+      {source:randomUUID(),unit:randomUUID(),key:randomUUID(),actor:secondActor}];
+    await admin!.query("begin");
+    await admin!.query("set local session_replication_role=replica");
+    await admin!.query("insert into auth.users(id,email) values($1,$2)",[secondActor,`return-${run}@carres.test`]);
+    await admin!.query("insert into app_users(id,email,name,role,status,is_person,warehouse_id) values($1,$2,'Second receiver','warehouse','active',true,$3)",[secondActor,`return-${run}@carres.test`,site]);
+    await admin!.query("insert into warehouses(id,name) values($1,$2)",[away,`Return origin ${run}`]);
+    await admin!.query("insert into stock_operating_parties(id,code,name,kind) values($1,$2,'Return company','warehouse_operator')",[party,`return_${run}`]);
+    await admin!.query("update warehouse_site_profiles set operating_party_id=$2 where site_id=$1",[site,party]);
+    await admin!.query("insert into repair_orders(id,request_id,ro_no,ro_doc_date,supplier_id,pickup_site_id,return_site_id,created_by) values($1,$2,$3,current_date,$4,$5,$6,$7)",[ro,randomUUID(),`RO-CON-${run}`,supplier,away,site,actor]);
+    for(const [i,leg] of legs.entries()){
+      const code=`U${Number.parseInt(run,16)}-9${i}1-001`;
+      await admin!.query("insert into ops_stock_items(id,unit_code,sku,warehouse_id,status,identity_scope,source_ref) values($1,$2,$3,$4,'free','unit','po_mint')",[leg.unit,code,`RETURN-${run}`,away]);
+      await admin!.query("insert into repair_order_units(repair_order_id,stock_item_id,unit_code,problem,problem_note,repair_requirement) values($1,$2,$3,'damaged','Test damage','Test repair')",[ro,leg.unit,code]);
+      await admin!.query("insert into arrival_sources(id,source_no,kind,from_site_id,to_site_id,party_id,repair_order_id,expected_date,reason,created_by) values($1,$2,'repair-return',$3,$4,$5,$6,current_date,'Concurrent return',$7)",[leg.source,`RETURN-${run}-${i}`,away,site,party,ro,actor]);
+      await admin!.query("insert into arrival_source_units(source_id,stock_item_id,status_before,holder_before) values($1,$2,'free',$3)",[leg.source,leg.unit,party]);
+      await admin!.query("insert into storage.objects(id,bucket_id,name,owner) values($1,'arrival-proofs',$2,$3)",[randomUUID(),`${leg.source}/proof.jpg`,leg.actor]);
+    }
+    await admin!.query("commit");
+    const reports=legs.map(leg=>JSON.stringify({arrival_source_id:leg.source,actual_site_id:site,
+      do_number:`RETURN-${leg.source}`,do_file_path:`${leg.source}/proof.jpg`,handover_person:'Driver',
+      goods_received_time:new Date(Date.now()-60000).toISOString(),arrival_units:[{stock_item_id:leg.unit,outcome:'received'}]}));
+    for(const [i,client] of [first!,second!].entries()){
+      await client.query("begin");await client.query("set local statement_timeout='8s'");
+      await client.query("select set_config('request.jwt.claims',$1,true)",[JSON.stringify({sub:legs[i]!.actor,role:'authenticated'})]);
+      await client.query("set local role authenticated");
+    }
+    const sql="select public.warehouse_confirm_receipt($1::jsonb,$2::uuid,null,null) result";
+    const a=(await first!.query(sql,[reports[0],legs[0]!.key])).rows[0]!.result;
+    expect(a.status,JSON.stringify(a.blockers)).toBe('posted');
+    const pending=second!.query(sql,[reports[1],legs[1]!.key]).then(value=>({value}),error=>({error}));
+    let blocked=false;
+    for(let attempt=0;attempt<100;attempt++){
+      const locks=(await admin!.query("select pg_blocking_pids($1) pids",[secondPid])).rows[0]!.pids as number[];
+      if(locks.includes(firstPid)){blocked=true;break;}
+      await new Promise(resolve=>setTimeout(resolve,10));
+    }
+    await first!.query('commit');
+    const outcome=await pending;if('error' in outcome)throw outcome.error;
+    const b=outcome.value.rows[0]!.result;await second!.query('commit');
+    expect(blocked).toBe(true);expect(b.status,JSON.stringify(b.blockers)).toBe('posted');
+    // Both application after-reads may now observe ALL goods back. Only B's
+    // immutable transaction marker proves who caused that transition.
+    const events=(await admin!.query("select receipt_id,actor_id,payload->>'repair_return_completed_ro' completed_ro from receiving_events where receipt_id=any($1::uuid[]) and event='posted'",[[a.id,b.id]])).rows;
+    expect(events).toContainEqual({receipt_id:a.id,actor_id:actor,completed_ro:null});
+    expect(events).toContainEqual({receipt_id:b.id,actor_id:secondActor,completed_ro:ro});
+    expect((await admin!.query("select public._receiving_repair_return_complete($1) complete",[ro])).rows[0]!.complete).toBe(true);
+  },15000);
+
 });

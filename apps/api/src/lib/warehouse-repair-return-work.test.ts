@@ -14,7 +14,7 @@ function facts(received=false):RepairReturnFacts{return {
   return_target_date:"2026-09-30",cancelled_at:null,
   units:[{unit_id:"U1-000-001",goods_received_date:received?"2026-10-05":null,grn_no:received?"GRN-1":null}],
   receipts:received?[{id:receipt,arrival_source_id:source,posted_by:actor,posted_at:"2026-10-05T01:00:01Z",grn_no:"GRN-1"}]:[],
-  acceptedReceiptIds:received?[receipt]:[],
+  acceptedReceiptIds:received?[receipt]:[],completionReceiptIds:received?[receipt]:[],
 };}
 async function run(options:{after?:RepairReturnFacts;status?:number;result?:Record<string,unknown>;authority?:boolean;historyFailure?:boolean;recordFailure?:boolean;alreadyBack?:boolean;noSource?:boolean}={}){
   let state=facts(options.alreadyBack);
@@ -45,12 +45,13 @@ describe("Warehouse repair-return Work completion",()=>{
     const after=facts(true);after.units.push({unit_id:"U1-000-002",goods_received_date:null,grn_no:null});
     expect((await run({after})).recordCompleted).not.toHaveBeenCalled();
   });
-  it.each(["blocked","refused","cancelled","other-actor","other-source","old-retry","no-contribution","no-grn","already-back"])("does not credit %s as Warehouse completion",async kind=>{
+  it.each(["blocked","refused","cancelled","other-actor","other-source","old-retry","no-contribution","other-grn-completed","no-grn","already-back"])("does not credit %s as Warehouse completion",async kind=>{
     const after=facts(true);
     if(kind==="cancelled")after.cancelled_at=started;
     if(kind==="other-actor")after.receipts[0]!.posted_by="someone-else";
     if(kind==="other-source")after.receipts[0]!.arrival_source_id="another-source";
     if(kind==="old-retry")after.receipts[0]!.posted_at="2026-10-04T01:00:00Z";
+    if(kind==="other-grn-completed")after.completionReceiptIds=["another-grn"];
     if(kind==="no-grn")after.receipts[0]!.grn_no=null;
     if(kind==="no-contribution")after.acceptedReceiptIds=[];
     const result=await run({after,status:kind==="refused"?403:200,
