@@ -1071,6 +1071,10 @@ export function warehouseConfirmationReportToWire(r: import("./schemas/warehouse
     typeof p === "string" ? p : { path: p.path, unit_code: p.unitCode };
   return {
     po_id: r.poId, actual_site_id: r.actualSiteId,
+    arrival_source_id: r.arrivalSourceId, handover_person: r.handoverPerson,
+    arrival_units: r.arrivalUnits?.map((unit) => ({
+      stock_item_id: unit.stockItemId, outcome: unit.outcome, issue_kind: unit.issueKind, note: unit.note,
+    })),
     do_number: r.doNumber, do_file_path: r.doFilePath, note: r.note,
     goods_received_time: r.goodsReceivedTime, goods_received_at: r.goodsReceivedAt,
     arrival_evidence: r.arrivalEvidence, extra_lines: r.extraLines,

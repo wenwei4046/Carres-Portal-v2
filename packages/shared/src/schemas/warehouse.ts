@@ -113,6 +113,14 @@ export type WarehouseReceiptReturnInput = z.infer<
  * unchanged so it can retain the report with blockers. Shape/size validation is
  * still enforced here; actor, Site, source and posting authority remain in SQL. */
 export const warehouseConfirmationReportInput = warehouseSubmitReceiptInput.partial().extend({
+  arrivalSourceId: z.string().uuid().nullish(),
+  handoverPerson: z.string().max(200).optional(),
+  arrivalUnits: z.array(z.object({
+    stockItemId: z.string().uuid(),
+    outcome: z.enum(["received", "received_with_issue", "not_received"]),
+    issueKind: z.enum(["damaged", "wrong_item"]).optional(),
+    note: z.string().max(300).optional(),
+  }).strict()).max(200).optional(),
   poId: z.string().max(100).nullish(),
   actualSiteId: z.string().uuid().nullish(),
   doNumber: z.string().max(64).nullish(),

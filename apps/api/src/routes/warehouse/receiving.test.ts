@@ -422,6 +422,23 @@ describe("POST /api/warehouse/receipts/confirm", () => {
     });
   });
 
+  it("carries a non-PO arrival and its exact Unit outcomes through the same confirmation door", async () => {
+    const sb = makeSb({ data: { id: LINE, status: "posted", blockers: [] } });
+    vi.mocked(userClient).mockReturnValue(sb as unknown as ReturnType<typeof userClient>);
+    const res = await req("/api/warehouse/receipts/confirm", "POST", await warehouseJwt(), {
+      saveKey: confirmationKey, report: {
+        arrivalSourceId: LINE, actualSiteId: WH, handoverPerson: "Driver",
+        arrivalUnits: [{ stockItemId: LINE, outcome: "received_with_issue", issueKind: "damaged" }],
+      },
+    });
+    expect(res.status).toBe(200);
+    const args = JSON.parse(JSON.stringify(sb.rpc.mock.calls[0]![1]));
+    expect(args.p_report).toEqual({ arrival_source_id: LINE, actual_site_id: WH,
+      handover_person: "Driver", arrival_units: [{ stock_item_id: LINE, outcome: "received_with_issue", issue_kind: "damaged" }],
+    });
+    expect(args.p_report).not.toHaveProperty("po_id");
+  });
+
   it("passes caller identity for retries and exact revision for a correction", async () => {
     const sb = makeSb({ data: { id: LINE, status: "posted", grn_no: "GRN-261005-0001", revision: 2, blockers: [] } });
     vi.mocked(userClient).mockReturnValue(sb as unknown as ReturnType<typeof userClient>);

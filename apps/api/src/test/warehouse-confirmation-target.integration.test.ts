@@ -63,7 +63,7 @@ describe.skipIf(!databaseUrl)("authorised Warehouse final receipt (approved targ
     note: "Physical report", lines, goods_received_time: arrived,
     arrival_evidence: [], extra_lines: [], ...over,
   });
-  const confirm = (body = report(), key = uid("90"), receiptId: string | null = null, revision: number | null = null) => request(
+  const confirm = (body: Record<string, unknown> = report(), key = uid("90"), receiptId: string | null = null, revision: number | null = null) => request(
     "select public.warehouse_confirm_receipt($1::jsonb,$2::uuid,$3::uuid,$4::integer) as result",
     [JSON.stringify(body), key, receiptId, revision],
   );
@@ -75,6 +75,24 @@ describe.skipIf(!databaseUrl)("authorised Warehouse final receipt (approved targ
     await as(person);
     const reports = (await q("select public.warehouse_my_receipts() as reports")).rows[0]!.reports as { id: string }[];
     expect(reports.some((report) => report.id === id)).toBe(true);
+  };
+
+  const setupArrival = async (targetSite = site) => {
+    await q("reset role");
+    const sourceId = uid("110");
+    const path = `${sourceId}/signed-handover.jpg`;
+    await q("insert into arrival_sources(id,source_no,kind,from_site_id,to_site_id,party_id,expected_date,reason,created_by) values($1,$2,'transfer',$3,$4,$5,current_date,'Local receipt test',$6)",
+      [sourceId, `TRF-WCT-${hex}`, targetSite === otherSite ? site : otherSite, targetSite, company, person]);
+    await q("update ops_stock_items set warehouse_id=$1,status='free',holder_party_id=$2 where id=any($3::uuid[])", [otherSite,company,unitIds]);
+    await q("insert into arrival_source_units(source_id,stock_item_id,status_before,holder_before) values($1,$2,'free',$3),($1,$4,'free',$3)", [sourceId,unitIds[0],company,unitIds[1]]);
+    await q("insert into storage.objects(id,bucket_id,name,owner) values($1,'arrival-proofs',$2,$3)", [uid("111"),path,person]);
+    await as(person);
+    return { arrival_source_id: sourceId, actual_site_id: site,
+      goods_received_time: arrived, do_number: `HANDOVER-${hex}`, do_file_path: path,
+      handover_person: "Local delivery person", arrival_units: [
+        { stock_item_id: unitIds[0], outcome: "received" },
+        { stock_item_id: unitIds[1], outcome: "not_received" },
+      ] };
   };
 
   beforeAll(async () => {
@@ -103,12 +121,97 @@ describe.skipIf(!databaseUrl)("authorised Warehouse final receipt (approved targ
     await q("set local session_replication_role = origin");
   });
   beforeEach(async () => { await q("savepoint test_case"); await as(person); });
-  afterEach(async () => { await q("reset role"); await q("rollback to savepoint test_case"); });
+  afterEach(async () => { await q("rollback to savepoint test_case"); await q("reset role"); });
   afterAll(async () => {
     if (!db) return;
     await q("reset role").catch(() => {});
     await q("rollback").catch(() => {});
     await db.end();
+  });
+
+  it("posts a transfer into the same preserved session without changing PO quantities and retries once", async () => {
+    const body = await setupArrival();
+    const first = await confirm(body);
+    if (!first.ok) throw new Error(first.reason);
+    expect(first.result.status, JSON.stringify(first.result.blockers)).toBe("posted");
+    const again = await confirm(body);
+    if (!again.ok) throw new Error(again.reason);
+    expect(again.result.id).toBe(first.result.id);
+    expect(again.result.grn_no).toBe(first.result.grn_no);
+    const row = await receipt(first.result.id);
+    expect(row.arrival_source_id).toBe(body.arrival_source_id);
+    expect(row.po_id).toBeNull();
+    expect(row.posted_authority).toBe("warehouse_confirmation");
+    expect(new Date(row.goods_received_time).toISOString()).toBe(arrived);
+    const units = (await q("select status,warehouse_id from ops_stock_items where id=any($1::uuid[]) order by id", [unitIds])).rows;
+    expect(units).toEqual([{ status: "free", warehouse_id: site }, { status: "free", warehouse_id: otherSite }]);
+    expect((await q("select received_qty from purchase_order_lines where id=$1", [line])).rows[0]!.received_qty).toBe(0);
+    expect((await q("select count(*)::int n from warehouse_receipts where arrival_source_id=$1", [body.arrival_source_id])).rows[0]!.n).toBe(1);
+  });
+
+  it("retains a second arrival report with the same handover note without posting again", async () => {
+    const body = await setupArrival();
+    const first = await confirm(body);
+    if (!first.ok) throw new Error(first.reason);
+    expect(first.result.status).toBe("posted");
+    const duplicate = await confirm(body, uid("91"));
+    if (!duplicate.ok) throw new Error(duplicate.reason);
+    expect(duplicate.result.status).toBe("draft");
+    expect(duplicate.result.blockers).toEqual([expect.objectContaining({ code: "duplicate_receipt" })]);
+    await receipt(first.result.id);
+    expect((await q("select count(*)::int n from warehouse_receipts where arrival_source_id=$1 and status='posted'", [body.arrival_source_id])).rows[0]!.n).toBe(1);
+    await as(person);
+    const own = (await q("select warehouse_my_receipts() reports")).rows[0]!.reports;
+    expect(own).toContainEqual(expect.objectContaining({ id: first.result.id, arrival_source_id: body.arrival_source_id, source_no: `TRF-WCT-${hex}` }));
+  });
+
+  it("preserves an arrival with a foreign proof path without promoting that path", async () => {
+    const body = await setupArrival();
+    const answer = await confirm({ ...body, do_file_path: doPath });
+    if (!answer.ok) throw new Error(answer.reason);
+    expect(answer.result.status).toBe("draft");
+    expect(answer.result.blockers).toEqual([expect.objectContaining({ code: "receipt_evidence_not_available" })]);
+    const row = await receipt(answer.result.id);
+    expect(row.do_file_path).toBeNull();
+    expect(row.raw_report.do_file_path).toBe(doPath);
+  });
+
+  it("preserves an arrival report with missing proof and corrects that same session", async () => {
+    const body = await setupArrival();
+    const first = await confirm({ ...body, do_file_path: null });
+    if (!first.ok) throw new Error(first.reason);
+    expect(first.result.status).toBe("draft");
+    expect(first.result.grn_no).toBeNull();
+    const corrected = await confirm(body,uid("90"),first.result.id,first.result.revision);
+    if (!corrected.ok) throw new Error(corrected.reason);
+    expect(corrected.result.status,JSON.stringify(corrected.result.blockers)).toBe("posted");
+    expect(corrected.result.id).toBe(first.result.id);
+  });
+
+  it("does not receive an arrival source destined for another Site", async () => {
+    const body = await setupArrival(otherSite);
+    const answer = await confirm(body);
+    if (!answer.ok) throw new Error(answer.reason);
+    expect(answer.result.status).toBe("draft");
+    expect(answer.result.blockers).toEqual([expect.objectContaining({ code: "source_not_available" })]);
+    await receipt(answer.result.id);
+    expect((await q("select warehouse_id from ops_stock_items where id=$1", [unitIds[0]])).rows[0]!.warehouse_id).toBe(otherSite);
+  });
+
+  it("keeps issue goods on hold when Warehouse confirms a transfer", async () => {
+    const body = await setupArrival();
+    body.arrival_units[0] = { ...body.arrival_units[0]!, outcome: "received_with_issue", issue_kind: "damaged" } as typeof body.arrival_units[number];
+    const answer = await confirm(body);
+    if (!answer.ok) throw new Error(answer.reason);
+    expect(answer.result.status,JSON.stringify(answer.result.blockers)).toBe("posted");
+    await receipt(answer.result.id);
+    expect((await q("select status from ops_stock_items where id=$1", [unitIds[0]])).rows[0]!.status).toBe("on_hold");
+  });
+
+  it("refuses the public Operation arrival posting door to Warehouse", async () => {
+    const body = await setupArrival();
+    const answer = await request("select receiving_arrival_post($1,'{}'::jsonb) as result", [body.arrival_source_id]);
+    expect(answer.ok).toBe(false);
   });
 
   it("final confirmation posts a numbered GRN, accepts only the received Unit and keeps missing goods outstanding", async () => {

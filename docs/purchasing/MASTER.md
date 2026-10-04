@@ -697,10 +697,11 @@ active individual/Site gate, a caller-held save key, optimistic report correctio
 history, safe raw evidence separate from signed receipt fields, explicit blockers and a distinct
 Warehouse confirming authority. Invalid scope remains an unposted Receiving Session; no source,
 physical date or quantity is fabricated. Effective line Deliver To is checked as well as the
-actual Site. This candidate currently exercises PO/CO-backed intake, not the complete source
-lifecycle, and is implementation evidence rather than a new approved business/schema ruling.
+actual Site. This candidate now exercises PO/CO-backed intake and a non-PO transfer through the existing
+arrival receipt engine. Repair/customer-return/replacement lifecycle coverage is not yet proven;
+this remains implementation evidence rather than a new approved business/schema ruling.
 
-The opt-in `warehouse-confirmation-target.integration.test.ts` now passes 23 local cases: valid
+The opt-in `warehouse-confirmation-target.integration.test.ts` now passes 30 local cases: valid
 automatic GRN and accepted/missing split; shared/disabled actor refusal; preserved missing-DO,
 unknown-source, unknown-Unit, all-missing and cross-Site reports; same-key replay; duplicate DO including a fully fulfilled PO; consignment ownership;
 same-session correction/history; stale and post-completion correction refusal; unknown physical
@@ -713,7 +714,8 @@ its fixtures. Three additional unknown-quantity regressions failed against the i
 missing damage/wrong counts could be treated as zero and post. The candidate now requires all
 three explicit category counts for quantity-mode lines, preserves the incomplete report and
 returns `receipt_quantity_unknown` without stock movement. Unit-mode counts remain derived from
-explicit Unit outcomes. All 23 transaction cases and both concurrency cases pass together.
+explicit Unit outcomes. The 23 PO/CO transaction cases passed together with both concurrency cases before the arrival
+extension; the current combined run passes 30 transaction cases and both concurrency cases.
 The separate `warehouse-confirmation-concurrency.integration.test.ts` passes two real
 concurrent-connection cases: the second connection demonstrably waits on the first transaction,
 then a same-key retry returns the original GRN, while a different-key duplicate DO remains an
@@ -730,12 +732,24 @@ physical counts and dates instead of manufacturing zero or now. The caller suppl
 a correction supplies the same receipt and revision together. The route forwards the user's JWT
 and calls only `warehouse_confirm_receipt`; a missing function or failed call cannot silently fall
 back to the old Operation-review queue. It returns the engine's posted result or preserved-report
-blockers, and refuses an empty success result. Thirty Warehouse route tests pass, including unknown
+blockers, and refuses an empty success result. Thirty-one Warehouse route tests pass, including non-PO source/Unit transport, unknown
 facts, correction identity, role refusal, authority injection, bounded lines and no fallback.
 API and Shared typechecks pass. This transport is not connected to the Warehouse form yet and must
 not deploy ahead of its reviewed database engine. No live final-confirmation claim is made.
 
-Still required before an exact SQL review/release: non-PO source convergence; remaining quantity/issue/extra and authority boundaries; complete source contracts and
+**Non-PO arrival convergence — LOCAL SQL DRAFT / NOT APPROVED / NOT DEPLOYED, 2026-10-05.**
+The candidate extracts the existing arrival receipt body behind its guarded Operation wrapper;
+Warehouse confirmation enters that same engine only with its preserved draft, individual actor,
+active Site/company and a source addressed to that Site. It updates the original session instead
+of creating another receipt. Seven local transaction checks cover a transfer, exact missing-Unit
+custody, unchanged commercial PO count, same-key retry, same-session missing-proof correction,
+other-Site refusal, issue hold, Operation-door refusal, duplicate handover note, foreign proof
+isolation and the own-report source identity. The shared transport carries arrival source/Units
+without inventing a PO. Existing arrival business transitions are retained; this does not prove
+all repair/return/replacement lifecycle fixtures or production function reconciliation. SQL stays
+only in chat and the isolated local database. API typecheck passes after this extension.
+
+Still required before an exact SQL review/release: remaining non-PO lifecycle and source read/form coverage; remaining quantity/issue/extra and authority boundaries; complete source contracts and
 Warehouse form and report history, Operation blocked-report/Work readers; exact reviewed SQL
 approval followed by the governed production probe/apply and delivery proof. The draft exists only
 in chat and the isolated local database, not in `supabase/migrations/`. The historical replay had
