@@ -15,7 +15,8 @@ geometry, text and styles, and must report **no unexplained difference**.
 
 - **One shared customer header:** name · order · phone; a ▾/▴ at the lower right of the customer cell
   opens the sales facts (no `Order info` words); address with its own toggle (▴ while open); target
-  date; Open and Close. The header grows with a long name; nothing overlaps.
+  date (`d Mon`) with the signed calendar-day countdown from Malaysia today (`27d`); Open and Close.
+  The phone glyph and number form one wrapping unit. The header grows with a long name; nothing overlaps.
 - **Sales facts:** `Order date` · `Sales Location` · `Salesperson`, label above value.
 - **Info opens sales facts and address; every other module starts with both closed.** Switching module
   applies that module's default and closes items and editors.
@@ -36,6 +37,10 @@ geometry, text and styles, and must report **no unexplained difference**.
   stamp — the Timeline records who recorded it. Logistics contacts the customer; Operation may record
   Logistics' reply, and the Timeline names Operation only as the recorder.
 - **DO:** read-only conditions, one per line; no manual tick, no repeated explanation.
+- **Items contains goods and services only.** Info uses its separate `Info · Order details` disclosure
+  for Email, Dealer, Proceed Date, statuses and related documents; it starts closed. The requested
+  date stays in the shared Header. The compact goods table includes Unit price and Amount with two
+  decimal places, and service Stock Status reads `Service`. The shared Register expansion is unchanged.
 - **Items, Communication and Timeline start closed.** Times show without a zone suffix
   (`30 Sep · 4:08 PM`); the full instant stays in the element; a date-only source shows the date and
   `Time unavailable`.
@@ -58,17 +63,30 @@ HTML/CSS. The SO number lazily opens the Orders endpoint’s current saved-versi
 `SalesOrderCardDocument` / `PdfPreview`; ↗ opens the full order and its existing deliberate Edit gate.
 The shared Drawer `compact-card` variant supplies focus containment, Escape, background scroll lock
 and return focus with an accessible hidden title; visible identity and Close belong to this card.
-Info and Delivery retain their defaults. Email, Dealer, Proceed Date, payment/receipt/delivery status,
-Items and related documents remain reachable in the collapsed module content. Address keeps Floor,
-Lift and stair carry facts. No sample dates, stock quantities or customer details become live facts.
+Info and Delivery retain their defaults. Email, Dealer, Proceed Date, payment/receipt/delivery status
+and related documents remain in the separate Info details disclosure; Items contains only goods and
+services. Address keeps the recorded building type, Floor, Lift and stair carry facts, with named
+unknowns rather than fabricated zero values. No sample dates, stock quantities or customer details become live facts.
 Delivery reads the existing Monitor projection for the final receiver; goods exclude services. Missing
 or failed reads stay explicit. Customer date and optional time remain separate from crew ETA.
 Existing Delivery-owned `DeliveryDatesEdit` / `LogisticsDetailsEdit` forms are reused through their
 governed arrangement door, including reason/evidence rules, permission checks and server refusals.
 Their compact action row uses Cancel then Save; failure retains input and exposes its reason.
+The compact Customer editor starts with no inferred information source and requires an actual choice;
+the existing save door records contact/proxy separately from the logged-in recorder. Coverage-based
+Logistics preselection remains an unsaved assignment draft, labelled `Assign logistics`; the summary
+continues to show only the saved partner. Compact crew fields share a row, with ETA, condo and reply
+proof retained. Its prepared message belongs in Communication, outside the assignment editor.
 DO conditions are read-only and cannot issue or release a document. Timeline uses recorded events,
 full instants and avatar identity without repeating names; its loading/error state stays inside its
-collapsed section. Communication only prepares drafts; attachments remain explicitly preview-only.
+collapsed section. Communication only prepares drafts; attachments remain explicitly preview-only. Info supplies the
+Payment’s active current reminder/follow-up templates (Default first), with the existing governed
+wording as the same fallback its Invoice composer uses, only when money is actually outstanding.
+Delivery supplies only the saved Logistics recipient and its existing group door, active current
+`ask_partner_for_date` templates from Delivery Settings (Default first), or the existing governed
+Delivery details wording when no active template exists. No saved partner means no Logistics
+communication door. Shared Settings versions are read here; Save as/Manage retain the kit’s existing
+browser-template scope and do not write the backend template library.
 This scoped adoption does not change tokens, phone navigation or Work contacts.
 
 **Reuse and verification boundary (2026-10-04):** `CompactModuleCard` owns card content;

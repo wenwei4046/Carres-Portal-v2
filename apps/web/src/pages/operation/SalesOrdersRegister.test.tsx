@@ -1593,6 +1593,7 @@ describe("approved solid SO status presentation", () => {
     fireEvent.click(screen.getByRole("button", { name: "SO-1303" }));
     const drawer = screen.getByRole("dialog", { name: "SO-1303 · Kimmy" });
     fireEvent.click(within(drawer).getByRole("button", { name: "Items" }));
+    fireEvent.click(within(drawer).getByRole("button", { name: "Info · Order details" }));
     check(drawer, String(stockLabel), String(stockTone));
     check(drawer, String(paymentLabel), String(paymentTone));
     check(drawer, String(deliveryLabel), String(deliveryTone));

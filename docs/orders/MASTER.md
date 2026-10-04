@@ -6818,6 +6818,25 @@ this module owns the following business-specific application. Delivered evidence
   No Print/Download or live business-data write was performed. This change removes the compact
   frame's hidden duplicate Close and names address facts explicitly; kit/dialog regression23
   checks cover visible initial focus, Escape and opener return.
+  **Current acceptance follow-up — BUILD / pending production proof:** the real top-to-toe audit
+  identified omissions, rather than new business choices. Building type and named unknown access
+  facts remain source truth; Info’s separate details disclosure owns Email/Dealer/Proceed Date,
+  statuses and document lineage. Items owns only goods/services, includes Unit price and two-decimal
+  Amount, and reads Service for service stock. Header target uses d Mon and Malaysia calendar-day
+  countdown; phone glyph/number wrap together. Compact Logistics retains coverage preselection as
+  an unsaved Assign logistics draft and saved summary truth, with crew/ETA/condo/proof intact and
+  the prepared message moved to Communication. Customer source is explicitly selected, never guessed
+  from an absent partner; Delivery’s save door owns actual contact/proxy evidence and Timeline recorder.
+  Info reads active current Payment reminder/follow-up templates, Default first, with the existing
+  Invoice composer’s governed fallback for outstanding balances. Delivery reads active current
+  Settings date-request templates, Default first, or existing Delivery details wording, addressed only
+  to the saved Logistics recipient. No additional template store or send is introduced. The backend
+  library and the kit’s existing browser Save as/Manage scope are distinct.
+  Required closure: exact-head CI/deploy, all-five revision convergence, authenticated real mobile and
+  long-value checks, isolated Items/details/template proofs, Customer source and Logistics Cancel proof.
+  Successful/refused saves remain meaningful automated evidence until an authorized live business
+  save is available; Print/Download is outside the current browser permission proof and is not claimed.
+
 - Full page opens read-only until deliberate Edit. Fixed white identity header and slate-2 tabs
   sit above one scrolling left form and independent right PDF. Back preserves register context.
 - Items has five columns Item, Qty, Unit (RM), Disc (RM), Amount (RM). Name, code and config share
