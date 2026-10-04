@@ -1,3 +1,4 @@
+import { customerOrderReferenceOf, customerOrderReferenceWord } from "@carres/shared";
 /**
  * SalesOrderWorkspace — the Sales Order object page. Commercial changes leave
  * through Amendment, never this form.
@@ -634,11 +635,11 @@ export function snapshotTemplateData(
   const paid = asOf ? payments.reduce((n, pm) => n + Number(pm.amount), 0) : (base?.paid ?? 0);
   const str = (k: string) => (h[k] == null ? null : String(h[k]));
   return {
-    so_number: h["so"] != null ? `SO-${h["so"]}` : (base?.so_number ?? ""),
+    so_number: str("public_reference") ?? customerOrderReferenceOf(base?.so_number) ?? (h["so"] != null ? `SO-${h["so"]}` : (base?.so_number ?? "")),
     issue_date: (str("placed_at") ?? base?.issue_date ?? "").slice(0, 10),
     proceed_date: str("proceed_date"),
     order_id: base?.order_id ?? "snapshot",
-    order_code: h["so"] != null ? `SO-${h["so"]}` : (base?.order_code ?? ""),
+    order_code: str("public_reference") ?? customerOrderReferenceOf(base?.order_code) ?? (h["so"] != null ? `SO-${h["so"]}` : (base?.order_code ?? "")),
     status_label: base?.status_label ?? "",
     channel: base?.channel ?? "dealer",
     customer: {
@@ -1053,13 +1054,16 @@ export default function SalesOrderWorkspace() {
   if (ident && ident.kind === "number") {
     return <SalesOrderNumberDoor so={ident.so} search={location.search} />;
   }
+  if (ident && ident.kind === "reference") {
+    return <SalesOrderNumberDoor so={ident.reference} search={location.search} />;
+  }
   if (ident && ident.kind === "invalid") {
     return <SalesOrderAbsence />;
   }
   return <SalesOrderWorkspaceBody />;
 }
 
-function SalesOrderNumberDoor({ so, search }: { so: number; search: string }) {
+function SalesOrderNumberDoor({ so, search }: { so: number | string; search: string }) {
   const navigate = useNavigate();
   const location = useLocation();
   const resolved = useSalesOrderIdByNumber(so);
@@ -1070,7 +1074,7 @@ function SalesOrderNumberDoor({ so, search }: { so: number; search: string }) {
   if (resolved.isError) return <SalesOrderAbsence />;
   return (
     <div className="flex h-full items-center justify-center" data-testid="so-number-door">
-      <Loading label={`Opening ${salesOrderNumberWord(so)}`} />
+      <Loading label={`Opening ${typeof so === "number" ? salesOrderNumberWord(so) : so}`} />
     </div>
   );
 }
@@ -1643,7 +1647,7 @@ function SalesOrderWorkspaceBody() {
      whole draft and either saves the correction or submits the request. ── */
   const createMut = useCreateSalesOrder({
     onSuccess: (r) => {
-      toast.success(`SO-${r.so}(1) created`);
+      toast.success(`${customerOrderReferenceWord(r)}(1) created`);
       navigate(`/operation/orders/so/${r.id}`, { replace: true });
     },
     onError: (e) => toast.error(e.message),
@@ -2501,7 +2505,7 @@ function SalesOrderWorkspaceBody() {
     </span>
   );
 
-  const soWord = isNew ? "New Sales Order" : order ? `SO-${order.so}` : "Sales Order";
+  const soWord = isNew ? "New Sales Order" : order ? customerOrderReferenceWord({ so: order.so, publicReference: order.public_reference }) : "Sales Order";
 
   const customerBuiltins = tab("customer").builtins;
   const emergencyEnabled = tab("emergency").builtins["emergency"]?.enabled !== false;
@@ -3803,7 +3807,7 @@ function SalesOrderWorkspaceBody() {
         onBack={(event) => {
           if (!confirmDiscard()) event.preventDefault();
         }}
-        docTitle={isNew ? "New Sales Order · Carres" : order ? `SO-${order.so} · Carres` : undefined}
+        docTitle={isNew ? "New Sales Order · Carres" : order ? `${customerOrderReferenceWord({ so: order.so, publicReference: order.public_reference })} · Carres` : undefined}
         right={headerRight}
         navigation={!isNew ? (
           <nav aria-label="Sales Order views" className="flex h-full items-stretch gap-1">
@@ -3829,6 +3833,7 @@ function SalesOrderWorkspaceBody() {
         <CancelSalesOrderDialog
           orderId={order.id}
           so={order.so}
+          publicReference={order.public_reference}
           open={cancelOpen}
           onOpenChange={setCancelOpen}
           onCancelled={() => void detailQ.refetch()}
@@ -3839,7 +3844,7 @@ function SalesOrderWorkspaceBody() {
         <ServiceCaseWizard
           initialOrder={{
             id: order.id,
-            so: `SO-${order.so}`,
+            so: customerOrderReferenceWord({ so: order.so, publicReference: order.public_reference }),
             refNos: order.source_ref ?? [],
             customerName: order.customer_name,
             customerPhone: order.customer_phone,
@@ -3908,7 +3913,7 @@ function SalesOrderWorkspaceBody() {
               />
             ) : (
             <SalesOrderLedger
-              orderReference={order ? `SO-${order.so}` : ""}
+              orderReference={order ? customerOrderReferenceWord({ so: order.so, publicReference: order.public_reference }) : ""}
               revisions={revisions}
               history={detailQ.data?.history ?? []}
               currentRevision={currentRev}

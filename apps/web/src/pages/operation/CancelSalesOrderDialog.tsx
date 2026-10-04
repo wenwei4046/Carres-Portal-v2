@@ -1,3 +1,4 @@
+import { customerOrderReferenceWord } from "@carres/shared";
 /**
  * CancelSalesOrderDialog — the governed door for cancelling one customer
  * transaction (SO V2 Cancel slice, migration 0350).
@@ -40,22 +41,25 @@ import { toast } from "sonner";
 export default function CancelSalesOrderDialog({
   orderId,
   so,
+  publicReference,
   open,
   onOpenChange,
   onCancelled,
 }: {
   orderId: string;
   so: number;
+  publicReference?: string | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** Fired once the transaction is cancelled, so the caller can refresh. */
   onCancelled?: () => void;
 }) {
+  const reference = customerOrderReferenceWord({ so, publicReference });
   const [reason, setReason] = useState("");
   const impactQ = useSalesOrderCancelImpact(orderId, open);
   const cancelMut = useCancelOrder(orderId, {
     onSuccess: () => {
-      toast.info(`SO-${so} cancelled`);
+      toast.info(`${reference} cancelled`);
       setReason("");
       onOpenChange(false);
       onCancelled?.();
@@ -79,7 +83,7 @@ export default function CancelSalesOrderDialog({
         if (!next) setReason("");
         onOpenChange(next);
       }}
-      title={`Cancel SO-${so}`}
+      title={`Cancel ${reference}`}
       description="The customer cancelled this order. The order keeps its number and nothing is deleted."
       footer={
         <div className="flex justify-end gap-2">
@@ -88,7 +92,7 @@ export default function CancelSalesOrderDialog({
           </Button>
           {/* Kit law: there is no danger variant — §3.3 gives red one job, and
               a destructive action is a neutral button whose WORD says what it
-              does. `Cancel SO-{so}` names the record it ends. */}
+              does. `Cancel {reference}` names the record it ends. */}
           {canCancel && (
             <Button
               variant="neutral"
@@ -97,7 +101,7 @@ export default function CancelSalesOrderDialog({
               onClick={() => cancelMut.mutate({ reason: reason.trim() })}
               data-testid="cancel-so-confirm"
             >
-              Cancel SO-{so}
+              Cancel {reference}
             </Button>
           )}
         </div>

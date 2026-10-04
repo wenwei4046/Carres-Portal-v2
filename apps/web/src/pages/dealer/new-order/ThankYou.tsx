@@ -1,3 +1,4 @@
+import { customerOrderReferenceWord } from "@carres/shared";
 import { useMemo, useState } from "react";
 import { Check, CheckCircle2, Gift, Plus, QrCode } from "lucide-react";
 import type { CatalogResponse, Order } from "@carres/shared";
@@ -96,7 +97,7 @@ export default function ThankYou({
           <div className="confirm__check">
             <Check size={26} strokeWidth={2.5} />
           </div>
-          <div className="confirm__eyebrow">Order confirmed · CO-{order.so}</div>
+          <div className="confirm__eyebrow">Order confirmed · {customerOrderReferenceWord({ publicReference: order.publicReference, legacyReference: `CO-${order.so}`, so: order.so })}</div>
           <h1 className="confirm__head">
             Welcome <span className="accent">home</span>, {firstName}.
           </h1>
@@ -152,6 +153,7 @@ export default function ThankYou({
               <DownloadSalesOrderButton
                 orderId={order.id}
                 so={order.so}
+            publicReference={order.publicReference}
                 role={role}
                 variant="secondary"
               />
@@ -163,7 +165,7 @@ export default function ThankYou({
       {/* ── Receipt panel ── */}
       <aside className="confirm__panel">
         <div className="summary__head">
-          <div className="summary__order">CO-{order.so}</div>
+          <div className="summary__order">{customerOrderReferenceWord({ publicReference: order.publicReference, legacyReference: `CO-${order.so}`, so: order.so })}</div>
           <div className="summary__title">Receipt</div>
         </div>
         <div className="summary__body">
@@ -317,6 +319,7 @@ export default function ThankYou({
         <StripeCollectModal
           orderId={order.id}
           so={order.so}
+            publicReference={order.publicReference}
           total={total}
           paid={order.paid + collected}
           initialAmount={stripeCollectAmount ?? undefined}

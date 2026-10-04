@@ -526,6 +526,7 @@ export const orderFromRow = (
 ): D.Order => ({
   id: r.id,
   so: r.so,
+  ...(r.public_reference !== undefined ? { publicReference: r.public_reference } : {}),
   status: r.status,
   channel: r.channel,
   dealerId: r.dealer_id,

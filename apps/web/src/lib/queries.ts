@@ -497,7 +497,7 @@ export const qk = {
     orderRoute: (id: string) => ["operation", "orders", id, "route"] as const,
     /** 【DELIVERY】 CARD 19 — the document word resolved to the id, keyed by
      *  the number the URL carried. */
-    orderByNumber: (so: number) => ["operation", "orders", "by-number", so] as const,
+    orderByNumber: (so: number | string) => ["operation", "orders", "by-number", so] as const,
     partners:  () => ["operation", "partners"] as const,
     suppliers: () => ["operation", "suppliers"] as const,
     pos:       (filters?: operationPoFilters) =>
@@ -2695,6 +2695,7 @@ export interface operationOrderThreadRow {
 export interface operationOrderListRow {
   id: string;
   so: number;
+  public_reference?: string | null;
   /**
    * ⭐ `cancelled` RESTORED 2026-09-14 (Card 23). This row type listed three
    * statuses while the canonical `OrderStatus` in `@carres/shared`
@@ -3100,6 +3101,7 @@ export interface operationOrdersListResponse {
 export interface operationOrderDetailOrder {
   id: string;
   so: number;
+  public_reference?: string | null;
   /** Customer/source reference(s), e.g. ["DL0584"] — shown next to the SO. */
   source_ref: string[] | null;
   /** 'autocount' for imported orders (already proceeded — never "placed"). */
@@ -5819,7 +5821,7 @@ export function useOperationOrders(
  * ONCE for a number URL and then re-enters by the id, so every other read
  * still happens by the id (Law C — one door, never a second fan-in).
  */
-export function useSalesOrderIdByNumber(so: number | null) {
+export function useSalesOrderIdByNumber(so: number | string | null) {
   return useQuery({
     queryKey: so ? qk.operation.orderByNumber(so) : (["operation", "orders", "by-number", "null"] as const),
     queryFn: () =>

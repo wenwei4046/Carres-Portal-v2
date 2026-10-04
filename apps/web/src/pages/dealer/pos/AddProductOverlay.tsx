@@ -1,3 +1,4 @@
+import { customerOrderReferenceWord } from "@carres/shared";
 import { useMemo, useState } from "react";
 import { X } from "lucide-react";
 import type {
@@ -176,7 +177,7 @@ export default function AddProductOverlay({
       >
         <header className="flex items-center gap-3 px-6 py-4 border-b border-base-200 bg-white">
           <div className="min-w-0 flex-1">
-            <p className="kicker">Order SO-{order.so}</p>
+            <p className="kicker">Order {customerOrderReferenceWord(order)}</p>
             <h2 className="t-h3">Add product</h2>
           </div>
           <input

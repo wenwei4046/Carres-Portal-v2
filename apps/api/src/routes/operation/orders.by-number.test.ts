@@ -52,6 +52,20 @@ function mockOrdersByNumber(row: { id: string; so: number } | null) {
 }
 
 describe("GET /api/operation/orders/by-number/:so", () => {
+  it("resolves approved public SO/SUB references through the same scoped id door", async () => {
+    for (const [word, base] of [["SO2609-0007(2)", "SO2609-0007"], ["SUB2609-00007", "SUB2609-00007"]]) {
+      const { eq } = mockOrdersByNumber({ id: ORDER_ID, so: 1362 });
+      const token = await makeJwt("operation");
+      const res = await app.fetch(new Request(`http://t/api/operation/orders/by-number/${encodeURIComponent(word)}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      }), env);
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ id: ORDER_ID, so: 1362 });
+      expect(eq).toHaveBeenCalledWith("public_reference", base);
+      expect(eq).not.toHaveBeenCalledWith("so", 7);
+    }
+  });
+
   it("resolves the document word to the id, reading `orders.so` and nothing else", async () => {
     const { eq, select } = mockOrdersByNumber({ id: ORDER_ID, so: 1362 });
     const token = await makeJwt("operation");

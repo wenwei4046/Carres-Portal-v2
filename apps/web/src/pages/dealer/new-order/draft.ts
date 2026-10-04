@@ -252,7 +252,7 @@ export interface WizardDraft {
    *  when the dealer tapped "Collect & complete order". Persisted so a refresh
    *  resumes the SAME order's QR instead of minting a duplicate SO. Cleared on
    *  payment success or explicit cancel. */
-  stripePending?: { orderId: string; so: number; amount: number } | null;
+  stripePending?: { orderId: string; so: number; publicReference?: string | null; amount: number } | null;
 }
 
 export const DRAFT_STORAGE_KEY = "carres-order-draft";

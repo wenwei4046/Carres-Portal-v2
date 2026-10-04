@@ -53,6 +53,19 @@ function mount(url: string, state?: Record<string, string>) {
 }
 
 describe("SalesOrderWorkspace — the number door (Card 19)", () => {
+  it.each(["SO2610-0007", "SUB2610-00007(2)"])("public reference %s resolves once with search and return context intact", async (word) => {
+    apiFetch.mockReset();
+    const base = word.replace(/\(\d+\)$/, "");
+    apiFetch.mockImplementation((path: unknown) => path === `/api/operation/orders/by-number/${base}`
+      ? Promise.resolve({ id: ID, so: 1362 }) : new Promise(() => {}));
+    mount(`/operation/orders/so/${word}?route=1`, { salesOrderRegisterReturn: `/operation/orders?search=${base}&view=cards` });
+    await waitFor(() => expect(screen.getByTestId("object-page")).toHaveTextContent(ID));
+    expect(screen.getByTestId("location")).toHaveTextContent(`/operation/orders/so/${ID}?route=1`);
+    expect(screen.getByTestId("return-context")).toHaveTextContent(`/operation/orders?search=${base}&view=cards`);
+    expect(apiFetch.mock.calls.map(([p]) => p).filter((p) => typeof p === "string" && p.includes("/by-number/")))
+      .toEqual([`/api/operation/orders/by-number/${base}`]);
+  });
+
   it("a number URL resolves once and re-enters by the id, keeping the search", async () => {
     apiFetch.mockReset();
     apiFetch.mockImplementation((path: unknown) => {

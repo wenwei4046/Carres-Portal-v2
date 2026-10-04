@@ -1739,3 +1739,13 @@ describe("the goods chain reads its owners (owner ruling 2026-09-26)", () => {
     expect(requirement(map, "goods")).toEqual({ id: "goods", met: false, text: "Warehouse has 2 of 3 Units ready" });
   });
 });
+
+describe("stored customer order identity", () => {
+  it.each(["SO2610-0007", "SUB2610-00007"])("Route identity uses %s while internal SO remains unchanged", (publicReference) => {
+    const source = input();
+    const map = resolveSalesOrderRoute({ ...source, order: { ...source.order, publicReference } });
+    expect(JSON.stringify(map)).toContain(publicReference);
+    expect(source.order.so).toBe(1319);
+    expect(JSON.stringify(map)).not.toContain("SO-1319");
+  });
+});

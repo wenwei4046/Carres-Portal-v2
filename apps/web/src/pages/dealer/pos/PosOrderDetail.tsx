@@ -1,3 +1,4 @@
+import { customerOrderReferenceWord } from "@carres/shared";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
@@ -1003,6 +1004,7 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
         variant="pos"
         orderId={order.id}
         so={order.so}
+            publicReference={order.publicReference}
         role={viewerRole ?? "dealer"}
       />
     </div>
@@ -1030,7 +1032,7 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
             <div className="os-detail__eyebrow">Order · {laneLabel}</div>
             {/* 2026-07-25 (Loo) — the official document number, not the 2990s
                 `#` code: matches the Sales Order PDF + every ERP surface. */}
-            <div className="os-detail__title">SO-{order.so}</div>
+            <div className="os-detail__title">{customerOrderReferenceWord(order)}</div>
             <div className="os-detail__sub">
               {order.customer.name || "Walk-in"} · placed {daysAgo(order.placedAt)} by{" "}
               {staffName ?? ""}
@@ -1760,6 +1762,7 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
           <StripeCollectModal
             orderId={order.id}
             so={order.so}
+            publicReference={order.publicReference}
             total={total}
             paid={paid}
             customerName={order.customer.name}

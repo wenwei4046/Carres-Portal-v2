@@ -109,6 +109,7 @@ const orderHistorySchema = z.object({
 export const orderSchema = z.object({
   id: z.string().uuid(),
   so: z.number().int(),
+  publicReference: z.string().nullable().optional(),
   status: orderStatusSchema,
   channel: z.string(),
   dealerId: z.string().uuid(),
@@ -232,6 +233,7 @@ const orderAddonInputSchema = z.object({
 });
 
 export const createOrderInputSchema = z.object({
+    requestKey: z.string().min(1).max(200).optional(),
   outletId: z.string().uuid(),
   salespersonId: z.string().uuid(),
   customer: z.object({

@@ -43,6 +43,7 @@ const DENIED: ReadonlySet<Role> = new Set(["partner", "supplier", "warehouse"]);
 interface Props {
   orderId: string;
   so: number;
+  publicReference?: string | null;
   role: Role;
   variant?: "primary" | "secondary" | "menuitem" | "pos";
   className?: string;
@@ -71,7 +72,7 @@ export default function DownloadSalesOrderButton({
       const url = URL.createObjectURL(blob);
       window.open(url, "_blank");
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
-      toast.success(`Sales Order SO-${String(so).padStart(6, "0")} opened`);
+      toast.success(`Sales Order ${data.so_number} opened`);
     } catch (e) {
       const msg = e instanceof ApiError ? e.message : String(e);
       toast.error(`Sales Order PDF failed: ${msg}`);

@@ -296,6 +296,53 @@ describe("POST /api/rental/agreements (0255 signup RPC)", () => {
     signedName: "Tan Mei Ling",
   };
 
+  const savedSignup = {
+    agreement: { ...AGREEMENT, agreement_no: "SUB2610-00007", signature_path: "rental-agreements/existing.png" },
+    customer: { ...AGREEMENT.customers, phone_key: "123456789", address: null, notes: null,
+      created_at: "2026-07-25T00:00:00Z", updated_at: "2026-07-25T00:00:00Z", created_by: null },
+    unit: null, entitlementId: null, visitsTotal: 0, pendingApproval: true, orderId: null, so: null,
+  };
+
+  it("replays the signed agreement before uploading another signature", async () => {
+    const sb = makeSb({}, { data: savedSignup, error: null });
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const admin = makeAdminStorage();vi.mocked(adminClient).mockReturnValue(admin as never);
+    const res = await request("/api/rental/agreements", { method: "POST",
+      headers: { Authorization: `Bearer ${await makeJwt("showroom", DEALER_ID)}`, "content-type": "application/json" },
+      body: JSON.stringify({ ...payload, requestKey: "wizard:line:0" }),
+    }, env);
+    expect(res.status).toBe(201);
+    expect((await res.json() as { agreement: { agreementNo: string } }).agreement.agreementNo).toBe("SUB2610-00007");
+    expect(sb.calls.rpc.map((r) => r.name)).toEqual(["customer_order_creation_replay"]);
+    expect(admin.calls.uploads).toHaveLength(0);expect(admin.calls.removes).toHaveLength(0);
+  });
+
+  it("a concurrent retry removes only its unused upload after the atomic writer replays", async () => {
+    const sb = makeSb({}, [{ data: null, error: null }, { data: savedSignup, error: null }]);
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const admin = makeAdminStorage();vi.mocked(adminClient).mockReturnValue(admin as never);
+    const res = await request("/api/rental/agreements", { method: "POST",
+      headers: { Authorization: `Bearer ${await makeJwt("showroom", DEALER_ID)}`, "content-type": "application/json" },
+      body: JSON.stringify({ ...payload, requestKey: "wizard:line:0" }),
+    }, env);
+    expect(res.status).toBe(201);
+    expect(sb.calls.rpc.map((r) => r.name)).toEqual(["customer_order_creation_replay", "customer_order_submit"]);
+    expect(admin.calls.uploads).toHaveLength(1);
+    expect(admin.calls.removes).toEqual([{ bucket: "rental-agreements", keys: [admin.calls.uploads[0]!.key] }]);
+    expect(admin.calls.removes[0]!.keys).not.toContain("existing.png");
+  });
+
+  it("an uncertain keyed submit keeps its signature so a committed agreement cannot lose evidence", async () => {
+    const sb = makeSb({}, [{ data: null, error: null }, { data: null, error: { message: "network response lost" } }]);
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const admin = makeAdminStorage();vi.mocked(adminClient).mockReturnValue(admin as never);
+    const res = await request("/api/rental/agreements", { method: "POST",
+      headers: { Authorization: `Bearer ${await makeJwt("showroom", DEALER_ID)}`, "content-type": "application/json" },
+      body: JSON.stringify({ ...payload, requestKey: "wizard:line:0" }),
+    }, env);
+    expect(res.status).toBe(500);expect(admin.calls.uploads).toHaveLength(1);expect(admin.calls.removes).toHaveLength(0);
+  });
+
   it("rejects a partner (403) and a phoneless payload (422) before the RPC", async () => {
     const asPartner = await request(
       "/api/rental/agreements",

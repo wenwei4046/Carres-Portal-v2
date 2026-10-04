@@ -232,7 +232,7 @@ function toGridColumn(
             inspectOrder(r);
           }}
         >
-          SO-{r.so}
+          {r.reference}
         </button>
       ),
     };
@@ -677,7 +677,7 @@ function ExpandedLines({ row, inspection = false, compact = false }: { row: Regi
       selectable: false,
     })),
   ];
-  if (compact) return <div className="max-h-64 overflow-auto"><table className="w-full text-body" aria-label={`Items on SO-${row.so}`}>
+  if (compact) return <div className="max-h-64 overflow-auto"><table className="w-full text-body" aria-label={`Items on ${row.reference}`}>
     <thead className="sticky top-0 bg-kit-slate-3 text-label text-kit-slate-11"><tr><th className="p-2 text-left">Item</th><th className="p-2 text-right">Qty</th><th className="p-2 text-right">Unit price</th><th className="p-2 text-right">Amount</th><th className="p-2 text-left">Stock Status</th></tr></thead>
     <tbody>{miniLines.map((line, index) => {
       const source = index < lines.length ? lines[index] : addons[index - lines.length];
@@ -710,7 +710,7 @@ function ExpandedLines({ row, inspection = false, compact = false }: { row: Regi
           {
             key: "goods",
             connectAt: CONNECT_AT_TABLE_HEADER,
-            node: <GoodsMiniTable label={`Goods on SO-${row.o.so}`} lines={miniLines} salesOrderLayout />,
+            node: <GoodsMiniTable label={`Goods on ${row.reference}`} lines={miniLines} salesOrderLayout />,
           },
         ]}
       />
@@ -758,7 +758,7 @@ function GoodsSummary({ row, onOpen, compact = false }: { row: RegisterRow; onOp
   const suffix = extra ? ` + ${extra} more` : "";
   const first = suffix && row.items.endsWith(suffix) ? row.items.slice(0, -suffix.length) : row.items;
   return <button type="button" className={`flex min-h-10 md:min-h-8 w-full min-w-0 items-center gap-1 text-left text-body hover:text-kit-blue-11 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9 ${compact ? "-my-px" : ""}`}
-    aria-label={`Items · SO-${row.so}`} title={row.items} onClick={(event) => { event.stopPropagation(); onOpen(row); }}>
+    aria-label={`Items · ${row.reference}`} title={row.items} onClick={(event) => { event.stopPropagation(); onOpen(row); }}>
     <span className="min-w-0 truncate">{first}</span>{extra > 0 && <span className="shrink-0 font-medium">+{extra}</span>}
   </button>;
 }
@@ -1246,14 +1246,14 @@ export default function SalesOrdersRegister() {
   return (
     <div className="flex h-full min-h-0 flex-col">
       <DestinationHeader />
-      {quickOrder && <Drawer variant="compact-card" open onOpenChange={(open) => { if (!open) setQuickOrder(null); }} title={`SO-${quickOrder.so} · ${quickOrder.customer}`}>
+      {quickOrder && <Drawer variant="compact-card" open onOpenChange={(open) => { if (!open) setQuickOrder(null); }} title={`${quickOrder.reference} · ${quickOrder.customer}`}>
         <SalesOrderCompactView row={quickOrder} salesLocation={salesLocationOf(quickOrder.o)} items={<div className="min-w-0 overflow-x-auto"><ExpandedLines row={quickOrder} compact /></div>} documents={<RelatedDocuments row={quickOrder} />} statuses={<dl className="flex flex-col gap-3 text-body">{[
           ["Stock Status", STOCK_STATUSES.find(status => status.key === stockStatusOf(quickOrder))!.label],
           ["Payment Status", PAYMENT_STATUSES.find(status => status.key === paymentStatusOf(quickOrder))!.label],
           ["Delivery Status", REGISTER_DELIVERY_CONDITIONS.find(status => status.key === registerDeliveryConditionOf(quickOrder.o.order_lines ?? [], quickOrder.o.allocated_units ?? []))?.label ?? "Not recorded"],
         ].map(([label, value]) => <div key={label} className="flex justify-between"><dt>{label}</dt><dd><StatusPill tone={salesOrderStatusTone(value)}>{value}</StatusPill></dd></div>)}</dl>} onOpen={() => openWorkspace(quickOrder)} onClose={() => setQuickOrder(null)} />
       </Drawer>}
-      {goodsTarget && <Drawer open onOpenChange={(open) => { if (!open) setGoodsTarget(null); }} title={`SO-${goodsTarget.so} · Items`}>
+      {goodsTarget && <Drawer open onOpenChange={(open) => { if (!open) setGoodsTarget(null); }} title={`${goodsTarget.reference} · Items`}>
         <div className="min-w-0 max-w-full overflow-x-auto"><ExpandedLines row={goodsTarget} inspection /></div>
       </Drawer>}
 
@@ -1318,8 +1318,8 @@ export default function SalesOrdersRegister() {
                   // Both views use the existing register delivery projection;
                   // scope-card readiness remains a separate final-leg fact.
                   return <div key={row.id} data-row-key={row.id} tabIndex={-1} className="min-w-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9" data-testid={`sales-order-card-${row.so}`}>
-                    <Block title={`SO-${row.so}`} headerSlot={<div className="flex items-center gap-3">
-                      <Checkbox id={`card-select-${row.id}`} ariaLabel={`Select SO-${row.so}`} checked={selected.has(row.id)} onCheckedChange={() => toggleRow(row.id)} />
+                    <Block title={row.reference} headerSlot={<div className="flex items-center gap-3">
+                      <Checkbox id={`card-select-${row.id}`} ariaLabel={`Select ${row.reference}`} checked={selected.has(row.id)} onCheckedChange={() => toggleRow(row.id)} />
                       <Button size="touch" variant="ghost" onClick={() => setQuickOrder(row)}>View</Button>
                     </div>}>
                       <dl className="grid min-w-0 grid-cols-2 gap-3 text-body">
@@ -1504,13 +1504,13 @@ function RegisterResultSummary({
   const scope = selected.length > 0 ? selected : filtered;
   const counts = new Map<string, number>();
   /* The lines behind `Not in catalog {n}` — what the click lists. */
-  const uncatalogued: { id: string; so: number; sku: string; name: string; qty: number }[] = [];
+  const uncatalogued: { id: string; so: number; reference: string; sku: string; name: string; qty: number }[] = [];
   for (const row of scope) {
     for (const line of row.o.order_lines ?? []) {
       const word = footerWord(line);
       counts.set(word, (counts.get(word) ?? 0) + Number(line.qty || 0));
       if (word === "Other goods") {
-        uncatalogued.push({ id: row.id, so: row.so, sku: line.sku, name: lineName(line), qty: Number(line.qty || 0) });
+        uncatalogued.push({ id: row.id, so: row.so, reference: row.reference, sku: line.sku, name: lineName(line), qty: Number(line.qty || 0) });
       }
     }
     for (const addon of row.o.order_addons ?? []) {
@@ -1589,7 +1589,7 @@ function RegisterResultSummary({
                     className="text-kit-blue-11 underline-offset-2 hover:underline"
                     onClick={() => navigate(`/operation/orders/so/${u.id}`)}
                   >
-                    SO-{u.so}
+                    {u.reference}
                   </button>
                 </td>
                 <td className="whitespace-nowrap px-2 py-1">{u.sku}</td>
