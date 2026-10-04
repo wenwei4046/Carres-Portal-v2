@@ -23,7 +23,11 @@ number, the party and the date already worked out, and one obvious button.
 ---
 
 **Mandatory UI cold-start:** before any listing/UI proposal or build, read `docs/ui/MASTER.md`
-§6.0, §6.7–6.10 and Complete-template adoption contract, the canonical token/component/pattern files, the owning module listing section and COPY entries. Reuse the kit and complete the contract’s full-page checks before delivery.
+**§0 Current kit index first** (one current source per thing on screen; anything not listed is not a
+pattern to copy), then §6.0, §6.7–6.10 and Complete-template adoption contract, the canonical
+token/component/pattern files, the owning module listing section and COPY entries. Module cards use the
+kit `CompactModuleCard` (§4.3), never a copy of its reference HTML. Reuse the kit and complete the
+contract’s full-page checks before delivery.
 Approved goods/Ready Stock flows: Purchasing §9.1 SO Batch and §9.2 Manual Purchase (Jess
 2026-09-18, both BUILT 2026-09-18 — the authenticated production walk is owed for both, and
 Manual Purchase's migrations 0545–0547 + 0549 are APPLIED 2026-09-20 and only the authenticated walk
@@ -55,8 +59,10 @@ On a conflict, Business wins.
   size, word, rail, table or guide document; when a kit gap is real, admit the thing to the kit
   (with its `/ui` example) and every page gets it. When an old rule is found, DELETE it and update
   the kit in the same change — never leave two versions. The old kit files are gone
-  (`UI-KIT-NEW-CHAT`, `archive/UI-KIT-*`, `ui-reference/`, the `carres-design` skill); do not
-  recreate them. Portal-wide standards ruled the same day: **no dash anywhere on a screen** ·
+  (`UI-KIT-NEW-CHAT`, `archive/UI-KIT-*`, the `carres-design` skill, the old `ui-reference/` mocks);
+  do not recreate them. `docs/ui-reference/` now holds only the confirmed compact-card reference that
+  the kit component is proven against, and `components/retired-components.test.ts` blocks new use of
+  the retired `Btn`, `Field` and `PageHeader`. Portal-wide standards ruled the same day: **no dash anywhere on a screen** ·
   **card titles are black bold `text-strong`, never blue** · **column separators by column
   count** · **rail = icon + title only; every group closed until clicked, its chosen value on the header; two views are a tab bar (owner ruling 2026-09-28; SO representative pilot owner correction 2026-10-01 stacks the two views and opens Delivery first, see Orders MASTER)** · **header filter icons on hover only**.
 - **Content decides column width**, never the table width. **Expand has exactly one job.**

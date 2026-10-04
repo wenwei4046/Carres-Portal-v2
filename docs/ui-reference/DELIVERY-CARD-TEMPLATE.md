@@ -63,4 +63,9 @@ Fixed sizes: card max 560 · header 56 · module tab row 36.8 · icon controls 3
 
 Recipient links need no API: wa.me opens a WhatsApp draft, mailto opens a default mail draft. Actual sending remains in that application. No invented supplier contact; no verified customer email. PO/evidence attachments require manual attachment in external mail. Template names/bodies persist in this browser's localStorage only; no team sharing/access control or backend upload. Reference publication does not migrate production module cards.
 
-There is no shared React component for this card. `apps/web/src/components/kit` has none, and production Work communication (`apps/web/src/pages/operation/work/WorkCommunication.tsx`) is a separate design: recorded channels only, no manual recipient, no ⋯ template menu. Adopting the card means rebuilding it with kit primitives, not importing it.
+**Use the kit component, not these files.** `apps/web/src/components/kit/CompactModuleCard.tsx`
+(on `/ui#compact-card`) is this card. These files stay as its proof target:
+`node scripts/compact-card-parity.mjs <dev url>` (measured JSON, five widths) and
+`node scripts/compact-card-states.mjs <dev url>` (14 more states against this page) must both report
+no difference. Production Work communication (`WorkCommunication.tsx`) is a separate, recorded-channels-only
+design and is not replaced by this card. No production page uses the card yet.

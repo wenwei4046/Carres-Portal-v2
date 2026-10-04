@@ -439,6 +439,23 @@ synthetic H.264 video (`ui-evidence-example.mp4`, generated colour/motion test p
 320×180 at 12fps; no recorded business or personal content). Receiving
 keeps arrival evidence at receipt scope; no Unit attribution is inferred.
 
+## CompactModuleCard
+
+**Purpose.** The owner-confirmed compact module card (UI MASTER §4.3, 2026-10-03): customer header,
+module tabs, a four-cell fact strip with inline editors, items, Communication and Timeline. Built
+2026-10-04 on `/ui#compact-card`; no production page uses it yet.
+
+**Contract.** The owning module passes its facts (`label`, `value`, optional `editor` or
+`opensItems`), item list, recipients, message templates and timeline events (actor, summary, date,
+time only when recorded, result). The card owns arrangement and interaction only: it never writes a
+record, never marks a message sent, keeps saved templates in the browser and uploads no file. Editor
+content uses `CardEditorButtons` and `compactCardStyles`.
+
+**Proof.** `scripts/compact-card-parity.mjs` (measured reference JSON, five widths) and
+`scripts/compact-card-states.mjs` (14 more states against the reference page) must report no
+difference after any change. Palette, font, radius and its drawn glyphs are the reference's own and
+await the owner's token decision; they live in one block of `compact-card.module.css`.
+
 ---
 
 # Shared control and state contract

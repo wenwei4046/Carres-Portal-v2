@@ -11,12 +11,46 @@
 
 | I am working on | Read |
 |---|---|
+| **any UI at all — first** | **§0 Current kit index** (below) |
 | anything | **§1 · §2** |
 | a kit component | **§3** |
 | a page shell or a grid | **§4** |
 | the right rail | **§5** |
 | colour or typography debt | **§6** |
 | something approved and unbuilt | **§7** |
+
+---
+
+# §0 · Current kit index — read this first
+
+**One row per thing on screen; one current source per row.** If something is not in this table it is
+not a current pattern: do not copy it from a neighbouring page. Live examples are on `/ui`. "Files" is
+the count of app files importing it, measured on `fe53daeec` (tests and `/ui` excluded) — re-measure
+before quoting. Built is not the same as owner-verified on every page.
+
+| Area | Use this | Source | Status |
+|---|---|---|---|
+| Tokens: type · colour · radius · icons · layers | Tailwind token classes; `Icon`; `overlay-layer` | `01-design-tokens.md`, `tailwind.config.ts`, `components/kit/Icon.tsx` | LOCKED · built |
+| Page frame | `ListPageShell` (27 files) today; kit `PageShell` (6) is the target | `components/ListPageShell.tsx` · `components/kit/PageShell.tsx` | Moving a page onto `PageShell` re-lays it out: owner preview first |
+| Register / listing | `register/DataGrid` (41) with §6.0 · §6.7–6.10 | `components/register/DataGrid.tsx` | Owner accepted 2026-10-01 · built |
+| Simple and document tables | `DataTable` (16) · `DocumentTable` · `TotalsSummary` · `TableScroller` | `components/kit/*` · `components/TableScroller.tsx` | Built |
+| Local filter rail | the Sales Orders `.so-template-rail` recipe | `SalesOrdersRegister.tsx` | Accepted 2026-10-01 · not yet extracted to the kit |
+| Object header + tabs | `SalesOrderTabs` recipe | `pages/operation/SalesOrderTabs.tsx` | Accepted · page-owned, no generic API yet |
+| Forms | `Input` · `Textarea` · `Select` · `SearchInput` · `Checkbox` · `DatePicker` · `FieldFrame` | `components/kit/*`, `field-recipe.ts` | LOCKED · built |
+| Buttons and menus | `Button` (99) · `DropdownMenu` · `Popover` · `Tooltip` · `Segmented` (Table/Cards) | `components/kit/*` · `components/Segmented.tsx` | LOCKED · built |
+| Fact cards | `Block` — the one object card (§4.1) · `Panel` · `StatusPill` · `EmptyState` · `Loading` | `components/kit/*` | LOCKED · built |
+| Orders list / drawer band | `SectionPanel` (cream band) — that surface only, not a general card | `components/SectionPanel.tsx` | Governed by §4.1; not a `Block` duplicate |
+| Dialogs and panels | `Modal` · `Drawer` (incl. quick view) · `Toast` · `PdfPreview` · `SavedEvidenceViewer` | `components/kit/*` | Built |
+| **Compact module card** (header, module tabs, four facts, editors, items, Communication, Timeline) | **`CompactModuleCard`** — pass the module's own facts, editors, recipients, templates, events | `components/kit/CompactModuleCard.tsx` · `/ui#compact-card` · reference `docs/ui-reference/` | Owner confirmed 2026-10-03 (§4.3) · component built, pixel parity proven · **no production page uses it yet** · palette/font/radius await the owner's token decision |
+| Work right-panel Communication | `WorkCommunication` — recorded channels only | `pages/operation/work/WorkCommunication.tsx` | Owner ruling 2026-09-17 · built; differs from the compact card's editable `To` (open owner question) |
+| Record history | §5 three-rank grammar 13/12/11 | this MASTER §5 | LOCKED · no shared component; each page draws it |
+
+**Retired — do not import; a test blocks new use** (`components/retired-components.test.ts`): `Btn`
+(→ `Button`), `Field` (→ kit inputs / `field-recipe`), `PageHeader` (→ `PageShell`). Their remaining
+pages move only after the owner approves a before/after preview, because each swap changes what the
+operator sees. **Deleted 2026-10-04:** the `carres-design` agent skill and
+`docs/ui-reference/po-supplier-reply-mock.html`. `docs/ui-reference/` now holds only the confirmed
+compact-card reference that `CompactModuleCard` is proven against.
 
 ---
 
@@ -3523,8 +3557,28 @@ The master contract being documented does not mean every module has migrated or 
 
 ## §4.3 · Confirmed compact module card — 2026-10-03
 
-**OWNER CONFIRMED TEMPLATE.** The current single source is [DELIVERY-CARD-TEMPLATE.md](../ui-reference/DELIVERY-CARD-TEMPLATE.md), [complete HTML](../ui-reference/delivery-card-approved.html), [exact CSS](../ui-reference/delivery-card-approved.css) and [measured dimensions](../ui-reference/delivery-card-measurements.json). All module chats must copy these together before proposing derivative cards. This replaces earlier clean-communication29 and toolbar proposals.
+**OWNER CONFIRMED 2026-10-03 · KIT COMPONENT BUILT 2026-10-04 · NO PRODUCTION PAGE ADOPTED YET.**
+Use the kit component [`CompactModuleCard`](../../apps/web/src/components/kit/CompactModuleCard.tsx)
+(live on `/ui#compact-card`). Never copy the reference HTML/CSS into a page. The reference files in
+[`docs/ui-reference/`](../ui-reference/DELIVERY-CARD-TEMPLATE.md) are the proof target only:
+`scripts/compact-card-parity.mjs` matches every element of `delivery-card-measurements.json` at the
+five widths, and `scripts/compact-card-states.mjs` matches the live reference page in 14 more states
+(Email, ⋯ menu, Find template, naming dialog, Manage templates, three editors, items, address,
+Timeline). Run both after any change to the component.
 
-Communication uses a header channel dropdown, editable recipient choice/manual entry, email-only Subject, Message ellipsis for Find/Save/Manage templates, a compact naming dialog and one attachment entry. Timeline follows Communication with avatar-only actor identity, readable event summary/date-time, a second line for result/reference, explicit missing time and actual source timestamps. Links open drafts, not confirmed sends. Sample stock is not verified stock. Template persistence is browser-local, not team-shared. The JSON measures one state per width; the contract lists the reproduction steps, audit values for the other states and the reference's known gaps. Those gaps are recorded, not approved, and differences from `01-design-tokens.md` await an owner ruling.
+Composition: grey customer header (name, order, phone · address · target date · Open/Close) · module
+tabs with Communication / items / Timeline icons · one four-cell fact strip whose cells open inline
+editors (Cancel then blue Save at right) · items · Communication then Timeline below. Communication:
+channel select in its header, `To` with the known contact or a typed phone/email, Subject for Email
+only, Message ⋯ for Find / Save as / Manage templates, a 320px naming dialog, one attachment entry,
+`Copy message` and `Open WhatsApp`/`Open email` at right. Timeline: 28px actor avatar (name in its
+label), summary and date/time on line one, result on line two, missing time stated, never invented.
+Links open drafts and never mark anything sent. Saved templates live in that browser only; files are
+not uploaded. Each module passes its own facts, editors, recipients, templates and events and keeps
+its own business gates; the card's width rules follow the card, so it works in a drawer.
 
-Published static reference: `/ui-kit/delivery-card.html`. This approval and reference publication do not certify migration of production module cards. Preserve existing business gates and use each module's own facts. Shared-kit owner owns adoption gaps; module chats own their implementation.
+**Open, recorded, not approved:** (1) palette, font, radius and drawn glyphs are the reference's own,
+not `01-design-tokens.md` — owner reviewing the side-by-side preview; (2) the editable `To` differs
+from the Work panel's recorded-channels-only rule; (3) reference defects listed in
+`DELIVERY-CARD-TEMPLATE.md` (⋯ menu has no Escape, 32px controls at phone width, fixed 56px header
+with long names) are reproduced faithfully and change only with an owner-approved preview.
