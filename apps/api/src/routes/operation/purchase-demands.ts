@@ -846,6 +846,7 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
    * disagree. An unreadable setting stamps nothing and SAYS so — buying still
    * works, and Work reports its Purchasing source instead of an empty day. */
   let poWindowsUnavailable = false;
+  let poRounds: SoBatchPurchaseResponse["poRounds"];
   try {
     const windows = await loadPoWindows(sb);
     const calendar = poWindowCalendarOf(windows.poDays, holidays);
@@ -869,6 +870,24 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
     for (const reg of registerRes.registerRows) {
       for (const po of reg.pos) po.poWindow = stamp(reg.orderId, po.supplierId);
     }
+    // Keep dated historical rounds; an excluded day creates no occurrence.
+    // The two next standard rounds read the same editable settings/calendar.
+    const rounds = new Map<string, Set<string>>();
+    const first = poWindowFor(new Date().toISOString(), windows.settings, null, calendar);
+    const next = poWindowFor(first.dueAt, windows.settings, null, calendar);
+    for (const window of [first, next]) rounds.set(poWindowKeyOf(window), new Set());
+    for (const row of rows) {
+      if (!row.poWindow) continue;
+      if (!rounds.has(row.poWindow)) rounds.set(row.poWindow, new Set());
+      if (row.toBuy == null || row.toBuy > 0) rounds.get(row.poWindow)!.add(row.orderId);
+    }
+    for (const reg of registerRes.registerRows) {
+      for (const po of reg.pos) {
+        if (po.poWindow && !rounds.has(po.poWindow)) rounds.set(po.poWindow, new Set());
+      }
+    }
+    poRounds = [...rounds].sort(([a], [b]) => a.localeCompare(b))
+      .map(([key, orderIds]) => ({ key, unfinishedSoCount: orderIds.size }));
   } catch (e) {
     poWindowsUnavailable = true;
     console.error("so batch — PO windows unavailable", (e as Error).message);
@@ -910,6 +929,7 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
        the one setting. The browser prints it; the arithmetic stayed here. */
     safetyDays: settings.orderByBufferDays,
     ...(poWindowsUnavailable ? { poWindowsUnavailable: true } : {}),
+    ...(poRounds ? { poRounds } : {}),
   };
   return c.json(body);
 });

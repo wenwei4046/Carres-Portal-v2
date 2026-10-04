@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { ApiError, apiFetch } from "@/lib/api";
 import Button from "@/components/kit/Button";
 import Icon from "@/components/kit/Icon";
+import Tabs from "@/components/kit/Tabs";
 import {
   SO_BATCH_PURCHASE_WORDS as W,
   SO_BATCH_RAIL,
@@ -47,6 +48,8 @@ import {
   type SoBatchStatusDoor,
   type SoBatchStatusWhy,
   GOODS_ABSENCE_WORDS,
+  parsePoWindowKey,
+  poWindowTimeWord,
 } from "@carres/shared";
 import { REGISTER_FIELD_WIDTH } from "@/components/register/register-field-widths";
 import {
@@ -170,11 +173,22 @@ function safetyDaysValue(cell: SoBatchSafetyDaysCell | undefined): number {
   return cell?.kind === "days" ? cell.days : Number.POSITIVE_INFINITY;
 }
 
+/** Scoped presentation copy: other Purchasing surfaces retain their governed wording. */
+function soBatchTimingWords(safetyDays: number) {
+  return {
+    can_order_early: "Order early",
+    safety_days_full: `${safetyDays} days left`,
+    safety_days_low: `1–${safetyDays - 1} days left`,
+    safety_days_none: "0 days left",
+    not_enough_production_time: "Production late",
+  };
+}
+
 /** The same cell as ONE string, for the column filter and every export. */
 function safetyDaysWord(cell: SoBatchSafetyDaysCell | undefined): string {
   if (cell == null || cell.kind === "none") return "";
   if (cell.kind === "absent") return soBatchOrderByAbsenceWord(cell.absence);
-  return cell.days < 0 ? W.safetyDaysOverrun : String(cell.days);
+  return cell.days < 0 ? "Production late" : String(cell.days);
 }
 
 function PoNumbersCell({ order }: { order: SoBatchOrderRow }) {
@@ -345,6 +359,11 @@ export interface SoBatchRegisterProps {
   data: SoBatchPurchaseResponse;
   isLoading: boolean;
   initialSearch?: string;
+  roundNavigation?: {
+    rounds: NonNullable<SoBatchPurchaseResponse["poRounds"]>;
+    selected: string | null;
+    onSelect: (key: string) => void;
+  };
   /** Kept mounted but hidden while the Issue workspace is open (R8). */
   hidden?: boolean;
   /** Hands the arrangement to the issue journey. This page creates nothing. */
@@ -354,7 +373,7 @@ export interface SoBatchRegisterProps {
   scope?: { label: string; onClear: () => void; preselectKey?: string };
 }
 
-export default function SoBatchRegister({ data, isLoading, onIssue, initialSearch, hidden = false, scope }: SoBatchRegisterProps) {
+export default function SoBatchRegister({ data, isLoading, onIssue, initialSearch, hidden = false, scope, roundNavigation }: SoBatchRegisterProps) {
   const navigate = useNavigate();
   /* R8 — a `display:none` box forgets its scroll offset, and by the time a
      render hides it the offset already reads 0. So the offset is remembered
@@ -501,8 +520,10 @@ export default function SoBatchRegister({ data, isLoading, onIssue, initialSearc
   const toggleTiming = useCallback((s: PurchaseDemandTimingState) => {
     setFilter((prev) => ({ ...prev, timing: prev.timing === s ? null : s }));
   }, []);
-  const stateWords = useMemo(() => purchaseDemandStateWords(data.safetyDays), [data.safetyDays]);
-  const railWords = useMemo(() => purchaseDemandRailWords(data.safetyDays), [data.safetyDays]);
+  const stateWords = useMemo(() => ({ ...purchaseDemandStateWords(data.safetyDays), ...soBatchTimingWords(data.safetyDays) }), [data.safetyDays]);
+  const railWords = useMemo(() => ({
+    ...purchaseDemandRailWords(data.safetyDays), ...soBatchTimingWords(data.safetyDays),
+  }), [data.safetyDays]);
   /* `SETUP TO FIX` renders only while an affected Sales Order exists. When the
      last such line is fixed, its filter must not survive as an invisible
      narrowing the operator can no longer see or clear. */
@@ -910,7 +931,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue, initialSearc
             cell.kind === "absent"
               ? soBatchOrderByAbsenceWord(cell.absence)
               : cell.kind === "days" && cell.days < 0
-                ? W.safetyDaysOverrun
+                ? "Production late"
                 : null;
           return (
             <span
@@ -1256,7 +1277,11 @@ export default function SoBatchRegister({ data, isLoading, onIssue, initialSearc
              primary action and the goods stay reachable; `Hide filters` puts
              it away exactly as it does on a wide screen. On a wider canvas nothing
              changes at all. */
-          className={styles.rail}
+          className={`${styles.rail} so-template-rail`}
+          header={<div className="so-rail-navigation"><Tabs fill orientation="vertical" label="SO Batch Purchase view" value="list" onValueChange={() => {}} tabs={[
+            { value: "list", label: "Listing", icon: "order" },
+            { value: "report", label: "Report", icon: "date", disabled: true },
+          ]} /></div>}
         >
           {/* ⛔ `TO ORDER / All not ordered` IS GONE (owner correction
               2026-09-11). It was the one row on this rail that named no fact
@@ -1265,7 +1290,17 @@ export default function SoBatchRegister({ data, isLoading, onIssue, initialSearc
               `ORDER TIMING`, the section that answers what to buy today. The
               outstanding arithmetic behind it is untouched and still governs
               the tick and the Ready Stock door. */}
-          <FilterRailGroup title={SO_BATCH_RAIL.timing.heading} icon="date">
+          {roundNavigation && <FilterRailGroup title="Order time" icon="date" defaultOpen>
+            {data.poWindowsUnavailable && <p className="px-2 py-2 text-meta text-kit-slate-11">Data not loaded</p>}
+            {roundNavigation.rounds.map(round => {
+              const window = parsePoWindowKey(round.key);
+              return window ? <FilterRailRow key={round.key} testId={`so-batch-round-${round.key}`}
+                label={poWindowTimeWord(window.time)} supportingText={fmtDate(window.date)}
+                count={round.unfinishedSoCount} title={`${round.unfinishedSoCount} unfinished Sales Orders`} active={roundNavigation.selected === round.key}
+                onClick={() => roundNavigation.onSelect(round.key)} /> : null;
+            })}
+          </FilterRailGroup>}
+          <FilterRailGroup title="PO Safety Days" icon="date" defaultOpen={!!roundNavigation}>
             {SO_BATCH_RAIL.timing.states.map((s) => (
               <FilterRailRow
                 key={s}
@@ -1287,6 +1322,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue, initialSearc
               rows wrote, so `All …` still clears only its own section and
               sections still combine with AND. The counts ride in the option
               text; `TO ORDER` and `ORDER TIMING` keep their visible rows. */}
+          {!roundNavigation && <>
           <FilterRailGroup title={SO_BATCH_RAIL.product.heading} icon="goods">
             {/* The CATALOG's categories, never SKU-text inference. `All
                 products` is the section's clear — and where the uncommon
@@ -1349,6 +1385,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue, initialSearc
               onChange={(region) => setFilter((prev) => ({ ...prev, region }))}
             />
           </FilterRailGroup>
+          </>}
           {/* The one Purchasing-owned setup exception, and only while it
               exists — an empty exception section is noise wearing a heading. */}
           {rail.setupExists && (
@@ -1754,7 +1791,7 @@ function SoBatchOrderExpansion({
     if (leaf) linesPerLeaf.set(leaf.id, (linesPerLeaf.get(leaf.id) ?? 0) + 1);
   }
 
-  const stateWords = purchaseDemandStateWords(safetyDays);
+  const stateWords = { ...purchaseDemandStateWords(safetyDays), ...soBatchTimingWords(safetyDays) };
   const lines: GoodsMiniLine[] = order.lines.map((l) => {
     const leaf = leafByLineId.get(l.orderLineId);
     const linePos = l.pos.map((p) => poById.get(p.poId)).filter(Boolean);

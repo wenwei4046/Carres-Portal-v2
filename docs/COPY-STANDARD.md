@@ -1377,22 +1377,22 @@ No recorded business date is silently moved to fit a calendar. Purchasing/Operat
 Office calendar (Mon–Fri); Receiving/GRN/Warehouse uses the Warehouse calendar (Mon–Sat); Sunday
 and Selangor public holidays are excluded.
 
-**The SO Batch Purchase rail — owner correction 2026-09-11.** FIVE purchasing fact sections, in
-this order. Central Work actions do not appear here. `SETUP TO FIX` renders only when at least
-one affected Sales Order exists. **`TO ORDER` / `All not ordered` is RETIRED from this rail**: it
-named the page's own default — what an operator already sees with nothing selected — rather than a
-fact about a Sales Order, and it sat above the section that answers what to buy today. The
-outstanding arithmetic behind it is untouched and still governs the tick and the Ready Stock door;
-Manual Purchase uses its own request groups and remainder arithmetic.
+**The SO Batch Purchase rail — owner-approved 2026-10-04.** Local navigation is Listing / deferred
+Report; factual groups are Order time and PO Safety Days. The existing Purchasing-owned Setup to
+fix exception appears only when affected SOs exist. Product, Supplier and Region filtering stays
+in the shared listing columns rather than duplicated rail controls. `TO ORDER` / `All not ordered`
+remain retired. Quantities, eligibility and source coverage retain their canonical calculations.
 
 | Heading | Rail rows |
 |---|---|
-| `ORDER TIMING` | `Can order early` · `14 safety days left` · `1 to 13 safety days left` · `No safety days left` · `Not enough production days` |
+| SO Batch local view navigation (owner-approved 2026-10-04) | `Listing` · `Report`. Report replaces Monthly demand on SO Batch only; contents remain undecided and deferred. Other modules retain Monthly demand. |
+| SO Batch daily cutoff heading (owner-approved 2026-10-04) | `Order time`; rows print configured clock times, currently `10:15 AM` / `4:00 PM`. |
+| SO Batch planning heading (owner-approved 2026-10-04) | `PO Safety Days`: `Order early` · `{N} days left` · `1–{N−1} days left` · `0 days left` · `Production late`. N is configured Safety days. No inner Safety days paragraph. Naming preserves keys, calendars and calculations. |
 | `PRODUCT` | `All products` · `Mattress` · `Bedframe` · `Sofa` |
 | `SUPPLIER` | `All suppliers` · actual supplier names, alphabetical — never hardcoded, never a placeholder, and no `No supplier` row |
 
-`PURPOSE` (Manual Purchase Request), `PRODUCT` and `SUPPLIER` are **compact fact dropdowns** (owner ruling
-2026-09-11; `PRODUCT`, `SUPPLIER` and `REGION` on SO Batch Purchase too). The `All …` word is the
+`PURPOSE`, `PRODUCT` and `SUPPLIER` on Manual Purchase Request remain **compact fact dropdowns**
+(owner ruling 2026-09-11). The `All …` word is the
 control's first option and its clear; every governed value stays present as an option; the
 count rides in the option text (`Ohana · 4`). `ORDER TIMING` and
 `SETUP TO FIX` keep their visible rows.
