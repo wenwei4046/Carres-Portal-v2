@@ -1345,6 +1345,27 @@ describe("the Sales Orders rail and its two views", () => {
     await waitFor(() => expect(useOperationOrdersSpy.mock.calls.map(call => call[0] as { stage?: string; search?: string }).filter(input => input.stage === "proceeded").at(-1)).toEqual({ stage: "proceeded" }));
   });
 
+  it("an explicit month drill-down preserves the contributing location, destination and category, with visible clearable conditions", async () => {
+    listHookState.data!.orders = [
+      order({ id: "a", so: 1401, delivery_date: "2026-10-05", dealers: { name: "{dealer 1}" }, customer_address_state: "Selangor", customer_address_city: "Petaling Jaya", order_lines: [{ sku: "B1201S-K", qty: 1, unit_price: 100, category: "mattress" }] }),
+      order({ id: "b", so: 1402, delivery_date: "2026-10-05", dealers: { name: "{dealer 2}" }, customer_address_state: "Selangor", customer_address_city: "Petaling Jaya", order_lines: [{ sku: "B1201S-K", qty: 1, unit_price: 100, category: "mattress" }] }),
+      order({ id: "c", so: 1403, delivery_date: "2026-10-05", dealers: { name: "{dealer 1}" }, customer_address_state: "Selangor", customer_address_city: "Petaling Jaya", order_lines: [{ sku: "BED", qty: 1, unit_price: 100, category: "bedframe" }] }),
+    ];
+    mount("/operation/orders?view=monthly&dealer=%7Bdealer%201%7D&state=Selangor&city=Petaling+Jaya&category=Mattress&search=Kimmy");
+    fireEvent.click(screen.getByRole("button", { name: "Open Sales Orders for Oct 2026" }));
+    const grid = await screen.findByTestId("register-column");
+    await waitFor(() => expect(within(grid).getByText("SO-1401")).toBeInTheDocument());
+    expect(within(grid).queryByText("SO-1402")).not.toBeInTheDocument();
+    expect(within(grid).queryByText("SO-1403")).not.toBeInTheDocument();
+    expect(grid).toHaveTextContent("Product category: Mattress");
+    expect(screen.getByRole("searchbox")).toHaveValue("");
+    expect(screen.getByTestId("location")).toHaveTextContent("category=Mattress");
+    expect(screen.getByTestId("location")).toHaveTextContent("dealer=");
+    fireEvent.click(screen.getByRole("button", { name: "Remove Product category: Mattress" }));
+    await waitFor(() => expect(within(grid).getByText("SO-1403")).toBeInTheDocument());
+    expect(within(grid).queryByText("SO-1402")).not.toBeInTheDocument();
+  });
+
   it("Monthly demand's filters never carry into the Order list", () => {
     mount("/operation/orders?view=monthly&dealer=%7Bdealer%201%7D&months=3");
     fireEvent.mouseDown(screen.getByRole("tab", { name: "Listing" }));

@@ -107,7 +107,7 @@ const emptyRow = (key: string, kind: MonthlyDemandRow["kind"], month: string | n
 });
 
 /** The column a goods line is counted in. Null = a service, which is no piece. */
-function columnOf(line: MonthlyDemandOrder["lines"][number]): MonthlyDemandCategory | "not-in-catalog" | null {
+export function monthlyDemandCategoryOf(line: Pick<MonthlyDemandOrder["lines"][number], "sku" | "attrs" | "category">): MonthlyDemandCategory | "not-in-catalog" | null {
   const word = goodsCategoryWordOf({ sku: line.sku, attrs: line.attrs ?? undefined, category: line.category ?? undefined });
   if (word === "Service") return null;
   if (word === "Other goods") return "not-in-catalog";
@@ -192,7 +192,7 @@ export function monthlyDemandOf(input: {
     const done = deliveredByLine(order);
 
     for (const line of order.lines) {
-      const column = columnOf(line);
+      const column = monthlyDemandCategoryOf(line);
       if (!column) continue;
       if (filters.category && column !== filters.category) continue;
       const qty = count(line.qty);

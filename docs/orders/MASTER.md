@@ -6864,6 +6864,8 @@ no-change/refused/mixed amendments, historical signature/receipt cutoffs, existi
 refusal, source/proxy separation and Cancel retaining input. The exact full CI/deploy also passed.
 They use isolated/mocked reads/writers; a passing route test is not a database rollback proof.
 
+**Filtered monthly drill-down — BUILD, target-release proof pending2026-10-04:** on631c115 a real Carres Kota Damansara + Mattress filter showed October1 physical piece, but the month door discarded those conditions and opened7 whole-month orders. This violates the existing same-scope ruling. The repair retains the selected Sales Location, customer State/City and Product category as explicit, clearable Register conditions, while clearing stale search. Direct view switching still clears the other view's conditions. Monthly classification and Register narrowing reuse one shared category function; opened order objects retain their complete goods/commercial truth. Register/monthly UI checks121 and shared monthly arithmetic checks16 passed. Separate baseline report/query/API checks45 passed, including unknown-source/legacy allocation and export-model coverage; they are fixture checks, not production data-ledger certification. Purchasing's reused report has its own month door and retains owner responsibility for equivalent scope reconciliation.
+
 **Whole-module remaining acceptance and capability register — concrete ownership, not a complete-module claim:**
 
 | Class | Specific remaining item / current truth | Existing owner and next action |
