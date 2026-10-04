@@ -518,7 +518,8 @@ Related-record coverage currently includes the PO and recorded source references
 handling links and the Receiving Differences view are not delivered by this panel slice.
 
 The two-view rail remains undelivered. Complete server-side column filtering and sorting are
-**BUILT ON BRANCH / NOT PRODUCTION VERIFIED** through the shared `DataGrid serverColumns`
+**DEPLOYED #1899 (`efa77a362`) / INTERACTIVE ACCEPTANCE INCOMPLETE**, after exact-head full CI
+`37214055018` passed on `19c69591b`, through the shared `DataGrid serverColumns`
 contract and the existing authorised GRN reader. Filterable supplier, document, source, item,
 location, date and quantity facts are resolved before the page slice. Unit details and signed
 files stay page-scoped. Changed filters/sort return to page 1; dropdown choices cover the full
@@ -528,12 +529,22 @@ original identities and supplier DO references stay unchanged. No local filter e
 Tests cover a match beyond the first 50 records, numeric sorting, invalid query rejection and
 clearing the filter. The shared preview browser found record 61 through Supplier B with only five
 rows loaded, then restored all 61 on Clear. After merging current main, 106 Receiving/shared-card/
-Sales Order/SO Batch regressions passed. Production deployment `37215036695` failed before publishing:
-a Manual Purchase test compared its wall-clock Settings result with fixed requested dates, which
-coincided after MYT midnight. The shared test-only repair fixes the PO test clock and preserves
-all date-ownership assertions; all 95 tests in that file passed locally. A covering production
-deployment and authenticated filter acceptance remain owed. Full-result export and the approved
-two-view/Table-Cards composition remain separate unfinished work.
+Sales Order/SO Batch regressions passed. Production deployment `37215036695` failed before publishing: a Manual Purchase test compared
+its wall-clock Settings result with fixed requested dates, which coincided after MYT midnight.
+The test-only repair fixes its PO clock and preserves the date-ownership assertions; all 95 tests
+in that file passed locally. Covering deployment `37216102072` succeeded at `719653ea0`; all five canonical surfaces converged. Live Receiving exposed complete supplier choices, but at 545px the shared filter menu opened beyond the right edge (left 534px/right 724px). Interactive acceptance therefore remains incomplete until the central UI correction ships. Full-result export and the two-view rail remain unfinished.
+
+**Table/Cards and shared Page tools — BUILT ON BRANCH / NOT PRODUCTION VERIFIED, 2026-10-05.**
+Receiving reuses the existing segmented Table/Cards control, shared DataGrid Page tools and
+`ReceivingCompactView` in both Cards and the right Working Panel. Both presentations keep the
+same search, column filters and sort; changing presentation starts at page 1. Table pages contain
+50 receipts; Cards pages contain 12 to bound per-receipt detail reads. Footer totals still describe
+the complete authorised filtered population. Open full page retains the register underneath.
+Columns and Export use the shared Page tools menu; Cards introduces no second receipt editor.
+Party/receiver facts awaiting a detail read show Loading or Unavailable, never false absence.
+81 local Receiving/card journey tests passed, including filter preservation across presentations
+and keyboard access to Page tools. The central filter correction anchors to its button, clamps to the viewport and returns focus on Escape. A 366px preview measured the menu at 158–358px; selecting Supplier B found record 61 and Clear restored all 61. The complete register plus Receiving/card targeted run passed 171 tests. Full exact-head CI and live acceptance are owed. This does not deliver
+the Receiving Differences view or Warehouse automatic posting.
 
 **Read-only production evidence, 2026-10-04:** `warehouse_submit_receipt` still files a report;
 `warehouse_receipt_check_in` calls Operation's post-authority gate. The only current active

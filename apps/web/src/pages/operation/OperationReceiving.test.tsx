@@ -98,6 +98,7 @@ vi.mock("@/lib/queries", async () => {
      * the server cannot hold two filtering rules. */
     useOperationGrnRegister: (filters: {
       columns?: string;
+      limit?: number;
       offset: number;
       category: string | null;
       supplier: string | null;
@@ -147,7 +148,7 @@ vi.mock("@/lib/queries", async () => {
         })),
         { ...filters, columns: filters.columns ? JSON.parse(filters.columns) : null, cancelled: filters.cancelled ? true : null },
         filters.offset,
-        h.pageLimit,
+        Math.min(h.pageLimit, filters.limit ?? 50),
       );
       const byId = new Map(grn.map((r) => [r.id as string, r]));
       return {
@@ -155,7 +156,7 @@ vi.mock("@/lib/queries", async () => {
           receipts: view.pageIds.map((id) => byId.get(id)),
           page: {
             offset: filters.offset,
-            limit: h.pageLimit,
+            limit: Math.min(h.pageLimit, filters.limit ?? 50),
             total: view.total,
           },
           facets: view.facets,
@@ -1893,5 +1894,46 @@ describe("the register column can shrink below its content", () => {
       "without min-w-0 the grid cannot shrink, its scroller never engages, " +
         "and the pinned pair scrolls away with everything else",
     ).toContain("min-w-0");
+  });
+});
+
+
+describe("Receiving shared presentations", () => {
+  const pickView = (name: string) => fireEvent.mouseDown(screen.getByRole("tab", { name }), { button: 0, ctrlKey: false });
+  it("keeps the same filter and quantities across Table and Cards", async () => {
+    renderPage();
+    fireEvent.click(screen.getByRole("button", { name: "Filter Supplier" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Nice Future" }));
+    fireEvent.keyDown(screen.getByRole("checkbox", { name: "Nice Future" }), { key: "Escape" });
+    const query = h.registerAsks.at(-1)?.columns;
+    pickView("Cards");
+    const cards = await screen.findByTestId("receiving-cards");
+    expect(within(cards).getByText("GRN-260901-1234")).toBeInTheDocument();
+    expect(within(cards).queryByText("GRN-260830-7777")).not.toBeInTheDocument();
+    expect(within(cards).getByText("Received Qty")).toBeInTheDocument();
+    expect(h.registerAsks.at(-1)?.columns).toEqual(query);
+    expect(h.registerAsks.at(-1)?.limit).toBe(12);
+    pickView("Table");
+    expect(screen.queryByTestId("receiving-cards")).not.toBeInTheDocument();
+    expect(screen.getByRole("cell", { name: "GRN-260901-1234" })).toBeInTheDocument();
+    expect(h.registerAsks.at(-1)?.columns).toEqual(query);
+  });
+  it("bounds Cards to twelve receipts and pages the remaining records", async () => {
+    h.receipts = Array.from({ length: 20 }, (_, i) => ({ ...REGISTER_ROWS[0], id: `card-${i}`, grn_no: `GRN-CARD-${i}` }));
+    renderPage();
+    pickView("Cards");
+    await screen.findByTestId("receiving-cards");
+    expect(screen.getAllByTestId("receiving-quick-view")).toHaveLength(12);
+    expect(screen.getByTestId("grn-page-range")).toHaveTextContent("Showing 1 to 12 of 20");
+    fireEvent.click(screen.getByTestId("grn-page-next"));
+    await waitFor(() => expect(screen.getByTestId("grn-page-range")).toHaveTextContent("Showing 13 to 20 of 20"));
+    expect(screen.getAllByTestId("receiving-quick-view")).toHaveLength(8);
+  });
+  it("opens Columns through the shared Page tools menu", async () => {
+    renderPage();
+    expect(screen.queryByRole("button", { name: "Columns" })).not.toBeInTheDocument();
+    fireEvent.keyDown(screen.getByRole("button", { name: "Page tools" }), { key: "ArrowDown" });
+    expect(await screen.findByRole("menuitem", { name: "Columns" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "Export" })).toBeInTheDocument();
   });
 });
