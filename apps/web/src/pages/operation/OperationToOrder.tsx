@@ -139,6 +139,7 @@ export default function OperationToOrder() {
       {issuing && (
         <SoBatchIssueWorkspace
           supplierBundle
+          roundWindow={windowParts ? scopeWindow! : undefined}
           documents={documents}
           destinations={data.destinations}
           onBack={backToBuying}

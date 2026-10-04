@@ -1,11 +1,12 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ApiError } from "@/lib/api";
 import type { PoTemplateData } from "@/lib/pdf/types";
 import PoSupplierBundle from "./PoSupplierBundle";
 const api = vi.hoisted(() => vi.fn());
 const renderPdf = vi.hoisted(() => vi.fn());
 const zip = vi.hoisted(() => vi.fn());
-vi.mock("@/lib/api", () => ({ apiFetch: api }));
+vi.mock("@/lib/api", async () => ({ ...await vi.importActual<typeof import("@/lib/api")>("@/lib/api"), apiFetch: api }));
 vi.mock("@/lib/pdf/render", () => ({ renderPoPdf: renderPdf }));
 vi.mock("@/lib/purchasing/po-bundle", async () => {
   const actual = await vi.importActual<typeof import("@/lib/purchasing/po-bundle")>("@/lib/purchasing/po-bundle");
@@ -18,8 +19,11 @@ const pos = [
 ];
 function data(id: string) { return { po_id: id, po_number: id, version: 1 } as PoTemplateData; }
 beforeEach(() => {
-  api.mockReset().mockImplementation(async (path: string) => data(path.split("/").at(-2)!));
-  renderPdf.mockReset().mockResolvedValue(new Blob(["%PDF-1.4"], { type: "application/pdf" }));
+  sessionStorage.clear();
+  api.mockReset().mockImplementation(async (path: string) => path.endsWith("email-capability") ? { configured: false } : data(path.split("/").at(-2)!));
+  const pdf = new Blob(["%PDF-1.4"], { type: "application/pdf" });
+  Object.defineProperty(pdf, "arrayBuffer", { value: async () => new TextEncoder().encode("%PDF-1.4").buffer });
+  renderPdf.mockReset().mockResolvedValue(pdf);
   zip.mockReset().mockResolvedValue(new Blob(["zip"], { type: "application/zip" }));
   URL.createObjectURL = vi.fn(() => "blob:bundle");
   URL.revokeObjectURL = vi.fn();
@@ -30,7 +34,7 @@ describe("issued supplier bundle", () => {
   it("shows exactly one supplier's separate POs and saved preferred channel", async () => {
     render(<PoSupplierBundle pos={pos} onPreview={() => {}} />);
     await ready();
-    expect(screen.getByLabelText("Message")).toHaveValue("PO-001 · V1\nPO-002 · V1");
+    expect(screen.getByLabelText("PO No")).toHaveValue("PO-001 · V1\nPO-002 · V1");
     expect(screen.getByLabelText("To")).toHaveValue("supplier@example.invalid");
     expect(screen.getByRole("button", { name: "Send Email" })).toBeDisabled();
     expect(screen.queryByLabelText("PO-003 · V1")).not.toBeInTheDocument();
@@ -40,7 +44,7 @@ describe("issued supplier bundle", () => {
     render(<PoSupplierBundle pos={pos} onPreview={() => {}} />);
     await ready();
     fireEvent.click(screen.getByLabelText("PO-002 · V1"));
-    expect(screen.getByLabelText("Message")).toHaveValue("PO-001 · V1");
+    expect(screen.getByLabelText("PO No")).toHaveValue("PO-001 · V1");
     fireEvent.click(screen.getByRole("button", { name: "Download PDFs" }));
     await waitFor(() => expect(zip).toHaveBeenCalledOnce());
     expect(zip.mock.calls[0][0].map((po: { id: string }) => po.id)).toEqual(["PO-001"]);
@@ -51,7 +55,30 @@ describe("issued supplier bundle", () => {
     render(<PoSupplierBundle pos={pos} onPreview={open} />);
     await ready();
     fireEvent.click(screen.getAllByRole("button", { name: "Open" })[1]);
-    expect(open).toHaveBeenCalledWith("PO-002");
+    expect(open).toHaveBeenCalledWith("PO-002", pos[1]);
+  });
+  it("loads Today across rounds without mixing it into This round", async () => {
+    const today = [{ ...pos[0], id: "PO-today" }];
+    api.mockImplementation(async (path: string) => path.endsWith("issued-today") ? { pos: today } : data(path.split("/").at(-2)!));
+    render(<PoSupplierBundle pos={pos} onPreview={() => {}} />);
+    await ready();
+    fireEvent.click(screen.getByRole("combobox", { name: "Purchase orders" }));
+    fireEvent.click(await screen.findByRole("option", { name: "Today" }));
+    await waitFor(() => expect(screen.getByLabelText("PO No")).toHaveValue("PO-today · V1"));
+    fireEvent.click(screen.getByRole("combobox", { name: "Purchase orders" }));
+    fireEvent.click(await screen.findByRole("option", { name: "Purchase orders" }));
+    await waitFor(() => expect(screen.getByLabelText("PO No")).toHaveValue("PO-001 · V1\nPO-002 · V1"));
+  });
+  it("shows earlier issued POs in the selected round without selecting them for sending", async () => {
+    api.mockImplementation(async (path: string) => {
+      if (path.includes("issued-round")) return { poIds: ["PO-001", "PO-earlier"] };
+      if (path.endsWith("issue-context")) return { ...pos[0], id: path.split("/").at(-2)! };
+      return data(path.split("/").at(-2)!);
+    });
+    render(<PoSupplierBundle pos={[pos[0]]} roundWindow="2026-10-05T10:15" onPreview={() => {}} />);
+    await waitFor(() => expect(screen.getByLabelText("PO-earlier · V1")).toBeInTheDocument());
+    expect(screen.getByLabelText("PO-earlier · V1")).not.toBeChecked();
+    expect(screen.getByLabelText("PO No")).toHaveValue("PO-001 · V1");
   });
   it("does not download or mark sent if rendering fails", async () => {
     renderPdf.mockRejectedValue(new Error("cannot render"));
@@ -61,5 +88,68 @@ describe("issued supplier bundle", () => {
     await screen.findByRole("alert");
     expect(zip).not.toHaveBeenCalled();
     expect(api.mock.calls.every(call => call.length === 1)).toBe(true);
+  });
+});
+
+
+describe("human-triggered supplier email", () => {
+  function configured(outcome: unknown) {
+    api.mockImplementation(async (path: string, init?: RequestInit) => {
+      if (path.endsWith("email-capability")) return { configured: true };
+      if (path.endsWith("supplier-email")) {
+        if (outcome instanceof Error) throw outcome;
+        return outcome;
+      }
+      if (init?.method === "POST") return { ok: true };
+      return data(path.split("/").at(-2)!);
+    });
+  }
+  it("sends only the selected separate PDF and server contact with editable text", async () => {
+    configured({ status: "dispatched", providerId: "email-1", documents: [{ id: "PO-001", version: 1, recorded: true }] });
+    render(<PoSupplierBundle pos={pos} onPreview={() => {}} />);
+    await ready();
+    fireEvent.click(screen.getByLabelText("PO-002 · V1"));
+    fireEvent.change(screen.getByLabelText("Subject"), { target: { value: "Carres purchase" } });
+    fireEvent.change(screen.getByLabelText("Message"), { target: { value: "Please arrange delivery." } });
+    fireEvent.click(screen.getByRole("button", { name: "Send Email" }));
+    await screen.findByText("PO sent to supplier · Email");
+    const body = JSON.parse(api.mock.calls.find(call => call[0].endsWith("supplier-email"))![1].body);
+    expect(body).toMatchObject({ supplierId: "s1", recipient: "supplier@example.invalid", subject: "Carres purchase", message: "Please arrange delivery." });
+    expect(body.documents).toEqual([{ id: "PO-001", version: 1, filename: "PO-001-V1.pdf", content: btoa("%PDF-1.4") }]);
+    expect(screen.getByRole("button", { name: "Send Email" })).toBeDisabled();
+  });
+  it("retries failed evidence only, without another supplier email", async () => {
+    configured({ status: "dispatched", providerId: "email-1", documents: [
+      { id: "PO-001", version: 1, recorded: true }, { id: "PO-002", version: 1, recorded: false },
+    ] });
+    render(<PoSupplierBundle pos={pos} onPreview={() => {}} />);
+    await ready();
+    fireEvent.click(screen.getByRole("button", { name: "Send Email" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Save" }));
+    await waitFor(() => expect(screen.queryByRole("button", { name: "Save" })).not.toBeInTheDocument());
+    const writes = api.mock.calls.filter(call => call[1]?.method === "POST");
+    expect(writes.map(call => call[0])).toEqual(["/api/operation/pos/supplier-email", "/api/operation/pos/PO-002/confirm-sent"]);
+    expect(JSON.parse(writes[1][1].body)).toMatchObject({ recipient: "supplier@example.invalid", poVersion: 1, channel: "email" });
+  });
+  it("retains an unknown outcome through reopening and refuses silent resend", async () => {
+    configured(new Error("lost response"));
+    const first = render(<PoSupplierBundle pos={pos} onPreview={() => {}} />);
+    await ready();
+    fireEvent.click(screen.getByRole("button", { name: "Send Email" }));
+    await screen.findByRole("status");
+    first.unmount();
+    render(<PoSupplierBundle pos={pos} onPreview={() => {}} />);
+    await ready();
+    expect(screen.getByRole("button", { name: "Send Email" })).toBeDisabled();
+    expect(api.mock.calls.filter(call => call[0].endsWith("supplier-email"))).toHaveLength(1);
+  });
+  it("a definite permission refusal leaves no uncertain dispatch record", async () => {
+    configured(new ApiError(403, "forbidden", { code: "forbidden" }));
+    render(<PoSupplierBundle pos={pos} onPreview={() => {}} />);
+    await ready();
+    fireEvent.click(screen.getByRole("button", { name: "Send Email" }));
+    await screen.findByRole("alert");
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Send Email" })).toBeEnabled();
   });
 });

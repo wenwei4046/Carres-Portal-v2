@@ -1663,6 +1663,61 @@ summary. Action ownership uses structured avatar metadata.
 
 ### 8.2 Object Detail
 
+**SO Batch supplier documents/communication — OWNER-APPROVED 2026-10-04; TARGET / NOT DEPLOYED.**
+
+After successful SO Batch Issue PO, the same right-side result/Quick View panel shows the issued
+bundle: separate numbered POs, current versions and suppliers. A bundle is a result scope, not a
+new formal document, merged supplier PDF or second issue authority. Default scope is This round;
+Today explicitly selects POs issued today across rounds. Filter by Supplier, select individual POs
+or Select all within that supplier/scope. Selection drives the exact same PO/version set for the
+message listing and PDF files. Refreshing or changing selection updates both; never include another
+supplier's document, a draft, superseded version or unselected PO silently.
+
+Each PO remains one independent PDF. Download PDFs packages selected files into a ZIP for one
+bulk download; it never merges the PDFs. A per-PO PDF action remains. Purchase Orders Register
+supports finding/re-downloading selected POs through supplier/date filters using the same capability.
+SO Batch gives immediate access without requiring a second trip to that register.
+
+Every supplier supports both Email and WhatsApp in the approved communication target. The panel
+provides a channel selector, initially using the supplier's saved preferred channel, and permits
+switching without restricting either channel by supplier identity. Ohana currently preferring Email
+is an operating example, not an Email-only rule; other suppliers may also use Email. Contact details
+for each channel come from supplier authority. This ruling does not silently overwrite production
+supplier settings. Email panel shows saved recipient, editable prepared subject/message listing
+selected PO numbers/versions, and each independent selected PDF as an attachment. Send Email is
+an approved target; expose it as executable only when the actual email/attachment capability is
+verified. Its result records actual dispatch evidence/failure, never supplier receipt by inference.
+WhatsApp panel shows the corresponding prepared message with Download PDFs, Copy message and
+Open WhatsApp. Staff attach the independent PDFs and send externally; copying/downloading/opening
+proves preparation only, never sending. No automatic WhatsApp attachment/transmission is promised.
+
+Scope labels: This round / Today. Shared action labels: Download PDFs / Copy message /
+Open WhatsApp / Send Email. PO Status Pending/Partial/Done still measures issue quantity only;
+communication and receipt are independent facts. Batch failures remain per PO/version and retain
+successful results, so retry cannot silently resend every document. Use governed communication
+ownership, permissions and actual supplier contact authority; this approval commissions target
+truth, not a live external email, supplier-settings write or production transmission.
+
+**OWNER RULING — copy and adapt Houzs supplier Email capability, 2026-10-04.**
+Use the inspected real-email/PDF pattern as the proven reference for Carres, adapted to its existing
+PO/version, communication, permissions and supplier contact authorities. Any supplier with a valid
+saved Email may use Email sending; no supplier-name restriction. Without an Email, keep WhatsApp
+preparation/download available and direct contact maintenance to the supplier record; never fabricate
+a recipient. Default to the saved preferred channel and retain channel switching. For the approved
+supplier bundle panel, selected PO numbers/versions, message listing and independent PDF attachments
+must be the same set. One supplier Email may carry the selected separate PO PDFs; never merge them
+into one PDF or silently omit an attachment. Confirm recipient and selected documents before actual
+send, record actual actor/channel/recipient/PO-version set and outcome, and expose failure/retry
+without duplicate issue. Reuse short duplicate-send protection adapted to explicit resend and version
+semantics; email success means dispatch, not supplier receipt. PDF preparation failure prevents this
+send, with no summary-only fallback. This is approved copy/adapt target, not proof of Carres build,
+production deployment or authorization to send a real supplier order during research.
+
+**PRESENTATION PROPOSAL / NOT LAW.** The isolated local result-panel preview at
+`http://127.0.0.1:5178/so-batch-rail-preview.html?supplier-panel=1` is awaiting owner visual review.
+It does not approve legacy PR #1859 or completion of the Workspace Working Panel.
+
+
 - View is full width and usually one scroll: WORK, authoritative facts, lines/Units, source,
   connections, evidence, corrections and History.
 - Tabs exist only for parallel/reference surfaces: Document, Revisions where applicable, History and
@@ -1681,7 +1736,7 @@ summary. Action ownership uses structured avatar metadata.
 - **Entry and action clarity.** Loading must not flash a missing-Deliver-To warning. Status and selectable remaining demand must agree; a disabled choice explains the actual reason. Selection summary names Sales Orders, items, units and POs rather than an ambiguous selected count. The final action explicitly states how many POs the atomic batch creates, even while viewing document 1 of several. These are approved presentation corrections, not changes to grouping, MPR approval or issue/send authority.
 - **Implementation and readback, 2026-09-24 — DEPLOYED #1573 (`913ef00897e5da27bd4aa7be819a7e1f871dad3a`).** Shared review paints actual PDF pages with the Sales Order renderer, zoom/fit and decode retry; issuance waits for painting, and the final action names the whole batch. Both lanes carry server-projected provisional dates and supplier/destination facts. SO split draft quantities reuse the allocated-part quantity helper used by `composeDocumentLines`: an 11-item 10/1 allocation previews 10/1 rather than 11/11. Loading no longer asserts missing destinations; selection names Sales Orders, items, units and POs. Full CI `35961742802` passed on `d97ab18f3` (12,596 tests passed, 100 existing skips), as did deployment `35962708358`; all five canonical SHA endpoints converged. Negative controls caught a dropped PDF page and the old split quantities. Bundle fingerprints prove the old draft iframe disappeared, provisional-date copy appeared and preview/Back controls survived.
 - **Authenticated SO read-only proof.** Operation selected SO-1365 + SO-1363: 2 Sales Orders, 3 items, 3 units, 3 POs. All three draft selections changed their document facts and actual paper. At 1074px the two panes were 481px each; 150% paper measured 674px inside a 449px independently scrolling pane. At 390px the page stayed 390px wide and stacked 278px panes; Back retained both selections and the summary plus all actions remained visible. Server destination addresses and supplier-specific delivery dates were shown; missing supplier addresses linked to Suppliers, never invented. The temporary selection was cleared afterward. No final Issue, sending, upload, receiving or stock write occurred.
-- **LOCAL BUILD FACT — 2026-10-04, NOT DEPLOYED.** SO Batch post-issue supplier grouping now offers individual selection/preview, a message listing the same selected PO/version set, and ZIP download of independent PDFs. Preparation rejects mixed suppliers, drafts, duplicate documents, failed rendering and revision during rendering. The existing individual PDF and persisted sending declaration remain; duplicate channel-preparation controls are hidden on this SO-only composition. The result remains visible after every PO is confirmed. Ten PDF/ZIP safeguards, four supplier-panel journeys and 65 existing issue/evidence tests passed. A Resend adapter copied/adapted from the approved Houzs reference is in development; it is not yet wired to a route or enabled on the screen. This round/Today scope persistence, real Email dispatch/evidence, shared Quick View placement, release/type checks and authenticated production acceptance remain incomplete. This fact is not a claim of mission completion or real supplier transmission.
+- **LOCAL BUILD FACT — 2026-10-04, NOT DEPLOYED.** SO Batch supplier composition supports individual PO selection, same-set/version message and independent PDF ZIP download, current-round projection through Work, and Malaysia-date Today scope. A human-triggered Email route validates authority, saved recipient, supplier membership/current versions and prior sending before the adapted Resend transport. Each successful dispatch reuses the existing current-version confirmation/Work-completion door. Per-PO evidence failures retain known dispatch; the UI retries only those evidence writes, never the Email. An unknown transport outcome blocks silent resend and persists minimal attempt metadata in account-scoped browser session storage. No PDF bytes or credentials are stored there. 83 web issue/evidence/bundle tests and 148 PO-route/provider tests passed. Shared result/Quick View placement, owner visual acceptance, configured real sender/provider verification, authenticated production lifecycle and rollout remain incomplete. Email remains unavailable without explicit verified configuration. This is not production completion or proof of an actual supplier transmission; local-session duplicate protection is not a server-durable attempt ledger.
 - **Verification boundary.** The authenticated MPR register has `Need PO 0`, so its issue walk was not manufactured; 189 full-page SO/MPR journey tests cover selection, refusals and preview readiness. No test or read-only view proves real issuance/receiving/sending. The exact-source versus generic PO-pool coverage discrepancy, remaining MPR composition/requester check, database-dependent work and the rest of the module remain open.
 
 - **ONE COMMUNICATION AREA PER DOCUMENT.** The doors out of the Portal (`Copy message`,

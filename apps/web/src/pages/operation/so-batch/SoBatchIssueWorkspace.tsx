@@ -70,6 +70,7 @@ export interface SoBatchIssueWorkspaceProps {
   /** The way back to the list this journey started from. Absent: SO Batch's. */
   backLabel?: string;
   supplierBundle?: boolean;
+  roundWindow?: string;
 }
 
 type Mode = "review" | "evidence";
@@ -82,8 +83,10 @@ export default function SoBatchIssueWorkspace({
   onIssue,
   backLabel,
   supplierBundle = false,
+  roundWindow,
 }: SoBatchIssueWorkspaceProps) {
   const [at, setAt] = useState(0);
+  const [bundlePreview, setBundlePreview] = useState<IssuedPo | null>(null);
   const [mode, setMode] = useState<Mode>("review");
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<{ wrong: string; todo: string } | null>(null);
@@ -351,8 +354,8 @@ export default function SoBatchIssueWorkspace({
       void loadEvidence(poId);
       setConfirmed((prev) => {
         const next = new Set(prev).add(poId);
-        if (next.size >= pos.length && pos.length > 0) { if (!supplierBundle) onDone(); }
-        else {
+        if (!supplierBundle && next.size >= pos.length && pos.length > 0) onDone();
+        else if (!supplierBundle) {
           /* Move to the next document the supplier has not received. */
           const nextIdx = pos.findIndex((p) => !next.has(p.id));
           if (nextIdx >= 0) setAt(nextIdx);
@@ -365,7 +368,7 @@ export default function SoBatchIssueWorkspace({
 
   const total = mode === "evidence" ? pos.length : documents.length;
   const idx = Math.min(at, Math.max(total - 1, 0));
-  const currentPo = mode === "evidence" ? pos[idx] : undefined;
+  const currentPo = mode === "evidence" ? bundlePreview ?? pos[idx] : undefined;
 
   const currentPoId = currentPo?.id ?? null;
   const [officialAttempt, setOfficialAttempt] = useState(0);
@@ -424,7 +427,7 @@ export default function SoBatchIssueWorkspace({
                 data-testid="so-batch-issue-prev"
                 className="h-7 rounded-control border border-kit-slate-6 px-2 text-meta disabled:opacity-40"
                 disabled={idx === 0}
-                onClick={() => setAt((i) => Math.max(0, i - 1))}
+                onClick={() => { setBundlePreview(null); setAt((i) => Math.max(0, i - 1)); }}
               >
                 Previous
               </button>
@@ -433,7 +436,7 @@ export default function SoBatchIssueWorkspace({
                 data-testid="so-batch-issue-next"
                 className="h-7 rounded-control border border-kit-slate-6 px-2 text-meta disabled:opacity-40"
                 disabled={idx >= total - 1}
-                onClick={() => setAt((i) => Math.min(total - 1, i + 1))}
+                onClick={() => { setBundlePreview(null); setAt((i) => Math.min(total - 1, i + 1)); }}
               >
                 Next
               </button>
@@ -581,10 +584,7 @@ export default function SoBatchIssueWorkspace({
             </>
           ) : currentPo ? (
             <>
-              {supplierBundle && <PoSupplierBundle pos={pos} onPreview={id => {
-                const index = pos.findIndex(po => po.id === id);
-                if (index >= 0) setAt(index);
-              }} />}
+              {supplierBundle && <PoSupplierBundle pos={pos} roundWindow={roundWindow} onPreview={(_id, po) => setBundlePreview(po)} />}
               {/* The form appears only once the official document has rendered:
                  until then there is no version to declare, and a confirmation
                  without one is the defect 0378 closes. */}

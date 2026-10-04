@@ -56,6 +56,8 @@ import Select from "@/components/kit/Select";
  * instead of offering a button that opens nothing.
  */
 export interface IssuedPo {
+  version?: number;
+  placedAt?: string;
   id: string;
   supplierId: string;
   supplierName: string | null;
