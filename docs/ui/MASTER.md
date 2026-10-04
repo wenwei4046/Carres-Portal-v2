@@ -71,6 +71,13 @@ no PO-only exception or page-local formatter. Stored identities and historical i
 remain unchanged; verify adoption per surface before calling it built.
 
 
+**Receiving compact-card adoption — branch only, 2026-10-04 / NOT PRODUCTION VERIFIED.**
+Receiving's adapter uses the existing compact-card Drawer and `CompactModuleCard`. A module may
+provide `detailsLabel` for its own object vocabulary; omission preserves Sales Order wording.
+`referenceStatus` provides an exceptional document state below the reference (Receiving:
+`Cancelled`), omitted on a normal document. Receipt quantities, evidence and history remain
+source-owned, and the full GRN owns amendments, voiding and PDF. No new card or drawer engine.
+
 ## Reuse-first shared page templates — owner ruling 2026-10-01
 
 ### Reference geometry with Carres colour — owner direction, 2026-10-01

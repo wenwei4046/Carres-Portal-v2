@@ -19,6 +19,7 @@ import Button from "@/components/kit/Button";
 /** Card widths of the reference page at browser widths 1146 · 480 · 440 · 420 · 390. */
 export const CARD_WIDTHS = [560, 440, 416, 396, 366] as const;
 const PRESETS = {
+  receiving: { label: "Receiving · cancelled preview", module: "receipt", open: {}, warehouseLeg: false },
   info: { label: "Info · default", module: "info", open: {}, warehouseLeg: false },
   delivery: { label: "Delivery · default", module: "delivery", open: {}, warehouseLeg: false },
   infoAll: { label: "Info · all open", module: "info", open: { items: true, communication: true, timeline: true }, warehouseLeg: false },
@@ -174,7 +175,15 @@ export default function CompactCardExample() {
         <Button size="sm" variant={failNext ? "primary" : "neutral"} data-testid="card-fail-next" onClick={() => setFailNext((v) => !v)}>{failNext ? "Preview: next save fails" : "Preview: saves succeed"}</Button>
       </div>
       <div data-testid="compact-card-frame" style={{ width, maxWidth: "100%" }}>
-        {closed ? null : <CompactModuleCard
+        {closed ? null : preset === "receiving" ? <CompactModuleCard
+          key={`receipt-${width}`} name="Sample supplier" reference="GRN-261004-1234" referenceStatus="Cancelled"
+          modulesLabel="Receiving" initialModule="receipt" openLabel="Receiving"
+          onOpen={() => window.open("/operation?tab=receiving", "_blank", "noopener")}
+          onClose={() => setClosed(true)} modules={[{
+            key: "receipt", label: "Receiving", detailsLabel: "Receipt details",
+            summary: [{ key: "received", label: "Received Qty", value: "2" }, { key: "damaged", label: "Damaged Qty", value: "1" }],
+            details: <p>Preview only · sample receipt facts</p>,
+          }]} /> : <CompactModuleCard
           key={`${preset}-${width}`}
           name="Jimmy"
           reference="SO-1368"
