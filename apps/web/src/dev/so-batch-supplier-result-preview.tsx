@@ -6,7 +6,6 @@ import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { PurchaseDemandRow, SoBatchOrderRow, SoBatchPurchaseResponse } from "@carres/shared";
 import type { PoTemplateData } from "@/lib/pdf/types";
-import ModuleHeader from "@/pages/operation/components/ModuleHeader";
 import SoBatchRegister from "@/pages/operation/so-batch/SoBatchRegister";
 import PoSupplierResultPanel from "@/pages/operation/so-batch/PoSupplierResultPanel";
 import "@/index.css";
@@ -70,10 +69,10 @@ window.fetch = async (input, init) => {
 const client = new QueryClient({ defaultOptions: { queries: { enabled: false, retry: false } } });
 function Preview() {
   const [open, setOpen] = useState(true);
+  const [time, setTime] = useState<string | null>(null);
   return <div className="flex h-screen min-w-0 flex-col bg-kit-canvas">
-    <ModuleHeader testId="so-batch-result-preview" word="SO Batch Purchase" docTitle="SO Batch Purchase · Supplier result preview" destinationHeader />
     <p className="border-b border-kit-slate-5 bg-white px-3 py-2 text-meta text-kit-slate-11">Sample data · Local preview only · No purchase was placed</p>
-    <SoBatchRegister data={base} isLoading={false} onIssue={() => {}} onOpenPurchaseOrders={() => setOpen(true)} />
+    <SoBatchRegister data={{ ...base, poCutoffTimes: ["11:00", "16:00"], rows: base.rows.map((leaf, index) => ({ ...leaf, poWindow: `2026-10-05T${index < 2 ? "11:00" : "16:00"}` })) }} roundNavigation={{ rounds: [], selected: time, onSelect: selected => setTime(previous => previous === selected ? null : selected) }} isLoading={false} onIssue={() => {}} onOpenPurchaseOrders={() => setOpen(true)} />
     <PoSupplierResultPanel open={open} onOpenChange={setOpen} pos={samplePos} roundWindow="2026-10-05T10:15" onChanged={() => {}} />
   </div>;
 }

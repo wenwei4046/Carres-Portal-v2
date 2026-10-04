@@ -1281,7 +1281,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
             {(data.poCutoffTimes ?? [...new Set(roundNavigation.rounds.flatMap(round => {
               const window = parsePoWindowKey(round.key);
               return window ? [window.time] : [];
-            }))]).map(time => <FilterRailRow key={time}
+            }))]).map(time => <FilterRailRow key={time} testId={`so-batch-cutoff-${time}`}
               label={poWindowTimeWord(time)}
               count={orders.filter(order => purchaseStatus(order) !== "Done" && orderMatchesTime(order, time)).length}
               active={roundNavigation.selected === time} onClick={() => roundNavigation.onSelect(time)} />)}
@@ -1470,7 +1470,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
               searchPlaceholder={W.search}
               initialSearch={initialSearch}
               noMatchMessage={W.noMatch}
-              onClearConditions={() => setFilter(SO_BATCH_RAIL_CLEAR)}
+              onClearConditions={() => { setFilter(SO_BATCH_RAIL_CLEAR); if (roundNavigation?.selected) roundNavigation.onSelect(roundNavigation.selected); }}
               toolbarStart={
                 !filterRailOpen ? (
                   <ShowFiltersButton
