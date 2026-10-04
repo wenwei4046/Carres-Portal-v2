@@ -491,7 +491,11 @@ header opens the same Calendar in the existing Drawer; picking a date keeps it o
 source closes it, and the selected day survives. This branch has not completed production
 acceptance or the broader Calendar event-source admission. Local evidence: 119 shared schedule/Inbound/PO-date tests, 15 Inbound API tests, 48 shell tests,
 32 Calendar tests, Web/API typechecks and design lint;
-the 201-receipt fixture verifies register paging does not clip Calendar history. This is not a
+the 201-receipt fixture verifies register paging does not clip Calendar history. Full CI
+37228990458 exposed a legacy Schedule input without quantity facts; the projection now keeps
+that quantity unknown instead of throwing. The corrected 58 schedule tests and 20 consumer-hook
+tests pass locally; reverting the guard makes the new legacy regression test fail. Full release
+CI must pass on the corrected head before merging. This is not a
 claim that the shared Calendar or Warehouse automatic GRN posting has shipped.
 
 

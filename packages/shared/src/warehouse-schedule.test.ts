@@ -988,6 +988,15 @@ describe("a pickup card is titled by the customer, never the address", () => {
 
 
 describe("Warehouse Calendar arrival evidence", () => {
+  it("keeps a legacy arrival without quantity facts visible without claiming zero", () => {
+    const input = inboundInput({ pos: [po("PO-legacy")] });
+    const arrivals = inboundArrivals(input).map((arrival) => ({ ...arrival, quantities: undefined } as unknown as typeof arrival));
+    expect(warehouseCalendarArrivals(arrivals, [], input.sites).events[0]).toMatchObject({
+      sourceId: "PO-legacy", date: "2026-09-20", expectedQty: null,
+    });
+    expect(warehouseArrivalScheduleCards(arrivals, [], "2026-09-14")).toHaveLength(1);
+  });
+
   it("keeps expected and actual dates, sites and receipt quantities separate", () => {
     const input = inboundInput({
       pos: [po("PO-calendar")],

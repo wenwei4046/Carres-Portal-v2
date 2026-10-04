@@ -374,7 +374,7 @@ function arrivalOpenHref(arrival: InboundArrival): string {
 function expectedArrivalGroups(arrival: InboundArrival) {
   if (!arrival.expectedArrivals?.length) return [{
     id: arrival.id, date: arrival.date,
-    qty: arrival.quantities.known ? arrival.quantities.pendingDeliveryQty : null,
+    qty: arrival.quantities?.known ? arrival.quantities.pendingDeliveryQty : null,
     batches: null as InboundArrival["expectedArrivals"] | null,
   }];
   const byDay = new Map<string, NonNullable<InboundArrival["expectedArrivals"]>>();
@@ -390,7 +390,7 @@ function expectedArrivalGroups(arrival: InboundArrival) {
   return [...byDay].map(([date, batches]) => ({
     id: byDay.size === 1 ? arrival.id : `${arrival.id}:${date}`,
     date,
-    qty: arrival.quantities.known && batches.every((batch) => batch.quantityKnown)
+    qty: arrival.quantities?.known && batches.every((batch) => batch.quantityKnown)
       ? batches.reduce((total, batch) => total + batch.qty, 0) : null,
     batches,
   }));
@@ -760,7 +760,7 @@ export function warehouseCalendarArrivals(
   const events: WarehouseCalendarArrival[] = [];
   const seen = new Set<string>();
   for (const arrival of arrivals) {
-    if (arrival.quantities.known && arrival.quantities.pendingDeliveryQty <= 0) continue;
+    if (arrival.quantities?.known && arrival.quantities.pendingDeliveryQty <= 0) continue;
     for (const group of expectedArrivalGroups(arrival)) {
       if (!group.date) continue;
       const id = `expected:${group.id}`;

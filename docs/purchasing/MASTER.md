@@ -572,7 +572,11 @@ the other view's cached population. PR #1907 passed full CI 37225888964 and depl
 `629ece995237d8a48c28c725d0d7e339507038bd` through successful run 37226814237; all five production
 proof endpoints converged. Authenticated live acceptance verified seven GRN Records, two Receiving
 Differences, shared Received with/Category filters, exact receipt GRN-260904-1064 → SC-1019 and
-browser Back retaining Differences; the same two receipts also rendered in Cards. No test
+browser Back retaining Differences; the same two receipts also rendered in Cards. The live
+Differences Excel export was inspected and contains exactly those two receipt records with
+their accepted/damaged quantities and governed short GRN numbers. List PDF remains unverified:
+the live action produced no observed preview tab or saved file, without a console error;
+the shared UI chat has this bounded finding. No test
 transaction was created. A raw eight-digit GRN date on the linked Claim page was found and its
 shared display-format adoption is corrected on the Calendar continuation branch, not yet deployed. Live unposted/Return fixtures
 were unavailable; those cases retain automated evidence only. Whole Receiving is not complete.
