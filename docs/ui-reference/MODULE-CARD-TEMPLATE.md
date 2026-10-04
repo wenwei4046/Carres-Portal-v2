@@ -58,6 +58,8 @@ handoff sample. Stock `1/1 Ready` is a layout sample. Any Customer date or Logis
 /ui exists only in that browser tab: **nothing is written to the ERP**, and it is not an order fact.
 `Preview: next save fails` is a /ui control that simulates a failed save. The header ↗ opens the existing Sales Order page. × closes the card.
 
+**SO file preview — owner approved 2026-10-04:** The source-owned preview uses the shared `PdfPreviewHeader`: `Sales order PDF · {actual SO number}` at left, existing saved-document `Download` and `Close PDF` × at right. Zoom stays on the next row, then the actual PDF. Identity and Close remain available during loading/error; Download is disabled until its saved Blob exists. No separate Close row. Close PDF returns to Info and focuses the SO number; the dark Header `Close order` × closes the whole Register Drawer and returns to its opener. Neither control saves business facts or changes current/historical issued documents.
+
 ## Real Sales Orders adoption — owner authorised 2026-10-04
 
 The Listing Table/Cards quick view uses `SalesOrderCompactView` and this kit, rather than reference

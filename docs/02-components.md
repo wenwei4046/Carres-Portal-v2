@@ -407,6 +407,8 @@ retry and unmount cancel old rendering and release its PDF worker resources.
 The caller owns the source URL and its lifetime. A failed preview is not a completed
 review. The live `/ui` example includes a real draft and a failed-preview sample.
 
+**Optional source header.** `PdfPreviewHeader` supplies a wrapping document title, source-owned actions and a named icon Close in one compact row, including loading/error states. It owns no download source or business action. Compact SO adoption follows UI MASTER §4.3 and MODULE-CARD-TEMPLATE; zoom remains a separate row.
+
 **Used by.** The shared SO Batch / Manual Purchase PO review. Purchasing MASTER §8.2
 owns its approved desktop composition and completion gate; this is not the image
 and evidence viewer promised for Supplier Claims.

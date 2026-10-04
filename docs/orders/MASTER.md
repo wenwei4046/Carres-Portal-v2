@@ -6926,4 +6926,6 @@ and failed source Unavailable. Independent Amendment No allocation remains an au
 
 Owner correction2026-10-02: toolbar omits the duplicate SO count; footer keeps filtered SO count and quantity. Listing uses COPY-STANDARD’s `Listing` tab word.
 
+**SO file preview — owner approved 2026-10-04:** The source-owned preview uses the shared `PdfPreviewHeader`: `Sales order PDF · {actual SO number}` at left, existing saved-document `Download` and `Close PDF` × at right. Zoom stays on the next row, then the actual PDF. Identity and Close remain available during loading/error; Download is disabled until its saved Blob exists. No separate Close row. Close PDF returns to Info and focuses the SO number; the dark Header `Close order` × closes the whole Register Drawer and returns to its opener. Neither control saves business facts or changes current/historical issued documents.
+
 **2026-10-04 owner-approved shared Header colour:** CompactModuleCard uses the dark identity Header defined in UI MASTER §4.3; sales/address disclosures stay in their existing order and open independently. Countdown is white label text, without a pale fill. SO Info money uses `Balance due`, matching COPY-STANDARD’s SO totals rule and the saved PDF; amounts and calculation are unchanged.

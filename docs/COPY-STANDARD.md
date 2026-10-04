@@ -5194,6 +5194,8 @@ These words are on screen in the branch and are not approved yet. `Net result` i
 | States | `Loading the forecast…` · `The forecast could not be loaded. Try again.` · `No income or expense account is in the chart.` |
 | Refusals | `Only Finance plans a forecast.` · `Choose the month.` · `The plan could not be read.` · `Account {code} cannot be planned: it is not an income or expense account.` · `{code} {name}: plan an amount or a share, not both.` · `{code} {name}: the amount is not a number.` · `{code} {name}: type the amount in ringgit and sen.` · `{code} {name}: an income account is planned as an amount.` · `{code} {name}: the share is not a number.` · `{code} {name}: a share is 0% or more, to two decimals.` · `Someone else saved this month after you opened it. Open it again to see their plan.` · `The forecast could not be saved. Try again.` |
 
+**SO compact file preview — owner approved 2026-10-04:** `Sales order PDF · {actual SO number}` · `Download` · accessible name/tooltip `Close PDF` for the file × and `Close order` for the dark order Header ×. File close returns to Info; order close returns to the Register.
+
 ### Receiving and shared Calendar — owner-approved target, 2026-10-04
 
 These words are approved target copy, not deployment evidence. Purchasing MASTER §9.4 owns

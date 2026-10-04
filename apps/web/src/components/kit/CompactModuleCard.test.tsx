@@ -233,14 +233,17 @@ describe("CompactModuleCard — Communication and Timeline", () => {
 describe("CompactModuleCard — document entry", () => {
   it("opens a lazy document independently of the full-object action", () => {
     let opened = 0;
-    card({ document: { label: "View Sales Order", preview: <div>Saved document</div> }, onOpen: () => { opened += 1; } });
+    card({ document: { label: "View Sales Order", preview: (onClose) => <div>Saved document<button onClick={onClose}>Close PDF</button></div> }, onOpen: () => { opened += 1; } });
     expect(screen.queryByText("Saved document")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "View Sales Order" }));
     expect(screen.getByText("Saved document")).toBeInTheDocument();
     expect(opened).toBe(0);
     fireEvent.click(screen.getByRole("button", { name: "Open order" }));
     expect(opened).toBe(1);
-    fireEvent.click(within(screen.getByRole("region", { name: "View Sales Order" })).getByRole("button", { name: "Close" }));
+    fireEvent.click(within(screen.getByRole("region", { name: "View Sales Order" })).getByRole("button", { name: "Close PDF" }));
+    expect(screen.getByRole("button", { name: "View Sales Order" })).toHaveFocus();
     expect(screen.queryByText("Saved document")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "View Sales Order" }));
+    expect(screen.getByText("Saved document")).toBeInTheDocument();
   });
 });
