@@ -1477,10 +1477,10 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
                 {stock.active ? <><Select id="round-stock-location" toolbar label="Stock Location" value={stock.location}
                   onValueChange={stock.setLocation} disabled={stock.busy} options={stock.locations} />
                   <Button size="sm" disabled={stock.busy} onClick={stock.clear}>Cancel</Button></>
-                  : <Button size="sm" loading={stock.busy} disabled={data.readyStockPriority == null} title={data.readyStockPriority == null ? "Not available" : undefined} onClick={() => {
+                  : <Button size="sm" loading={stock.busy} disabled={isLoading || data.readyStockPriority == null} title={data.readyStockPriority == null ? "Not available" : undefined} onClick={() => {
                     void stock.match(visibleOrders.current.filter(order => shown.some(row => row.orderId === order.orderId) && purchaseStatus(order) !== "Done"));
                   }}>Match Ready Stock</Button>}
-                {onOpenPurchaseOrders ? <Button size="sm" loading={purchaseOrdersLoading} onClick={() => {
+                {onOpenPurchaseOrders ? <Button size="sm" loading={purchaseOrdersLoading} disabled={isLoading} onClick={() => {
                 const visibleIds = new Set(shown.map(order => order.orderId));
                 onOpenPurchaseOrders([...new Set(visibleOrders.current.filter(order => visibleIds.has(order.orderId))
                   .flatMap(order => order.pos.map(po => po.poId)))]);

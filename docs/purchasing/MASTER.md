@@ -296,8 +296,9 @@ original `customer_delivery` value remains after rollback. Anonymous execution i
 authenticated execution intentionally uses the same internal manager gate as other Purchasing
 Settings writes. The advisor's exposed-definer notice is intentional for this guarded RPC, not
 an unguarded grant. Nine loader, 30 Settings route, 39 Settings UI, 133 Register and nine hook
-tests passed; API/web type checks and design/migration guards passed. Full CI/deployment and
-authenticated production acceptance of the new Settings UI remain required. This does not close
+tests passed; API/web type checks and design/migration guards passed. Full CI `37205634561` passed on exact head `10ba421a5515a1690698f59437048b49f6cbc5aa`.
+PR #1885 merged as `262d88b8966db29ac0c2a78de5adf3167eda49d9`; deployment and authenticated
+production acceptance of the new Settings UI remain required. This does not close
 the full SO Batch boundary above.
 
 Authenticated production acceptance also found that the Batch Purchase Orders toolbar opened
@@ -308,8 +309,25 @@ DataGrid search and column filters determine membership; no broader supplier poo
 All reads must succeed with matching PO identities before the panel opens. Starting a new read
 closes the old result scope. A failed read says `Supplier details could not be loaded.` and offers
 `Try again` on the same exact PO read, rather than presenting an empty or stale PO answer.
-23 page journey and 131 actual Register tests pass, including fresh-mount recovery, search scope
-and failed-read retry without a write. Direct production acceptance remains open.
+23 page journey and 131 actual Register tests passed, including fresh-mount recovery, search scope
+and failed-read retry without a write. PR #1882 merged as
+`631c115f52b20545f1725069fea6e21500126755`; deploy `37205103865` succeeded and all five
+canonical endpoints passed independent SHA convergence. After a fresh production mount, search
+`1328` yielded one retained SO; Purchase Orders recovered exactly `PO-20260902-8370` V1 under
+Nice Future, with its original source, destination, channel and existing sent evidence. No issue
+or supplier transmission occurred. Evidence: `/tmp/so-batch-live-po-recovery.png`. Searching
+`7907` matches multiple SOs sharing that PO; result preparation uses each matching SO's complete
+PO lineage, so sibling supplier POs remain legitimate and must not be mistaken for stale scope.
+
+Authenticated production matching of `SO-1365` read its real source and showed zero available
+Units at the default Klang location. Cancel restored the ordinary Listing; no reservation or
+issue was performed. The empty candidate list exposed `site:Carres Klang` as a label; the local
+correction retains the readable default location option even with zero candidates. Match and PO
+recovery controls now refuse interaction during the initial Register load. These corrections
+require release and production acceptance. Evidence of the discovered empty-stock state:
+`/tmp/so-batch-live-stock-empty.png`. Positive live stock selection, whole-scope acceptance,
+multiple selected live PDFs, Quick View and Table/Cards remain open; this bounded proof does
+not complete the mission.
 
 ### SO Batch PO Status — owner-approved 2026-10-04
 
