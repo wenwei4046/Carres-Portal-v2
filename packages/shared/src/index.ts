@@ -1216,6 +1216,7 @@ export {
   type WarehouseIncomingLine,
   type WarehouseIncomingPo,
   type WarehouseIncomingResponse,
+  type WarehouseIncomingArrival,
   // 0426 · the 2026-09-04 owner instruction — stored GRN, Actual Site, unit
   // outcomes, extra goods, the save-blocker law and the Work feed.
   receivingDisplayNo,

@@ -759,7 +759,7 @@ local-only and are part of the SQL still requiring review/approval, not applied 
 Six added local cases cover pending-source projection, other-Site isolation, shared/inactive
 accounts, upload-path enforcement and historical-proof access: 36 transaction cases pass. Forty
 Warehouse API tests cover the source and signing routes as well as final confirmation. This does
-not prove real Storage transport or the non-PO Warehouse form, which remains to be connected.
+not prove real Storage transport. The non-PO Warehouse form is connected on branch as recorded below.
 
 **Warehouse confirmation form — BUILT ON BRANCH / NOT DEPLOYED, 2026-10-05.**
 The PO form now calls the final-confirmation API with a stable save key. It uses kit Modal, Button,
@@ -783,9 +783,24 @@ six decoder tests pass. A reopened form requires fresh confirmation. Previously 
 missing from the current source are retained and saving is disabled, preventing confirmation of
 invisible facts. Loading, read failure and unavailable correction sources are distinguished beside
 the action; source failures offer retry. The rendered reopen/correct test proves the same session
-and evidence are sent again. Source-disappearance resolution, complete report history, non-PO UI,
+and evidence are sent again. Source-disappearance resolution, complete report history,
 and broader page/keyboard acceptance remain owed. The own-report list still has its legacy table
 and PageHeader; this bounded correction does not claim complete shared-template adoption.
+
+**Non-PO Warehouse form — BUILT ON BRANCH / NOT DEPLOYED, 2026-10-05.**
+Incoming includes destination-scoped arrival sources alongside POs. The shared-kit modal records
+each exact Unit explicitly; results and actual date start unknown, and optional time is never
+manufactured. Handover proof uses the Warehouse-scoped signing route. Saved reports reopen with
+their original source, evidence, notes, save key and revision; source disappearance blocks saving.
+Editing clears confirmation, uncertain retries retain identity, and only a posted result with a
+GRN closes the form. A blocked response keeps its report and reason visible without claiming a GRN.
+Thirty-one component/upload tests pass, including six non-PO journeys. The 390×844 local preview
+verified explicit received/missing outcomes, the blocked-report message, edit-clears-confirmation
+and shared date selection; the modal measured 388px client/scroll width with no horizontal overflow.
+The walk found and corrected simultaneous saved/not-saved messaging. Evidence:
+`/tmp/carres-warehouse-arrival-phone-local.jpg`. This uses illustrative API responses, not a real
+Warehouse login, proof upload, stock receipt or production acceptance. Broader source lifecycle,
+report history and complete Warehouse listing-template acceptance remain outstanding.
 
 **Operation preserved-report visibility — BUILT ON BRANCH / NOT DEPLOYED, 2026-10-05.**
 Operation receipt reads carry the saved raw report and engine blockers without promoting raw

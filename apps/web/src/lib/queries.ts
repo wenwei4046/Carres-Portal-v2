@@ -302,6 +302,7 @@ import {
   type SupplierClaimMove,
   type SupplierClaimUnit,
   type WarehouseIncomingResponse,
+  type WarehouseIncomingArrival,
   type WarehouseReceiptLine,
   type WarehouseReceiptRow,
   type WarehouseSubmitReceiptInput,
@@ -4217,6 +4218,14 @@ export function useWarehouseIncoming(
   });
 }
 
+export function useWarehouseArrivals() {
+  return useQuery({
+    queryKey: ["warehouse-portal", "arrivals"],
+    queryFn: () => apiFetch<{ arrivals: WarehouseIncomingArrival[] }>("/api/warehouse/arrivals"),
+    staleTime: 30_000,
+  });
+}
+
 /** What this warehouse filed, and what became of it — including the claims each
  *  check-in opened. */
 export function useWarehouseMyReceipts(
@@ -4273,6 +4282,7 @@ export function useWarehouseConfirmReceiptMutation() {
     onSuccess: async () => {
       await Promise.all([
         qc.invalidateQueries({ queryKey: qk.warehousePortal.incoming() }),
+        qc.invalidateQueries({ queryKey: ["warehouse-portal", "arrivals"] }),
         qc.invalidateQueries({ queryKey: qk.warehousePortal.receipts() }),
         qc.invalidateQueries({ queryKey: ["operation", "warehouse-receipts"] }),
         qc.invalidateQueries({ queryKey: ["operation", "warehouse-inbound"] }),

@@ -2,17 +2,19 @@ import { useState } from "react";
 import { warehouseConfirmationReportFromWire } from "@carres/shared/adapters";
 import Button from "@/components/kit/Button";
 import WarehouseCountModal from "./WarehouseCountModal";
+import WarehouseArrivalModal from "./WarehouseArrivalModal";
 import {
   supplierClaimTypeLabel,
   documentDisplayNumber,
   type WarehouseIncomingPo,
+  type WarehouseIncomingArrival,
   type WarehouseConfirmationReportInput,
   type WarehouseConfirmationResult,
   warehouseReceiptStatusLabel,
   warehouseReceiptSummary,
   type WarehouseReceiptStatus,
 } from "@carres/shared";
-import { useWarehouseMyReceipts, useWarehouseIncoming } from "@/lib/queries";
+import { useWarehouseMyReceipts, useWarehouseIncoming, useWarehouseArrivals } from "@/lib/queries";
 import { fmtDate } from "@/lib/fmt-date";
 import PageHeader from "@/components/PageHeader";
 
@@ -40,8 +42,10 @@ export default function WarehouseMyReceipts() {
   const { data, isLoading, isError, error, refetch } = useWarehouseMyReceipts();
   const receipts = data?.receipts ?? [];
   const incoming = useWarehouseIncoming();
+  const arrivals = useWarehouseArrivals();
   const [editing, setEditing] = useState<{
-    po: WarehouseIncomingPo;
+    po?: WarehouseIncomingPo;
+    source?: WarehouseIncomingArrival;
     saved: { saveKey: string; report: WarehouseConfirmationReportInput; result: WarehouseConfirmationResult };
   } | null>(null);
 
@@ -164,17 +168,19 @@ export default function WarehouseMyReceipts() {
                   {r.status === "draft" && r.save_key && r.revision != null && (() => {
                     const report = warehouseConfirmationReportFromWire(r.raw_report);
                     const po = incoming.data?.pos.find((item) => item.po_id === report?.poId);
-                    const unavailable = incoming.isLoading ? "Loading…"
-                      : incoming.isError ? "Could not be loaded"
-                      : !report || !po ? "Not available. Go back and reload." : null;
+                    const source = arrivals.data?.arrivals?.find((item) => item.id === report?.arrivalSourceId);
+                    const sourceQuery = report?.arrivalSourceId ? arrivals : incoming;
+                    const unavailable = sourceQuery.isLoading ? "Loading…"
+                      : sourceQuery.isError ? "Could not be loaded"
+                      : !report || (!po && !source) ? "Not available. Go back and reload." : null;
                     return <><Button disabled={Boolean(unavailable)} aria-describedby={unavailable ? `receipt-unavailable-${r.id}` : undefined} onClick={() => {
-                      if (!report || !po || !r.save_key || r.revision == null) return;
-                      setEditing({ po, saved: { saveKey: r.save_key, report,
+                      if (!report || (!po && !source) || !r.save_key || r.revision == null) return;
+                      setEditing({ po, source, saved: { saveKey: r.save_key, report,
                         result: { id: r.id, receipt_id: r.id, status: "draft", revision: r.revision,
                           grn_no: null, blockers: r.blockers ?? [], already_saved: true } } });
                     }}>Open Receiving</Button>
                       {unavailable && <p id={`receipt-unavailable-${r.id}`} className="text-body text-base-700">{unavailable}</p>}
-                      {incoming.isError && <Button onClick={() => void incoming.refetch()}>Try again</Button>}
+                      {sourceQuery.isError && <Button onClick={() => void sourceQuery.refetch()}>Try again</Button>}
                     </>;
                   })()}
                   {r.status === "returned" && r.return_reason && (
@@ -191,7 +197,8 @@ export default function WarehouseMyReceipts() {
           </tbody>
         </table>
       </div>
-      {editing && <WarehouseCountModal key={editing.saved.result.id} po={editing.po}
+      {editing?.source && <WarehouseArrivalModal key={editing.saved.result.id} source={editing.source} saved={editing.saved} onClose={() => setEditing(null)} />}
+      {editing?.po && <WarehouseCountModal key={editing.saved.result.id} po={editing.po}
         saved={editing.saved} onClose={() => setEditing(null)} />}
     </div>
   );

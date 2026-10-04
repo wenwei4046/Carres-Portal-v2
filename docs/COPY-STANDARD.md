@@ -1940,6 +1940,7 @@ Operation owns supplier follow-up; Warehouse owns physical evidence and results.
 | Posted successfully | `Receiving saved · {GRN No}` | Only after the engine returns a posted receipt and its actual GRN. |
 | Preserved but unposted report | `Receiving report saved. No GRN created.` | Show the returned blockers; keep the same session for correction. Never describe this as received stock. |
 | Unresolved physical report in Work | `Open Receiving` | Exact validation blockers explain the work. Opens that saved report; GRN Duty coordinates resolution, Warehouse corrects physical facts, Operation owns supplier follow-up. No routine approval action for valid posted Warehouse receipts. |
+| Non-PO Warehouse receiving fields | `Document` · `Party` · `Goods Received Date` · `Time` · `Handover person` · `Document No` · `Note` | Reuse the arrival-source receiving facts; date and optional time remain distinct. Unit outcomes reuse `Received`, `Received with issue · Damaged`, `Received with issue · Wrong item`, `Not received`; unrecorded is `Not recorded`. |
 | Reopen own unposted report | `Open Receiving` | Reuse `Open {object}`. Restore the same report and revision, with fresh physical confirmation. Loading/read failure use `Loading…` / `Could not be loaded` + `Try again`; a source that cannot support correction uses `Not available. Go back and reload.` |
 | Existing returned report | `Return count to {warehouse}` · `Count returned to {warehouse}` | A specific physical correction request; never mandatory approval of a normal Warehouse receipt. |
 

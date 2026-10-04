@@ -430,6 +430,12 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     id: SUBMITTED, receipt_id: SUBMITTED, status: "draft", grn_no: null, revision: 0,
     blockers: [{ code: "do_file_required", message: "Delivery note is missing" }], already_saved: false,
   });
+  if (url.includes("/api/warehouse/arrivals")) return json({ arrivals: [{
+    id: "77777777-7777-4777-8777-777777777777", source_no: "TR-20261005-1234", kind: "transfer",
+    expected_date: "2026-10-05", to_site_id: WH2, from_site_name: "Carres Klang", party_name: "Warehouse company",
+    units: [{ id: "88888888-8888-4888-8888-888888888888", unit_code: "U1-000-201", sku: "BF02-Q Queen Bedframe" },
+      { id: "99999999-9999-4999-8999-999999999999", unit_code: "U1-000-202", sku: "BF02-Q Queen Bedframe" }],
+  }] });
   if (url.includes("/api/warehouse/incoming")) return json(WAREHOUSE_INCOMING);
   if (url.includes("/api/operation/warehouse-receipts/duty")) return json(DUTY);
   if (url.includes(`/api/operation/warehouse-receipts/${POSTED}`)) return json(DETAIL);

@@ -28,6 +28,7 @@ const MAX_SIZE = 10 * 1024 * 1024;
 type Props = {
   poId: string;
   arrivalSourceId?: string;
+  warehouseArrival?: boolean;
   imageOnly?: boolean;
   doNumber: string;
   onUploaded: (filePath: string) => void;
@@ -38,6 +39,7 @@ export default function DOFileUploadField({
   doNumber,
   onUploaded,
   arrivalSourceId,
+  warehouseArrival = false,
   imageOnly = false,
 }: Props) {
   const [error, setError] = useState<string | null>(null);
@@ -69,7 +71,7 @@ export default function DOFileUploadField({
     try {
       const sign = await apiFetch<{ token: string; path: string }>(
         arrivalSourceId
-          ? `/api/operation/arrival-sources/${arrivalSourceId}/proof`
+          ? warehouseArrival ? `/api/warehouse/arrivals/${arrivalSourceId}/proof` : `/api/operation/arrival-sources/${arrivalSourceId}/proof`
           : "/api/storage/dos/sign-upload",
         {
           method: "POST",

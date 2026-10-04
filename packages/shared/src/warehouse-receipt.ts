@@ -404,6 +404,18 @@ export interface WarehouseIncomingPo {
   open_receipt_id: string | null;
 }
 
+/** Destination-Site scoped non-PO receipt source; no commercial fields. */
+export interface WarehouseIncomingArrival {
+  id: string;
+  source_no: string;
+  kind: Exclude<import("./arrival-source").ArrivalSourceType, "supplier-delivery">;
+  expected_date: string;
+  to_site_id: string;
+  from_site_name: string | null;
+  party_name: string | null;
+  units: Array<{ id: string; unit_code: string; sku: string }>;
+}
+
 export interface WarehouseIncomingResponse {
   warehouse: { id: string; name: string } | null;
   pos: WarehouseIncomingPo[];
