@@ -37,8 +37,13 @@ another operating model. Approved target is not proof that the current page impl
 ### SO Batch — daily operation
 
 1. Customer Sales Orders enter their purchase round using actual Proceed Date/time. Default daily
-   cutoffs are **10:15 AM and 4:00 PM**; authorised Settings can edit them. Preserve missed work and
-   exact SO/item lineage. Ordinary customer demand defaults to purchase; unassigned warehouse stock
+   cutoffs are **10:15 AM and 4:00 PM**; authorised Settings can edit them. Owner reaffirmed
+   2026-10-04: Order timing uses configured PO Days intersected with the governed Office working
+   calendar and public holidays (§5.6.1). No round occurs on an excluded weekday or public holiday;
+   new demand rolls to the next eligible Purchasing day's first round. A skipped holiday creates no
+   missed occurrence. Previously incomplete eligible rounds remain incomplete across the holiday.
+   Use Asia/Kuala_Lumpur dates/times and existing calendar authority, not another holiday list.
+   Preserve missed work and exact SO/item lineage. Ordinary customer demand defaults to purchase; unassigned warehouse stock
    must never make the system decide that purchase is unnecessary.
 2. Select the round in the left rail. The right side uses the shared Sales Orders Table/Cards
    register, search, per-column filters and Columns selection. Default listing is date-first;
