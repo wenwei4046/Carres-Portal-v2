@@ -4,8 +4,8 @@
  * nothing here writes to the ERP.
  */
 import { fireEvent, render, screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
-import CompactCardExample from "./CompactCardExample";
+import { describe, expect, it, vi } from "vitest";
+import CompactCardExample, { SAMPLE_ORDER_PATH } from "./CompactCardExample";
 
 function delivery() {
   render(<CompactCardExample />);
@@ -21,6 +21,24 @@ function confirm(c: ReturnType<typeof delivery>, { date = "2026-10-31", slot = "
   if (time) fireEvent.change(c.getByLabelText("Confirmed delivery time"), { target: { value: time } });
   fireEvent.click(c.getByRole("button", { name: "Save" }));
 }
+
+describe("Header actions", () => {
+  it("Open order opens the existing Sales Order page in a new tab", () => {
+    const open = vi.spyOn(window, "open").mockReturnValue(null);
+    const c = delivery();
+    fireEvent.click(c.getByRole("button", { name: "Open order" }));
+    expect(open).toHaveBeenCalledWith(SAMPLE_ORDER_PATH, "_blank", "noopener");
+    open.mockRestore();
+  });
+
+  it("Close panel hides the card; choosing a state brings it back", () => {
+    const c = delivery();
+    fireEvent.click(c.getByRole("button", { name: "Close panel" }));
+    expect(screen.queryByRole("button", { name: "Open order" })).toBeNull();
+    fireEvent.click(screen.getByTestId("card-state-info"));
+    expect(screen.getByRole("button", { name: "Open order" })).toBeTruthy();
+  });
+});
 
 describe("Delivery summary cells", () => {
   it("shows Stock / Logistics / Customer / DO with Stock quantity and Ready on separate lines", () => {

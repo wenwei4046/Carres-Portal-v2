@@ -36,6 +36,8 @@ const PAYMENT: CardTimelineEvent = {
   result: "RC-300926-3735",
 };
 const TARGET = "2026-10-31";
+/** The existing Sales Order page for the sample order (the reference page opens the same order). */
+export const SAMPLE_ORDER_PATH = "/operation/orders/so/82cee77c-67df-4515-8b4e-7b81796e1423";
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const RESULTS = ["No Answer", "Asked to Call Again", "Waiting for Customer Reply", "Requested Another Date", "Confirmed"];
 
@@ -133,6 +135,7 @@ export default function CompactCardExample() {
   const [logistics, setLogistics] = useState("");
   const [arrangement, setArrangement] = useState<Arrangement>(NONE);
   const [failNext, setFailNext] = useState(false);
+  const [closed, setClosed] = useState(false);
   const [events, setEvents] = useState<CardTimelineEvent[]>([PAYMENT]);
   const days = daysToTarget();
   const customer = customerSummary(arrangement);
@@ -161,17 +164,17 @@ export default function CompactCardExample() {
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap gap-2" role="group" aria-label="Card width">
         {CARD_WIDTHS.map((w) => (
-          <Button key={w} size="sm" variant={w === width ? "primary" : "neutral"} data-testid={`card-width-${w}`} onClick={() => setWidth(w)}>{`${w}px`}</Button>
+          <Button key={w} size="sm" variant={w === width ? "primary" : "neutral"} data-testid={`card-width-${w}`} onClick={() => { setWidth(w); setClosed(false); }}>{`${w}px`}</Button>
         ))}
       </div>
       <div className="flex flex-wrap gap-2" role="group" aria-label="Card state">
         {(Object.keys(PRESETS) as PresetKey[]).map((k) => (
-          <Button key={k} size="sm" variant={k === preset ? "primary" : "neutral"} data-testid={`card-state-${k}`} onClick={() => setPreset(k)}>{PRESETS[k].label}</Button>
+          <Button key={k} size="sm" variant={k === preset ? "primary" : "neutral"} data-testid={`card-state-${k}`} onClick={() => { setPreset(k); setClosed(false); }}>{PRESETS[k].label}</Button>
         ))}
         <Button size="sm" variant={failNext ? "primary" : "neutral"} data-testid="card-fail-next" onClick={() => setFailNext((v) => !v)}>{failNext ? "Preview: next save fails" : "Preview: saves succeed"}</Button>
       </div>
       <div data-testid="compact-card-frame" style={{ width, maxWidth: "100%" }}>
-        <CompactModuleCard
+        {closed ? null : <CompactModuleCard
           key={`${preset}-${width}`}
           name="Jimmy"
           reference="SO-1368"
@@ -179,6 +182,8 @@ export default function CompactCardExample() {
           sales={{ orderDate: "30 Sep 2026", salesLocation: "Carres Kota Damansara", salesperson: "Alvin" }}
           address={{ area: "Ampang", full: "1888. jalan Pillow, 68000 Ampang, Selangor", facts: [{ kind: "building", label: "Building", value: "Condo · Floor 1" }, { kind: "access", label: "Access", value: "No lift" }] }}
           target={{ date: "31 Oct", badge: `${days}d` }}
+          onOpen={() => window.open(SAMPLE_ORDER_PATH, "_blank", "noopener")}
+          onClose={() => setClosed(true)}
           initialModule={p.module}
           initiallyOpen={p.open}
           modules={[
@@ -242,7 +247,7 @@ export default function CompactCardExample() {
             ],
           }}
           timeline={events}
-        />
+        />}
       </div>
     </div>
   );

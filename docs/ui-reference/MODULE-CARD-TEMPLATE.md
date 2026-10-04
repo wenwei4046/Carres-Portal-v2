@@ -49,8 +49,9 @@ It is a **UI example**. SO-1368 order facts (customer, order date, Sales Locatio
 Total/Paid/Outstanding, the payment at 2026-09-30T08:08:32Z, receipt RC-300926-3735) are the verified
 handoff sample. Stock `1/1 Ready` is a layout sample. Any Customer date or Logistics company saved on
 /ui exists only in that browser tab: **nothing is written to the ERP**, and it is not an order fact.
-`Preview: next save fails` is a /ui control that simulates a failed save. No production page uses the
-card.
+`Preview: next save fails` is a /ui control that simulates a failed save. The header ↗ opens the
+existing Sales Order page in a new tab; the card has no PDF preview or download of its own. × closes
+the card. No production page uses the card.
 
 ## Differences from the reference page (125 checks: 25 states × 5 widths)
 
