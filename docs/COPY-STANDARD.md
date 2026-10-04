@@ -5209,3 +5209,7 @@ Receiving placement; UI MASTER owns Calendar. No posting/permission change is im
 | Shared list toolbar | `Search` · `Table` · `Cards` · `Page tools` · `Columns` | Reuse shared controls and existing action availability |
 | Right Working Panel sections | `Receipt details` · `Items & quantities` · `Evidence` · `Related records` · `History` | Receiving-owned facts and permitted actions |
 | Shared Calendar | `All modules` · `Filter by module` · `Filter by location` | Authorised implemented dated events; one owner/event/count; no duplicate Receiving arrival |
+
+### Shared register export failure
+
+`The list could not be exported. Try again.` — A failed full-population read or file render produces no partial export. Retry remains the same Export action. Technical error details never replace this operator sentence.

@@ -433,6 +433,16 @@ describe("GET /?scope=grn — the paged GRN Register", () => {
     expect(sortedBody.page.total).toBe(61); expect(sortedBody.receipts[0].id).toBe(records[60].id);
     const cleared = await req("/api/operation/warehouse-receipts?scope=grn", "GET", jwt);
     expect((await cleared.json() as { page: { total: number } }).page.total).toBe(61);
+    const exported = await req(`/api/operation/warehouse-receipts?scope=grn&export=1&offset=50&limit=1&columns=${encodeURIComponent(JSON.stringify({ ...columns, filters: {}, sort: { key: "receivedQty", dir: "desc" } }))}`, "GET", jwt);
+    expect(exported.status).toBe(200);
+    const exportBody = await exported.json() as { receipts: Array<{ id: string; unit_ids_by_line: unknown; do_file_url: unknown }>; page: { offset: number; total: number } };
+    expect(exportBody.receipts).toHaveLength(61);
+    expect(exportBody.receipts[0].id).toBe(records[60].id);
+    expect(exportBody.page).toMatchObject({ offset: 0, total: 61 });
+    expect(exportBody.receipts.every(row => row.unit_ids_by_line === null && row.do_file_url === null)).toBe(true);
+    const filteredExport = await req(`/api/operation/warehouse-receipts?scope=grn&export=1&columns=${encodeURIComponent(JSON.stringify(columns))}`, "GET", jwt);
+    expect((await filteredExport.json() as { receipts: Array<{ id: string }> }).receipts.map(row => row.id)).toEqual([records[60].id]);
+
   });
 
   it.each(["{", JSON.stringify({ filters: { private_field: ["value"] }, dateFilters: {}, numberFilters: {}, dateRangeFilters: {}, sort: null })])("rejects invalid column asks before reading data", async (columns) => {

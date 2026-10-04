@@ -4727,10 +4727,8 @@ export interface GrnRegisterResponse {
  * `keepPreviousData` holds the current page while the next one loads so
  * Previous/Next never blinks the register empty.
  */
-export function useOperationGrnRegister(
-  filters: GrnRegisterFilters,
-  opts?: Partial<UseQueryOptions<GrnRegisterResponse>>,
-) {
+/** Export reads the complete authorised filtered population once; no page stitching. */
+function grnRegisterParams(filters: GrnRegisterFilters) {
   const params = new URLSearchParams({ scope: "grn" });
   if (filters.limit) params.set("limit", String(filters.limit));
   if (filters.columns) params.set("columns", filters.columns);
@@ -4743,6 +4741,21 @@ export function useOperationGrnRegister(
   if (filters.to) params.set("to", filters.to);
   if (filters.cancelled) params.set("cancelled", "1");
   if (filters.q.trim()) params.set("q", filters.q.trim());
+  return params;
+}
+export async function fetchGrnRegisterExport(filters: GrnRegisterFilters) {
+  const params = grnRegisterParams(filters);
+  params.set("export", "1");
+  const result = await apiFetch<GrnRegisterResponse>(`/api/operation/warehouse-receipts?${params}`);
+  if (result.receipts.length !== result.page.total) throw new Error("Incomplete register export");
+  return result.receipts;
+}
+
+export function useOperationGrnRegister(
+  filters: GrnRegisterFilters,
+  opts?: Partial<UseQueryOptions<GrnRegisterResponse>>,
+) {
+  const params = grnRegisterParams(filters);
   return useQuery({
     queryKey: qk.operation.grnRegister({
       ...filters,
