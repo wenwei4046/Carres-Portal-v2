@@ -101,8 +101,11 @@ bulk download; it never merges the PDFs. A per-PO PDF action remains. Purchase O
 supports finding/re-downloading selected POs through supplier/date filters using the same capability.
 SO Batch gives immediate access without requiring a second trip to that register.
 
-Supplier's saved channel/contact determines the communication controls. Ohana uses Email; other
-suppliers in this owner scenario use WhatsApp. These facts do not silently overwrite production
+Every supplier supports both Email and WhatsApp in the approved communication target. The panel
+provides a channel selector, initially using the supplier's saved preferred channel, and permits
+switching without restricting either channel by supplier identity. Ohana currently preferring Email
+is an operating example, not an Email-only rule; other suppliers may also use Email. Contact details
+for each channel come from supplier authority. This ruling does not silently overwrite production
 supplier settings. Email panel shows saved recipient, editable prepared subject/message listing
 selected PO numbers/versions, and each independent selected PDF as an attachment. Send Email is
 an approved target; expose it as executable only when the actual email/attachment capability is
