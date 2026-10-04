@@ -39,7 +39,7 @@ import {
 } from "@/lib/queries";
 import BdAccountsPage from "@/pages/bd/BdAccountsPage";
 import BdOrdersBoard from "@/pages/bd/BdOrdersBoard";
-import { triggerLinesInCart, type PwpTriggerLine } from "./pos/pwp-line";
+import { triggerLinesInCart, linePwpClaimGroup, type PwpTriggerLine } from "./pos/pwp-line";
 import { extensionForMime, uploadDataUrl } from "@/lib/storage";
 import {
   type WizardDraft,
@@ -226,14 +226,20 @@ export default function DealerPos({
   // agreement) + it is threaded onto each `attrs.pwp.claimGroup`. Minted LAZILY
   // (review MINOR) on first read via getClaimGroup() — so a dormant / non-PWP cart
   // never runs crypto.randomUUID(); reset on startAnotherOrder / discardDraft so a
-  // new cart gets a fresh group. Stored in a ref (no re-render) — the CartDrawer
+  // new cart gets a fresh group. Restored from persisted voucher lines or the wizard session after refresh;
+  // otherwise minted lazily. Stored in a ref (no re-render) — the CartDrawer
   // reads it when a voucher is bound; the same value is on the bound lines' attrs
   // already at submit, so handleSubmit doesn't need to re-stamp it. */
   const claimGroupRef = useRef<string>("");
   const getClaimGroup = useCallback((): string => {
-    if (!claimGroupRef.current) claimGroupRef.current = newClaimGroup();
+    if (!claimGroupRef.current) {
+      claimGroupRef.current =
+        draft.lines.map(linePwpClaimGroup).find((group) => group !== null) ??
+        draft.wizardSessionId ??
+        newClaimGroup();
+    }
     return claimGroupRef.current;
-  }, []);
+  }, [draft.lines, draft.wizardSessionId]);
 
   // Trap the browser Back button inside the POS flow: on the Customer (2) or
   // Confirm (3) step, Back returns to the Catalog (step 1) instead of leaving
@@ -637,11 +643,11 @@ export default function DealerPos({
           : err instanceof Error
             ? err.message
             : "Could not create the rental agreement";
-      // Say what DID happen — a half-finished run must not look like nothing
-      // happened, or the store re-submits and double-signs the customer.
+      // Keep the completed references visible; the persisted per-unit request keys
+      // make a retry recover completed agreements before creating the remainder.
       setSubmitError(
         done.length > 0
-          ? `${done.map((d) => d.agreementNo).join(", ")} created, then it failed: ${msg}. Do NOT retry the whole cart. Check Admin → Rental first.`
+          ? `${done.map((d) => d.agreementNo).join(", ")} created, then it failed: ${msg}. Try again.`
           : msg,
       );
     } finally {
