@@ -1,7 +1,7 @@
 /** Receiving adapter for the shared module card. Full GRN owns edits and PDF. */
 import { useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { documentDisplayNumber, receivingDisplayNo, receivingExtraQty, warehouseReceiptTotals } from "@carres/shared";
+import { documentDisplayNumber, receivingDisplayNo, receivingExtraQty, warehouseReceiptTotals, SUPPLIER_CLAIM_NOT_ISSUED } from "@carres/shared";
 import CompactModuleCard from "@/components/kit/CompactModuleCard";
 import Panel from "@/components/kit/Panel";
 import Button from "@/components/kit/Button";
@@ -47,6 +47,10 @@ export default function ReceivingCompactView({ row, items, onOpen, onClose }: {
       <div className="flex flex-col gap-2 text-body">
         {receipt.po_id && <Link className="text-kit-blue-9 underline" to={`/operation/procurement?po=${encodeURIComponent(receipt.po_id)}`}>{documentDisplayNumber(receipt.po_id)}</Link>}
         {(row.source_refs ?? []).map(ref => <span key={ref}>{documentDisplayNumber(ref)}</span>)}
+        {detail?.related_records ? <>
+          {detail.related_records.claims.map(claim => <Link key={claim.id} className="text-kit-blue-9 underline" to={`/operation?tab=claims&claim=${encodeURIComponent(claim.id)}`}>{claim.claim_no ? documentDisplayNumber(claim.claim_no) : SUPPLIER_CLAIM_NOT_ISSUED}</Link>)}
+          {detail.related_records.returns.map(record => <Link key={record.id} className="text-kit-blue-9 underline" to={`/operation?tab=purchase-returns&pr=${encodeURIComponent(record.id)}`}>{documentDisplayNumber(record.pr_no)}</Link>)}
+        </> : <div role="status">{detail || query.isError ? "Unavailable" : "Loading…"}{detail && <Button onClick={() => void query.refetch()}>Try again</Button>}</div>}
         <Button onClick={onOpen}>Open full page</Button>
       </div>
     </Panel>

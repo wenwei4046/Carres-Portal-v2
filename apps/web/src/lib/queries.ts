@@ -4546,6 +4546,8 @@ export function useReceivingDuty(
 /** GET /api/operation/warehouse-receipts/:id — one Receiving Session / GRN
  *  record: the row, its per-Unit results, its source PO and its events. */
 export interface ReceivingSessionDetail {
+  /** null/absent means unavailable, not an empty relationship list. */
+  related_records?: { claims: Array<{ id: string; claim_no: string | null }>; returns: Array<{ id: string; pr_no: string }> } | null;
   receipt: WarehouseReceiptQueueRow & {
     unit_results: Array<{
       stock_item_id: string;

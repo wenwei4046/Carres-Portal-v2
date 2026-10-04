@@ -63,6 +63,22 @@ describe("Receiving shared working panel", () => {
     expect(screen.getAllByText("Loading…").length).toBeGreaterThan(0);
     expect(screen.queryByText("Not recorded")).not.toBeInTheDocument();
   });
+  it("links only returned related identities and retains stored IDs in the destinations", () => {
+    state.data = { receipt: { ...row, unit_results: [] }, events: [], po: null,
+      related_records: { claims: [{ id: "claim-exact", claim_no: "SC-20261004-0001" }], returns: [{ id: "return-exact", pr_no: "PR-20261004-0002" }] } };
+    mount();
+    fireEvent.click(screen.getByRole("button", { name: "Receipt details" }));
+    expect(screen.getByRole("link", { name: "SC-261004-0001" })).toHaveAttribute("href", "/operation?tab=claims&claim=claim-exact");
+    expect(screen.getByRole("link", { name: "PR-261004-0002" })).toHaveAttribute("href", "/operation?tab=purchase-returns&pr=return-exact");
+  });
+  it("shows unavailable and retry when relationships fail instead of pretending none exist", () => {
+    state.data = { receipt: { ...row, unit_results: [] }, events: [], po: null, related_records: null };
+    mount();
+    fireEvent.click(screen.getByRole("button", { name: "Receipt details" }));
+    expect(screen.getByText("Unavailable")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    expect(state.retry).toHaveBeenCalledOnce();
+  });
   it("offers retry when details cannot be read", () => {
     state.error = true;
     mount();

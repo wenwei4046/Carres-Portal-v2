@@ -1158,6 +1158,35 @@ warehouseReceiptsRouter.get("/:id", requireOperation, async (c) => {
   if (!row) return c.json({ error: "receipt not found" }, 404);
   const r = row as ReceiptRow;
 
+  // Related documents are read through this actor's RLS scope and exact source IDs.
+  // A failed relationship read is unavailable, never a false empty result.
+  const relatedRead = (async () => {
+    const all = async <T>(page: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown }>) => {
+      const rows: T[] = [];
+      for (let from = 0; ; from += 200) {
+        const result = await page(from, from + 199);
+        if (result.error) throw result.error;
+        rows.push(...(result.data ?? []));
+        if ((result.data ?? []).length < 200) return rows;
+      }
+    };
+    try {
+      const claims = await all<{ id: string; claim_no: string | null }>((from, to) => sb
+        .from("supplier_claims").select("id, claim_no")
+        .eq("warehouse_receipt_id", id).order("id").range(from, to));
+      const returns = await all<{ id: string; pr_no: string }>((from, to) => sb
+        .from("purchase_returns").select("id, pr_no")
+        .eq("warehouse_receipt_id", id).order("id").range(from, to));
+      for (let offset = 0; offset < claims.length; offset += 100) {
+        returns.push(...await all<{ id: string; pr_no: string }>((from, to) => sb
+          .from("purchase_returns").select("id, pr_no")
+          .in("supplier_claim_id", claims.slice(offset, offset + 100).map(claim => claim.id))
+          .order("id").range(from, to)));
+      }
+      return { claims, returns: [...new Map(returns.map(record => [record.id, record])).values()] };
+    } catch { return null; }
+  })();
+
   const [unitsRead, eventsRead, poRead] = await Promise.all([
     sb
       .from("receiving_unit_results")
@@ -1352,6 +1381,7 @@ warehouseReceiptsRouter.get("/:id", requireOperation, async (c) => {
       arrival_evidence_files: arrivalEvidence,
       unit_results: unitResults,
     },
+    related_records: await relatedRead,
     line_info: lineInfo,
     po: po ?? null,
     events: ((evs ?? []) as Array<Record<string, unknown>>).map((e) => ({

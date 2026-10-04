@@ -902,6 +902,59 @@ describe("GET /:id — one Receiving Session / GRN record", () => {
     void_reason: null,
   };
 
+  it("reads exact receipt-linked claims and direct or claim-linked returns without duplicates", async () => {
+    const sb = makeSb({ ...detailTables(),
+      supplier_claims: { list: { data: [{ id: "claim-1", claim_no: "SC-202610-001" }], error: null } },
+      purchase_returns: { list: { data: [{ id: "return-1", pr_no: "PR-202610-001" }], error: null } },
+    });
+    const reads: Array<{ table: string; method: string; args: unknown[] }> = [];
+    const from = sb.from.bind(sb);
+    sb.from = (table: string) => {
+      const builder = from(table);
+      for (const method of ["eq", "in"]) {
+        const original = builder[method] as (...args: unknown[]) => unknown;
+        builder[method] = (...args: unknown[]) => { reads.push({ table, method, args }); return original(...args); };
+      }
+      return builder;
+    };
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const res = await req(`/api/operation/warehouse-receipts/${RECEIPT}`, "GET", await makeJwt("operation"));
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as { related_records: unknown }).related_records).toEqual({ claims: [{ id: "claim-1", claim_no: "SC-202610-001" }], returns: [{ id: "return-1", pr_no: "PR-202610-001" }] });
+    expect(reads).toEqual(expect.arrayContaining([
+      { table: "supplier_claims", method: "eq", args: ["warehouse_receipt_id", RECEIPT] },
+      { table: "purchase_returns", method: "eq", args: ["warehouse_receipt_id", RECEIPT] },
+      { table: "purchase_returns", method: "in", args: ["supplier_claim_id", ["claim-1"]] },
+    ]));
+    expect(reads.filter(read => ["supplier_claims", "purchase_returns"].includes(read.table)).some(read => read.args[0] === "po_id")).toBe(false);
+  });
+
+  it("reads receipt relationships beyond the database page boundary", async () => {
+    const claims = Array.from({ length: 201 }, (_, n) => ({ id: `claim-${n}`, claim_no: null }));
+    const sb = makeSb(detailTables());
+    const from = sb.from.bind(sb);
+    sb.from = (table: string) => {
+      const builder = from(table);
+      if (table === "supplier_claims") builder.range = vi.fn((start: number, end: number) => Promise.resolve({ data: claims.slice(start, end + 1), error: null }));
+      return builder;
+    };
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const res = await req(`/api/operation/warehouse-receipts/${RECEIPT}`, "GET", await makeJwt("operation"));
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as { related_records: { claims: unknown[] } }).related_records.claims).toEqual(claims);
+  });
+
+  it("preserves the receipt but marks failed relationship reads unavailable", async () => {
+    vi.mocked(userClient).mockReturnValue(makeSb({ ...detailTables(),
+      supplier_claims: { list: { data: null, error: { code: "42501", message: "refused" } } },
+    }) as never);
+    const res = await req(`/api/operation/warehouse-receipts/${RECEIPT}`, "GET", await makeJwt("operation"));
+    expect(res.status).toBe(200);
+    const body = await res.json() as { receipt: { id: string }; related_records: unknown };
+    expect(body.receipt.id).toBe(RECEIPT);
+    expect(body.related_records).toBeNull();
+  });
+
   function detailTables() {
     return {
       warehouse_receipts: { single: { data: DETAIL_ROW, error: null } },

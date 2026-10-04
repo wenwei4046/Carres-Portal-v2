@@ -546,8 +546,16 @@ The list remains mounted. Refreshed quantities and goods use the same receipt pa
 results without a source-line identity remain unavailable rather than being joined by SKU.
 The live `GRN-260904-0210` panel retained its Cancelled indicator; ordinary GRNs gain no
 Completed/Valid badge. No receipt, stock or supplier action was submitted during these checks.
-Related-record coverage currently includes the PO and recorded source references; Claim/Return
-handling links and the Receiving Differences view are not delivered by this panel slice.
+Related-record PO and recorded source references are production verified. Claim/Return links
+are now implemented, awaiting delivery: the existing authenticated receipt detail reader loads
+all claims by exact `warehouse_receipt_id`, direct receipt-linked returns and returns linked
+through those claims, deduplicated by return identity. Reads use the actor's existing RLS scope;
+no new permission or write door. The shared Working Panel links each returned identity to its
+existing owning object. Failed reads show Unavailable/retry, never a false empty list.
+The Receiving Differences view remains undelivered. Local validation passed 64 receipt API tests
+(including 201 related records, exact receipt/claim scopes, deduplication and failure preservation),
+83 Receiving panel/register tests, both type checks and design checks. This is branch evidence,
+not production acceptance; carry this reader into the approved two-view/Differences delivery.
 
 The two-view rail remains undelivered. Complete server-side column filtering and sorting are
 **PRODUCTION VERIFIED, 2026-10-05** through the shared `DataGrid serverColumns` contract and
