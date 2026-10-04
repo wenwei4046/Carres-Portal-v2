@@ -1190,6 +1190,23 @@ warehouseReceiptsRouter.get("/:id/history/:eventId/evidence", requireOperation, 
   return c.json({url:signed.data.signedUrl});
 });
 
+warehouseReceiptsRouter.post("/:id/extra-custody/:custodyId/notes", requireOperation, async (c) => {
+  const ids = z.object({ id: z.string().uuid(), custodyId: z.string().uuid() }).safeParse(c.req.param());
+  if (!ids.success) return c.json({ message: "Invalid Receiving" }, 422);
+  const input = await parseJsonBody(c, z.object({ note: z.string().trim().min(1).max(2000), key: z.string().uuid() }).strict());
+  if (!input.ok) return c.json(input.body, input.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const scope = await sb.from("receiving_extra_custody").select("id")
+    .eq("id", ids.data.custodyId).eq("receipt_id", ids.data.id).maybeSingle();
+  if (scope.error) { const mapped = mapPgError(scope.error); return c.json(mapped.body, mapped.status); }
+  if (!scope.data) return c.json({ message: "Custody record not found" }, 404);
+  const result = await sb.rpc("receiving_extra_custody_note", {
+    p_custody_id: ids.data.custodyId, p_note: input.data.note, p_key: input.data.key,
+  });
+  if (result.error) { const mapped = mapPgError(result.error); return c.json(mapped.body, mapped.status); }
+  return c.json(result.data);
+});
+
 // Custody survives receipt correction/void: return the original observation and
 // the current parent state together; never infer stock availability from either.
 warehouseReceiptsRouter.get("/:id/extra-custody", requireOperation, async (c) => {
@@ -1210,7 +1227,13 @@ warehouseReceiptsRouter.get("/:id/extra-custody", requireOperation, async (c) =>
   const sites = siteIds.length ? await readAllPages<{ id: string; name: string }>((from, to) => sb
     .from("warehouses").select("id,name").in("id", siteIds).order("id").range(from, to)) : { rows: [] };
   if (!("rows" in sites)) return c.json({ message: "Custody locations could not be read completely" }, 503);
-  return c.json({ receipt, custody: result.rows, siteNames: Object.fromEntries(sites.rows.map(site => [site.id, site.name])) });
+  const custodyIds = result.rows.map(row => row.id as string);
+  const notes = custodyIds.length ? await readAllPages<Record<string, unknown>>((from, to) => sb
+    .from("receiving_extra_custody_notes").select("id,custody_id,note,actor_id,recorded_at")
+    .in("custody_id", custodyIds).order("recorded_at").order("id").range(from, to)) : { rows: [] };
+  if (!("rows" in notes)) return c.json({ message: "Custody notes could not be read completely" }, 503);
+  return c.json({ receipt, custody: result.rows, notes: notes.rows,
+    siteNames: Object.fromEntries(sites.rows.map(site => [site.id, site.name])) });
 });
 
 warehouseReceiptsRouter.get("/:id", requireOperation, async (c) => {

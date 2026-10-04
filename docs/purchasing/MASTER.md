@@ -1026,6 +1026,17 @@ in chat and the isolated local database, not in `supabase/migrations/`. The hist
 seven failures (0149, 0317, 0339, 0398a, 0453, 0561, 0588); the relevant original receipt bodies
 were reconciled to production before drafting, not a clean whole-chain replay.
 
+**Extra-goods investigation notes — LOCAL CANDIDATE / NOT DEPLOYED, 2026-10-05.**
+The candidate provides append-only Operation investigation evidence on an exact custody record.
+It records actual individual actor/time and a caller save key; an identical retry returns the same
+note, while changed evidence under the same key is refused. Warehouse cannot write these notes;
+the note read policy is Operation-only, keeping supplier/commercial investigation outside Warehouse
+access. An Operation API checks the exact receipt/custody pair, rejects disposition fields and calls
+the guarded writer with the user's JWT. The custody reader includes complete bounded note history;
+a failed history read fails explicitly. Saving a note changes no custody quantity, Stock, PO, Claim,
+acceptance or return result. No supplier message is sent. The UI note editor and formal resolution
+journey remain unfinished. SQL is retained in the chat-only draft and disposable local database.
+
 **Missed-arrival Work ownership — DEPLOYED, BOUNDED LIVE ACCEPTANCE, 2026-10-05.**
 A supplier date without a physical report no longer creates Receiving Check in work. The existing
 Purchasing supplier-date-passed action owns that follow-up under PO Duty and opens the exact PO.

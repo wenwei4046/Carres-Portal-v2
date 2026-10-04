@@ -167,6 +167,34 @@ describe.skipIf(!databaseUrl)("authorised Warehouse final receipt (approved targ
       .toEqual([{ id: custody[0]!.id, reported_qty: 2 }]);
   });
 
+  it("records Operation source-investigation notes once without resolving physical custody", async () => {
+    const result = await confirm(report({ extra_lines: [{ sku: `${sku}-EXTRA`, qty: 2 }] }));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const saved = await receipt(result.result.id);
+    const custody = (await q("select id from receiving_extra_custody where receipt_id=$1", [saved.id])).rows[0]!;
+    const noteSql = "select receiving_extra_custody_note($1,$2,$3) as result";
+    const noteArgs = [custody.id, "Supplier checking original order reference", uid("901")];
+    await as(person);
+    expect((await request(noteSql, noteArgs)).ok).toBe(false);
+    await q("reset role");
+    await q("update app_users set role='operation',warehouse_id=null where id=$1", [person]);
+    await as(person);
+    const first = await request(noteSql, noteArgs);
+    expect(first.ok).toBe(true);
+    const retry = await request(noteSql, noteArgs);
+    expect(retry).toEqual(first);
+    expect((await request(noteSql, [custody.id, "Different evidence", uid("901")])).ok).toBe(false);
+    expect((await request(noteSql, [custody.id, " ", uid("902")])).ok).toBe(false);
+    expect((await q("select note,actor_id from receiving_extra_custody_notes where custody_id=$1", [custody.id])).rows)
+      .toEqual([{ note: noteArgs[1], actor_id: person }]);
+    expect((await q("select reported_qty from receiving_extra_custody where id=$1", [custody.id])).rows[0]!.reported_qty).toBe(2);
+    await q("reset role");
+    await q("update app_users set role='warehouse',warehouse_id=$2 where id=$1", [person,site]);
+    await as(person);
+    expect((await q("select id from receiving_extra_custody_notes where custody_id=$1", [custody.id])).rows).toEqual([]);
+  });
+
   it("pages more than 200 reports at a tied timestamp without hiding old blockers or another Site", async () => {
     await q("reset role");
     await q("insert into warehouse_receipts(warehouse_id,submitted_from,status,submitted_by,lines,goods_received_at,save_key,raw_report,submitted_at,validation_blockers) select $1,'warehouse','draft',$2,'[]'::jsonb,null,gen_random_uuid(),'{}'::jsonb,'2026-10-01T00:00:00Z'::timestamptz,'[{\"code\":\"receipt_evidence_not_available\"}]'::jsonb from generate_series(1,205)", [site,person]);

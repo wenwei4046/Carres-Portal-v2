@@ -1915,7 +1915,7 @@ describe("extra-goods custody evidence", () => {
     const response = await read({ warehouse_receipts: { single: { data: parent, error: null } },
       receiving_extra_custody: { list: { data: [observation], error: null } } });
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ receipt: parent, custody: [observation], siteNames: {} });
+    expect(await response.json()).toEqual({ receipt: parent, custody: [observation], notes: [], siteNames: {} });
   });
   it("does not expose custody when the parent is inaccessible", async () => {
     expect((await read({})).status).toBe(404);
@@ -1927,5 +1927,29 @@ describe("extra-goods custody evidence", () => {
   });
   it("Warehouse cannot enter the Operation investigation door", async () => {
     expect((await read({}, "warehouse")).status).toBe(403);
+  });
+});
+
+
+describe("extra-goods investigation note", () => {
+  async function save(body: unknown, role="operation", visible=true) {
+    const sb = makeSb({ receiving_extra_custody: { single: { data: visible ? { id: LINE } : null, error: null } } }, { data: { id: "note" } });
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const response = await req(`/api/operation/warehouse-receipts/${RECEIPT}/extra-custody/${LINE}/notes`, "POST", await makeJwt(role), body);
+    return { response, sb };
+  }
+  it("uses the caller's owning note writer with a stable key", async () => {
+    const {response,sb}=await save({note:" Supplier checking source ",key:SAVE_KEY});
+    expect(response.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("receiving_extra_custody_note",{p_custody_id:LINE,p_note:"Supplier checking source",p_key:SAVE_KEY});
+  });
+  it.each([{note:"",key:SAVE_KEY},{note:"Check",key:"wrong"},{note:"Check",key:SAVE_KEY,status:"accepted"}])("refuses malformed or disposition payload %j",async body=>{
+    const {response,sb}=await save(body);expect(response.status).toBe(422);expect(sb.rpc).not.toHaveBeenCalled();
+  });
+  it("refuses Warehouse and inaccessible receipt/custody pairs",async()=>{
+    for(const [role,visible,status] of [["warehouse",true,403],["operation",false,404]] as const){
+      const {response,sb}=await save({note:"Check",key:SAVE_KEY},role,visible);
+      expect(response.status).toBe(status);expect(sb.rpc).not.toHaveBeenCalled();
+    }
   });
 });
