@@ -718,6 +718,11 @@ Operations Superuser) is overwritten by this ruling for posting; 0601 widens it 
 staff and the principal. Amend and Void Receiving keep the GRN Duty authority.
 
 **WAREHOUSE FINAL CONFIRMATION — OWNER-APPROVED TARGET / NOT BUILT, Jess 2026-10-04.**
+Operation checks missing arrivals and handles every supplier interaction: ETA, shortages,
+damage, wrong goods and claim/return arrangements. Warehouse receives, checks, confirms and
+reports physical facts/evidence; it does not chase suppliers. Display in Warehouse Inbound or
+the shared Calendar does not transfer supplier follow-up responsibility to Warehouse.
+
 An individually authenticated Warehouse operator authorised for the source and actual Site may
 confirm final physical receipt through the one Receiving engine. Valid source, identities,
 quantities, condition, Site and required evidence cause automatic receipt posting and GRN creation;

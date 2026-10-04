@@ -1690,6 +1690,14 @@ The Claim preserves the receipt/source, affected quantity and evidence without r
 order waiting for these goods does not by itself require a customer Service Case.
 
 **WAREHOUSE-CONFIRMED RECEIPT — OWNER-APPROVED TARGET / NOT BUILT, Jess 2026-10-04.**
+**Supplier follow-up ownership — owner clarification, same date.** Operation checks missing
+arrivals, chases supplier ETA and handles all supplier communication, including shortages, damage,
+wrong goods and claim/return arrangements. Warehouse performs physical receiving, checks and
+records actual goods/evidence and reports differences; it never chases or negotiates with suppliers.
+Warehouse / Inbound / Calendar placement identifies the arrival data surface, not the person
+responsible for supplier follow-up. Operation can inspect those same arrival facts and follows up
+through the owning PO/Claim record and its Operation action.
+
 Office direct receiving and authorised Warehouse confirmation are entry doors to one Receiving
 Session and one posting engine. An individually authenticated Warehouse operator (NETS today),
 authorised for the source and actual receiving Site, confirms the physical quantities, Unit
@@ -4264,8 +4272,11 @@ Invalid scope → preserve report and show blocker; no false GRN or Inventory po
   The existing supplier-date check remains a dated monitoring fact, never evidence of arrival:
   only a current sent PO with goods still owed qualifies; outstanding quantity alone does not
   create an action. `Supplier date passed · nothing received yet` must not become `Goods arrived`.
-  PO owns supplier promises and follow-up; Inbound owns the arrival calendar. My Work / Team Work
-  project these owning facts and close from their real outcomes, not manual Done or a second receipt.
+  Operation owns checking missing arrivals and all supplier follow-up; PO owns supplier promises
+  and Claim owns supplier issue handling. Inbound supplies arrival/calendar facts, never an
+  assignment for Warehouse to chase the supplier. My Work / Team Work project the Operation-owned
+  follow-up and Warehouse-owned physical receipt separately and close from their real outcomes,
+  not manual Done or a second receipt.
 - **`Settings → Staff & Duties`** is the ONE assignment surface: the resolution today
   (holder / `{cover} covering for {holder}` / `Nobody holds GRN Duty.`), effective-dated
   assignment, dated cover, immutable history; the manager gate mirrors the SQL door and the page

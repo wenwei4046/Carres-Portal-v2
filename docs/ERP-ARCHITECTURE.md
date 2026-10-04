@@ -85,7 +85,10 @@ The authorised, individually identified Warehouse operator confirms the actual r
 permitted Site/source. Receiving validates source, identities, quantities, condition and required
 evidence, posts once and automatically creates the GRN; Stock projects the accepted consequences
 with its existing holds, reservations and eligibility rules. Operation retains direct receiving
-and handles differences; normal Warehouse receipts need no second Operation approval. Invalid
+and handles differences; normal Warehouse receipts need no second Operation approval. Operation
+also checks missing arrivals and owns all supplier communication and follow-up. Warehouse only
+performs physical receipt/checks and reports evidence/differences; it never chases suppliers.
+Inbound/Calendar placement does not transfer that responsibility. Invalid
 scope remains an unposted report; supplier declarations alone never create stock. Warehouse gets
 no direct Inventory writer, amendment/void, adjustment approval or Finance authority. The complete
 receipt contract is Purchasing §7.3, mirrored by Stock §7. Approval is business target truth, not
