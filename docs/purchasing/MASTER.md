@@ -518,7 +518,7 @@ Related-record coverage currently includes the PO and recorded source references
 handling links and the Receiving Differences view are not delivered by this panel slice.
 
 The two-view rail remains undelivered. Complete server-side column filtering and sorting are
-**MERGED #1899 (`efa77a362`) / NOT PRODUCTION VERIFIED**, after exact-head full CI
+**DEPLOYED #1899 (`efa77a362`) / INTERACTIVE ACCEPTANCE INCOMPLETE**, after exact-head full CI
 `37214055018` passed on `19c69591b`, through the shared `DataGrid serverColumns`
 contract and the existing authorised GRN reader. Filterable supplier, document, source, item,
 location, date and quantity facts are resolved before the page slice. Unit details and signed
@@ -532,7 +532,7 @@ rows loaded, then restored all 61 on Clear. After merging current main, 106 Rece
 Sales Order/SO Batch regressions passed. Production deployment `37215036695` failed before publishing: a Manual Purchase test compared
 its wall-clock Settings result with fixed requested dates, which coincided after MYT midnight.
 The test-only repair fixes its PO clock and preserves the date-ownership assertions; all 95 tests
-in that file passed locally. A covering production deployment and live filter acceptance remain owed. Full-result export and the two-view rail remain unfinished.
+in that file passed locally. Covering deployment `37216102072` succeeded at `719653ea0`; all five canonical surfaces converged. Live Receiving exposed complete supplier choices, but at 545px the shared filter menu opened beyond the right edge (left 534px/right 724px). Interactive acceptance therefore remains incomplete until the central UI correction ships. Full-result export and the two-view rail remain unfinished.
 
 **Table/Cards and shared Page tools — BUILT ON BRANCH / NOT PRODUCTION VERIFIED, 2026-10-05.**
 Receiving reuses the existing segmented Table/Cards control, shared DataGrid Page tools and
@@ -543,7 +543,7 @@ the complete authorised filtered population. Open full page retains the register
 Columns and Export use the shared Page tools menu; Cards introduces no second receipt editor.
 Party/receiver facts awaiting a detail read show Loading or Unavailable, never false absence.
 81 local Receiving/card journey tests passed, including filter preservation across presentations
-and keyboard access to Page tools. Full CI and live acceptance are owed. This does not deliver
+and keyboard access to Page tools. The central filter correction anchors to its button, clamps to the viewport and returns focus on Escape. A 366px preview measured the menu at 158–358px; selecting Supplier B found record 61 and Clear restored all 61. The complete register plus Receiving/card targeted run passed 171 tests. Full exact-head CI and live acceptance are owed. This does not deliver
 the Receiving Differences view or Warehouse automatic posting.
 
 **Read-only production evidence, 2026-10-04:** `warehouse_submit_receipt` still files a report;
