@@ -34,11 +34,12 @@ function readEmailAttempts(key: string): EmailAttempt[] {
 }
 
 /** Same issued POs, grouped for supplier preparation and human-triggered dispatch. */
-export default function PoSupplierBundle({ pos, onPreview, roundWindow, onEvidenceChanged }: {
+export default function PoSupplierBundle({ pos, onPreview, roundWindow, onEvidenceChanged, onOpenObject }: {
   pos: readonly IssuedPo[];
   roundWindow?: string;
   onPreview: (id: string, po: IssuedPo) => void;
   onEvidenceChanged?: () => void;
+  onOpenObject?: (id: string) => void;
 }) {
   const userId = useAuth(state => state.user?.id ?? "unidentified");
   const attemptsKey = `carres-po-email-attempts:${userId}`;
@@ -261,7 +262,8 @@ export default function PoSupplierBundle({ pos, onPreview, roundWindow, onEviden
           disabled={busy} checked={selected.has(po.id)} onCheckedChange={checked => {
             setSelected(previous => { const next = new Set(previous); if (checked) next.add(po.id); else next.delete(po.id); return next; }); setCopied(false);
           }} />
-        <Button variant="neutral" size="sm" onClick={() => onPreview(po.id, po)}>Open PDF</Button>
+        <div className="flex items-center gap-2"><Button variant="neutral" size="sm" onClick={() => onPreview(po.id, po)}>Open PDF</Button>
+        {onOpenObject && <Button variant="neutral" size="sm" onClick={() => onOpenObject(po.id)}>Open full page</Button>}</div>
         </div>
         <p className="text-body">{documents[po.id]?.destination?.name ?? po.destination}</p>
         {documents[po.id]?.so_refs?.length ? <p className="text-meta text-kit-slate-11">SO {documents[po.id].so_refs!.join(", ")}</p> : null}

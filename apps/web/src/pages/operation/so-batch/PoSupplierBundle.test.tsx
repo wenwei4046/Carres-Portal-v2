@@ -78,6 +78,16 @@ describe("issued supplier bundle", () => {
     fireEvent.click(screen.getByRole("button", { name: "Copy message" }));
     await waitFor(() => expect(copy).toHaveBeenCalledWith("Please confirm delivery.\n\nPO-001 · V1"));
   });
+  it("opens the exact formal PO object independently of PDF review", async () => {
+    const open = vi.fn();
+    const preview = vi.fn();
+    render(<PoSupplierBundle pos={pos} onPreview={preview} onOpenObject={open} />);
+    await ready();
+    fireEvent.click(screen.getAllByRole("button", { name: "Open full page" })[1]);
+    expect(open).toHaveBeenCalledWith("PO-002");
+    expect(preview).not.toHaveBeenCalled();
+    expect(api.mock.calls.every(call => call.length === 1)).toBe(true);
+  });
   it("opens the selected independent PO preview", async () => {
     const open = vi.fn();
     render(<PoSupplierBundle pos={pos} onPreview={open} />);
