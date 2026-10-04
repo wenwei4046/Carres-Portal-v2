@@ -7,6 +7,7 @@
  * The Delivery editors below are MODULE content passed into the card; another
  * module passes its own facts and editors.
  */
+// design-standard: not-a-list-page — a /ui component sample; its table is the card's item list.
 import { useState } from "react";
 import CompactModuleCard, { CardEditorButtons, compactCardStyles as s, type CardTimelineEvent } from "@/components/kit/CompactModuleCard";
 import Button from "@/components/kit/Button";
