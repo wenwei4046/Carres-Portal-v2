@@ -1190,6 +1190,25 @@ warehouseReceiptsRouter.get("/:id/history/:eventId/evidence", requireOperation, 
   return c.json({url:signed.data.signedUrl});
 });
 
+// Custody survives receipt correction/void: return the original observation and
+// the current parent state together; never infer stock availability from either.
+warehouseReceiptsRouter.get("/:id/extra-custody", requireOperation, async (c) => {
+  const id = z.string().uuid().safeParse(c.req.param("id"));
+  if (!id.success) return c.json({ message: "Invalid Receiving" }, 422);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data: receipt, error } = await sb.from("warehouse_receipts")
+    .select("id,status,grn_no,extra_lines,actual_site_id,warehouse_id")
+    .eq("id", id.data).maybeSingle();
+  if (error) { const mapped = mapPgError(error); return c.json(mapped.body, mapped.status); }
+  if (!receipt) return c.json({ error: "receipt not found" }, 404);
+  const result = await readAllPages<Record<string, unknown>>((from, to) => sb
+    .from("receiving_extra_custody")
+    .select("id,receipt_id,extra_ordinal,reported_sku,reported_qty,reported_note,actual_site_id,holder_party_id,recorded_by,recorded_at,goods_received_at")
+    .eq("receipt_id", id.data).order("extra_ordinal").order("id").range(from, to));
+  if (!("rows" in result)) return c.json({ message: "Custody records could not be read completely" }, 503);
+  return c.json({ receipt, custody: result.rows });
+});
+
 warehouseReceiptsRouter.get("/:id", requireOperation, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
   const id = c.req.param("id");

@@ -1901,3 +1901,31 @@ describe("Operation original report labels",()=>{
     expect(body.events[0]?.unit_labels).toEqual({[LINE]:"U1-000-123"});
   });
 });
+
+
+describe("extra-goods custody evidence", () => {
+  async function read(tables: Record<string, TableCfg>, role = "operation") {
+    vi.mocked(userClient).mockReturnValue(makeSb(tables) as never);
+    return req(`/api/operation/warehouse-receipts/${RECEIPT}/extra-custody`, "GET", await makeJwt(role));
+  }
+  const parent = { id: RECEIPT, status: "voided", grn_no: "GRN-1", extra_lines: [] };
+  const observation = { id: "custody-1", receipt_id: RECEIPT, reported_sku: "UNKNOWN",
+    reported_qty: 2, actual_site_id: SITE, holder_party_id: null };
+  it("retains the custody observation beside a voided/corrected parent without inventing a holder", async () => {
+    const response = await read({ warehouse_receipts: { single: { data: parent, error: null } },
+      receiving_extra_custody: { list: { data: [observation], error: null } } });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ receipt: parent, custody: [observation] });
+  });
+  it("does not expose custody when the parent is inaccessible", async () => {
+    expect((await read({})).status).toBe(404);
+  });
+  it("does not turn custody read failure into an empty list", async () => {
+    const response = await read({ warehouse_receipts: { single: { data: parent, error: null } },
+      receiving_extra_custody: { list: { data: null, error: { message: "unavailable" } } } });
+    expect(response.status).toBe(503);
+  });
+  it("Warehouse cannot enter the Operation investigation door", async () => {
+    expect((await read({}, "warehouse")).status).toBe(403);
+  });
+});

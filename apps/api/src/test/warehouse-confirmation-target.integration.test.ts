@@ -159,6 +159,12 @@ describe.skipIf(!databaseUrl)("authorised Warehouse final receipt (approved targ
     expect((await q("select id from receiving_extra_custody where receipt_id=$1", [saved.id])).rows).toEqual([]);
     await as(group);
     expect((await q("select id from receiving_extra_custody where receipt_id=$1", [saved.id])).rows).toEqual([]);
+    await q("reset role");
+    // Structural persistence check only; production amendment/void doors have
+    // their own business guards and are not bypassed by application code.
+    await q("update warehouse_receipts set extra_lines='[]'::jsonb,status='voided',void_at=now(),void_reason='Local persistence fixture' where id=$1", [saved.id]);
+    expect((await q("select id,reported_qty from receiving_extra_custody where receipt_id=$1", [saved.id])).rows)
+      .toEqual([{ id: custody[0]!.id, reported_qty: 2 }]);
   });
 
   it("pages more than 200 reports at a tied timestamp without hiding old blockers or another Site", async () => {

@@ -999,6 +999,13 @@ The initial custody regression proves capture, Site/actor facts, retry uniquenes
 shared/inactive readers while preserving PO and availability arithmetic. The full 53-case local
 receipt target run passes; all fixture writes roll back. This is bounded local proof, not release
 acceptance or a claim that the extra-goods workflow is complete.
+Operation now has an exact-receipt custody evidence reader through caller RLS. It returns the
+original custody observation beside the current receipt status/extra lines, including a voided
+parent; no known holder is invented from a missing one. Inaccessible parents return not found,
+failed custody reads fail explicitly, and Warehouse cannot enter this Operation investigation door.
+A local structural check proves clearing/voiding the parent does not erase the custody observation;
+it is not a test of the production amendment/void business authorisation. The 53 local transaction
+and 87 Operation receipt-route tests pass together (140). UI and resolution writes remain owed.
 
 Still required before an exact SQL review/release: remaining non-PO downstream lifecycle and
 source-resolution audit, extra-goods custody and authority boundaries, full Warehouse
