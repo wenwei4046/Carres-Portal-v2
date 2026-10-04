@@ -49,9 +49,59 @@ It is a **UI example**. SO-1368 order facts (customer, order date, Sales Locatio
 Total/Paid/Outstanding, the payment at 2026-09-30T08:08:32Z, receipt RC-300926-3735) are the verified
 handoff sample. Stock `1/1 Ready` is a layout sample. Any Customer date or Logistics company saved on
 /ui exists only in that browser tab: **nothing is written to the ERP**, and it is not an order fact.
-`Preview: next save fails` is a /ui control that simulates a failed save. The header ↗ opens the
-existing Sales Order page in a new tab; the card has no PDF preview or download of its own. × closes
-the card. No production page uses the card.
+`Preview: next save fails` is a /ui control that simulates a failed save. The header ↗ opens the existing Sales Order page. × closes the card.
+
+## Real Sales Orders adoption — owner authorised 2026-10-04
+
+The Listing Table/Cards quick view uses `SalesOrderCompactView` and this kit, rather than reference
+HTML/CSS. The SO number lazily opens the Orders endpoint’s current saved-version document through
+`SalesOrderCardDocument` / `PdfPreview`; ↗ opens the full order and its existing deliberate Edit gate.
+The shared Drawer `compact-card` variant supplies focus containment, Escape, background scroll lock
+and return focus with an accessible hidden title; visible identity and Close belong to this card.
+Info and Delivery retain their defaults. Email, Dealer, Proceed Date, payment/receipt/delivery status,
+Items and related documents remain reachable in the collapsed module content. Address keeps Floor,
+Lift and stair carry facts. No sample dates, stock quantities or customer details become live facts.
+Delivery reads the existing Monitor projection for the final receiver; goods exclude services. Missing
+or failed reads stay explicit. Customer date and optional time remain separate from crew ETA.
+Existing Delivery-owned `DeliveryDatesEdit` / `LogisticsDetailsEdit` forms are reused through their
+governed arrangement door, including reason/evidence rules, permission checks and server refusals.
+Their compact action row uses Cancel then Save; failure retains input and exposes its reason.
+DO conditions are read-only and cannot issue or release a document. Timeline uses recorded events,
+full instants and avatar identity without repeating names; its loading/error state stays inside its
+collapsed section. Communication only prepares drafts; attachments remain explicitly preview-only.
+This scoped adoption does not change tokens, phone navigation or Work contacts.
+
+**Reuse and verification boundary (2026-10-04):** `CompactModuleCard` owns card content;
+`Drawer` owns this Register overlay, not the Workspace Working Panel container. Modules provide
+facts, editors, actions and permissions through the kit API; a new missing shared capability returns
+to the shared UI owner rather than being drawn locally. The current contract is the owner-rules
+2026-10-03/04 contract in this file; a production commit is recorded only after release proof.
+SO ↗ continues to `/operation/orders/so/:id`. Its existing `SalesOrderWorkspace` supplies the
+responsive two-pane form/document view and deliberate Edit; successful saves end editing and refresh
+its source facts/revisions, while Back returns to the Register. This release does not change those
+mechanics or claim that one navigation click proves the whole save/return journey. Existing full-page
+contract/document tests passed (105 checks); authenticated navigation, Edit/Cancel, formal preview
+and Back are verified below. A live successful save is not claimed.
+Workspace Working Panel and other modules have not adopted this adapter. Their placement, recorded
+contact channels, domain headers and approved full-page composition remain module-owned; customer/SO
+header assumptions must not be imposed on supplier POs or source-free purchasing objects.
+
+**PRODUCTION VERIFIED — scoped Sales Orders adoption, 2026-10-04.** PR #1871 merged as
+`a9dbb6b8918e9337328eefccebe547ee1d2f4ab6`. CI `37189941545`, Deploy `37190758212` and independent five-surface
+revision verification passed. Sara · Principal used the real Listing Cards entry: Info showed the
+saved money; Delivery showed actual0/1 goods, Not assigned, Date not confirmed and No DO yet.
+Customer form opened and Cancel preserved those facts; DO conditions remained non-interactive.
+The SO number rendered the saved formal document. Info/Delivery were photographed at
+1146/480/440/420/390px with no page overflow. Full-page navigation produced equal752px panes at
+1800px, formal PDF remained visible through Edit/Cancel, and Back restored search1368 and Cards.
+137 targeted card/Register tests and105 existing full-page checks passed before release.
+No live record was changed for a save test; success/failure/Cancel are covered by tests, not claimed
+as a live save. No Print/Download was invoked; physical printing remains unverified.
+The compact Drawer's accessible hidden identity contains no focusable duplicate Close; its visible
+card controls own initial focus and Close. The regression covers initial focus, Escape and return;
+its targeted kit/dialog suite passed23 checks. Source-backed address facts name Floor, No lift/Has
+lift (shared LIFT_OPTIONS) and Items needing stair carry rather than presenting bare numbers or Yes/No.
+A /ui result alone still does not prove a business entry.
 
 ## Differences from the reference page (125 checks: 25 states × 5 widths)
 

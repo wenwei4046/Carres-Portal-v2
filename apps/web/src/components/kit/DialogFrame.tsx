@@ -106,7 +106,7 @@ export default function DialogFrame({
   title: string;
   description?: string;
   headerActions?: ReactNode;
-  variant?: "quick-view";
+  variant?: "quick-view" | "compact-card";
   /** The actions. One `primary` — §3.4 bans two blue actions in one block. */
   footer?: ReactNode;
   /** The `data-kit` value, so a test can tell a modal from a drawer. */
@@ -177,7 +177,7 @@ export default function DialogFrame({
             if (back && document.contains(back)) back.focus();
           }}
         >
-          <header className="flex items-start justify-between gap-4 border-b border-kit-slate-6 px-4 py-3">
+          <header className={variant === "compact-card" ? "sr-only" : "flex items-start justify-between gap-4 border-b border-kit-slate-6 px-4 py-3"}>
             <div className={`flex flex-col gap-1 ${variant === "quick-view" ? "min-w-0 flex-1" : ""}`}>
               <Dialog.Title
                 className={`text-strong text-kit-slate-12 ${variant === "quick-view" ? "truncate" : ""}`}
@@ -189,7 +189,7 @@ export default function DialogFrame({
                 </Dialog.Description>
               )}
             </div>
-            <div className={`flex items-center gap-2 ${variant === "quick-view" ? "shrink-0" : ""}`}>{headerActions}
+            {variant !== "compact-card" && <div className={`flex items-center gap-2 ${variant === "quick-view" ? "shrink-0" : ""}`}>{headerActions}
             <Dialog.Close
               aria-label="Close"
               title="Close"
@@ -197,10 +197,10 @@ export default function DialogFrame({
               className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-control text-kit-slate-11 hover:bg-kit-slate-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9 md:h-8 md:w-8"
             >
               <Icon name="close" size={16} />
-            </Dialog.Close></div>
+            </Dialog.Close></div>}
           </header>
 
-          <div className="flex-1 overflow-y-auto p-4">{children}</div>
+          <div className={variant === "compact-card" ? "flex-1 overflow-y-auto" : "flex-1 overflow-y-auto p-4"}>{children}</div>
 
           {footer && (
             <footer className="flex items-center justify-end gap-2 border-t border-kit-slate-6 px-4 py-3">

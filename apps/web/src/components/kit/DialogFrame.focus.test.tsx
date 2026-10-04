@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import Button from "./Button";
 import DropdownMenu from "./DropdownMenu";
 import Modal from "./Modal";
+import Drawer from "./Drawer";
 
 function MenuDialog() {
  const [open, setOpen] = useState(false);
@@ -22,6 +23,27 @@ describe("dialog focus from a menu", () => {
   screen.getByRole("textbox",{name:"Reason"}).focus();
   fireEvent.click(screen.getByRole("button",{name:"Cancel"}));
   await waitFor(()=>expect(trigger).toHaveFocus());
+  expect(screen.queryByRole("dialog")).toBeNull();
+ });
+});
+
+function CompactDrawer() {
+ const [open, setOpen] = useState(false);
+ return <><Button onClick={()=>setOpen(true)}>View order</Button>
+ <Drawer open={open} onOpenChange={setOpen} title="SO-1368" variant="compact-card">
+  <button onClick={()=>setOpen(false)}>Close panel</button>
+ </Drawer></>;
+}
+describe("compact card focus", () => {
+ it("focuses its visible control without a hidden duplicate Close and returns to the opener", async () => {
+  render(<CompactDrawer />);
+  const opener = screen.getByRole("button", {name:"View order"});
+  opener.focus(); fireEvent.click(opener);
+  expect(await screen.findByRole("dialog", {name:"SO-1368"})).toBeVisible();
+  expect(screen.queryByRole("button", {name:"Close"})).toBeNull();
+  await waitFor(()=>expect(screen.getByRole("button", {name:"Close panel"})).toHaveFocus());
+  fireEvent.keyDown(screen.getByRole("button", {name:"Close panel"}), {key:"Escape"});
+  await waitFor(()=>expect(opener).toHaveFocus());
   expect(screen.queryByRole("dialog")).toBeNull();
  });
 });

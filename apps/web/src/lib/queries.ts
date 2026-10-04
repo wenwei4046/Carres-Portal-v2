@@ -7563,7 +7563,13 @@ export function useSaveDeliveryArrangement(orderId: string | undefined, leg = 0)
         `/api/operation/delivery-arrangements/${orderId}?leg=${leg}`,
         { method: "PUT", body: JSON.stringify(input) },
       ),
-    onSuccess: () => {
+    onSuccess: ({ arrangement }) => {
+      // Publish only the server-returned saved fact before the editor folds.
+      qc.setQueryData<DeliveryArrangementsPayload>(["operation", "delivery-arrangements"], current => current ? {
+        ...current,
+        arrangements: [...current.arrangements.filter(row => row.order_id !== arrangement.order_id || row.leg !== arrangement.leg), arrangement],
+      } : current);
+      if (orderId) void qc.invalidateQueries({ queryKey: qk.operation.orderTimeline(orderId) });
       void qc.invalidateQueries({ queryKey: ["operation", "delivery-arrangements"] });
       void qc.invalidateQueries({ queryKey: ["operation", "delivery-arrangement", orderId ?? ""] });
       void qc.invalidateQueries({ queryKey: ["operation", "orders"] });

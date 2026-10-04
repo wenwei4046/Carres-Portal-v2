@@ -74,6 +74,8 @@ export default function OperationToOrder() {
     },
   });
 
+  // Every scoped response retains the complete rail projection from the same server read.
+  const railData = q.data ?? queryClient.getQueryData<SoBatchPurchaseResponse>([...QUERY_KEY, null]);
   const data = q.data;
 
   const documents = useMemo(() => {
@@ -160,6 +162,16 @@ export default function OperationToOrder() {
             setSearchParams(next, { replace: true });
           },
         } : undefined}
+        roundNavigation={{
+          rounds: railData?.poRounds ?? [],
+          selected: windowParts ? scopeWindow : null,
+          onSelect: key => {
+            const next = new URLSearchParams(searchParams);
+            if (scopeWindow === key) next.delete("window");
+            else next.set("window", key);
+            setSearchParams(next, { replace: true });
+          },
+        }}
         onIssue={setSelections}
       />
     </>
