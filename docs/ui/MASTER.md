@@ -41,7 +41,7 @@ before quoting. Built is not the same as owner-verified on every page.
 | Fact cards | `Block` — the one object card (§4.1) · `Panel` · `StatusPill` · `EmptyState` · `Loading` | `components/kit/*` | LOCKED · built |
 | Orders list / drawer band | `SectionPanel` (cream band) — that surface only, not a general card | `components/SectionPanel.tsx` | Governed by §4.1; not a `Block` duplicate |
 | Dialogs and panels | `Modal` · `Drawer` (incl. quick view) · `Toast` · `PdfPreview` · `SavedEvidenceViewer` | `components/kit/*` | Built |
-| **Compact module card** (shared customer header, module tabs, module summary, editors, items, Communication, Timeline) | **`CompactModuleCard`** — pass the header facts once and each module's own facts, editors and items | `components/kit/CompactModuleCard.tsx` · `/ui#compact-card` · contract `docs/ui-reference/MODULE-CARD-TEMPLATE.md` | Owner rules 2026-10-03/04 (§4.3) · built on branch, parity proven against the owner's reference page · **Sales Orders quick-view production verified (PR #1871; §4.3 evidence)** · palette/font/radius await the token decision |
+| **Compact module card** (shared customer header, module tabs, module summary, editors, items, Communication, Timeline) | **`CompactModuleCard`** — pass the header facts once and each module's own facts, editors and items | `components/kit/CompactModuleCard.tsx` · `/ui#compact-card` · contract `docs/ui-reference/MODULE-CARD-TEMPLATE.md` | Owner rules 2026-10-03/04 (§4.3) · shared component built · **Sales Orders adoption and confirmed corrections production verified 2026-10-05 (PR #1893/#1896/#1897; §4.3 evidence)** · palette/font/radius await the token decision |
 | Work right-panel Communication | `WorkCommunication` — recorded channels only | `pages/operation/work/WorkCommunication.tsx` | Owner ruling 2026-09-17 · built; differs from the compact card's editable `To` (open owner question) |
 | Record history | §5 three-rank grammar 13/12/11 | this MASTER §5 | LOCKED · no shared component; each page draws it |
 
@@ -3603,13 +3603,100 @@ The master contract being documented does not mean every module has migrated or 
 
 ## §4.3 · Compact module card — owner rules 2026-10-03 / 2026-10-04
 
-**OWNER CONFIRMED · SHARED KIT BUILT · INITIAL SALES ORDERS ADOPTION PRODUCTION VERIFIED; AUDIT CORRECTIONS IN BUILD.** Every module card
+**OWNER CONFIRMED · SHARED KIT BUILT · SALES ORDERS ADOPTION AND CONFIRMED AUDIT CORRECTIONS PRODUCTION VERIFIED (2026-10-05).** Every module card
 uses the kit [`CompactModuleCard`](../../apps/web/src/components/kit/CompactModuleCard.tsx) (live on
 `/ui#compact-card` with Info and Delivery). Never copy reference HTML or CSS into a page. The
 complete rules, the sample-data boundary and the deviations from the reference page live in
 [`MODULE-CARD-TEMPLATE.md`](../ui-reference/MODULE-CARD-TEMPLATE.md); the reference page
 `module-card-reference.html` is the proof target of `scripts/compact-card-states.mjs`
 (25 states × 5 widths; reference parity evidence is distinct from business-page acceptance).
+
+**Read the whole confirmed template before reuse.** This section is the shared entry point, not a claim that every Sales Order business workflow or every module has migrated. Read the single linked card contract, then Orders MASTER for full-page Items/Payment and Delivery MASTER for Customer/Logistics/DO business rules. Reuse `CompactModuleCard` and the source-owned adapter; never copy HTML/CSS, substitute sample facts, or assume another module has customer/SO fields. Other module adoption must verify its own source, permissions, states and full-page return path.
+
+**Compact editor field skin and density — confirmed, deployed:** both universal border resets and button resets must exclude `data-kit` controls. The shared field recipe supplies visible 1px borders and 32px controls. Customer fields use two columns above 400px actual card width and one at 400px or below. Logistics crew shares a row; its condo textarea has two natural rows (48px in the accepted empty state), with no long hint. Keep source choice, evidence, ETA, failed-save input and actual business gates. One editor opens at once; Cancel then Save at right.
+
+**Full Sales Order continuation — confirmed, deployed:** Orders MASTER owns the existing full-page layout. Remove only duplicate Quantity/category and Services prose below Items; retain line quantities, amounts and Total payable. Payment links use attachment icon + `Slip`, preserving both source-owned slip doors and the existing layout. Info `Balance due` agrees with the saved PDF; do not change amounts/calculation to match a visual proposal.
+
+### Compact-card measurements — complete source lookup, 2026-10-05
+
+**Scope and authority:** this table describes the existing shared compact card, not every full-page table or the whole kit. CSS px throughout; padding is vertical × horizontal unless otherwise stated. Source is `apps/web/src/components/kit/compact-card.module.css`, plus `DeliveryBrief.tsx`, `field-recipe.ts`, `PdfPreview.tsx` and `DialogFrame.tsx`. These are implementation measurements, not new independently editable token definitions. Canonical tokens remain in01; update source and this lookup together. Do not copy these values into a page-local stylesheet.
+
+**Evidence key:** **Live** means measured on real SO-1368 after production2ce91e2d. **Source** means inspected current final cascade, not a fresh browser measurement. **Pending reference value** means implemented for fidelity but still subject to the existing token decision; recording it does not approve it globally. Natural content decides height; do not reserve four lines or freeze card/editor/section height.
+
+| Element | Current measurement and relationship | Basis |
+|---|---|---|
+| Card container |100% of available width, maximum560px; inline-size container queries | Source; live560/440/416/396/366 |
+| Outer card | Border1px; overflow hidden; natural height | Source |
+| Card radius/font | Outer radius8px; system-ui; base13px/1.4 (18.2px line height); normal weight400 | Pending reference value |
+| Reference control/inner-box radius | Native reference controls4px; summary/editor/menu boxes6px; kit controls retain canonical6px | Pending reference value versus canonical field recipe |
+| General card glyph |16×16px, stroke1.7; contact glyph12×12px; address glyph stroke1.6 | Source; reference glyph decision remains pending |
+| Header | Minimum56px, natural growth; padding6×12px; columns `minmax(0,1fr) auto auto 64px`; gap8px, vertically centred | Source |
+| Identity layout | Text plus24px toggle column; row gap2px, column gap6px; right divider1px and8px inset | Source |
+| Customer name |14px/18px, weight700; wrap long words; title-group gap10px | Source; card font/weight fidelity exception |
+| Order/phone |11px; flex wrapping contact group gap4px; phone icon+number stays one wrapping unit, internal gap4px | Source |
+| Sales chevron |24×32px; lower-right of identity; font12px, chevron11px/1; margin-bottom−7px; no visible label | Source |
+| Address trigger column |38px high,6px right inset,1px right divider; bottom aligned; trigger11px/18px with4px icon/text gap | Source |
+| Target date column |38px high; vertical gap2px, right inset8px/divider1px; date13px, icon gap5px, no wrapping | Source |
+| Countdown | Canonical label11px/500/14px; white on dark Header, no badge fill; existing0×5px inset | Source; visible26d live5Oct |
+| Header Open/Close |32×32px each; text-arrow/×18px; action column64px above460px | Source |
+| Header colours | slate-12 background, white primary/countdown, slate-4 contacts, slate-11 dividers/hover; white2px focus outline with−2px offset | Approved source tokens |
+| Sales-fact disclosure | Padding10×12px; grid1fr/1.55fr/0.75fr; gap12px;1px top rule; label11px, value12px/17px weight500; label/value gap4px | Source |
+| Address disclosure | Padding8×12px; type12px;1px top rule; full-address icon gap6px; building/floor/lift group gap16px, top margin5px; fact internal gap5px | Source |
+| Module navigation | Horizontal inset10px;1px top/bottom rules; tabs12px with8×7px padding; selected underline2px, weight600 | Source |
+| Navigation disclosure icons |32×32px, padding8px; icon16px; active soft background/brand colour | Source |
+| Body | Padding10px; white surface | Source |
+| Summary strip | Equal columns based on actual1/2/3/4 facts, no column gap; border1px, radius6px; bottom margin8px | Source |
+| Summary cell | Padding8px; natural height; right dividers1px except last; title row16px then natural value, gap4px, top/left aligned | Source |
+| Summary type | Title11px/16px; main value12px/18px weight700; optional status11px/16px weight400 with4px top margin; Info value13px above400px | Source |
+| Summary disclosure | Chevron at right of title row; active cell bottom inset accent2px; main value maximum4 lines, never4 reserved rows | Source |
+| Inline editor | Padding10px; soft surface, radius6px, bottom margin8px; natural height | Source |
+| Editor labels/error | Labels11px; reference margin7px top/3px bottom, compact kit labels margin0; error12px/16px with8px top margin | Source; error colour retains existing pending review |
+| Native reference field | Type12px; padding7px, border1px, reference radius4px; default textarea minimum90px | Source, distinct from embedded kit fields |
+| Canonical embedded field recipe | Single line32px, sides8px/radius6px, solid1px slate-5 border; focus blue-9 ring2px; multiline sides8px/top-bottom4px | Source field-recipe; see actual cascade below |
+| Actual Select/DatePicker in card |32px high, padding0×8px, radius6px, solid1px slate-5; Select13px/18px, inherited system-ui | Live Select; DatePicker recipe/source and border live |
+| Actual ETA Input/condo Textarea | `.panel input/textarea` still overrides recipe:12px system-ui, padding7px all sides, radius4px, border1px card-line. ETA32px; condo48px minimum | Live; recorded source-cascade discrepancy, not a canonical token change |
+| Customer grid | Two equal columns, gap8px above400px card width; one column at400px or below; outer form stack gap12px | Source; five widths live |
+| Logistics grid | Driver/vehicle two equal columns, gap12px; outer form stack gap12px; ETA full width; source/proof retained | Source; controls live within bounds |
+| Compact condo textarea | Two rows, minimum48px; grows with content; omit long hint | Source; empty48px live |
+| Editor actions | Cancel then Save, right aligned; gap6px, top margin10px; minimum32px, type12px, padding6×10px | Source; live visible through366px |
+| DO checklist | Single column; one condition per line; grid gap4px vertical/12px horizontal, top margin8px; line internal gap8px; type12px, indicator16px | Source; live read-only conditions |
+| Compact generic items |100% width, fixed layout, separate borders/spacing0; cells6px; header11px/500, body12px; bottom rules1px, none after last row | Source |
+| Generic item column hints | Source first55%, second10%, third38%; these are CSS hints, not additive exact pixel widths (total103%). Do not reuse them as a full-page table-width contract | Source; retained fidelity limitation |
+| Info goods table |100% width, auto table layout; cells7×6px; header11px/500, body13px; first body cell50%; numeric cells right/no-wrap; row rules1px; config11px | Source |
+| Communication/Timeline section | Top rule1px; section padding10px; head padding8×10px, margin−10px sides/top and10px bottom; header/body natural height | Source |
+| Section title |14px, inherited1.4 line height, weight700 | Source; reference fidelity, not global Block title token |
+| Channel select |112×32px; padding4×8px, type12px;1px border, native radius4px | Source |
+| To/Subject row | Label column48px + flexible field, gap8px; row margin8px vertical; label11px; input32px high | Source |
+| Message toolbar | Internal gap8px; margin8px top/4px bottom; menu trigger32×32px | Source |
+| Message input |80px high/minimum, vertically resizable, full width | Source |
+| Template menu |190px wide,4px inset, top36px, right0; border1px/radius6px; shadow0 3px 12px black13%; menu rows8px inset,12px type | Source |
+| Template picker/manager | Picker padding8px/bottom margin8px; manager padding10px/top margin8px;1px border/radius6px; template rows6px vertical, gap8px | Source |
+| Naming dialog | `min(320px,100vw−32px)`; padding12px; border1px/radius8px; backdrop rgb(20,30,40)/25%; actions top margin12px | Source |
+| Attachment evidence | Trigger32×32px/border1px; row gap6px/margin8px vertical; chips11px, padding4×6px, gap6px, native radius4px, wrap within card | Source |
+| Timeline event | Padding8px vertical, gap8px, type12px; subsequent events top rule1px | Source |
+| Actor avatar |28×28px circle;1px border; initial11px/600; actor name accessible, no repeated visible name | Source; live |
+| Event metadata/result | Metadata/time11px, gap8px; title12px; time no-wrap, full instant retained; result12px, top margin2px | Source; live recorded time without MYT |
+| Compact Drawer | No second visible container header; body0 inset with vertical scrolling; card owns visible identity/Close; Drawer owns focus/Escape/backdrop/return | Source |
+| PDF title/action header | Gap8px, bottom margin8px; flexible wrapped title13px/18px weight600; actions shrink0/gap8px; Close uses existing icon-only Button32×32px at viewport≥768px and40×40px below768px (iconOnly overrides small-button height); Button requests14px icon, while the enclosing card SVG cascade is16px | Source, distinct from32px card Header × |
+| PDF zoom/render region | Controls on next row, gap8px/bottom margin8px; PDF pane flexes/scrolls. Paper height depends on actual document and zoom, no card-local fixed height | Source |
+| Full-page continuation | Use existing Block/DocumentTable/TotalsSummary/field recipes in§6.0 and Detailed composition measurements; Slip uses the existing inline link-button with16px attachment icon,6px icon/text gap,13px/18px body text/weight500; not a new input or card | Source; Orders owns business grouping |
+
+**Responsive rules — actual card width, not viewport width:**
+
+| Width condition | Existing change |
+|---|---|
+| Card≤460px | Header inset6×8px, gap5px; columns `minmax(0,1fr) 28px auto 60px`; hide only the address-place word on its icon trigger; order text10px; title gaps2px/6px; sales-fact horizontal inset8px |
+| Card≤420px | Reference arrange split becomes one column; original-date divider becomes bottom rule with8px bottom inset; event metadata wraps; sales-fact columns1fr/1.4fr/0.65fr, gap8px; Info items cells7×3px/type11px |
+| Card≤400px | Four-fact strip becomes2×2; right divider removed from second cell; three-fact Info strip remains three columns; Info value12px/title11px; compact Customer fields one column |
+| Five verified card widths |560/440/416/396/366px; actual dimensions checked. Do not equate them to identical viewport sizes in a Drawer or reference page |
+
+**Recorded field-cascade limitation:** excluding `data-kit` from border/button resets restores Select/DatePicker skin, but the existing `.panel input/select/textarea` rule still overrides font, padding, radius and border colour of native Input/Textarea. Do not claim all fields already use canonical skin unchanged; the actual dimensions above are the current implementation. This documentation commission does not authorise another visual change. Keep this discrepancy visible for a governed source correction rather than silently copying it to another module.
+
+**Surface values still awaiting the existing token decision:** source CSS variables are background#f3f5f7, surface#fff, soft#f0f3f6, ink#202631, muted#596370, line#d8dde5, brand#006ac2, select-line#d5dce6, select-ink#172033, missing#64748b, disabled-fill#e8ebef, info-muted#536175, table-head#f1f3f5, toggle-hover#e7edf4, error#ce2c31. These describe the reference-fidelity block only; the approved dark Header and embedded kit field tokens override it in their own scopes. Do not spread these literals to another page or claim the pending full-card token conversion has been approved.
+
+**Height evidence:** `docs/ui-reference/module-card-measurements.json` records the historical25-state×5-width reference parity run at viewport height900px. Its card/section heights and reference source hash are evidence of that run, not fixed heights for the current card, current business editors or current copy. The real production editor acceptance above records controls and layout; long names, wrapped values, errors/evidence and open sections can increase height. Never recreate a fixed total height from a screenshot.
+
+**Latest confirmed-correction release proof — 2026-10-05:** PR1893 adds compact form density and removes duplicate Items prose; PR1896 corrects the stale Customer build record; PR1897 preserves kit control borders. Final merge `2ce91e2d0ce7b118cfd7bb95c2b8e6974233ad3f` passed full CI37212809683 and deployment37213753695. Independent ERP, POS, both Pages version endpoints and API health matched that SHA. Actual SO-1368 Customer and Logistics controls have solid1px borders; selects/inputs32px, empty condo textarea48px. Actual card widths560/440/416/396/366 were verified: Customer two/two/two/one/one columns, visible fields/actions within bounds. Cancel leaves the saved summaries unchanged. Related shared/form tests cover one editor, save success folding, save failure input retention and source/recorder distinction; no real customer agreement was saved for acceptance. Full-page Items retains quantities1/1/2 and totalRM2,759; paidRM1,380 and balanceRM1,379 remain. Both Slip links have attachment icons. The real PDF renders with its titled toolbar; Close PDF keeps the order and returns focus to the SO number, Close order returns to View. Dark header/countdown, sales facts, address, module summary, Items, Communication and Timeline were rechecked top to bottom on this release. Timeline shows recorded time without MYT and actor avatar without repeated visible name. Source contracts and this proof are authoritative; a screenshot alone is not a second template.
 
 **SO file preview — owner approved 2026-10-04:** The source-owned preview uses the shared `PdfPreviewHeader`: `Sales order PDF · {actual SO number}` at left, existing saved-document `Download` and `Close PDF` × at right. Zoom stays on the next row, then the actual PDF. Identity and Close remain available during loading/error; Download is disabled until its saved Blob exists. No separate Close row. Close PDF returns to Info and focuses the SO number; the dark Header `Close order` × closes the whole Register Drawer and returns to its opener. Neither control saves business facts or changes current/historical issued documents.
 
@@ -3625,7 +3712,7 @@ fewest lines, four at most; one editor at a time, folded on success, kept on fai
 without a zone suffix while the full instant is kept; nothing in a module repeats the header, a date,
 the sales facts or a completion note.
 
-**Current bounded production acceptance — 2026-10-04:** PR1888 exact head
+**Earlier register/navigation production acceptance — 2026-10-04:** PR1888 exact head
 `dd581fb3139b9539216f1f1c9ddc25b107e3d4a5` passed full CI37207794735 and deployed as
 `36d96ac427f059901f6fdf2d623bd6277adeb611` (Deploy37208534384); independent verification matched
 all five revision surfaces. Orders MASTER owns the measured existing-path matrix and boundaries.
