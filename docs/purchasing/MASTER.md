@@ -81,8 +81,10 @@ Do not display `PO rounds`, `Order rounds` or `Daily orders` as competing names.
 Retain the existing `Order timing` capability separately: it describes early purchasing and
 production/safety margin, not a clock round. The owner explicitly requires these planning filters
 to remain. Owner correction 2026-10-04 approves the shortened planning labels for the current HTML and
-shared dictionary: `Order early`; a `Safety days` context above `14 days left`, `1–13 days left`,
-`0 days left`; then `Production late`. Replace long labels throughout this SO Batch surface,
+shared dictionary: `Order early`, `14 days left`, `1–13 days left`, `0 days left`,
+`Production late`. Latest owner correction removes the inner `Safety days` paragraph from the
+rail. Keep `Order timing` as the group heading; changing it to `PO Safety Days` is a proposal,
+not an approved label. Replace long labels throughout this SO Batch surface,
 including table absence text where it expresses the same production-shortfall fact. Keys,
 calculations, calendars and eligibility remain unchanged; icons never substitute for these words. Proceed-based automatic round admission versus planned Order By admission
 is still under review; this naming approval does not resolve that scheduling contradiction or
