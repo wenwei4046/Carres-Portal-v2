@@ -3826,6 +3826,18 @@ facts remain explicit exceptions, not permission to issue an invalid order.
 3. **Generate PO and real PDF.** Successful lawful issue creates the numbered PO/current version
    and its real supplier-facing PDF. Do not represent an unissued preview as a formal issued PO.
    Full-page 50/50 inspection remains available, not compulsory for every placement.
+**OWNER CONFIRMED 2026-10-04 — SO Batch pre-issue 50/50 placement view.**
+Before Place order, no formal PO has been issued. The left half displays system-prepared
+purchase details derived from the source Sales Orders: supplier, goods/specifications,
+quantities, destination and dates. The right half displays the corresponding Draft PO PDF
+preview, plainly identified as not issued. Retain source SO links for inspection; the right
+half is the proposed supplier purchase document, not the Sales Order PDF. Place order is the
+lawful issue action; only after success does the view show the formal PO number/current
+version and its actual issued PDF, followed by the supplier sending action. Never fabricate
+an issued number or claim successful placement before the owning issue result. This confirms
+pre-/post-issue composition, not a mandatory extra review gate, batch-wide issue mechanics,
+application implementation or permission to send a real supplier order.
+
 4. **Operation sends the PO to the supplier.** Send the actual current PDF and record actual
    version, recipient, channel, actor and time. Generating a PDF alone is not sending. The
    SO Batch purchase work is complete only when its eligible buying scope is covered and all
