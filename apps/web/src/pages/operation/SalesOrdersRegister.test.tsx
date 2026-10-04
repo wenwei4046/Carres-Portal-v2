@@ -1073,7 +1073,7 @@ describe("order view before editing", () => {
     mount();
     fireEvent.click(screen.getByRole("button", {name:"SO-1303"}));
     const summary=screen.getByTestId("sales-order-quick-view");
-    expect(summary).toHaveTextContent("Outstanding");
+    expect(summary).toHaveTextContent("Balance due");
     expect(summary).toHaveTextContent("RM 1,249.00");
     expect(within(summary).getByRole("button", { name: "Items" })).toHaveAttribute("aria-expanded", "false");
     expect(within(summary).queryByRole("button",{name:"Edit"})).not.toBeInTheDocument();
