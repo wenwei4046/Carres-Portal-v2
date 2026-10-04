@@ -86,6 +86,38 @@ This overwrites the earlier SO Batch parent/item `Need PO` / `No PO needed` pres
 Manual Purchase's independent approval/request grouping is unchanged. Target approval is not build
 or production verification. Supplier communication evidence and Receiving remain separate facts.
 
+### Supplier documents and communication — owner-approved 2026-10-04
+
+After successful SO Batch Issue PO, the same right-side result/Quick View panel shows the issued
+bundle: separate numbered POs, current versions and suppliers. A bundle is a result scope, not a
+new formal document, merged supplier PDF or second issue authority. Default scope is This round;
+Today explicitly selects POs issued today across rounds. Filter by Supplier, select individual POs
+or Select all within that supplier/scope. Selection drives the exact same PO/version set for the
+message listing and PDF files. Refreshing or changing selection updates both; never include another
+supplier's document, a draft, superseded version or unselected PO silently.
+
+Each PO remains one independent PDF. Download PDFs packages selected files into a ZIP for one
+bulk download; it never merges the PDFs. A per-PO PDF action remains. Purchase Orders Register
+supports finding/re-downloading selected POs through supplier/date filters using the same capability.
+SO Batch gives immediate access without requiring a second trip to that register.
+
+Supplier's saved channel/contact determines the communication controls. Ohana uses Email; other
+suppliers in this owner scenario use WhatsApp. These facts do not silently overwrite production
+supplier settings. Email panel shows saved recipient, editable prepared subject/message listing
+selected PO numbers/versions, and each independent selected PDF as an attachment. Send Email is
+an approved target; expose it as executable only when the actual email/attachment capability is
+verified. Its result records actual dispatch evidence/failure, never supplier receipt by inference.
+WhatsApp panel shows the corresponding prepared message with Download PDFs, Copy message and
+Open WhatsApp. Staff attach the independent PDFs and send externally; copying/downloading/opening
+proves preparation only, never sending. No automatic WhatsApp attachment/transmission is promised.
+
+Scope labels: This round / Today. Shared action labels: Download PDFs / Copy message /
+Open WhatsApp / Send Email. PO Status Pending/Partial/Done still measures issue quantity only;
+communication and receipt are independent facts. Batch failures remain per PO/version and retain
+successful results, so retry cannot silently resend every document. Use governed communication
+ownership, permissions and actual supplier contact authority; this approval commissions target
+truth, not a live external email, supplier-settings write or production transmission.
+
 ### Manual Purchase — when needed
 
 Showroom's complete arrangement stays in Display Request. Only the Carres-buying portion enters
