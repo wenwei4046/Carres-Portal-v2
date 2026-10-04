@@ -663,9 +663,11 @@ revision capability is not added to the separately commissioned PO-placement unb
 #### 5.6.1 Daily PO windows — owner-approved 2026-09-24; MERGED (#1621) and DEPLOYED, 0584/0585 APPLIED; owner walk owed
 
 SO demand is accumulated for batch review; PO Duty does not issue one PO action per Sales Order.
-Purchasing Settings owns an editable first standard window, initially `11:30 AM` Malaysia time,
-and one optional editable second standard window, initially `4:00 PM`. The second window may be
-switched off. Demand admitted before a window belongs to that next valid window; demand after the
+**CURRENT WINDOW CONFIGURATION — OWNER RULING 2026-10-04 / APPROVED TARGET:** the first PO
+window is `10:15 AM` and the second is `4:00 PM`, Malaysia time, with both enabled. These are
+two consolidated buying/supplier-PO rounds on each governed PO working day. Purchasing Settings
+owns the editable times and second-window switch; a later authorised configuration change may
+change them. This document update does not claim that the live Settings values have been changed. Demand admitted before a window belongs to that next valid window; demand after the
 last enabled window belongs to the next Purchasing working day's first window. A supplier's
 governed earlier cut-off always wins and may never be placed in a later invalid window.
 
@@ -689,7 +691,8 @@ panel belong to Workspace (handed off to the Workspace lane the same day); Purch
 facts, the one send area and the completion fact below.
 
 - **Settings.** `Settings → Purchasing → PO windows` carries `PO Days` (day ticks), `First PO
-  window` (default `11:30 AM`), `Second PO window` with an on/off switch (default `4:00 PM`).
+  window` (current owner target `10:15 AM`), `Second PO window` with an on/off switch
+  (current owner target enabled, `4:00 PM`).
   Every change records actor, time, old value, new value and effective date; it never rewrites an
   issued PO. **BUILT 2026-09-28:** one `PO windows` card at the top of Purchasing Settings holds
   `PO Days`, `First PO window` and `Second PO window` with its switch. It reads through the same
@@ -755,7 +758,9 @@ facts, the one send area and the completion fact below.
   nothing. A received PO needs no sending; a PO serving two windows belongs to the earliest.
 - **Gap.** 0585 stores the window times (`purchasing_set_po_windows`) and supplier cut-offs
   (`purchasing_set_supplier_po_cutoff`), but Purchasing Settings has no editing screen for them yet;
-  until it ships the windows are the 11:30 AM / 4:00 PM defaults and no supplier has a cut-off.
+  this was an earlier implementation observation, not the current configuration authority.
+  The editing screen is now recorded above; current owner-requested times are 10:15 AM / 4:00 PM.
+  Live configured times and supplier exceptions require readback before claiming convergence.
 
 **HOW IT IS ENFORCED — BUILT, migrations 0378 / 0379 / 0380, PR #894.**
 
@@ -3697,6 +3702,68 @@ Communication. Workspace enters the same Communication action directly.
 **Exceptions:** supplier fabric/model unavailable, delayed/split promise, quantity change,
 overdelivery, price change, cancellation and post-send destination change retain their owning law.
 **Connections:** demand, supplier, GRN, Stock, claims and Finance retain their existing ownership.
+
+
+
+#### Purchase Order page recovery — owner mission and proposed content, 2026-10-04
+
+**OWNER MISSION / LOCKED:** start with the independent Purchase Order page and its complete
+Operation journey. Make module-owned operations understandable and usable before composing them
+in Workspace. Workspace remains a projection of the same source actions, not a prerequisite to
+placing or following a PO. Conversation is Chinese; reusable design blocks and interface text
+are English. Do not produce another HTML attempt before the content/action journey is reviewed.
+
+**PROPOSAL / NOT LAW — page composition for owner review.** Reuse the owner's supplied Sales Order
+page template. The left tray exposes the two current PO windows (10:15 AM and 4:00 PM), preserving
+existing required Listing/Monthly demand access and the approved PO follow-up filters. A window
+selects exact eligible uncovered source demand using §5.6.1/§9.1; it is not a PO-number filter that
+loses unissued demand. Its buying operation reuses SO Batch Purchase authority, never a second PO
+creation engine. Keep new, blocked, issued-but-unsent and missed-window quantities distinguishable.
+One round groups compatible source lines by supplier and the existing grouping constraints; it
+may issue several supplier POs. One batch action does not mean one cross-supplier PDF or one
+external transmission to all suppliers. Finish actual sending separately for each supplier/version.
+
+Record hierarchy: PO window -> supplier group -> numbered PO/current version -> goods line ->
+quantity/date delivery batch. A supplier is a communication/filter grouping; the numbered PO is
+the commitment tracked to closure. Multiple POs from one supplier remain individually identifiable.
+A summary box is a fact about its enclosing record; it is never a substitute PO object.
+
+Recommended PO card: one card per numbered PO, with supplier/current version in its header,
+accountable PIC and actual next action in the action region. Eight summary facts may use two rows:
+Supplier Deliver To; PO Doc Date; immutable PO Delivery Date; Supplier Confirmed Delivery Date
+(next outstanding batch date plus explicit additional-batch count); Order Qty; Received Qty;
+Pending Delivery Qty; current-version sending evidence. Confirmed date never substitutes a planned
+date; each additional quantity/date remains reachable beside its exact goods line. Cancelled,
+damaged, wrong and extra quantities remain distinct in goods detail under §5.8. Table/Cards are
+two presentations of one register, not duplicate facts on one screen. Exact items/Units and receipt/
+promise batches are inspected on the selected PO; do not repeat a full item table inside every card.
+Full PO information/edit + actual PDF remains the approved 50/50 surface under §9.3.
+
+Operation journey for review: (1) accumulate authorised source demand; subtract only authoritative
+secured-stock/exact-PO coverage; (2) select the due window and inspect ready/blocked demand;
+(3) review grouping, supplier, goods, quantities, destinations, dates and approvals;
+(4) inspect every proposed supplier PO and actual rendered PDF in the shared 50/50 review;
+(5) issue the reviewed supplier POs once; (6) transmit each current PDF through its supplier's
+recorded channel and record actual version/recipient/channel/actor/time; (7) close that window
+only from the complete source-demand/current-version sending conditions; (8) follow outstanding
+PO goods, using original planning dates until an evidenced supplier answer establishes confirmed
+line/batch dates; (9) record date changes/splits/inability/price facts through existing governed
+doors; (10) confirm each effective incoming batch one Office working day before arrival;
+(11) Receiving records physical arrival, exact goods/Units, condition and numbered GRN evidence;
+(12) keep partial outstanding quantity and its next date open, handle claims with their owner, and
+close resolved goods without losing unconfirmed sending or open claims. Supplier invoice/payable
+settlement remains Finance-owned. Wrong/damaged goods do not silently count as acceptable delivery.
+No supplier answer alone revises a PO; actual document/goods/destination changes use governed
+revision/approval and current-version resend. A missed round retains its date/time and scope;
+subsequent demand is a separate round, preventing double buying.
+
+**FALSIFIER / ACCEPTANCE:** reject the proposed composition if an Operation user cannot, without
+Workspace, select either round, identify every supplier PO/current PDF, finish evidenced sending,
+locate a specific outstanding goods line/batch, or follow a partial receipt to its next operation.
+Reject any design that hides a PO inside a count, confuses planned and confirmed dates, duplicates
+creation/sending/reply forms, counts unknown facts as zero, or claims closure while an obligation
+remains. The proposed tray/card placement is not approved merely because this text is committed.
+No application build, live Settings change, external sending, merge or deployment is commissioned.
 
 
 ### 9.4 Receiving / GRN — owner instruction 2026-09-04 + owner correction 2026-09-06, PRODUCTION-VERIFIED
