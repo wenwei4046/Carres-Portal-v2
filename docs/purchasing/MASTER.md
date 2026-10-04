@@ -3729,6 +3729,29 @@ Sales Order source and purchase quantity; supplier grouping never erases lineage
 existing destination/document grouping rules. The owner approved this grouping, not all remaining
 card, register or full-page composition.
 
+**OWNER CONFIRMED 2026-10-04 — Manual Purchase and SO Batch inspection/actions.**
+Manual Purchase exposes Showroom as a left-rail category with individual showroom selection;
+the right listing shows the matching purchase requests and preserves their originating Display
+Request. Display Request retains the complete arrangement; only its Carres-buying scope enters
+Manual Purchase, reusing supplied information. Operation reviews the request first, then submits
+it to Jess for purchase approval. Operation review is not purchase approval; authorised approval
+still precedes PO creation.
+
+Both Manual Purchase and SO Batch use listing selection to open a right-side Quick View without
+requiring full-page navigation for ordinary tasks. Quick View contains the source facts/evidence
+and authorised owning actions needed to complete the current task. Manual Purchase supports
+Operation review/submission and Jess approval/return there. SO Batch supports its existing review
+and purchase actions there; this presentation approval does not introduce a new Jess approval
+round for SO Batch or override existing approval, issue, grouping and sending rules.
+
+Full page exposes the complete original form and supporting material in a 50/50 view; opening it
+is viewing, not entering edit mode. Explicit Edit enters information editing. The Purchase Order
+right half retains its real current PO PDF under §9.3. Manual Purchase is an internal request with
+no fabricated formal PO PDF; the preceding suggestion to place source/quotation evidence on its
+right half remains a presentation proposal pending specific confirmation. Full page is available
+for detailed inspection and editing; it is not a compulsory extra step before every Quick View
+completion. This is approved interaction truth, not evidence of production implementation.
+
 **PROPOSAL / NOT LAW — page composition for owner review.** Reuse the owner's supplied Sales Order
 page template. The left tray exposes the two current PO windows (10:15 AM and 4:00 PM), preserving
 existing required Listing/Monthly demand access and the approved PO follow-up filters. A window
