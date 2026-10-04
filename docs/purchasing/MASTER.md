@@ -3759,6 +3759,19 @@ Reuse actual shared Sales Orders rail/grid components for the replacement review
 new summary selection remains a proposal until reviewed. Existing required Listing/Monthly demand
 capabilities remain available; a bounded round preview does not retire them.
 
+**OWNER CORRECTION 2026-10-04 — optional warehouse Ready Stock matching.**
+Customer demand defaults to purchase. Unassigned warehouse stock is an offer, never authority to
+exclude a customer requirement automatically. Remove the misleading `No purchase needed` grouping
+and the rejected generic `Order summary` rail presentation. Only already bound exact Units and
+lawful existing PO coverage reduce uncovered demand before the owner chooses another allocation.
+Selecting a purchase round keeps its demand in the same listing. An optional manually triggered
+button calculates warehouse-specific Ready Stock offers there; it does not require a separate
+Warehouse page or compulsory per-order inspection. Exact goods compatibility, ownership,
+availability and existing reservation protection remain governed by Stock authority. The owner
+requests whole-round matching, matched results first, optional review and bulk selection/Proceed.
+Priority settings, exact button labels and confirmation semantics are PROPOSAL / NOT LAW until
+reviewed; no suggestion by itself reserves a Unit or reduces quantity to purchase.
+
 **OWNER CONFIRMED 2026-10-04 — Manual Purchase and SO Batch inspection/actions.**
 Manual Purchase exposes Showroom as a left-rail category with individual showroom selection;
 the right listing shows the matching purchase requests and preserves their originating Display
