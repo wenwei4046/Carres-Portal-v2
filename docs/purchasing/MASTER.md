@@ -416,6 +416,16 @@ verification. Local journey tests cover bundle restoration with fresh versions, 
 membership, repeated failed-read recovery and both sides of the exact object return. Release and
 authenticated end-to-end return verification are still required.
 
+**SO Batch document display adoption, 2026-10-04 — local build, production proof owed.**
+The Register PO cell/context door, its exact-source Quick View lineage and expanded PO details
+reuse `documentDisplayNumber` for Carres-owned dated PO display. Original and shortened numbers
+both find the same retained SO. Navigation, lineage keys, API inputs and exported original identities
+remain unchanged; Unit IDs and supplier-owned references are not formatted. The older tests that
+forbade short-year presentation have been replaced by the approved global ruling and checks that
+the displayed short number opens the original stored PO. 164 Register/detail tests pass locally.
+This bounded adoption does not claim supplier messages, historical PDFs or every Purchasing
+surface migrated. Full production release and the remaining governed display surfaces are still owed.
+
 ### SO Batch PO Status — owner-approved 2026-10-04
 
 Column/filter title: `PO Status`. In that named context use `Pending`, `Partial`, `Done`.

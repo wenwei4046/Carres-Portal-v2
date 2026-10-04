@@ -73,7 +73,7 @@
  * own numbers would stop adding up. Its quantity stays inside the remainder
  * row, where it is honestly described as not yet allocated.
  */
-import { GOODS_ABSENCE_WORDS } from "@carres/shared";
+import { GOODS_ABSENCE_WORDS, documentDisplayNumber } from "@carres/shared";
 import {
   soBatchPoDocumentState,
   unitIdOf,
@@ -411,10 +411,10 @@ export default function PoDetailsTable({
                       onPoClick(r.poNo);
                     }}
                   >
-                    {r.poNo}
+                    {documentDisplayNumber(r.poNo)}
                   </button>
                 ) : (
-                  r.poNo
+                  documentDisplayNumber(r.poNo)
                 )}
               </td>
               <td className="px-2 py-2 tabular-nums">

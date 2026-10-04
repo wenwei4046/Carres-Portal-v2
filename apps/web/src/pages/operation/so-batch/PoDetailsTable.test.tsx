@@ -348,10 +348,8 @@ describe("PoDetailsTable — the read-only presentation", () => {
     expect(headers).not.toContain("Ready Stock");
     expect(headers).not.toContain("To buy");
     expect(headers).not.toContain("Category");
-    /* `PO-20260904-4665`, never `PO-260904-4665`. */
-    expect(screen.getAllByText("PO-20260904-4665").length).toBeGreaterThan(0);
-    /* The six-digit short form is what a "tidier" column would have printed. */
-    expect(screen.getByTestId("po-details-table").textContent).not.toMatch(/PO-\d{6}-/);
+    expect(screen.getAllByText("PO-260904-4665").length).toBeGreaterThan(0);
+    expect(screen.getByTestId("po-details-table")).toHaveTextContent("U1-000-078");
   });
 
   it("carries no control at all — a record cannot be bought again", () => {
@@ -364,6 +362,6 @@ describe("PoDetailsTable — the read-only presentation", () => {
 
   it("opens a document only where the page gives it somewhere to go", () => {
     render(<PoDetailsTable label="Purchase order details" rows={rows} />);
-    expect(screen.queryByRole("button", { name: "PO-20260904-4665" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "PO-260904-4665" })).toBeNull();
   });
 });
