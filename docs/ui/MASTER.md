@@ -3598,20 +3598,19 @@ fewest lines, four at most; one editor at a time, folded on success, kept on fai
 without a zone suffix while the full instant is kept; nothing in a module repeats the header, a date,
 the sales facts or a completion note.
 
-**Current bounded production acceptance — 2026-10-04:** PR #1881 exact head
-`ee8cf695cb9790321efeeaa5fbaac0e05e43ce1e` passed CI37201089568 and deployed as
-`f7857f6af3f1b6b7870b927db32d2bd9bc3f4232` (Deploy37202073286). Independent verification matched
-all five revision surfaces. The owning Orders MASTER acceptance matrix carries the earlier086f23d
-fact/template/context/monthly proof and the finalf7857f6 completed/open-order comparison: completed
-Delivery retains the final carrier/date/DO without writers or re-entering Monitor, while the open
-order retains its forms and Cancel truth. Five completed-Delivery widths have no page overflow;
-the final formal page has equal752px panes and retains its PDF through Edit/Cancel/Back. The target
-also contains PR #1879's approved header and Balance due correction. Visible document focus,
-Escape/opener return, source facts and explicit loading/error remain covered by shared guards.
-This proof is card content plus its Register Drawer and existing formal object paths. Workspace
-Working Panel and other-module adoption, live business saves/sends, Print/Download completion and
-all-role historical/exception variants are not certified. The sole contract defines reuse; Orders
-MASTER carries the concrete acceptance and remaining module boundaries.
+**Current bounded production acceptance — 2026-10-04:** PR1883 exact head
+`016dd27f22c9eb1f891a6b01a4bcb66c69a2dc60` passed CI37204713835 and deployed as
+`7f662b505c0e1c64853a295a587218626046cd7e` (Deploy37205596250); independent verification matched
+all five revision surfaces. Orders MASTER carries the actual path matrix and evidence boundaries.
+Its priorf7857f6 proof retains final customer Delivery without writers or re-entering Monitor, open
+forms/Cancel, five widths and formal PDF/Back;086f23d covers earlier source/template/monthly checks.
+The new target adds real390px History note expansion/Escape without nested buttons or page overflow,
+existing Revisions entry and Cards/search return. No live Revisions long-note sample was present;
+its cut-note/no-version-action variant is covered by136 functional checks. PR1879's approved header
+and Balance due correction remains preserved. Workspace/other-module adoption, live business
+saves/sends, Print/Download and all-role historical/exception variants are outside this proof.
+The separately measured filtered monthly drill-down defect remains BUILD in Orders MASTER until
+its own target verification; ledger proof does not close that gap.
 
 **Open, recorded, not approved:** palette, font, radius and glyphs are the reference's own (token
 decision pending); 40px phone touch targets shown for review only; the editable `To` differs from the
