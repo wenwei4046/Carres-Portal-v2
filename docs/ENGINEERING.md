@@ -155,6 +155,11 @@ and uploads that same artifact to both. The web build writes `/__carres_deploy.j
 projects, both custom web domains and `/health` until all report the exact merged SHA.
 No convergence means a visible failed production workflow.
 
+**Explicit merge gate:** verify successful CI for the exact current PR head before invoking merge.
+`gh pr merge --auto` does not guarantee waiting when required checks are not enforced; measured
+2026-10-04 on #1872. The post-merge production gate remains required and is not a substitute for
+passing PR CI before merge. Do not change live branch protection as part of ordinary delivery.
+
 **One-time owner setup (never paste values into chat or commit them):**
 
 1. In Cloudflare, create a scoped API token for account `e2494242a0fd563cacee5a301cf95dd3`
