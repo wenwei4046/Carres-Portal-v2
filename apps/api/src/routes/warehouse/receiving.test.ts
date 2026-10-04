@@ -184,6 +184,33 @@ describe("GET /api/warehouse/receipts", () => {
   });
 });
 
+describe("GET Warehouse receipt history", () => {
+  const receiptId="11111111-1111-4111-8111-111111111111";
+  const event=(i:number)=>({id:`22222222-2222-4222-8222-${String(i).padStart(12,"0")}`,receipt_id:receiptId,event_at:"2026-10-01T00:00:00Z",event:"submitted",actor_name:"Receiver",payload:{report:{note:"Saved fact"}}});
+  it("reads all own-report events with stable continuation",async()=>{
+    const first=Array.from({length:200},(_,i)=>event(300-i));
+    const sb=makeSb({data:[]});
+    sb.rpc.mockResolvedValueOnce({data:first,error:null}).mockResolvedValueOnce({data:[event(1)],error:null});
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const res=await req(`/api/warehouse/receipts/${receiptId}/history`,"GET",await warehouseJwt());
+    expect(res.status).toBe(200);
+    expect((await res.json() as {events:unknown[]}).events).toEqual([...first,event(1)]);
+    expect(sb.rpc).toHaveBeenNthCalledWith(2,"warehouse_receipt_history_page",{p_receipt_id:receiptId,p_before_at:first[199]!.event_at,p_before_id:first[199]!.id,p_limit:200});
+  });
+  it.each(["foreign", "missing", "denied"])("refuses %s history rather than exposing it",async(kind)=>{
+    const sb=makeSb(kind==="denied"?{error:{code:"42501",message:"Not available"}}:{data:kind==="missing"?null:[{...event(1),receipt_id:"33333333-3333-4333-8333-333333333333"}]});
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const res=await req(`/api/warehouse/receipts/${receiptId}/history`,"GET",await warehouseJwt());
+    expect(res.status).toBe(kind==="denied"?403:502);
+    expect(await res.json()).not.toHaveProperty("events");
+  });
+  it("rejects invalid report identity before querying",async()=>{
+    const sb=makeSb({data:[]});vi.mocked(userClient).mockReturnValue(sb as any);
+    const res=await req("/api/warehouse/receipts/not-an-id/history","GET",await warehouseJwt());
+    expect(res.status).toBe(422);expect(sb.rpc).not.toHaveBeenCalled();
+  });
+});
+
 describe("POST /api/warehouse/receipts", () => {
   it("files the count through warehouse_submit_receipt and answers 201", async () => {
     const sb = makeSb({ data: { id: "r1", po_id: "PO-1001", status: "submitted" } });

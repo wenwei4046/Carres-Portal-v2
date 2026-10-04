@@ -103,6 +103,30 @@ warehouseReceivingRouter.get("/receipts", requireWarehouse, async (c) => {
   return c.json({ error: "Receiving reports could not be loaded" }, 502);
 });
 
+/** Read-only history of this Warehouse Site's exact report. The SQL projection
+ * exposes report snapshots and actor names, not supplier correspondence or stock internals. */
+warehouseReceivingRouter.get("/receipts/:id/history", requireWarehouse, async (c) => {
+  const id = z.string().uuid().safeParse(c.req.param("id"));
+  if (!id.success) return c.json({message:"Invalid receipt"},422);
+  const sb = userClient(c.env,c.var.auth.jwt);
+  const events: Record<string,unknown>[] = [];
+  const seen = new Set<string>();
+  let beforeAt: string | null = null;
+  let beforeId: string | null = null;
+  for (let page=0;page<100;page++) {
+    const {data,error} = await sb.rpc("warehouse_receipt_history_page",{p_receipt_id:id.data,p_before_at:beforeAt,p_before_id:beforeId,p_limit:200});
+    if (error) {const mapped=mapPgError(error);return c.json(mapped.body,mapped.status);}
+    const parsed=z.array(z.object({id:z.string().uuid(),receipt_id:z.literal(id.data),event_at:z.string().datetime({offset:true})}).passthrough()).max(200).safeParse(data);
+    if (!parsed.success || new Set(parsed.data.map(e=>e.id)).size!==parsed.data.length || parsed.data.some(e=>seen.has(e.id)))
+      return c.json({error:"Receiving history could not be loaded"},502);
+    for(const event of parsed.data) {seen.add(event.id);events.push(event);}
+    if(parsed.data.length<200) return c.json({events});
+    const last=parsed.data[parsed.data.length-1]!;
+    beforeAt=last.event_at;beforeId=last.id;
+  }
+  return c.json({error:"Receiving history could not be loaded"},502);
+});
+
 /**
  * File a count.
  *

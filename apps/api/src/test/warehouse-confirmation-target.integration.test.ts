@@ -153,6 +153,44 @@ describe.skipIf(!databaseUrl)("authorised Warehouse final receipt (approved targ
     expect((await request("select warehouse_my_receipts() as result", [])).ok).toBe(false);
   });
 
+  it("keeps original and corrected physical report snapshots in own-Site history without stock internals", async () => {
+    const first = await confirm(report({do_file_path:null,note:"Original count"}));
+    if(!first.ok) throw new Error(first.reason);
+    const corrected = await confirm(report({note:"Corrected count"}),uid("90"),first.result.id,first.result.revision);
+    if(!corrected.ok) throw new Error(corrected.reason);
+    expect(corrected.result.status).toBe("posted");
+    const events=(await q("select warehouse_receipt_history_page($1) result",[first.result.id])).rows[0]!.result;
+    expect(events).toEqual(expect.arrayContaining([
+      expect.objectContaining({event:"submitted",actor_name:"Warehouse test actor",payload:expect.objectContaining({report:expect.objectContaining({note:"Original count",do_file_path:null})})}),
+      expect.objectContaining({event:"resubmitted",payload:expect.objectContaining({report:expect.objectContaining({note:"Corrected count",do_file_path:doPath})})}),
+    ]));
+    expect(events.find((e:{event:string})=>e.event==="submitted").payload.report).toEqual(report({do_file_path:null,note:"Original count"}));
+    expect(events.find((e:{event:string})=>e.event==="resubmitted").payload.report).toEqual(report({note:"Corrected count"}));
+    expect(events.some((e:{payload:Record<string,unknown>})=>"before_units" in e.payload || "after_units" in e.payload || "duty" in e.payload)).toBe(false);
+    await q("reset role");
+    await q("update warehouse_receipts set warehouse_id=$2 where id=$1",[first.result.id,otherSite]);
+    await as(person);
+    expect((await request("select warehouse_receipt_history_page($1) result",[first.result.id])).ok).toBe(false);
+    await as(group);
+    expect((await request("select warehouse_receipt_history_page($1) result",[first.result.id])).ok).toBe(false);
+  });
+
+  it("pages all saved revisions at the same timestamp without dropping the original report",async()=>{
+    const first=await confirm(report({do_file_path:null}));
+    if(!first.ok) throw new Error(first.reason);
+    await q("reset role");
+    await q("insert into receiving_events(receipt_id,event,actor_id,event_at,payload) select $1,'resubmitted',$2,'2026-09-01T00:00:00Z'::timestamptz,jsonb_build_object('revision',n,'report',jsonb_build_object('received_qty',null),'before_units',jsonb_build_object('private_fact','not for this surface')) from generate_series(1,201)n",[first.result.id,person]);
+    await as(person);
+    const page1=(await q("select warehouse_receipt_history_page($1,null,null,200) result",[first.result.id])).rows[0]!.result as {id:string;event_at:string;payload:Record<string,unknown>}[];
+    expect(page1).toHaveLength(200);
+    const last=page1[199]!;
+    const page2=(await q("select warehouse_receipt_history_page($1,$2,$3,200) result",[first.result.id,last.event_at,last.id])).rows[0]!.result as typeof page1;
+    expect(page2).toHaveLength(2);
+    expect(new Set([...page1,...page2].map(e=>e.id)).size).toBe(202);
+    expect(page2.every(e=>!("before_units" in e.payload))).toBe(true);
+    expect(page2[0]!.payload.report).toEqual({received_qty:null});
+  });
+
   it("lists only this Site's open arrival Units and removes only physically posted Units", async () => {
     const body = await setupArrival();
     const arrivals = async () => (await q("select warehouse_incoming_arrivals() as result")).rows[0]!.result;

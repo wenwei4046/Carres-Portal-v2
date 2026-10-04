@@ -792,6 +792,18 @@ time, no duplicate status badge and 390px document/scroll width. Evidence:
 `/tmp/carres-blocked-receiving-history-local.jpg`. This is event-list visibility, not yet complete
 per-revision physical-fact/evidence inspection or Warehouse-side report-history acceptance.
 
+**Warehouse report snapshot reader — BUILT API / LOCAL SQL DRAFT, 2026-10-05.**
+`/api/warehouse/receipts/:id/history` uses an active-individual, exact-Site SQL reader and stable
+event-date/id pagination. Only event identity/time, the actual actor's name and whitelisted report,
+revision, reason and GRN fields are projected; internal Stock before/after records and Duty payloads
+are excluded. A missing, foreign or incomplete response fails rather than returning partial history.
+Original and corrected report snapshots compare exactly, including explicit null/unknown facts.
+The initial local projection incorrectly stripped nested nulls; the regression test caught it and
+the candidate now preserves the original report JSON. A 202-event tied-timestamp case verifies
+complete traversal. Together, 45 local receipt transaction tests and 49 Warehouse API tests pass.
+This supplies the history read contract; the Warehouse history UI and evidence viewer are still
+outstanding. SQL remains unapproved, chat-only and unapplied to production.
+
 **Warehouse confirmation form — BUILT ON BRANCH / NOT DEPLOYED, 2026-10-05.**
 The PO form now calls the final-confirmation API with a stable save key. It uses kit Modal, Button,
 Checkbox and TableScroller, preserves unknown quantities/date, retains missing Unit outcomes,
