@@ -29,4 +29,12 @@ describe("Carres document display, without identity mutation", () => {
     expect(receivingDisplayNo(receipt)).toBe("GRN-261004-1234");
     expect(receipt.grn_no).toBe("GRN-20261004-1234");
   });
+  it.each(["draft", "submitted", "returned"])("never invents a GRN for a %s report", status => {
+    expect(receivingDisplayNo({ id: "report", status, goods_received_at: "2026-10-04" })).toBe("");
+    expect(receivingDisplayNo({ id: "report", status, grn_no: "GRN-20261004-1234" })).toBe("");
+  });
+  it.each(["posted", "voided"])("preserves historical issued identity for %s receipts", status => {
+    expect(receivingDisplayNo({ id: "receipt", status, goods_received_at: "2026-08-05" })).toMatch(/^GRN-050826-\d{4}$/);
+  });
+
 });

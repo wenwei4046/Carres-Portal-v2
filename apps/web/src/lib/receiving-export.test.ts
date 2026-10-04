@@ -11,6 +11,11 @@ describe("Receiving full export request", () => {
     const url = new URL(String(vi.mocked(apiFetch).mock.calls[0][0]), "https://example.test");
     expect(Object.fromEntries(url.searchParams)).toMatchObject({ scope: "grn", export: "1", columns: filters.columns, category: "Mattress", supplier: "s", site: "w", receivedWith: "damaged", from: filters.from, to: filters.to, cancelled: "1", q: "GRN-26" });
   });
+  it("exports the selected Differences population rather than the GRN register", async () => {
+    vi.mocked(apiFetch).mockResolvedValue({ receipts: [], page: { total: 0 } });
+    await fetchGrnRegisterExport({ ...filters, view: "differences" });
+    expect(String(vi.mocked(apiFetch).mock.calls[0][0])).toContain("view=differences");
+  });
   it("refuses an incomplete server result", async () => {
     vi.mocked(apiFetch).mockResolvedValue({ receipts: [{ id: "one" }], page: { total: 61 } });
     await expect(fetchGrnRegisterExport(filters)).rejects.toThrow("Incomplete register export");

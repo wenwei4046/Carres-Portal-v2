@@ -440,10 +440,13 @@ export function receivingRecordNo(
  */
 export function receivingDisplayNo(r: {
   id: string;
+  /** Explicit unposted reports never own a formal or derived GRN number. */
+  status?: string | null;
   grn_no?: string | null;
   goods_received_at?: string;
   submitted_at?: string;
 }): string {
+  if (r.status != null && r.status !== "posted" && r.status !== "voided") return "";
   const stored = (r.grn_no ?? "").trim();
   if (stored) return documentDisplayNumber(stored);
   return receivingRecordNo(r);
@@ -664,22 +667,13 @@ export const RECEIVING_WORK_WORDS = {
 } as const;
 
 export interface ReceivingWorkSource {
-  /** Warehouse counts waiting for the Carres check — always executable. */
+  /** Actual submitted physical reports awaiting the existing receipt action. */
   submitted: readonly {
     id: string;
     po_id: string;
     supplier_name: string | null;
     goods_received_at?: string;
     submitted_at: string;
-  }[];
-  /** Open POs whose supplier date has arrived and which still owe goods —
-   *  the arrival/physical trigger (the anti-spam rule: outstanding quantity
-   *  alone never makes a row). */
-  arrivalsDue: readonly {
-    po_id: string;
-    supplier_name: string | null;
-    eta_date: string | null;
-    pending_qty: number;
   }[];
 }
 
@@ -707,8 +701,8 @@ export function receivingWorkItems(
   broken: boolean;
   dueIso: string | null;
   workingDaysLate: number;
-  /** The exact deep link — the session when one exists, else the source PO. */
-  receiptId: string | null;
+  /** The exact submitted physical report; a PO date is never a receipt. */
+  receiptId: string;
   poId: string;
 }> {
   const today = todayIso.slice(0, 10);
@@ -716,9 +710,7 @@ export function receivingWorkItems(
     ? { ownerName: ctx.grnDuty.name, ownerUserId: ctx.grnDuty.userId }
     : { ownerName: null, ownerUserId: null, ownerDuty: "GRN Duty" };
   const out: ReturnType<typeof receivingWorkItems> = [];
-  const covered = new Set<string>();
   for (const r of src.submitted) {
-    covered.add(r.po_id);
     const due = r.goods_received_at ?? r.submitted_at.slice(0, 10);
     out.push({
       ruleKey: "receiving.check_in",
@@ -734,25 +726,6 @@ export function receivingWorkItems(
       workingDaysLate: due && today > due ? workingDaysLate(due) : 0,
       receiptId: r.id,
       poId: r.po_id,
-    });
-  }
-  for (const p of src.arrivalsDue) {
-    if (covered.has(p.po_id)) continue;
-    if (!p.eta_date || p.eta_date > today || p.pending_qty <= 0) continue;
-    out.push({
-      ruleKey: "receiving.check_in",
-      module: "receiving",
-      soRef: `Receiving · ${p.supplier_name ?? p.po_id}`,
-      orderId: p.po_id,
-      action: RECEIVING_WORK_WORDS.rowLine(p.po_id, p.supplier_name ?? "the supplier"),
-      ...owner,
-      tone: "info",
-      locked: false,
-      broken: false,
-      dueIso: p.eta_date,
-      workingDaysLate: today > p.eta_date ? workingDaysLate(p.eta_date) : 0,
-      receiptId: null,
-      poId: p.po_id,
     });
   }
   return out;

@@ -1,7 +1,7 @@
 /** Receiving adapter for the shared module card. Full GRN owns edits and PDF. */
 import { useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { documentDisplayNumber, receivingDisplayNo, receivingExtraQty, warehouseReceiptTotals } from "@carres/shared";
+import { documentDisplayNumber, receivingDisplayNo, receivingExtraQty, warehouseReceiptTotals, SUPPLIER_CLAIM_NOT_ISSUED, RECEIVING_UNIT_OUTCOME_LABEL } from "@carres/shared";
 import CompactModuleCard from "@/components/kit/CompactModuleCard";
 import Panel from "@/components/kit/Panel";
 import Button from "@/components/kit/Button";
@@ -23,11 +23,12 @@ export default function ReceivingCompactView({ row, items, onOpen, onClose }: {
       }, {}),
   } : row;
   const totals = warehouseReceiptTotals(receipt.lines);
-  const number = receivingDisplayNo(receipt);
+  const number = receivingDisplayNo(receipt) || "Receiving";
   const [evidenceId, setEvidenceId] = useState<string | null>(null);
   const evidence = detail?.receipt.arrival_evidence ?? [];
   const unavailable = query.isError ? "Unavailable" : "Loading…";
   const details = <div className="flex flex-col gap-3">
+    {receipt.return_reason && <p className="text-body">{receipt.return_reason}</p>}
     <dl className="grid grid-cols-2 gap-3 text-body">
       {[
         ["Supplier DO No", receipt.do_number || "Not recorded"],
@@ -47,15 +48,25 @@ export default function ReceivingCompactView({ row, items, onOpen, onClose }: {
       <div className="flex flex-col gap-2 text-body">
         {receipt.po_id && <Link className="text-kit-blue-9 underline" to={`/operation/procurement?po=${encodeURIComponent(receipt.po_id)}`}>{documentDisplayNumber(receipt.po_id)}</Link>}
         {(row.source_refs ?? []).map(ref => <span key={ref}>{documentDisplayNumber(ref)}</span>)}
+        {detail?.related_records ? <>
+          {detail.related_records.claims.map(claim => <Link key={claim.id} className="text-kit-blue-9 underline" to={`/operation?tab=claims&claim=${encodeURIComponent(claim.id)}`}>{claim.claim_no ? documentDisplayNumber(claim.claim_no) : SUPPLIER_CLAIM_NOT_ISSUED}</Link>)}
+          {detail.related_records.returns.map(record => <Link key={record.id} className="text-kit-blue-9 underline" to={`/operation?tab=purchase-returns&pr=${encodeURIComponent(record.id)}`}>{documentDisplayNumber(record.pr_no)}</Link>)}
+        </> : <div role="status">{detail || query.isError ? "Unavailable" : "Loading…"}{detail && <Button onClick={() => void query.refetch()}>Try again</Button>}</div>}
         <Button onClick={onOpen}>Open full page</Button>
       </div>
     </Panel>
   </div>;
   return <div data-testid="receiving-quick-view">
     <CompactModuleCard key={row.id} name={receipt.supplier_name || receipt.source_party_name || (detail ? "Not recorded" : unavailable)}
-      reference={number} referenceStatus={receipt.status === "voided" ? "Cancelled" : undefined} openLabel="Open full page" onOpen={onOpen} onClose={onClose}
+      reference={number} referenceStatus={receipt.status === "voided" ? "Cancelled" : receipt.status !== "posted" ? "Not issued" : undefined} openLabel="Open full page" onOpen={onOpen} onClose={onClose}
       initialModule="receipt" modulesLabel="Receiving" modules={[{
-        key: "receipt", label: "Receiving", detailsLabel: "Receipt details", items: items(receipt), details,
+        key: "receipt", label: "Receiving", detailsLabel: "Receipt details", items: <>{items(receipt)}
+          {!!detail?.receipt.unit_results.length && <Panel title="Unit results">
+            {detail.receipt.unit_results.map(unit => <div key={unit.stock_item_id} className="flex flex-wrap gap-2 text-body">
+              <span>{unit.unit_code}</span><span>{RECEIVING_UNIT_OUTCOME_LABEL[unit.outcome]}{unit.issue_kind === "damaged" ? " · damaged" : unit.issue_kind === "wrong_item" ? " · wrong item" : ""}</span>
+            </div>)}
+          </Panel>}
+        </>, details,
         summary: [
           { key: "received", label: "Received Qty", value: String(totals.received) },
           { key: "damaged", label: "Damaged Qty", value: String(totals.damaged) },

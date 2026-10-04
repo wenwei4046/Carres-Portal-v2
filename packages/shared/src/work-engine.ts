@@ -457,11 +457,11 @@ export const MODULE_WORK_RULES: readonly WorkRuleDefinition[] = [
   {
     key: "receiving.check_in",
     module: "receiving",
-    trigger: "goods have an arrival promise and no posted Receiving Session covers them",
+    trigger: "an actual submitted physical receipt report has not been posted",
     owner: "the effective GRN Duty holder from Workspace; never inferred from PO Duty",
     ownerRule: "grn_duty",
     action: "Check in",
-    dueRule: "the promised arrival day",
+    dueRule: "the actual goods received date, or the report submission date when not recorded",
     completionFact: "a posted Receiving Session (warehouse_receipts + receiving_events 'posted')",
   },
   /* ⭐ REPAIR ORDERS (Purchasing §9.7 · §10, owner rulings 2026-09-19/20/28).

@@ -411,6 +411,7 @@ interface PurchaseOrderWorkSource {
   supplier_id: string;
   status: "open" | "received" | "cancelled";
   version?: number | null;
+  official_delivery_date?: string | null;
   /** OUR predicted arrival (production days) — the advance check's one
    *  anchor. Already selected by the internal `/pos` read. */
   eta_date?: string | null;
@@ -440,12 +441,25 @@ export function projectPurchaseOrderReplyWork(input: {
   return input.pos.flatMap((po) => {
     const version = po.version ?? 1;
     const supplierName = supplierById.get(po.supplier_id) || "Supplier";
+    // Reuse the register/day-before arrival authority, including per-line and
+    // split answers. An absent supplier reply does not erase a passed PO date.
+    const expectedArrivals = poExpectedArrivalsOf({
+      version,
+      officialDeliveryDate: po.official_delivery_date ?? null,
+      etaDate: po.eta_date ?? null,
+      promises: po.promises ?? [],
+      lines: po.purchase_order_lines.map((line, index) => ({
+        id: line.id ?? `${po.id}#${index}`,
+        qty: Number(line.qty), receivedQty: Number(line.received_qty),
+      })),
+    }).map((arrival) => arrival.arrival);
     const items = purchaseOrderReplyWorkItems({
       id: po.id,
       supplierName,
       status: po.status,
       version,
       supplierDate: poSupplierDeliveryDateOf(po.promises, version),
+      expectedArrivals,
       expectedReadyDate: po.expected_ready_date ?? null,
       lines: po.purchase_order_lines.map((line) => ({
         qty: line.qty,
@@ -878,20 +892,7 @@ export function receivingWorkSourceFromModuleFacts(data: {
     goods_received_at?: string;
     submitted_at: string;
   }>;
-  pos: Array<{
-    id: string;
-    status: string;
-    supplier_id: string | null;
-    eta_date: string | null;
-    version?: number | null;
-    official_delivery_date?: string | null;
-    promises?: unknown[];
-    sends?: Array<{ kind?: string | null; po_version?: number | null }>;
-    purchase_order_lines?: Array<{ id?: string; qty: number; received_qty: number }>;
-  }>;
-  suppliers: Array<{ id: string; name: string | null }>;
 }): ReceivingWorkSource {
-  const supplier = new Map(data.suppliers.map((row) => [row.id, row.name]));
   return {
     submitted: data.receipts
       .filter((row) => row.status === "submitted")
@@ -902,36 +903,6 @@ export function receivingWorkSourceFromModuleFacts(data: {
         goods_received_at: row.goods_received_at,
         submitted_at: row.submitted_at,
       })),
-    arrivalsDue: data.pos
-      .filter((row) => row.status === "open")
-      /* Purchasing §9.4 / Blueprint segment 2 (2026-09-25): a PO the supplier
-         never received cannot arrive. Only a PO whose CURRENT version is marked
-         `PO sent to supplier` derives an arrival; outstanding quantity alone
-         never makes a row. */
-      .filter((row) => (row.sends ?? []).some((send) => send.kind === "confirmed_sent" && (send.po_version ?? 1) === (row.version ?? 1)))
-      .map((row) => {
-        const lines = (row.purchase_order_lines ?? []).map((line, i) => ({
-          id: line.id ?? `${row.id}#${i}`, qty: Number(line.qty), receivedQty: Number(line.received_qty),
-        }));
-        /* The EARLIEST expected arrival (per line / batch) — the same ladder
-           the day-before check and the Register read — never the planning
-           estimate alone. */
-        const arrivals = poExpectedArrivalsOf({
-          version: row.version ?? 1,
-          officialDeliveryDate: row.official_delivery_date ?? null,
-          etaDate: row.eta_date,
-          promises: (row.promises ?? []) as never,
-          lines,
-        });
-        return {
-          po_id: row.id,
-          supplier_name: row.supplier_id
-            ? (supplier.get(row.supplier_id) ?? null)
-            : null,
-          eta_date: arrivals.map((a) => a.arrival).sort()[0] ?? row.eta_date,
-          pending_qty: lines.reduce((total, line) => total + Math.max(0, line.qty - line.receivedQty), 0),
-        };
-      }),
   };
 }
 
@@ -1177,7 +1148,6 @@ export function projectReceivingWork(input: {
   );
   const supplierByPo = new Map<string, string | null>([
     ...input.source.submitted.map((row) => [row.po_id, row.supplier_name] as const),
-    ...input.source.arrivalsDue.map((row) => [row.po_id, row.supplier_name] as const),
   ]);
   return projected.map((item) => {
     const workItem: WorkItem = {
@@ -1205,18 +1175,14 @@ export function projectReceivingWork(input: {
     return operationWorkItemFromProjection(workItem, {
       object: {
         kind: "receiving",
-        id: item.receiptId ?? item.poId,
+        id: item.receiptId,
         label: item.poId,
       },
-      /* A submitted Warehouse count means goods ARRIVED. A passed supplier
-         date with nothing counted means only that the date passed — the card
-         never claims an arrival nobody recorded (Blueprint segment 2). */
-      problem: item.receiptId ? "Goods arrived · GRN not posted" : "Supplier date passed · nothing received yet",
+      // Only an actual submitted physical report reaches this projection.
+      problem: "Goods arrived · GRN not posted",
       recipient: supplier,
       requiredResult: "GRN posted",
-      destination: item.receiptId
-        ? `/operation?tab=receiving&session=${encodeURIComponent(item.receiptId)}`
-        : `/operation?tab=receiving&po=${encodeURIComponent(item.poId)}`,
+      destination: `/operation?tab=receiving&session=${encodeURIComponent(item.receiptId)}`,
       today: input.today,
     });
   });
@@ -1623,12 +1589,12 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
         "/warehouse-receipts?status=submitted",
         c,
       ),
-      readInternal<{ pos: Parameters<typeof receivingWorkSourceFromModuleFacts>[0]["pos"] }>(
+      readInternal<{ pos: PurchaseOrderArrivalSource[] }>(
         internal,
         "/pos?status=all",
         c,
       ),
-      readInternal<{ suppliers: Parameters<typeof receivingWorkSourceFromModuleFacts>[0]["suppliers"] }>(
+      readInternal<{ suppliers: Array<{ id: string; name: string | null }> }>(
         internal,
         "/suppliers",
         c,
@@ -1721,8 +1687,6 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
   });
   const receivingSource = receivingWorkSourceFromModuleFacts({
     receipts: receipts.receipts,
-    pos: pos.pos,
-    suppliers: suppliers.suppliers,
   });
   const holidays = myHolidaySet();
   const receivingItems = projectReceivingWork({

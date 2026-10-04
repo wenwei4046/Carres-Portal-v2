@@ -2743,13 +2743,20 @@ five rows were loaded, then a one-row workbook for its record-61 supplier. #1905
 `a087fec9a`. Actual authenticated production exports contained seven receipts, then exactly three
 Ohana receipts from filtered Cards. Live PDF-list download is not claimed.
 
-**Compact card wrapped summary labels — LOCAL VERIFIED / DELIVERY PENDING, 2026-10-05.**
+**Compact card wrapped summary labels — PRODUCTION VERIFIED, 2026-10-05.**
 The shared summary cells use two shared grid tracks per row so a wrapped label grows the label
 track and every value remains aligned below it. No token, label or module-specific CSS changed.
 The Receiving showcase now includes all four actual summary labels. At 416px, the old fixed
 16px track placed the value 13.59px inside the wrapped label; the correction leaves 4px clear
 space and aligns all four values. At 366px the existing two-column composition also clears
 all labels. Shared card/Receiving regression tests passed 102; design checks passed.
+#1906 full CI `37221701382` passed on `c14f960a7`; deployment `37222437753` passed,
+and all five canonical surfaces independently converged to `d4cca587587b64117a41625e3ca9631e1a873530`.
+Authenticated production Cards at 1280px and the actual 545px viewport show 4px clear space
+below every Wrong Item Qty label, with quantities aligned per row. The previous stylesheet
+`index-Cz5N3xH6.css` contained the fixed 16px row rule once and no subgrid rule; deployed
+`index-DITNaKRT.css` contains zero old rules and one subgrid rule. Screenshot:
+`/tmp/carres-receiving-cards-production-fixed.jpg`. Original user tab restored to Table.
 
 🟡 **FACET COUNTS ARE SPELT THREE WAYS, AND THAT IS ONE FACT WITH THREE ANSWERS — found
 2026-09-20.** Purchase Orders §9.3 says a facet's number "describes the whole register, never what

@@ -230,13 +230,12 @@ describe("R8 · the Purchasing lane speaks the dictionary", () => {
     expect(
       visibleSource("pages/operation/OperationSupplierClaims.tsx"),
     ).toMatch(/supplier: "Supplier"/);
-    // Receiving names it as the FILTER RAIL group's title — style C prints
-    // group titles in normal case (UI MASTER §6.7, 2026-09-17): `Supplier`,
-    // never `Factory`.
-    expect(
-      visibleSource("pages/operation/OperationReceiving.tsx"),
-      "Receiving must still call the facet Supplier",
-    ).toMatch(/FilterRailGroup title="Supplier"/);
+    // Receiving's approved two-view rail keeps Supplier in the shared column
+    // filter. The dictionary binds its name, not the retired rail placement.
+    const receiving = visibleSource("pages/operation/OperationReceiving.tsx");
+    expect(receiving, "Receiving must still call the column filter Supplier")
+      .toMatch(/key: "supplier",\s*label: "Supplier"/);
+    expect(receiving).not.toMatch(/FilterRailGroup title="Supplier"/);
   });
 });
 

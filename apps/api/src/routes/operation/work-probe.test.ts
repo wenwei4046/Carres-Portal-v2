@@ -5,7 +5,7 @@
  * document must equal what the whole Work feed says for that order.
  */
 import { describe, expect, it } from "vitest";
-import { projectPurchaseOrderReplyWork, projectSalesOrdersFromModuleFacts } from "./work";
+import { projectPurchaseOrderReplyWork, projectReceivingWork, receivingWorkSourceFromModuleFacts, projectSalesOrdersFromModuleFacts } from "./work";
 
 type Row = Parameters<typeof projectSalesOrdersFromModuleFacts>[0]["orders"][number];
 
@@ -129,5 +129,54 @@ describe("the one-PO Work probe", () => {
   it("the fixture exercises the passed-date rule, and a silent sent PO is not Work", () => {
     const all = projectPurchaseOrderReplyWork({ pos: POS, suppliers: [], poDuty: null, today: "2026-09-08" });
     expect(all.map((i) => i.ruleKey)).toEqual(["purchasing.supplier_date_passed"]);
+  });
+});
+
+
+describe("missed arrivals remain Operation supplier follow-up", () => {
+  it("routes a passed source date to Purchasing, never to Receiving without a report", () => {
+    const items = projectPurchaseOrderReplyWork({
+      pos: [po("PO-late", { official_delivery_date: "2026-09-04" })],
+      suppliers: [{ id: "supplier-1", name: "Nice Future" }],
+      poDuty: null, today: "2026-09-08",
+    });
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({
+      ruleKey: "purchasing.supplier_date_passed",
+      destination: "/operation?tab=purchase-orders&po=PO-late",
+      requiredResult: "New evidenced supplier delivery date recorded",
+    });
+    expect(projectReceivingWork({
+      source: receivingWorkSourceFromModuleFacts({ receipts: [] }),
+      duty: null, today: "2026-09-08", workingDaysLate: () => 2,
+    })).toEqual([]);
+  });
+
+  it("a later line reply cannot hide another line whose date passed", () => {
+    const promise = POS[1]!.promises![0]!;
+    const items = projectPurchaseOrderReplyWork({
+      pos: [po("PO-split", {
+        purchase_order_lines: [{ id: "late", qty: 2, received_qty: 0 }, { id: "later", qty: 2, received_qty: 0 }],
+        promises: [
+          { ...promise, po_line_id: "late", new_date: "2026-09-04", recorded_at: "2026-09-03T02:00:00Z" },
+          { ...promise, po_line_id: "later", new_date: "2026-09-10", recorded_at: "2026-09-04T02:00:00Z" },
+        ] as Po["promises"],
+      })],
+      suppliers: [], poDuty: null, today: "2026-09-08",
+    });
+    expect(items).toHaveLength(1);
+    expect(items[0]?.timing.actionOn).toBe("2026-09-04");
+  });
+
+  it("does not chase today's arrival, future goods, full receipts or unsent revisions", () => {
+    const items = projectPurchaseOrderReplyWork({
+      pos: [
+        po("today", { official_delivery_date: "2026-09-08" }),
+        po("future", { official_delivery_date: "2026-09-10" }),
+        po("received", { official_delivery_date: "2026-09-04", purchase_order_lines: [{ qty: 4, received_qty: 4 }] }),
+        po("unsent", { official_delivery_date: "2026-09-04", version: 3 }),
+      ], suppliers: [], poDuty: null, today: "2026-09-08",
+    });
+    expect(items).toEqual([]);
   });
 });

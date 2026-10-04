@@ -2,10 +2,8 @@ import { GOODS_ABSENCE_WORDS } from "@carres/shared";
 import { useCallback, useEffect, useId, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
-  grnDateMonths,
   documentDisplayNumber,
   type RegisterColumnQuery,
-  grnDateWeeks,
   receivingDisplayNo,
   receivingExtraQty,
   RECEIVING_CATEGORY_ROWS,
@@ -24,13 +22,12 @@ import {
   type SupplierRow,
   type WarehouseReceiptQueueRow,
 } from "@/lib/queries";
-import { fmtDate, fmtDateShort, fmtMonth } from "@/lib/fmt-date";
+import { fmtDate, fmtDateShort } from "@/lib/fmt-date";
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
-import { DateField } from "@/components/register/DateField";
 import { REGISTER_FIELD_WIDTH } from "@/components/register/register-field-widths";
 import {
   FilterRail,
-  FilterRailExpandableRow,
+  RailItem,
   FilterRailGroup,
   FilterRailRow,
 } from "./components/workspace-rail";
@@ -40,6 +37,8 @@ import GoodsMiniTable, {
 import PoReceivingView from "./components/PoReceivingView";
 import ReceivingRecord from "./components/ReceivingRecord";
 import ReceivingCompactView from "./components/ReceivingCompactView";
+import Popover from "@/components/kit/Popover";
+import Button from "@/components/kit/Button";
 import Tabs from "@/components/kit/Tabs";
 import Drawer from "@/components/kit/Drawer";
 import PurchasingTabs from "./PurchasingTabs";
@@ -53,8 +52,8 @@ import ArrivalSourceWorkspace from "./ArrivalSourceWorkspace";
  * Formal GRNs share the DataGrid and CompactModuleCard presentations. The
  * register stays mounted beneath its full object, preserving the user's view.
  * Receipt quantities belong to this receipt, not cumulative PO completion.
- * The former facet rail remains until the approved Differences read-model and
- * replacement controls are delivered; its presence is not target authority.
+ * The rail selects GRN Records or Receiving Differences; non-column filters
+ * use the shared list Popover, while column facts use their own header controls.
  */
 
 // design-standard: not-a-list-page — the Receiving Register renders through
@@ -89,6 +88,7 @@ function weekLabel(from: string, to: string): string {
 
 export default function OperationReceiving() {
   const [params, setParams] = useSearchParams();
+  const view = params.get("view") === "differences" ? "differences" : "records";
   const sessionId = params.get("session");
   const poId = params.get("po");
   const arrivalId = params.get("arrival");
@@ -127,10 +127,11 @@ export default function OperationReceiving() {
   const [quickReceipt, setQuickReceipt] = useState<WarehouseReceiptQueueRow | null>(null);
   /** `Choose dates…` opens its two fields in the rail; it is not a filter of
    *  its own until both ends are typed. */
-  const [choosing, setChoosing] = useState(false);
+
 
   // A changed filter or search term starts the result set over — page 1.
   const filterKey = [
+    view,
     categorySel,
     supplierSel,
     siteSel,
@@ -145,6 +146,7 @@ export default function OperationReceiving() {
   }, [filterKey]);
 
   const registerFilters = {
+    view: view as "records" | "differences",
     offset,
     limit: presentation === "cards" ? 12 : 50,
     columns: columnQuery,
@@ -216,13 +218,10 @@ export default function OperationReceiving() {
     const next = new URLSearchParams(params);
     for (const key of RAIL_KEYS) next.delete(key);
     setParams(next, { replace: true });
-    setChoosing(false);
   }
 
   /** The rail's date ladder, folded from the SERVER's complete day counts —
    *  so a week's number is the truth about the whole filtered set. */
-  const weeks = useMemo(() => grnDateWeeks(facets.grnDate), [facets.grnDate]);
-  const months = useMemo(() => grnDateMonths(facets.grnDate), [facets.grnDate]);
   const dateChosen = Boolean(fromSel && toSel);
 
   /** Only the governed rows PRESENT in the result set appear (owner
@@ -235,16 +234,6 @@ export default function OperationReceiving() {
       ),
     [facets.category, categorySel],
   );
-  const supplierNames = useMemo(() => {
-    const names = new Set(Object.keys(facets.supplier));
-    if (supplierSel) names.add(supplierSel);
-    return [...names].sort((a, b) => a.localeCompare(b));
-  }, [facets.supplier, supplierSel]);
-  const siteNames = useMemo(() => {
-    const names = new Set(Object.keys(facets.site));
-    if (siteSel) names.add(siteSel);
-    return [...names].sort((a, b) => a.localeCompare(b));
-  }, [facets.site, siteSel]);
 
   /**
    * ⭐ THE APPROVED REGISTER COLUMNS — owner ruling 2026-09-18, in this order
@@ -824,7 +813,7 @@ export default function OperationReceiving() {
     >
       <PurchasingTabs />
       {quickReceipt && <Drawer variant="compact-card" open
-        title={receivingDisplayNo(quickReceipt)}
+        title={receivingDisplayNo(quickReceipt) || "Receiving"}
         onOpenChange={(open) => { if (!open) setQuickReceipt(null); }}>
         <ReceivingCompactView row={quickReceipt}
           items={(receipt) => <GoodsMiniTable label="Items & quantities" lines={expansionLines(receipt)} receivingLayout itemHeading="Items" />}
@@ -876,157 +865,9 @@ export default function OperationReceiving() {
         data-testid="receiving-register"
       >
         <FilterRail testId="receiving-rail">
-          {/* ── GRN Doc Date — weeks, their days, months, and Choose dates… ─────
-              The date is the GRN's CREATION date. Nothing has to be chosen to
-              see records: this group NARROWS a listing that is already
-              complete. The arrow beside a week only opens it; pressing a
-              week, a month or a day is what filters. Only periods that HAVE
-              GRNs are listed — Sunday included, because a GRN can be created
-              on one. Every count is a count of GRN RECORDS. */}
-          <FilterRailGroup title="GRN Doc Date" icon="date">
-            {weeks.map((w) => (
-              <FilterRailExpandableRow
-                key={w.from}
-                label={weekLabel(w.from, w.to)}
-                count={w.count}
-                active={fromSel === w.from && toSel === w.to}
-                onClick={() => setGrnDate(w.from, w.to)}
-                expandLabel={`Show the days in ${weekLabel(w.from, w.to)}`}
-                testId={`rail-grn-week-${w.from}`}
-              >
-                {w.days.map((d) => (
-                  <FilterRailRow
-                    key={d.iso}
-                    label={fmtDateShort(d.iso)}
-                    count={d.count}
-                    active={fromSel === d.iso && toSel === d.iso}
-                    onClick={() => setGrnDate(d.iso, d.iso)}
-                    testId={`rail-grn-day-${d.iso}`}
-                  />
-                ))}
-              </FilterRailExpandableRow>
-            ))}
-            {months.map((m) => (
-              <FilterRailRow
-                key={m.period}
-                label={fmtMonth(m.period)}
-                count={m.count}
-                active={fromSel === m.from && toSel === m.to}
-                onClick={() => setGrnDate(m.from, m.to)}
-                testId={`rail-grn-month-${m.period}`}
-              />
-            ))}
-            <FilterRailRow
-              label="Choose dates…"
-              active={false}
-              onClick={() => setChoosing((v) => !v)}
-              testId="rail-grn-choose"
-            />
-            {choosing && (
-              /* Two real fields, both labelled: a range is not a filter until
-                 both ends exist, so nothing narrows while one is being
-                 typed. */
-              <div
-                className="flex flex-col gap-1 px-2 pb-1"
-                data-testid="rail-grn-range"
-              >
-                <span className="text-label text-kit-slate-11">From</span>
-                <DateField
-                  aria-label="GRN Doc Date from"
-                  value={fromSel ?? ""}
-                  fullWidth
-                  onChange={(iso) =>
-                    setGrnDate(iso || null, toSel ?? (iso || null))
-                  }
-                />
-                <span className="text-label text-kit-slate-11">To</span>
-                <DateField
-                  aria-label="GRN Doc Date to"
-                  value={toSel ?? ""}
-                  fullWidth
-                  onChange={(iso) =>
-                    setGrnDate(fromSel ?? (iso || null), iso || null)
-                  }
-                />
-              </div>
-            )}
-          </FilterRailGroup>
-
-          {/* ── Received with — a RECORD of what was found at receiving, not
-              a to-do list. Counted by GRN, and a GRN that carries two of them
-              appears in two rows: these three numbers OVERLAP and may never
-              be added into a total. */}
-          <FilterRailGroup title="Received with" icon="goods">
-            {RECEIVED_WITH_ROWS.map((row) => (
-              <FilterRailRow
-                key={row.key}
-                label={row.label}
-                count={facets.receivedWith[row.key] ?? 0}
-                active={receivedSel === row.key}
-                onClick={() => setFacet("received", row.key)}
-                testId={`rail-received-${row.key}`}
-              />
-            ))}
-          </FilterRailGroup>
-
-          {/* Only the governed category rows PRESENT in the result set, in
-              the shared ladder's order — no `Any`, no `All …`, no invented
-              category. Counts speak for the COMPLETE filtered result set;
-              re-clicking the active row clears the section. */}
-          <FilterRailGroup title="Category" icon="goods">
-            {categoryRows.map((word) => (
-              <FilterRailRow
-                key={word}
-                label={word}
-                count={facets.category[word] ?? 0}
-                active={categorySel === word}
-                onClick={() => setFacet("category", word)}
-                testId={`rail-category-${word}`}
-              />
-            ))}
-          </FilterRailGroup>
-
-          {/* The receiving locations actually present in the records —
-              where the goods PHYSICALLY arrived. */}
-          <FilterRailGroup title="Goods arrived at" icon="warehouse">
-            {siteNames.map((name) => (
-              <FilterRailRow
-                key={name}
-                label={name}
-                count={facets.site[name] ?? 0}
-                active={siteSel === name}
-                onClick={() => setFacet("site", name)}
-                testId={`rail-site-${name}`}
-              />
-            ))}
-          </FilterRailGroup>
-
-          {/* The suppliers actually present in Receiving records. */}
-          <FilterRailGroup title="Supplier" icon="supplier">
-            {supplierNames.map((name) => (
-              <FilterRailRow
-                key={name}
-                label={name}
-                count={facets.supplier[name] ?? 0}
-                active={supplierSel === name}
-                onClick={() => setFacet("supplier", name)}
-                testId={`rail-supplier-${name}`}
-              />
-            ))}
-          </FilterRailGroup>
-
-          {/* The last ROW, not a group of one: a cancelled GRN keeps its row
-              and its number in the register forever, and this narrows to
-              them. There is no `Clear filters` button beneath it. */}
-          <div className="border-t border-kit-slate-5 py-2">
-            <FilterRailRow
-              label="Cancelled GRNs"
-              count={facets.cancelled}
-              active={cancelledSel}
-              onClick={() => setFacet("cancelled", cancelledSel ? null : "1")}
-              testId="rail-cancelled"
-            />
-          </div>
+          {([['records', 'GRN Records'], ['differences', 'Receiving Differences']] as const).map(([key, label]) =>
+            <RailItem key={key} label={label} active={view === key} testId={`receiving-view-${key}`}
+              onClick={() => { const next = new URLSearchParams(params); next.set("view", key); if (key === "differences") next.delete("cancelled"); setOffset(0); setQuickReceipt(null); setParams(next); }} />)}
         </FilterRail>
 
         {/* ⭐ `min-w-0` IS LOAD-BEARING — measured on the 2026-09-19 walk.
@@ -1104,7 +945,7 @@ export default function OperationReceiving() {
                 renderExpansion: (r) => (
                   <div className="px-2 py-3" data-testid={`grn-goods-${r.id}`}>
                     <GoodsMiniTable
-                      label={`Goods on ${receivingDisplayNo(r)}`}
+                      label={receivingDisplayNo(r) ? `Goods on ${receivingDisplayNo(r)}` : "Items & quantities"}
                       lines={expansionLines(r)}
                       receivingLayout
                       itemHeading="Items"
@@ -1113,7 +954,7 @@ export default function OperationReceiving() {
                 ),
               }}
               onRowClick={setQuickReceipt}
-              toolbarStart={
+              toolbarStart={<>
                 <button
                   type="button"
                   data-testid="start-receiving-door"
@@ -1128,7 +969,25 @@ export default function OperationReceiving() {
                 >
                   Start Receiving
                 </button>
-              }
+                <Popover label="Filters" trigger={<Button>Filters</Button>}>
+                  <div data-testid="receiving-list-filters">
+                    <FilterRailGroup title="Received with" icon="goods">
+                      {RECEIVED_WITH_ROWS.map(row => <FilterRailRow key={row.key} label={row.label}
+                        count={facets.receivedWith[row.key] ?? 0} active={receivedSel === row.key}
+                        onClick={() => setFacet("received", row.key)} testId={`rail-received-${row.key}`} />)}
+                    </FilterRailGroup>
+                    <FilterRailGroup title="Category" icon="goods">
+                      {categoryRows.map(word => <FilterRailRow key={word} label={word}
+                        count={facets.category[word] ?? 0} active={categorySel === word}
+                        onClick={() => setFacet("category", word)} testId={`rail-category-${word}`} />)}
+                    </FilterRailGroup>
+                    {view === "records" && <div className="border-t border-kit-slate-5 py-2">
+                      <FilterRailRow label="Cancelled GRNs" count={facets.cancelled} active={cancelledSel}
+                        onClick={() => setFacet("cancelled", cancelledSel ? null : "1")} testId="rail-cancelled" />
+                    </div>}
+                  </div>
+                </Popover>
+              </>}
               emptyMessage={
                 !narrowed && search.trim() === ""
                   ? // The record is what is empty — never "the goods have not

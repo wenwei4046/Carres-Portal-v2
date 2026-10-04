@@ -885,6 +885,39 @@ describe("GET /duty", () => {
   });
 });
 
+describe("Receiving Differences population", () => {
+  it("uses recorded outcomes and unposted reports, never current PO balance", async () => {
+    const base = { ...RECEIPT_ROW, po_id: null, status: "posted", posted_at: "2026-10-04T00:00:00Z", grn_no: null,
+      lines: [{ id: LINE, sku: "SKU", received_now: 1, damaged_qty: 0, wrong_item_qty: 0 }] };
+    const rows = [
+      { ...base, id: "good" },
+      { ...base, id: "damage", lines: [{ ...base.lines[0], damaged_qty: 1 }] },
+      { ...base, id: "wrong", lines: [{ ...base.lines[0], wrong_item_qty: 1 }] },
+      { ...base, id: "missing" },
+      { ...base, id: "extra", extra_lines: [{ sku: "EXTRA", qty: 2 }] },
+      ...["draft", "submitted", "returned"].map(status => ({ ...base, id: status, status })),
+      { ...base, id: "cancelled", status: "voided", lines: [{ ...base.lines[0], damaged_qty: 1 }] },
+    ];
+    vi.mocked(userClient).mockReturnValue(makeSb({
+      warehouse_receipts: { list: { data: rows, error: null } },
+      receiving_unit_results: { listBySelect: columns => ({ data: columns === "id, receipt_id" ? [{ id: "physical-result", receipt_id: "missing" }] : [], error: null }) },
+    }) as never);
+    const res = await req("/api/operation/warehouse-receipts?scope=grn&view=differences&export=1", "GET", await makeJwt("operation"));
+    expect(res.status).toBe(200);
+    const body = await res.json() as { receipts: Array<{ id: string }>; page: { total: number } };
+    expect(body.receipts.map(row => row.id).sort()).toEqual(["damage", "draft", "extra", "missing", "returned", "submitted", "wrong"]);
+    expect(body.page.total).toBe(7);
+  });
+  it("refuses an unreadable physical result population instead of showing no missing goods", async () => {
+    vi.mocked(userClient).mockReturnValue(makeSb({
+      warehouse_receipts: { list: { data: [RECEIPT_ROW], error: null } },
+      receiving_unit_results: { list: { data: null, error: { message: "read failed" } } },
+    }) as never);
+    const res = await req("/api/operation/warehouse-receipts?scope=grn&view=differences", "GET", await makeJwt("operation"));
+    expect(res.status).toBe(500);
+  });
+});
+
 describe("GET /:id — one Receiving Session / GRN record", () => {
   const DETAIL_ROW = {
     ...RECEIPT_ROW,
@@ -901,6 +934,59 @@ describe("GET /:id — one Receiving Session / GRN record", () => {
     void_by: null,
     void_reason: null,
   };
+
+  it("reads exact receipt-linked claims and direct or claim-linked returns without duplicates", async () => {
+    const sb = makeSb({ ...detailTables(),
+      supplier_claims: { list: { data: [{ id: "claim-1", claim_no: "SC-202610-001" }], error: null } },
+      purchase_returns: { list: { data: [{ id: "return-1", pr_no: "PR-202610-001" }], error: null } },
+    });
+    const reads: Array<{ table: string; method: string; args: unknown[] }> = [];
+    const from = sb.from.bind(sb);
+    sb.from = (table: string) => {
+      const builder = from(table);
+      for (const method of ["eq", "in"]) {
+        const original = builder[method] as (...args: unknown[]) => unknown;
+        builder[method] = (...args: unknown[]) => { reads.push({ table, method, args }); return original(...args); };
+      }
+      return builder;
+    };
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const res = await req(`/api/operation/warehouse-receipts/${RECEIPT}`, "GET", await makeJwt("operation"));
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as { related_records: unknown }).related_records).toEqual({ claims: [{ id: "claim-1", claim_no: "SC-202610-001" }], returns: [{ id: "return-1", pr_no: "PR-202610-001" }] });
+    expect(reads).toEqual(expect.arrayContaining([
+      { table: "supplier_claims", method: "eq", args: ["warehouse_receipt_id", RECEIPT] },
+      { table: "purchase_returns", method: "eq", args: ["warehouse_receipt_id", RECEIPT] },
+      { table: "purchase_returns", method: "in", args: ["supplier_claim_id", ["claim-1"]] },
+    ]));
+    expect(reads.filter(read => ["supplier_claims", "purchase_returns"].includes(read.table)).some(read => read.args[0] === "po_id")).toBe(false);
+  });
+
+  it("reads receipt relationships beyond the database page boundary", async () => {
+    const claims = Array.from({ length: 1001 }, (_, n) => ({ id: `claim-${n}`, claim_no: null }));
+    const sb = makeSb(detailTables());
+    const from = sb.from.bind(sb);
+    sb.from = (table: string) => {
+      const builder = from(table);
+      if (table === "supplier_claims") builder.range = vi.fn((start: number, end: number) => Promise.resolve({ data: claims.slice(start, end + 1), error: null }));
+      return builder;
+    };
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const res = await req(`/api/operation/warehouse-receipts/${RECEIPT}`, "GET", await makeJwt("operation"));
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as { related_records: { claims: unknown[] } }).related_records.claims).toEqual(claims);
+  });
+
+  it("preserves the receipt but marks failed relationship reads unavailable", async () => {
+    vi.mocked(userClient).mockReturnValue(makeSb({ ...detailTables(),
+      supplier_claims: { list: { data: null, error: { code: "42501", message: "refused" } } },
+    }) as never);
+    const res = await req(`/api/operation/warehouse-receipts/${RECEIPT}`, "GET", await makeJwt("operation"));
+    expect(res.status).toBe(200);
+    const body = await res.json() as { receipt: { id: string }; related_records: unknown };
+    expect(body.receipt.id).toBe(RECEIPT);
+    expect(body.related_records).toBeNull();
+  });
 
   function detailTables() {
     return {
