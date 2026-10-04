@@ -3723,11 +3723,19 @@ request/approval/PO issue and actual-sending rules remain unchanged. Do not pres
 as a third daily task or silently add its demand to a customer-only SO Batch round.
 This confirms round/list behaviour and domain separation, not the rest of the proposed page layout.
 
-**OWNER CONFIRMED 2026-10-04 — SO Batch supplier grouping.** After selecting a PO window,
-show its eligible customer-order buying lines grouped by supplier. Each line retains its original
-Sales Order source and purchase quantity; supplier grouping never erases lineage or overrides the
-existing destination/document grouping rules. The owner approved this grouping, not all remaining
-card, register or full-page composition.
+**OWNER CONFIRMED 2026-10-04 — date-first SO Batch with selectable grouping.**
+Proceed Date remains the priority date fact and default chronological reading of SO Batch,
+preserving the existing date-first register authority. Reuse Sales Orders' Table/Cards segmented
+view and Page tools menu for choosing grouping; supplier grouping is an available view, not a
+mandatory replacement of date-first listing. The recommended default is Group by: None, with
+Group by: Supplier selectable from the same menu; each group preserves Proceed Date, original
+SO source and purchase quantity. Do not create a separate table per supplier. Grouping affects
+presentation only: window eligibility, secured-stock/exact-PO coverage, compatible supplier/
+destination document grouping and issue/sending rules remain unchanged. Additional purchasing
+status grouping and literal menu additions remain proposals pending review; Sales Orders'
+Delivery/Stock/Payment grouping labels are not automatically Purchasing truth. Completed records
+remain accessible under the established SO Batch register law. This replaces the earlier fixed
+supplier-group presentation in this recovery section.
 
 **OWNER-DESIGNATED LATEST MODULE CARD REFERENCE — 2026-10-04.** Jess explicitly designated
 `http://127.0.0.1:5459/confirmed-module-card-handoff.html` as the latest confirmed reference.
