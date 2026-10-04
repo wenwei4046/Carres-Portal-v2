@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   sortWarehouseScheduleCards,
   warehouseArrivalScheduleCards,
+  warehouseCalendarArrivals,
   warehouseArrivalSourceFacts,
   warehousePickupScheduleCards,
   warehousePickupScopeKey,
@@ -982,5 +983,52 @@ describe("a pickup card is titled by the customer, never the address", () => {
     expect(card.partyName).toBeNull();
     /* An address is a different fact, not a weaker version of a name. */
     expect(card.partyName).not.toBe("12 Jalan Test");
+  });
+});
+
+
+describe("Warehouse Calendar arrival evidence", () => {
+  it("keeps expected and actual dates, sites and receipt quantities separate", () => {
+    const input = inboundInput({
+      pos: [po("PO-calendar")],
+      lines: [{ id: "line", po_id: "PO-calendar", sku: "SKU", qty: 10, received_qty: 7, destination_id: null, identity_mode: "quantity" } as never],
+    });
+    const arrivals = inboundArrivals(input);
+    const receipt = {
+      id: "receipt", po_id: "PO-calendar", status: "posted", posted_at: "2026-09-22T00:00:00Z",
+      goods_received_at: "2026-09-21", actual_site_id: "site-2", grn_no: "GRN-test",
+      lines: [{ received_now: 7, damaged_qty: 1, wrong_item_qty: 0 }] as never,
+      extra_lines: [{ qty: 2 }] as never,
+    };
+    const result = warehouseCalendarArrivals(arrivals, [receipt, receipt], [...input.sites, { id: "site-2", name: "AL" }]);
+    expect(result.events).toHaveLength(2);
+    expect(result.events[0]).toMatchObject({ kind: "expected_arrival", date: "2026-09-20", siteId: "site-1", expectedQty: 3, physicalQty: null });
+    expect(result.events[1]).toMatchObject({ kind: "actual_arrival", date: "2026-09-21", siteId: "site-2", physicalQty: 8, extraQty: 2, receiptId: "receipt" });
+    expect(result.events[1]?.href).toBe("/operation?tab=receiving&session=receipt");
+    expect(result.events.some((event) => event.date === "2026-09-22")).toBe(false);
+  });
+
+  it("does not invent an actual arrival from a draft, void, posting date or absent quantities", () => {
+    const row = { id: "r", po_id: "PO", status: "posted", posted_at: "2026-09-22T00:00:00Z" };
+    const result = warehouseCalendarArrivals([], [row, { ...row, id: "draft", status: "draft", goods_received_at: "2026-09-21" }, { ...row, id: "voided", status: "voided", goods_received_at: "2026-09-21" }, { ...row, id: "known-date", goods_received_at: "2026-09-21" }], []);
+    expect(result.undatedReceipts).toBe(1);
+    expect(result.events).toHaveLength(1);
+    expect(result.events[0]).toMatchObject({ id: "receipt:known-date", siteId: null, physicalQty: null, extraQty: null });
+  });
+
+  it("does not count an all-missing report as goods physically arriving", () => {
+    const result = warehouseCalendarArrivals([], [{
+      id: "empty", po_id: "PO", status: "posted", posted_at: null, goods_received_at: "2026-09-21",
+      lines: [{ received_now: 0, damaged_qty: 0, wrong_item_qty: 0 }] as never, extra_lines: [],
+    }], []);
+    expect(result.events).toEqual([]);
+  });
+
+  it("preserves all receipt dates beyond the register page and excludes fulfilled expectations", () => {
+    const input = inboundInput({ pos: [po("PO-done")], lines: [{ po_id: "PO-done", qty: 2, received_qty: 2, destination_id: null, identity_mode: "quantity" }] });
+    const receipts = Array.from({ length: 201 }, (_, i) => ({ id: `r-${i}`, po_id: "PO-done", status: "posted", posted_at: null, goods_received_at: "2026-09-21" }));
+    const result = warehouseCalendarArrivals(inboundArrivals(input), receipts, input.sites);
+    expect(result.events).toHaveLength(201);
+    expect(result.events.every((event) => event.kind === "actual_arrival")).toBe(true);
   });
 });

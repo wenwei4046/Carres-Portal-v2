@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
-import { DB, reservedDrilldownQuery, buildInboundRegisterView, inboundArrivals, inboundUnresolvedSources, warehouseArrivalSourceFacts, type InboundInput } from "@carres/shared";
+import { DB, reservedDrilldownQuery, buildInboundRegisterView, inboundArrivals, inboundUnresolvedSources, warehouseArrivalSourceFacts, warehouseCalendarArrivals, type InboundInput } from "@carres/shared";
 import { fail } from "../../lib/route-helpers";
 import { readOptionalRelation } from "../../lib/optional-relation";
 import { userClient } from "../../lib/supabase";
@@ -87,11 +87,11 @@ operationWarehouseRouter.get("/inbound", async (c) => {
       /* `arrival_source_id` arrives with those same draft tables; without it
          every receipt is simply PO-backed, which is what production holds. */
       readOptionalRelation(
-        () => read("warehouse_receipts", "id,po_id,arrival_source_id,actual_site_id,status,posted_at,grn_no,goods_received_at,do_number"),
+        () => read("warehouse_receipts", "id,po_id,arrival_source_id,actual_site_id,status,posted_at,grn_no,goods_received_at,do_number,lines,extra_lines"),
         null,
       ).then((rows) =>
         rows ??
-        read("warehouse_receipts", "id,po_id,actual_site_id,status,posted_at,grn_no,goods_received_at,do_number"),
+        read("warehouse_receipts", "id,po_id,actual_site_id,status,posted_at,grn_no,goods_received_at,do_number,lines,extra_lines"),
       ),
       read("receiving_unit_results", "id,receipt_id,stock_item_id,outcome,issue_kind"),
       read(
@@ -199,6 +199,9 @@ operationWarehouseRouter.get("/inbound", async (c) => {
     ].sort((a, b) => (a.name ?? "~").localeCompare(b.name ?? "~"));
     return c.json({
       arrivals: view.rows,
+      ...(c.req.query("calendar") === "1" ? {
+        arrivalCalendar: warehouseCalendarArrivals(all, receipts as unknown as Parameters<typeof warehouseCalendarArrivals>[1], sites as unknown as InboundInput["sites"]),
+      } : {}),
       sites,
       unmappedDestinations,
       sourceFacts,

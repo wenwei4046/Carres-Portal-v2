@@ -630,6 +630,10 @@ Actual production Excel files contained all seven receipts and exactly the three
 when exported from filtered Cards. Short Carres numbers and original supplier DO references
 were preserved. The PDF list renderer is covered by tests; its live download is not claimed here.
 
+**Shared Calendar continuation — branch only, 2026-10-05.** Stock MASTER §7 records the new
+Warehouse-owned full-population arrival read. Its expected/actual receipt separation is locally
+tested; Calendar UI, complete source-date convergence and production acceptance remain open.
+
 **Read-only production evidence, 2026-10-04:** `warehouse_submit_receipt` still files a report;
 `warehouse_receipt_check_in` calls Operation's post-authority gate. The only current active
 Warehouse account has `is_person=false`; it is not proof of individually authorised Warehouse

@@ -5,7 +5,8 @@ import {
   type WarehouseActivity,
   type WarehouseScheduleInput as WarehouseSettingsScheduleInput,
 } from "./warehouse-settings";
-import type { InboundArrival } from "./warehouse-inbound";
+import type { InboundArrival, InboundInput } from "./warehouse-inbound";
+import { warehouseReceiptTotals, receivingExtraQty, type WarehouseReceiptLine } from "./warehouse-receipt";
 import {
   WAREHOUSE_OFF_DAYS,
   type WarehouseOutboundCard,
@@ -685,4 +686,74 @@ function stepIsoDate(iso: IsoDate): IsoDate {
     2,
     "0",
   )}-${String(next.getUTCDate()).padStart(2, "0")}`;
+}
+
+
+/** Calendar is a read of Warehouse arrangements and actual receipt evidence.
+ * A GRN is the same actual arrival, never a second Calendar event. Do not use
+ * a current PO balance as the quantity of an earlier physical receipt. */
+export interface WarehouseCalendarArrival {
+  id: string;
+  kind: "expected_arrival" | "actual_arrival";
+  date: string;
+  sourceId: string | null;
+  sourceRef: string | null;
+  siteId: string | null;
+  siteName: string | null;
+  expectedQty: number | null;
+  physicalQty: number | null;
+  extraQty: number | null;
+  receiptId: string | null;
+  href: string;
+}
+
+export function warehouseCalendarArrivals(
+  arrivals: readonly InboundArrival[],
+  receipts: readonly (InboundInput["receipts"][number] & {
+    lines?: WarehouseReceiptLine[] | null;
+    extra_lines?: Parameters<typeof receivingExtraQty>[0];
+  })[],
+  sites: readonly { id: string; name: string }[],
+): { events: WarehouseCalendarArrival[]; undatedReceipts: number } {
+  const events: WarehouseCalendarArrival[] = [];
+  const seen = new Set<string>();
+  for (const arrival of arrivals) {
+    if (!arrival.date || (arrival.quantities.known && arrival.quantities.pendingDeliveryQty <= 0)) continue;
+    const id = `expected:${arrival.id}`;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    events.push({
+      id, kind: "expected_arrival", date: arrival.date,
+      sourceId: arrival.sourceId, sourceRef: arrival.documentNo,
+      siteId: arrival.siteId || null, siteName: arrival.siteMapped ? arrival.site : null,
+      expectedQty: arrival.quantities.known ? arrival.quantities.pendingDeliveryQty : null,
+      physicalQty: null, extraQty: null, receiptId: null,
+      href: arrivalOpenHref(arrival),
+    });
+  }
+  let undatedReceipts = 0;
+  for (const receipt of receipts) {
+    if (receipt.status !== "posted" || seen.has(`receipt:${receipt.id}`)) continue;
+    seen.add(`receipt:${receipt.id}`);
+    // GRN creation time is not the date the goods physically arrived.
+    if (!receipt.goods_received_at) { undatedReceipts += 1; continue; }
+    const totals = Array.isArray(receipt.lines) ? warehouseReceiptTotals(receipt.lines) : null;
+    const extraQty = receipt.extra_lines == null ? null : receivingExtraQty(receipt.extra_lines);
+    // A report recording no physical goods is not an actual arrival event.
+    if (totals && totals.received + totals.issue === 0 && extraQty === 0) continue;
+    const sourceId = receipt.arrival_source_id ?? receipt.po_id;
+    const source = arrivals.find((arrival) => arrival.sourceId === sourceId);
+    events.push({
+      id: `receipt:${receipt.id}`, kind: "actual_arrival", date: receipt.goods_received_at.slice(0, 10),
+      sourceId, sourceRef: source?.documentNo ?? receipt.po_id,
+      siteId: receipt.actual_site_id ?? null,
+      siteName: sites.find((site) => site.id === receipt.actual_site_id)?.name ?? null,
+      expectedQty: null,
+      physicalQty: totals ? totals.received + totals.damaged + totals.wrongItem : null,
+      extraQty,
+      receiptId: receipt.id,
+      href: `/operation?tab=receiving&session=${encodeURIComponent(receipt.id)}`,
+    });
+  }
+  return { events: events.sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id)), undatedReceipts };
 }
