@@ -155,7 +155,9 @@ export interface CardFact {
   key: string;
   label: string;
   value: string;
-  /** Shows the ▾ on the label: the fact opens an inline editor. */
+  /** Optional second line under the value, e.g. Stock `Ready`, Customer `Date confirmed`. Omit it when there is nothing to say. */
+  status?: string;
+  /** Shows the ▾ at the right of the title row: the fact opens an inline editor. */
   editable?: boolean;
   /** Inline editor content. Call `close` only after a successful save, so a failure keeps the input. */
   editor?: (close: () => void) => ReactNode;
@@ -314,7 +316,8 @@ export default function CompactModuleCard(p: CompactModuleCardProps) {
               <div className={s.strip} data-cells={summary.length}>
                 {summary.map((f) => (f.editor || f.opensItems ? (
                   <button key={f.key} type="button" className={s.cell} aria-expanded={marked === f.key} onClick={() => openFact(f)}>
-                    <small>{f.label}{f.editable ? " ▾" : ""}</small><strong>{f.value}</strong>
+                    <small>{f.label}{f.editable ? <span className={s.arrow} aria-hidden="true">▾</span> : null}</small>
+                    {f.status ? <strong><span>{f.value}</span><span className={s.status}>{f.status}</span></strong> : <strong className={s.clamp}>{f.value}</strong>}
                   </button>
                 ) : (
                   <div key={f.key} className={`${s.cell} ${s.readCell}`}><span>{f.label}</span><strong>{f.value}</strong></div>
@@ -334,12 +337,15 @@ export default function CompactModuleCard(p: CompactModuleCardProps) {
 
 /* ---------- editor building blocks for module-supplied editors ---------- */
 /** Cancel then Save, at the right. Save closes the editor only when the module reports success. */
-export function CardEditorButtons({ onSave, onCancel }: { onSave: () => void; onCancel: () => void }) {
+export function CardEditorButtons({ onSave, onCancel, error }: { onSave: () => void; onCancel: () => void; error?: string | null }) {
   return (
+    <>
+    {error ? <p className={s.editorError} role="alert">{error}</p> : null}
     <div className={s.buttons}>
       <button type="button" className={s.btn} onClick={onSave}>{CARD_WORDS.save}</button>
       <button type="button" className={s.btn} onClick={onCancel}>{CARD_WORDS.cancel}</button>
     </div>
+    </>
   );
 }
 /** One condition per line. */

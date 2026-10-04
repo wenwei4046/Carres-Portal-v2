@@ -30,6 +30,7 @@
   --cc-info-muted: #536175;
   --cc-table-head: #f1f3f5;
   --cc-toggle-hover: #e7edf4;
+  --cc-error: #ce2c31;
   --cc-font: system-ui;
   --cc-radius-card: 8px;
   --cc-radius-control: 4px;
@@ -211,11 +212,17 @@
 .panel .cell { padding: 8px; text-align: left; min-height: 0; height: auto; min-width: 0; border-right: 1px solid var(--cc-line); }
 .panel .cell:last-child { border: 0; }
 .panel .cell[aria-expanded="true"] { box-shadow: inset 0 -2px var(--cc-brand); }
-.cell small { display: block; font-size: 11px; color: var(--cc-muted); }
-.cell strong { display: block; font-size: 12px; margin-top: 4px; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; overflow: hidden; }
-.panel .readCell { display: flex; flex-direction: column; justify-content: center; gap: 4px; }
+/* Every cell: title row, value, optional status — top aligned on common baselines (owner 2026-10-04). */
+.panel .strip > .cell { display: grid; grid-template-rows: 16px auto; align-content: start; align-items: start; gap: 4px; text-align: left; }
+.cell small { display: flex; align-items: center; justify-content: space-between; margin: 0; line-height: 16px; font-size: 11px; color: var(--cc-muted); }
+.arrow { margin-left: auto; }
+.cell strong { display: block; font-size: 12px; margin: 0; line-height: 18px; overflow-wrap: anywhere; }
+.cell strong.clamp { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; overflow: hidden; }
+.status { display: block; font-size: 11px; line-height: 16px; font-weight: 400; color: var(--cc-muted); margin-top: 4px; }
 .readCell span { font-size: 12px; color: var(--cc-muted); }
 .panel .readCell strong { font-size: 13px; white-space: nowrap; display: block; }
+.editorError { font-size: 12px; line-height: 16px; color: var(--cc-error); margin: 8px 0 0; }
+.panel p.editorError { color: var(--cc-error); font-size: 12px; margin: 8px 0 0; }
 
 /* ---------- inline editor ---------- */
 .editor { padding: 10px; background: var(--cc-soft); border-radius: var(--cc-radius-box); margin-bottom: 8px; }

@@ -2,8 +2,9 @@
 /**
  * Compact module card — parity with the owner's reference page.
  *
- * Drives docs/ui-reference/module-card-reference.html (owner handoff
- * 2026-10-04) and the kit `CompactModuleCard` on /ui through the SAME clicks,
+ * Drives docs/ui-reference/module-card-reference.html (owner handoff 2026-10-04
+ * with the owner's Stock and Customer corrections, sha256 98c1ae53…) and the
+ * kit `CompactModuleCard` on /ui through the SAME clicks,
  * then compares every visible card element: geometry relative to the card
  * within 0.6px, plus font, colours, borders, radius and padding. Reference
  * browser widths 1146 · 480 · 440 · 420 · 390 equal card widths
@@ -32,6 +33,22 @@ const click = (p, role, name) => p.getByRole(role, { name, exact: true }).first(
 const delivery = (p) => click(p, "button", "Delivery");
 const comm = (p) => click(p, "button", "Communication");
 const menu = async (p) => { await comm(p); await click(p, "button", "Message options"); };
+const isRef = (p) => typeof p.page !== "function" && p.url().startsWith("file:");
+const customer = (p) => p.getByRole("button", { name: /^Customer/ }).click();
+/** Fill the arrangement form: the reference by its ids, the component by its labels. */
+async function arrange(p, { result = "Confirmed", date = "2026-10-31", slot = "", time = "" } = {}) {
+  const ref = isRef(p);
+  const sel = (refId, label) => (ref ? p.locator(refId) : p.getByLabel(label, { exact: true }));
+  await sel("#result1", "Contact result").selectOption(result);
+  if (result !== "Confirmed") return;
+  await sel("#date1", "Confirmed Delivery").fill(date);
+  if (slot) await sel("#slot1", "Confirmed Time · optional").selectOption(slot);
+  if (time) await sel("#from1", "Confirmed delivery time").selectOption(time);
+}
+const save = (p) => p.getByRole("button", { name: "Save", exact: true }).first().click();
+/** The reference prints "Preview only · Recorded at …" after a save; the owner rule removes it, so it is hidden before comparing. */
+const hideRefNote = (p) => (isRef(p) ? p.evaluate(() => { const n = document.getElementById("saved1"); if (n) n.hidden = true; }) : null);
+const saved = (opts) => async (p) => { await delivery(p); await customer(p); await arrange(p, opts); await save(p); await hideRefNote(p); };
 const STATES = {
   "Info · default": async () => {},
   "Info · sales closed": (p) => click(p, "button", "Order details"),
@@ -44,7 +61,14 @@ const STATES = {
   "Delivery · default": delivery,
   "Delivery · sales open": async (p) => { await delivery(p); await click(p, "button", "Order details"); },
   "Delivery · Logistics editor": async (p) => { await delivery(p); await p.getByRole("button", { name: /^Logistics/ }).click(); },
-  "Delivery · Confirmed Delivery editor": async (p) => { await delivery(p); await p.getByRole("button", { name: /^Confirmed Delivery/ }).click(); },
+  "Delivery · Customer editor": async (p) => { await delivery(p); await customer(p); },
+  "Delivery · Customer editor, Confirmed chosen": async (p) => { await delivery(p); await customer(p); await arrange(p, { slot: "Specific time", time: "15:00" }); },
+  "Delivery · Customer saved, date only": saved({}),
+  "Delivery · Customer saved, Afternoon": saved({ slot: "Afternoon" }),
+  "Delivery · Customer saved, 3:00 PM": saved({ slot: "Specific time", time: "15:00" }),
+  "Delivery · Customer saved, not confirmed": saved({ result: "No Answer" }),
+  "Delivery · Customer cancel": async (p) => { await delivery(p); await customer(p); await arrange(p, { slot: "Morning" }); await p.getByRole("button", { name: "Cancel", exact: true }).first().click(); },
+  "Delivery · Customer reopened after save": async (p) => { await saved({ slot: "Specific time", time: "15:00" })(p); await customer(p); },
   "Delivery · DO conditions": async (p) => { await delivery(p); await p.getByRole("button", { name: /^DO/ }).click(); },
   "Delivery · Stock opens items": async (p) => { await delivery(p); await p.getByRole("button", { name: /^Stock/ }).click(); },
   "Delivery · items": async (p) => { await delivery(p); await click(p, "button", "Items"); },
@@ -58,8 +82,14 @@ const STATES = {
 /** Owner rules 2026-10-04 that differ from the reference page on purpose. */
 const APPROVED = {
   "Delivery · DO conditions": "DO: one condition per line (reference shows two per line on wide cards)",
+  "Delivery · Customer saved, not confirmed": "Before agreement the cell keeps `Date not confirmed` (reference prints the contact result `No Answer`)",
+  "Delivery · Customer reopened after save": "Reopening shows the saved answer (reference opens an empty form)",
+  "Delivery · Stock opens items": "Service lines read `Service`, not a dash, and are not counted as goods",
+  "Delivery · items": "Service lines read `Service`, not a dash, and are not counted as goods",
 };
-const INFO_DIVIDER = "Info strip keeps the Paid | Outstanding divider on narrow cards (reference drops it through a Delivery-only rule)";
+const INFO_LEFT = "Info summary values stay left aligned and keep the Paid | Outstanding divider (reference centres them through a leftover flex rule and drops the divider on narrow cards)";
+const INFO_CELLS = /"(Total|Paid|Outstanding|RM2,759\.00|RM1,380\.00|RM1,379\.00)": /;
+const ADDRESS_ARROW = "The address arrow shows ▴ while the address is open (reference shows ▾ on first load)";
 
 function snap(keys) {
   const panel = document.querySelector('[data-testid="compact-card-frame"] section') ?? document.querySelector("#complete-panel");
@@ -99,17 +129,26 @@ for (const [refW, cardW] of Object.entries(WIDTHS)) {
       if (!x || !y) { diffs.push(`#${i} ${x ? `missing ${x.tag} "${x.text}"` : `extra ${y.tag} "${y.text}"`}`); continue; }
       const d = [];
       if (x.tag !== y.tag) d.push(`tag ${x.tag}→${y.tag}`);
+      if (x.text !== y.text) d.push(`text "${x.text}"→"${y.text}"`);
       for (const k of ["x", "y", "w", "h"]) if (Math.abs(x[k] - y[k]) > TOL) d.push(`${k} ${x[k].toFixed(1)}→${y[k].toFixed(1)}`);
       for (const k of KEYS) if (x.st[k] !== y.st[k]) d.push(`${k} ${x.st[k]}→${y.st[k]}`);
       if (d.length) diffs.push(`#${i} ${x.tag} "${x.text}": ${d.join("; ")}`);
     }
     // The kept divider costs the middle Info cell 1px of width on narrow cards; nothing else may differ.
-    const infoDivider = cardW <= 400 && diffs.length > 0 && diffs.every((l) => { const m = /"(Paid|RM1,380\.00)": w ([\d.]+)→([\d.]+)$/.exec(l); return !!m && Math.abs(m[2] - m[3] - 1) < 0.05; });
-    const why = APPROVED[name] ?? (infoDivider ? INFO_DIVIDER : null);
+    // Classify every differing line; a state passes only when each line has a named reason.
+    const reasons = new Set();
+    const open = [];
+    for (const l of diffs) {
+      const body = l.replace(/^#\d+ \S+ "[^"]*": /, "");
+      if (/^text "▾"→"▴"$/.test(body)) reasons.add(ADDRESS_ARROW);
+      else if (INFO_CELLS.test(l) && /^(x [\d.]+→[\d.]+(; )?)?(w [\d.]+→[\d.]+)?$/.test(body)) reasons.add(INFO_LEFT);
+      else open.push(l);
+    }
+    const why = APPROVED[name] ?? (open.length === 0 && reasons.size ? [...reasons].join(" · ") : null);
     if (diffs.length && why) approved++; else failures += diffs.length;
     report[`${refW}|${name}`] = { cardWidth: cardW, reference: { height: a.height, header: a.header }, component: { height: b.height, header: b.header }, differing: diffs.length, approved: why };
     console.log(`${refW}px · ${name}: card ${b.height}px (reference ${a.height}px) · ${diffs.length ? (why ? `APPROVED DEVIATION — ${why}` : `${diffs.length} DIFF`) : "match"}`);
-    if (!why) for (const l of diffs.slice(0, 10)) console.log(`    ${l}`);
+    if (!why) for (const l of (open.length ? open : diffs).slice(0, 10)) console.log(`    ${l}`);
   }
   await ref.close(); await kit.close();
 }
