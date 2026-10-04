@@ -436,14 +436,40 @@ or production verification. Supplier communication evidence and Receiving remain
 
 ### Receiving delivery state — 2026-10-04
 
-**BUILD IN PROGRESS; not production-verified.** The shared `documentDisplayNumber` formatter
-has been added without changing any stored identity or allocation. Receiving's existing
-`receivingDisplayNo` reader adopts it for the Register, record, report and newly rendered GRN
-preview. The Register search retains original and short number matching at both API and client.
-Supplier DO references and Unit IDs are untouched. Other modules still need explicit adoption;
-this is not evidence of system-wide completion. The two-view rail, differences presentation,
-Working Panel and Warehouse automatic posting/permissions remain undelivered. Runtime deployment
-and authenticated checks for this numbering change remain owed.
+**BUILD IN PROGRESS; partial production acceptance.** Shared two-digit-year GRN display and
+original/short register search shipped in #1890 (`0b2b37ba4`). Exact-head full CI
+`37208414732` and deployment `37209394804` passed; all five production surfaces converged.
+Authenticated browser acceptance on 2026-10-04 found the same receipt using both
+`GRN-20260904-1064` and `GRN-260904-1064`, with the short number in the register and full
+record heading. Supplier DO `DO-SMOKE-B` and Unit `U1-000-064` remained unchanged.
+The historical event display still used the original number; its presentation-only correction
+is in the pending Working Panel slice. Issued historical PDFs were not changed.
+Stored identities, supplier references and Unit IDs are unchanged; other modules still need
+explicit adoption, so this does not establish system-wide completion.
+
+The Receiving Working Panel is **BUILT ON BRANCH / NOT PRODUCTION VERIFIED**: row selection
+uses the existing `Drawer` + `CompactModuleCard`, receipt-only quantities, actual arrival facts,
+source-owned evidence and history, and `Open full page` to the existing GRN/PDF/edit object.
+Local shared-kit preview verified the receipt header, cancellation indicator and details
+disclosure at 366px; authenticated panel acceptance still awaits delivery.
+The list remains mounted. Refreshed quantities and goods use the same receipt payload; old Unit
+results without a source-line identity remain unavailable rather than being joined by SKU.
+Cancelled receipts retain their indicator; ordinary GRNs gain no Completed/Valid badge.
+Related-record coverage currently includes the PO and recorded source references; Claim/Return
+handling links and the Receiving Differences view are not delivered by this panel slice.
+
+The two-view rail and complete server-side header filtering remain undelivered. The current
+shared grid filters loaded rows, while Receiving pages 50 rows on the server; moving the rail's
+filters must first preserve full-result matching, totals and page reset through the shared kit.
+No page-local alternative table/filter component is admitted.
+
+**Read-only production evidence, 2026-10-04:** `warehouse_submit_receipt` still files a report;
+`warehouse_receipt_check_in` calls Operation's post-authority gate. The only current active
+Warehouse account has `is_person=false`; it is not proof of individually authorised Warehouse
+confirmation. Receipt JSON on current test rows has no `expected_qty` snapshot. Do not infer a
+shipment's shortage from today's cumulative PO balance. Warehouse automatic posting, invalid
+report preservation and individual actor/Site controls remain approved targets, not built.
+NETS account activation/cutover still requires its separate explicit authorisation.
 
 ### 2.5 Receiving end-to-end assurance review — 2026-10-04
 

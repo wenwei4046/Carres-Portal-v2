@@ -1002,10 +1002,13 @@ describe("OperationReceiving — the formal GRN Register", () => {
     expect(empty).toHaveTextContent("No supplier delivery is ready to receive.");
   });
 
-  it("a row opens the record, and the register stays MOUNTED but invisible", async () => {
+  it("a row opens the shared panel, then Open full page keeps the register mounted", async () => {
     h.sessionDetail = postedDetail();
     renderPage();
     fireEvent.click(screen.getAllByText("GRN-260901-1234")[0]);
+    await screen.findByTestId("receiving-quick-view");
+    expect(screen.getByTestId("receiving-register").className).not.toContain("invisible");
+    fireEvent.click(screen.getByRole("button", { name: "Open full page" }));
     await screen.findByTestId("receiving-record");
     // Never display:none — `invisible` keeps rail filters, search, sort and
     // scroll alive for Back (the Manual Purchase / SO object law).
