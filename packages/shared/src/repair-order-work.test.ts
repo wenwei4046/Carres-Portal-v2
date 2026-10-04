@@ -120,7 +120,8 @@ describe("Repair Order Work — the four RO-owned obligations (Purchasing §9.7 
 
 it("the minimal receipt probe projects the exact same return occurrence as the full Work feed",()=>{
   const source=ro({supplier_received_at:"2026-09-29T01:00:00Z",return_target_date:"2026-09-30"});
-  const full=projectRepairOrderWork({repairOrders:[source],poDuty:null,today:"2026-10-05"})
+  const observedAt="2026-10-05T01:00:00.000Z";
+  const full=projectRepairOrderWork({repairOrders:[source],poDuty:null,today:"2026-10-05",observedAt})
     .filter(item=>item.ruleKey===REPAIR_ORDER_WORK_RULE.returnDatePassed);
-  expect(projectRepairOrderReturnWork({repairOrder:source,today:"2026-10-05"})).toEqual(full);
+  expect(projectRepairOrderReturnWork({repairOrder:source,today:"2026-10-05",observedAt})).toEqual(full);
 });

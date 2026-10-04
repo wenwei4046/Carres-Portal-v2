@@ -771,6 +771,17 @@ constraint/trigger from migration 0453; the function body was reconciled read-on
 MD5 `7b6e70d7cfee68be65bef8c783404b2e`. This is a local test dependency repair, not a new production
 change or a clean whole-chain replay. Production acceptance remains.
 
+**Operation arrival completion causality — BUILT ON BRANCH / NOT DEPLOYED, 2026-10-05.**
+Operation's arrival receipt completion now requires the same server-generated final-GRN marker.
+It reads the exact returned receipt and marker through the caller's RLS, requiring this source,
+actor, posted status, GRN and a posting time no earlier than the request. The physical-return
+predicate excludes cancellation; cancellation completion stays with the RO cancellation door.
+Another actor's final return, a delayed partial read, stale replay and unknown evidence do not
+receive completion credit. Thirteen focused evidence tests plus seven existing RO and nineteen
+Warehouse adapter tests pass (39 total). The Warehouse review chat independently passed its
+19 tests and closed the adapter finding; it did not independently run the SQL concurrency proof.
+These changes depend on the unapproved SQL candidate and are not production acceptance.
+
 **Confirmation transport — BUILT ON BRANCH / NOT DEPLOYED, 2026-10-05.**
 The bounded shared confirmation schema and `/api/warehouse/receipts/confirm` preserve absent/null
 physical counts and dates instead of manufacturing zero or now. The caller supplies the save key;
@@ -971,8 +982,8 @@ Validation: 69 receipt-route tests (including 1,001 unresolved reports and permi
 tests pass. API/Web typechecks and design-standard checks pass. No production SQL or data changed.
 
 Still required before an exact SQL review/release: remaining non-PO downstream lifecycle and
-source-resolution audit, extra-goods custody and authority boundaries, Operation arrival completion
-causality, full Warehouse listing/keyboard acceptance and real evidence transport. Source forms,
+source-resolution audit, extra-goods custody and authority boundaries, full Warehouse
+listing/keyboard acceptance and real evidence transport. Source forms,
 preserved report history and Operation blocked-report/Work readers are implemented on the branch;
 they still require authenticated production acceptance. Exact reviewed SQL approval must precede
 the governed production probe/apply and dependent delivery proof. The draft exists only
