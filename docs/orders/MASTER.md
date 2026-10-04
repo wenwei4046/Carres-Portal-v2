@@ -6818,24 +6818,38 @@ this module owns the following business-specific application. Delivered evidence
   No Print/Download or live business-data write was performed. This change removes the compact
   frame's hidden duplicate Close and names address facts explicitly; kit/dialog regression23
   checks cover visible initial focus, Escape and opener return.
-  **Current acceptance follow-up — BUILD / pending production proof:** the real top-to-toe audit
-  identified omissions, rather than new business choices. Building type and named unknown access
-  facts remain source truth; Info’s separate details disclosure owns Email/Dealer/Proceed Date,
-  statuses and document lineage. Items owns only goods/services, includes Unit price and two-decimal
-  Amount, and reads Service for service stock. Header target uses d Mon and Malaysia calendar-day
-  countdown; phone glyph/number wrap together. Compact Logistics retains coverage preselection as
-  an unsaved Assign logistics draft and saved summary truth, with crew/ETA/condo/proof intact and
-  the prepared message moved to Communication. Customer source is explicitly selected, never guessed
-  from an absent partner; Delivery’s save door owns actual contact/proxy evidence and Timeline recorder.
+  **Current card acceptance follow-up — production verified / module acceptance continues:**
+  PR #1876 merged as `c6b1987bfa0cfd7c473494f4d3f7ee99c8077248`; exact-head CI37195312343
+  and Production Deploy37196156890 succeeded. Independent five-surface verification matched that
+  revision. Real Principal SO-1368 at390px shows Condo, named unknown stair carry,31 Oct27d,
+  two-decimal money and unit prices, Service stock, separate Info details and goods-only Items.
+  Customer editor starts Information received from at Pick one with Save disabled; no absent-partner
+  guess becomes evidence. Delivery retains actual0/1 goods, Not assigned, Date not confirmed and
+  No DO yet. No saved partner means no invented Logistics message recipient.
   Info reads active current Payment reminder/follow-up templates, Default first, with the existing
-  Invoice composer’s governed fallback for outstanding balances. Delivery reads active current
-  Settings date-request templates, Default first, or existing Delivery details wording, addressed only
-  to the saved Logistics recipient. No additional template store or send is introduced. The backend
-  library and the kit’s existing browser Save as/Manage scope are distinct.
-  Required closure: exact-head CI/deploy, all-five revision convergence, authenticated real mobile and
-  long-value checks, isolated Items/details/template proofs, Customer source and Logistics Cancel proof.
-  Successful/refused saves remain meaningful automated evidence until an authorized live business
-  save is available; Print/Download is outside the current browser permission proof and is not claimed.
+  Invoice fallback for outstanding balances. Delivery reads active current Settings date-request
+  templates, Default first, or existing Delivery details wording, addressed only to saved Logistics.
+  Existing browser Save as/Manage and backend libraries remain separate; no send occurred.
+  Compact Logistics keeps approved coverage preselection as an unsaved Assign logistics draft;
+  cancelling preserves Not assigned. Existing crew/ETA/condo/proof and refusal/retry checks remain.
+  Whole-path acceptance found three further presentation defects: list Cards hardcoded Unavailable
+  while Table had its register delivery fact; FullPage printed unknown stair carry as0; structured
+  service sizes already counted their quantity but Services appended the same quantity again.
+  The current repair uses the same governed register delivery projection in both list views (not
+  final-leg readiness), prints Not recorded for null stair carry and leaves its edit input blank,
+  preserves null in unchanged save payloads, and renders Services through its one shared summary.
+  Explicit0 remains0. Structured repeated and mixed sizes retain every unit without double quantity.
+  Timeline recovers actor ids from the same order-scoped records and uses the existing canonical
+  identity resolver: real person, shared/missing identity, recorded automation stay distinct.
+  A missing name is never promoted to System. A template reference uses imported source references
+  when present, otherwise the real SO number; the protected {ref} is not left empty on a known order.
+  Query/view changes and number-to-id resolution preserve the register return state, so Revisions,
+  History and Order Route cannot drop search/view context.
+  Monthly-demand drill-down clears an earlier list search in both the server request and shared
+  register session; an explicit empty initial search outranks a remembered one.
+  These latest repairs await exact-revision production
+  acceptance; successful/refused business saves have automated evidence only. Live Save/send and
+  Print/Download completion are not claimed.
 
 - Full page opens read-only until deliberate Edit. Fixed white identity header and slate-2 tabs
   sit above one scrolling left form and independent right PDF. Back preserves register context.

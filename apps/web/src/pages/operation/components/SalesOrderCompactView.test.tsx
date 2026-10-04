@@ -42,12 +42,12 @@ describe("real SO card", () => {
   });
   it("uses the Payment library's current Default and excludes superseded versions", () => {
     state.paymentTemplates = [
-      { id: "latest", name: "Current payment reminder", body: "Hi {customer}, RM {outstanding}", purpose: "gentle_reminder", active: true, is_head: true, is_default: true },
+      { id: "latest", name: "Current payment reminder", body: "Hi {customer}, {ref}, RM {outstanding}", purpose: "gentle_reminder", active: true, is_head: true, is_default: true },
       { id: "old", name: "Old payment reminder", body: "Old", purpose: "gentle_reminder", active: true, is_head: false },
     ] as PaymentTemplateRow[];
     mount(); fireEvent.click(screen.getByRole("button", { name: "Communication" })); fireEvent.click(screen.getByRole("button", { name: "Message options" })); fireEvent.click(screen.getByRole("button", { name: "Find template…" }));
     expect(screen.getByRole("option", { name: "Current payment reminder" })).toBeVisible(); expect(screen.queryByRole("option", { name: "Old payment reminder" })).toBeNull();
-    fireEvent.change(screen.getByRole("combobox", { name: "Message template" }), { target: { value: "latest" } }); expect(screen.getByRole("textbox", { name: "Message" })).toHaveValue("Hi Kimmy, RM 1,249.00");
+    fireEvent.change(screen.getByRole("combobox", { name: "Message template" }), { target: { value: "latest" } }); expect(screen.getByRole("textbox", { name: "Message" })).toHaveValue("Hi Kimmy, SO-1303, RM 1,249.00");
   });
   it("does not offer cached payment reminders on an order already paid in full", () => {
     state.paymentTemplates = [{ id: "latest", name: "Current payment reminder", body: "Pay", purpose: "gentle_reminder", active: true, is_head: true, is_default: true }] as PaymentTemplateRow[];

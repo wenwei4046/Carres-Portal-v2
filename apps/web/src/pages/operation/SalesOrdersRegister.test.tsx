@@ -1335,6 +1335,16 @@ describe("the Sales Orders rail and its two views", () => {
     expect(within(grid).queryByText("SO-1401")).not.toBeInTheDocument();
   });
 
+  it("a monthly drill-down clears the prior list search instead of restoring it from session", async () => {
+    mount("/operation/orders?search=Kimmy");
+    expect(screen.getByRole("searchbox")).toHaveValue("Kimmy");
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "Monthly demand" }));
+    fireEvent.click(screen.getByRole("button", { name: "Open Sales Orders for Oct 2026" }));
+    await waitFor(() => expect(screen.getByRole("searchbox")).toHaveValue(""));
+    expect(screen.getByTestId("location").textContent).not.toContain("search=");
+    await waitFor(() => expect(useOperationOrdersSpy.mock.calls.map(call => call[0] as { stage?: string; search?: string }).filter(input => input.stage === "proceeded").at(-1)).toEqual({ stage: "proceeded" }));
+  });
+
   it("Monthly demand's filters never carry into the Order list", () => {
     mount("/operation/orders?view=monthly&dealer=%7Bdealer%201%7D&months=3");
     fireEvent.mouseDown(screen.getByRole("tab", { name: "Listing" }));
@@ -1546,11 +1556,12 @@ describe("the isolated shared-template pilot", () => {
     fireEvent.mouseDown(screen.getByRole("tab", { name: "Cards" }));
     expect(screen.getByRole("checkbox", { name: "Select SO-101" })).toBeChecked();
   });
-  it("does not convert sold stock without identity/outcome evidence into a delivered card", () => {
+  it("uses the governed register delivery projection in Cards instead of hardcoded unavailability", () => {
     listHookState.data = { orders: [order({ allocated_units: [{ sku: "B1201S-K", status: "sold", qty: 1 }] })] };
     mount("/operation/orders?view=cards");
-    expect(within(screen.getByTestId("sales-orders-cards")).getByText("Unavailable")).toBeInTheDocument();
-    expect(within(screen.getByTestId("sales-orders-cards")).queryByText("Fully delivered")).not.toBeInTheDocument();
+    const cardStatus = within(screen.getByTestId("sales-orders-cards")).getByText("Fully delivered");
+    expect(cardStatus).toBeInTheDocument();
+    expect(within(screen.getByTestId("sales-orders-cards")).queryByText("Unavailable")).not.toBeInTheDocument();
   });
   it("opens goods-only inspection with actual additional line count, never quantity", () => {
     listHookState.data = { orders: [order({ order_lines: [{ id: "l1", sku: "A", qty: 10, unit_price: 1 }, { id: "l2", sku: "B", qty: 20, unit_price: 1 }] })] };

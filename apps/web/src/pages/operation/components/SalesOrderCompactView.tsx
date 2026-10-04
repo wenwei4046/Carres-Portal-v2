@@ -48,7 +48,7 @@ export default function SalesOrderCompactView({ row, salesLocation, items, docum
     { text: "Customer confirmed date", done: !!card.confirmedDate },
   ]} /> : <p role="status">{unavailable}</p> };
   const goodsLines = (row.o.order_lines ?? []).map(line => ({ sku: nameOf(line.sku), qty: line.qty }));
-  const reference = (row.o.source_ref ?? []).filter(Boolean).join(" · ") || null;
+  const reference = (row.o.source_ref ?? []).filter(Boolean).join(" · ") || `SO-${row.so}`;
   const customerInput = { salutation: salutationOf(null, row.customer), ref: reference, outstanding: row.balance.kind === "amount" ? row.balance.value.toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "", lines: goodsLines };
   const builtInCustomerTemplates = row.balance.kind === "amount" && row.balance.value > 0 ? [
     { key: "reminder", label: "Payment reminder", body: buildCustomerReminder(customerInput) },
@@ -87,6 +87,6 @@ export default function SalesOrderCompactView({ row, salesLocation, items, docum
     ]}
     communication={{ recipients: [{ value: row.phone, label: row.customer, phone: row.phone }], templates: customerTemplates }}
     timelineStatus={timeline.isError ? "Unavailable" : timeline.isLoading ? "Loading…" : undefined}
-    timeline={timeline.data?.map(entry => { const description = describeActivity(entry); const actor = entry.actor_name || "System"; return { id: entry.id, actorName: actor, actorInitial: actor.slice(0, 1), summary: description.title, result: description.body || undefined, at: entry.occurred_at }; }) ?? []}
+    timeline={timeline.data?.map(entry => { const description = describeActivity(entry); const actor = entry.actor_name || "Staff identity not recorded"; return { id: entry.id, actorName: actor, actorInitial: actor.slice(0, 1), summary: description.title, result: description.body || undefined, at: entry.occurred_at }; }) ?? []}
   /></div>;
 }

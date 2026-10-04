@@ -766,7 +766,7 @@ function DataGridInner<T>({
   rowHighlight,
   onFilteredRowsChange,
   onSearchChange,
-  initialSearch = "",
+  initialSearch,
   renderResults, presentationTools = false, pageToolsItems, toolbarSummary, searchScope, facetRows, onFacetRowsChange, sessionKey, presentationKey = "table",
   appearance = "default",
   palette,
@@ -853,7 +853,7 @@ function DataGridInner<T>({
     [storageKey],
   );
 
-  const [search, setSearch] = useState(initialSearch || remembered?.search || "");
+  const [search, setSearch] = useState(initialSearch ?? remembered?.search ?? "");
   /** Listing Standard 2026-09-16: below a 768px canvas a row checkbox gets a
    *  40×40 hit area (its column widens to 40 so the target is not shared). */
   const [narrowCanvas, setNarrowCanvas] = useState(false);
@@ -880,7 +880,7 @@ function DataGridInner<T>({
      discoverable toolbar button + popover with a per-column checkbox + Reset
      link, matching houzs-erp/src/pages/SalesOrderPage.tsx lines 576-624. */
   const [columnsMenuOpen, setColumnsMenuOpen] = useState(false);
-  const [searchOpen, setSearchOpen] = useState(initialSearch.length > 0);
+  const [searchOpen, setSearchOpen] = useState((initialSearch?.length ?? 0) > 0);
   const [outputMenuOpen, setOutputMenuOpen] = useState(false);
   /* The Columns popover is fixed-positioned (not absolute) so it escapes the
      grid card's `overflow: hidden`, which otherwise clips the dropdown when the
