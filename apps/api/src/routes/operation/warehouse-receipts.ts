@@ -503,7 +503,10 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
       const supplierName = supplierByPo.get(r.po_id) ?? null;
       const totals = warehouseReceiptTotals(r.lines ?? []);
       const number = receivingDisplayNo({ id: r.id, grn_no: r.grn_no, goods_received_at: r.goods_received_at ?? undefined, submitted_at: r.submitted_at ?? undefined });
-      const source = [...new Set([...(r.lines ?? []).flatMap(line => refsByLine.get(line.id) ?? []), ...(r.arrival_source_id && arrivalNoById.has(r.arrival_source_id) ? [arrivalNoById.get(r.arrival_source_id)!] : [])])].map(ref => documentDisplayNumber(ref)).join(" · ");
+      const source = [...new Set([
+        ...(r.arrival_source_id && arrivalNoById.has(r.arrival_source_id) ? [arrivalNoById.get(r.arrival_source_id)!] : []),
+        ...(r.lines ?? []).flatMap(line => refsByLine.get(line.id) ?? []),
+      ])].map(ref => documentDisplayNumber(ref)).join(" · ");
       const labels = [...new Set((r.lines ?? []).map(line => productWordBySku.get(line.sku) ?? line.sku))];
       const actualSite = (r.actual_site_id ? whNames.get(r.actual_site_id) : null) ?? (r.warehouse_id ? whNames.get(r.warehouse_id) : null) ?? "";
       const extra = receivingExtraQty((Array.isArray(r.extra_lines) ? r.extra_lines : []) as ReceivingExtraLine[]);
