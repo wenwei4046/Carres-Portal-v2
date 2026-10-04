@@ -173,6 +173,17 @@ function safetyDaysValue(cell: SoBatchSafetyDaysCell | undefined): number {
   return cell?.kind === "days" ? cell.days : Number.POSITIVE_INFINITY;
 }
 
+/** Scoped presentation copy: other Purchasing surfaces retain their governed wording. */
+function soBatchTimingWords(safetyDays: number) {
+  return {
+    can_order_early: "Order early",
+    safety_days_full: `${safetyDays} days left`,
+    safety_days_low: `1–${safetyDays - 1} days left`,
+    safety_days_none: "0 days left",
+    not_enough_production_time: "Production late",
+  };
+}
+
 /** The same cell as ONE string, for the column filter and every export. */
 function safetyDaysWord(cell: SoBatchSafetyDaysCell | undefined): string {
   if (cell == null || cell.kind === "none") return "";
@@ -509,14 +520,9 @@ export default function SoBatchRegister({ data, isLoading, onIssue, initialSearc
   const toggleTiming = useCallback((s: PurchaseDemandTimingState) => {
     setFilter((prev) => ({ ...prev, timing: prev.timing === s ? null : s }));
   }, []);
-  const stateWords = useMemo(() => purchaseDemandStateWords(data.safetyDays), [data.safetyDays]);
+  const stateWords = useMemo(() => ({ ...purchaseDemandStateWords(data.safetyDays), ...soBatchTimingWords(data.safetyDays) }), [data.safetyDays]);
   const railWords = useMemo(() => ({
-    ...purchaseDemandRailWords(data.safetyDays),
-    can_order_early: "Order early",
-    safety_days_full: `${data.safetyDays} days left`,
-    safety_days_low: `1–${data.safetyDays - 1} days left`,
-    safety_days_none: "0 days left",
-    not_enough_production_time: "Production late",
+    ...purchaseDemandRailWords(data.safetyDays), ...soBatchTimingWords(data.safetyDays),
   }), [data.safetyDays]);
   /* `SETUP TO FIX` renders only while an affected Sales Order exists. When the
      last such line is fixed, its filter must not survive as an invisible
@@ -1285,6 +1291,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue, initialSearc
               outstanding arithmetic behind it is untouched and still governs
               the tick and the Ready Stock door. */}
           {roundNavigation && <FilterRailGroup title="Order time" icon="date" defaultOpen>
+            {data.poWindowsUnavailable && <p className="px-2 py-2 text-meta text-kit-slate-11">Data not loaded</p>}
             {roundNavigation.rounds.map(round => {
               const window = parsePoWindowKey(round.key);
               return window ? <FilterRailRow key={round.key} testId={`so-batch-round-${round.key}`}
@@ -1784,7 +1791,7 @@ function SoBatchOrderExpansion({
     if (leaf) linesPerLeaf.set(leaf.id, (linesPerLeaf.get(leaf.id) ?? 0) + 1);
   }
 
-  const stateWords = purchaseDemandStateWords(safetyDays);
+  const stateWords = { ...purchaseDemandStateWords(safetyDays), ...soBatchTimingWords(safetyDays) };
   const lines: GoodsMiniLine[] = order.lines.map((l) => {
     const leaf = leafByLineId.get(l.orderLineId);
     const linePos = l.pos.map((p) => poById.get(p.poId)).filter(Boolean);
