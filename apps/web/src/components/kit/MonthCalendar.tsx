@@ -48,7 +48,7 @@ const CLASSNAMES = {
   // its modifiers — a td-level `[&>button]` override loses to the button's own
   // hover class and paints white text on the grey hover tint.
   day_button: "",
-  today: "[&>button]:font-medium [&>button]:text-kit-blue-11",
+  today: "[&>button]:font-medium",
   outside: "text-kit-slate-9",
   disabled: "opacity-40",
   hidden: "invisible",
@@ -57,7 +57,7 @@ const CLASSNAMES = {
 /** The day button's own skin — precedence is explicit: the SELECTED day wears
  *  the governed blue; a muted non-working Sunday stays readable; everything
  *  else hovers grey. */
-function dayButtonClass(mods: { selected?: boolean; nonworking?: boolean }): string {
+function dayButtonClass(mods: { selected?: boolean; nonworking?: boolean; today?: boolean }): string {
   return [
     "flex h-9 w-[30px] flex-col items-center justify-start rounded-control pt-0.5 text-body",
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9",
@@ -65,7 +65,9 @@ function dayButtonClass(mods: { selected?: boolean; nonworking?: boolean }): str
       ? "bg-kit-blue-9 text-white hover:brightness-95"
       : mods.nonworking
         ? "text-kit-slate-9 hover:bg-kit-slate-3"
-        : "text-kit-slate-12 hover:bg-kit-slate-3",
+        : mods.today
+          ? "text-kit-blue-11 hover:bg-kit-slate-3"
+          : "text-kit-slate-12 hover:bg-kit-slate-3",
   ].join(" ");
 }
 
@@ -129,7 +131,6 @@ export default function MonthCalendar({
             d.toLocaleDateString("en-GB", { weekday: "short" }),
         }}
         modifiers={{ nonworking: { dayOfWeek: [0] } }}
-        modifiersClassNames={{ nonworking: "[&>button]:text-kit-slate-9" }}
         classNames={CLASSNAMES}
         components={{
           DayButton: ({ day, modifiers, ...button }) => {

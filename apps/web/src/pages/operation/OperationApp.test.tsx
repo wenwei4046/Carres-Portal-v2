@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
-import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation, useSearchParams, Link } from "react-router-dom";
 
 /**
  * Regression test for the Phase 4.5 Chunk 2 procurement nested routing.
@@ -102,6 +102,16 @@ vi.mock("./DeliveryOrderPage", () => ({
 // production walk found broken: the route existed and the `isUrlDriven` gate
 // did not include it, so the main pane rendered nothing.
 // The right rail self-fetches (tasks/notes) — stub it; this suite tests routing.
+vi.mock("./components/rail/CalendarPanel", () => ({
+  default: () => {
+    const [params, setParams] = useSearchParams();
+    return <div data-testid="calendar-stub">
+      <button onClick={() => { const next = new URLSearchParams(params); next.set("calendarDay", "2026-10-12"); setParams(next); }}>Pick fixture day</button>
+      <span>{params.get("calendarDay")}</span>
+      <Link to="/operation/orders?calendarDay=2026-10-12">Open fixture source</Link>
+    </div>;
+  },
+}));
 vi.mock("./components/OperationRightRail", () => ({
   default: () => <div data-testid="right-rail-stub">rail</div>,
 }));
@@ -546,6 +556,23 @@ describe("OperationApp — the phone shell (owner review 2026-09-25, round 2)", 
     } finally {
       restore();
     }
+  });
+
+  it("opens the shared Calendar on phone, retains date picks, and closes on a source door", () => {
+    const restore = phoneMedia(true);
+    try {
+      renderApp("/operation?tab=dashboard");
+      fireEvent.click(screen.getByRole("button", { name: /^Calendar$/ }));
+      expect(screen.getByRole("dialog", { name: "Calendar" })).toBeVisible();
+      fireEvent.click(screen.getByText("Pick fixture day"));
+      expect(screen.getByRole("dialog", { name: "Calendar" })).toBeVisible();
+      expect(screen.getByTestId("calendar-stub")).toHaveTextContent("2026-10-12");
+      fireEvent.click(screen.getByText("Open fixture source"));
+      expect(screen.queryByRole("dialog", { name: "Calendar" })).toBeNull();
+      expect(screen.getByTestId("register-stub")).toBeVisible();
+      fireEvent.click(screen.getByRole("button", { name: /^Calendar$/ }));
+      expect(screen.getByTestId("calendar-stub")).toHaveTextContent("2026-10-12");
+    } finally { restore(); }
   });
 
   it("from 768px the shell is unchanged: sidebar column, right rail, no Menu", () => {
