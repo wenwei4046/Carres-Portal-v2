@@ -215,6 +215,21 @@ describe("delivery scopes and journey legs", () => {
     ]);
     expect(rows).toHaveLength(0);
   });
+
+  it("retains a completed journey's own carrier and date only for an object read", () => {
+    const completed = order({ id: "c", so: 1303, status: "delivered", delivered_at: "2026-08-10T00:00:00Z", delivery_stops: [
+      { leg: 1, status: "handed_off", partner_name: "NETS", to_loc: "JB transit warehouse", scheduled_at: "2026-08-08T00:00:00Z" },
+      { leg: 2, status: "delivered", partner_name: "AL", to_loc: "Customer", scheduled_at: "2026-08-10T00:00:00Z" },
+    ] as operationOrderListRow["delivery_stops"] });
+    const source = { orders: [completed], deliveryOrders: [], attempts: [], handoverEvents: [], partnerNameById: new Map<string, string>() };
+    expect(buildDeliveryScopeRows(source)).toHaveLength(0);
+    const rows = buildDeliveryScopeRows({ ...source, includeCompleted: true });
+    expect(rows.map(row => [row.leg, row.logisticsName, row.confirmedIso])).toEqual([
+      [1, "NETS", "2026-08-08"], [2, "AL", "2026-08-10"],
+    ]);
+    expect(rows[1]!.status.kind).toBe("delivered");
+    expect(buildDeliveryScopeRows({ ...source, includeCompleted: true, orders: [{ ...completed, status: "cancelled" }] })).toHaveLength(0);
+  });
 });
 
 describe("Confirmed Delivery has one arithmetic", () => {

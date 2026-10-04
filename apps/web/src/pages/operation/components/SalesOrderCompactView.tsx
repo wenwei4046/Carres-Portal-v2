@@ -35,7 +35,7 @@ export default function SalesOrderCompactView({ row, salesLocation, items, docum
     enabled: ["operation", "finance", "principal"].includes(role ?? "") && row.balance.kind === "amount" && row.balance.value > 0,
   });
   const card = delivery.failed || delivery.loading || (delivery.card && (delivery.card.leg ?? 0) !== leg) ? null : delivery.card;
-  const mayEdit = (role === "operation" || role === "principal") && !!card && !card.settled && row.o.status !== "cancelled";
+  const mayEdit = (role === "operation" || role === "principal") && !!card && !card.settled && row.o.status !== "cancelled" && row.o.status !== "delivered" && !row.o.delivered_at;
   const unavailable = delivery.failed ? "Unavailable" : delivery.loading ? "Loading…" : "Not recorded";
   const money = (fact: RegisterRow["total"]) => fact.kind === "amount" ? new Intl.NumberFormat("en-MY", { style: "currency", currency: "MYR", maximumFractionDigits: 2 }).format(fact.value) : fact.kind === "settled" ? "Paid in full" : "No price yet";
   const goods = card ? [...card.items, ...card.extras.filter(item => item.kind === "accessory")].reduce((sum, item) => sum + item.qty, 0) : 0;

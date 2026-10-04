@@ -36,6 +36,13 @@ describe("real SO card", () => {
   it("uses the final journey receiver and does not mistake the first leg for it", () => {
     state.card!.leg = 1; mount({ ...row, o: { ...row.o, delivery_stops: [{ leg: 1 }, { leg: 2 }] as operationOrderListRow["delivery_stops"] } }); fireEvent.click(screen.getByRole("button", { name: "Delivery" })); expect(state.leg).toBe(2); expect(screen.queryByText("Date confirmed")).toBeNull();
   });
+  it("shows completed delivery facts without opening a writer even if the source card is stale", () => {
+    mount({ ...row, o: { ...row.o, status: "delivered", delivered_at: "2026-09-30T08:00:00Z" } });
+    fireEvent.click(screen.getByRole("button", { name: "Delivery" }));
+    expect(screen.getByText("NETS")).toBeVisible();
+    expect(screen.queryByRole("button", { name: /^Customer/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Logistics/ })).toBeNull();
+  });
   it("uses the Malaysia calendar for the target countdown and keeps the phone pair together", () => {
     vi.useFakeTimers(); vi.setSystemTime(new Date("2026-10-03T17:00:00Z"));
     try { mount(); expect(screen.getByText("27d")).toBeVisible(); const phone = screen.getByText("0191234567"); expect(phone.querySelector("svg")).not.toBeNull(); } finally { vi.useRealTimers(); }

@@ -67,6 +67,7 @@ export function useDeliveryScopeCard(orderId: string | null, leg = 0, knownOrder
     const addonNameByKey = new Map<string, string>();
     for (const a of catalogQ.data?.addons ?? []) if (a.key && a.name) addonNameByKey.set(a.key, a.name);
     const cards = buildDeliveryMonitorCards({
+      includeCompleted: Boolean(knownOrder),
       orders: [order],
       deliveryOrders: (docsQ.data?.deliveryOrders ?? []).filter((d) => d.order_id === orderId),
       attempts: docsQ.data?.attempts ?? [],
@@ -81,7 +82,10 @@ export function useDeliveryScopeCard(orderId: string | null, leg = 0, knownOrder
       addonNameByKey,
       todayIso: today,
     });
-    return cards.find((c) => (c.leg ?? 0) === leg) ?? cards[0] ?? null;
+    const selected = cards.find((c) => (c.leg ?? 0) === leg) ?? cards[0] ?? null;
+    return selected && (order.status === "delivered" || order.delivered_at)
+      ? { ...selected, settled: true }
+      : selected;
   }, [orderId, leg, knownOrder, ordersQ.data, docsQ.data, arrangementsQ.data, partnersQ.data, settingsQ.data, catalogQ.data, today]);
 
   return {
