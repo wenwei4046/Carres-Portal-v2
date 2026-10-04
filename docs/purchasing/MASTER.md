@@ -374,6 +374,28 @@ Unit and clearing returned to no Unit chosen. No Proceed/save/issue was performe
 The initial live Register load also showed Match and Purchase Orders disabled. These prove
 positive candidate/selection and read/loading behavior, not live reservation acceptance.
 
+**Supplier PDF source/recovery measurement, 2026-10-04.** Actual production search `7907`
+matched 12 retained SOs. Nice Future preparation deduplicated their lineage to three selected
+V1 documents: `PO-20260903-7907`, `PO-20260903-4585`, `PO-20260903-6426`. Download produced
+`/Users/chaichiewlim/Downloads/Purchase-orders-00000000-0000-0000-0000-0000000000e2.zip`
+with exactly those three independent PDFs (31,165 / 26,926 / 26,696 bytes). Archive CRC, unique
+entry names, PDF headers and EOF markers passed; no PO or sending evidence was written.
+Original source/version/destination and earlier sent evidence remained separate per PO.
+The supplier UUID exposed in the archive name is locally corrected to the readable supplier name;
+individual official PDF filenames and stored identities remain unchanged.
+
+Ohana's retained `PO-20260903-4316` and `PO-20260903-9389` could not prepare PDFs. Read-only
+production data confirmed both are open and their original Ohana destination has no address.
+The local panel now names the affected PO with the governed address/Settings refusal rather than
+generic preview trouble. Failed or mismatched/draft/invalid-version source documents cannot supply
+a sendable message. Readable sibling documents remain visible; selecting a failed document blocks
+copy/download/send, while deliberately deselecting it permits the exact readable selection. Try
+again rereads the same supplier document identities without issuing, reserving or sending.
+35 supplier preparation/archive tests pass. Actual write-rejecting sample UI shows SAMPLE-PO-001
+unavailable beside readable SAMPLE-PO-002 V2, disabled preparation, then recovery of the same
+selected V1/V2 set via Try again. Evidence: `/tmp/so-batch-supplier-source-failure.png`.
+This correction is local build pending release; no destination address was invented or changed.
+
 ### SO Batch PO Status — owner-approved 2026-10-04
 
 Column/filter title: `PO Status`. In that named context use `Pending`, `Partial`, `Done`.
