@@ -3770,9 +3770,9 @@ still precedes PO creation.
 Both Manual Purchase and SO Batch use listing selection to open a right-side Quick View without
 requiring full-page navigation for ordinary tasks. Quick View contains the source facts/evidence
 and authorised owning actions needed to complete the current task. Manual Purchase supports
-Operation review/submission and Jess approval/return there. SO Batch supports its existing review
-and purchase actions there; this presentation approval does not introduce a new Jess approval
-round for SO Batch or override existing approval, issue, grouping and sending rules.
+Operation review/submission and Jess approval/return there. SO Batch supports placing the system-prepared order and handling its current PO sending
+action there. Ordinary SO Batch has no additional manual information-review checkpoint or new
+Jess approval round; source eligibility, lawful issue and actual-sending controls remain.
 
 Full page exposes the complete original form and supporting material in a 50/50 view; opening it
 is viewing, not entering edit mode. Explicit Edit enters information editing. The Purchase Order
@@ -3808,23 +3808,57 @@ two presentations of one register, not duplicate facts on one screen. Exact item
 promise batches are inspected on the selected PO; do not repeat a full item table inside every card.
 Full PO information/edit + actual PDF remains the approved 50/50 surface under §9.3.
 
-Operation journey for review: (1) accumulate authorised source demand; subtract only authoritative
-secured-stock/exact-PO coverage; (2) select the due window and inspect ready/blocked demand;
-(3) review grouping, supplier, goods, quantities, destinations, dates and approvals;
-(4) inspect every proposed supplier PO and actual rendered PDF in the shared 50/50 review;
-(5) issue the reviewed supplier POs once; (6) transmit each current PDF through its supplier's
-recorded channel and record actual version/recipient/channel/actor/time; (7) close that window
-only from the complete source-demand/current-version sending conditions; (8) follow outstanding
-PO goods, using original planning dates until an evidenced supplier answer establishes confirmed
-line/batch dates; (9) record date changes/splits/inability/price facts through existing governed
-doors; (10) confirm each effective incoming batch one Office working day before arrival;
-(11) Receiving records physical arrival, exact goods/Units, condition and numbered GRN evidence;
-(12) keep partial outstanding quantity and its next date open, handle claims with their owner, and
-close resolved goods without losing unconfirmed sending or open claims. Supplier invoice/payable
-settlement remains Finance-owned. Wrong/damaged goods do not silently count as acceptable delivery.
-No supplier answer alone revises a PO; actual document/goods/destination changes use governed
-revision/approval and current-version resend. A missed round retains its date/time and scope;
-subsequent demand is a separate round, preventing double buying.
+### SO Batch Purchase Blueprint — owner-confirmed steps, 2026-10-04
+
+**RULING / APPROVED OPERATING FLOW; target, not production proof.** Jess corrected the
+ordinary flow: Operation follows the prepared buying demand and places the order. Do not
+add an Operation checklist, second validation, editable reconstruction of source facts or
+mandatory full-page/PDF inspection before ordinary order placement. The system owns the
+correct source goods, quantity, supplier, destination and dates; missing or invalid source
+facts remain explicit exceptions, not permission to issue an invalid order.
+
+1. **Customer SO enters the round.** Use actual Proceed Date/time and the governed 10:15 AM /
+   4:00 PM windows. Bring forward existing goods/specification, supplier, destination and date
+   facts; deduct only authoritative eligible stock and exact PO coverage. Keep source lineage.
+2. **Operation places the order.** Open the due round and execute the owning purchase action
+   from its Quick View. Use system-prepared information; no extra routine manual review gate.
+   Compatible source demand produces the appropriate supplier POs under existing document rules.
+3. **Generate PO and real PDF.** Successful lawful issue creates the numbered PO/current version
+   and its real supplier-facing PDF. Do not represent an unissued preview as a formal issued PO.
+   Full-page 50/50 inspection remains available, not compulsory for every placement.
+4. **Operation sends the PO to the supplier.** Send the actual current PDF and record actual
+   version, recipient, channel, actor and time. Generating a PDF alone is not sending. The
+   SO Batch purchase work is complete only when its eligible buying scope is covered and all
+   relevant current PO versions have confirmed sending. This is purchase-task completion,
+   not physical receipt or Finance settlement.
+5. **Normally await delivery to the warehouse.** A supplier reply is not a prerequisite to
+   waiting or completing the order-and-send task. Do not create an immediate mandatory
+   supplier-reply/chasing checkpoint after every send. If the supplier reports an issue,
+   handle the specific goods/date/quantity/price/cancellation exception through its owning
+   rules. Overdue outstanding goods remain visible. This normal waiting state does not
+   silently repeal the separately governed date-specific pre-arrival action in §5.7.1;
+   that is an incoming-batch coordination obligation, not another SO Batch placement gate.
+6. **Warehouse records actual receipt.** Receiving records actual goods, quantities, condition
+   and numbered receipt evidence. Partial receipt leaves the remaining quantity outstanding;
+   damaged/wrong/extra goods follow their existing exception rules. Keep related PO, source,
+   supplier evidence and any open Claim/Finance obligations reachable.
+
+**Listing completion and next action.** Retain completed records in the same SO Batch listing.
+Owner direction is unfinished purchase work first; Proceed Date remains the priority date
+within unfinished work. Completed purchase records follow beneath it. The row states its actual
+next action, such as placing the order or sending its already-issued PDF; never require staff to
+learn the proposed `To order / To send / Completed` three-stage taxonomy. Those proposed new
+labels are withdrawn. Selecting Supplier grouping changes presentation, not purchase completion
+or quantities. Do not equate sending completion with warehouse receipt, or hide an unpurchased
+remainder after a partial PO. Exact literal labels and additional status-group menu composition
+remain review proposals rather than approved screen copy.
+
+**Boundaries.** Manual Purchase retains its separate Operation review → Jess approval → PO path.
+SO Batch does not inherit that review/approval loop. Supplier response alone does not revise
+PO document truth; real goods/destination/document changes use governed revision/approval and
+current-version resend. Missed rounds retain their own occurrence and scope; later demand must
+not be purchased twice. Existing module ownership, exception, permission, receiving, claim and
+financial obligations remain separately traceable.
 
 **FALSIFIER / ACCEPTANCE:** reject the proposed composition if an Operation user cannot, without
 Workspace, select either round, identify every supplier PO/current PDF, finish evidenced sending,
