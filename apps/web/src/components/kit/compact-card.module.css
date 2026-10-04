@@ -220,7 +220,7 @@
 .cell strong.clamp { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; overflow: hidden; }
 .status { display: block; font-size: 11px; line-height: 16px; font-weight: 400; color: var(--cc-muted); margin-top: 4px; }
 .readCell span { font-size: 12px; color: var(--cc-muted); }
-.panel .readCell strong { font-size: 13px; white-space: nowrap; display: block; }
+.panel .readCell strong { font-size: 13px; white-space: normal; display: block; }
 .editorError { font-size: 12px; line-height: 16px; color: var(--cc-error); margin: 8px 0 0; }
 .panel p.editorError { color: var(--cc-error); font-size: 12px; margin: 8px 0 0; }
 
@@ -395,3 +395,5 @@ aside.section { background: var(--cc-surface); }
   .panel .readCell strong { font-size: 12px; }
   .readCell span { font-size: 11px; }
 }
+
+.panel .documentNumber { padding: 0; text-align: left; text-decoration: underline; text-underline-offset: 2px; }

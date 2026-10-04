@@ -41,7 +41,7 @@ before quoting. Built is not the same as owner-verified on every page.
 | Fact cards | `Block` — the one object card (§4.1) · `Panel` · `StatusPill` · `EmptyState` · `Loading` | `components/kit/*` | LOCKED · built |
 | Orders list / drawer band | `SectionPanel` (cream band) — that surface only, not a general card | `components/SectionPanel.tsx` | Governed by §4.1; not a `Block` duplicate |
 | Dialogs and panels | `Modal` · `Drawer` (incl. quick view) · `Toast` · `PdfPreview` · `SavedEvidenceViewer` | `components/kit/*` | Built |
-| **Compact module card** (shared customer header, module tabs, module summary, editors, items, Communication, Timeline) | **`CompactModuleCard`** — pass the header facts once and each module's own facts, editors and items | `components/kit/CompactModuleCard.tsx` · `/ui#compact-card` · contract `docs/ui-reference/MODULE-CARD-TEMPLATE.md` | Owner rules 2026-10-03/04 (§4.3) · built on branch, parity proven against the owner's reference page · **no production page uses it yet** · palette/font/radius await the token decision |
+| **Compact module card** (shared customer header, module tabs, module summary, editors, items, Communication, Timeline) | **`CompactModuleCard`** — pass the header facts once and each module's own facts, editors and items | `components/kit/CompactModuleCard.tsx` · `/ui#compact-card` · contract `docs/ui-reference/MODULE-CARD-TEMPLATE.md` | Owner rules 2026-10-03/04 (§4.3) · built on branch, parity proven against the owner's reference page · **Sales Orders quick-view adoption implemented; release verification pending** · palette/font/radius await the token decision |
 | Work right-panel Communication | `WorkCommunication` — recorded channels only | `pages/operation/work/WorkCommunication.tsx` | Owner ruling 2026-09-17 · built; differs from the compact card's editable `To` (open owner question) |
 | Record history | §5 three-rank grammar 13/12/11 | this MASTER §5 | LOCKED · no shared component; each page draws it |
 
@@ -3558,16 +3558,16 @@ The master contract being documented does not mean every module has migrated or 
 
 ## §4.3 · Compact module card — owner rules 2026-10-03 / 2026-10-04
 
-**OWNER CONFIRMED · KIT COMPONENT BUILT ON BRANCH · NO PRODUCTION PAGE ADOPTED YET.** Every module card
+**OWNER CONFIRMED · SHARED KIT BUILT · SALES ORDERS ADOPTION IMPLEMENTED, RELEASE PENDING.** Every module card
 uses the kit [`CompactModuleCard`](../../apps/web/src/components/kit/CompactModuleCard.tsx) (live on
 `/ui#compact-card` with Info and Delivery). Never copy reference HTML or CSS into a page. The
 complete rules, the sample-data boundary and the deviations from the reference page live in
 [`MODULE-CARD-TEMPLATE.md`](../ui-reference/MODULE-CARD-TEMPLATE.md); the reference page
 `module-card-reference.html` is the proof target of `scripts/compact-card-states.mjs`
-(18 states × 5 widths, no unexplained difference).
+(25 states × 5 widths; reference parity evidence is distinct from business-page acceptance).
 
 In one line each: one shared customer header with sales facts behind a ▾/▴ (no words), address with
-its own toggle, target date, Open and Close; Info opens sales facts and address, other modules start
+its own toggle, target date, Open and Close; the source-owned SO number lazily opens the saved formal document; Info opens sales facts and address, other modules start
 closed; summary cells are label above value, left aligned, only the module's own facts (Info
 `Total · Paid · Outstanding`, Delivery `Stock · Logistics · Customer · DO`, the Customer cell ruled by Delivery MASTER); title row, value
 and optional status line are top aligned on common baselines with the ▾ at the right; values take the

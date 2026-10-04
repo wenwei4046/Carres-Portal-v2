@@ -1,3 +1,4 @@
+import SalesOrderCompactView from "./components/SalesOrderCompactView";
 import StatusPill from "@/components/kit/StatusPill";
 /**
  * SalesOrdersRegister — STAGE 1 (BUILD-QUEUE): the page RUNS THE REGISTER
@@ -1233,29 +1234,12 @@ export default function SalesOrdersRegister() {
   return (
     <div className="flex h-full min-h-0 flex-col">
       <DestinationHeader />
-      {quickOrder && <Drawer variant="quick-view" open onOpenChange={(open) => { if (!open) setQuickOrder(null); }} title={`SO-${quickOrder.so} · ${quickOrder.customer}`} headerActions={<><StatusPill tone={salesOrderStatusTone(REGISTER_DELIVERY_CONDITIONS.find(c => c.key === registerDeliveryConditionOf(quickOrder.o.order_lines ?? [], quickOrder.o.allocated_units ?? []))?.label ?? "Not recorded")}>{REGISTER_DELIVERY_CONDITIONS.find(c => c.key === registerDeliveryConditionOf(quickOrder.o.order_lines ?? [], quickOrder.o.allocated_units ?? []))?.label ?? "Not recorded"}</StatusPill><Button iconOnly icon="print" variant="ghost" aria-label="Print sales order" title="Print sales order" onClick={() => void printSalesOrders([quickOrder])} /><Button iconOnly icon="open" variant="ghost" aria-label="Open full page" onClick={() => openWorkspace(quickOrder)} /></>}>
-        <div className="flex flex-col gap-3" data-testid="sales-order-quick-view">
-          <Block title="SO info" tone="muted"><dl className="grid grid-cols-2 gap-3 text-body">
-            <div><dt className="text-label text-kit-slate-11">Phone</dt><dd>{quickOrder.o.customer_phone || "Not given"}</dd></div>
-            <div><dt>Email</dt><dd className="break-words">{quickOrder.o.customer_email || "Not given"}</dd></div>
-            <div><dt className="text-label text-kit-slate-11">Sales Location</dt><dd>{salesLocationOf(quickOrder.o)}</dd></div>
-            <div><dt className="text-label text-kit-slate-11">Salesperson</dt><dd>{quickOrder.o.salespersons?.name ?? "Not recorded"}</dd></div>
-            <div><dt className="text-label text-kit-slate-11">SO Doc Date</dt><dd>{fmtDate(quickOrder.ordered)}</dd></div>
-            <div><dt>Proceed Date</dt><dd>{quickOrder.proceeded ? fmtDate(quickOrder.proceeded) : "Not recorded"}</dd></div><div className="col-span-2"><dt>Dealer</dt><dd>{quickOrder.o.dealers?.name || "Not recorded"}</dd></div>
-          </dl></Block>
-          <Block title="Delivery"><dl className="grid grid-cols-2 gap-3 text-body">
-            <div><dt className="text-label text-kit-slate-11">Customer Requested Delivery Date</dt><dd>{quickOrder.customerDelivery ? fmtDate(quickOrder.customerDelivery) : "Not recorded"}</dd></div>
-            <div className="col-span-2"><dt className="text-label text-kit-slate-11">Delivery Location</dt><dd>{quickOrder.o.customer_address || quickOrder.deliveryLocation}</dd></div><div><dt>Floor</dt><dd>{quickOrder.o.delivery_floor ?? "Not recorded"}</dd></div><div><dt>Lift</dt><dd>{quickOrder.o.delivery_has_lift == null ? "Not recorded" : quickOrder.o.delivery_has_lift ? "Yes" : "No"}</dd></div><div><dt>Stair carry items</dt><dd>{quickOrder.o.delivery_stair_items ?? "Not recorded"}</dd></div>
-          </dl></Block>
-          <Block title="Items"><div className="min-w-0 overflow-x-auto"><ExpandedLines row={quickOrder} compact /></div></Block>
-          <Block title="Payment"><dl className="flex flex-col gap-3 text-body">
-            <div className="flex justify-between"><dt>Total payable</dt><dd>{moneyCell(quickOrder.total)}</dd></div>
-            <div className="flex justify-between"><dt>Paid to date</dt><dd>{moneyCell(quickOrder.paid)}</dd></div>
-            <div className="flex justify-between font-semibold"><dt>Balance due</dt><dd>{moneyCell(quickOrder.balance)}</dd></div>
-            <div className="flex justify-between"><dt>Payment Status</dt><dd><StatusPill tone={salesOrderStatusTone(PAYMENT_STATUSES.find(p => p.key === paymentStatusOf(quickOrder))!.label)}>{PAYMENT_STATUSES.find(p => p.key === paymentStatusOf(quickOrder))!.label}</StatusPill></dd></div>
-          </dl></Block>
-          <RelatedDocuments row={quickOrder} />
-        </div>
+      {quickOrder && <Drawer variant="compact-card" open onOpenChange={(open) => { if (!open) setQuickOrder(null); }} title={`SO-${quickOrder.so} · ${quickOrder.customer}`}>
+        <SalesOrderCompactView row={quickOrder} salesLocation={salesLocationOf(quickOrder.o)} items={<div className="min-w-0 overflow-x-auto"><ExpandedLines row={quickOrder} compact /></div>} documents={<RelatedDocuments row={quickOrder} />} statuses={<dl className="flex flex-col gap-3 text-body">{[
+          ["Stock Status", STOCK_STATUSES.find(status => status.key === stockStatusOf(quickOrder))!.label],
+          ["Payment Status", PAYMENT_STATUSES.find(status => status.key === paymentStatusOf(quickOrder))!.label],
+          ["Delivery Status", REGISTER_DELIVERY_CONDITIONS.find(status => status.key === registerDeliveryConditionOf(quickOrder.o.order_lines ?? [], quickOrder.o.allocated_units ?? []))?.label ?? "Not recorded"],
+        ].map(([label, value]) => <div key={label} className="flex justify-between"><dt>{label}</dt><dd><StatusPill tone={salesOrderStatusTone(value)}>{value}</StatusPill></dd></div>)}</dl>} onOpen={() => openWorkspace(quickOrder)} onClose={() => setQuickOrder(null)} />
       </Drawer>}
       {goodsTarget && <Drawer open onOpenChange={(open) => { if (!open) setGoodsTarget(null); }} title={`SO-${goodsTarget.so} · Items`}>
         <div className="min-w-0 max-w-full overflow-x-auto"><ExpandedLines row={goodsTarget} inspection /></div>

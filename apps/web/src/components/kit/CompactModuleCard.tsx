@@ -197,6 +197,8 @@ export interface CardCommunication {
 export interface CompactModuleCardProps {
   name: string;
   reference: string;
+  /** Optional source-owned read-only document. Mounted only after the number is opened. */
+  document?: { label: string; preview: ReactNode };
   phone?: string;
   sales?: { orderDate: string; salesLocation: string; salesperson: string };
   address?: { area: string; full: string; facts?: { kind: "building" | "access"; label: string; value: string }[] };
@@ -209,6 +211,7 @@ export interface CompactModuleCardProps {
   initialModule: string;
   communication?: CardCommunication;
   timeline?: CardTimelineEvent[];
+  timelineStatus?: string;
   timeZone?: string;
   /** For /ui and tests only; operators always start with these closed. */
   initiallyOpen?: { communication?: boolean; timeline?: boolean; items?: boolean };
@@ -216,6 +219,7 @@ export interface CompactModuleCardProps {
 
 export default function CompactModuleCard(p: CompactModuleCardProps) {
   const first = p.modules.find((m) => m.key === p.initialModule) ?? p.modules[0];
+  const [documentOpen, setDocumentOpen] = useState(false);
   const [moduleKey, setModuleKey] = useState(first.key);
   const [sales, setSales] = useState(!!first.opensHeaderDetails);
   const [address, setAddress] = useState(!!first.opensHeaderDetails);
@@ -254,7 +258,7 @@ export default function CompactModuleCard(p: CompactModuleCardProps) {
         <header className={s.header}>
           <div className={s.identity}>
             <div className={s.identityTitle}><strong>{p.name}</strong></div>
-            <small className={s.contactLine}><span>{p.reference}</span>{p.phone ? <><Glyph name="phone" /><span>{p.phone}</span></> : null}</small>
+            <small className={s.contactLine}><>{p.document ? <button type="button" className={s.documentNumber} title={p.document.label} aria-label={p.document.label} aria-expanded={documentOpen} aria-controls={`${ids}-document`} onClick={() => setDocumentOpen((v) => !v)}>{p.reference}</button> : <span>{p.reference}</span>}</>{p.phone ? <><Glyph name="phone" /><span>{p.phone}</span></> : null}</small>
             {p.sales ? (
               <button type="button" className={s.salesToggle} title={CARD_WORDS.orderDetails} aria-label={CARD_WORDS.orderDetails} aria-controls={`${ids}-sales`} aria-expanded={sales} onClick={() => setSales((v) => !v)}>
                 <span className={s.chevron}>{sales ? "▴" : "▾"}</span>
@@ -310,6 +314,10 @@ export default function CompactModuleCard(p: CompactModuleCardProps) {
             <button type="button" className={`${s.toggle} ${s.toggleTimeline} ${p.communication || mod.items ? "" : s.toggleFirst}`} title={CARD_WORDS.timeline} aria-label={timeline ? CARD_WORDS.hideTimeline : CARD_WORDS.showTimeline} aria-expanded={timeline} onClick={() => setTimeline((v) => !v)}><Glyph name="history" /></button>
           ) : null}
         </nav>
+        {p.document && documentOpen ? <div id={`${ids}-document`} className={s.body} role="region" aria-label={p.document.label}>
+          <div className={s.buttons}><button type="button" onClick={() => setDocumentOpen(false)}>{CARD_WORDS.close}</button></div>
+          {p.document.preview}
+        </div> : null}
         <article>
           <div className={s.body}>
             {summary.length ? (
@@ -320,7 +328,7 @@ export default function CompactModuleCard(p: CompactModuleCardProps) {
                     {f.status ? <strong><span>{f.value}</span><span className={s.status}>{f.status}</span></strong> : <strong className={s.clamp}>{f.value}</strong>}
                   </button>
                 ) : (
-                  <div key={f.key} className={`${s.cell} ${s.readCell}`}><span>{f.label}</span><strong>{f.value}</strong></div>
+                  <div key={f.key} className={`${s.cell} ${s.readCell}`}><span>{f.label}</span><strong className={s.clamp}>{f.value}{f.status ? <span className={s.status}>{f.status}</span> : null}</strong></div>
                 )))}
               </div>
             ) : null}
@@ -329,7 +337,7 @@ export default function CompactModuleCard(p: CompactModuleCardProps) {
           </div>
         </article>
         {p.communication && comm ? <CardCommunicationPanel id={`${ids}-comm`} config={p.communication} onClose={() => setComm(false)} /> : null}
-        {p.timeline && timeline ? <CardTimeline events={p.timeline} timeZone={p.timeZone ?? CARD_TIME_ZONE} onClose={() => setTimeline(false)} /> : null}
+        {p.timeline && timeline ? <CardTimeline events={p.timeline} status={p.timelineStatus} timeZone={p.timeZone ?? CARD_TIME_ZONE} onClose={() => setTimeline(false)} /> : null}
       </section>
     </div>
   );
@@ -337,12 +345,12 @@ export default function CompactModuleCard(p: CompactModuleCardProps) {
 
 /* ---------- editor building blocks for module-supplied editors ---------- */
 /** Cancel then Save, at the right. Save closes the editor only when the module reports success. */
-export function CardEditorButtons({ onSave, onCancel, error }: { onSave: () => void; onCancel: () => void; error?: string | null }) {
+export function CardEditorButtons({ onSave, onCancel, error, disabled }: { onSave: () => void; onCancel: () => void; error?: string | null; disabled?: boolean }) {
   return (
     <>
     {error ? <p className={s.editorError} role="alert">{error}</p> : null}
     <div className={s.buttons}>
-      <button type="button" className={s.btn} onClick={onSave}>{CARD_WORDS.save}</button>
+      <button type="button" className={s.btn} disabled={disabled} onClick={onSave}>{CARD_WORDS.save}</button>
       <button type="button" className={s.btn} onClick={onCancel}>{CARD_WORDS.cancel}</button>
     </div>
     </>
@@ -529,13 +537,14 @@ function CardCommunicationPanel({ id, config, onClose }: { id: string; config: C
 }
 
 /* ---------- Timeline ---------- */
-function CardTimeline({ events, timeZone, onClose }: { events: CardTimelineEvent[]; timeZone: string; onClose: () => void }) {
+function CardTimeline({ events, status, timeZone, onClose }: { events: CardTimelineEvent[]; status?: string; timeZone: string; onClose: () => void }) {
   return (
     <section className={s.section}>
       <div className={s.sectionHead}>
         <h2>{CARD_WORDS.timeline}</h2>
         <button type="button" className={s.btn} aria-label={CARD_WORDS.closeTimeline} onClick={onClose}>×</button>
       </div>
+      {status ? <p role="status">{status}</p> : null}
       <ol className={s.events}>
         {events.map((e) => {
           const t = e.at ? formatCardTime(e.at, timeZone) : null;
