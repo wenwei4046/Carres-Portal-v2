@@ -474,7 +474,8 @@ same search, column filters and sort; changing presentation starts at page 1. Ta
 50 receipts; Cards pages contain 12 to bound per-receipt detail reads. Footer totals still describe
 the complete authorised filtered population. Open full page retains the register underneath.
 Columns and Export use the shared Page tools menu; Cards introduces no second receipt editor.
-80 local Receiving/card journey tests passed, including filter preservation across presentations
+Party/receiver facts awaiting a detail read show Loading or Unavailable, never false absence.
+81 local Receiving/card journey tests passed, including filter preservation across presentations
 and keyboard access to Page tools. Full CI and live acceptance are owed. This does not deliver
 the Receiving Differences view or Warehouse automatic posting.
 

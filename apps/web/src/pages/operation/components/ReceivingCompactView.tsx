@@ -33,7 +33,7 @@ export default function ReceivingCompactView({ row, items, onOpen, onClose }: {
         ["Supplier DO No", receipt.do_number || "Not recorded"],
         ["Goods arrived at", receipt.actual_site_name || receipt.warehouse_name || "Not recorded"],
         ["Goods Received Date", receipt.goods_received_time ? fmtDate(receipt.goods_received_time, { time: true }) : receipt.goods_received_at ? `${fmtDate(receipt.goods_received_at)} · Time not recorded` : "Not recorded"],
-        ["Received by", receipt.received_by_name || "Not recorded"],
+        ["Received by", receipt.received_by_name || (detail ? "Not recorded" : unavailable)],
       ].map(([label, value]) => <div key={label}><dt className="text-kit-slate-11">{label}</dt><dd className="break-words text-kit-slate-12">{value}</dd></div>)}
     </dl>
     <Panel title="Evidence">
@@ -52,7 +52,7 @@ export default function ReceivingCompactView({ row, items, onOpen, onClose }: {
     </Panel>
   </div>;
   return <div data-testid="receiving-quick-view">
-    <CompactModuleCard key={row.id} name={receipt.supplier_name || receipt.source_party_name || "Not recorded"}
+    <CompactModuleCard key={row.id} name={receipt.supplier_name || receipt.source_party_name || (detail ? "Not recorded" : unavailable)}
       reference={number} referenceStatus={receipt.status === "voided" ? "Cancelled" : undefined} openLabel="Open full page" onOpen={onOpen} onClose={onClose}
       initialModule="receipt" modulesLabel="Receiving" modules={[{
         key: "receipt", label: "Receiving", detailsLabel: "Receipt details", items: items(receipt), details,
