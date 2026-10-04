@@ -6790,10 +6790,24 @@ this module owns the following business-specific application. Delivered evidence
   Payment, Delivery and Stock Status filters live in columns; no duplicate rail or case filter.
   Monthly demand retains its own governed single-choice filters and views.
 - Table/Cards selectors use shared kit icon16 plus visible Table/Cards text, including the selected-record toolbar (owner amendment2026-10-01). Both use the same result/filter engine.
-- Row click and Cards View open read-only quick view. Dark SO/customer header carries status,
-  Print icon-only with tooltip/accessible name, Open full page and Close (owner correction2026-10-02); no footer. Grey SO info starts with customer Phone/Email,
-  then sales attribution/dates/Dealer. Delivery, Items, Payment and Related documents are white
-  Block cards. No separate duplicate customer card. Source failures and absences stay explicit.
+- Row click and Cards View open the shared CompactModuleCard quick view (owner authorised2026-10-04).
+  One customer header carries name, SO, phone, independent sales/address expansion, target date,
+  saved-version SO document entry, full-order door and Close. Info starts with sales/address open,
+  Total/Paid/Outstanding summary; Delivery starts closed and shows Stock/Logistics/Customer/DO.
+  Items, Communication and Timeline start closed. Email, Dealer, Proceed Date, payment/status facts,
+  related documents and all former Items remain reachable in expanded module content; address keeps
+  Floor/Lift/stair carry. Missing stock/dates stay unknown, never sample data. Delivery reuses its
+  existing Monitor projection and governed forms on the final customer leg; only operation/principal
+  can edit unsettled scopes, server gates remain authoritative. Failure preserves input; Cancel does
+  not write; successful save folds the editor. DO conditions are read-only and cannot release goods.
+  Communication prepares drafts; timeline uses recorded instants with no MYT suffix or repeated actor.
+  Closing preserves list filters, selection and scroll; SO full page retains deliberate Edit.
+  Card content uses the sole owner-rules2026-10-03/04 contract; its Drawer container is distinct from
+  Workspace Working Panel. Full-page navigation keeps `/operation/orders/so/:id`; existing
+  SalesOrderWorkspace supplies the responsive 50/50 form/document view, deliberate Edit and source
+  refresh after saving. Existing full-page contract/document checks105 passed; authenticated
+  card→full page→edit/preview→save→return proof remains pending. This release does not claim
+  Workspace or other-module adoption. Implemented in this BUILD branch; release acceptance pending.
 - Full page opens read-only until deliberate Edit. Fixed white identity header and slate-2 tabs
   sit above one scrolling left form and independent right PDF. Back preserves register context.
 - Items has five columns Item, Qty, Unit (RM), Disc (RM), Amount (RM). Name, code and config share

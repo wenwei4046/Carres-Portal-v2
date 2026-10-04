@@ -41,7 +41,7 @@ before quoting. Built is not the same as owner-verified on every page.
 | Fact cards | `Block` — the one object card (§4.1) · `Panel` · `StatusPill` · `EmptyState` · `Loading` | `components/kit/*` | LOCKED · built |
 | Orders list / drawer band | `SectionPanel` (cream band) — that surface only, not a general card | `components/SectionPanel.tsx` | Governed by §4.1; not a `Block` duplicate |
 | Dialogs and panels | `Modal` · `Drawer` (incl. quick view) · `Toast` · `PdfPreview` · `SavedEvidenceViewer` | `components/kit/*` | Built |
-| **Compact module card** (shared customer header, module tabs, module summary, editors, items, Communication, Timeline) | **`CompactModuleCard`** — pass the header facts once and each module's own facts, editors and items | `components/kit/CompactModuleCard.tsx` · `/ui#compact-card` · contract `docs/ui-reference/MODULE-CARD-TEMPLATE.md` | Owner rules 2026-10-03/04 (§4.3) · built on branch, parity proven against the owner's reference page · **no production page uses it yet** · palette/font/radius await the token decision |
+| **Compact module card** (shared customer header, module tabs, module summary, editors, items, Communication, Timeline) | **`CompactModuleCard`** — pass the header facts once and each module's own facts, editors and items | `components/kit/CompactModuleCard.tsx` · `/ui#compact-card` · contract `docs/ui-reference/MODULE-CARD-TEMPLATE.md` | Owner rules 2026-10-03/04 (§4.3) · built on branch, parity proven against the owner's reference page · **Sales Orders quick-view adoption implemented; release verification pending** · palette/font/radius await the token decision |
 | Work right-panel Communication | `WorkCommunication` — recorded channels only | `pages/operation/work/WorkCommunication.tsx` | Owner ruling 2026-09-17 · built; differs from the compact card's editable `To` (open owner question) |
 | Record history | §5 three-rank grammar 13/12/11 | this MASTER §5 | LOCKED · no shared component; each page draws it |
 
@@ -3360,14 +3360,14 @@ All listing pages follow **active filter chips → toolbar → table header/resu
 Jess accepted the rendered Sales Orders pilot as the shared TEMPLATE and authorised a dedicated BUILD controller through testing and deployment. This supersedes earlier unapproved visual-composition restrictions for the accepted elements below; production evidence below bounds the delivered reference. Business facts, permissions and module workflows remain module-owned.
 
 - Global utility grammar (owner correction2026-10-02): Jump to, Help and Settings are icon-only on all widths; Jump to uses kit `jump`/Command16 while register Search remains a magnifier; tooltips/accessible names/key shortcuts remain, bell retains count, and menu contents/page identity do not change.
-- Action grammar (owner amendment2026-10-01): Full-object Print and Export/Edit use canonical icon16 plus visible word; quick-view Print is icon-only with tooltip/accessible name (owner correction2026-10-02); labels remain on narrow screens and toolbars wrap. Back/Close/More are shared icon-only controls with tooltip and accessible name. Content tabs Order/Revisions/History/Order Route stay text-only, selected black600 with blue underline. Status pills retain text; icons are not added indiscriminately. No2990 comparison was verified for this amendment.
+- Action grammar (owner amendment2026-10-01): Full-object Print and Export/Edit use canonical icon16 plus visible word; the compact card opens the saved document from its number, with output controls inside the source-owned document preview; labels remain on narrow screens and toolbars wrap. Back/Close/More are shared icon-only controls with tooltip and accessible name. Content tabs Order/Revisions/History/Order Route stay text-only, selected black600 with blue underline. Status pills retain text; icons are not added indiscriminately. No2990 comparison was verified for this amendment.
 - Register presentation uses existing Tabs segmented variant: Table icon `Table2`, Cards icon `LayoutGrid`, both16px inheriting text colour with visible words. The same controls remain during selection; decorative icons are hidden from accessibility and names stay Table/Cards. This narrowly approved presentation amendment changes no data/filter engine or Purchasing business scope.
 - Register: reuse DataGrid, active removable filter chips above its compact toolbar, neutral Clear all, Table/Cards sharing one search/filter result, existing column chooser and header filters. Left rail complements the table with relevant aggregate summaries and useful time shortcuts rather than repeating every column filter. Sales Orders uses four compact rows (owner2026-10-02): Sales orders, Total payable, Paid to date and Balance due, label left/value right with tabular no-wrap values and all four visible; missing-amount notices span the row only when needed, following the filtered LOADED result with explicit scope/missing-money wording, and Customer Requested Delivery Date shortcuts. Status filters live in table columns. Other modules choose meaningful aggregates from their own authoritative facts, never copy SO financial arithmetic blindly.
 - Object header: white identity/actions row; slate-2 navigation row with slate-5 1px top divider. Selected tab uses semibold600 black text and blue underline. Header stays outside scrolling content. Back navigation is a neutral rounded square, canonical kit back icon16, desktop32/touch40 target, tooltip Back to the owning register, keyboard-accessible destination label. Do not replace status pills with square buttons: actions and status keep their distinct kit roles. Existing kit Button/Icon/Badge primitives own consistent sizes, states and semantics.
 - Sidebar: expanded official Carres lockup mark36, versus prior26 (about40% enlargement), collapsed mark28. Preserve asset proportions and button clearance.
 - Object composition: left form scrolls as ONE pane, right document preview independently; Items has natural height and no independent vertical scroll box. Desktop wraps product details; horizontal overflow only when required. Small-screen stacking follows existing responsive split.
 - Sales Order Items example: five columns Item, Qty, Unit (RM), Disc (RM), Amount (RM); item name, code and configuration share Item. No sequence/code columns, numbers do not repeat RM below RM headers, amount remains on one line. Preserve per-line editing/protection and service rows; footer Total payable and category Quantity; omit empty Services: None. Printed PDF remains governed separately.
-- Quick view: read-only, dark header document number and customer, status pill, Print/Open full page/Close icons with tooltips and accessible names (owner correction2026-10-02); no footer. Existing rounded Block cards: grey SO info, remaining sections white. Customer Phone/Email FIRST in SO info, followed by sales attribution/dates/Dealer; no standalone Customer card duplicating header name. Delivery, Items with truthful Stock Status, Payment, Related documents follow. Full object opens read-only with deliberate Edit. Missing or failed source facts remain explicit unknown/error, never invented stock receipt or document numbers.
+- Quick view: use the shared `CompactModuleCard` under §4.3 and `docs/ui-reference/MODULE-CARD-TEMPLATE.md` (owner2026-10-03/04). The common customer header, Info/Delivery facts and collapsed content replace the former Block composition. Preserve module facts, source errors, permissions and full-object door; no invented stock receipts or document numbers. The `Drawer` compact-card variant owns focus, Escape, background scroll lock and return behavior. Full object retains its governed read-first state and deliberate Edit.
 
 **DELIVERED / PRODUCTION-VERIFIED — accepted SO pilot and action amendment, 2026-10-01.**
 PR #1838 merged as `c926e3f76d6508245b91da2bda44783e69798898`; PR #1839 merged as
@@ -3390,8 +3390,7 @@ browser tooling, so that viewer and physical printing are not claimed verified.
 
 Shared reuse follow-up corrects selected kit tabs to semibold600, truncates long quick-view
 identity only when needed with its full tooltip, and keeps header actions from shrinking.
-At <=767px the identity and action group use two rows inside the same header. Fact labels
-use12px and values600 for every shared quick-view drawer. Local /ui measurement proved dark
+At <=767px the identity and action group use two rows inside the same header. Full-object facts retain their governed labels and values; compact-card facts follow §4.3 and the sole card contract. Local /ui measurement proved dark
 selected labels600 and blue indicators; SO390 proof showed title356px, header95px and all
 40px actions visible without page overflow. Purchasing's read-only prototype reviewer confirmed
 its long PO identity fits the same390px recipe. Focused follow-up checks:117 passed plus
@@ -3511,8 +3510,7 @@ Shared token radii: control6px, card10px. `text-strong` is15px/22px, weight600.
 - No source-based dimension in this section should be called a freshly rendered measurement.
   Visual validation remains owed for other-module adoption; Route/Monthly composition is owned by Orders MASTER and its separate delivery lane.
 
-Do not assume every control is icon-only: global utility triggers and quick-view Print are;
-Table/Cards and full-object Print retain words. Status pills retain text. Column width, drawer width,
+Do not assume every control is icon-only: global utility triggers are; Table/Cards and full-object Print retain words. Compact-card document actions follow §4.3 and the source-owned preview. Status pills retain text. Column width, drawer width,
 field height, gaps and rail width must resolve to the actual admitted shared source/token; copy the
 complete recipe rather than guessing from an image. Before changing a missing shared dimension,
 record the measured source and route the gap to the kit owner.
@@ -3524,7 +3522,8 @@ record the measured source and route the gap to the kit owner.
 | Register | `apps/web/src/pages/operation/SalesOrdersRegister.tsx` | Shared Portal shell and right rail; DataGrid toolbar, search, selection, Table/Cards, column controls and filter chips |
 | Local filter rail | Register `.so-template-rail` composition and `useFilterRailOpen` | Measure available content canvas, not browser width; threshold896; collapsed44px Show filters; narrow open overlay, backdrop, Escape and restored selection |
 | Object header | `apps/web/src/pages/operation/SalesOrderTabs.tsx` | White identity/actions, quiet tab row, divider, selected black600/blue underline, fixed header and responsive action wrapping |
-| Quick view | Register Drawer `variant="quick-view"` plus shared Block | Dark identity/status/actions, compact facts, full-object door, accessible icon actions, scrolling body and no footer |
+| Quick view content | `CompactModuleCard` with a module-owned adapter; sole contract `docs/ui-reference/MODULE-CARD-TEMPLATE.md` | Common header, module facts/editors, source-owned saved document, collapsed Items/Communication/Timeline and full-object door |
+| Quick view container | Shared `Drawer` `variant="compact-card"` | Focus containment/return, Escape, background scroll lock, accessible identity; closing preserves register context |
 | Object facts/items | `apps/web/src/pages/operation/SalesOrderWorkspace.tsx` | Shared field framing, readable hierarchy, protected edit state, natural Items height and separate document-preview scroll |
 | Shared primitives | `apps/web/src/components/kit` and `/ui` | Exact supported props, tokens, hover/focus/disabled/loading states and keyboard/touch behavior |
 
@@ -3558,16 +3557,16 @@ The master contract being documented does not mean every module has migrated or 
 
 ## §4.3 · Compact module card — owner rules 2026-10-03 / 2026-10-04
 
-**OWNER CONFIRMED · KIT COMPONENT BUILT ON BRANCH · NO PRODUCTION PAGE ADOPTED YET.** Every module card
+**OWNER CONFIRMED · SHARED KIT BUILT · SALES ORDERS ADOPTION IMPLEMENTED, RELEASE PENDING.** Every module card
 uses the kit [`CompactModuleCard`](../../apps/web/src/components/kit/CompactModuleCard.tsx) (live on
 `/ui#compact-card` with Info and Delivery). Never copy reference HTML or CSS into a page. The
 complete rules, the sample-data boundary and the deviations from the reference page live in
 [`MODULE-CARD-TEMPLATE.md`](../ui-reference/MODULE-CARD-TEMPLATE.md); the reference page
 `module-card-reference.html` is the proof target of `scripts/compact-card-states.mjs`
-(18 states × 5 widths, no unexplained difference).
+(25 states × 5 widths; reference parity evidence is distinct from business-page acceptance).
 
 In one line each: one shared customer header with sales facts behind a ▾/▴ (no words), address with
-its own toggle, target date, Open and Close; Info opens sales facts and address, other modules start
+its own toggle, target date, Open and Close; the source-owned SO number lazily opens the saved formal document; Info opens sales facts and address, other modules start
 closed; summary cells are label above value, left aligned, only the module's own facts (Info
 `Total · Paid · Outstanding`, Delivery `Stock · Logistics · Customer · DO`, the Customer cell ruled by Delivery MASTER); title row, value
 and optional status line are top aligned on common baselines with the ▾ at the right; values take the

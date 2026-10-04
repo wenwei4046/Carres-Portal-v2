@@ -41,6 +41,7 @@ import { fmtDate } from "@/lib/fmt-date";
 import { apiFetch, ApiError } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
 import { displayCustomerName } from "@/lib/customer-name";
+import { CardEditorButtons } from "@/components/kit/CompactModuleCard";
 import Panel from "@/components/kit/Panel";
 import Button from "@/components/kit/Button";
 import DatePicker from "@/components/kit/DatePicker";
@@ -189,6 +190,7 @@ export function DeliveryDatesEdit({
   card,
   onDone,
   layout = "stack",
+  compact = false,
 }: {
   card: DeliveryMonitorCard;
   onDone: () => void;
@@ -196,6 +198,7 @@ export function DeliveryDatesEdit({
    *  same fields and the same save, three per row, 36px buttons. The
    *  Requested date is on the Route already, so the card repeats no fact. */
   layout?: "stack" | "grid";
+  compact?: boolean;
 }) {
   const row = card.scope;
   const arrangement = row.arrangement;
@@ -203,6 +206,7 @@ export function DeliveryDatesEdit({
   const partner = card.logisticsPartnerName;
   const save = useSaveDeliveryArrangement(card.orderId, leg);
   const proof = useReplyProofUpload(card.orderId, leg);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [date, setDate] = useState<string | null>(card.confirmedDate);
   const [time, setTime] = useState<string | undefined>(card.confirmedTime ?? undefined);
   const [from, setFrom] = useState<InformationReceivedFrom | undefined>(
@@ -241,7 +245,9 @@ export function DeliveryDatesEdit({
       toast.success(MONITOR_COPY.deliveryConfirmedDone(fmtDate(date), time ?? null));
       onDone();
     } catch (err) {
-      toast.error(err instanceof ApiError || err instanceof Error ? err.message : MONITOR_COPY.uploadFailed);
+      const message = err instanceof Error ? err.message : MONITOR_COPY.uploadFailed;
+      setSaveError(message);
+      toast.error(message);
     }
   };
 
@@ -258,7 +264,7 @@ export function DeliveryDatesEdit({
       {layout === "stack" ? (
         <Fact label={MONITOR_COPY.customerRequested} value={requestedDeliveryText({ iso: requestedIso, tbd: row.customerDateTbd })} />
       ) : null}
-      <div className={layout === "grid" ? "grid grid-cols-3 gap-3" : "flex flex-col gap-3"}>
+      <div className={layout === "grid" && !compact ? "grid grid-cols-3 gap-3" : "flex flex-col gap-3"}>
       <DatePicker
         id={`delivery-brief-date-${card.scopeId}`}
         label={MONITOR_COPY.confirmedDateField}
@@ -293,7 +299,7 @@ export function DeliveryDatesEdit({
         }}
       />
       </div>
-      <div className="flex items-center gap-2">
+      {compact ? <CardEditorButtons onSave={() => void submit()} onCancel={onDone} error={saveError} disabled={!canSave} /> : <div className="flex items-center gap-2">
         <Button
           variant="primary"
           size={layout === "grid" ? "touch" : "sm"}
@@ -306,7 +312,7 @@ export function DeliveryDatesEdit({
         <Button size={layout === "grid" ? "touch" : "sm"} type="button" onClick={onDone} data-testid="delivery-brief-cancel-dates">
           {MONITOR_COPY.cancel}
         </Button>
-      </div>
+      </div>}
     </form>
   );
 }
@@ -318,10 +324,12 @@ export function LogisticsDetailsEdit({
   card,
   onDone,
   linkUrl = null,
+  compact = false,
 }: {
   card: DeliveryMonitorCard;
   onDone: () => void;
   linkUrl?: string | null;
+  compact?: boolean;
 }) {
   const row = card.scope;
   const arrangement = row.arrangement;
@@ -332,6 +340,7 @@ export function LogisticsDetailsEdit({
   const save = useSaveDeliveryArrangement(card.orderId, leg);
   const cannot = useRecordCannotDeliver(card.orderId, leg);
   const proof = useReplyProofUpload(card.orderId, leg);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [partnerId, setPartnerId] = useState<string | undefined>(
     card.logisticsPartnerId ?? defaultPartnerFor([row], partners) ?? undefined,
   );
@@ -425,7 +434,9 @@ export function LogisticsDetailsEdit({
       toast.success(`${chosen?.name ?? MONITOR_COPY.partner} assigned`);
       onDone();
     } catch (err) {
-      toast.error(err instanceof ApiError || err instanceof Error ? err.message : MONITOR_COPY.uploadFailed);
+      const message = err instanceof Error ? err.message : MONITOR_COPY.uploadFailed;
+      setSaveError(message);
+      toast.error(message);
     }
   };
 
@@ -544,14 +555,14 @@ export function LogisticsDetailsEdit({
           }}
         />
       </div>
-      <div className="flex items-center gap-2">
+      {compact ? <CardEditorButtons onSave={() => void submit()} onCancel={onDone} error={saveError} disabled={!canSave} /> : <div className="flex items-center gap-2">
         <Button variant="primary" size="sm" type="submit" disabled={!canSave} data-testid="delivery-brief-save-logistics">
           {card.logisticsPartnerId ? MONITOR_COPY.changeLogistics : MONITOR_COPY.assignLogistics}
         </Button>
         <Button size="sm" type="button" onClick={onDone} data-testid="delivery-brief-cancel-logistics">
           {MONITOR_COPY.cancel}
         </Button>
-      </div>
+      </div>}
       {card.logisticsPartnerId && card.logisticsPartnerName ? (
         <div className="border-t border-kit-slate-5 pt-2">
           {!cannotOpen ? (

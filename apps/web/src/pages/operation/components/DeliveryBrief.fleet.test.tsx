@@ -26,7 +26,7 @@ vi.mock("@/lib/queries", async () => ({
   useRecordCannotDeliver: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
 
-function mount(driver = "", vehicle = "") {
+function mount(driver = "", vehicle = "", compact = false, onDone = vi.fn()) {
   const card = {
     orderId: "order-1", scopeId: "order-1#0", leg: 0,
     logisticsPartnerId: "nets", logisticsPartnerName: "NETS",
@@ -37,7 +37,7 @@ function mount(driver = "", vehicle = "") {
       arrangement: { driver_name: driver, vehicle, expected_arrival: "14:30:00" },
     },
   } as unknown as DeliveryMonitorCard;
-  return render(<LogisticsDetailsEdit card={card} onDone={vi.fn()} />);
+  return render(<LogisticsDetailsEdit card={card} onDone={onDone} compact={compact} />);
 }
 function pick(label: string, option: string) {
   fireEvent.click(screen.getByRole("combobox", { name: new RegExp(`^${label}`) }));
@@ -86,5 +86,24 @@ describe("Logistics Details fleet templates", () => {
     expect(screen.getByRole("combobox", { name: "Driver name" })).toBeDisabled();
     await act(async () => { fireEvent.click(screen.getByTestId("delivery-brief-save-logistics")); });
     expect(save).toHaveBeenCalledWith(expect.objectContaining({ driverName: "Alex", vehicle: "ABC 123" }));
+  });
+});
+
+describe("compact Logistics save lifecycle", () => {
+  it("keeps a refused save and its input, folds only on success, and Cancel never writes", async () => {
+    const done = vi.fn();
+    mount("Alex", "ABC 123", true, done);
+    fireEvent.change(screen.getByLabelText("ETA"), { target: { value: "15:10" } });
+    save.mockRejectedValueOnce(new Error("Server refused this change"));
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Save" })); });
+    expect(screen.getByRole("alert")).toHaveTextContent("Server refused this change");
+    expect(screen.getByLabelText("ETA")).toHaveValue("15:10");
+    expect(done).not.toHaveBeenCalled();
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Save" })); });
+    expect(done).toHaveBeenCalledTimes(1);
+    expect(save).toHaveBeenLastCalledWith(expect.objectContaining({ expectedArrival: "15:10" }));
+    save.mockClear();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(save).not.toHaveBeenCalled();
   });
 });
