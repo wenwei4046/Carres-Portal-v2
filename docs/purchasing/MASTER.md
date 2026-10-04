@@ -3769,8 +3769,20 @@ button calculates warehouse-specific Ready Stock offers there; it does not requi
 Warehouse page or compulsory per-order inspection. Exact goods compatibility, ownership,
 availability and existing reservation protection remain governed by Stock authority. The owner
 requests whole-round matching, matched results first, optional review and bulk selection/Proceed.
-Priority settings, exact button labels and confirmation semantics are PROPOSAL / NOT LAW until
-reviewed; no suggestion by itself reserves a Unit or reduces quantity to purchase.
+**OWNER CONFIRMED 2026-10-04 — whole-round matching and location choice.** Default matching
+priority is earliest Customer Requested Delivery Date, with earliest Proceed Date breaking ties;
+undated demand follows dated demand. Matching priority is configurable in Settings. Stock selection
+uses FIFO among otherwise eligible exact Units. The matching location is selectable and defaults to
+Carres Klang; changing it changes the candidate stock scope, not the customer delivery address.
+The same listing shows whether goods have a matching offer and its quantity/location. One manual
+trigger computes non-overlapping whole-round suggestions and puts matched demand first. Bulk
+selection and Proceed accept chosen offers; detailed review is optional. Preserve the individual
+customer/item action to choose an eligible exact warehouse Unit manually, including location choice,
+without requiring whole-round matching. Neither browsing nor a computed suggestion reserves stock
+or reduces purchase quantity. Confirming uses the existing Sales Order-owned reservation door and
+revalidates eligibility/remaining demand; only successful reservations reduce purchase quantity.
+Existing reservations cannot be stolen or duplicated. Unmatched quantities continue to purchase.
+Exact new screen labels remain governed-copy proposals, not production implementation proof.
 
 **OWNER CONFIRMED 2026-10-04 — Manual Purchase and SO Batch inspection/actions.**
 Manual Purchase exposes Showroom as a left-rail category with individual showroom selection;
