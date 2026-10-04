@@ -84,6 +84,8 @@ remaining ranks do not collapse into one sentence. The law itself is in
 **Source: `@radix-ui/colors`. No file in this repo maintains a hex table, so
 nobody can mistype a digit.** The law names the STEP; Tailwind resolves the hex.
 
+**CompactModuleCard identity Header (owner2026-10-04):** existing slate-12 fill, white primary/countdown, slate-4 secondary text and slate-11 divider/hover. Countdown uses label. Light body tokens remain unchanged; no new token values.
+
 ### 2.1 Semantic layer (approved Loo, 2026-07-31)
 
 | Semantic | Step | Use |

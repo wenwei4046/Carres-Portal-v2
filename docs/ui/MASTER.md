@@ -3565,10 +3565,12 @@ complete rules, the sample-data boundary and the deviations from the reference p
 `module-card-reference.html` is the proof target of `scripts/compact-card-states.mjs`
 (25 states × 5 widths; reference parity evidence is distinct from business-page acceptance).
 
+**Shared Header colour — owner approved 2026-10-04:** use existing Radix slate-12 background, white primary text and countdown, slate-4 contact text, slate-11 dividers/hover. Countdown uses the existing label token (11px/500/14px), with no pale badge fill. Focus is visibly white inside the dark header. Only the identity Header changes; address details, tabs, summary and body stay light. Every CompactModuleCard consumer inherits this treatment; no per-module copy. This scoped approval does not decide the remaining card palette, font or radius.
+
 In one line each: one shared customer header with sales facts behind a ▾/▴ (no words), address with
 its own toggle, target date, Open and Close; the source-owned SO number lazily opens the saved formal document; Info opens sales facts and address, other modules start
 closed; summary cells are label above value, left aligned, only the module's own facts (Info
-`Total · Paid · Outstanding`, Delivery `Stock · Logistics · Customer · DO`, the Customer cell ruled by Delivery MASTER); title row, value
+`Total · Paid · Balance due`, Delivery `Stock · Logistics · Customer · DO`, the Customer cell ruled by Delivery MASTER); title row, value
 and optional status line are top aligned on common baselines with the ▾ at the right; values take the
 fewest lines, four at most; one editor at a time, folded on success, kept on failure, `Cancel` then
 `Save` at right; DO one condition per line; items, Communication and Timeline start closed; times show

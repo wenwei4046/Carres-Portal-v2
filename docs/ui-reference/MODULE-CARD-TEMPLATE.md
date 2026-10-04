@@ -13,6 +13,8 @@ geometry, text and styles, and must report **no unexplained difference**.
 
 ## Rules
 
+**Shared Header colour — owner approved 2026-10-04:** use existing Radix slate-12 background, white primary text and countdown, slate-4 contact text, slate-11 dividers/hover. Countdown uses the existing label token (11px/500/14px), with no pale badge fill. Focus is visibly white inside the dark header. Only the identity Header changes; address details, tabs, summary and body stay light. Every CompactModuleCard consumer inherits this treatment; no per-module copy. This scoped approval does not decide the remaining card palette, font or radius.
+
 - **One shared customer header:** name · order · phone; a ▾/▴ at the lower right of the customer cell
   opens the sales facts (no `Order info` words); address with its own toggle (▴ while open); target
   date (`d Mon`) with the signed calendar-day countdown from Malaysia today (`27d`); Open and Close.
@@ -22,7 +24,7 @@ geometry, text and styles, and must report **no unexplained difference**.
   applies that module's default and closes items and editors.
 - **Summary cells:** title row, value, optional status line — top aligned on common baselines, left
   aligned, ▾ at the right of the title row for a fact with an editor. Each module shows only its own
-  facts: Info `Total · Paid · Outstanding`; Delivery `Stock · Logistics · Customer · DO`.
+  facts: Info `Total · Paid · Balance due`; Delivery `Stock · Logistics · Customer · DO`.
 - **Stock:** value `{ready}/{goods}`, status `Ready` on its own line; only goods count. Service lines
   are not goods: the item list reads `Service`, never a dash.
 - **Logistics:** empty value `Not assigned`.
@@ -51,7 +53,7 @@ geometry, text and styles, and must report **no unexplained difference**.
 ## What the /ui example is — and is not
 
 It is a **UI example**. SO-1368 order facts (customer, order date, Sales Location, Salesperson,
-Total/Paid/Outstanding, the payment at 2026-09-30T08:08:32Z, receipt RC-300926-3735) are the verified
+Total/Paid/Balance due, the payment at 2026-09-30T08:08:32Z, receipt RC-300926-3735) are the verified
 handoff sample. Stock `1/1 Ready` is a layout sample. Any Customer date or Logistics company saved on
 /ui exists only in that browser tab: **nothing is written to the ERP**, and it is not an order fact.
 `Preview: next save fails` is a /ui control that simulates a failed save. The header ↗ opens the existing Sales Order page. × closes the card.
@@ -130,7 +132,7 @@ Strictly identical states: **0**, because three global fixes touch every state. 
 | Kind | Checks | What differs | Height |
 |---|---:|---|---|
 | Global fix · governed word | 45 | Logistics empty `Not assigned` (reference prints `No logistics picked`, retired in COPY-STANDARD 2026-09-24) | same |
-| Global fix · reference defect | 55 | Info values stay left aligned and keep the Paid \| Outstanding divider (a leftover flex rule centres them and drops the divider) | same |
+| Global fix · reference defect | 55 | Info values stay left aligned and keep the Paid \| Balance due divider (a leftover flex rule centres them and drops the divider) | same |
 | Global fix · reference defect | 50 | Address arrow `▴` while the address is open (reference shows `▾` on first load) | same |
 | Owner rule | 5 | Reopened Customer editor shows the saved answer (reference opens an empty form) | **+99px** |
 | Owner rule | 5 | DO conditions one per line (reference two per line on wide cards) | **+26px** on the two widest cards |

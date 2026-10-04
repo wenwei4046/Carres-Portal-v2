@@ -6900,3 +6900,5 @@ and failed source Unavailable. Independent Amendment No allocation remains an au
 
 
 Owner correction2026-10-02: toolbar omits the duplicate SO count; footer keeps filtered SO count and quantity. Listing uses COPY-STANDARD’s `Listing` tab word.
+
+**2026-10-04 owner-approved shared Header colour:** CompactModuleCard uses the dark identity Header defined in UI MASTER §4.3; sales/address disclosures stay in their existing order and open independently. Countdown is white label text, without a pale fill. SO Info money uses `Balance due`, matching COPY-STANDARD’s SO totals rule and the saved PDF; amounts and calculation are unchanged.
