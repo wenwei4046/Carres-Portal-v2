@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useLocation } from "react-router-dom";
 import {
   groupSelectionsIntoDocuments,
   soBatchPurchaseResponseSchema,
@@ -46,6 +46,8 @@ const QUERY_KEY = ["so-batch-purchase"] as const;
 
 export default function OperationToOrder() {
   const queryClient = useQueryClient();
+  const location = useLocation();
+  const restoredPos = Array.isArray(location.state?.soBatchIssuedPos) ? location.state.soBatchIssuedPos as IssuedPo[] : [];
   const [searchParams, setSearchParams] = useSearchParams();
   const scopeSo = searchParams.get("so");
   /* ⭐ THE PO WINDOW SCOPE (Purchasing §5.6.1). Work's window card opens this
@@ -54,8 +56,8 @@ export default function OperationToOrder() {
   const scopeWindow = searchParams.get("window");
   const windowParts = scopeWindow ? parsePoWindowKey(scopeWindow) : null;
   const [selections, setSelections] = useState<SoBatchSelection[] | null>(null);
-  const [issuedPos, setIssuedPos] = useState<IssuedPo[]>([]);
-  const [resultsOpen, setResultsOpen] = useState(false);
+  const [issuedPos, setIssuedPos] = useState<IssuedPo[]>(restoredPos);
+  const [resultsOpen, setResultsOpen] = useState(restoredPos.length > 0);
 
   /**
    * THE PAYLOAD IS PARSED, NOT TRUSTED.

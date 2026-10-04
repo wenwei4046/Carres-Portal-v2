@@ -267,7 +267,7 @@ const renderOpen = ((...args: Parameters<typeof render>) => {
   return result;
 }) as typeof render;
 
-function renderPage(path = "/operation/procurement") {
+function renderPage(path: string | { pathname: string; search?: string; state?: unknown } = "/operation/procurement") {
   return renderOpen(
     <MemoryRouter initialEntries={[path]}>
       <PurchaseOrdersPage />
@@ -353,6 +353,14 @@ describe("Purchase Orders Register", () => {
     expect(screen.getByRole("checkbox", { name: "Select PO-20260828-4827" })).toBeChecked();
   });
 
+  it("returns an issued PO object to its SO Batch cutoff and supplier result scope", () => {
+    const pos = [{ id: "PO-20260828-4827", supplierId: "s1" }];
+    renderPage({ pathname: "/operation/procurement", search: "?po=PO-20260828-4827",
+      state: { soBatchReturn: { path: "/operation?tab=purchase&time=16%3A00", pos } } });
+    expect(screen.getByTestId("purchase-order-object")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Back to Purchase Orders" }));
+    expect(navigate).toHaveBeenCalledWith("/operation?tab=purchase&time=16%3A00", { state: { soBatchIssuedPos: pos } });
+  });
   it("returns from a card's PO object to the original Cards view and selection", () => {
     renderPage("/operation/procurement?view=cards");
     fireEvent.click(screen.getByRole("checkbox", { name: "Select PO-20260828-4827" }));

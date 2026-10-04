@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import Drawer from "@/components/kit/Drawer";
 import Modal from "@/components/kit/Modal";
 import Block from "@/components/kit/Block";
@@ -20,6 +20,7 @@ export default function PoSupplierResultPanel({ open, onOpenChange, pos, roundWi
   onChanged: () => void;
 }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const [current, setCurrent] = useState<IssuedPo | null>(null);
   const [document, setDocument] = useState<PoTemplateData | null>(null);
   const [evidence, setEvidence] = useState<PoSendEvidence[]>([]);
@@ -50,7 +51,7 @@ export default function PoSupplierResultPanel({ open, onOpenChange, pos, roundWi
     <Drawer open={open} onOpenChange={onOpenChange} title="Purchase Orders">
       <div className="flex flex-col gap-3" data-testid="po-supplier-result-panel">
         <PoSupplierBundle pos={pos} roundWindow={roundWindow} onEvidenceChanged={changed}
-          onOpenObject={id => { onOpenChange(false); navigate(`/operation/procurement?po=${encodeURIComponent(id)}`); }} onPreview={(_id, po) => { setCurrent(po); setPdfOpen(true); }} />
+          onOpenObject={id => { onOpenChange(false); navigate(`/operation/procurement?po=${encodeURIComponent(id)}`, { state: { soBatchReturn: { path: `${location.pathname}${location.search}`, pos } } }); }} onPreview={(_id, po) => { setCurrent(po); setPdfOpen(true); }} />
         {current && <Block title={document?.po_number ?? current.id} note={document ? `V${document.version}` : undefined}>
           {document && <><p className="text-body">{document.supplier.name} · {document.destination.name}</p>
             {document.so_refs?.length ? <p className="text-body">SO {document.so_refs.join(", ")}</p> : null}

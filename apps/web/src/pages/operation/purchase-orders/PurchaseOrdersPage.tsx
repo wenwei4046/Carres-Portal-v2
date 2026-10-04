@@ -31,7 +31,7 @@ import {
   GOODS_CATEGORY_WORDS,
   poDocumentNumberOf,
 } from "@carres/shared";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import {
   DataGrid,
   type DataGridColumn,
@@ -401,6 +401,7 @@ export default function PurchaseOrdersPage() {
   const poDutyActor = workspaceDutyActor(dutyQ.data, "po_duty");
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [filter, setFilter] = useState<RailFilter>(RAIL_CLEAR);
   /* The personal saved-layout pilot (ui MASTER §6.7 rule 4). A failed read
      leaves the Columns menu without saved layouts; the register still works. */
@@ -599,6 +600,15 @@ export default function PurchaseOrdersPage() {
         destinations={destinations}
         activeDestinations={activeDestinations}
         onBack={() => {
+          const batchReturn = location.state?.soBatchReturn;
+          if (batchReturn && typeof batchReturn.path === "string" && Array.isArray(batchReturn.pos)) {
+            const returnUrl = new URL(batchReturn.path, "https://carres.invalid");
+            if (returnUrl.origin === "https://carres.invalid" &&
+                (returnUrl.pathname === "/operation/to-order" || (returnUrl.pathname === "/operation" && returnUrl.searchParams.get("tab") === "purchase"))) {
+              navigate(`${returnUrl.pathname}${returnUrl.search}`, { state: { soBatchIssuedPos: batchReturn.pos } });
+              return;
+            }
+          }
           const returnParams = listingReturnParams.current;
           listingReturnParams.current = null;
           setParams((current) => {

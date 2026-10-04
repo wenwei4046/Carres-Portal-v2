@@ -159,7 +159,7 @@ function payload(over: Partial<SoBatchPurchaseResponse> = {}): SoBatchPurchaseRe
   };
 }
 
-function renderPage(initialEntry = "/operation?tab=purchase") {
+function renderPage(initialEntry: string | { pathname: string; search?: string; state?: unknown } = "/operation?tab=purchase") {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
@@ -248,6 +248,17 @@ describe("the page reads the ONE projection and draws the Register", () => {
 });
 
 describe("the whole journey — tick, arrange, issue, prove it arrived", () => {
+  it("restores issued PO scope and carries the cutoff when opening its full page", async () => {
+    const pos = [{ id: "PO-2041", supplierId: "s-hooka", supplierName: "Hooka", destinationId: KLANG, destination: "Carres Klang" }];
+    apiFetch.mockImplementation(async (path: string) => path.includes("print-data") ? officialDocument()
+      : path.endsWith("/sends") ? { sends: [] } : path.endsWith("email-capability") ? { configured: false } : payload());
+    renderPage({ pathname: "/operation", search: "?tab=purchase&time=11%3A00", state: { soBatchIssuedPos: pos } });
+    await screen.findByTestId("po-supplier-result-panel");
+    fireEvent.click(screen.getByRole("button", { name: "Open full page" }));
+    expect(navigate).toHaveBeenCalledWith("/operation/procurement?po=PO-2041", {
+      state: { soBatchReturn: { path: "/operation?tab=purchase&time=11%3A00", pos } },
+    });
+  });
   it("walks from a ticked line to confirmed supplier evidence", async () => {
     apiFetch.mockResolvedValue(payload());
     renderPage();
