@@ -2,6 +2,8 @@ import { Hono } from "hono";
 import { z } from "zod";
 import {
   arrivalReceivingInput,
+  documentDisplayNumber,
+  type RegisterColumnQuery,
   buildGrnRegisterView,
   catalogCategoryWordOf,
   poSupplierDeliveryDateOf,
@@ -191,6 +193,16 @@ const GRN_PAGE_DEFAULT = 50;
 const GRN_PAGE_MAX = 200;
 /** The scan's own page size — a Worker-side read, never sent to the browser. */
 const GRN_SCAN_PAGE = 1000;
+const GRN_COLUMN_KEYS = new Set(["grnDate", "grn", "source", "po", "supplier", "deliverTo", "actualSite", "supplierConfirmedDeliveryDate", "receivedAt", "doNo", "items", "receivedQty", "damagedQty", "wrongQty", "extraQty"]);
+const grnColumnKey = z.string().refine(key => GRN_COLUMN_KEYS.has(key));
+const grnColumnQuery = z.object({
+  filters: z.record(grnColumnKey, z.array(z.string().max(2000)).max(5000)),
+  dateFilters: z.record(grnColumnKey, z.enum(["today", "tomorrow", "thisWeek", "thisMonth", "lastMonth", "overdue"])),
+  numberFilters: z.record(grnColumnKey, z.object({ min: z.number().finite().optional(), max: z.number().finite().optional() }).strict()),
+  dateRangeFilters: z.record(grnColumnKey, z.object({ from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(), to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional() }).strict()),
+  sort: z.object({ key: grnColumnKey, dir: z.enum(["asc", "desc"]) }).strict().nullable(),
+}).strict();
+
 
 warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
@@ -220,7 +232,16 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
         : null;
     const isoDay = (v: string | undefined) =>
       v && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null;
+    let columns: RegisterColumnQuery | null = null;
+    if (c.req.query("columns")) {
+      try {
+        const parsed = grnColumnQuery.safeParse(JSON.parse(c.req.query("columns")!));
+        if (!parsed.success) return c.json({ message: "Invalid register filters" }, 422);
+        columns = parsed.data;
+      } catch { return c.json({ message: "Invalid register filters" }, 422); }
+    }
     const sel = {
+      columns,
       category: c.req.query("category") ?? null,
       supplier: c.req.query("supplier") ?? null,
       site: c.req.query("site") ?? null,
@@ -236,6 +257,7 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
     // submitted stamp breaking ties).
     type ScanRow = {
       id: string;
+      arrival_source_id?: string | null;
       po_id: string;
       warehouse_id: string | null;
       actual_site_id: string | null;
@@ -255,7 +277,7 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
       const { data, error } = await sb
         .from("warehouse_receipts")
         .select(
-          "id, po_id, warehouse_id, actual_site_id, goods_received_at, submitted_at, posted_at, status, grn_no, do_number, lines, extra_lines",
+          "id, po_id, arrival_source_id, warehouse_id, actual_site_id, goods_received_at, submitted_at, posted_at, status, grn_no, do_number, lines, extra_lines",
         )
         .in("status", ["posted", "voided"])
         .order("goods_received_at", { ascending: false })
@@ -338,95 +360,11 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
       scan.flatMap((r) => (r.lines ?? []).map((l) => l.sku)),
     );
 
-    const factRows: GrnRegisterFactRow[] = scan.map((r) => {
-      const supplierName = supplierByPo.get(r.po_id) ?? null;
-      const totals = warehouseReceiptTotals(r.lines ?? []);
-      return {
-        id: r.id,
-        categories: receiptCategoryWords(r.lines, scanCatalog),
-        supplierName,
-        siteName:
-          (r.actual_site_id ? whNames.get(r.actual_site_id) : null) ??
-          (r.warehouse_id ? whNames.get(r.warehouse_id) : null) ??
-          null,
-        grnDateIso: businessDay(r.posted_at),
-        // `Received with` reads the receipt's OWN stored quantities through the
-        // shared totals — the register never re-counts a jsonb line itself.
-        damaged: totals.damaged > 0,
-        wrongItem: totals.wrongItem > 0,
-        extra:
-          receivingExtraQty(
-            (Array.isArray(r.extra_lines)
-              ? r.extra_lines
-              : []) as ReceivingExtraLine[],
-          ) > 0,
-        cancelled: r.status === "voided",
-        // The Search box's own promise: GRN, PO, supplier or DO number.
-        searchText: [
-          r.grn_no ?? "",
-          receivingDisplayNo({
-            id: r.id,
-            grn_no: r.grn_no,
-            goods_received_at: r.goods_received_at ?? undefined,
-            submitted_at: r.submitted_at ?? undefined,
-          }),
-          r.po_id,
-          r.do_number ?? "",
-          supplierName ?? "",
-        ].join(" "),
-      };
-    });
-
-    const view = buildGrnRegisterView(factRows, sel, offset, limit);
-
-    // The page itself — full records for exactly these ids, in the scan's
-    // order (a `.in(…)` read has no order of its own).
-    let pageRows: ReceiptRow[] = [];
-    try {
-      pageRows = await readReceipts((select) =>
-        readByIds<ReceiptRow>(view.pageIds, (ids) =>
-          sb.from("warehouse_receipts").select(select).in("id", ids) as unknown as
-            PromiseLike<{ data: ReceiptRow[] | null; error: unknown }>,
-        ),
-      );
-    } catch (error) {
-      const m = mapPgError(error as never);
-      return c.json(m.body, m.status);
-    }
-    const byId = new Map(pageRows.map((r) => [r.id as string, r]));
-    const ordered = view.pageIds
-      .map((id) => byId.get(id))
-      .filter((r): r is ReceiptRow => r != null);
-
-    const pageUserIds = [
-      ...new Set(
-        ordered
-          .flatMap((r) => [
-            r.submitted_by,
-            r.reviewed_by,
-            r.posted_by,
-            r.posted_duty_holder,
-            r.posted_duty_cover,
-            r.void_by,
-          ])
-          .filter((v): v is string => typeof v === "string" && v.length > 0),
-      ),
-    ];
-    const userNames = new Map<string, string>();
-    if (pageUserIds.length > 0) {
-      const { data: users } = await sb
-        .from("app_users")
-        .select("id, name")
-        .in("id", pageUserIds);
-      for (const u of users ?? [])
-        userNames.set(u.id as string, u.name as string);
-    }
-
     // The Product cell speaks the GRN PAPER's word — `product_skus.variant`,
-    // else the SKU — resolved for the page only.
-    const pageSkus = [
+    // else the SKU — resolved for the complete authorised filter population.
+    const scanSkus = [
       ...new Set(
-        ordered.flatMap((r) => [
+        scan.flatMap((r) => [
           ...((Array.isArray(r.lines) ? r.lines : []) as WarehouseReceiptLine[]).map(
             (l) => l.sku,
           ),
@@ -441,31 +379,18 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
       ),
     ];
     const productWordBySku = new Map<string, string>();
-    if (pageSkus.length > 0) {
-      const { data: skuRows } = await sb
-        .from("product_skus")
-        .select("sku, variant")
-        .in("sku", pageSkus);
+    if (scanSkus.length > 0) {
+      const skuRows = await readByIds<{ sku: string; variant: string | null }>(scanSkus, ids =>
+        sb.from("product_skus").select("sku, variant").in("sku", ids));
       for (const s of (skuRows ?? []) as Array<{ sku: string; variant: string | null }>)
         if (s.variant) productWordBySku.set(s.sku, s.variant);
     }
 
-    /* ── THE PAGE'S OWN RECEIPT FACTS — the same ones the official GRN
-       object reads (§9.4), resolved for the fifty rows on screen and never
-       for the whole history. They answer two approved columns:
-
-         `SO No / MPR No / CO No / RO No`   the receipt's ACTUAL linked
-                                            documents, per line, blank when
-                                            there are none — never invented,
-                                            and never a PO standing in for a
-                                            CO or RO receipt
-         the read-only goods expansion      one row per received line, with
-                                            the source number above its own
-                                            line-bound Unit IDs
-       ──────────────────────────────────────────────────────────────────── */
-    const pageLineIds = [
+    // Source references are filterable facts, so resolve them across the full
+    // authorised scan. Unit results and signed evidence remain page-only.
+    const scanLineIds = [
       ...new Set(
-        ordered.flatMap((r) =>
+        scan.flatMap((r) =>
           ((Array.isArray(r.lines) ? r.lines : []) as WarehouseReceiptLine[]).map(
             (l) => l.id,
           ),
@@ -475,18 +400,18 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
 
     /** `po_line_id` → the governed reference numbers of that line's sources. */
     const refsByLine = new Map<string, string[]>();
-    if (pageLineIds.length > 0) {
+    if (scanLineIds.length > 0) {
       const poLines = await readByIds<{
         id: string;
         demand_id: string | null;
-      }>(pageLineIds, (ids) =>
+      }>(scanLineIds, (ids) =>
         sb
           .from("purchase_order_lines")
           .select("id, demand_id")
           .in("id", ids),
       );
       const sources = await readByIds<{ po_line_id: string; so: number | null }>(
-        pageLineIds,
+        scanLineIds,
         (ids) =>
           sb
             .from("po_line_sources")
@@ -552,7 +477,7 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
        the claim, case or delivery paper for the others. */
     const arrivalIds = [
       ...new Set(
-        ordered
+        scan
           .map((r) => r.arrival_source_id as string | null | undefined)
           .filter((v): v is string => typeof v === "string" && v.length > 0),
       ),
@@ -567,12 +492,117 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
         );
         for (const a of arrivals)
           if (a.source_no) arrivalNoById.set(a.id, a.source_no);
-      } catch (e) {
-        // The arrival-source tables are still unnumbered in some deployments;
-        // a register that cannot read them prints no reference rather than
-        // refusing to open (the same discipline `readReceipts` already uses).
-        console.error("reading arrival sources failed (non-fatal):", e);
+      } catch (error) {
+        // A failed source read cannot become a false empty source-filter answer.
+        const mapped = mapPgError(error as never);
+        return c.json(mapped.body, mapped.status);
       }
+    }
+
+    const factRows: GrnRegisterFactRow[] = scan.map((r) => {
+      const supplierName = supplierByPo.get(r.po_id) ?? null;
+      const totals = warehouseReceiptTotals(r.lines ?? []);
+      const number = receivingDisplayNo({ id: r.id, grn_no: r.grn_no, goods_received_at: r.goods_received_at ?? undefined, submitted_at: r.submitted_at ?? undefined });
+      const source = [...new Set([...(r.lines ?? []).flatMap(line => refsByLine.get(line.id) ?? []), ...(r.arrival_source_id && arrivalNoById.has(r.arrival_source_id) ? [arrivalNoById.get(r.arrival_source_id)!] : [])])].map(ref => documentDisplayNumber(ref)).join(" · ");
+      const labels = [...new Set((r.lines ?? []).map(line => productWordBySku.get(line.sku) ?? line.sku))];
+      const actualSite = (r.actual_site_id ? whNames.get(r.actual_site_id) : null) ?? (r.warehouse_id ? whNames.get(r.warehouse_id) : null) ?? "";
+      const extra = receivingExtraQty((Array.isArray(r.extra_lines) ? r.extra_lines : []) as ReceivingExtraLine[]);
+      return {
+        columnFacts: {
+          grnDate: { text: businessDay(r.posted_at) ?? "", date: businessDay(r.posted_at) },
+          grn: { text: number }, source: { text: source }, po: { text: documentDisplayNumber(r.po_id ?? "") },
+          supplier: { text: supplierName ?? "" }, deliverTo: { text: r.warehouse_id ? whNames.get(r.warehouse_id) ?? "" : "" },
+          actualSite: { text: actualSite }, supplierConfirmedDeliveryDate: { text: supplierDateByPo.get(r.po_id) ?? "Not confirmed", date: supplierDateByPo.get(r.po_id) ?? null },
+          receivedAt: { text: r.goods_received_at ?? "", date: r.goods_received_at }, doNo: { text: r.do_number ?? "" },
+          items: { text: labels.join(" · ") }, receivedQty: { text: String(totals.received), number: totals.received },
+          damagedQty: { text: String(totals.damaged), number: totals.damaged }, wrongQty: { text: String(totals.wrongItem), number: totals.wrongItem },
+          extraQty: { text: String(extra), number: extra },
+        },
+        id: r.id,
+        categories: receiptCategoryWords(r.lines, scanCatalog),
+        supplierName,
+        siteName:
+          (r.actual_site_id ? whNames.get(r.actual_site_id) : null) ??
+          (r.warehouse_id ? whNames.get(r.warehouse_id) : null) ??
+          null,
+        grnDateIso: businessDay(r.posted_at),
+        // `Received with` reads the receipt's OWN stored quantities through the
+        // shared totals — the register never re-counts a jsonb line itself.
+        damaged: totals.damaged > 0,
+        wrongItem: totals.wrongItem > 0,
+        extra:
+          receivingExtraQty(
+            (Array.isArray(r.extra_lines)
+              ? r.extra_lines
+              : []) as ReceivingExtraLine[],
+          ) > 0,
+        cancelled: r.status === "voided",
+        // The Search box's own promise: GRN, PO, supplier or DO number.
+        searchText: [
+          r.grn_no ?? "",
+          receivingDisplayNo({
+            id: r.id,
+            grn_no: r.grn_no,
+            goods_received_at: r.goods_received_at ?? undefined,
+            submitted_at: r.submitted_at ?? undefined,
+          }),
+          r.po_id,
+          documentDisplayNumber(r.po_id ?? ""),
+          r.do_number ?? "",
+          supplierName ?? "",
+        ].join(" "),
+      };
+    });
+
+    const view = buildGrnRegisterView(factRows, sel, offset, limit);
+    // Dropdown choices cover the complete authorised population narrowed by the
+    // existing rail/search. Current column choices remain available to clear.
+    const choiceIds = new Set(buildGrnRegisterView(factRows, { ...sel, columns: null }, 0, Math.max(1, factRows.length)).pageIds);
+    const columnValues = Object.fromEntries([...GRN_COLUMN_KEYS].map(key => [key,
+      [...new Set(factRows.filter(row => choiceIds.has(row.id)).map(row => row.columnFacts?.[key]?.text ?? ""))].sort((a, b) => a.localeCompare(b, "en", { numeric: true })),
+    ]));
+
+    // The page itself — full records for exactly these ids, in the scan's
+    // order (a `.in(…)` read has no order of its own).
+    let pageRows: ReceiptRow[] = [];
+    try {
+      pageRows = await readReceipts((select) =>
+        readByIds<ReceiptRow>(view.pageIds, (ids) =>
+          sb.from("warehouse_receipts").select(select).in("id", ids) as unknown as
+            PromiseLike<{ data: ReceiptRow[] | null; error: unknown }>,
+        ),
+      );
+    } catch (error) {
+      const m = mapPgError(error as never);
+      return c.json(m.body, m.status);
+    }
+    const byId = new Map(pageRows.map((r) => [r.id as string, r]));
+    const ordered = view.pageIds
+      .map((id) => byId.get(id))
+      .filter((r): r is ReceiptRow => r != null);
+
+    const pageUserIds = [
+      ...new Set(
+        ordered
+          .flatMap((r) => [
+            r.submitted_by,
+            r.reviewed_by,
+            r.posted_by,
+            r.posted_duty_holder,
+            r.posted_duty_cover,
+            r.void_by,
+          ])
+          .filter((v): v is string => typeof v === "string" && v.length > 0),
+      ),
+    ];
+    const userNames = new Map<string, string>();
+    if (pageUserIds.length > 0) {
+      const { data: users } = await sb
+        .from("app_users")
+        .select("id, name")
+        .in("id", pageUserIds);
+      for (const u of users ?? [])
+        userNames.set(u.id as string, u.name as string);
     }
 
     /** `receipt id` → `po_line_id` → the Unit IDs THIS receiving answered. */
@@ -636,6 +666,10 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
        item word — so the register and the document can never disagree. */
     const lineInfo: Record<string, { description: string | null; category: string }> =
       {};
+    const pageSkus = new Set(ordered.flatMap(r => [
+      ...(Array.isArray(r.lines) ? r.lines as WarehouseReceiptLine[] : []).map(line => line.sku),
+      ...(Array.isArray(r.extra_lines) ? r.extra_lines as ReceivingExtraLine[] : []).map(line => line.sku),
+    ]));
     for (const sku of pageSkus) {
       lineInfo[sku] = {
         description: productWordBySku.get(sku) ?? null,
@@ -732,6 +766,7 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
       }),
       page: { offset, limit, total: view.total },
       facets: view.facets,
+      column_values: columnValues,
       /* The expansion's item words and governed categories, resolved once for
          the page — the same two facts the official GRN document prints. */
       line_info: lineInfo,

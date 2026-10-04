@@ -1,8 +1,10 @@
 import { GOODS_ABSENCE_WORDS } from "@carres/shared";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
   grnDateMonths,
+  documentDisplayNumber,
+  type RegisterColumnQuery,
   grnDateWeeks,
   receivingDisplayNo,
   receivingExtraQty,
@@ -163,6 +165,11 @@ export default function OperationReceiving() {
   const cancelledSel = params.get("cancelled") === "1";
   const [search, setSearch] = useState("");
   const [offset, setOffset] = useState(0);
+  const [columnQuery, setColumnQuery] = useState<string>();
+  const changeColumns = useCallback((query: RegisterColumnQuery) => {
+    setColumnQuery(JSON.stringify(query)); setOffset(0);
+  }, []);
+  const changeSearch = useCallback((value: string) => { setSearch(value); setOffset(0); }, []);
   const [quickReceipt, setQuickReceipt] = useState<WarehouseReceiptQueueRow | null>(null);
   /** `Choose dates…` opens its two fields in the rail; it is not a filter of
    *  its own until both ends are typed. */
@@ -185,6 +192,7 @@ export default function OperationReceiving() {
 
   const registerQ = useOperationGrnRegister({
     offset,
+    columns: columnQuery,
     category: categorySel,
     supplier: supplierSel,
     site: siteSel,
@@ -328,6 +336,7 @@ export default function OperationReceiving() {
       },
       {
         key: "grn",
+        filterValue: receivingDisplayNo,
         label: "GRN No",
         width: REGISTER_FIELD_WIDTH.documentNo,
         sortable: true,
@@ -359,6 +368,7 @@ export default function OperationReceiving() {
       },
       {
         key: "source",
+        filterValue: r => (r.source_refs ?? []).map(ref => documentDisplayNumber(ref)).join(" · "),
         label: "SO No / MPR No / CO No / RO No",
         headerLines: ["SO No / MPR No", "CO No / RO No"],
         width: REGISTER_FIELD_WIDTH.mixedReferenceFourWay,
@@ -367,14 +377,14 @@ export default function OperationReceiving() {
            it has none. No word stands in for a missing number, and no PO is
            invented for a receipt that came back through an arrival source. */
         searchValue: (r) => (r.source_refs ?? []).join(" "),
-        exportValue: (r) => (r.source_refs ?? []).join(" · "),
+        exportValue: (r) => (r.source_refs ?? []).map(ref => documentDisplayNumber(ref)).join(" · "),
         sortFn: (a, b) =>
           (a.source_refs?.[0] ?? "").localeCompare(b.source_refs?.[0] ?? ""),
         accessor: (r) => (
           <span className="flex flex-col">
             {(r.source_refs ?? []).map((ref) => (
               <span key={ref} className="font-mono text-meta text-base-900">
-                {ref}
+                {documentDisplayNumber(ref)}
               </span>
             ))}
           </span>
@@ -382,15 +392,16 @@ export default function OperationReceiving() {
       },
       {
         key: "po",
+        filterValue: r => documentDisplayNumber(r.po_id ?? ""),
         label: "PO No",
         width: REGISTER_FIELD_WIDTH.documentNo,
         sortable: true,
         /* Its own column, and blank for a CO or RO receipt that has no
            purchase order — an absence, never a borrowed number. */
-        searchValue: (r) => r.po_id ?? "",
-        exportValue: (r) => r.po_id ?? "",
+        searchValue: (r) => `${r.po_id ?? ""} ${documentDisplayNumber(r.po_id ?? "")}`,
+        exportValue: (r) => documentDisplayNumber(r.po_id ?? ""),
         accessor: (r) => (
-          <span className="font-mono text-meta text-base-900">{r.po_id ?? ""}</span>
+          <span className="font-mono text-meta text-base-900">{documentDisplayNumber(r.po_id ?? "")}</span>
         ),
       },
       {
@@ -531,6 +542,7 @@ export default function OperationReceiving() {
       },
       {
         key: "items",
+        filterValue: r => (r.product_labels ?? []).join(" · "),
         label: "Items",
         width: REGISTER_FIELD_WIDTH.items,
         sortable: true,
@@ -559,6 +571,8 @@ export default function OperationReceiving() {
       },
       {
         key: "receivedQty",
+        filterType: "number",
+        numberValue: r => warehouseReceiptTotals(r.lines).received,
         label: "Received Qty",
         headerLines: ["Received", "Qty"],
         width: REGISTER_FIELD_WIDTH.receiptQty,
@@ -577,6 +591,8 @@ export default function OperationReceiving() {
       },
       {
         key: "damagedQty",
+        filterType: "number",
+        numberValue: r => warehouseReceiptTotals(r.lines).damaged,
         label: "Damaged Qty",
         headerLines: ["Damaged", "Qty"],
         width: REGISTER_FIELD_WIDTH.receiptQty,
@@ -606,6 +622,8 @@ export default function OperationReceiving() {
       },
       {
         key: "wrongQty",
+        filterType: "number",
+        numberValue: r => warehouseReceiptTotals(r.lines).wrongItem,
         label: "Wrong Item Qty",
         headerLines: ["Wrong Item", "Qty"],
         width: REGISTER_FIELD_WIDTH.receiptQty,
@@ -635,6 +653,8 @@ export default function OperationReceiving() {
       },
       {
         key: "extraQty",
+        filterType: "number",
+        numberValue: r => receivingExtraQty(r.extra_lines ?? []),
         label: "Extra Qty",
         headerLines: ["Extra", "Qty"],
         width: REGISTER_FIELD_WIDTH.receiptQty,
@@ -661,7 +681,13 @@ export default function OperationReceiving() {
     [],
   );
 
+  const hasColumnFilters = useMemo(() => {
+    if (!columnQuery) return false;
+    const query: RegisterColumnQuery = JSON.parse(columnQuery);
+    return [query.filters, query.dateFilters, query.numberFilters, query.dateRangeFilters].some(values => Object.keys(values).length > 0);
+  }, [columnQuery]);
   const narrowed =
+    hasColumnFilters ||
     categorySel !== null ||
     supplierSel !== null ||
     siteSel !== null ||
@@ -1087,14 +1113,16 @@ export default function OperationReceiving() {
               rowKey={(r) => r.id}
               exportName="Receiving"
               searchPlaceholder="GRN, PO, supplier or DO number…"
-              isLoading={registerQ.isLoading}
-              onSearchChange={setSearch}
+              isLoading={registerQ.isLoading || registerQ.isFetching}
+              onSearchChange={changeSearch}
+              serverColumns={{ values: registerQ.data?.column_values ?? {}, onChange: changeColumns }}
               /* GRN Doc Date and GRN No lead and pin at a canvas ≥768px; below it
                  the number pins alone. No column is hidden by width. */
               leadingColumns={{ date: "grnDate", identity: "grn" }}
               activeConditions={activeConditions}
               onClearConditions={clearRail}
               groupBanner={false}
+              allowColumnGrouping={false}
               /* Receiving is UNGROUPED — one sticky header, no business
                  groups. The group-local header pattern applies to registers
                  that HAVE groups; inventing GRN groups to use it would be a

@@ -61,6 +61,7 @@ import Toast from "@/components/kit/Toast";
 import Tooltip from "@/components/kit/Tooltip";
 import TotalsSummary from "@/components/kit/TotalsSummary";
 import { Z_LADDER } from "@/components/kit/overlay-layer";
+import ServerRegisterExample from "@/pages/dev/ServerRegisterExample";
 import CompactCardExample from "@/pages/dev/CompactCardExample";
 import { fmtDate } from "@/lib/fmt-date";
 import {
@@ -884,6 +885,10 @@ export default function UiShowcase() {
               </div>
             </Card>
           </Grid>
+        </Section>
+
+        <Section id="server-register" title="Paged register filters" note="Preview only: five rows are loaded. Supplier B exists only at record 61; choose it in the Supplier column filter, then clear the filter to restore all 61 records.">
+          <ServerRegisterExample />
         </Section>
 
         <Section

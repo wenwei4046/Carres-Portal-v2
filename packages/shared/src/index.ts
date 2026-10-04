@@ -3354,3 +3354,6 @@ export { evaluateWorkspaceActivityCheck, type WorkspaceActivityEvidence, type Wo
 export { decideWorkspaceReassignment, type WorkspaceCheckpointIdentity, type WorkspaceReassignmentDecision } from "./workspace-reassignment";
 
 export { documentDisplayNumber } from "./document-display";
+
+export { dateMatchesPreset, matchesRegisterColumnFilters } from "./register-column-query";
+export type { DatePreset, RegisterColumnQuery, RegisterColumnFact } from "./register-column-query";

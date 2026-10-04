@@ -360,7 +360,8 @@ is in the pending Working Panel slice. Issued historical PDFs were not changed.
 Stored identities, supplier references and Unit IDs are unchanged; other modules still need
 explicit adoption, so this does not establish system-wide completion.
 
-The Receiving Working Panel is **BUILT ON BRANCH / NOT PRODUCTION VERIFIED**: row selection
+The Receiving Working Panel merged in #1894 (`c335716a1`), with full exact-head CI
+`37211169952` passed; it is **NOT PRODUCTION VERIFIED**: row selection
 uses the existing `Drawer` + `CompactModuleCard`, receipt-only quantities, actual arrival facts,
 source-owned evidence and history, and `Open full page` to the existing GRN/PDF/edit object.
 Local shared-kit preview verified the receipt header, cancellation indicator and details
@@ -371,10 +372,17 @@ Cancelled receipts retain their indicator; ordinary GRNs gain no Completed/Valid
 Related-record coverage currently includes the PO and recorded source references; Claim/Return
 handling links and the Receiving Differences view are not delivered by this panel slice.
 
-The two-view rail and complete server-side header filtering remain undelivered. The current
-shared grid filters loaded rows, while Receiving pages 50 rows on the server; moving the rail's
-filters must first preserve full-result matching, totals and page reset through the shared kit.
-No page-local alternative table/filter component is admitted.
+The two-view rail remains undelivered. Complete server-side column filtering and sorting are
+**BUILT ON BRANCH / NOT PRODUCTION VERIFIED** through the shared `DataGrid serverColumns`
+contract and the existing authorised GRN reader. Filterable supplier, document, source, item,
+location, date and quantity facts are resolved before the page slice. Unit details and signed
+files stay page-scoped. Changed filters/sort return to page 1; dropdown choices cover the full
+searched/rail-filtered population. Filtered totals and rail facets use the same shared arithmetic.
+The source/PO references in this Receiving register also adopt the shared two-digit-year display;
+original identities and supplier DO references stay unchanged. No local filter engine is admitted.
+Tests cover a match beyond the first 50 records, numeric sorting, invalid query rejection and
+clearing the filter. Full CI and authenticated acceptance remain owed. Full-result export and
+the approved two-view/Table-Cards composition remain separate unfinished work.
 
 **Read-only production evidence, 2026-10-04:** `warehouse_submit_receipt` still files a report;
 `warehouse_receipt_check_in` calls Operation's post-authority gate. The only current active
