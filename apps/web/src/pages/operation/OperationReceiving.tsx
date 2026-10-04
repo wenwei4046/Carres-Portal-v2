@@ -36,6 +36,8 @@ import GoodsMiniTable, {
 } from "./components/GoodsMiniTable";
 import PoReceivingView from "./components/PoReceivingView";
 import ReceivingRecord from "./components/ReceivingRecord";
+import ReceivingCompactView from "./components/ReceivingCompactView";
+import Drawer from "@/components/kit/Drawer";
 import PurchasingTabs from "./PurchasingTabs";
 import ArrivalSourceWorkspace from "./ArrivalSourceWorkspace";
 // ⭐ HEADER PALETTE MATCHES THE PURCHASING REGISTERS (owner request 2026-09-15)
@@ -161,6 +163,7 @@ export default function OperationReceiving() {
   const cancelledSel = params.get("cancelled") === "1";
   const [search, setSearch] = useState("");
   const [offset, setOffset] = useState(0);
+  const [quickReceipt, setQuickReceipt] = useState<WarehouseReceiptQueueRow | null>(null);
   /** `Choose dates…` opens its two fields in the rail; it is not a filter of
    *  its own until both ends are typed. */
   const [choosing, setChoosing] = useState(false);
@@ -838,6 +841,14 @@ export default function OperationReceiving() {
       data-testid="receiving-page"
     >
       <PurchasingTabs />
+      {quickReceipt && <Drawer variant="compact-card" open
+        title={receivingDisplayNo(quickReceipt)}
+        onOpenChange={(open) => { if (!open) setQuickReceipt(null); }}>
+        <ReceivingCompactView row={quickReceipt}
+          items={(receipt) => <GoodsMiniTable label="Items & quantities" lines={expansionLines(receipt)} receivingLayout itemHeading="Items" />}
+          onOpen={() => { const id = quickReceipt.id; setQuickReceipt(null); openSession(id); }}
+          onClose={() => setQuickReceipt(null)} />
+      </Drawer>}
 
       {/* ── The open object takes the stage; the Register stays MOUNTED
              underneath (`invisible`, never display:none) so Back restores the
@@ -1104,7 +1115,7 @@ export default function OperationReceiving() {
                   </div>
                 ),
               }}
-              onRowClick={(r) => openSession(r.id)}
+              onRowClick={setQuickReceipt}
               toolbarStart={
                 <button
                   type="button"

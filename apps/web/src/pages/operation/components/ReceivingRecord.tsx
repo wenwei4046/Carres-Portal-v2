@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { Download, Printer } from "lucide-react";
 import {
   receivedByWords,
+  documentDisplayNumber,
   receivingDisplayNo,
   receivingExtraQty,
   receivingSummaryOf,
@@ -37,6 +38,7 @@ import ArrivalEvidenceUploadField from "@/components/ArrivalEvidenceUploadField"
 import { DOC_BTN, DocSection as Section, Prop } from "./workspace-doc";
 import { grnTemplateDataOf, type GrnAmendDraft } from "./grn-template-data";
 import "./receiving-workspace.css";
+import { receivingEventLabel } from "./receiving-event-label";
 
 /**
  * ReceivingRecord — one Receiving Session / formal GRN object
@@ -543,19 +545,7 @@ export default function ReceivingRecord({
                 {events.map((e) => (
                   <li key={e.id}>
                     <div className="text-body font-semibold text-kit-slate-12">
-                      {e.event === "posted"
-                        ? "Receiving saved"
-                        : e.event === "submitted"
-                          ? "Count submitted"
-                          : e.event === "resubmitted"
-                            ? "Count submitted again"
-                            : e.event === "returned"
-                              ? "Count returned"
-                              : e.event === "amended"
-                                ? "Receiving amended"
-                                : e.event === "voided"
-                                  ? "Receiving voided"
-                                  : "Activity"}
+                      {receivingEventLabel(e.event)}
                     </div>
                     <div className="text-meta text-kit-slate-11">
                       {e.actor_name ?? "Staff identity not recorded"} ·{" "}
@@ -567,7 +557,7 @@ export default function ReceivingRecord({
                       </div>
                     ) : e.payload?.grn_no ? (
                       <div className="text-label font-normal text-kit-slate-11">
-                        {e.payload.grn_no}
+                        {documentDisplayNumber(e.payload.grn_no)}
                         {e.payload.units_counted != null
                           ? ` · ${e.payload.units_counted} unit(s)`
                           : ""}
