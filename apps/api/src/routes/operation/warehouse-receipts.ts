@@ -111,7 +111,9 @@ const SIGNED_URL_TTL_SECONDS = 3600;
 type ReceiptRow = Record<string, unknown>;
 
 /**
- * GET / — `?status=submitted|returned|posted|voided|all` (default `submitted`).
+ * GET / — `?status=submitted|draft|unresolved|returned|posted|voided|all`.
+ * Default `submitted` preserves the legacy review queue. Work uses `unresolved`
+ * with complete bounded pagination for submitted and preserved draft reports.
  *
  * Defaults to the OPEN queue for the same reason R3's claim list defaults to
  * open: this is a worklist, and a worklist that opens on settled rows is a
@@ -151,6 +153,7 @@ const RECEIPT_FIELDS_0601 =
   "goods_received_time, received_by_kind, received_by_name, revision";
 const RECEIPT_SELECT_0601 = `id, arrival_source_id, ${RECEIPT_FIELDS}, ${RECEIPT_FIELDS_0601}`;
 const RECEIPT_SELECT = `id, arrival_source_id, ${RECEIPT_FIELDS}`;
+const RECEIPT_SELECT_REPORT = `${RECEIPT_SELECT_0601}, raw_report, validation_blockers`;
 /** `arrival_source_id` lands with the arrival-source tables, still an
  *  unnumbered draft (docs/stock/MASTER.md §13.9). Until they exist every
  *  receipt is PO-backed — which is what production holds — so the register
@@ -164,7 +167,7 @@ async function readReceipts<T>(run: (select: string) => Promise<T>): Promise<T> 
   // 0601's columns first; a schema that does not carry them yet (the Worker
   // deploys on merge, the migration is applied through its governed path)
   // still opens every record, reading `Time not recorded` and no receiver.
-  for (const select of [RECEIPT_SELECT_0601, RECEIPT_SELECT]) {
+  for (const select of [RECEIPT_SELECT_REPORT, RECEIPT_SELECT_0601, RECEIPT_SELECT]) {
     try {
       return await run(select);
     } catch (error) {
@@ -786,6 +789,7 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
           do_file_url: r.do_file_path
             ? (doUrls.get(r.do_file_path as string) ?? null)
             : null,
+          blockers: r.validation_blockers ?? [],
           summary: warehouseReceiptSummary(lines),
           opens_claims: warehouseReceiptOpensClaims(lines),
         };
@@ -802,7 +806,7 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
 
   const raw = (c.req.query("status") ?? "submitted").toLowerCase();
   const status = (
-    ["submitted", "returned", "posted", "voided", "all"] as const
+    ["submitted", "draft", "unresolved", "returned", "posted", "voided", "all"] as const
   ).includes(raw as never)
     ? raw
     : "submitted";
@@ -814,7 +818,7 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
   // actual_site_id · arrival_evidence · extra_lines · the posted
   // duty-evidence trio · void_* are what the Register and the GRN record read.
   const listRead = async (select: string) => {
-    let q = sb
+    const makeQuery = () => sb
       .from("warehouse_receipts")
       .select(select)
       // The register is a HISTORY, so it sorts by the BUSINESS date — when
@@ -822,7 +826,15 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
       // The submitted stamp only breaks ties.
       .order("goods_received_at", { ascending: false })
       .order("submitted_at", { ascending: false })
-      .limit(
+      .order("id");
+    if (status === "unresolved") {
+      const result = await readAllPages<ReceiptRow>((from, to) =>
+        makeQuery().in("status", ["submitted", "draft"]).range(from, to));
+      if ("error" in result) throw result.error;
+      if (!("rows" in result)) throw new Error("Receiving reports could not be loaded completely");
+      return result.rows;
+    }
+    let q = makeQuery().limit(
         Math.min(
           Math.max(1, Math.floor(Number(c.req.query("limit")) || DEFAULT_LIMIT)),
           MAX_LIMIT,
@@ -1029,7 +1041,8 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
           : null,
         // Composed by the shared module so the ops queue and the warehouse's
         // own list describe one receipt with one sentence.
-        summary: warehouseReceiptSummary(lines),
+        blockers: r.validation_blockers ?? [],
+        summary: r.status === "draft" && r.raw_report ? "Receiving report saved. No GRN created." : warehouseReceiptSummary(lines),
         // Said out loud BEFORE the button is pressed: a check-in with an issue
         // files cases against a supplier.
         opens_claims: warehouseReceiptOpensClaims(lines),
@@ -1216,13 +1229,13 @@ warehouseReceiptsRouter.get("/:id", requireOperation, async (c) => {
       .select("id, receipt_id, event, actor_id, event_at, payload")
       .eq("receipt_id", id)
       .order("event_at", { ascending: false }),
-    sb
+    r.po_id ? sb
       .from("purchase_orders")
       .select(
         "id, supplier_id, warehouse_id, destination_id, is_consignment, suppliers(name), purchase_order_lines(id, sku, qty, received_qty, damaged_qty, wrong_item_qty)",
       )
       .eq("id", r.po_id as string)
-      .maybeSingle(),
+      .maybeSingle() : Promise.resolve({ data: null, error: null }),
   ]);
 
   // A missing read must never produce a seemingly complete formal receipt.
@@ -1381,6 +1394,7 @@ warehouseReceiptsRouter.get("/:id", requireOperation, async (c) => {
   return c.json({
     receipt: {
       ...r,
+      blockers: r.validation_blockers ?? [],
       supplier_name: sup?.name ?? null,
       warehouse_name:
         typeof r.warehouse_id === "string"

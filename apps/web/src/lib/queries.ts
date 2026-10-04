@@ -4288,6 +4288,8 @@ export function useWarehouseConfirmReceiptMutation() {
 /** The ops queue row: one filed count, with the names a human needs and the
  *  one sentence the shared module composes. */
 export interface WarehouseReceiptQueueRow {
+  raw_report?: unknown;
+  blockers?: Array<{ code: string; message: string }>;
   arrival_source_id?: string | null;
   id: string;
   po_id: string | null;

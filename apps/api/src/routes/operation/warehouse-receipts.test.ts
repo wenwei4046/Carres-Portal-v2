@@ -67,6 +67,7 @@ type TableCfg = {
   /** Answer according to the SELECTED columns — lets a test reproduce a
    *  deployed schema that does not carry one optional column. */
   listBySelect?: (columns: string) => Result;
+  listByRange?: (from: number, to: number) => Result;
 };
 
 function makeSb(
@@ -83,6 +84,8 @@ function makeSb(
       const builder: Record<string, unknown> = {};
       const chain = () => builder;
       for (const m of ["eq", "in", "order", "limit", "range"]) builder[m] = vi.fn(chain);
+      let bounds: [number, number] = [0, 999];
+      builder.range = vi.fn((from: number, to: number) => { bounds = [from, to]; return builder; });
       // GET /:id reads one row — resolves to the table's `single` config.
       builder.maybeSingle = vi.fn(() =>
         Promise.resolve(cfg.single ?? { data: null, error: null }),
@@ -107,7 +110,7 @@ function makeSb(
         reject?: (e: unknown) => unknown,
       ) =>
         Promise.resolve(
-          cfg.listBySelect?.(selectedColumns) ??
+          cfg.listByRange?.(...bounds) ?? cfg.listBySelect?.(selectedColumns) ??
             cfg.list ?? { data: [], error: null },
         ).then(resolve, reject);
       return builder;
@@ -216,6 +219,49 @@ describe("who may review a warehouse count", () => {
 });
 
 describe("GET /api/operation/warehouse-receipts", () => {
+  it("reads unresolved reports beyond the first thousand without a silent Work cutoff", async () => {
+    const row = { ...RECEIPT_ROW, po_id: null, do_file_path: null, lines: [], status: "draft", submitted_from: "warehouse",
+      raw_report: {}, validation_blockers: [{ code: "receipt_date_missing", message: "Goods Received Date is not recorded" }] };
+    const rows = Array.from({ length: 1001 }, (_, i) => ({ ...row, id: `report-${i}` }));
+    const ranges: number[] = [];
+    const sb = makeSb({ ...opsTables(row), warehouse_receipts: { listByRange: (from, to) => {
+      ranges.push(from); return { data: rows.slice(from, to + 1), error: null };
+    } } });
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const response = await req("/api/operation/warehouse-receipts?status=unresolved", "GET", await makeJwt("operation"));
+    expect(response.status).toBe(200);
+    const body = await response.json() as { receipts: Array<{ id: string }> };
+    expect(body.receipts).toHaveLength(1001);
+    expect(body.receipts[1000]?.id).toBe("report-1000");
+    expect(ranges).toEqual([0, 1000]);
+  });
+
+  it("reads unresolved physical reports with their blockers and no fabricated received summary", async () => {
+    const raw = { po_id: "UNVALIDATED", do_file_path: "foreign/proof.jpg" };
+    const row = { ...RECEIPT_ROW, status: "draft", submitted_from: "warehouse", po_id: null,
+      do_file_path: null, lines: [], raw_report: raw,
+      validation_blockers: [{ code: "receipt_date_missing", message: "Goods Received Date is not recorded" }] };
+    const sb = makeSb(opsTables(row));
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const spy = vi.spyOn(sb, "from");
+    const response = await req("/api/operation/warehouse-receipts?status=unresolved", "GET", await makeJwt("operation"));
+    expect(response.status).toBe(200);
+    const body = await response.json() as { receipts: Array<Record<string, unknown>> };
+    expect(body.receipts[0]).toMatchObject({ raw_report: raw, blockers: row.validation_blockers,
+      po_id: null, do_file_url: null, summary: "Receiving report saved. No GRN created." });
+    const query = spy.mock.results[0].value;
+    expect(query.in).toHaveBeenCalledWith("status", ["submitted", "draft"]);
+    expect(query.range).toHaveBeenCalled();
+    expect(query.limit).not.toHaveBeenCalled();
+  });
+
+  it("does not turn permission failure reading unresolved reports into an empty queue", async () => {
+    const sb = makeSb({ warehouse_receipts: { list: { data: null, error: { code: "42501", message: "Not allowed" } } } });
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const response = await req("/api/operation/warehouse-receipts?status=unresolved", "GET", await makeJwt("operation"));
+    expect(response.status).toBe(403);
+  });
+
   it("names an arrival source without inventing a purchase order", async () => {
     const tables = {
       ...opsTables(),

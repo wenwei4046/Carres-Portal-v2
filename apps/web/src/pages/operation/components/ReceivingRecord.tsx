@@ -248,7 +248,14 @@ export default function ReceivingRecord({
         </div>
       )}
 
-      {amending && draft && r.po_id ? (
+      {r.status === "draft" && r.raw_report != null ? (
+        <Section title="Receiving">
+          <p role="status" className="text-body text-kit-slate-12">Receiving report saved. No GRN created.</p>
+          {(r.blockers ?? []).map((blocker) => <p key={blocker.code} className="text-body text-kit-red-9">{blocker.message}</p>)}
+          <Prop label="Warehouse">{r.warehouse_name ?? "Not recorded"}</Prop>
+          <Prop label="Count submitted">{fmtDate(r.submitted_at)} · {r.submitted_by_name ?? "Staff identity not recorded"}</Prop>
+        </Section>
+      ) : amending && draft && r.po_id ? (
         <AmendPanel
           receipt={{ ...r, po_id: r.po_id }}
           lines={lines}

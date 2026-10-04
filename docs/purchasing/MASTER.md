@@ -775,6 +775,22 @@ and evidence are sent again. Source-disappearance resolution, complete report hi
 and broader page/keyboard acceptance remain owed. The own-report list still has its legacy table
 and PageHeader; this bounded correction does not claim complete shared-template adoption.
 
+**Operation preserved-report visibility — BUILT ON BRANCH / NOT DEPLOYED, 2026-10-05.**
+Operation receipt reads carry the saved raw report and engine blockers without promoting raw
+source/evidence to validated links or signed files. Work reads submitted and draft reports through
+complete bounded pagination, instead of the first 200 records; read failure remains failure.
+Only Warehouse drafts with preserved reports and explicit blockers create `receiving.resolve_report`.
+GRN Duty coordinates that exact report through `Open Receiving`; Warehouse retains physical
+correction and Operation retains supplier follow-up. The submission's Kuala Lumpur business day
+starts the follow-up, never an invented goods-arrival day. Posted receipts and ordinary Office
+drafts create no such action. The exact unposted report shows the saved-report notice, blocker,
+Warehouse and submitter; it shows no GRN totals or routine approval control. Detail reads no longer
+query a fictitious PO for a source-less draft or non-PO receipt. This is visibility and source-door
+coverage, not a claim that all blocker-resolution actions/history/evidence review are complete.
+Validation: 69 receipt-route tests (including 1,001 unresolved reports and permission failure),
+50 Work projection tests, 12 Work probe tests, 79 shared Work/receipt tests and 75 Receiving UI
+tests pass. API/Web typechecks and design-standard checks pass. No production SQL or data changed.
+
 Still required before an exact SQL review/release: remaining non-PO lifecycle and source read/form coverage; remaining quantity/issue/extra and authority boundaries; complete source contracts and
 Warehouse form and report history, Operation blocked-report/Work readers; exact reviewed SQL
 approval followed by the governed production probe/apply and delivery proof. The draft exists only

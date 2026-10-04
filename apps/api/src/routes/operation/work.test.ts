@@ -203,6 +203,21 @@ describe("operation Work response composition", () => {
     ).toThrow();
   });
 
+  it("routes preserved blockers to the exact report without declaring goods arrived or creating approval work", () => {
+    const base = { id: "blocked-1", po_id: null, supplier_name: null, status: "draft",
+      submitted_from: "warehouse", raw_report: { po_id: "UNVALIDATED" },
+      submitted_at: "2026-09-05T23:00:00Z", blockers: [{ code: "receipt_date_missing", message: "Goods Received Date is not recorded" }] };
+    const source = receivingWorkSourceFromModuleFacts({ receipts: [base,
+      { ...base, id: "posted", status: "posted" }, { ...base, id: "office", submitted_from: "office" },
+      { ...base, id: "empty", blockers: [] }] });
+    const items = projectReceivingWork({ source, duty: null, today: "2026-09-07", workingDaysLate: () => 1 });
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({ ruleKey: "receiving.resolve_report", action: "Open Receiving",
+      problem: "Goods Received Date is not recorded", timing: { businessDueOn: "2026-09-06" }, destination: "/operation?tab=receiving&session=blocked-1" });
+    expect(JSON.stringify(items)).not.toContain("UNVALIDATED");
+    expect(items[0]?.problem).not.toContain("Goods arrived");
+  });
+
   it("projects submitted Receiving facts with GRN Duty cover and an exact session door", () => {
     const items = projectReceivingWork({
       source: {

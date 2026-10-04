@@ -29,6 +29,7 @@
  * PURE — no I/O, no clock.
  */
 import { docNumber } from "./doc-number";
+import { mytDayOf } from "./customer-card";
 import { documentDisplayNumber } from "./document-display";
 import { catalogCategoryWordOf } from "./line-category";
 import {
@@ -672,6 +673,10 @@ export const RECEIVING_WORK_WORDS = {
 } as const;
 
 export interface ReceivingWorkSource {
+  blocked?: readonly {
+    id: string; sourceLabel: string; submitted_at: string;
+    blockers: readonly { code: string; message: string }[];
+  }[];
   /** Actual submitted physical reports awaiting the existing receipt action. */
   submitted: readonly {
     id: string;
@@ -693,7 +698,7 @@ export function receivingWorkItems(
   todayIso: string,
   workingDaysLate: (dueIso: string) => number,
 ): Array<{
-  ruleKey: "receiving.check_in";
+  ruleKey: "receiving.check_in" | "receiving.resolve_report";
   module: "receiving";
   soRef: string;
   orderId: string;
@@ -716,7 +721,7 @@ export function receivingWorkItems(
     : { ownerName: null, ownerUserId: null, ownerDuty: "GRN Duty" };
   const out: ReturnType<typeof receivingWorkItems> = [];
   for (const r of src.submitted) {
-    const due = r.goods_received_at ?? r.submitted_at.slice(0, 10);
+    const due = r.goods_received_at ?? mytDayOf(r.submitted_at);
     out.push({
       ruleKey: "receiving.check_in",
       module: "receiving",
@@ -731,6 +736,17 @@ export function receivingWorkItems(
       workingDaysLate: due && today > due ? workingDaysLate(due) : 0,
       receiptId: r.id,
       poId: r.po_id,
+    });
+  }
+  for (const r of src.blocked ?? []) {
+    // Submission time starts the follow-up; it is not a physical arrival date.
+    const due = mytDayOf(r.submitted_at);
+    out.push({
+      ruleKey: "receiving.resolve_report", module: "receiving",
+      soRef: `Receiving · ${r.sourceLabel}`, orderId: r.id,
+      action: "Open Receiving", ...owner, tone: "warning", locked: false, broken: false,
+      dueIso: due, workingDaysLate: due && today > due ? workingDaysLate(due) : 0,
+      receiptId: r.id, poId: r.sourceLabel,
     });
   }
   return out;

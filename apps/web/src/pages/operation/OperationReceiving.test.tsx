@@ -1362,6 +1362,18 @@ describe("ReceivingRecord — the posted GRN, the review, the two doors", () => 
       <ReceivingRecord sessionId="r-posted" onBack={() => {}} />,
     );
 
+  it("shows an unposted raw report and its blocker without GRN totals or approval controls", () => {
+    h.sessionDetail = postedDetail({ receipt: { status: "draft", grn_no: null,
+      raw_report: { po_id: "UNVALIDATED" }, lines: [],
+      blockers: [{ code: "receipt_date_missing", message: "Goods Received Date is not recorded" }] } });
+    renderRecord();
+    expect(screen.getByRole("status")).toHaveTextContent("Receiving report saved. No GRN created.");
+    expect(screen.getByText("Goods Received Date is not recorded")).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Save Receiving" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Receiving Summary")).not.toBeInTheDocument();
+    expect(screen.queryByText("UNVALIDATED")).not.toBeInTheDocument();
+  });
+
   it("keeps an unreadable saved arrival photo visible and opens the shared viewer with its GRN source", async () => {
     h.sessionDetail = postedDetail({ receipt: {
       arrival_evidence: [{ path: "stored/photo.jpg", kind: "photo" }],
