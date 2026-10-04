@@ -230,7 +230,7 @@
 .panel .cell:last-child { border: 0; }
 .panel .cell[aria-expanded="true"] { box-shadow: inset 0 -2px var(--cc-brand); }
 /* Every cell: title row, value, optional status — top aligned on common baselines (owner 2026-10-04). */
-.panel .strip > .cell { display: grid; grid-template-rows: 16px auto; align-content: start; align-items: start; gap: 4px; text-align: left; }
+.panel .strip > .cell { display: grid; grid-row: span 2; grid-template-rows: subgrid; align-content: start; align-items: start; gap: 4px; text-align: left; }
 .cell small { display: flex; align-items: center; justify-content: space-between; margin: 0; line-height: 16px; font-size: 11px; color: var(--cc-muted); }
 .arrow { margin-left: auto; }
 .cell strong { display: block; font-size: 12px; margin: 0; line-height: 18px; overflow-wrap: anywhere; }

@@ -550,35 +550,43 @@ Related-record coverage currently includes the PO and recorded source references
 handling links and the Receiving Differences view are not delivered by this panel slice.
 
 The two-view rail remains undelivered. Complete server-side column filtering and sorting are
-**DEPLOYED #1899 (`efa77a362`) / INTERACTIVE ACCEPTANCE INCOMPLETE**, after exact-head full CI
-`37214055018` passed on `19c69591b`, through the shared `DataGrid serverColumns`
-contract and the existing authorised GRN reader. Filterable supplier, document, source, item,
-location, date and quantity facts are resolved before the page slice. Unit details and signed
-files stay page-scoped. Changed filters/sort return to page 1; dropdown choices cover the full
-searched/rail-filtered population. Filtered totals and rail facets use the same shared arithmetic.
-The source/PO references in this Receiving register also adopt the shared two-digit-year display;
-original identities and supplier DO references stay unchanged. No local filter engine is admitted.
-Tests cover a match beyond the first 50 records, numeric sorting, invalid query rejection and
-clearing the filter. The shared preview browser found record 61 through Supplier B with only five
-rows loaded, then restored all 61 on Clear. After merging current main, 106 Receiving/shared-card/
-Sales Order/SO Batch regressions passed. Production deployment `37215036695` failed before publishing: a Manual Purchase test compared
-its wall-clock Settings result with fixed requested dates, which coincided after MYT midnight.
-The test-only repair fixes its PO clock and preserves the date-ownership assertions; all 95 tests
-in that file passed locally. Covering deployment `37216102072` succeeded at `719653ea0`; all five canonical surfaces converged. Live Receiving exposed complete supplier choices, but at 545px the shared filter menu opened beyond the right edge (left 534px/right 724px). Interactive acceptance therefore remains incomplete until the central UI correction ships. Full-result export and the two-view rail remain unfinished.
+**PRODUCTION VERIFIED, 2026-10-05** through the shared `DataGrid serverColumns` contract and
+existing authorised GRN reader. Supplier, document, source, item, location, date and quantity
+facts resolve before pagination. Unit details and signed files remain page-scoped. Changed
+filters/sort return to page 1; choices cover the complete searched/rail-filtered population.
+Filtered totals/facets share one arithmetic. Source/PO numbers use the shared two-digit-year
+display; stored identities and supplier DO references remain unchanged.
 
-**Table/Cards and shared Page tools — MERGED #1901 / NOT PRODUCTION VERIFIED, 2026-10-05.**
-Receiving reuses the existing segmented Table/Cards control, shared DataGrid Page tools and
-`ReceivingCompactView` in both Cards and the right Working Panel. Both presentations keep the
-same search, column filters and sort; changing presentation starts at page 1. Table pages contain
-50 receipts; Cards pages contain 12 to bound per-receipt detail reads. Footer totals still describe
-the complete authorised filtered population. Open full page retains the register underneath.
-Columns and Export use the shared Page tools menu; Cards introduces no second receipt editor.
-Party/receiver facts awaiting a detail read show Loading or Unavailable, never false absence.
-81 local Receiving/card journey tests passed, including filter preservation across presentations
-and keyboard access to Page tools. The central filter correction anchors to its button, clamps to the viewport and returns focus on Escape. A 366px preview measured the menu at 158–358px; selecting Supplier B found record 61 and Clear restored all 61. The complete register plus Receiving/card targeted run passed 171 tests. Full exact-head CI `37217770861` passed on `c4f8b10ec`; #1901 merged as `5c04b6625`. Deployment `37218697773` and live acceptance are owed. This does not deliver
-the Receiving Differences view or Warehouse automatic posting.
+#1899 passed exact-head CI `37214055018`; the shared narrow-menu correction in #1901 passed
+CI `37217770861` on `c4f8b10ec`. Deployment `37218697773` succeeded and all five canonical
+surfaces independently converged to `5c04b6625a0bd2f6bfc19f03400e7bfae0308195`.
+At the actual authenticated 545px Receiving viewport, the supplier menu measured 337–537px;
+Ohana filtered seven records to three, Received Qty descending put the two-unit receipt first,
+and Clear restored all seven. The beyond-page boundary is separately proved by API/tests and
+an actual 61-record shared preview with only five rows loaded; production currently has seven.
 
-**Complete filtered-result export — BUILT ON BRANCH / NOT PRODUCTION VERIFIED, 2026-10-05.**
+**Table/Cards and shared Page tools — PRODUCTION VERIFIED, 2026-10-05.**
+Receiving uses the shared segmented control, DataGrid Page tools and `ReceivingCompactView`
+for Cards and the right Working Panel. Search/column filters/sort persist across presentations;
+changing view starts at page 1. Table pages contain 50 receipts, Cards 12; footer totals cover
+the complete authorised result. Detail loading/failure never pretends a party/receiver is absent.
+The live three-record Ohana filter remained identical in Cards and Table. Opening full GRN
+`GRN-050826-2973` and returning preserved Cards and the supplier filter. Shared Page tools
+opened its 15-column control; no column setting was changed. All temporary filters/sort were
+cleared and Table restored. The local register/Receiving/card run passed 171 tests.
+
+Bundle proof against the preceding release's own deployment
+`https://6be3a617.carres-portal.pages.dev`: `index-BkDrOL2X.js` → `index-D7wV4aOD.js`;
+`receiving-cards` 0→1, viewport-clamp string 0→1, retired fixed filter style 1→0,
+`GRN Doc Date` control 6→6. This acceptance covers these list/card controls only; it does not
+close Receiving Differences, linked Claim/Return handling or Warehouse automatic posting.
+Formal GRN preview and Download PDF are verified. An authenticated fresh production tab downloaded
+`GRN-260904-1064.pdf` (26,972 bytes); extracted text confirms the short number, original
+`DO-SMOKE-B` and Unit `U1-000-064`. The older tab failed to save downloads; no PDF code change
+was needed. Desktop Cards exposed a wrapped-label overlap; the shared-kit correction below
+is locally verified but still awaits deployment.
+
+**Complete filtered-result export — PRODUCTION VERIFIED, 2026-10-05.**
 Receiving supplies the shared DataGrid export loader with the current search, rail/column filters
 and sort. The existing authorised GRN reader resolves the complete result in one request,
 ignoring display offset/page size; it does not sign receipt files or load Unit expansion for this
@@ -588,7 +596,10 @@ a second click cannot start a duplicate export. The register page/presentation s
 Local browser-generated workbooks contained 61 records with five loaded, then exactly the one
 record for Supplier B. API tests prove full-population filtering/sort; client tests refuse an
 incomplete response. The combined register/Receiving suite passed 176 tests and the receipt API
-suite passed 61. Full CI and production acceptance remain owed.
+suite passed 61. Exact-head full CI `37219247916` passed on `c09ecf1d7`; #1905 merged as `a087fec9a`. Deployment `37219944735` passed and all five canonical surfaces converged to `a087fec9a`.
+Actual production Excel files contained all seven receipts and exactly the three Ohana receipts
+when exported from filtered Cards. Short Carres numbers and original supplier DO references
+were preserved. The PDF list renderer is covered by tests; its live download is not claimed here.
 
 **Read-only production evidence, 2026-10-04:** `warehouse_submit_receipt` still files a report;
 `warehouse_receipt_check_in` calls Operation's post-authority gate. The only current active
