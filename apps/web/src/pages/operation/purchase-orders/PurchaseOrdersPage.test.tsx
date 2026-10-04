@@ -1,7 +1,9 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { useEffect } from "react";
+import { fireEvent, render, screen, within, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+let useRealRegisterGrid = false;
 const navigate = vi.fn();
 /* The page's own doors are asserted, not React Router's: `useNavigate` is the
    one thing stubbed so a click can be read as the destination it asks for. */
@@ -146,8 +148,13 @@ const queryData = {
   messageTemplate: "Please build this purchase order.",
 };
 
-vi.mock("@/components/register/DataGrid", () => ({
-  DataGrid: ({ rows, columns, onRowDoubleClick, statusSummary, fixedGroups, leadingColumns, personalLayouts, activeConditions, expandable, toolbarEnd, renderResults, selectable }: any) => (
+vi.mock("@/components/register/DataGrid", async () => {
+  const { DataGrid: RealDataGrid } = await vi.importActual<typeof import("@/components/register/DataGrid")>("@/components/register/DataGrid");
+  return { DataGrid: (props: any) => {
+    if (useRealRegisterGrid) return <RealDataGrid {...props} />;
+    const { rows, columns, onRowDoubleClick, statusSummary, fixedGroups, leadingColumns, personalLayouts, activeConditions, expandable, toolbarEnd, renderResults, selectable, selectionPrimary, onFacetRowsChange } = props;
+    useEffect(() => { onFacetRowsChange?.([...rows]); });
+    return (
     <div
       data-testid="register-grid"
       data-groups={fixedGroups?.groups.map((g: any) => g.key).join(",")}
@@ -155,7 +162,7 @@ vi.mock("@/components/register/DataGrid", () => ({
       data-leading={leadingColumns ? `${leadingColumns.date},${leadingColumns.identity}` : undefined}
       data-personal-layouts={personalLayouts ? "1" : undefined}
     >
-      {toolbarEnd}
+      {rows.some((row: any) => selectable?.selectedKeys.has(row.id)) ? selectionPrimary : toolbarEnd}
       {renderResults?.(rows)}
       <div data-testid="register-conditions">{(activeConditions ?? []).map((c: any) => c.label).join(" | ")}</div>
       <div data-testid="register-columns">{columns.filter((c: any) => !c.defaultHidden).map((c: any) => c.label).join(" | ")}</div>
@@ -172,8 +179,8 @@ vi.mock("@/components/register/DataGrid", () => ({
       ))}
       {statusSummary?.(rows, rows.filter((row: any) => selectable?.selectedKeys.has(row.id)))}
     </div>
-  ),
-}));
+  ); },
+}; });
 
 vi.mock("../PurchasingTabs", () => ({
   default: () => <div data-testid="purchasing-tabs">Purchasing · Purchase Orders</div>,
@@ -254,6 +261,8 @@ vi.mock("../components/PoIssueEvidence", () => ({
 }));
 
 vi.mock("@/lib/api", () => ({ apiFetch: vi.fn().mockResolvedValue({}) }));
+vi.mock("@/lib/purchasing/po-bundle", () => ({ prepareSelectedPoDocuments: vi.fn(), zipPoBundle: vi.fn() }));
+import { prepareSelectedPoDocuments, zipPoBundle } from "@/lib/purchasing/po-bundle";
 vi.mock("@/lib/pdf/render", () => ({ renderPoPdf: vi.fn() }));
 
 import PurchaseOrdersPage from "./PurchaseOrdersPage";
@@ -276,6 +285,7 @@ function renderPage(path: string | { pathname: string; search?: string; state?: 
 }
 
 beforeEach(() => {
+  useRealRegisterGrid = false;
   navigate.mockReset();
   supplierDateMutate.mockReset();
   auditError = false;
@@ -317,6 +327,17 @@ beforeEach(() => {
 /* ⭐ Purchasing MASTER §9.3 (Jess, 2026-09-17): nine columns, four groups,
    the SUPPLIER REPLY / RECEIVING / SUPPLIER / DELIVER TO rail and an ordered-goods category footer. */
 describe("Purchase Orders Register", () => {
+  it("real shared grid settles facet membership and opens an actual PO object", async () => {
+    useRealRegisterGrid = true;
+    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      renderPage();
+      fireEvent.click(await screen.findByRole("button", { name: /^PO-20260828-4827$/ }));
+      expect(await screen.findByTestId("purchase-order-object")).toBeInTheDocument();
+      expect(screen.getByTestId("po-document-panes")).toHaveAttribute("data-layout", "50-50");
+      expect(errors.mock.calls.flat().join(" ")).not.toContain("Maximum update depth");
+    } finally { errors.mockRestore(); }
+  });
   it("summarises ordered quantity by category and names unknown goods", () => {
     const line = queryData.pos[0]!.purchase_order_lines[0]!;
     const original = line.attrs;
@@ -353,6 +374,24 @@ describe("Purchase Orders Register", () => {
     expect(screen.getByRole("checkbox", { name: "Select PO-20260828-4827" })).toBeChecked();
   });
 
+  it("downloads only the selected PO versions from the register", async () => {
+    vi.mocked(prepareSelectedPoDocuments).mockReset().mockResolvedValue([]);
+    vi.mocked(zipPoBundle).mockReset().mockResolvedValue(new Blob(["zip"], { type: "application/zip" }));
+    const create = vi.fn(() => "blob:po-pack"); const revoke = vi.fn();
+    const oldCreate = URL.createObjectURL; const oldRevoke = URL.revokeObjectURL;
+    URL.createObjectURL = create; URL.revokeObjectURL = revoke;
+    const download = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+    try {
+      renderPage("/operation/procurement?view=cards");
+      fireEvent.click(screen.getByRole("checkbox", { name: "Select PO-20260828-4827" }));
+      fireEvent.click(screen.getByRole("button", { name: "Download PDFs" }));
+      await waitFor(() => expect(download).toHaveBeenCalledOnce());
+      expect(prepareSelectedPoDocuments).toHaveBeenCalledWith([{ id: "PO-20260828-4827", supplierId: "supplier-1", version: 2 }], expect.any(Function), expect.any(Function));
+      expect(revoke).toHaveBeenCalledWith("blob:po-pack");
+    } finally {
+      download.mockRestore(); URL.createObjectURL = oldCreate; URL.revokeObjectURL = oldRevoke;
+    }
+  });
   it("returns an issued PO object to its SO Batch cutoff and supplier result scope", () => {
     const pos = [{ id: "PO-20260828-4827", supplierId: "s1" }];
     renderPage({ pathname: "/operation/procurement", search: "?po=PO-20260828-4827",
@@ -953,10 +992,17 @@ describe("Purchase Order object", () => {
      what the supplier actually received meant scrolling the two apart. They are
      now two panes that each scroll on their own — the Sales Order's shape —
      and the document is paper, not a framed PDF viewer. */
-  it("viewing never splits: one column, the official document full width and LAST (MASTER §9.3, owner 2026-09-25)", () => {
+  it("opens read-only original facts beside the current official PDF without entering Edit", () => {
     renderPage("/operation/procurement?po=PO-20260828-4827");
     const page = screen.getByTestId("po-document-panes");
-    expect(page.className).not.toContain("lg:flex-row");
+    expect(page).toHaveAttribute("data-layout", "50-50");
+    expect(page.className).toContain("min-[1130px]:grid-cols-2");
+    expect(screen.queryByTestId("po-document-split")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("po-issue-evidence")).not.toBeInTheDocument();
+    const originalFacts = screen.getByTestId("po-document-facts-pane");
+    expect(within(originalFacts).getByRole("heading", { name: "Purchase order" })).toBeInTheDocument();
+    expect(within(originalFacts).getByRole("heading", { name: "Goods lines" })).toBeInTheDocument();
+    expect(within(originalFacts).queryByLabelText("Official purchase order preview")).toBeNull();
     const column = screen.getByTestId("po-document-column");
     expect(within(column).getByLabelText("Official purchase order preview")).toBeInTheDocument();
     const heads = within(page).getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
@@ -1006,7 +1052,7 @@ describe("Purchase Order object", () => {
     expect(cards.className).not.toContain("sm:grid-cols-2");
   });
 
-  it("uses the 50/50 official-document layout only for issue or revision work", () => {
+  it("keeps explicit issue work separate from the read-only two-pane view", () => {
     renderPage("/operation/procurement?po=PO-20260828-4827");
     expect(screen.queryByTestId("po-document-split")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Issue current PDF" }));

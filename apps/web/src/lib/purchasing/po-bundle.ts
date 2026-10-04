@@ -67,3 +67,26 @@ export async function zipPoBundle(documents: readonly PreparedPoDocument[]): Pro
   const bytes = CFB.write(archive, { type: "array", fileType: "zip" });
   return new Blob([new Uint8Array(bytes)], { type: "application/zip" });
 }
+
+/** Register downloads may span suppliers; each supplier still prepares separate
+ * current-version documents through the same guarded preparation door. */
+export async function prepareSelectedPoDocuments(
+  selection: readonly SelectedPoDocument[],
+  load: (id: string) => Promise<PoTemplateData>,
+  render: (data: PoTemplateData) => Promise<Blob>,
+): Promise<PreparedPoDocument[]> {
+  if (!selection.length) throw new PoBundleError("empty_selection");
+  if (new Set(selection.map(po => po.id)).size !== selection.length) throw new PoBundleError("duplicate_po");
+  const snapshot = selection.map(po => ({ ...po }));
+  const suppliers = [...new Set(snapshot.map(po => po.supplierId))];
+  const groups = await Promise.all(suppliers.map(supplierId => preparePoBundle(supplierId,
+    snapshot.filter(po => po.supplierId === supplierId), load, render)));
+  const prepared = new Map(groups.flat().map(document => [document.id, document]));
+  // Recheck the complete selection after ALL suppliers have finished rendering.
+  await Promise.all(snapshot.map(async po => {
+    const current = await load(po.id);
+    if (current.draft || current.po_id !== po.id || current.version !== po.version)
+      throw new PoBundleError("stale_po_version");
+  }));
+  return snapshot.map(po => prepared.get(po.id)!);
+}

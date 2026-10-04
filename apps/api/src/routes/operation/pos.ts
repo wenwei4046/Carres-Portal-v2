@@ -1563,8 +1563,7 @@ operationPosRouter.get("/:id/email-attempts", requireOperation, async c => {
   if (read.error) return c.json({ code: "email_history_unavailable" }, 503);
   const attempts = (read.data ?? []).flatMap(row => {
     const evidence = row.po_email_attempts as unknown as { id: string; outcome: string; provider_id: string | null; recipient: string };
-    if (evidence.outcome === "failed") return [];
-    return [{ id: evidence.id, status: evidence.outcome === "dispatched" ? "dispatched" : "unknown",
+    return [{ id: evidence.id, status: evidence.outcome === "failed" ? "failed" : evidence.outcome === "dispatched" ? "dispatched" : "unknown",
       providerId: evidence.provider_id ?? undefined, recipient: evidence.recipient,
       documents: [{ id: row.po_id, version: row.po_version }] }];
   });

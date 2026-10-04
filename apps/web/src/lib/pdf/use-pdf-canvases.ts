@@ -66,8 +66,10 @@ export function usePdfCanvases(key: string | null, render: () => Promise<Blob>) 
           const canvas = document.createElement("canvas");
           canvas.width = viewport.width;
           canvas.height = viewport.height;
-          canvas.style.width = `${Math.round(viewport.width / dpr)}px`;
-          canvas.style.height = `${Math.round(viewport.height / dpr)}px`;
+          // Keep paper inside its current pane when the viewport changes;
+          // bitmap dimensions preserve rendering detail and the aspect ratio.
+          canvas.style.width = "100%";
+          canvas.style.height = "auto";
           canvas.style.display = "block";
           canvas.style.margin = "0 auto 16px";
           canvas.style.boxShadow = "0 1px 4px rgba(0,0,0,0.18)";

@@ -63,6 +63,7 @@ export default function PoSupplierBundle({ pos, onPreview, roundWindow, onEviden
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [resend, setResend] = useState(false);
   const [emailConfigured, setEmailConfigured] = useState(false);
   const [subject, setSubject] = useState("Carres · Purchase Orders");
   const [messageIntroduction, setMessageIntroduction] = useState("");
@@ -76,6 +77,9 @@ export default function PoSupplierBundle({ pos, onPreview, roundWindow, onEviden
   const ready = picked.length > 0 && picked.every(po => documents[po.id]) && !busy && !scopeLoading && !(scope === "round" && roundUnavailable);
   const selectedAttempts = emailAttempts.filter(attempt => attempt.documents.some(document => picked.some(po => po.id === document.id && documents[po.id]?.version === document.version)));
   const emailOutcome = selectedAttempts.some(attempt => attempt.status === "unknown") ? "unknown" : selectedAttempts.length ? "dispatched" : null;
+  const alreadySent = emailOutcome === "dispatched" || picked.some(po => documents[po.id] && confirmedSendFor(sendHistory[po.id] ?? [], documents[po.id].version));
+  const sendBlocked = emailOutcome === "unknown" || (alreadySent && !resend);
+  useEffect(() => { setResend(false); }, [supplier, scope, [...selected].sort().join("|")]);
 
   useEffect(() => {
     if (attemptsStorageKey.current !== attemptsKey) {
@@ -114,18 +118,20 @@ export default function PoSupplierBundle({ pos, onPreview, roundWindow, onEviden
       const result = await apiFetch<{ sends: PoSendEvidence[] }>(`/api/operation/pos/${encodeURIComponent(po.id)}/sends`);
       if (!Array.isArray(result.sends)) throw new Error("invalid_send_history");
       const recovery = emailConfigured
-        ? await apiFetch<{ attempts: EmailAttempt[] }>(`/api/operation/pos/${encodeURIComponent(po.id)}/email-attempts`)
+        ? await apiFetch<{ attempts: Array<Omit<EmailAttempt, "status"> & { status: EmailAttempt["status"] | "failed" }> }>(`/api/operation/pos/${encodeURIComponent(po.id)}/email-attempts`)
         : { attempts: [] };
-      const attempts = recovery.attempts.map(attempt => ({ ...attempt,
+      const failed = recovery.attempts.filter(attempt => attempt.status === "failed").map(attempt => attempt.id);
+      const attempts = recovery.attempts.filter((attempt): attempt is EmailAttempt => attempt.status !== "failed").map(attempt => ({ ...attempt,
         documents: attempt.documents.map(document => ({ ...document,
           recorded: result.sends.some(event => event.kind === "confirmed_sent" && event.po_version === document.version && event.note?.includes(`po-email/${attempt.id}`)) })) }));
-      return [po.id, result.sends, attempts] as const;
+      return [po.id, result.sends, attempts, failed] as const;
     })).then(results => {
       if (cancelled) return;
       setSendHistory(Object.fromEntries(results.flatMap(result => result.status === "fulfilled" ? [[result.value[0], result.value[1]]] : [])));
       const restored = results.flatMap(result => result.status === "fulfilled" ? result.value[2] : []);
       setEmailAttempts(previous => {
-        const merged = new Map(previous.map(attempt => [attempt.id, attempt]));
+        const failed = new Set(results.flatMap(result => result.status === "fulfilled" ? result.value[3] : []));
+        const merged = new Map(previous.filter(attempt => !failed.has(attempt.id)).map(attempt => [attempt.id, attempt]));
         for (const attempt of restored) {
           const existing = merged.get(attempt.id);
           const documents = new Map((existing?.documents ?? []).map(document => [document.id, document]));
@@ -207,7 +213,7 @@ export default function PoSupplierBundle({ pos, onPreview, roundWindow, onEviden
   }
 
   async function sendEmail() {
-    if (!ready || !emailConfigured || !contact?.contactEmail || emailOutcome || historyLoading || historyFailed.length) return;
+    if (!ready || !emailConfigured || !contact?.contactEmail || sendBlocked || historyLoading || historyFailed.length) return;
     setBusy(true);
     setError(null);
     const attemptId = crypto.randomUUID();
@@ -231,9 +237,10 @@ export default function PoSupplierBundle({ pos, onPreview, roundWindow, onEviden
       setEmailAttempts(attempts);
       const result = await apiFetch<{ status: "dispatched"; providerId: string; documents: Array<{ id: string; version: number; recorded: boolean }> }>("/api/operation/pos/supplier-email", {
         method: "POST", body: JSON.stringify({ supplierId: supplier, recipient: contact.contactEmail.trim(), subject,
-          message: messageIntroduction, attemptId, documents: files }),
+          message: messageIntroduction, attemptId, documents: files, resend }),
       });
       if (result.status !== "dispatched") throw new Error("email_unknown");
+      setResend(false);
       setEmailAttempts(previous => previous.map(attempt => attempt.id === attemptId ? { ...attempt, status: "dispatched", providerId: result.providerId, documents: result.documents } : attempt));
       if (result.documents.some(document => document.recorded)) { setHistoryRefresh(previous => previous + 1); refreshPurchasingReads(); onEvidenceChanged?.(); }
     } catch (failure) {
@@ -296,11 +303,14 @@ export default function PoSupplierBundle({ pos, onPreview, roundWindow, onEviden
         options={[{ value: "whatsapp", label: "WhatsApp" }, { value: "email", label: "Email" }]} />
       <Input id="po-bundle-recipient" label="To" readOnly value={channel === "email" ? contact?.contactEmail ?? "" : contact?.whatsappGroupUrl ?? contact?.contact ?? ""} />
       {channel === "email" && <>
-        <Input id="po-bundle-subject" label="Subject" value={subject} disabled={busy || Boolean(emailOutcome)} onChange={event => setSubject(event.target.value)} />
+        <Input id="po-bundle-subject" label="Subject" value={subject} disabled={busy || sendBlocked} onChange={event => setSubject(event.target.value)} />
       </>}
-      <Textarea id="po-bundle-introduction" label="Message" value={messageIntroduction} disabled={busy || Boolean(emailOutcome)} onChange={event => { setMessageIntroduction(event.target.value); setCopied(false); }} />
+      <Textarea id="po-bundle-introduction" label="Message" value={messageIntroduction} disabled={busy || sendBlocked} onChange={event => { setMessageIntroduction(event.target.value); setCopied(false); }} />
       <Textarea id="po-bundle-message" label="PO No" value={message} readOnly />
       {channel === "email" && picked.map(po => documents[po.id] && <p key={po.id} className="text-meta text-kit-slate-11">{documents[po.id].po_number.replace(/[^a-zA-Z0-9._-]/g, "_")}-V{documents[po.id].version}.pdf</p>)}
+      {channel === "email" && alreadySent && <Checkbox id="po-bundle-resend" label="Send again" checked={resend}
+        disabled={busy || historyLoading || historyFailed.length > 0 || emailOutcome === "unknown"}
+        onCheckedChange={checked => setResend(checked === true)} />}
       <div className="flex flex-wrap gap-2">
         <Button variant="neutral" size="sm" disabled={!ready} loading={busy} onClick={() => void download()}>Download PDFs</Button>
         <Button variant="neutral" size="sm" disabled={!ready} onClick={() => {
@@ -308,7 +318,7 @@ export default function PoSupplierBundle({ pos, onPreview, roundWindow, onEviden
         }}>Copy message</Button>
         {channel === "whatsapp" ? <Button variant="neutral" size="sm" disabled={!ready || !doors?.whatsapp}
           onClick={() => { if (doors?.whatsapp) window.open(doors.whatsapp.url, "_blank", "noopener,noreferrer"); }}>Open WhatsApp</Button>
-          : <Button variant="primary" size="sm" disabled={!ready || !emailConfigured || !contact?.contactEmail || !subject.trim() || Boolean(emailOutcome) || historyLoading || historyFailed.length > 0} loading={busy}
+          : <Button variant="primary" size="sm" disabled={!ready || !emailConfigured || !contact?.contactEmail || !subject.trim() || sendBlocked || historyLoading || historyFailed.length > 0} loading={busy}
             title={!emailConfigured ? "Not available" : undefined} onClick={() => void sendEmail()}>Send Email</Button>}
       </div>
       {emailOutcome === "unknown" && <p role="status" className="text-meta text-kit-amber-11">Sending not confirmed</p>}

@@ -227,6 +227,36 @@ describe("human-triggered supplier email", () => {
     expect(screen.getByRole("button", { name: "Send Email" })).toBeDisabled();
     expect(api.mock.calls.filter(call => call[0].endsWith("supplier-email"))).toHaveLength(0);
   });
+  it("requires an explicit resend choice for a known successful current-version dispatch", async () => {
+    configured({ status: "dispatched", providerId: "email-new", documents: pos.slice(0, 2).map(po => ({ id: po.id, version: 1, recorded: true })) });
+    const configuredRead = api.getMockImplementation()!;
+    api.mockImplementation(async (path: string, init?: RequestInit) => path.endsWith("/sends")
+      ? { sends: [{ kind: "confirmed_sent", channel: "email", po_version: 1, sent_at: "2026-10-04T08:00:00Z" }] }
+      : configuredRead(path, init));
+    render(<PoSupplierBundle pos={pos} onPreview={() => {}} />);
+    await screen.findByLabelText("Send again");
+    expect(screen.getByRole("button", { name: "Send Email" })).toBeDisabled();
+    fireEvent.click(screen.getByLabelText("Send again"));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Send Email" })).toBeEnabled());
+    fireEvent.click(screen.getByRole("button", { name: "Send Email" }));
+    await screen.findByText("PO sent to supplier · Email");
+    const input = JSON.parse(api.mock.calls.find(call => call[0].endsWith("supplier-email"))![1].body);
+    expect(input.resend).toBe(true);
+    expect(input.documents.map((document: { id: string }) => document.id)).toEqual(["PO-001", "PO-002"]);
+    expect(screen.getByRole("button", { name: "Send Email" })).toBeDisabled();
+  });
+  it("clears a local unknown record only after the server reports a definite failed dispatch", async () => {
+    sessionStorage.setItem("carres-po-email-attempts:unidentified", JSON.stringify([{ id: "failed-attempt", status: "unknown", recipient: "supplier@example.invalid", documents: [{ id: "PO-001", version: 1, recorded: false }] }]));
+    configured({});
+    const configuredRead = api.getMockImplementation()!;
+    api.mockImplementation(async (path: string, init?: RequestInit) => path.endsWith("/email-attempts")
+      ? { attempts: [{ id: "failed-attempt", status: "failed", recipient: "supplier@example.invalid", documents: [{ id: "PO-001", version: 1 }] }] }
+      : configuredRead(path, init));
+    render(<PoSupplierBundle pos={pos} onPreview={() => {}} />);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Send Email" })).toBeEnabled());
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    expect(api.mock.calls.filter(call => call[0].endsWith("supplier-email"))).toHaveLength(0);
+  });
   it("a definite permission refusal leaves no uncertain dispatch record", async () => {
     configured(new ApiError(403, "forbidden", { code: "forbidden" }));
     render(<PoSupplierBundle pos={pos} onPreview={() => {}} />);
