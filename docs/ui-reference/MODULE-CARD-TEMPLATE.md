@@ -80,7 +80,8 @@ proof retained. Its prepared message belongs in Communication, outside the assig
 DO conditions are read-only and cannot issue or release a document. Timeline uses recorded events,
 full instants and avatar identity without repeating names; its loading/error state stays inside its
 collapsed section. Communication only prepares drafts; attachments remain explicitly preview-only. Info supplies the
-existing governed customer payment reminder/follow-up only when money is actually outstanding.
+Payment’s active current reminder/follow-up templates (Default first), with the existing governed
+wording as the same fallback its Invoice composer uses, only when money is actually outstanding.
 Delivery supplies only the saved Logistics recipient and its existing group door, active current
 `ask_partner_for_date` templates from Delivery Settings (Default first), or the existing governed
 Delivery details wording when no active template exists. No saved partner means no Logistics

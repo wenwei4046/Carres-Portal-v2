@@ -2,7 +2,9 @@
 import type { ReactNode } from "react";
 import { LIFT_OPTIONS } from "@carres/shared";
 import CompactModuleCard, { CardChecklist, type CardFact } from "@/components/kit/CompactModuleCard";
-import { renderPaymentTemplate } from "@carres/shared/payment-templates";
+import { useQuery } from "@tanstack/react-query";
+import { apiFetch } from "@/lib/api";
+import { renderPaymentTemplate, type PaymentTemplateRow } from "@carres/shared/payment-templates";
 import { useAuth } from "@/lib/auth";
 import { useDeliveryPartners, useDeliverySettings, useOrderTimeline } from "@/lib/queries";
 import { appTodayIso, fmtDate, fmtDateShort } from "@/lib/fmt-date";
@@ -26,6 +28,12 @@ export default function SalesOrderCompactView({ row, salesLocation, items, docum
   const partners = useDeliveryPartners();
   const nameOf = useGoodsName();
   const role = useAuth(s => s.role);
+  const paymentTemplates = useQuery<{ templates: PaymentTemplateRow[] }>({
+    queryKey: ["finance", "payment-templates"],
+    queryFn: () => apiFetch("/api/finance/payment-settings/templates"),
+    staleTime: 60_000,
+    enabled: ["operation", "finance", "principal"].includes(role ?? "") && row.balance.kind === "amount" && row.balance.value > 0,
+  });
   const card = delivery.failed || delivery.loading || (delivery.card && (delivery.card.leg ?? 0) !== leg) ? null : delivery.card;
   const mayEdit = (role === "operation" || role === "principal") && !!card && !card.settled && row.o.status !== "cancelled";
   const unavailable = delivery.failed ? "Unavailable" : delivery.loading ? "Loading…" : "Not recorded";
@@ -42,10 +50,13 @@ export default function SalesOrderCompactView({ row, salesLocation, items, docum
   const goodsLines = (row.o.order_lines ?? []).map(line => ({ sku: nameOf(line.sku), qty: line.qty }));
   const reference = (row.o.source_ref ?? []).filter(Boolean).join(" · ") || null;
   const customerInput = { salutation: salutationOf(null, row.customer), ref: reference, outstanding: row.balance.kind === "amount" ? row.balance.value.toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "", lines: goodsLines };
-  const customerTemplates = row.balance.kind === "amount" && row.balance.value > 0 ? [
+  const builtInCustomerTemplates = row.balance.kind === "amount" && row.balance.value > 0 ? [
     { key: "reminder", label: "Payment reminder", body: buildCustomerReminder(customerInput) },
     { key: "followup", label: "Payment follow-up", body: buildCustomerChase(customerInput) },
   ] : [];
+  const paymentFacts = { customer: customerInput.salutation, ref: reference, outstanding: customerInput.outstanding, items: goodsLines.map(line => `${line.qty}× ${line.sku}`).join("\n") };
+  const activePaymentTemplates = row.balance.kind === "amount" && row.balance.value > 0 ? (paymentTemplates.data?.templates ?? []).filter(template => template.active && template.is_head && ["gentle_reminder", "should_have_been_received"].includes(template.purpose)).sort((a, b) => Number(b.is_default) - Number(a.is_default)).map(template => ({ key: template.id, label: template.name, body: renderPaymentTemplate(template.body, paymentFacts) })) : [];
+  const customerTemplates = activePaymentTemplates.length ? activePaymentTemplates : builtInCustomerTemplates;
   const partner = (partners.data?.partners ?? []).find(partner => partner.id === card?.logisticsPartnerId);
   const deliveryFacts = { customer: row.customer, so: reference, address: row.o.customer_address, goods: goodsLines.map(line => `${line.qty}× ${line.sku}`).join("\n"), requested_date: row.customerDelivery ? fmtDate(row.customerDelivery) : null, confirmed_date: card?.confirmedDate ? fmtDate(card.confirmedDate) : null, confirmed_time: card?.confirmedTime, partner: card?.logisticsPartnerName };
   const deliveryTemplates = (settings.data?.templates ?? []).filter(template => template.active && template.is_head && template.purpose === "ask_partner_for_date" && template.channel === "whatsapp").sort((a, b) => Number(b.is_default) - Number(a.is_default)).map(template => ({ key: template.id, label: template.name, body: renderPaymentTemplate(template.body, deliveryFacts) }));

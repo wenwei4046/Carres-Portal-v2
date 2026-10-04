@@ -6827,7 +6827,8 @@ this module owns the following business-specific application. Delivered evidence
   an unsaved Assign logistics draft and saved summary truth, with crew/ETA/condo/proof intact and
   the prepared message moved to Communication. Customer source is explicitly selected, never guessed
   from an absent partner; Delivery’s save door owns actual contact/proxy evidence and Timeline recorder.
-  Info uses existing governed payment wording for outstanding balances. Delivery reads active current
+  Info reads active current Payment reminder/follow-up templates, Default first, with the existing
+  Invoice composer’s governed fallback for outstanding balances. Delivery reads active current
   Settings date-request templates, Default first, or existing Delivery details wording, addressed only
   to the saved Logistics recipient. No additional template store or send is introduced. The backend
   library and the kit’s existing browser Save as/Manage scope are distinct.
