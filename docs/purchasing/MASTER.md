@@ -3729,6 +3729,16 @@ Sales Order source and purchase quantity; supplier grouping never erases lineage
 existing destination/document grouping rules. The owner approved this grouping, not all remaining
 card, register or full-page composition.
 
+**OWNER CORRECTION 2026-10-04 — complementary left rail and column filters.**
+The SO Batch left rail presents useful aggregate information and round access not already
+supplied by listing columns. Do not repeat the page title inside the rail or duplicate Product/
+Supplier column filters there. Each factual listing column retains its shared DataGrid filter;
+aggregate summaries use the same filtered result and distinguish record counts from quantities.
+The hand-drawn 5462 HTML is rejected review material, not an approved template or implementation.
+Reuse actual shared Sales Orders rail/grid components for the replacement review; the exact
+new summary selection remains a proposal until reviewed. Existing required Listing/Monthly demand
+capabilities remain available; a bounded round preview does not retire them.
+
 **OWNER CONFIRMED 2026-10-04 — Manual Purchase and SO Batch inspection/actions.**
 Manual Purchase exposes Showroom as a left-rail category with individual showroom selection;
 the right listing shows the matching purchase requests and preserves their originating Display
