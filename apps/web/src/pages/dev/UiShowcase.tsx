@@ -61,6 +61,7 @@ import Toast from "@/components/kit/Toast";
 import Tooltip from "@/components/kit/Tooltip";
 import TotalsSummary from "@/components/kit/TotalsSummary";
 import { Z_LADDER } from "@/components/kit/overlay-layer";
+import CompactCardExample from "@/pages/dev/CompactCardExample";
 import { fmtDate } from "@/lib/fmt-date";
 import {
   ICON_STROKE,
@@ -636,6 +637,10 @@ export default function UiShowcase() {
               </div>
             </Card>
           </Grid>
+        </Section>
+
+        <Section id="compact-card" title="Compact module card — §4.3" note="Owner-confirmed 3 Oct 2026. One component for every module card: header, module tabs, four facts with inline editors, items, Communication and Timeline. Filled here with the confirmed Delivery sample; each module passes its own facts. Palette, font and radius await the owner's token decision.">
+          <CompactCardExample />
         </Section>
 
         <Section id="surfaces" title="Card · Panel — §6" note="A Card holds. A Panel holds and says what it is.">

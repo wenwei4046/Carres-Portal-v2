@@ -81,7 +81,9 @@ const HEX_RE = /#[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{3}\b/g;
 const HEX_ALLOW = [/(^|\/)index\.css$/, /design-standard/, /\/lib\/pdf\//, /\/pages\/print\//];
 // Pages that HAVE adopted the shell and must keep it (grows as pages migrate).
 const MUST_USE_SHELL = ["pages/operation/OperationOrdersControl.tsx"];
-const SHELL_IMPORT_RE = /from\s+["']@\/components\/(ListPageShell|PageHeader)["']/;
+// PageHeader stays accepted for the pages that already use it; it is retired, and
+// components/retired-components.test.ts blocks any NEW importer (UI MASTER §0).
+const SHELL_IMPORT_RE = /from\s+["']@\/components\/(ListPageShell|PageHeader|kit\/PageShell)["']/;
 const OPT_OUT_RE = /design-standard:\s*not-a-list-page/;
 const LIST_MARKER_RE = /<table[\s>]|<DataGrid[\s/>]/;
 
@@ -187,7 +189,7 @@ for (const f of MUST_USE_SHELL) {
   if (!files.includes(p)) continue;
   const src = readFileSync(join(ROOT, p), "utf8");
   if (!SHELL_IMPORT_RE.test(src)) {
-    errors.push(`RULE B · shell removed — ${p} must import ListPageShell/PageHeader (docs/UI-KIT.md §A9).`);
+    errors.push(`RULE B · shell removed — ${p} must keep its page shell (ListPageShell or kit PageShell; UI MASTER §0).`);
   }
 }
 for (const f of files) {
@@ -197,7 +199,7 @@ for (const f of files) {
   if (LIST_MARKER_RE.test(src) && !SHELL_IMPORT_RE.test(src) && !OPT_OUT_RE.test(src)) {
     errors.push(
       `RULE B · new List page without shell — ${f} renders a table/DataGrid but does not use ` +
-        `ListPageShell/PageHeader. Adopt the shell (docs/UI-KIT.md §A9) or add ` +
+        `a page shell. Use ListPageShell or kit PageShell (UI MASTER §0) or add ` +
         `\`// design-standard: not-a-list-page\` with a reason.`,
     );
   }
