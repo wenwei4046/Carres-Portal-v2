@@ -583,8 +583,11 @@ close Receiving Differences, linked Claim/Return handling or Warehouse automatic
 Formal GRN preview and Download PDF are verified. An authenticated fresh production tab downloaded
 `GRN-260904-1064.pdf` (26,972 bytes); extracted text confirms the short number, original
 `DO-SMOKE-B` and Unit `U1-000-064`. The older tab failed to save downloads; no PDF code change
-was needed. Desktop Cards exposed a wrapped-label overlap; the shared-kit correction below
-is locally verified but still awaits deployment.
+was needed. The shared-kit wrapped-label correction is production verified through #1906: full CI
+`37221701382` and deployment `37222437753` passed; all five canonical surfaces match
+`d4cca587587b64117a41625e3ca9631e1a873530`. Every Wrong Item Qty label clears its quantity
+by 4px at desktop 1280px and the actual 545px viewport. Shared UI MASTER holds the stylesheet
+negative-control and live screenshot evidence. This does not close the remaining Receiving scopes.
 
 **Complete filtered-result export — PRODUCTION VERIFIED, 2026-10-05.**
 Receiving supplies the shared DataGrid export loader with the current search, rail/column filters
