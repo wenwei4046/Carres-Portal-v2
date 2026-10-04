@@ -92,6 +92,20 @@ approve the earlier clock-only preview as the complete rail. Do not retire timin
 simplify the preview. Apply existing holiday/calendar authority to whichever scheduling policy is
 finally approved.
 
+**LOCAL REVIEW MATERIAL / NOT PRODUCTION — 2026-10-04.** Isolated branch
+`codex/so-batch-local-rail-preview`, commit `155ceb717`, renders the real shared ModuleHeader,
+Sales FilterRail/Tabs composition and existing 12-column SoBatchRegister at
+`http://127.0.0.1:5178/so-batch-rail-preview.html`. It preserves one SO parent row, date-first
+identity, approved short planning labels, `Production late` in the table/filter/export,
+and no inner Safety days paragraph. The Group heading remains Order timing. Desktop1280 and
+tablet820 inspection verified clock/independent planning samples, selected-row styling,
+hide/show and explicit Monthly demand not-connected content; tablet page width820 and rail240.
+Preview types and 128 existing Register tests passed. Sample statuses/counts are illustrative;
+this does not prove real scheduling, whole-round stock matching, Quick View issue, Cards/grouping
+adoption or supplier communication. Production callers do not enable the inspection-preview option.
+No business write, merge or deployment occurred. Admission policy remains the explicit owner review
+above; preview completion is not whole-page completion.
+
 ### SO Batch PO Status — owner-approved 2026-10-04
 
 Column/filter title: `PO Status`. In that named context use `Pending`, `Partial`, `Done`.
