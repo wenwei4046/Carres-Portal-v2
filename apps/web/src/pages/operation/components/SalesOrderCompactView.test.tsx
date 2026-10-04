@@ -18,20 +18,20 @@ describe("real SO card", () => {
   it("keeps saved documents lazy, Info defaults and all former facts reachable", () => {
     mount(); expect(screen.getByText("Recorded address")).toBeVisible(); expect(screen.getByText("Recorded location")).toBeVisible(); expect(screen.queryByText("Saved document")).toBeNull(); expect(screen.queryByText("Actual Items")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Sales Order SO-1303" })); expect(screen.getByText("Saved document")).toBeVisible();
-    fireEvent.click(screen.getByRole("button", { name: "Items", exact: true })); expect(screen.getByText("a@example.com")).toBeVisible(); expect(screen.getByText("Recorded dealer")).toBeVisible(); expect(screen.getByText("Related documents")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Items" })); expect(screen.getByText("a@example.com")).toBeVisible(); expect(screen.getByText("Recorded dealer")).toBeVisible(); expect(screen.getByText("Related documents")).toBeVisible();
   });
   it("uses real goods only, date-only precision, one formal editor and read-only DO", () => {
-    mount(); fireEvent.click(screen.getByRole("button", { name: "Delivery", exact: true })); expect(screen.queryByText("Recorded address")).toBeNull(); expect(screen.getByText("1/1")).toBeVisible(); expect(screen.getByText("31 Oct")).toBeVisible(); expect(screen.getByText("Date confirmed")).toBeVisible();
+    mount(); fireEvent.click(screen.getByRole("button", { name: "Delivery" })); expect(screen.queryByText("Recorded address")).toBeNull(); expect(screen.getByText("1/1")).toBeVisible(); expect(screen.getByText("31 Oct")).toBeVisible(); expect(screen.getByText("Date confirmed")).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: /Logistics/ })); expect(screen.getByText("Logistics editor")).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: /Customer/ })); expect(screen.queryByText("Logistics editor")).toBeNull(); expect(screen.getByText("Date editor")).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: /^DO/ })); expect(screen.queryByText("Date editor")).toBeNull(); expect(screen.getByLabelText("Delivery Order")).toBeVisible(); expect(screen.queryByRole("checkbox")).toBeNull();
   });
   it("never turns failed reads into stock readiness or absence, and hides writers for other roles", () => {
-    state.failed = true; mount(); fireEvent.click(screen.getByRole("button", { name: "Delivery", exact: true })); expect(screen.queryByText("1/1")).toBeNull(); expect(screen.queryByText("Date not confirmed")).toBeNull(); expect(screen.getAllByText("Unavailable").length).toBe(4); expect(screen.queryByRole("button", { name: /^Customer/ })).toBeNull();
-    cleanup(); state.failed = false; state.role = "finance"; mount(); fireEvent.click(screen.getByRole("button", { name: "Delivery", exact: true })); expect(screen.queryByRole("button", { name: /^Customer/ })).toBeNull();
+    state.failed = true; mount(); fireEvent.click(screen.getByRole("button", { name: "Delivery" })); expect(screen.queryByText("1/1")).toBeNull(); expect(screen.queryByText("Date not confirmed")).toBeNull(); expect(screen.getAllByText("Unavailable").length).toBe(4); expect(screen.queryByRole("button", { name: /^Customer/ })).toBeNull();
+    cleanup(); state.failed = false; state.role = "finance"; mount(); fireEvent.click(screen.getByRole("button", { name: "Delivery" })); expect(screen.queryByRole("button", { name: /^Customer/ })).toBeNull();
   });
   it("uses the final journey receiver and does not mistake the first leg for it", () => {
-    state.card!.leg = 1; mount({ ...row, o: { ...row.o, delivery_stops: [{ leg: 1 }, { leg: 2 }] as operationOrderListRow["delivery_stops"] } }); fireEvent.click(screen.getByRole("button", { name: "Delivery", exact: true })); expect(state.leg).toBe(2); expect(screen.queryByText("Date confirmed")).toBeNull();
+    state.card!.leg = 1; mount({ ...row, o: { ...row.o, delivery_stops: [{ leg: 1 }, { leg: 2 }] as operationOrderListRow["delivery_stops"] } }); fireEvent.click(screen.getByRole("button", { name: "Delivery" })); expect(state.leg).toBe(2); expect(screen.queryByText("Date confirmed")).toBeNull();
   });
   it("keeps the complete timestamp and actor only on the avatar", () => {
     mount(); fireEvent.click(screen.getByRole("button", { name: "Show timeline" })); const event = screen.getByText("Saved note").closest("li")!; expect(within(event).getByLabelText("Recorded by Recorder")).toBeVisible(); expect(event.querySelector("time")).toHaveAttribute("dateTime", "2026-09-30T08:08:32Z"); expect(event).toHaveTextContent("30 Sep · 4:08 PM"); expect(event).not.toHaveTextContent("MYT");

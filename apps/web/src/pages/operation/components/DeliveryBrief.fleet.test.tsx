@@ -95,15 +95,15 @@ describe("compact Logistics save lifecycle", () => {
     mount("Alex", "ABC 123", true, done);
     fireEvent.change(screen.getByLabelText("ETA"), { target: { value: "15:10" } });
     save.mockRejectedValueOnce(new Error("Server refused this change"));
-    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Save", exact: true })); });
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Save" })); });
     expect(screen.getByRole("alert")).toHaveTextContent("Server refused this change");
     expect(screen.getByLabelText("ETA")).toHaveValue("15:10");
     expect(done).not.toHaveBeenCalled();
-    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Save", exact: true })); });
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Save" })); });
     expect(done).toHaveBeenCalledTimes(1);
     expect(save).toHaveBeenLastCalledWith(expect.objectContaining({ expectedArrival: "15:10" }));
     save.mockClear();
-    fireEvent.click(screen.getByRole("button", { name: "Cancel", exact: true }));
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(save).not.toHaveBeenCalled();
   });
 });
