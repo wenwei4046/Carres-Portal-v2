@@ -1459,15 +1459,18 @@ owners. UI and implementation must preserve that boundary rather than changing a
 
 ### 6.1 Formal document numbers
 
-**PO — OWNER RULING 2026-09-23 (Jess) · APPROVED / LOCKED · BUILT, migration 0574.**
+**PO stored identity — migration 0574 BUILT; current display — owner ruling 2026-10-01,
+APPROVED TARGET / NOT BUILT (§9.3).** Allocation and display are separate facts.
 
 ```text
-PO260924-4827(1)     PO · YYMMDD of first issue · 4 random digits · version
-PO260924-4827(2)     the same PO after one revision
+Stored base identity example: PO260924-4827
+Current approved version display: PO-260924-4827-V1
+After revision: PO-260924-4827-V2
 ```
 
-- The date is the day the PO was **first issued** (supplier production lead time counts from it);
-  a revision never changes the date or the number. Version marker has no space, as on the SO.
+- The date is the day the PO was **first issued**; a revision changes neither that date nor
+  the stored base identity. Display uses the two-digit year and the actual document version,
+  with no spaces or parentheses, under §9.3 and COPY's `PO Version` entry.
 - Four random digits, leading zeros allowed: **10,000 PO numbers a day, for PO alone** — the PO
   draws from its OWN daily pool, never sharing codes with GRN, SB, PV or any other prefix. One PO
   of any number of lines uses one number.
@@ -1482,12 +1485,13 @@ PO260924-4827(2)     the same PO after one revision
   (`purchasing_issue_pos_batch`'s caller) and `manualPurchaseIssueDocuments` at once — and the
   request/demand rows need a business fact to partition by, which does not exist yet. A supplier
   serving both businesses receives separate POs.
-- **Permanence:** existing `PO-…` numbers (e.g. `PO-20260904-4665`, `PO-2054`) keep their form forever
-  and are never renumbered — they live in supplier hands, `po_sends`, GRNs and Claim lineage. Register
-  and search match BOTH shapes while pre-cutover POs exist. The new form and `(n)` change the
-  ALLOCATOR (0381 mints `PREFIX-YYYYMMDD-RRRR`), so they need a migration; the `(n)` comes from the
-  PO's own version, never from the code pool.
-- This replaces `PO-YYYYMMDD-RRRR` and `V{n}` for NEW POs only.
+- **Permanence:** stored legacy identities (for example `PO-20260904-4665` and `PO-2054`)
+  and historical issued PDFs remain unchanged. The approved display may render the dated PO as
+  `PO-260904-4665-V{actual version}`; this is a presentation of that same record, not a new PO.
+  Resolve/search the original identity and approved display. Non-date legacy numbers retain
+  their identity and never acquire an invented date. Migration 0574's allocation evidence below
+  does not prove the 2026-10-01 display change has shipped. No GRN or other prefix is implicitly
+  migrated by the PO display ruling.
 
 **HOW IT IS BUILT — migration 0574 + `poDocumentNumberOf`, 2026-09-23. DELIVERED:** PR #1551
 squash-merged as `e9bc40a0a`, that SHA reported by both Pages projects, both canonical hosts and
@@ -2551,8 +2555,10 @@ PO-20260904-4665   Not allocated        JAGER-SS  Jager · SS         1   Carres
 - **`PO No`, not `Covered by` and not `ON PO`**, and `PO No` and `Unit ID` are NEIGHBOURS: they are
   the two identifiers a person copies, and a reader who must look across four columns to pair a
   document with its goods pairs them wrongly. Both print in FULL and stay selectable.
-  **`PO-20260904-4665` is never shortened to `PO-260904-4665`** — no numbering change is approved,
-  and a shortened number names a document that does not exist.
+  Stored PO identity remains unchanged. Where the current official version is presented,
+  apply §9.3's approved two-digit-year `PO Version` display and resolve it to the same source PO;
+  do not restore the retired blanket prohibition on removing `20`. Never invent a version for
+  a source link whose version is unknown.
 - **Ordinary readable rows, no control, no grey block.** A record cannot be bought again, so it
   carries no checkbox and no destination editor; what makes it read-only is the ABSENCE of controls,
   not a disabled-looking wash over the module's own audit evidence.
