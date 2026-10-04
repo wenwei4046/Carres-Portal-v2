@@ -462,8 +462,10 @@ original identities and supplier DO references stay unchanged. No local filter e
 Tests cover a match beyond the first 50 records, numeric sorting, invalid query rejection and
 clearing the filter. The shared preview browser found record 61 through Supplier B with only five
 rows loaded, then restored all 61 on Clear. After merging current main, 106 Receiving/shared-card/
-Sales Order/SO Batch regressions passed. Production deployment `37215036695` and authenticated
-filter acceptance remain owed. Full-result export and the two-view rail remain unfinished.
+Sales Order/SO Batch regressions passed. Production deployment `37215036695` failed before publishing: a Manual Purchase test compared
+its wall-clock Settings result with fixed requested dates, which coincided after MYT midnight.
+The test-only repair fixes its PO clock and preserves the date-ownership assertions; all 95 tests
+in that file passed locally. A covering production deployment and live filter acceptance remain owed. Full-result export and the two-view rail remain unfinished.
 
 **Table/Cards and shared Page tools — BUILT ON BRANCH / NOT PRODUCTION VERIFIED, 2026-10-05.**
 Receiving reuses the existing segmented Table/Cards control, shared DataGrid Page tools and
