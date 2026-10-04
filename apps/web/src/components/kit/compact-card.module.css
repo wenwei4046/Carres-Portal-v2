@@ -60,11 +60,11 @@
   text-align: left;
 }
 .panel svg { display: inline; vertical-align: baseline; width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.7; }
-.panel button { font: inherit; border: 0; background: transparent; cursor: pointer; color: inherit; padding: 1px 6px; margin: 0; text-align: center; }
-.panel button:hover { background: var(--cc-soft); }
-.panel button:active { background: var(--cc-line); }
-.panel button:focus-visible { outline: 2px solid var(--cc-brand); outline-offset: 2px; }
-.panel button:disabled { opacity: 0.5; cursor: not-allowed; }
+.panel button:where(:not([data-kit])) { font: inherit; border: 0; background: transparent; cursor: pointer; color: inherit; padding: 1px 6px; margin: 0; text-align: center; }
+.panel button:where(:not([data-kit])):hover { background: var(--cc-soft); }
+.panel button:where(:not([data-kit])):active { background: var(--cc-line); }
+.panel button:where(:not([data-kit])):focus-visible { outline: 2px solid var(--cc-brand); outline-offset: 2px; }
+.panel button:where(:not([data-kit])):disabled { opacity: 0.5; cursor: not-allowed; }
 .panel input,
 .panel select,
 .panel textarea {
@@ -78,6 +78,10 @@
   margin: 0;
 }
 .panel textarea { resize: vertical; min-height: 90px; }
+/* Embedded kit fields keep their own control recipe; compact forms use the card width. */
+.editor [data-compact="true"] label { margin: 0; }
+.editor [data-compact="true"] textarea { min-height: 48px; }
+.editor [data-compact="true"] [data-compact-fields] { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .panel h2 { font-size: 14px; margin: 0; font-weight: 700; line-height: inherit; }
 .panel b,
 .panel strong { font-weight: 700; }
@@ -400,6 +404,7 @@ aside.section { background: var(--cc-surface); }
   .orderItems td { padding: 7px 3px; font-size: 11px; }
 }
 @container (max-width: 400px) {
+  .editor [data-compact="true"] [data-compact-fields] { grid-template-columns: 1fr; }
   .strip[data-cells="4"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .panel .strip[data-cells="4"] .cell:nth-child(2) { border-right: 0; }
   .panel .readCell strong { font-size: 12px; }
