@@ -68,6 +68,23 @@ another operating model. Approved target is not proof that the current page impl
    actual accepted/rejected quantities and evidence; partial receipt retains outstanding quantities.
    Date-specific pre-arrival coordination, Claims and Finance obligations retain their own owners.
 
+### SO Batch PO Status — owner-approved 2026-10-04
+
+Column/filter title: `PO Status`. In that named context use `Pending`, `Partial`, `Done`.
+Standalone cards, other pages and notifications use `PO Pending`, `PO Partial`, `PO Done`.
+Always spell `PO`, not `P.O.`. `Issue PO` remains the action verb.
+Calculate across every SO item and its exact supplier/PO lineage, not the presence of one PO.
+Exclude successfully confirmed eligible Ready Stock reservations from quantity requiring purchase.
+`Pending`: purchasing quantity remains and none of that required purchase quantity has been issued.
+`Partial`: some required purchase quantity has valid PO lineage and some remains unissued.
+`Done`: no required purchase quantity remains unissued, including an SO fully fulfilled by confirmed
+Ready Stock. Done expresses purchase-task quantity completion, not a claim that a PO exists, was
+sent or was received. Unconfirmed matches never qualify; failed/unknown coverage reads cannot
+produce Done. Pending/Partial remain above Done in the retained listing, ordered by Proceed Date.
+This overwrites the earlier SO Batch parent/item `Need PO` / `No PO needed` presentation;
+Manual Purchase's independent approval/request grouping is unchanged. Target approval is not build
+or production verification. Supplier communication evidence and Receiving remain separate facts.
+
 ### Manual Purchase — when needed
 
 Showroom's complete arrangement stays in Display Request. Only the Carres-buying portion enters
@@ -2275,9 +2292,9 @@ pins. `Proceed Date` reads `orders.proceeded_at` (the actual hand-off), never
 order; `leadingColumns` still refuses to hide or move the pair. Widths are measured at 1440 in the
 shell with the rail open during the build.
 
-- **Status is the new-PO need, not a generic Partial/Ordered progress badge.** Use `Need PO` /
-  `No PO needed`; retain the authoritative selection and coverage gates. Neither a status word
-  nor an unknown coverage read authorizes purchasing. Partial/Ordered footer tallies stay retired.
+- **PO Status** uses the current owner-approved `Pending` / `Partial` / `Done` contract at
+  this MASTER's beginning. Retain authoritative selection and exact coverage gates; a status word
+  never authorizes purchase or turns unknown coverage into Done. Footer status tallies stay retired.
 - **Visible PO attribution comes ONLY from `po_line_sources`** — never `purchase_orders.so`,
   `so_refs`, or a global SKU/supplier/customer match. `PO Delivery Date` is
   `purchase_orders.official_delivery_date`, the ORIGINAL supplier-facing date stamped at birth and
@@ -2362,7 +2379,7 @@ No SKU, Ordered Qty, To buy, Order By or PO Safety Days column in this actionabl
 Qty remains the original SO quantity. Remaining purchasing quantity is shown in the selection
 bar and the issue review, using authoritative coverage; removing columns removes no duplicate-order
 protection. A matched set remains one purchasing demand, not one tick per physical display row.
-Status uses `Need PO` / `No PO needed` for the need for a new PO, not permission to buy:
+PO Status uses `Pending` / `Partial` / `Done` under the current owner-approved quantity contract;
 unknown coverage and other blockers still prevent selection and state their actual reason.
 
 The row-leading disclosure expands goods; it is separate from the SO No detail link.
