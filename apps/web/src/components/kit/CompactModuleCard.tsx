@@ -173,6 +173,8 @@ export interface CardModule {
   items?: ReactNode;
   /** Source-owned facts and document lineage, separate from goods/services. */
   details?: ReactNode;
+  /** Owning object vocabulary; Sales Order keeps its existing default. */
+  detailsLabel?: string;
   /** Each module names its own recipient; null disables communication. */
   communication?: CardCommunication | null;
   /** Info opens sales facts and address on selection; other modules leave them closed. */
@@ -201,6 +203,8 @@ export interface CardCommunication {
 export interface CompactModuleCardProps {
   name: string;
   reference: string;
+  /** Exceptional document state only; normal records need no badge. */
+  referenceStatus?: string;
   /** Optional source-owned read-only document. Mounted only after the number is opened. */
   document?: { label: string; preview: (onClose: () => void) => ReactNode };
   phone?: string;
@@ -212,6 +216,8 @@ export interface CompactModuleCardProps {
   closeLabel?: string;
   onClose?: () => void;
   modules: CardModule[];
+  /** Domain label for accessibility; customer orders keep their default. */
+  modulesLabel?: string;
   initialModule: string;
   communication?: CardCommunication;
   timeline?: CardTimelineEvent[];
@@ -268,10 +274,11 @@ export default function CompactModuleCard(p: CompactModuleCardProps) {
   return (
     <div className={s.cq}>
       <section className={s.panel}>
-        <header className={s.header}>
+        <header className={s.header} data-layout={!p.address && !p.target ? "identity" : undefined}>
           <div className={s.identity}>
             <div className={s.identityTitle}><strong>{p.name}</strong></div>
             <small className={s.contactLine}><>{p.document ? <button ref={documentEntry} type="button" className={s.documentNumber} title={p.document.label} aria-label={p.document.label} aria-expanded={documentOpen} aria-controls={`${ids}-document`} onClick={() => setDocumentOpen((v) => !v)}>{p.reference}</button> : <span>{p.reference}</span>}</>{p.phone ? <span className={s.phonePair}><Glyph name="phone" />{p.phone}</span> : null}</small>
+            {p.referenceStatus ? <small className={s.referenceStatus}>{p.referenceStatus}</small> : null}
             {p.sales ? (
               <button type="button" className={s.salesToggle} title={CARD_WORDS.orderDetails} aria-label={CARD_WORDS.orderDetails} aria-controls={`${ids}-sales`} aria-expanded={sales} onClick={() => setSales((v) => !v)}>
                 <span className={s.chevron}>{sales ? "▴" : "▾"}</span>
@@ -312,7 +319,7 @@ export default function CompactModuleCard(p: CompactModuleCardProps) {
             ) : null}
           </div>
         ) : null}
-        <nav className={s.moduleNav} aria-label={CARD_WORDS.modules}>
+        <nav className={s.moduleNav} aria-label={p.modulesLabel ?? CARD_WORDS.modules}>
           {p.modules.map((m) => (
             <button key={m.key} type="button" disabled={m.disabled} className={m.key === mod.key ? s.selected : undefined} aria-current={m.key === mod.key ? "page" : undefined} onClick={() => selectModule(m)}>{m.label}</button>
           ))}
@@ -320,7 +327,7 @@ export default function CompactModuleCard(p: CompactModuleCardProps) {
           {communication ? (
             <button type="button" className={`${s.toggle} ${s.toggleFirst}`} aria-label={CARD_WORDS.communication} title={CARD_WORDS.communication} aria-controls={`${ids}-comm`} aria-expanded={comm} onClick={() => setComm((v) => !v)}><Glyph name="message" /></button>
           ) : null}
-          {mod.details ? <button type="button" className={s.toggle} aria-label={`${mod.label} · ${CARD_WORDS.orderDetails}`} title={CARD_WORDS.orderDetails} aria-controls={`${ids}-details`} aria-expanded={details} onClick={() => setDetails(value => !value)}>⋯</button> : null}
+          {mod.details ? <button type="button" className={s.toggle} aria-label={mod.detailsLabel ?? `${mod.label} · ${CARD_WORDS.orderDetails}`} title={mod.detailsLabel ?? CARD_WORDS.orderDetails} aria-controls={`${ids}-details`} aria-expanded={details} onClick={() => setDetails(value => !value)}>⋯</button> : null}
           {mod.items ? (
             <button type="button" className={`${s.toggle} ${s.toggleItems} ${communication ? "" : s.toggleFirst}`} aria-label={CARD_WORDS.items} title={CARD_WORDS.items} aria-controls={`${ids}-items`} aria-expanded={items} onClick={() => setItems((v) => !v)}><Glyph name="box" /></button>
           ) : null}

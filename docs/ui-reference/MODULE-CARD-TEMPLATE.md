@@ -155,3 +155,12 @@ Strictly identical states: **0**, because three global fixes touch every state. 
 - Phone: controls stay 32px; a 40px touch version needs a module-tab-row decision (shown separately).
 - The editable `To` differs from the Work panel's recorded-channels-only rule.
 - The editor's red error line (`#ce2c31`, the kit red-11 value) is new to the card and awaits review.
+
+**Receiving adapter — built on branch, not production verified (2026-10-04).**
+The same card/Drawer accepts a supplier/source name and GRN reference, without customer sales or
+address fields. `modulesLabel` supplies domain-specific accessible navigation; optional module
+`detailsLabel` supplies the owning object's disclosure name. Defaults remain unchanged for Sales
+Orders. `referenceStatus` places an exceptional document state below its reference using existing
+header tokens (`Cancelled` for a voided GRN); normal receipts omit it. When address and target
+are both absent, their empty header slots collapse; Sales Order geometry is unchanged. Receipt quantities and
+evidence come from Receiving; the existing full-page object owns PDF, amendment and void actions.
