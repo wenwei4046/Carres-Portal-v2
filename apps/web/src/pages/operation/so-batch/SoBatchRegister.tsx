@@ -1296,7 +1296,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue, initialSearc
               const window = parsePoWindowKey(round.key);
               return window ? <FilterRailRow key={round.key} testId={`so-batch-round-${round.key}`}
                 label={poWindowTimeWord(window.time)} supportingText={fmtDate(window.date)}
-                count={round.unfinishedSoCount} active={roundNavigation.selected === round.key}
+                count={round.unfinishedSoCount} title={`${round.unfinishedSoCount} unfinished Sales Orders`} active={roundNavigation.selected === round.key}
                 onClick={() => roundNavigation.onSelect(round.key)} /> : null;
             })}
           </FilterRailGroup>}

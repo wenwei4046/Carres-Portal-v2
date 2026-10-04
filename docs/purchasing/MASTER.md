@@ -27,39 +27,6 @@ Git history keeps superseded designs. A screen or earlier chat cannot create a s
 
 ---
 
-### SO Batch left rail — owner-approved 2026-10-04; delivery in progress
-
-The bounded rail delivery uses the shared Sales Orders rail composition with local `Listing` /
-`Report` navigation. `Report` is a deferred destination: its contents are undecided, it remains
-unavailable, and no monthly report is built. Other modules retain Monthly demand.
-
-`Order time` prints the configured daily cutoffs; the approved default target is `10:15 AM` /
-`4:00 PM`, never a hardcoded override of Settings. Authenticated read-only Settings inspection on
-2026-10-04 measured production `11:00 AM` / `4:00 PM`, all Monday–Friday PO Days and 14 Safety days;
-this delivery does not change configuration or live business records. The separate
-planning group is `PO Safety Days`, with `Order early`, `{N} days left`, `1–{N−1} days left`,
-`0 days left`, and `Production late`; N comes from configured Safety days. There is no inner
-Safety days paragraph. This changes wording, not timing keys, quantities, eligibility or calendars.
-
-**Measured baseline:** `apps/api/src/routes/operation/purchase-demands.ts` derives each demand's
-`poWindow` from actual Proceed time through shared `poWindowFor`, governed PO Days and the Office
-calendar/holidays. Work and the existing `?window=` destination use the same stamps. Authority resolution: §§5.6.1 and 9.1 explicitly approve actual Proceed admission; Order By is
-planning arithmetic, never an unlock/admission gate. The contrary "still under review" sentence
-in the page-content draft (`e8eb0c826`) is superseded residue, not a new business decision.
-This delivery preserves the existing server stamps and Work linkage.
-The local preview's illustrative clocks, counts and statuses are not production evidence.
-
-**Delivery state:** isolated branch `codex/so-batch-rail-delivery` starts from `origin/main`, leaving
-the original preview and primary dirty checkout intact. The server now returns dated rounds using its existing window stamps plus the next two configured
-standard occurrences, with unique unfinished-SO counts (blocked uncovered demand remains counted).
-The entire round projection survives a `?window=` read; the left rail selects that existing exact
-source scope without another API or admission engine. Date support text distinguishes repeated
-clock times. Product/Supplier/Region duplicate rail controls are removed from this adopter; shared
-column filters remain. The governed setup exception remains reachable. Planning calculations,
-PO/Stock writers and Work completion are unchanged. Local targeted API and web regression suites
-passed; production deployment and authenticated acceptance remain owed. Whole-round Ready Stock matching, Quick View issuance, supplier communication and full
-SO Batch completion remain separate.
-
 ## 1 · Mission and boundary
 
 Purchasing answers five questions:
@@ -2003,142 +1970,60 @@ band with the summary, `Clear`, PO Duty chip and `Issue PO` on the left, and val
 `Export Excel` at the far right. The primary action is never placed in a second bar below the table
 or at the bottom of the viewport.
 
-**Left rail — APPROVED / LOCKED, latest owner ruling 2026-08-30.** The rail lets an operator inspect
-what remains unordered, when each order should be placed, which product category and which actual
-supplier and delivery region — with every label fully readable. It does not repeat central Work or
-expose Sales/Catalog actions to Operation. Six sections, in this exact order:
+**Left rail — APPROVED / LOCKED, owner ruling 2026-10-04; delivery in progress.**
 
-An unavailable row explains its non-price blocker inside that Sales Order's framed expansion.
-Price resolution never disables ordinary selection or becomes an Operation cost editor.
+The bounded rail delivery uses the shared Sales Orders rail composition with local `Listing` /
+`Report` navigation. `Report` is a deferred destination: its contents are undecided, it remains
+unavailable, and no monthly report is built. Other modules retain Monthly demand.
 
-```text
-ORDER TIMING
-  Can order early
-  14 safety days left
-  1–13 safety days left
-  No safety days left
-  Not enough production days
+`Order time` prints the configured daily cutoffs; the approved default target is `10:15 AM` /
+`4:00 PM`, never a hardcoded override of Settings. Authenticated read-only Settings inspection on
+2026-10-04 measured production `11:00 AM` / `4:00 PM`, all Monday–Friday PO Days and 14 Safety days;
+this delivery does not change configuration or live business records. The separate
+planning group is `PO Safety Days`, with `Order early`, `{N} days left`, `1–{N−1} days left`,
+`0 days left`, and `Production late`; N comes from configured Safety days. There is no inner
+Safety days paragraph. This changes wording, not timing keys, quantities, eligibility or calendars.
 
-PRODUCT                   ▾ compact fact dropdown (owner ruling 2026-09-11)
-  All products
-  Mattress · Bedframe · Sofa
+**Measured baseline:** `apps/api/src/routes/operation/purchase-demands.ts` derives each demand's
+`poWindow` from actual Proceed time through shared `poWindowFor`, governed PO Days and the Office
+calendar/holidays. Work and the existing `?window=` destination use the same stamps. Authority resolution: §§5.6.1 and 9.1 explicitly approve actual Proceed admission; Order By is
+planning arithmetic, never an unlock/admission gate. The contrary "still under review" sentence
+in the page-content draft (`e8eb0c826`) is superseded residue, not a new business decision.
+This delivery preserves the existing server stamps and Work linkage.
+The local preview's illustrative clocks, counts and statuses are not production evidence.
 
-SUPPLIER                  ▾ compact fact dropdown (owner ruling 2026-09-11)
-  All suppliers
-  [actual supplier names, alphabetical — never hardcoded]
+**Delivery state:** isolated branch `codex/so-batch-rail-delivery` starts from `origin/main`, leaving
+the original preview and primary dirty checkout intact. The server now returns dated rounds using its existing window stamps plus the next two configured
+standard occurrences, with unique unfinished-SO counts (blocked uncovered demand remains counted).
+The entire round projection survives a `?window=` read; the left rail selects that existing exact
+source scope without another API or admission engine. Date support text distinguishes repeated
+clock times. Product/Supplier/Region duplicate rail controls are removed from this adopter; shared
+column filters remain. The governed setup exception remains reachable. Planning calculations,
+PO/Stock writers and Work completion are unchanged. Local targeted API and web regression suites
+passed; production deployment and authenticated acceptance remain owed. Whole-round Ready Stock matching, Quick View issuance, supplier communication and full
+SO Batch completion remain separate.
 
-REGION                    ▾ compact fact dropdown (owner correction 2026-09-11)
-  All regions
-  Klang Valley
-  [actual outstation Delivery State names, alphabetical]
-  Others                    ← only when Delivery State is not recorded
 
-SETUP TO FIX              ← the whole section renders only when at least one affected SO exists
-  Production days not set
-```
+**Composition and interaction.** Reuse admitted `FilterRail` / `FilterRailGroup` / `FilterRailRow`,
+shared Sales Orders `.so-template-rail`, and vertical `Tabs`; do not draw another rail kit.
+Order time and PO Safety Days open by default. `Production days not set` remains the governed
+Purchasing-owned setup exception only while an affected SO exists. Required source blockers stay
+named in the register/expansion; no local Sales/Catalog action or second Work list is added.
 
-- **`PRODUCT`, `SUPPLIER` and `REGION` are compact fact dropdowns** (owner ruling
-  2026-09-11, completed for `REGION` by the owner correction of the same day — the shared
-  purchasing rail grammar; Manual Purchase collapses the same shape plus `PURCHASE PURPOSE`,
-  and §9.2 carries the reasoning). All three are FACT lists that grow with the business:
-  every supplier Carres buys from and every outstation state it delivers to earns a row, and
-  as rows they pushed `SETUP TO FIX` — and on a short window `ORDER TIMING`, *what to buy
-  today* — below the fold of a 240px rail. Each control writes the same single-slot section
-  value the rows wrote, keeps the counts in its option text and wears the rail's own blue
-  active treatment when narrowed. `ORDER TIMING` and `SETUP TO FIX` keep their visible rows:
-  they are the daily worklist, not a fact list.
-- **⭐ `TO ORDER / All not ordered` IS RETIRED — owner correction 2026-09-11.** It was the one
-  rail row that named no FACT about a Sales Order: it named the page's own DEFAULT, which is
-  the unfiltered purchasing population — and it sat ABOVE `ORDER TIMING`,
-  the section that answers *what to buy today*. The section, the row and the word are gone from
-  this surface and may not return under another spelling. **The arithmetic behind it is
-  untouched** (`soBatchOrderLineOutstandingQty`): customer quantity less current Ready Stock coverage
-  less exact non-cancelled `po_line_sources` lineage still governs the tick and the Ready
-  Stock reservation door. Manual Purchase uses its governed groups (§9.2); its request remainder arithmetic
-  remains distinct from SO coverage.
-- **The rail is navigation, not batch selection.** No checkboxes in the rail — rows use the
-  governed `NavRow` active treatment; the only checkboxes on the page are the Register's own
-  `Issue PO` selection. One filter may be selected per section; filters from different
-  sections combine; clicking a selected timing row again clears it; `All products`,
-  `All suppliers` and `All regions` clear their sections; clearing every filter restores the
-  complete permanent Register in its two groups, including the collapsed `No purchase needed` group.
-- **Counts are UNIQUE Sales Orders** — never documents, notifications, leaf lines, SKU
-  quantities or PO counts. Each section's counts update against the other selected sections,
-  so the printed number predicts the resulting SO rows. The fixed rows (the five timing rows,
-  the three product rows and the setup row) print their live count, zero included. A supplier or
-  region appears only while it has a matching SO under the other active filters — except the
-  currently selected row, which stays visible with `0`.
-- **The outstanding arithmetic reads the permanent Register's exact coverage facts** — for each SO
-  line, customer quantity less Ready Stock already taken and less non-cancelled PO lineage
-  (`soBatchOrderLineOutstandingQty`). A generic Open PO SKU pool may prevent the same units being
-  issued twice today, but it does not make that Sales Order ordered and it may not claim coverage
-  without exact `po_line_sources` evidence. The issue leaf is an action contract, never the
-  coverage authority.
-- **Product comes from the authoritative Catalog category** — never SKU text, model name,
-  description, supplier, or a browser-only mapping. A multi-category Sales Order counts once
-  under every matching category and still appears once in the Register. Records outside the
-  three categories remain visible under `All products` and never silently leave the
-  permanent Register.
-- **Supplier uses the same projection as the Register's `Supplier` column** — the resolved
-  outstanding-demand supplier plus the issued PO lineage supplier
-  (`soBatchOrderSupplierNames`), no second browser-only supplier calculation. Actual names
-  only, alphabetical. There is no `No supplier` fact category: an unexpectedly missing
-  supplier fails at Catalog authority; its concrete `Check the supplier` action belongs to the
-  responsible owner's central Work list, not this Operation rail.
-- **Region reads the server's recorded Delivery State** — never customer text, supplier address or
-  a postcode guessed on this page. Kuala Lumpur, Selangor and Putrajaya group as `Klang Valley`;
-  every outstation state keeps its own name; a missing state remains findable as `Others`.
-- Every timing row remains orderable. `Can order early`, `1–13 safety days left`,
-  `No safety days left` and `Not enough production days` express timing risk, never
-  `Cannot buy`. Order By is a planned date, never an unlock date.
-- `Production days not set` is the only normal setup blocker on this surface. It belongs to
-  Purchasing Settings, and its lines are not selectable until the Supplier × Category
-  production days exist.
-- **The readable rail shell (Card 02-C):** 240px wide · 12px outer padding · 8px heading →
-  first row · 20px between groups · 36px minimum row · a wrapped label takes its natural
-  height (≥ 48px) in the same body font. A governed label is never truncated and never
-  hidden behind a tooltip; the count stays visible and right-aligned; the rail scrolls
-  vertically as supplier names grow; at narrow desktop widths the Register scrolls
-  horizontally and the rail is never squeezed below 240px. The shell/group/row grammar is
-  the shared `FilterRail` component (`workspace-rail.tsx`). Manual Purchase imports the
-  same shell, grammar, daily-work lens, Product authority and unique-object count rule (§9.2,
-  Card 06). Its `ORDER TIMING` reads Manual `Order By`; it never imports SO Safety-days arithmetic
-  or the SO-specific meaning of `All not ordered`.
-- **The rail may hide completely.** Its top-right `Hide filters` control uses the same governed
-  panel-left icon grammar as the Portal sidebar. While hidden it does not become a 60px icon rail;
-  the Register takes the width and its toolbar exposes `Show filters`. The choice is remembered for
-  that staff browser. This is one local-filter control, not another module-navigation control.
-- **⭐ ON A NARROW WINDOW THE RAIL FLOATS; IT DOES NOT EAT THE TABLE — owner correction
-  2026-09-11.** Below 896px of available canvas the 240px rail leaves the flow and overlays the Register, which is the
-  shared purchasing responsive pattern already shipped on Purchase Orders. At 459px the Register
-  keeps its full width, the page itself never scrolls sideways, each table scrolls inside its own
-  box, and `Issue PO` stays on screen. At or above 896px of available canvas the rail stays in flow. The rail is never squeezed
-  below 240px and a governed label is never truncated. **S3 (built 2026-09-17, SO Batch and Manual
-  Purchase, `useFilterRailOpen`):** below 896px of canvas the rail STARTS hidden unless this browser
-  opened it before; a browser that hid it keeps it hidden at any width.
-- **PO Duty appears only in the selected Issue action, never as a permanent toolbar/rail block and
-  never repeated on rows.** Selection replaces the Register's top Work Toolbar; it never adds a
-  bottom action bar. The selected bar direction is
-  `1 selected · 1 unit · Issue 1 PO  [Clear]  [YJ]  [Issue PO]          [Export Excel (1)]`.
-  `[YJ]` is a compact structured owner
-  avatar chip; hover/title reads `Yu Jun · PO Duty`. A dated cover replaces the initials and title
-  with the cover identity. The action sentence never names Yu Jun. The chip states normal ownership;
-  button authority comes from §5.3, so duty/cover, Jess and `operation@carres.com` see the live action.
-- Fully covered / `Buy = 0` DEMAND leaves the buying selection — it is not offered a tick, and
-  the leaf listing drops it — but the SALES ORDER'S ROW never leaves (Card 02-B). If a PO is
-  cancelled and the quantity is still required, the selectable demand returns automatically by
-  recomputation; nothing is stored.
-- A line whose customer date, SKU or supplier is unexpectedly missing fails safely at its owning
-  boundary (Sales / Catalog). It is named on its own row; the owning person's central Work action
-  deep-links to that owning door. It never becomes a local rail category and is never silently
-  defaulted.
-- Every category derives from the one server planning engine. There is no second stored status.
-- Retired rail words, never to return on this surface: `TO ORDER` · `All not ordered` ·
-  `Ready to buy` · `Covered` ·
-  `No customer date` · `No SKU` · `No supplier` · `No production days` · `BUYING RECORDS` ·
-  `All lines` · `No buying needed` · `Cannot buy` — alongside the standing bans
-  `Today` · `Tomorrow` · `Overdue` · `Follow Up` · `Needs Attention` · `Priority` · `Pending` ·
-  `Waiting` · `Next Action` · `Buffer`.
+Clock rows use exact dated `poWindow` identity, configured clock label and date supporting text;
+counts are unique unfinished Sales Orders, never quantities, documents or suppliers. A selected
+clock reuses the existing server `?window=` scope and selection behaviour. Selecting it again or
+using the existing scope Clear filters returns to the original permanent register. Each planning
+selection preserves its existing key, single-slot toggle and counts. All timing bands remain
+orderable when otherwise eligible; late/early timing is risk, never an unlock gate. Source coverage
+and purchase quantity continue to use the one canonical engine.
+
+The rail stays 240px, scrolls vertically and uses the shared hide/show controls. Below an 896px
+canvas it starts hidden and leaves the register flow when shown; above that width it remains in
+flow. It never squeezes the register or retires columns. PO Duty remains in the selected Issue
+action rather than a permanent rail block. The bounded rail delivery preserves the original
+register; approved whole-round matching, Quick View/issuance, status/grouping and other module
+completion work keep their separate delivery boundaries.
 
 **Safety days — APPROVED 2026-08-26.** The visible term is `Safety days`; `buffer` never reaches
 a screen. `Safety days = 14 working days` on the governed Office working calendar and holidays;
