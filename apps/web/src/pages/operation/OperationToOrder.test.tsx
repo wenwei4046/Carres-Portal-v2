@@ -32,6 +32,11 @@ async function clickIssue() {
 }
 
 const apiFetch = vi.fn();
+const toastError = vi.hoisted(() => vi.fn());
+vi.mock("sonner", async () => {
+  const actual = await vi.importActual<typeof import("sonner")>("sonner");
+  return { ...actual, toast: Object.assign(actual.toast, { error: toastError }) };
+});
 vi.mock("@/lib/api", async () => {
   const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
   return { ...actual, apiFetch: (...a: unknown[]) => apiFetch(...a) };
@@ -248,6 +253,30 @@ describe("the page reads the ONE projection and draws the Register", () => {
 });
 
 describe("the whole journey — tick, arrange, issue, prove it arrived", () => {
+  it("refuses unreadable PO scope and retries the same exact read without a write", async () => {
+    const po = { id: "PO-2041", supplierId: "s-hooka", supplierName: "Hooka", destinationId: KLANG, destination: "Carres Klang" };
+    const read = payload({ registerRows: [orderRow({ pos: [{
+      poId: po.id, status: "open", supplierId: po.supplierId, supplierName: po.supplierName,
+      destinationId: KLANG, officialDeliveryDate: "2026-09-18", sentCurrentVersion: false,
+    }] })] });
+    let readable = false;
+    apiFetch.mockImplementation(async (path: string) => {
+      if (path.endsWith("/issue-context")) { if (!readable) throw new Error("unavailable"); return po; }
+      return path.includes("print-data") ? officialDocument() : path.endsWith("/sends") ? { sends: [] }
+        : path.endsWith("email-capability") ? { configured: false } : read;
+    });
+    toastError.mockClear();
+    renderPage();
+    await screen.findByTestId("so-batch-row-o1");
+    fireEvent.click(screen.getByRole("button", { name: /^Purchase Orders$/ }));
+    await waitFor(() => expect(toastError).toHaveBeenCalledWith("Supplier details could not be loaded.", expect.any(Object)));
+    expect(screen.queryByTestId("po-supplier-result-panel")).toBeNull();
+    readable = true;
+    toastError.mock.calls.at(-1)![1].action.onClick();
+    await screen.findByTestId("po-supplier-result-panel");
+    expect(apiFetch.mock.calls.filter(([path]) => String(path).endsWith("/issue-context"))).toHaveLength(2);
+    expect(apiFetch.mock.calls.some(([, options]) => options?.method === "POST")).toBe(false);
+  });
   it("reloads a retained SO's linked PO before opening supplier preparation", async () => {
     const po = { id: "PO-2041", supplierId: "s-hooka", supplierName: "Hooka", destinationId: KLANG, destination: "Carres Klang" };
     const read = payload({ registerRows: [orderRow({ status: "ordered", pos: [{

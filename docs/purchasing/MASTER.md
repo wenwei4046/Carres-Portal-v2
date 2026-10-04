@@ -278,8 +278,11 @@ an empty result panel after a fresh mount because it relied only on browser-held
 The local correction loads the exact deduplicated PO lineage of visible Register rows through
 the existing permission-bound issue-context reads, including retained completed rows. Shared
 DataGrid search and column filters determine membership; no broader supplier pool is substituted.
-All reads must succeed with matching PO identities before the panel opens. A failed read refuses
-preparation rather than presenting an empty PO answer. Direct production acceptance remains open.
+All reads must succeed with matching PO identities before the panel opens. Starting a new read
+closes the old result scope. A failed read says `Supplier details could not be loaded.` and offers
+`Try again` on the same exact PO read, rather than presenting an empty or stale PO answer.
+23 page journey and 131 actual Register tests pass, including fresh-mount recovery, search scope
+and failed-read retry without a write. Direct production acceptance remains open.
 
 ### SO Batch PO Status — owner-approved 2026-10-04
 

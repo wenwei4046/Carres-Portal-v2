@@ -15,16 +15,20 @@ import PoSupplierBundle from "./PoSupplierBundle";
 
 /** Recover exact Register lineage after a reload. One failed or mismatched
  * source refuses the entire preparation; it cannot masquerade as no POs. */
-export function useVisiblePoResults(onLoaded: (pos: IssuedPo[]) => void) {
-  return useMutation({
+export function useVisiblePoResults(onLoaded: (pos: IssuedPo[]) => void, onOpening: () => void) {
+  const result = useMutation<IssuedPo[], Error, readonly string[]>({
+    onMutate: onOpening,
     mutationFn: async (poIds: readonly string[]) => Promise.all([...new Set(poIds)].map(async id => {
       const po = await apiFetch<IssuedPo>(`/api/operation/pos/${encodeURIComponent(id)}/issue-context`);
       if (po.id !== id || !po.supplierId) throw new Error("invalid_po_context");
       return po;
     })),
     onSuccess: onLoaded,
-    onError: () => toast.error("Could not load the preview. Try again on the document."),
+    onError: (_error, poIds) => toast.error("Supplier details could not be loaded.", {
+      action: { label: "Try again", onClick: () => result.mutate(poIds) },
+    }),
   });
+  return result;
 }
 
 /** Issued result scope, beside the retained register. Each PO keeps its own document/evidence. */

@@ -61,7 +61,7 @@ export default function OperationToOrder() {
   const [resultRoundWindow, setResultRoundWindow] = useState<string | undefined>(windowParts ? scopeWindow! : undefined);
   const visiblePoResults = useVisiblePoResults(pos => {
     setIssuedPos(pos); setResultRoundWindow(undefined); setResultsOpen(true);
-  });
+  }, () => setResultsOpen(false));
 
   /**
    * THE PAYLOAD IS PARSED, NOT TRUSTED.
