@@ -3652,7 +3652,9 @@ complete rules, the sample-data boundary and the deviations from the reference p
 | Inline editor | Padding10px; soft surface, radius6px, bottom margin8px; natural height | Source |
 | Editor labels/error | Labels11px; reference margin7px top/3px bottom, compact kit labels margin0; error12px/16px with8px top margin | Source; error colour retains existing pending review |
 | Native reference field | Type12px; padding7px, border1px, reference radius4px; default textarea minimum90px | Source, distinct from embedded kit fields |
-| Embedded kit field | Solid1px resting slate-5 border; white surface; single line32px, sides8px, canonical radius6px; focus blue-9 ring2px; multiline sides8px/top-bottom4px | Source; borders/32px live |
+| Canonical embedded field recipe | Single line32px, sides8px/radius6px, solid1px slate-5 border; focus blue-9 ring2px; multiline sides8px/top-bottom4px | Source field-recipe; see actual cascade below |
+| Actual Select/DatePicker in card |32px high, padding0×8px, radius6px, solid1px slate-5; Select13px/18px, inherited system-ui | Live Select; DatePicker recipe/source and border live |
+| Actual ETA Input/condo Textarea | `.panel input/textarea` still overrides recipe:12px system-ui, padding7px all sides, radius4px, border1px card-line. ETA32px; condo48px minimum | Live; recorded source-cascade discrepancy, not a canonical token change |
 | Customer grid | Two equal columns, gap8px above400px card width; one column at400px or below; outer form stack gap12px | Source; five widths live |
 | Logistics grid | Driver/vehicle two equal columns, gap12px; outer form stack gap12px; ETA full width; source/proof retained | Source; controls live within bounds |
 | Compact condo textarea | Two rows, minimum48px; grows with content; omit long hint | Source; empty48px live |
@@ -3687,6 +3689,8 @@ complete rules, the sample-data boundary and the deviations from the reference p
 | Card≤420px | Reference arrange split becomes one column; original-date divider becomes bottom rule with8px bottom inset; event metadata wraps; sales-fact columns1fr/1.4fr/0.65fr, gap8px; Info items cells7×3px/type11px |
 | Card≤400px | Four-fact strip becomes2×2; right divider removed from second cell; three-fact Info strip remains three columns; Info value12px/title11px; compact Customer fields one column |
 | Five verified card widths |560/440/416/396/366px; actual dimensions checked. Do not equate them to identical viewport sizes in a Drawer or reference page |
+
+**Recorded field-cascade limitation:** excluding `data-kit` from border/button resets restores Select/DatePicker skin, but the existing `.panel input/select/textarea` rule still overrides font, padding, radius and border colour of native Input/Textarea. Do not claim all fields already use canonical skin unchanged; the actual dimensions above are the current implementation. This documentation commission does not authorise another visual change. Keep this discrepancy visible for a governed source correction rather than silently copying it to another module.
 
 **Surface values still awaiting the existing token decision:** source CSS variables are background#f3f5f7, surface#fff, soft#f0f3f6, ink#202631, muted#596370, line#d8dde5, brand#006ac2, select-line#d5dce6, select-ink#172033, missing#64748b, disabled-fill#e8ebef, info-muted#536175, table-head#f1f3f5, toggle-hover#e7edf4, error#ce2c31. These describe the reference-fidelity block only; the approved dark Header and embedded kit field tokens override it in their own scopes. Do not spread these literals to another page or claim the pending full-card token conversion has been approved.
 
