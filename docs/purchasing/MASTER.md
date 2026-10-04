@@ -670,6 +670,23 @@ uploads live under their source's prefix in `delivery-orders`. These are measure
 gaps against §7.3, not new business rulings. No SQL draft has been approved, migration written or
 production write performed for this automatic-confirmation work.
 
+**Local database acceptance baseline — 2026-10-05; target still failing.** An isolated PostgreSQL
+17 replay matches the live normalised function bodies for the shared stock receipt engine,
+Warehouse submit, Warehouse check-in, receipt line validator and actor context. Existing
+`receiving-closure-0601.integration.test.ts` passes all 13 tests against that local database; it
+proves the old Operation-posting flow only. The new opt-in
+`warehouse-confirmation-target.integration.test.ts` runs eight approved-target checks: seven fail
+and one passes. Valid final Warehouse confirmation remains `submitted`; a shared company login
+is still accepted by the count door; missing DO evidence, unknown source, unidentified Unit,
+all-missing count and out-of-scope source are rejected before preserving a report. The disabled
+individual is correctly refused. All fixtures are transaction-rolled-back, with no production
+receipt, stock, storage upload or account change. The target suite is explicitly skipped without
+its isolated-local-database variable; ordinary CI is not automatic-confirmation acceptance.
+Retry/concurrency, report correction, precise blocker payloads, issue holds and unchanged
+amendment/void authority remain acceptance work for the reviewed confirmation implementation.
+The full historical replay had seven failures (0149, 0317, 0339, 0398a, 0453, 0561, 0588);
+only the named receipt dependencies were reconciled, not a clean whole-chain replay.
+
 **Missed-arrival Work ownership — DEPLOYED, BOUNDED LIVE ACCEPTANCE, 2026-10-05.**
 A supplier date without a physical report no longer creates Receiving Check in work. The existing
 Purchasing supplier-date-passed action owns that follow-up under PO Duty and opens the exact PO.
