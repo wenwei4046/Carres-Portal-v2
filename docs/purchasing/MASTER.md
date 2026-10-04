@@ -445,6 +445,20 @@ original issued references. Search accepts original and shortened forms. Missing
 unclaimed; Unit IDs and supplier references are unchanged. This verifies the Batch adoption only,
 not every Purchasing display surface or the complete SO Batch delivery boundary above.
 
+**PO issuance/retry — current production transaction proof, 2026-10-05.** The existing
+`purchasing_issue_pos_batch` was exercised as an eligible active Operation actor against SO-1368's
+exact line, current Catalog cost and its governed Nice Future → NETS → Carres Klang arrangement.
+Inside mandatory-rollback blocks it produced one exact source and one line-bound incoming Unit,
+reduced remaining demand to zero and refused duplicate issue with `unknown_demand`. Deferred
+constraints were checked explicitly. A second document's `unresolved_supplier` refusal rolled
+back the first document, its Unit and numbering; retry added exactly one source commitment.
+The final deliberate exception rolled back the complete probe. Separate fresh reads proved zero
+probe POs, formal-code claims, Units, sources and audit rows; the Unit series remained 1/328 and
+the buying remainder remained one. Evidence: `/tmp/so-batch-issue-rollback-proof.json`.
+No committed purchase, supplier transmission or lasting number allocation was made. This proves
+the current database issue/retry door; exact-head CI 37215990410's 100 API and 41 actual-component
+issue cases cover the route and guided interaction, with their transport boundaries explicit.
+
 **Deployed display acceptance, 2026-10-05.** At a controlled 1200px viewport, the actual formal
 PO document contained two equal 516px panes and one rendered PDF canvas. The 390px Cards check
 retained search `7907`, Supplier grouping and 12-of-32 records; Match Ready Stock ended at
