@@ -879,7 +879,7 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
     for (const row of rows) {
       if (!row.poWindow) continue;
       if (!rounds.has(row.poWindow)) rounds.set(row.poWindow, new Set());
-      if (row.toBuy > 0) rounds.get(row.poWindow)!.add(row.orderId);
+      if (row.toBuy == null || row.toBuy > 0) rounds.get(row.poWindow)!.add(row.orderId);
     }
     for (const reg of registerRes.registerRows) {
       for (const po of reg.pos) {
