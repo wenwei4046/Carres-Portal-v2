@@ -1418,8 +1418,11 @@ ONE SCROLL           Goods Receipt · Purchase Return · Repair Order · Display
 Yes and it runs beside the others → reason one. No, but they would hunt for it when something
 went wrong → reason two. Neither → it is a section in the scroll, not a tab.
 
-### THE SPLIT IS AN EDIT MODE, AND ONLY WHERE AN OUTSIDER READS THE RESULT
-**Viewing never splits the screen** (Jess, 2026-08-18). Pressing edit does, and the right half is
+### DOCUMENT COMPOSITION FOLLOWS THE OWNING OBJECT RULE
+Ordinary viewing remains a single facts flow except for explicit object rulings. Formal PO View
+shows original read-only information and the actual current PDF in equal panes (owner 2026-10-04,
+Purchasing MASTER complete SO Batch delivery boundary); opening it never enters Edit. GRN uses its
+explicit preview rule below. Pressing edit shows the right half as
 **the document the other party will actually receive**, redrawn as the left half is typed — which
 is the only way an operator can see what a supplier will read without printing it.
 ```

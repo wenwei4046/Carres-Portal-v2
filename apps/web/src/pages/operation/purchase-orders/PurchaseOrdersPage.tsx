@@ -437,6 +437,12 @@ export default function PurchaseOrdersPage() {
   const [railOpen, setRailVisible] = useFilterRailOpen("carres.purchaseOrders.filterRail", canvasRef);
   const [bundleBusy, setBundleBusy] = useState(false);
   const [facetCandidates, setFacetCandidates] = useState<RegisterRow[]>([]);
+  // DataGrid may recompute facet rows when presentation props change. Download
+  // needs membership only; unchanged membership must not trigger another render.
+  const updateFacetCandidates = useCallback((rows: RegisterRow[]) => {
+    setFacetCandidates(previous => previous.length === rows.length &&
+      previous.every((row, index) => row.id === rows[index]?.id) ? previous : rows);
+  }, []);
   const [pdfProblem, setPdfProblem] = useState<string | null>(null);
   /* The PO whose receipts are open. `{n} receipt dates` and `{n} GRNs` are
      two doors into the SAME list, because they are two facts about one set of
@@ -1155,7 +1161,7 @@ export default function PurchaseOrdersPage() {
               searchPresentation="responsive"
               rows={visibleRows}
               facetRows={allRows}
-              onFacetRowsChange={setFacetCandidates}
+              onFacetRowsChange={updateFacetCandidates}
               columns={columns}
               /* v2 — the nine-column date-first register replaces v1's twelve. */
               storageKey="carres.purchaseOrders.register.v2"
@@ -1596,7 +1602,7 @@ function PurchaseOrderObject({
       <main
         className={
           view === "Document" && mode === "read"
-            ? "min-h-0 flex-1 overflow-y-auto"
+            ? "min-h-0 flex-1 overflow-y-auto min-[1130px]:overflow-hidden"
             : "min-h-0 flex-1 overflow-y-auto p-3 sm:p-4"
         }
       >
@@ -1846,26 +1852,11 @@ function DocumentView({ row, owner, onIssue, units, receiving, claims, destinati
       .map((source) => source.request_id ?? source.reference),
   ).size;
   return (
-    /* ⭐ THE FACTS AND THE DOCUMENT, SIDE BY SIDE — AS TWO PANES (YH, 2026-09-03).
-       The first cut put them in one grid inside a scrolling page and pinned the
-       document with `sticky`: a bordered box holding an iframe holding the
-       browser's PDF viewer, with its own grey chrome and its own scrollbar,
-       jumping as the page scrolled under it. The Sales Order does not do that.
-       Its facts and its document are two panes that each scroll on their own
-       and the page does not; the document is sheets of paper on the canvas, no
-       box, no caption strip. This is that shape, 50/50 at `lg`; below it the
-       two stack, facts first, and the page scrolls normally.
-
-       `min-w-0` on the facts pane is load-bearing. A flex item defaults to
-       `min-width: auto`, so the Goods lines table's `min-w-[900px]` would size
-       the PANE rather than scroll inside it, and the document would be
-       squeezed to nothing. */
-    /* ⭐ VIEWING NEVER SPLITS (Purchasing MASTER §9.3 composition, owner
-       2026-09-25; UI MASTER §4.1). One scroll: Current action → Purchase order
-       → Goods lines → Receiving → Claims and returns → Document, the current
-       version's PDF full width and last. Only `Edit` and issuing open the
-       50/50 split beside the paper. */
-    <div className="mx-auto flex w-full max-w-[1280px] flex-col gap-3 p-3 sm:p-4" data-testid="po-document-panes">
+    /* Purchasing's 2026-10-04 object ruling: read-only original facts and
+       the actual current PDF share equal panes; Edit remains an explicit door.
+       Each desktop pane scrolls independently; narrow screens stack. */
+    <div className="grid min-h-0 grid-cols-1 gap-3 p-3 sm:p-4 min-[1130px]:h-full min-[1130px]:grid-cols-2" data-testid="po-document-panes" data-layout="50-50">
+      <div className="flex min-w-0 flex-col gap-3 min-[1130px]:min-h-0 min-[1130px]:overflow-y-auto" data-testid="po-document-facts-pane">
       <CurrentAction row={row} owner={owner} onIssue={onIssue} />
       <Block title="Purchase order">
         {/* The Sales Order fact grammar (owner, 2026-09-26): label over a
@@ -1981,6 +1972,8 @@ function DocumentView({ row, owner, onIssue, units, receiving, claims, destinati
           {claims.length > 0 ? <Link className="mt-2 text-meta font-medium text-kit-blue-11 hover:underline" to={`/operation?tab=claims&po=${encodeURIComponent(po.id)}`}>Open Claims and Returns</Link> : null}
         </ConnectionBlock>
       </div>
+      </div>
+      <div className="min-w-0 min-[1130px]:min-h-0 min-[1130px]:overflow-y-auto">
       <Block title="Document">
         <div data-testid="po-document-column">
         {/* A cancelled purchase order has no official document to preview —
@@ -1995,6 +1988,7 @@ function DocumentView({ row, owner, onIssue, units, receiving, claims, destinati
         )}
         </div>
       </Block>
+      </div>
     </div>
   );
 }

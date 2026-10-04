@@ -14,6 +14,7 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
+import type { PoTemplateData } from "@/lib/pdf/types";
 import PurchaseOrdersPage from "@/pages/operation/purchase-orders/PurchaseOrdersPage";
 import "@/index.css";
 
@@ -212,6 +213,24 @@ const realFetch = window.fetch.bind(window);
 window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   const url =
     typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+  // This inspection fixture can never write business facts or send messages.
+  if ((init?.method ?? (input instanceof Request ? input.method : "GET")).toUpperCase() !== "GET") {
+    return Response.json({ message: "Local preview is read only" }, { status: 403 });
+  }
+  const print = /\/api\/operation\/pos\/([^/]+)\/print-data/.exec(url);
+  if (print) {
+    const source = POS.find(po => po.id === decodeURIComponent(print[1]!));
+    if (!source) return Response.json({}, { status: 404 });
+    return Response.json({
+      po_id: source.id, po_number: source.id, version: source.version ?? 1,
+      issue_date: "2026-09-01", eta_date: "2026-09-12",
+      supplier: { name: "Hooka", address: "Sample supplier address", contact: "Sample contact" },
+      destination: { name: "Carres Klang", address: "Sample warehouse address" },
+      issued_by: "Sample staff", so_refs: [4001],
+      lines: [{ sku: "MAT-K-001", description: "Cody King", qty: 3, unit: "pcs", identity_mode: "quantity" }],
+      terms: "Sample data only. No purchase was placed.",
+    } satisfies PoTemplateData);
+  }
   const units = /\/api\/operation\/pos\/([^/]+)\/units/.exec(url);
   if (units) {
     return new Response(JSON.stringify({ units: UNITS[decodeURIComponent(units[1]!)] ?? [] }), {

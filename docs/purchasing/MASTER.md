@@ -228,8 +228,14 @@ execution. Missing implementation does not reopen these decisions.
 
 **MEASURED OPEN TARGETS, 2026-10-04.** Whole-round non-overlapping stock suggestions/location/
 priority/bulk acceptance, SO Batch shared Table/Cards/Page tools presentation, complete source
-Quick View actions and read-only 50/50 formal PO object integration still require implementation
-or direct proof. Existing individual stock reservation, guarded issue and current-version evidence
+Quick View actions still require implementation or direct proof. Formal PO read-only 50/50
+original-information/current-PDF composition is now built locally using existing facts and PDF
+components; 54 PO Register/object tests pass, including the actual shared DataGrid opening a PO,
+read-only opening, separate explicit issue
+work and cancelled-document refusal. Desktop actual-component sample acceptance shows equal facts/PDF panes with the real PDF renderer
+(`/tmp/so-batch-po-readonly-split-preview.png`); the local fixture rejects all writes. Narrow-screen
+acceptance and production proof remain open. A real-grid facet callback render loop found during
+this walk was corrected by retaining unchanged membership, with a real-grid integration regression. Existing individual stock reservation, guarded issue and current-version evidence
 are reusable authorities, not permission to infer whole-round or shared-panel completion.
 
 ### SO Batch PO Status — owner-approved 2026-10-04
