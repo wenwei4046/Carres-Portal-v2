@@ -31,6 +31,11 @@ describe("Receiving shared working panel", () => {
     fireEvent.click(screen.getByRole("button", { name: "Close panel" }));
     expect(close).toHaveBeenCalledOnce();
   });
+  it("keeps an unposted report distinct from an issued GRN", () => {
+    mount({ ...row, status: "submitted", grn_no: null });
+    expect(screen.queryByText(/GRN-/)).not.toBeInTheDocument();
+    expect(screen.getByText("Not issued")).toBeInTheDocument();
+  });
   it("retains cancellation instead of presenting a normal receipt", () => {
     mount({ ...row, status: "voided" });
     expect(screen.getByText("Cancelled")).toBeInTheDocument();
@@ -78,6 +83,15 @@ describe("Receiving shared working panel", () => {
     expect(screen.getByText("Unavailable")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Try again" }));
     expect(state.retry).toHaveBeenCalledOnce();
+  });
+  it("shows the actual missing Unit outcome and recorded report reason", () => {
+    state.data = { receipt: { ...row, return_reason: "Recount the second pallet", unit_results: [{ stock_item_id: "unit", unit_code: "U1-000-099", po_line_id: "line1", outcome: "not_received", issue_kind: null, note: null }] }, events: [], po: null };
+    mount();
+    fireEvent.click(screen.getByRole("button", { name: "Items" }));
+    expect(screen.getByText("U1-000-099")).toBeInTheDocument();
+    expect(screen.getByText("Not received")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Receipt details" }));
+    expect(screen.getByText("Recount the second pallet")).toBeInTheDocument();
   });
   it("offers retry when details cannot be read", () => {
     state.error = true;

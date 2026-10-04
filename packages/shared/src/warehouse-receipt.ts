@@ -440,10 +440,13 @@ export function receivingRecordNo(
  */
 export function receivingDisplayNo(r: {
   id: string;
+  /** Explicit unposted reports never own a formal or derived GRN number. */
+  status?: string | null;
   grn_no?: string | null;
   goods_received_at?: string;
   submitted_at?: string;
 }): string {
+  if (r.status != null && r.status !== "posted" && r.status !== "voided") return "";
   const stored = (r.grn_no ?? "").trim();
   if (stored) return documentDisplayNumber(stored);
   return receivingRecordNo(r);

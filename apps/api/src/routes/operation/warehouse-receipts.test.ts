@@ -885,6 +885,39 @@ describe("GET /duty", () => {
   });
 });
 
+describe("Receiving Differences population", () => {
+  it("uses recorded outcomes and unposted reports, never current PO balance", async () => {
+    const base = { ...RECEIPT_ROW, po_id: null, status: "posted", posted_at: "2026-10-04T00:00:00Z", grn_no: null,
+      lines: [{ id: LINE, sku: "SKU", received_now: 1, damaged_qty: 0, wrong_item_qty: 0 }] };
+    const rows = [
+      { ...base, id: "good" },
+      { ...base, id: "damage", lines: [{ ...base.lines[0], damaged_qty: 1 }] },
+      { ...base, id: "wrong", lines: [{ ...base.lines[0], wrong_item_qty: 1 }] },
+      { ...base, id: "missing" },
+      { ...base, id: "extra", extra_lines: [{ sku: "EXTRA", qty: 2 }] },
+      ...["draft", "submitted", "returned"].map(status => ({ ...base, id: status, status })),
+      { ...base, id: "cancelled", status: "voided", lines: [{ ...base.lines[0], damaged_qty: 1 }] },
+    ];
+    vi.mocked(userClient).mockReturnValue(makeSb({
+      warehouse_receipts: { list: { data: rows, error: null } },
+      receiving_unit_results: { listBySelect: columns => ({ data: columns === "id, receipt_id" ? [{ id: "physical-result", receipt_id: "missing" }] : [], error: null }) },
+    }) as never);
+    const res = await req("/api/operation/warehouse-receipts?scope=grn&view=differences&export=1", "GET", await makeJwt("operation"));
+    expect(res.status).toBe(200);
+    const body = await res.json() as { receipts: Array<{ id: string }>; page: { total: number } };
+    expect(body.receipts.map(row => row.id).sort()).toEqual(["damage", "draft", "extra", "missing", "returned", "submitted", "wrong"]);
+    expect(body.page.total).toBe(7);
+  });
+  it("refuses an unreadable physical result population instead of showing no missing goods", async () => {
+    vi.mocked(userClient).mockReturnValue(makeSb({
+      warehouse_receipts: { list: { data: [RECEIPT_ROW], error: null } },
+      receiving_unit_results: { list: { data: null, error: { message: "read failed" } } },
+    }) as never);
+    const res = await req("/api/operation/warehouse-receipts?scope=grn&view=differences", "GET", await makeJwt("operation"));
+    expect(res.status).toBe(500);
+  });
+});
+
 describe("GET /:id — one Receiving Session / GRN record", () => {
   const DETAIL_ROW = {
     ...RECEIPT_ROW,
@@ -930,7 +963,7 @@ describe("GET /:id — one Receiving Session / GRN record", () => {
   });
 
   it("reads receipt relationships beyond the database page boundary", async () => {
-    const claims = Array.from({ length: 201 }, (_, n) => ({ id: `claim-${n}`, claim_no: null }));
+    const claims = Array.from({ length: 1001 }, (_, n) => ({ id: `claim-${n}`, claim_no: null }));
     const sb = makeSb(detailTables());
     const from = sb.from.bind(sb);
     sb.from = (table: string) => {

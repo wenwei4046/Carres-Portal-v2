@@ -601,61 +601,12 @@ afterEach(() => {
 /* ═══ THE REGISTER ═════════════════════════════════════════════════════════ */
 
 describe("OperationReceiving — the formal GRN Register", () => {
-  it("draws the 240px rail — the six approved groups, no month Calendar, no Clear filters button", () => {
+  it("uses the two approved views without duplicate column filters in the rail", () => {
     renderPage();
-    const rail = screen.getByTestId("receiving-rail");
-    expect(rail.className).toContain("w-[240px]");
-    const inRail = within(rail);
-    // The six groups the owner ruled, in order (§9.4, 2026-09-17).
-    for (const heading of [
-      "GRN Doc Date",
-      "Received with",
-      "Category",
-      "Goods arrived at",
-      "Supplier",
-      "Cancelled GRNs",
-    ]) {
-      expect(inRail.getByText(heading)).toBeInTheDocument();
-    }
-    // The month Calendar is RETIRED — the expected-arrival view lives in
-    // Warehouse Arrival Schedule.
-    expect(inRail.queryByTestId("receiving-calendar")).not.toBeInTheDocument();
-    // And the rail has NO permanent Clear filters button (owner correction
-    // 2026-09-18); the toolbar's active conditions clear what is on.
-    expect(inRail.queryByTestId("rail-clear-filters")).not.toBeInTheDocument();
-    expect(inRail.queryByText("Clear filters")).not.toBeInTheDocument();
-
-    expect(
-      inRail.getByTestId("rail-category-Mattress"),
-    ).toBeInTheDocument();
-    // Only the governed categories PRESENT in the result set render — the
-    // fixtures hold Mattress and Sofa GRNs, so Bedframe/Pillow/Mattress
-    // protector rows do not appear (owner correction 2026-09-06).
-    expect(inRail.getByTestId("rail-category-Sofa")).toBeInTheDocument();
-    for (const absent of ["Bedframe", "Pillow", "Mattress protector"]) {
-      expect(
-        inRail.queryByTestId(`rail-category-${absent}`),
-      ).not.toBeInTheDocument();
-    }
-    // No invented category ever renders a row.
-    for (const banned of ["Accessory", "Topper", "Footrest", "Service", "Any"]) {
-      expect(
-        inRail.queryByTestId(`rail-category-${banned}`),
-      ).not.toBeInTheDocument();
-      expect(inRail.queryByText(banned)).not.toBeInTheDocument();
-    }
-    // The old Receiving state rail is retired — no `All …`, no state rows.
-    for (const gone of [
-      "All receiving",
-      "All suppliers",
-      "Count waiting for check",
-      "Sent back to recount",
-      "Posted",
-      "Voided",
-      "Received date",
-    ]) {
-      expect(inRail.queryByText(gone)).not.toBeInTheDocument();
-    }
+    const rail = within(screen.getByTestId("receiving-rail"));
+    expect(rail.getAllByRole("button").map(button => button.textContent)).toEqual(["GRN Records", "Receiving Differences"]);
+    expect(rail.queryAllByRole("checkbox")).toHaveLength(0);
+    for (const label of ["Filter GRN Doc Date", "Filter Supplier", "Filter Goods arrived at"]) expect(screen.getByRole("button", { name: label })).toBeInTheDocument();
   });
 
   it("opens on every permitted GRN — no date has to be chosen to see records", () => {
@@ -757,6 +708,7 @@ describe("OperationReceiving — the formal GRN Register", () => {
 
   it("a category pick narrows the listing; picking it again clears; the toolbar chip clears the rest", async () => {
     renderPage();
+    fireEvent.click(screen.getByRole("button", { name: "Filters" }));
     fireEvent.click(screen.getByTestId("rail-category-Sofa"));
     await waitFor(() =>
       expect(screen.queryByText("GRN-260901-1234")).not.toBeInTheDocument(),
@@ -772,97 +724,46 @@ describe("OperationReceiving — the formal GRN Register", () => {
     // The rail lost its Clear filters button; the toolbar's active
     // conditions name what is on and clear it (owner correction 2026-09-18).
     fireEvent.click(screen.getByTestId("rail-category-Mattress"));
-    fireEvent.click(screen.getByTestId("rail-supplier-Nice Future"));
+
     await waitFor(() =>
       expect(screen.queryByText("GRN-260830-7777")).not.toBeInTheDocument(),
     );
     expect(screen.getByText("Category: Mattress")).toBeInTheDocument();
-    expect(screen.getByText("Supplier: Nice Future")).toBeInTheDocument();
+
     fireEvent.click(screen.getByRole("button", { name: /clear all/i }));
     await waitFor(() =>
       expect(screen.getAllByText("GRN-260830-7777").length).toBeGreaterThan(0),
     );
   });
 
-  it("the GRN Doc Date group lists weeks, months and Choose dates — and a week's arrow only OPENS it", async () => {
-    renderPage();
-    const rail = within(screen.getByTestId("receiving-rail"));
-    // Two weeks, each counting the GRNs CREATED in it — 31 Aug to 6 Sep holds
-    // the Tuesday record, 24 to 30 Aug holds the SUNDAY one.
-    const week = rail.getByTestId("rail-grn-week-2026-08-31");
-    expect(week).toHaveTextContent("31 Aug to 6 Sep");
-    expect(week).toHaveTextContent("1");
-    expect(rail.getByTestId("rail-grn-week-2026-08-24")).toHaveTextContent(
-      "24 to 30 Aug",
-    );
-    // Months and Choose dates… are the coarser and the free choice.
-    expect(rail.getByTestId("rail-grn-month-2026-09")).toHaveTextContent("Sep 2026");
-    expect(rail.getByTestId("rail-grn-month-2026-08")).toHaveTextContent("Aug 2026");
-    expect(rail.getByTestId("rail-grn-choose")).toHaveTextContent("Choose dates…");
-
-    // THE ARROW FILTERS NOTHING — it only reveals the week's days, Sunday
-    // included, and days with no GRN are never listed.
-    expect(rail.queryByTestId("rail-grn-day-2026-08-30")).not.toBeVisible();
-    fireEvent.click(rail.getByTestId("rail-grn-week-2026-08-24-expand"));
-    await waitFor(() =>
-      expect(rail.getByTestId("rail-grn-day-2026-08-30")).toBeVisible(),
-    );
-    expect(rail.getByTestId("rail-grn-day-2026-08-30")).toHaveTextContent("30 Aug");
-    expect(rail.queryByTestId("rail-grn-day-2026-08-29")).not.toBeInTheDocument();
-    // Opening it changed no filter.
-    expect(screen.getByTestId("grn-page-range")).toHaveTextContent("of 2");
-
-    // Pressing the WEEK is what filters, as one inclusive range.
-    fireEvent.click(rail.getByTestId("rail-grn-week-2026-08-24"));
-    await waitFor(() =>
-      expect(screen.queryByText("GRN-260901-1234")).not.toBeInTheDocument(),
-    );
-    const ask = h.registerAsks[h.registerAsks.length - 1]!;
-    expect(ask.from).toBe("2026-08-24");
-    expect(ask.to).toBe("2026-08-30");
-    // Pressing it again clears the choice.
-    fireEvent.click(rail.getByTestId("rail-grn-week-2026-08-24"));
-    await waitFor(() =>
-      expect(screen.getAllByText("GRN-260901-1234").length).toBeGreaterThan(0),
-    );
+  it("preserves an existing date-range link and its clear action", async () => {
+    renderPage("/operation?tab=receiving&from=2026-08-01&to=2026-08-31");
+    expect(h.registerAsks.at(-1)).toMatchObject({ from: "2026-08-01", to: "2026-08-31" });
+    fireEvent.click(screen.getByRole("button", { name: /clear all/i }));
+    await waitFor(() => expect(h.registerAsks.at(-1)).toMatchObject({ from: null, to: null }));
   });
 
-  it("a day inside a week filters that one day", async () => {
-    renderPage();
-    const rail = within(screen.getByTestId("receiving-rail"));
-    fireEvent.click(rail.getByTestId("rail-grn-week-2026-08-31-expand"));
-    fireEvent.click(await rail.findByTestId("rail-grn-day-2026-09-01"));
-    await waitFor(() =>
-      expect(screen.queryByText("GRN-260830-7777")).not.toBeInTheDocument(),
-    );
-    const ask = h.registerAsks[h.registerAsks.length - 1]!;
-    expect(ask.from).toBe("2026-09-01");
-    expect(ask.to).toBe("2026-09-01");
+  it("switches the source view without creating another page or leaving cancelled-only active", async () => {
+    renderPage("/operation?tab=receiving&cancelled=1");
+    fireEvent.click(screen.getByTestId("receiving-view-differences"));
+    await waitFor(() => expect(h.registerAsks.at(-1)).toMatchObject({ view: "differences", cancelled: false, offset: 0 }));
+    expect(screen.getByTestId("receiving-view-differences")).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(screen.getByTestId("receiving-view-records"));
+    await waitFor(() => expect(h.registerAsks.at(-1)).toMatchObject({ view: "records" }));
   });
 
-  it("Choose dates… opens two labelled fields and asks the server for that range", async () => {
+  it("keeps non-column filters in the list controls", () => {
     renderPage();
-    const rail = within(screen.getByTestId("receiving-rail"));
-    fireEvent.click(rail.getByTestId("rail-grn-choose"));
-    await rail.findByTestId("rail-grn-range");
-    /* The shared `DateField` — day-first whatever the machine's locale, so
-       the rail cannot show one spelling of a date and the table another. */
-    const from = rail.getByLabelText("GRN Doc Date from");
-    fireEvent.change(from, { target: { value: "01/08/2026" } });
-    fireEvent.change(rail.getByLabelText("GRN Doc Date to"), {
-      target: { value: "31/08/2026" },
-    });
-    await waitFor(() =>
-      expect(screen.queryByText("GRN-260901-1234")).not.toBeInTheDocument(),
-    );
-    const ask = h.registerAsks[h.registerAsks.length - 1]!;
-    expect(ask.from).toBe("2026-08-01");
-    expect(ask.to).toBe("2026-08-31");
+    fireEvent.click(screen.getByRole("button", { name: "Filters" }));
+    const filters = within(screen.getByTestId("receiving-list-filters"));
+    for (const label of ["Received with", "Category", "Cancelled GRNs"]) expect(filters.getByText(label)).toBeInTheDocument();
+    for (const label of ["Supplier", "Goods arrived at", "GRN Doc Date"]) expect(filters.queryByText(label)).not.toBeInTheDocument();
   });
 
   it("`Received with` counts GRN RECORDS, overlapping — never a total", async () => {
     renderPage();
-    const rail = within(screen.getByTestId("receiving-rail"));
+    fireEvent.click(screen.getByRole("button", { name: "Filters" }));
+    const rail = within(screen.getByTestId("receiving-list-filters"));
     // ONE GRN carries both a damaged unit and extra goods, so it is counted
     // in two rows. 1 + 0 + 1 describes one record, which is exactly why the
     // three numbers are never added together.
@@ -887,7 +788,8 @@ describe("OperationReceiving — the formal GRN Register", () => {
 
   it("Cancelled GRNs is the last ROW, and the default listing holds valid and cancelled alike", async () => {
     renderPage();
-    const rail = within(screen.getByTestId("receiving-rail"));
+    fireEvent.click(screen.getByRole("button", { name: "Filters" }));
+    const rail = within(screen.getByTestId("receiving-list-filters"));
     expect(rail.getByTestId("rail-cancelled")).toHaveTextContent("1");
     // Both are listed before anything is chosen.
     expect(screen.getAllByText("GRN-260901-1234").length).toBeGreaterThan(0);
@@ -939,6 +841,7 @@ describe("OperationReceiving — the formal GRN Register", () => {
 
   it("shows real counts from the COMPLETE GRN result set", () => {
     renderPage();
+    fireEvent.click(screen.getByRole("button", { name: "Filters" }));
     // One Mattress GRN, one Sofa GRN — the submitted Sofa count is NOT a
     // record and must not inflate the number. Counts come from the server's
     // facets over the whole filtered set, never the loaded page.
@@ -1091,27 +994,14 @@ describe("OperationReceiving — the formal GRN Register", () => {
     ).toBeGreaterThan(0);
   });
 
-  it("is reachable by keyboard — the arrow opens a week with Enter and still filters nothing", async () => {
+  it("keeps source view controls keyboard-focusable with explicit selected state", () => {
     renderPage();
-    const rail = within(screen.getByTestId("receiving-rail"));
-    const arrow = rail.getByTestId("rail-grn-week-2026-08-24-expand");
-    // A real button with a stated expanded state, and an accessible name that
-    // says what it does — not a decorative caret.
-    expect(arrow.tagName).toBe("BUTTON");
-    expect(arrow).toHaveAttribute("aria-expanded", "false");
-    expect(arrow).toHaveAccessibleName("Show the days in 24 to 30 Aug");
-    arrow.focus();
-    expect(document.activeElement).toBe(arrow);
-    fireEvent.keyDown(arrow, { key: "Enter" });
-    fireEvent.click(arrow);
-    await waitFor(() => expect(arrow).toHaveAttribute("aria-expanded", "true"));
-    // Opening it narrowed nothing — both GRNs are still listed.
-    expect(screen.getByTestId("grn-page-range")).toHaveTextContent(
-      "Showing 1 to 2 of 2",
-    );
-    const ask = h.registerAsks[h.registerAsks.length - 1]!;
-    expect(ask.from).toBeNull();
-    expect(ask.to).toBeNull();
+    const records = screen.getByTestId("receiving-view-records");
+    const differences = screen.getByTestId("receiving-view-differences");
+    records.focus(); expect(records).toHaveFocus();
+    differences.focus(); expect(differences).toHaveFocus();
+    expect(records).toHaveAttribute("aria-pressed", "true");
+    expect(differences).toHaveAttribute("aria-pressed", "false");
   });
 
   it("Goods Received Date carries its KL clock, or says Time not recorded on an older GRN (0601)", () => {
@@ -1215,6 +1105,7 @@ describe("OperationReceiving — one destination and the paged register", () => 
         "Showing 2 to 2 of 2",
       ),
     );
+    fireEvent.click(screen.getByRole("button", { name: "Filters" }));
     fireEvent.click(screen.getByTestId("rail-category-Sofa"));
     await waitFor(() =>
       expect(screen.getByTestId("grn-page-range")).toHaveTextContent(

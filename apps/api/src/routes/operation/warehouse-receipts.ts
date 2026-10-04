@@ -23,7 +23,7 @@ import {
   type WarehouseReceiptLine,
 } from "@carres/shared";
 import { requireOperation } from "../../lib/auth-guards";
-import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
+import { mapPgError, parseJsonBody, readAllPages } from "../../lib/route-helpers";
 import { isMissingRelationError } from "../../lib/optional-relation";
 import { skuCategories } from "../../lib/sku-categories";
 import { adminClient, userClient } from "../../lib/supabase";
@@ -215,6 +215,7 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
      (`buildGrnRegisterView`) for facets and the slice, then reads the full
      record for just that page. Everything else keeps the legacy shape. ── */
   if (c.req.query("scope") === "grn") {
+    const differences = c.req.query("view") === "differences";
     const exportAll = c.req.query("export") === "1";
     const limit = Math.min(
       Math.max(1, Math.floor(Number(c.req.query("limit")) || GRN_PAGE_DEFAULT)),
@@ -280,7 +281,7 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
         .select(
           "id, po_id, arrival_source_id, warehouse_id, actual_site_id, goods_received_at, submitted_at, posted_at, status, grn_no, do_number, lines, extra_lines",
         )
-        .in("status", ["posted", "voided"])
+        .in("status", differences ? ["draft", "submitted", "returned", "posted"] : ["posted", "voided"])
         .order("goods_received_at", { ascending: false })
         .order("submitted_at", { ascending: false })
         .range(from, from + GRN_SCAN_PAGE - 1);
@@ -290,6 +291,26 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
       }
       scan.push(...((data ?? []) as ScanRow[]));
       if ((data ?? []).length < GRN_SCAN_PAGE) break;
+    }
+
+    if (differences) {
+      const notReceived = new Set<string>();
+      for (let start = 0; start < scan.length; start += 100) {
+        const ids = scan.slice(start, start + 100).map(row => row.id);
+        const results = await readAllPages<{ id: string; receipt_id: string }>((from, to) => sb
+          .from("receiving_unit_results").select("id, receipt_id")
+          .in("receipt_id", ids).eq("outcome", "not_received").order("id").range(from, to));
+        if (!("rows" in results)) return c.json({ message: "Receiving could not be opened" }, 500);
+        for (const result of results.rows) notReceived.add(result.receipt_id);
+      }
+      const included = scan.filter(row => {
+        if (["draft", "submitted", "returned"].includes(row.status ?? "")) return true;
+        if (row.status !== "posted") return false;
+        const totals = warehouseReceiptTotals(row.lines ?? []);
+        return totals.damaged > 0 || totals.wrongItem > 0 || notReceived.has(row.id)
+          || receivingExtraQty((Array.isArray(row.extra_lines) ? row.extra_lines : []) as ReceivingExtraLine[]) > 0;
+      });
+      scan.splice(0, scan.length, ...included);
     }
 
     const scanPoIds = [...new Set(scan.map((r) => r.po_id).filter(Boolean))];
@@ -503,7 +524,7 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
     const factRows: GrnRegisterFactRow[] = scan.map((r) => {
       const supplierName = supplierByPo.get(r.po_id) ?? null;
       const totals = warehouseReceiptTotals(r.lines ?? []);
-      const number = receivingDisplayNo({ id: r.id, grn_no: r.grn_no, goods_received_at: r.goods_received_at ?? undefined, submitted_at: r.submitted_at ?? undefined });
+      const number = receivingDisplayNo({ id: r.id, status: r.status, grn_no: r.grn_no, goods_received_at: r.goods_received_at ?? undefined, submitted_at: r.submitted_at ?? undefined });
       const source = [...new Set([
         ...(r.arrival_source_id && arrivalNoById.has(r.arrival_source_id) ? [arrivalNoById.get(r.arrival_source_id)!] : []),
         ...(r.lines ?? []).flatMap(line => refsByLine.get(line.id) ?? []),
@@ -546,6 +567,7 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
           r.grn_no ?? "",
           receivingDisplayNo({
             id: r.id,
+            status: r.status,
             grn_no: r.grn_no,
             goods_received_at: r.goods_received_at ?? undefined,
             submitted_at: r.submitted_at ?? undefined,
@@ -1161,14 +1183,10 @@ warehouseReceiptsRouter.get("/:id", requireOperation, async (c) => {
   // Related documents are read through this actor's RLS scope and exact source IDs.
   // A failed relationship read is unavailable, never a false empty result.
   const relatedRead = (async () => {
-    const all = async <T>(page: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown }>) => {
-      const rows: T[] = [];
-      for (let from = 0; ; from += 200) {
-        const result = await page(from, from + 199);
-        if (result.error) throw result.error;
-        rows.push(...(result.data ?? []));
-        if ((result.data ?? []).length < 200) return rows;
-      }
+    const all = async <T>(page: Parameters<typeof readAllPages>[0]): Promise<T[]> => {
+      const result = await readAllPages<T>(page);
+      if ("rows" in result) return result.rows;
+      throw new Error("Related records could not be read completely");
     };
     try {
       const claims = await all<{ id: string; claim_no: string | null }>((from, to) => sb

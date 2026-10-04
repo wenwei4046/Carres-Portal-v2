@@ -4684,6 +4684,7 @@ export function useOperationWarehouseReceipts(
 
 /** The paged GRN Register's ask and answer (owner correction 2026-09-06). */
 export interface GrnRegisterFilters {
+  view?: "records" | "differences";
   offset: number;
   limit?: number;
   /** Shared grid column filters and sort, encoded for the authorised reader. */
@@ -4732,6 +4733,7 @@ export interface GrnRegisterResponse {
 /** Export reads the complete authorised filtered population once; no page stitching. */
 function grnRegisterParams(filters: GrnRegisterFilters) {
   const params = new URLSearchParams({ scope: "grn" });
+  if (filters.view === "differences") params.set("view", "differences");
   if (filters.limit) params.set("limit", String(filters.limit));
   if (filters.columns) params.set("columns", filters.columns);
   if (filters.offset > 0) params.set("offset", String(filters.offset));
@@ -4769,7 +4771,10 @@ export function useOperationGrnRegister(
       apiFetch<GrnRegisterResponse>(
         `/api/operation/warehouse-receipts?${params.toString()}`,
       ),
-    placeholderData: keepPreviousData,
+    placeholderData: (previous, query) => {
+      const previousView = (query?.queryKey[3] as { view?: string } | undefined)?.view ?? "records";
+      return previousView === (filters.view ?? "records") ? previous : undefined;
+    },
     staleTime: 30_000,
     ...opts,
   });

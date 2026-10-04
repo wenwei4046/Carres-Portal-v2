@@ -552,12 +552,26 @@ all claims by exact `warehouse_receipt_id`, direct receipt-linked returns and re
 through those claims, deduplicated by return identity. Reads use the actor's existing RLS scope;
 no new permission or write door. The shared Working Panel links each returned identity to its
 existing owning object. Failed reads show Unavailable/retry, never a false empty list.
-The Receiving Differences view remains undelivered. Local validation passed 64 receipt API tests
-(including 201 related records, exact receipt/claim scopes, deduplication and failure preservation),
+The Receiving Differences view is implemented on branch, not deployed. Local relationship validation passed 64 receipt API tests
+(including the full-page boundary, exact receipt/claim scopes, deduplication and failure preservation),
 83 Receiving panel/register tests, both type checks and design checks. This is branch evidence,
 not production acceptance; carry this reader into the approved two-view/Differences delivery.
 
-The two-view rail remains undelivered. Complete server-side column filtering and sorting are
+**Two-view rail / Differences — BUILT ON BRANCH, NOT PRODUCTION VERIFIED, 2026-10-05.**
+The existing Receiving rail selects GRN Records or Receiving Differences. Category, Received with
+and Cancelled GRNs use the shared list Popover; supplier, Site and dates use existing column
+filters. Old URL filters and clear actions remain supported. Differences uses recorded receipt
+damage/wrong/extra quantities, exact Not received Unit outcomes, and unposted draft/submitted/returned
+reports before pagination. Cancelled GRNs remain in Records. A failed physical-outcome read fails
+the Differences view; it never pretends there were no missing goods. No historical counted-goods
+shortage is inferred from current PO balance. Discrepancy facts retain their linked handling
+records; this view does not decide Claim/Return completion or provide manual Done.
+Explicit unposted reports have no generated GRN identity; the Working Panel says Receiving /
+Not issued, retains the record ID for navigation, and shows recorded Unit outcomes/recount reason.
+Existing posted/cancelled historical GRN identities remain unchanged. View changes do not borrow
+the other view's cached population. Full UI/production acceptance remains owed.
+
+Complete server-side column filtering and sorting are
 **PRODUCTION VERIFIED, 2026-10-05** through the shared `DataGrid serverColumns` contract and
 existing authorised GRN reader. Supplier, document, source, item, location, date and quantity
 facts resolve before pagination. Unit details and signed files remain page-scoped. Changed
