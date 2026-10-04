@@ -414,6 +414,32 @@ describe("GET /?scope=grn — the paged GRN Register", () => {
     goods_received_at: "2026-09-01",
   };
 
+  it("filters and sorts before paging, with choices from records beyond the first fifty", async () => {
+    const records = Array.from({ length: 61 }, (_, i) => ({
+      ...POSTED, id: `00000000-0000-4000-8000-${String(i).padStart(12, "0")}`,
+      do_number: i === 60 ? "DO-OUTSIDE-FIRST-PAGE" : `DO-${i}`,
+      lines: [{ id: "line", sku: "SKU", received_now: i === 60 ? 10 : 2, damaged_qty: 0, wrong_item_qty: 0 }],
+    }));
+    vi.mocked(userClient).mockReturnValue(makeSb({ warehouse_receipts: { list: { data: records, error: null }, count: 0 } }) as never);
+    const columns = { filters: { doNo: ["DO-OUTSIDE-FIRST-PAGE"] }, dateFilters: {}, numberFilters: {}, dateRangeFilters: {}, sort: null };
+    const jwt = await makeJwt("operation");
+    const filtered = await req(`/api/operation/warehouse-receipts?scope=grn&columns=${encodeURIComponent(JSON.stringify(columns))}`, "GET", jwt);
+    expect(filtered.status).toBe(200);
+    const body = await filtered.json() as { receipts: Array<{ id: string }>; page: { total: number }; column_values: Record<string, string[]> };
+    expect(body.page.total).toBe(1); expect(body.receipts.map(row => row.id)).toEqual([records[60].id]);
+    expect(body.column_values.doNo).toContain("DO-0"); expect(body.column_values.doNo).toContain("DO-OUTSIDE-FIRST-PAGE");
+    const sorted = await req(`/api/operation/warehouse-receipts?scope=grn&limit=1&columns=${encodeURIComponent(JSON.stringify({ ...columns, filters: {}, sort: { key: "receivedQty", dir: "desc" } }))}`, "GET", jwt);
+    const sortedBody = await sorted.json() as { receipts: Array<{ id: string }>; page: { total: number } };
+    expect(sortedBody.page.total).toBe(61); expect(sortedBody.receipts[0].id).toBe(records[60].id);
+    const cleared = await req("/api/operation/warehouse-receipts?scope=grn", "GET", jwt);
+    expect((await cleared.json() as { page: { total: number } }).page.total).toBe(61);
+  });
+
+  it.each(["{", JSON.stringify({ filters: { private_field: ["value"] }, dateFilters: {}, numberFilters: {}, dateRangeFilters: {}, sort: null })])("rejects invalid column asks before reading data", async (columns) => {
+    const response = await req(`/api/operation/warehouse-receipts?scope=grn&columns=${encodeURIComponent(columns)}`, "GET", await makeJwt("operation"));
+    expect(response.status).toBe(422);
+  });
+
   it.each(["GRN-20260906-1234", "GRN-260906-1234"])(
     "resolves original and displayed GRN search %s to the same stored receipt",
     async (number) => {

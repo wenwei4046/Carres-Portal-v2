@@ -2713,6 +2713,17 @@ facts, permissions, complete-record populations or task ownership.
    live in **§6.10** — one truth, not a second copy here. A listing round reads it there and
    writes no page-local version of it.
 
+**Paged-register column controls — BUILT ON BRANCH / NOT PRODUCTION VERIFIED, 2026-10-04.**
+`DataGrid serverColumns={{ values, onChange }}` reuses the same enum, date, number and clear
+controls for a server-paged population. The server supplies complete authorised value choices
+and applies the emitted filters/sort before pagination; the grid does not filter or sort the
+returned page again. Existing client-side registers retain their behaviour. Browser and server
+share `register-column-query` date/range/value matching; a module does not copy that arithmetic.
+The caller resets to page 1 and shows loading during replacement. Receiving is the first adapter.
+The `/ui` paged-register example exposes a supplier found only at record 61 while five rows are
+loaded. Filter/reset and numeric sorting must be proved beyond page 1; local tests and preview
+are not production acceptance. This does not establish all-record Export or grouped pagination.
+
 🟡 **FACET COUNTS ARE SPELT THREE WAYS, AND THAT IS ONE FACT WITH THREE ANSWERS — found
 2026-09-20.** Purchase Orders §9.3 says a facet's number "describes the whole register, never what
 another facet happens to have selected"; Purchase Returns §9.6 says counts "respect the other

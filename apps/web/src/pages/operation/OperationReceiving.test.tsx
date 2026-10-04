@@ -97,6 +97,7 @@ vi.mock("@/lib/queries", async () => {
      * Worker runs (`buildGrnRegisterView`) over the fixtures — the test and
      * the server cannot hold two filtering rules. */
     useOperationGrnRegister: (filters: {
+      columns?: string;
       offset: number;
       category: string | null;
       supplier: string | null;
@@ -124,6 +125,7 @@ vi.mock("@/lib/queries", async () => {
           id: r.id as string,
           categories: (r.categories as string[] | undefined) ?? [],
           supplierName: (r.supplier_name as string | null) ?? null,
+          columnFacts: { supplier: { text: (r.supplier_name as string | null) ?? "" } },
           siteName:
             (r.actual_site_name as string | null) ??
             (r.warehouse_name as string | null) ??
@@ -143,7 +145,7 @@ vi.mock("@/lib/queries", async () => {
             .filter(Boolean)
             .join(" "),
         })),
-        { ...filters, cancelled: filters.cancelled ? true : null },
+        { ...filters, columns: filters.columns ? JSON.parse(filters.columns) : null, cancelled: filters.cancelled ? true : null },
         filters.offset,
         h.pageLimit,
       );
@@ -157,6 +159,7 @@ vi.mock("@/lib/queries", async () => {
             total: view.total,
           },
           facets: view.facets,
+          column_values: { supplier: [...new Set(grn.map(r => String(r.supplier_name ?? "")))] },
           line_info: h.lineInfo,
           counts: { waiting: h.waiting },
         },
@@ -745,7 +748,7 @@ describe("OperationReceiving — the formal GRN Register", () => {
   it("prints the genuine linked documents, and invents none for a receipt without them", () => {
     renderPage();
     expect(screen.getByText("SO-1303")).toBeInTheDocument();
-    expect(screen.getByText("MPR-20260904-8935")).toBeInTheDocument();
+    expect(screen.getByText("MPR-260904-8935")).toBeInTheDocument();
     // The cancelled GRN has no linked source and no purchase order of its
     // own in the fixture — the cells stay empty rather than borrowing one.
     expect(screen.queryByText("SO-0000")).not.toBeInTheDocument();
@@ -1075,9 +1078,9 @@ describe("OperationReceiving — the formal GRN Register", () => {
     for (const ref of [
       "SO-1303",
       "SO-1477",
-      "MPR-20260904-8935",
-      "RO-20260916-0042",
-      "PO-20260901-4827",
+      "MPR-260904-8935",
+      "RO-260916-0042",
+      "PO-260901-4827",
     ]) {
       expect(screen.getByText(ref)).toBeInTheDocument();
     }
@@ -1185,6 +1188,21 @@ describe("OperationReceiving — one destination and the paged register", () => 
         "Showing 1 to 1 of 2",
       ),
     );
+  });
+
+  it("header filtering sees suppliers beyond this page and clear restores the whole result", async () => {
+    h.pageLimit = 1;
+    renderPage();
+    fireEvent.click(screen.getByTestId("grn-page-next"));
+    await waitFor(() => expect(screen.getByTestId("grn-page-range")).toHaveTextContent("Showing 2 to 2 of 2"));
+    fireEvent.click(screen.getByRole("button", { name: "Filter Supplier" }));
+    // Nice Future is absent from the loaded second page, but is in the server choices.
+    fireEvent.click(screen.getByRole("checkbox", { name: "Nice Future" }));
+    await waitFor(() => expect(screen.getByTestId("grn-page-range")).toHaveTextContent("Showing 1 to 1 of 1"));
+    expect(h.registerAsks.at(-1)?.offset).toBe(0);
+    expect(JSON.parse(String(h.registerAsks.at(-1)?.columns)).filters).toEqual({ supplier: ["Nice Future"] });
+    fireEvent.click(screen.getByRole("button", { name: "Clear" }));
+    await waitFor(() => expect(screen.getByTestId("grn-page-range")).toHaveTextContent("Showing 1 to 1 of 2"));
   });
 
   it("a changed filter returns the register to page 1", async () => {

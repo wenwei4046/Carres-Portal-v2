@@ -1,3 +1,4 @@
+import { matchesRegisterColumnFilters, type RegisterColumnQuery, type RegisterColumnFact } from "./register-column-query";
 /**
  * The Receiving page's ONE register arithmetic (owner correction 2026-09-06,
  * rail overwritten by the owner ruling 2026-09-17 and PURCHASING CARD 12).
@@ -76,6 +77,7 @@ export interface GrnRegisterFactRow {
   /** What the Search box may match — the placeholder's own list: GRN, PO,
    *  supplier or DO number. Lower-cased by the builder, not the caller. */
   searchText: string;
+  columnFacts?: Record<string, RegisterColumnFact>;
 }
 
 export interface GrnRegisterSelection {
@@ -91,6 +93,7 @@ export interface GrnRegisterSelection {
   /** `Cancelled GRNs` — true narrows to them. Absent lists both. */
   cancelled?: boolean | null;
   q?: string | null;
+  columns?: RegisterColumnQuery | null;
 }
 
 export interface GrnRegisterView {
@@ -167,6 +170,7 @@ function matchesExcept(
   // so no facet is counted "without" it.
   const q = (sel.q ?? "").trim().toLowerCase();
   if (q && !r.searchText.toLowerCase().includes(q)) return false;
+  if (sel.columns && !matchesRegisterColumnFilters(sel.columns, key => r.columnFacts?.[key])) return false;
   return true;
 }
 
@@ -206,6 +210,15 @@ export function buildGrnRegisterView(
     if (matchesExcept(r, sel, "cancelled") && r.cancelled) cancelled += 1;
     if (matchesExcept(r, sel, "")) filtered.push(r);
   }
+  const sort = sel.columns?.sort;
+  if (sort) filtered.sort((a, b) => {
+    const left = a.columnFacts?.[sort.key], right = b.columnFacts?.[sort.key];
+    const value = (fact: RegisterColumnFact | undefined) => fact?.number !== undefined ? fact.number ?? "" : fact?.date !== undefined ? fact.date ?? "" : fact?.text ?? "";
+    const x = value(left), y = value(right);
+    if (x === "" || y === "") return x === y ? 0 : x === "" ? 1 : -1;
+    const result = typeof x === "number" && typeof y === "number" ? x - y : String(x).localeCompare(String(y), "en", { numeric: true });
+    return result * (sort.dir === "asc" ? 1 : -1) || a.id.localeCompare(b.id);
+  });
   const from = Math.max(0, Math.floor(offset));
   return {
     total: filtered.length,
