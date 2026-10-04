@@ -470,7 +470,7 @@ approval. It is not a stock adjustment. No physical event or submitted report is
 
 ## 7 · Pages and daily journeys
 
-**Receiving Calendar source and UI — BUILT ON BRANCH, NOT PRODUCTION VERIFIED, 2026-10-05.**
+**Receiving Calendar source and UI — DEPLOYED / BOUNDED LIVE ACCEPTANCE, 2026-10-05.**
 The existing authorised Inbound reader supports an opt-in `calendar=1` response using the shared
 `warehouseCalendarArrivals` projection over its complete source population, before register paging.
 Expected arrangements use Purchasing's existing current-version line/batch date authority,
@@ -484,19 +484,22 @@ accepted + damaged + wrong quantity; Extra Qty stays separate. Unknown receipt q
 remain unknown, undated receipts are reported separately, and voided/unposted reports never become
 actual arrivals. An all-missing report with recorded zero physical/extra quantities is not an arrival.
 No write, permission, stock or event store is added. The shared Quick Rail now reads this source
-on branch, reuses MonthCalendar and Select, separates expected/actual groups without mixed totals,
+in production, reuses MonthCalendar and Select, separates expected/actual groups without mixed totals,
 and preserves explicit Calendar day/module/location in source links. A local illustrative preview
 verified the module/location selectors, quantities and selected-date contrast. Operation's phone
-header opens the same Calendar in the existing Drawer; picking a date keeps it open, opening a
-source closes it, and the selected day survives. This branch has not completed production
-acceptance or the broader Calendar event-source admission. Local evidence: 119 shared schedule/Inbound/PO-date tests, 15 Inbound API tests, 48 shell tests,
+header opens the same Calendar in the existing Drawer; picking a date keeps it open and the
+selected day survives. Live phone testing found that opening an already-current source leaves
+the Drawer open; the tested explicit record-open callback correction is not yet deployed.
+Broader Calendar event-source admission is not complete. Local evidence: 119 shared schedule/Inbound/PO-date tests, 15 Inbound API tests, 48 shell tests,
 32 Calendar tests, Web/API typechecks and design lint;
 the 201-receipt fixture verifies register paging does not clip Calendar history. Full CI
 37228990458 exposed a legacy Schedule input without quantity facts; the projection now keeps
 that quantity unknown instead of throwing. The corrected 58 schedule tests and 20 consumer-hook
-tests pass locally; reverting the guard makes the new legacy regression test fail. Full release
-CI must pass on the corrected head before merging. This is not a
-claim that the shared Calendar or Warehouse automatic GRN posting has shipped.
+tests pass locally; reverting the guard makes the new legacy regression test fail. Corrected-head
+CI 37229951282 passed; PR #1908 deployed through successful run 37230876813. Independent five-endpoint
+verification matched `eeedfe361083717c97c701fa33075c1398b5aa88`. Authenticated desktop/phone proof and
+the bounded same-source phone finding are recorded in Purchasing MASTER §2.4. Warehouse automatic
+GRN posting remains a separate unbuilt target.
 
 
 All surfaces reuse the governed Shell, Register, Workspace and Object Detail grammar.

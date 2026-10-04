@@ -223,7 +223,7 @@ export default function ReceivingRecord({
             {isGrn ? displayNo : "Receiving"}
           </h2>
           <div className="text-meta text-base-500">
-            {r.supplier_name ?? ""} · <span className="font-mono">{r.po_id}</span>
+            {r.supplier_name ?? ""} · <span className="font-mono">{documentDisplayNumber(r.po_id ?? "")}</span>
           </div>
         </div>
         {r.status !== "posted" && <span
@@ -261,7 +261,7 @@ export default function ReceivingRecord({
           {/* ── The facts ─────────────────────────────────────────────── */}
           <Section title="Receiving Details">
             <Prop label={isGrn ? "Linked PO" : "Linked PO"}>
-              <span className="font-mono">{r.po_id}</span>
+              <span className="font-mono">{documentDisplayNumber(r.po_id ?? "")}</span>
             </Prop>
             <Prop label="Supplier">{r.supplier_name ?? ""}</Prop>
             <Prop label="Supplier Deliver To">{r.warehouse_name ?? ""}</Prop>

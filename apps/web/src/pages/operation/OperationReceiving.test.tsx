@@ -910,13 +910,15 @@ describe("OperationReceiving — the formal GRN Register", () => {
   });
 
   it("a row opens the shared panel, then Open full page keeps the register mounted", async () => {
-    h.sessionDetail = postedDetail();
+    h.sessionDetail = postedDetail({ receipt: { po_id: "PO-20260901-4827" } });
     renderPage();
     fireEvent.click(screen.getAllByText("GRN-260901-1234")[0]);
     await screen.findByTestId("receiving-quick-view");
     expect(screen.getByTestId("receiving-register").className).not.toContain("invisible");
     fireEvent.click(screen.getByRole("button", { name: "Open full page" }));
     await screen.findByTestId("receiving-record");
+    expect(within(screen.getByTestId("receiving-record")).getAllByText("PO-260901-4827")).toHaveLength(2);
+    expect(within(screen.getByTestId("receiving-record")).queryByText("PO-20260901-4827")).toBeNull();
     // Never display:none — `invisible` keeps rail filters, search, sort and
     // scroll alive for Back (the Manual Purchase / SO object law).
     const register = screen.getByTestId("receiving-register");

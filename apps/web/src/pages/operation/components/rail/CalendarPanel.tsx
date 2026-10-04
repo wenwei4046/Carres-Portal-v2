@@ -46,7 +46,7 @@ interface DayDelivery extends DayBooking {
   address: string | null;
 }
 
-export default function CalendarPanel() {
+export default function CalendarPanel({ onOpenRecord }: { onOpenRecord?: () => void } = {}) {
   const deliveryQuery = useOperationOrders();
   const data = deliveryQuery.data;
   const orders = useMemo(() => data?.orders ?? [], [data]);
@@ -271,6 +271,7 @@ export default function CalendarPanel() {
                 const rows = dayReceive.filter((row) => row.kind === kind);
                 if (!rows.length) return null;
                 return <DaySection key={kind}
+                  onOpenRecord={onOpenRecord}
                   title={kind === "expected_arrival" ? `Warehouse · ${rows.length} arriving` : `Warehouse · GRN Records · ${rows.length}`}
                   tone="text-base-700"
                   items={rows.map((row) => ({
@@ -283,7 +284,7 @@ export default function CalendarPanel() {
               {dayDeliveries.length > 0 && (
                 <div className="space-y-1.5">
                   <div className="text-label uppercase tracking-[0.05em] text-info">Delivery · {dayDeliveries.length} scheduled {dayDeliveries.length === 1 ? "delivery" : "deliveries"}</div>
-                  {dayDeliveries.map((d) => <DeliveryRow key={d.orderId} d={d} href={calendarHref(`/operation?tab=delivery&view=day&date=${day}`, day)} />)}
+                  {dayDeliveries.map((d) => <DeliveryRow key={d.orderId} d={d} onOpenRecord={onOpenRecord} href={calendarHref(`/operation?tab=delivery&view=day&date=${day}`, day)} />)}
                   {loads.map((l) => (
                     <CarrierLoadRow key={l.partnerId ?? "none"} load={l} />
                   ))}
@@ -299,12 +300,12 @@ export default function CalendarPanel() {
 
 /** One booked delivery. Confirmed is the ONLY green (T1): the customer said
  *  yes. The carrier's own date is amber — a date nobody has agreed to. */
-function DeliveryRow({ d, href }: { d: DayDelivery; href: string }) {
+function DeliveryRow({ d, href, onOpenRecord }: { d: DayDelivery; href: string; onOpenRecord?: () => void }) {
   const confirmed = d.kind === "confirmed";
   const loc = locationForAddress(d.address);
   const carrier = d.partnerName?.trim() || "Logistics not assigned";
   return (
-    <Link to={href}
+    <Link to={href} onClick={onOpenRecord}
       className="flex gap-2 rounded bg-base-50 hover:bg-base-100 px-2 py-1.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9"
       title={
         confirmed
@@ -368,17 +369,19 @@ function DaySection({
   title,
   tone,
   items,
+  onOpenRecord,
 }: {
   title: string;
   tone: string;
   items: Array<{ key: string; main: string; sub: string; href: string }>;
+  onOpenRecord?: () => void;
 }) {
   return (
     <div className="mb-3">
       <div className={`text-label uppercase tracking-[0.05em] mb-1.5 ${tone}`}>{title}</div>
       <div className="space-y-1.5">
           {items.map((it) => (
-            <Link key={it.key} to={it.href} className="flex gap-2 rounded bg-base-50 hover:bg-base-100 px-2 py-1.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9">
+            <Link key={it.key} to={it.href} onClick={onOpenRecord} className="flex gap-2 rounded bg-base-50 hover:bg-base-100 px-2 py-1.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9">
               <div className="min-w-0 flex-1">
                 <div className="font-mono text-meta font-semibold text-base-900 break-words">
                   {it.main}

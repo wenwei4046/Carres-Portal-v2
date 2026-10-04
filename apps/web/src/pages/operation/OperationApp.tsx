@@ -383,7 +383,7 @@ export default function OperationApp() {
               <Button variant="ghost" icon="date" onClick={() => setCalendarOpen(true)} aria-expanded={calendarOpen}>Calendar</Button>
             </div>
             <Drawer open={calendarOpen} onOpenChange={setCalendarOpen} title="Calendar">
-              {calendarOpen && <CalendarPanel />}
+              {calendarOpen && <CalendarPanel onOpenRecord={() => setCalendarOpen(false)} />}
             </Drawer>
           </div>
         ) : null}
