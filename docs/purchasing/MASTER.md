@@ -3832,6 +3832,16 @@ permanent times. Existing issued documents and recorded/missed round occurrences
 original identity/time/scope when the schedule changes; no retroactive reassignment or duplicate
 purchase is permitted. Settings approval here does not mean live settings were changed.
 
+**OWNER CONFIRMED 2026-10-04 — shared Columns catalogue and Purchasing-first contribution.**
+Follow UI MASTER “Shared module Columns contribution”. SOB retains SO source facts once and adds
+Purchasing-owned projections to the common chooser. Supplier, Supplier Deliver To, PO Safety Days,
+PO No and original PO delivery date already have existing SOB equivalents; purchase completion
+and exact current-version sending coverage need a source/meaning proposal rather than a second
+stored status. Each field/default proposal is reviewed by Jess before adoption. Other modules
+contribute their own facts to the same catalogue, preserving permissions, record relationship and
+one authoritative fact. The shared format direction is approved; the complete Purchasing default
+column set and literal completion/sending copy are not thereby approved.
+
 ### SO Batch Purchase Blueprint — owner-confirmed steps, 2026-10-04
 
 **RULING / APPROVED OPERATING FLOW; target, not production proof.** Jess corrected the
