@@ -15,7 +15,7 @@ describe("DataGrid server column controls", () => {
     // The caller owns pending/result rows. The kit must not fabricate an empty result
     // by applying the new filter only to the old loaded page.
     expect(screen.getByRole("cell", { name: "First supplier" })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Clear", exact: true }));
+    fireEvent.click(screen.getByRole("button", { name: "Clear" }));
     await waitFor(() => expect(onChange.mock.lastCall?.[0].filters).toEqual({}));
   });
   it("sends sort intent while preserving the server's page order", async () => {
@@ -24,7 +24,7 @@ describe("DataGrid server column controls", () => {
       { key: "id", label: "Record", width: 140, accessor: row => row.id, sortable: true },
     ]} storageKey="server-sort" rowKey={row => row.id}
       serverColumns={{ values: { id: ["a", "z"] }, onChange }} />);
-    fireEvent.click(screen.getByRole("button", { name: "Record", exact: true }));
+    fireEvent.click(screen.getByRole("button", { name: "Record" }));
     await waitFor(() => expect(onChange.mock.lastCall?.[0].sort).toEqual({ key: "id", dir: "asc" }));
     expect(screen.getAllByRole("cell").map(cell => cell.textContent)).toEqual(["z", "a"]);
   });

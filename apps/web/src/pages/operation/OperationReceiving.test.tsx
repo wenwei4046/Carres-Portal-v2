@@ -1195,13 +1195,13 @@ describe("OperationReceiving — one destination and the paged register", () => 
     renderPage();
     fireEvent.click(screen.getByTestId("grn-page-next"));
     await waitFor(() => expect(screen.getByTestId("grn-page-range")).toHaveTextContent("Showing 2 to 2 of 2"));
-    fireEvent.click(screen.getByRole("button", { name: "Filter Supplier", exact: true }));
+    fireEvent.click(screen.getByRole("button", { name: "Filter Supplier" }));
     // Nice Future is absent from the loaded second page, but is in the server choices.
-    fireEvent.click(screen.getByRole("checkbox", { name: "Nice Future", exact: true }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Nice Future" }));
     await waitFor(() => expect(screen.getByTestId("grn-page-range")).toHaveTextContent("Showing 1 to 1 of 1"));
     expect(h.registerAsks.at(-1)?.offset).toBe(0);
     expect(JSON.parse(String(h.registerAsks.at(-1)?.columns)).filters).toEqual({ supplier: ["Nice Future"] });
-    fireEvent.click(screen.getByRole("button", { name: "Clear", exact: true }));
+    fireEvent.click(screen.getByRole("button", { name: "Clear" }));
     await waitFor(() => expect(screen.getByTestId("grn-page-range")).toHaveTextContent("Showing 1 to 1 of 2"));
   });
 
