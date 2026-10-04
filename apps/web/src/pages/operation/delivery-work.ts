@@ -528,6 +528,8 @@ export function isOpenDeliveryScope(o: operationOrderListRow): boolean {
 }
 
 export interface ScopeInputs {
+  /** Object reads retain completed facts; Monitor's default stays open work only. */
+  includeCompleted?: boolean;
   orders: operationOrderListRow[];
   deliveryOrders: DeliveryOrderRow[];
   attempts: DeliveryOrderAttemptRow[];
@@ -568,6 +570,7 @@ function overlayOf<T>(value: T | T[] | null | undefined): T | null {
  * of it, so the two pages cannot disagree about whether a trip went out.
  */
 export function buildDeliveryScopeRows({
+  includeCompleted = false,
   orders,
   deliveryOrders,
   attempts,
@@ -699,7 +702,10 @@ export function buildDeliveryScopeRows({
     /* THE ENTRY RULE (owner ruling 2026-08-24) — a Sales Order missing its
        address is Sales work, not delivery work, and must not arrive here as a
        row of `Not given`. */
-    if (!entersDeliveryWork(o)) continue;
+    const completedObject = includeCompleted && o.status !== "cancelled" &&
+      (o.status === "delivered" || Boolean(o.delivered_at)) &&
+      deliveryEntryFactsOf(o).hasLocation && deliveryEntryFactsOf(o).hasGoods;
+    if (!entersDeliveryWork(o) && !completedObject) continue;
 
     /* The ACTIVE document is the one `orders.do_number` mirrors — the DO model's
        own definition. A superseded or failed document keeps its history in the
@@ -921,4 +927,3 @@ export function regionBucketOf(row: DeliveryScopeRow): string | null {
   }
   return customerRegionOf(row.o);
 }
-

@@ -6777,99 +6777,88 @@ the normal discoverable doors already governed for Edit, output or View Flow.
 
 ### Sales Order accepted shared UI template — owner-approved 2026-10-01
 
-Jess accepted the rendered Sales Orders pilot and authorised the dedicated BUILD controller
-through tests, merge, deployment and authenticated production verification. The shared
-composition and numeric recipes live in UI MASTER “Confirmed shared template” and the kit;
-this module owns the following business-specific application. Delivered evidence is below.
+The current operating composition below uses UI MASTER's confirmed shared template and the one kit.
+Creation stays in the Sales Portal; Operation does not regain a New Sales Order or Copy order door.
+The acceptance matrix records current implementation and proof, not a new Blueprint or new business law.
 
 - Order list rail: Order summary (Sales orders, Total payable, Paid to date, Balance due), then
-  Customer Requested Delivery Date shortcuts. Both open initially. Order summary is four compact
-  label-left/value-right rows, all visible (owner2026-10-02): count uses text-strong; money values
-  right-align, keep tabular digits and do not wrap; missing-amount notices span the row only when needed. Aggregates follow the SAME
-  filtered loaded result as Table/Cards. The redundant “Current filtered list” paragraph and spacing are removed by owner amendment; incomplete loaded scope remains a summary tooltip and register count, and missing-money warnings remain visible.
-  Payment, Delivery and Stock Status filters live in columns; no duplicate rail or case filter.
-  Monthly demand retains its own governed single-choice filters and views.
-- Table/Cards selectors use shared kit icon16 plus visible Table/Cards text, including the selected-record toolbar (owner amendment2026-10-01). Both use the same result/filter engine.
-- Row click and Cards View open the shared CompactModuleCard quick view (owner authorised2026-10-04).
-  One customer header carries name, SO, phone, independent sales/address expansion, target date,
-  saved-version SO document entry, full-order door and Close. Info starts with sales/address open,
-  Total/Paid/Outstanding summary; Delivery starts closed and shows Stock/Logistics/Customer/DO.
-  Items, Communication and Timeline start closed. Email, Dealer, Proceed Date, payment/status facts,
-  related documents and all former Items remain reachable in expanded module content; address keeps
-  Floor/Lift/stair carry. Missing stock/dates stay unknown, never sample data. Delivery reuses its
-  existing Monitor projection and governed forms on the final customer leg; only operation/principal
-  can edit unsettled scopes, server gates remain authoritative. Failure preserves input; Cancel does
-  not write; successful save folds the editor. DO conditions are read-only and cannot release goods.
-  Communication prepares drafts; timeline uses recorded instants with no MYT suffix or repeated actor.
-  Closing preserves list filters, selection and scroll; SO full page retains deliberate Edit.
-  Card content uses the sole owner-rules2026-10-03/04 contract; its Drawer container is distinct from
-  Workspace Working Panel. Full-page navigation keeps `/operation/orders/so/:id`; existing
-  SalesOrderWorkspace supplies the responsive 50/50 form/document view, deliberate Edit and source
-  refresh after saving. Existing full-page contract/document checks105 passed; authenticated
-  card→full page→Edit/formal preview→Cancel→Back is verified below. Live successful-save testing
-  is not claimed; tests cover successful/refused saves without altering a live business record. This release does not claim
-  Workspace or other-module adoption. Production verified2026-10-04: PR #1871, merge
-  `a9dbb6b8918e9337328eefccebe547ee1d2f4ab6`, CI37189941545, Deploy37190758212; independent verification
-  matched all five revision surfaces. Sara · Principal saw real Info money, Delivery0/1 goods,
-  Not assigned, Date not confirmed and No DO yet; Customer Cancel preserved facts and DO checks
-  were read-only. SO number rendered the saved formal document. Info/Delivery were checked at
-  1146/480/440/420/390px with no page overflow. Existing full page had equal752px panes at1800px,
-  formal PDF remained visible through Edit/Cancel, and Back restored search1368 and Cards.
-  No Print/Download or live business-data write was performed. This change removes the compact
-  frame's hidden duplicate Close and names address facts explicitly; kit/dialog regression23
-  checks cover visible initial focus, Escape and opener return.
-  **Current card acceptance follow-up — production verified / module acceptance continues:**
-  PR #1876 merged as `c6b1987bfa0cfd7c473494f4d3f7ee99c8077248`; exact-head CI37195312343
-  and Production Deploy37196156890 succeeded. Independent five-surface verification matched that
-  revision. Real Principal SO-1368 at390px shows Condo, named unknown stair carry,31 Oct27d,
-  two-decimal money and unit prices, Service stock, separate Info details and goods-only Items.
-  Customer editor starts Information received from at Pick one with Save disabled; no absent-partner
-  guess becomes evidence. Delivery retains actual0/1 goods, Not assigned, Date not confirmed and
-  No DO yet. No saved partner means no invented Logistics message recipient.
-  Info reads active current Payment reminder/follow-up templates, Default first, with the existing
-  Invoice fallback for outstanding balances. Delivery reads active current Settings date-request
-  templates, Default first, or existing Delivery details wording, addressed only to saved Logistics.
-  Existing browser Save as/Manage and backend libraries remain separate; no send occurred.
-  Compact Logistics keeps approved coverage preselection as an unsaved Assign logistics draft;
-  cancelling preserves Not assigned. Existing crew/ETA/condo/proof and refusal/retry checks remain.
-  Whole-path acceptance found three further presentation defects: list Cards hardcoded Unavailable
-  while Table had its register delivery fact; FullPage printed unknown stair carry as0; structured
-  service sizes already counted their quantity but Services appended the same quantity again.
-  The current repair uses the same governed register delivery projection in both list views (not
-  final-leg readiness), prints Not recorded for null stair carry and leaves its edit input blank,
-  preserves null in unchanged save payloads, and renders Services through its one shared summary.
-  Explicit0 remains0. Structured repeated and mixed sizes retain every unit without double quantity.
-  Timeline recovers actor ids from the same order-scoped records and uses the existing canonical
-  identity resolver: real person, shared/missing identity, recorded automation stay distinct.
-  A missing name is never promoted to System. A template reference uses imported source references
-  when present, otherwise the real SO number; the protected {ref} is not left empty on a known order.
-  Query/view changes and number-to-id resolution preserve the register return state, so Revisions,
-  History and Order Route cannot drop search/view context.
-  Monthly-demand drill-down clears an earlier list search in both the server request and shared
-  register session; an explicit empty initial search outranks a remembered one.
-  These latest repairs await exact-revision production
-  acceptance; successful/refused business saves have automated evidence only. Live Save/send and
-  Print/Download completion are not claimed.
+  Customer Requested Delivery Date shortcuts. Both start open. Summary labels sit left and values
+  right; count uses text-strong, money has tabular digits and never wraps. Missing-amount notices
+  remain visible only when needed. Summary and Table/Cards use the same filtered loaded result;
+  incomplete scope remains in the summary tooltip/register count. Payment, Delivery and Stock
+  Status filters live in columns. Monthly demand keeps its own single-choice filters and views.
+- Table/Cards use the kit icon16 with visible words, including the selection toolbar. Search,
+  selection, columns, filters and output remain on the shared Register engine. List Cards and Table
+  read the same `registerDeliveryConditionOf` fact; this is not final-leg readiness or release proof.
+  An explicit empty initial search clears a remembered grid search; an omitted initial search still
+  restores it. URL search also clears the server query, including after a monthly drill-down.
+- Row click and Cards View open `CompactModuleCard` in the kit Drawer. One customer header carries
+  name, SO, phone, independent sales/address expansion, source requested date plus Malaysia-day
+  countdown, saved-version document, full-order door and Close. The visible SO document button owns
+  initial focus; no hidden duplicate Close is focusable. Phone icon and number wrap together.
+  Info starts with sales/address open and Total/Paid/Balance due. Delivery starts with header
+  details closed and Stock/Logistics/Customer/DO. Items, Communication, Timeline and Info details
+  start closed. Info details owns Email, Dealer, Proceed Date, three statuses and document lineage;
+  Items owns only goods/services, Unit price, Qty, two-decimal Amount and source Stock Status.
+  Services read Service for stock. Building type, Floor, named Lift and stair carry stay recorded
+  facts; missing stair carry is Not recorded, never a fabricated0.
+- Delivery reads the existing Monitor projection for the final customer leg, excluding services
+  from goods readiness. Only operation/principal may edit unsettled, non-cancelled scopes and the
+  existing server gates remain authoritative. Customer date/time is separate from crew ETA.
+  Customer information source starts at Pick one and requires an actual choice; the writer keeps
+  contact/proxy evidence separate from the logged-in recorder. Logistics coverage preselection is
+  an unsaved Assign logistics draft; its summary names only the saved partner. Crew, ETA, condo,
+  reason and WhatsApp evidence remain in the existing Delivery forms. Cancel writes nothing;
+  refused saves preserve input; successful saves fold the editor. DO conditions are read-only and
+  cannot issue or release a document.
+- Communication prepares drafts. Info reads active current Payment reminder/follow-up versions,
+  Default first, only for an outstanding balance; the existing Invoice wording is its fallback.
+  Delivery reads active current date-request templates from Delivery Settings, Default first, or
+  existing Delivery details wording, addressed only to saved Logistics. No saved partner means no
+  Logistics message door. Source references take precedence; without one a known SO supplies its
+  actual number to protected {ref}. Kit browser Save as/Manage is separate from backend Settings;
+  no new template store or send is introduced. Prepared messages are outside assignment editors.
+- Timeline uses stored instants and the same canonical actor resolver as History/Revisions, from
+  order-scoped actor records. A real person, shared/missing identity and explicitly recorded
+  automation remain distinct; a missing name is Staff identity not recorded, never guessed System.
+  Identity stays on the avatar; timestamps do not repeat a MYT suffix. Loading/error is explicit.
+- Full order uses `/operation/orders/so/:id`, read-first with deliberate Edit, the existing responsive
+  50/50 form/PDF and independent pane scrolling. Saved/current and historical documents retain
+  their existing truth. Items has Item, Qty, Unit (RM), Disc (RM), Amount (RM); name/code/config share
+  Item, totals preserve currency and category quantities. Structured or counted legacy service-size
+  summaries print each quantity once. Null stair carry is blank in Edit and remains null in an
+  unchanged save payload; explicit0 remains0. View switches, historical return and number-to-id
+  resolution retain the Register return state. Cancel/Back preserves the original list context.
+  Source receipts remain unconfirmed until Stock proves an exact-line posted, non-void receipt.
 
-- Full page opens read-only until deliberate Edit. Fixed white identity header and slate-2 tabs
-  sit above one scrolling left form and independent right PDF. Back preserves register context.
-- Items has five columns Item, Qty, Unit (RM), Disc (RM), Amount (RM). Name, code and config share
-  Item; no sequence/code columns. Money units appear in column headers; Total payable retains its
-  currency. Natural rows, no separate vertical Items scroller, category Quantity footer, no empty
-  Services line. Preserve all commercial/edit/protected-line rules. PDF keeps its printed columns.
-- Stock Status remains unknown: associated reserved/sold Units cannot prove an exact-line latest
-  posted non-void receipt. The unsafe classification is excluded until the Stock-owned source
-  projection proves those facts. No receipt facts are fabricated.
+**Current release evidence — production-verified repair / existing-path acceptance continues.** PR #1878 exact head
+`633a3c783e175d3e4b35b433b3c939ae6c3d1220` passed CI37198797912 and merged as
+`086f23d0a10ff9144d13f4cfc130c2f8c2394dc6`. Deploy37199668418 succeeded; independent verification matched all five production revision surfaces.
+Register/adapter/service checks,9 API identity checks,4 number-door/context checks and101 existing
+FullPage/document checks passed; the final shared session/return run passed105 checks.
+These counts are scoped checks, not evidence of a live business save.
 
-Delivery is production-verified for the accepted pilot/action amendment: PR #1838 and #1839,
-exact amendment SHA `f04ed27ccd7f5129ec5dd0125b39ce4970869cee`, successful CI `36883995352`
-and Deploy `36886061086`. All five production revision surfaces converged. Authenticated
-read-only verification proved identical Kimmy/SO-1303 Table/Cards results and RM2,499/1,250/1,249
-summary, truthful receipt/document absences, narrow icon-plus-word controls, read-first object,
-five Items columns, protected lines, rendered PDF and Back restoring search/view context.
-UI MASTER “Confirmed shared template” owns the full bounded evidence and shared reuse follow-up.
-Print invocation showed no observed error; its separate viewer was not observable, so physical
-printing/viewer completion remains unverified. No business-data writes or migration were performed.
+| Existing operating surface | Measured evidence and current acceptance | Boundary / responsible owner |
+|---|---|---|
+| Listing/search/selection → Table/Cards → quick view | Real Principal SO-1368; saved money and lineage, goods-only Items, separate details; selection/search return covered by real walks and Register checks. On086f23d Cards reads Not delivered, matching Table; search1368, Cards and selection survive all four views and Edit/Cancel/Back. | Orders + shared Register; loaded scope remains explicit |
+| Customer/Logistics editors and DO | Pick one with disabled Save; unsaved NETS coverage suggestion, Cancel returns Not assigned; actual0/1 goods, Date not confirmed, No DO yet and non-interactive conditions. Failure/retry is tested. | Delivery owns writes and release gates; no live Save performed |
+| Formal FullPage → Edit → Cancel → Back | Real saved PDF and equal752px panes at1800px were verified on the adopted template. On086f23d unknown stair carry reads Not recorded and Edit stays blank; Services prints King ×2 once; all four views retain return context. | Orders owns commercial edits; no live full-page Save performed |
+| Revisions / History / Order Route | Real SO-1368 original/current revision and Jess · Principal history; goods/Delivery/Payment owner doors. Real SO-1362 has two legs, two issued DOs, delivered-to-customer and paid-in-full; missing final photo remains visible. | Orders read-only fan-in; receiving/void/amendment and older revision live variants are not all certified by this walk |
+| Communication / Timeline | Current backend libraries read; on086f23d Standard reminder renders REF: SO-1368 and recorded events identify Jess. Recorded timestamps and role/read-error checks are covered by tests. | Payment/Delivery own templates and messages; no send, settings change or attachment upload |
+| Monthly demand | Oct2026 shows11 total/not-delivered goods; on086f23d the month door automatically clears old1368 search; after clearing retained selection,7 orders reconcile Mattress4/Bedframe3/Sofa2/Accessory2. | Orders owns report; filtered category/source coverage and exceptional receipts remain broader ScopeF acceptance, not certified by this single month |
+| Existing Workspace Working Panel | Real Team Work search1368 names the order and the SO button renders its saved document. It uses the existing Work composition and file drawer. | Workspace-owned surface; this release does not claim shared-card adoption or a new formal-object door there |
+| Permissions, refusals and read failures | 086f23d browser proof began as Sara · Principal; the browser session changed externally to Logistics · Operation, after which a fresh full path retained search/view/selection. This is not controlled role impersonation. API dealer rejection and adapter finance/read-failure cases pass; existing form refusal/retry preserves evidence. | Orders/Delivery/shared guards; no additional controlled role acceptance is claimed |
+
+**Measured completed-order defect — BUILD:** real086f23d SO-1362 has two DOs and a completed customer leg in Order Route, but compact Delivery reads Not recorded. The shared Monitor projection excludes completed orders by its work-entry rule. The repair retains completed facts only for known-order object reads, keeps Monitor entry unchanged, excludes cancelled orders, and closes all writers for completed orders. Target-release proof remains owed. Long-name Info on086f23d was checked at1146/480/440/420/390px with no page horizontal overflow. The shared header/Balance due visual correction is separately owned by PR #1879; its governing changes are preserved, not claimed as086f23d visual proof.
+
+**Remaining module boundary:** the current listing/quick-view/full-order repair is the acceptance
+slice, not completion of every approved evolution. New SO/Subscription number allocation and the
+separate amendment-number authority remain their recorded target/gap (§0.1). ScopeA–F exceptional
+source/permission/historical variants retain their named production obligations until measured.
+Workspace and supplier/source-free purchasing objects keep their own headers, contacts and workflows.
+Live Save/send, historical-issued-file retrieval beyond the inspected version and Print/Download
+completion are not claimed. Engineering owns follow-up acceptance in each owning module; a new
+business record, outbound message or printing proof requires its existing explicit authorization.
 
 ### Solid SO status pills — owner confirmed 2026-10-02
 
