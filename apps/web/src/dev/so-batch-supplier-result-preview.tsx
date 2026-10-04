@@ -53,6 +53,8 @@ const sampleDocuments = new Map(samplePos.map((po, index) => [po.id, {
   terms: "LOCAL SAMPLE — no purchase was placed.",
 } satisfies PoTemplateData]));
 const realFetch = window.fetch.bind(window);
+const sampleDocumentFailure = new URLSearchParams(window.location.search).get("documentFailure");
+let sampleTransientReads = 3; // StrictMode and round-recovery reads fail; a user retry recovers.
 window.fetch = async (input, init) => {
   const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url, window.location.href);
   if (!url.pathname.startsWith("/api/")) return realFetch(input, init);
@@ -87,7 +89,14 @@ window.fetch = async (input, init) => {
     });
   }
   if (url.pathname.endsWith("issue-context")) return Response.json(samplePos.find(po => po.id === id));
-  if (url.pathname.endsWith("print-data")) return Response.json(sampleDocuments.get(id));
+  if (url.pathname.endsWith("print-data")) {
+    if (id === "SAMPLE-PO-001" && sampleDocumentFailure === "transient" && sampleTransientReads-- > 0) {
+      return Response.json({ message: "Sample read unavailable" }, { status: 503 });
+    }
+    if (id === "SAMPLE-PO-001" && sampleDocumentFailure === "address")
+      return Response.json({ code: "destination_address_missing" }, { status: 422 });
+    return Response.json(sampleDocuments.get(id));
+  }
   if (url.pathname.endsWith("sends")) return Response.json({ sends: id === "SAMPLE-PO-002" ? [{ kind: "confirmed_sent", channel: "email", po_version: 1, recipient: "orders@ohana.example", sent_at: "2026-10-05T02:20:00Z", sent_by_name: "Sample staff" }] : [] });
   return Response.json({ message: "Sample data · Local preview only" }, { status: 503 });
 };
