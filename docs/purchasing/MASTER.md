@@ -445,6 +445,13 @@ original issued references. Search accepts original and shortened forms. Missing
 unclaimed; Unit IDs and supplier references are unchanged. This verifies the Batch adoption only,
 not every Purchasing display surface or the complete SO Batch delivery boundary above.
 
+**Deployed display acceptance, 2026-10-05.** At a controlled 1200px viewport, the actual formal
+PO document contained two equal 516px panes and one rendered PDF canvas. The 390px Cards check
+retained search `7907`, Supplier grouping and 12-of-32 records; Match Ready Stock ended at
+333px and the header Purchase Orders action at 142px, both inside the viewport. Normal browser
+sizing was restored. Screenshots: `/tmp/so-batch-live-formal-po-desktop.png` and
+`/tmp/so-batch-live-cards-390.png`. This is the deployed composition, not a preview fixture.
+
 **Ready Stock save — current production transaction proof, 2026-10-05.** The exact existing
 `so_batch_reserve_ready_units` door was exercised with eligible `U1-000-180` and SO-1368's exact
 item line inside a deliberately failing atomic SQL statement. It reserved one Unit, bound that
