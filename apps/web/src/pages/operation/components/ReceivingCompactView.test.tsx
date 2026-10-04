@@ -57,6 +57,12 @@ describe("Receiving shared working panel", () => {
     expect(items.mock.calls[0][0].lines[0].received_now).toBe(3);
     expect(items.mock.calls[0][0].unit_ids_by_line).toEqual({ line1: ["U1-000-001"] });
   });
+  it("does not call an unrequested party or receiver absent while details load", () => {
+    mount({ ...row, supplier_name: null });
+    fireEvent.click(screen.getByRole("button", { name: "Receipt details" }));
+    expect(screen.getAllByText("Loading…").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Not recorded")).not.toBeInTheDocument();
+  });
   it("offers retry when details cannot be read", () => {
     state.error = true;
     mount();

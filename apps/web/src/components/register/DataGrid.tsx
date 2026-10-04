@@ -989,6 +989,22 @@ function DataGridInner<T>({
     };
   }, [filterMenu]);
 
+  // Keep the shared filter surface inside the viewport, including narrow
+  // registers whose later columns sit at the right edge of a scroller.
+  useLayoutEffect(() => {
+    if (!filterMenu || !filterMenuRef.current) return;
+    const place = () => {
+      const rect = filterMenuRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const x = Math.max(8, Math.min(filterMenu.x, window.innerWidth - rect.width - 8));
+      const y = Math.max(8, Math.min(filterMenu.y, window.innerHeight - rect.height - 8));
+      if (x !== filterMenu.x || y !== filterMenu.y) setFilterMenu({ ...filterMenu, x, y });
+    };
+    place();
+    window.addEventListener("resize", place);
+    return () => window.removeEventListener("resize", place);
+  }, [filterMenu, filterSearch, rows, serverColumns?.values, dateFilters, numberFilters, dateRangeFilters]);
+
   // Reset the numbering type-to-find when the open column changes / closes.
   useEffect(() => {
     setFilterSearch("");
@@ -2265,7 +2281,9 @@ function DataGridInner<T>({
                   aria-label={`Filter ${col.label}`}
                   onClick={(e) => {
                     e.stopPropagation();
-                    setFilterMenu({ colKey: col.key, x: e.clientX, y: e.clientY });
+                    filterOrigin.current = e.currentTarget;
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    setFilterMenu({ colKey: col.key, x: rect.left, y: rect.bottom });
                   }}
                   style={{
                     background: "transparent",
@@ -3641,7 +3659,7 @@ function DataGridInner<T>({
               ref={filterMenuRef}
               data-testid={isReference ? "column-filter-menu" : undefined}
               className={styles.ctxMenu}
-              style={{ top: filterMenu.y, left: filterMenu.x, maxHeight: 320, overflowY: "auto", minWidth: 200 }}
+              style={{ top: filterMenu.y, left: filterMenu.x, maxHeight: "min(320px, calc(100vh - 16px))", overflowY: "auto", minWidth: "min(200px, calc(100vw - 16px))", maxWidth: "calc(100vw - 16px)" }}
               onClick={(e) => e.stopPropagation()}
             >
               <div

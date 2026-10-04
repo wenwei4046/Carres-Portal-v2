@@ -11,6 +11,8 @@ and `/ui-kit/delivery-card.html` answer with a 301 that keeps the query string) 
 geometry, text and styles, and must report **no unexplained difference**.
 `module-card-measurements.json` holds reference and component heights per state and width.
 
+**Measurement lookup:** UI MASTER §4.3 “Compact-card measurements” records the complete source dimensions, responsive rules, live evidence and pending reference values. It is the single lookup; do not create another page-local measurement guide. Historical state-height JSON is parity evidence, not fixed card height.
+
 ## Rules
 
 **Shared Header colour — owner approved 2026-10-04:** use existing Radix slate-12 background, white primary text and countdown, slate-4 contact text, slate-11 dividers/hover. Countdown uses the existing label token (11px/500/14px), with no pale badge fill. Focus is visibly white inside the dark header. Only the identity Header changes; address details, tabs, summary and body stay light. Every CompactModuleCard consumer inherits this treatment; no per-module copy. This scoped approval does not decide the remaining card palette, font or radius.
@@ -76,9 +78,10 @@ or failed reads stay explicit. Customer date and optional time remain separate f
 Existing Delivery-owned `DeliveryDatesEdit` / `LogisticsDetailsEdit` forms are reused through their
 governed arrangement door, including reason/evidence rules, permission checks and server refusals.
 Their compact action row uses Cancel then Save; failure retains input and exposes its reason.
-Embedded kit controls keep the shared field skin (including visible dropdown/date borders); the
-card button reset must not override `data-kit` controls. Compact Customer fields use two columns
-above 400px card width and one below, without reserved blank rows. Compact condo input uses its
+Embedded kit controls must preserve their shared field skin; the card universal border reset and
+button reset exclude `data-kit`, and visible dropdown/date borders are production verified.
+UI MASTER §4.3 records the remaining native Input/Textarea cascade discrepancy (font/padding/radius/card-line border); do not claim that part already matches the canonical recipe unchanged. Compact Customer fields use two columns
+above 400px card width and one at 400px or below, without reserved blank rows. Compact condo input uses its
 two natural rows and omits the long instructional hint; evidence and all save gates remain.
 The compact Customer editor starts with no inferred information source and requires an actual choice;
 the existing save door records contact/proxy separately from the logged-in recorder. Coverage-based
@@ -112,7 +115,7 @@ Workspace Working Panel and other modules have not adopted this adapter. Their p
 contact channels, domain headers and approved full-page composition remain module-owned; customer/SO
 header assumptions must not be imposed on supplier POs or source-free purchasing objects.
 
-**Current bounded production acceptance — 2026-10-04:** PR1888 exact head
+**Earlier register/navigation production acceptance — 2026-10-04:** PR1888 exact head
 `dd581fb3139b9539216f1f1c9ddc25b107e3d4a5` passed full CI37207794735 and deployed as
 `36d96ac427f059901f6fdf2d623bd6277adeb611` (Deploy37208534384); independent verification matched
 all five revision surfaces. Orders MASTER owns the measured existing-path matrix and boundaries.
@@ -129,6 +132,8 @@ source/template/context/monthly evidence. PR1879's approved header/Balance due l
 Live Save/send, Print/Download, Workspace/other-module adoption and all-role historical/exception
 variants remain outside this proof. This acceptance does not certify the whole module.
 A /ui result alone does not prove a business entry; the actual Orders entry supplies this evidence.
+
+**Confirmed corrections production verified — 2026-10-05:** UI MASTER §4.3 records the current release proof for PR1893/1896/1897, deployed `2ce91e2d0ce7b118cfd7bb95c2b8e6974233ad3f` (CI37212809683, Deploy37213753695). Actual Customer/Logistics fields retain solid1px borders at560/440/416/396/366px card widths; Customer stacks at400px or below. Orders MASTER owns the full-page duplicate Items-prose removal and attachment icon + `Slip` wording. Preserve those confirmed continuations without changing full-page layout or financial calculations. Shared rules apply to kit consumers; migration/production acceptance remains per module.
 
 ## Differences from the reference page (125 checks: 25 states × 5 widths)
 
