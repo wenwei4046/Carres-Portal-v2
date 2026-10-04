@@ -60,17 +60,18 @@ function klDateOf(iso: string): IsoDate {
   return new Date(new Date(iso).getTime() + 8 * 60 * 60 * 1000).toISOString().slice(0, 10);
 }
 
-export function repairOrderWorkItems(
-  ro: RepairOrderWorkSource,
-  owner: WorkspaceDutyResolution | null,
-  today: IsoDate,
-  holidays: ReadonlySet<string> = myHolidaySet(),
-): RepairOrderWorkOccurrence[] {
-  if (ro.cancelled_at) return [];
+export type RepairOrderReturnWorkSource = Pick<RepairOrderWorkSource,
+  "id" | "ro_no" | "supplier_name" | "supplier_received_at" | "return_target_date" | "cancelled_at"> & {
+  units: ReadonlyArray<Pick<RepairOrderWorkSource["units"][number], "unit_id" | "goods_received_date">>;
+};
+
+function repairOrderWorkItemFactory(
+  ro: Pick<RepairOrderWorkSource,"id"|"ro_no">, owner: WorkspaceDutyResolution | null,
+  today: IsoDate, holidays: ReadonlySet<string>,
+) {
   const office = { offDays: PURCHASING_OFFICE_OFF_DAYS, holidays };
-  const supplier = ro.supplier_name ?? "the Supplier";
   const late = (due: IsoDate | null) => (due && due < today ? countWorkingDays(due, today, office) : 0);
-  const make = (ruleKey: RepairOrderWorkRule, action: string, dueIso: IsoDate | null): WorkItem => ({
+  return (ruleKey: RepairOrderWorkRule, action: string, dueIso: IsoDate | null): WorkItem => ({
     ruleKey,
     module: "purchasing",
     soRef: ro.ro_no,
@@ -91,6 +92,31 @@ export function repairOrderWorkItems(
     dueIso,
     workingDaysLate: late(dueIso),
   });
+}
+
+/** The same return obligation for Work and a server-only receipt completion probe. */
+export function repairOrderReturnWorkItems(ro: RepairOrderReturnWorkSource,
+  owner: WorkspaceDutyResolution | null, today: IsoDate, holidays: ReadonlySet<string> = myHolidaySet(),
+): RepairOrderWorkOccurrence[] {
+  if (ro.cancelled_at || !ro.supplier_received_at || !ro.return_target_date || ro.return_target_date >= today) return [];
+  const outstanding = ro.units.filter(unit => !unit.goods_received_date).map(unit => unit.unit_id);
+  if (!outstanding.length) return [];
+  const make = repairOrderWorkItemFactory(ro, owner, today, holidays);
+  return [{item: make(REPAIR_ORDER_WORK_RULE.returnDatePassed,
+    `Ask ${ro.supplier_name ?? "the Supplier"} when ${repairOrderUnitsPhrase(outstanding)} will return`, ro.return_target_date),
+    problem: "The repair return date has passed", requiredResult: "The Units are received back"}];
+}
+
+export function repairOrderWorkItems(
+  ro: RepairOrderWorkSource,
+  owner: WorkspaceDutyResolution | null,
+  today: IsoDate,
+  holidays: ReadonlySet<string> = myHolidaySet(),
+): RepairOrderWorkOccurrence[] {
+  if (ro.cancelled_at) return [];
+  const office = { offDays: PURCHASING_OFFICE_OFF_DAYS, holidays };
+  const supplier = ro.supplier_name ?? "the Supplier";
+  const make = repairOrderWorkItemFactory(ro, owner, today, holidays);
 
   const out: RepairOrderWorkOccurrence[] = [];
 
@@ -116,21 +142,7 @@ export function repairOrderWorkItems(
     });
   }
 
-  // (c) The Carres return target has passed and a Unit is not back.
-  if (ro.supplier_received_at && ro.return_target_date && ro.return_target_date < today) {
-    const out_ = ro.units.filter((u) => !u.goods_received_date).map((u) => u.unit_id);
-    if (out_.length > 0) {
-      out.push({
-        item: make(
-          REPAIR_ORDER_WORK_RULE.returnDatePassed,
-          `Ask ${supplier} when ${repairOrderUnitsPhrase(out_)} will return`,
-          ro.return_target_date,
-        ),
-        problem: "The repair return date has passed",
-        requiredResult: "The Units are received back",
-      });
-    }
-  }
+  out.push(...repairOrderReturnWorkItems(ro, owner, today, holidays));
 
   // (d) Owner consent for non-Carres-owned Units — never an Issue gate, no date.
   const consent = repairOrderConsentOutstanding(ro);
@@ -163,15 +175,38 @@ export function projectRepairOrderWork(input: {
 }): OperationWorkItem[] {
   const holidays = input.holidays ?? myHolidaySet();
   return input.repairOrders.flatMap((ro) =>
-    repairOrderWorkItems(ro, input.poDuty, input.today, holidays).map(({ item, problem, requiredResult }) =>
-      operationWorkItemFromProjection(item, {
+    repairOrderWorkItems(ro, input.poDuty, input.today, holidays).map(occurrence =>
+      repairOrderOccurrenceToWork(ro, occurrence, input.today, input.observedAt)),
+  );
+}
+
+function repairOrderOccurrenceToWork(ro: Pick<RepairOrderWorkSource,"id"|"ro_no"|"supplier_name">,
+  {item,problem,requiredResult}: RepairOrderWorkOccurrence, today: IsoDate, observedAt?: string,
+): OperationWorkItem {
+  return operationWorkItemFromProjection(item, {
         object: { kind: "repair_order", id: ro.id, label: ro.ro_no },
         problem,
         recipient: item.ruleKey === REPAIR_ORDER_WORK_RULE.ownerConsent ? null : ro.supplier_name,
         requiredResult,
         destination: repairOrderDestination(ro.id),
-        today: input.today,
-        ...(input.observedAt ? { observedAt: input.observedAt } : {}),
-      })),
-  );
+        today: today,
+        ...(observedAt ? { observedAt: observedAt } : {}),
+      });
+}
+
+export function projectRepairOrderReturnWork(input: {
+  repairOrder: RepairOrderReturnWorkSource; today: IsoDate; observedAt?: string;
+}): OperationWorkItem[] {
+  return repairOrderReturnWorkItems(input.repairOrder,null,input.today).map(occurrence =>
+    repairOrderOccurrenceToWork(input.repairOrder,occurrence,input.today,input.observedAt));
+}
+
+/** Physical return completion only; cancellation belongs to the RO's own door. */
+export function repairOrderReturnReceiptResult(ro: {
+  cancelled_at: string | null;
+  units: ReadonlyArray<{goods_received_date: string | null; grn_no: string | null}>;
+}): string | null {
+  if (ro.cancelled_at || !ro.units.length || ro.units.some(unit=>!unit.goods_received_date)) return null;
+  const grns=[...new Set(ro.units.map(unit=>unit.grn_no).filter((grn): grn is string=>Boolean(grn)))].sort();
+  return `grn=${grns.join(",") || "posted"}`;
 }

@@ -6,6 +6,7 @@ import { requireWarehouse } from "../../lib/auth-guards";
 import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
+import { withWarehouseRepairReturnCompletion } from "../../lib/warehouse-repair-return-work";
 import { rpcWithArrivalTime } from "../../lib/receiving-time";
 
 /** Warehouse-owned incoming sources, physical reports and final confirmation.
@@ -206,6 +207,7 @@ warehouseReceivingRouter.post("/receipts/confirm", requireWarehouse, async (c) =
   const parsed = await parseJsonBody(c, warehouseConfirmReceiptInput);
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
   const body = parsed.data;
+  return withWarehouseRepairReturnCompletion(c,body.report.arrivalSourceId ?? undefined,async()=>{
   const sb = userClient(c.env, c.var.auth.jwt);
   const { data, error } = await sb.rpc("warehouse_confirm_receipt", {
     p_report: warehouseConfirmationReportToWire(body.report),
@@ -219,6 +221,7 @@ warehouseReceivingRouter.post("/receipts/confirm", requireWarehouse, async (c) =
   }
   if (!data) return c.json({ error: "Receipt confirmation returned no result" }, 502);
   return c.json(data, 200);
+  });
 });
 
 export default warehouseReceivingRouter;

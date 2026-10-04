@@ -1808,7 +1808,7 @@ export interface WorkLedger {
 }
 
 const LEDGER_CHUNK = 200;
-const LEDGER_COLUMNS =
+export const LEDGER_COLUMNS =
   "id, occurrence_id, event, actor_id, at, channel, contact_kind, contact_id, reply_due_on, result_reference, source_version, action_on, object_label";
 /** `YYYY-MM-DD` moved by whole days — string arithmetic, no clock. */
 function addDaysIsoUtc(iso: string, days: number): string {
@@ -1820,7 +1820,7 @@ function addDaysIsoUtc(iso: string, days: number): string {
 /** How far back the Completed read reaches, in calendar days. */
 export const WORK_COMPLETED_WINDOW_DAYS = 60;
 
-function ledgerRow(r: Record<string, unknown>): WorkOccurrenceEvent {
+export function ledgerRow(r: Record<string, unknown>): WorkOccurrenceEvent {
   return workOccurrenceEventSchema.parse({
     id: r.id, occurrenceId: r.occurrence_id, event: r.event, actorId: r.actor_id, at: r.at,
     channel: r.channel, contactKind: r.contact_kind, contactId: r.contact_id,
@@ -1926,7 +1926,7 @@ const MAX_WORK_GENERATIONS = 20;
  */
 export async function readWorkLedger(
   c: Context<AppEnv>,
-  ledger: WorkLedger,
+  ledger: Pick<WorkLedger,"read">,
   baseIds: readonly string[],
 ): Promise<{ currentId: Map<string, string>; events: WorkOccurrenceEvent[] }> {
   const currentId = new Map(baseIds.map((id) => [id, id]));

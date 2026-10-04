@@ -732,19 +732,30 @@ they no longer inherit an unrelated default destination. The Office-door Warehou
 Operation direct receipts, time validation, exact-Unit amendments and version checks remain intact.
 All fixture writes roll back; `/tmp/receiving-closure-target-convergence.log` records the run.
 
-**Repair-return Work consequence — VERIFIED GAP / NOT BUILT, 2026-10-05.**
-The existing RO reader derives returned Units from posted source-linked GRNs; the Work projection
-removes the return-date follow-up only when all required Units are back. Operation arrival posting
-wraps that write with `repairOrderReturnWorkCompletion`, but Warehouse final confirmation currently
-does not record the Completed occurrence. The existing wrapper is not directly reusable: its RO
-read enters the Operation-only router, and its Work history read uses caller RLS. Warehouse would
-be refused or unable to resolve the correct occurrence generation. The Workspace chat independently
-confirmed both boundaries. Required convergence is a source-authorised, server-only minimal return
-fact/history read, reusing the common projection and Completed writer with the actual Warehouse
-actor. No RO page/read grant or commercial payload belongs in the Warehouse response. Partial return,
-blocked report, failed confirmation and concurrent RO cancellation must not count as Warehouse
-completion; only this successful GRN's return fact may do so. This remains an implementation gap,
-not an unresolved owner business decision or a reason to reintroduce Operation approval.
+**Repair-return Work consequence — BUILT ON BRANCH / NOT DEPLOYED, 2026-10-05.**
+Warehouse final confirmation now wraps its existing receipt writer with the shared Completed mechanism.
+A server-only reader first checks the individual caller's arrival-source permission, then reads only
+that source-linked RO's return identity, target, Unit/posted-GRN facts and exact Work occurrence history.
+No Operation-role impersonation, Warehouse RO endpoint, commercial detail response or new role grant
+is introduced. Supplier name is used internally for the existing Work projection; prices, quotes,
+replies, consents and evidence are not read. Pagination failures remain unknown, never false completion.
+
+The full Work feed and this minimal receipt probe use the same extracted return projection and
+physical-return completion predicate. History resolves the current occurrence generation through
+the existing reader. The existing writer records the actual Warehouse actor only when the occurrence
+was open before the write, disappears afterward, all required Units have valid physical return facts,
+and this newly posted GRN belongs to that source/actor and contributes a required Unit. Cancellation,
+partial return, blocked/refused report, another actor/source, stale replay, absent GRN and unrelated
+receipt contribution cannot count as this Warehouse completion. A recorder failure is logged without
+undoing or misreporting a successfully posted receipt. The normal PO Duty task ownership is unchanged.
+
+117 targeted API checks pass across Warehouse routes, the new 18-case return adapter suite, original
+RO completion, Work lifecycle/generation, probes and route wiring. Nine shared projection tests pass,
+including equality between the minimal probe and the full feed. API and Shared typechecks pass.
+The source reader is tested with authorised/denied/cancelled/non-repair sources and filters foreign or
+not-received results; the actual generation resolver is exercised after an earlier completion. These
+are local adapter/projection checks alongside the real receipt-engine tests, not a production
+Warehouse repair-return write or full live Completed-ledger journey. Production acceptance remains.
 
 **Confirmation transport — BUILT ON BRANCH / NOT DEPLOYED, 2026-10-05.**
 The bounded shared confirmation schema and `/api/warehouse/receipts/confirm` preserve absent/null
@@ -866,7 +877,7 @@ Photo 1 then Next to Video 2 without a false error; video metadata/media loads (
 no media error), and native controls are present. Playback itself and real uploaded-file transport
 are not claimed. Screenshot: `/tmp/carres-warehouse-evidence-phone-local.jpg`.
 SQL remains chat-only, unapproved and unapplied to production. This does not close
-source-resolution workflow, downstream repair-return Work closure,
+source-resolution workflow, live repair-return Work acceptance,
 full Warehouse listing acceptance or the production release gate.
 
 **Operation saved-report inspection — BUILT ON BRANCH / NOT DEPLOYED, 2026-10-05.**

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { myHolidaySet } from "./my-holidays";
 import type { RepairOrderDetail, RepairOrderUnitRow } from "./repair-order";
-import { REPAIR_ORDER_WORK_RULE, repairOrderWorkItems } from "./repair-order-work";
+import { REPAIR_ORDER_WORK_RULE, repairOrderWorkItems, projectRepairOrderWork, projectRepairOrderReturnWork } from "./repair-order-work";
 import { WORK_RULES } from "./work-engine";
 import type { WorkspaceDutyResolution } from "./workspace-duty";
 
@@ -116,4 +116,11 @@ describe("Repair Order Work — the four RO-owned obligations (Purchasing §9.7 
     expect(occ!.item.ownerState).toBe("not_assigned");
     expect(occ!.item.ownerDuty).toBe("PO Duty");
   });
+});
+
+it("the minimal receipt probe projects the exact same return occurrence as the full Work feed",()=>{
+  const source=ro({supplier_received_at:"2026-09-29T01:00:00Z",return_target_date:"2026-09-30"});
+  const full=projectRepairOrderWork({repairOrders:[source],poDuty:null,today:"2026-10-05"})
+    .filter(item=>item.ruleKey===REPAIR_ORDER_WORK_RULE.returnDatePassed);
+  expect(projectRepairOrderReturnWork({repairOrder:source,today:"2026-10-05"})).toEqual(full);
 });

@@ -508,7 +508,7 @@ describe("POST /api/warehouse/receipts/confirm", () => {
       },
     });
     expect(res.status).toBe(200);
-    const args = JSON.parse(JSON.stringify(sb.rpc.mock.calls[0]![1]));
+    const args = JSON.parse(JSON.stringify(sb.rpc.mock.calls.find(call=>call[0]==="warehouse_confirm_receipt")![1]));
     expect(args.p_report).toEqual({ arrival_source_id: LINE, actual_site_id: WH,
       handover_person: "Driver", arrival_units: [{ stock_item_id: LINE, outcome: "received_with_issue", issue_kind: "damaged" }],
     });

@@ -25,6 +25,7 @@ import {
   REPAIR_ORDER_WORK_RULE,
   projectRepairOrderWork,
   repairOrderConsentOutstanding,
+  repairOrderReturnReceiptResult,
   type OperationWorkItem,
   type RepairOrderDetail,
   type WorkspaceDutyResolution,
@@ -92,9 +93,7 @@ export function repairOrderWorkResult(ruleKey: string, ro: RepairOrderDetail | n
       return ro.supplier_received_at ? `repair_orders.supplier_received_at=${ro.supplier_received_at}` : null;
     case REPAIR_ORDER_WORK_RULE.returnDatePassed: {
       if (ro.cancelled_at) return `repair_orders.cancelled_at=${ro.cancelled_at}`;
-      if (ro.units.length === 0 || ro.units.some((u) => !u.goods_received_date)) return null;
-      const grns = [...new Set(ro.units.map((u) => u.grn_no).filter((g): g is string => Boolean(g)))].sort();
-      return `grn=${grns.join(",") || "posted"}`;
+      return repairOrderReturnReceiptResult(ro);
     }
     case REPAIR_ORDER_WORK_RULE.ownerConsent: {
       if (ro.cancelled_at || repairOrderConsentOutstanding(ro).length > 0) return null;
