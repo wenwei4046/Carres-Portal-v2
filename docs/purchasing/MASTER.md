@@ -346,7 +346,7 @@ The explicit full-page door retains the source SO destination. Table and Cards s
 filter/sort scope, selection and footer; URL presentation/group parameters preserve cutoff/deep-link
 scope, and the kit remembers volatile Register context across object return. Supplier grouping
 uses the exact supplier set for each SO; multi-supplier SOs are never duplicated across groups.
-138 Register tests, three exact-header/failure tests and 23 whole-page issue/evidence/retry tests
+138 Register tests, four exact-header/failure/PDF-close tests and 23 whole-page issue/evidence/retry tests
 pass locally. Page journeys use distinct real-grid session keys between tests while retaining
 the same session across a journey's remounts; this prevents one test's search from hiding another
 test's SO without disabling production context retention. Type checking and design guard pass.
@@ -358,6 +358,21 @@ issuance or reservation proof. Release and authenticated production walkthrough 
 At 390px the module toolbar wraps its labelled controls; Purchase Orders is fully visible
 (x=20 to 142 within the 390px viewport), the page width remains 390px and keyboard Enter opens
 the result panel. This corrects a locally observed clipped toolbar control without changing the kit.
+After mainline integration the saved-source document preview uses the kit's current close callback;
+PDF close restores focus to the same source entry and reopening retains the SO panel. Its four
+adapter tests and four actual saved-document tests pass; the earlier CI type rejection is not
+accepted as delivery proof.
+
+**Additional authenticated stock acceptance, 2026-10-04.** In the actual `time=11:00` scope,
+manual whole-round matching offered SO-1368 exact Unit `U1-000-180` at Carres Klang (New,
+received 14 Aug, original reference `PO/2608-068`). The eligible suggestion appeared first;
+other unmatched SOs showed zero available. Ticking that Unit enabled Proceed and showed one
+selected SO. Clear then Cancel restored normal purchasing, with the individual item chooser still
+showing `1 available 0 reserved`. Its own location was Carres Klang; ticking enabled Choose Ready
+Unit and clearing returned to no Unit chosen. No Proceed/save/issue was performed. Evidence:
+`/tmp/so-batch-live-positive-stock-choice.png`, `/tmp/so-batch-live-individual-stock-choice.png`.
+The initial live Register load also showed Match and Purchase Orders disabled. These prove
+positive candidate/selection and read/loading behavior, not live reservation acceptance.
 
 ### SO Batch PO Status — owner-approved 2026-10-04
 

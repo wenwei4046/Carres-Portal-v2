@@ -34,7 +34,7 @@ export default function SoBatchCompactView({ row, status, supplier, safetyDays, 
       ] }}
     target={row.requestedDeliveryDate ? { date: fmtDateShort(row.requestedDeliveryDate),
       badge: `${Math.round((Date.parse(row.requestedDeliveryDate.slice(0, 10)) - Date.parse(appTodayIso())) / 86400000)}d` } : undefined}
-    document={row.so == null ? undefined : { label: `Sales Order SO-${row.so}`, preview: <SalesOrderCardDocument orderId={row.orderId} reference={`SO-${row.so}`} /> }}
+    document={row.so == null ? undefined : { label: `Sales Order SO-${row.so}`, preview: onClose => <SalesOrderCardDocument orderId={row.orderId} reference={`SO-${row.so}`} onClose={onClose} /> }}
     openLabel="Open full page" onOpen={onOpen} onClose={onClose} initialModule="buying"
     modules={[{ key: "buying", label: "SO Batch Purchase", communication: null,
       summary: [
