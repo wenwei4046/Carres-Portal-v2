@@ -670,22 +670,36 @@ uploads live under their source's prefix in `delivery-orders`. These are measure
 gaps against §7.3, not new business rulings. No SQL draft has been approved, migration written or
 production write performed for this automatic-confirmation work.
 
-**Local database acceptance baseline — 2026-10-05; target still failing.** An isolated PostgreSQL
-17 replay matches the live normalised function bodies for the shared stock receipt engine,
-Warehouse submit, Warehouse check-in, receipt line validator and actor context. Existing
-`receiving-closure-0601.integration.test.ts` passes all 13 tests against that local database; it
-proves the old Operation-posting flow only. The new opt-in
-`warehouse-confirmation-target.integration.test.ts` runs eight approved-target checks: seven fail
-and one passes. Valid final Warehouse confirmation remains `submitted`; a shared company login
-is still accepted by the count door; missing DO evidence, unknown source, unidentified Unit,
-all-missing count and out-of-scope source are rejected before preserving a report. The disabled
-individual is correctly refused. All fixtures are transaction-rolled-back, with no production
-receipt, stock, storage upload or account change. The target suite is explicitly skipped without
-its isolated-local-database variable; ordinary CI is not automatic-confirmation acceptance.
-Retry/concurrency, report correction, precise blocker payloads, issue holds and unchanged
-amendment/void authority remain acceptance work for the reviewed confirmation implementation.
-The full historical replay had seven failures (0149, 0317, 0339, 0398a, 0453, 0561, 0588);
-only the named receipt dependencies were reconciled, not a clean whole-chain replay.
+**Automatic confirmation implementation — LOCAL SQL DRAFT / NOT APPROVED / NOT DEPLOYED,
+2026-10-05.** The chat-only candidate compiles on an isolated PostgreSQL 17 replay. It keeps one
+private stock/session engine behind separately guarded Operation and Warehouse doors, with an
+active individual/Site gate, a caller-held save key, optimistic report correction, original report
+history, safe raw evidence separate from signed receipt fields, explicit blockers and a distinct
+Warehouse confirming authority. Invalid scope remains an unposted Receiving Session; no source,
+physical date or quantity is fabricated. Effective line Deliver To is checked as well as the
+actual Site. This candidate currently exercises PO/CO-backed intake, not the complete source
+lifecycle, and is implementation evidence rather than a new approved business/schema ruling.
+
+The opt-in `warehouse-confirmation-target.integration.test.ts` now passes 18 local cases: valid
+automatic GRN and accepted/missing split; shared/disabled actor refusal; preserved missing-DO,
+unknown-source, unknown-Unit, all-missing and cross-Site reports; same-key replay; duplicate DO;
+same-session correction/history; stale and post-completion correction refusal; unknown physical
+date; foreign evidence isolation; damaged Unit hold with exact receipt Claim; and refusal of
+direct stock/check-in/amend authority. Restoring the old Warehouse submit function makes the seven
+original target gaps fail again; restoring the draft returns all 18 to green. All fixtures roll
+back, and zero test actors/reports remain. No production receipt, stock, storage upload or account
+was changed. Ordinary CI skips this suite without `CARRES_RECEIVING_TARGET_DATABASE_URL`; that
+skip is not acceptance. Existing 0601 baseline was 13/13 before the candidate and is now 12/13:
+its legacy Warehouse-count/Operation-check-in case still uses the old contract and does not prove
+the new flow. Existing Operation direct receipt/amendment checks continue to pass.
+
+Still required before an exact SQL review/release: genuine concurrent-session proof; non-PO source
+convergence; remaining quantity/issue/extra and authority boundaries; API/shared contracts,
+Warehouse form and report history, Operation blocked-report/Work readers; exact reviewed SQL
+approval followed by the governed production probe/apply and delivery proof. The draft exists only
+in chat and the isolated local database, not in `supabase/migrations/`. The historical replay had
+seven failures (0149, 0317, 0339, 0398a, 0453, 0561, 0588); the relevant original receipt bodies
+were reconciled to production before drafting, not a clean whole-chain replay.
 
 **Missed-arrival Work ownership — DEPLOYED, BOUNDED LIVE ACCEPTANCE, 2026-10-05.**
 A supplier date without a physical report no longer creates Receiving Check in work. The existing
