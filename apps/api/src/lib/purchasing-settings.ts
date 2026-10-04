@@ -109,6 +109,14 @@ export async function loadPurchasingSettings(
   sb: SupabaseClient,
 ): Promise<LoadedPurchasingSettings> {
   const numbers = await loadPurchasingNumbers(sb);
+  // An unavailable optional matcher setting must not invent a priority or
+  // prevent ordinary purchasing. The matcher itself refuses a missing value.
+  let readyStockPriority: "customer_delivery" | "proceed_date" | null = null;
+  try {
+    const result = await sb.from("purchasing_settings").select("ready_stock_priority").eq("id", 1).maybeSingle();
+    const value = result.data?.ready_stock_priority;
+    if (!result.error && (value === "customer_delivery" || value === "proceed_date")) readyStockPriority = value;
+  } catch { /* The unavailable value is exposed as null. */ }
 
   const [skusR, suppliersR, prodR, weekR, changesR, destinationsR, partnersR] = await Promise.all([
     sb
@@ -301,6 +309,7 @@ export async function loadPurchasingSettings(
 
   return {
     ...numbers,
+    readyStockPriority,
     suppliers,
     productionDays,
     destinations,

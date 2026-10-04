@@ -25,6 +25,7 @@ const setPoWindows = vi.fn();
 const setCutoff = vi.fn();
 const setAddress = vi.fn();
 const setChannel = vi.fn();
+const setPriority = vi.fn();
 
 function mutation(mutateAsync: ReturnType<typeof vi.fn>) {
   return { mutateAsync, isPending: false, isError: false, error: null };
@@ -46,6 +47,7 @@ vi.mock("@/lib/queries", async () => {
     useSetSupplierPoCutoff: () => mutation(setCutoff),
     useSetSupplierAddress: () => mutation(setAddress),
     useSetSupplierChannel: () => mutation(setChannel),
+    useSetReadyStockPriority: () => mutation(setPriority),
   };
 });
 
@@ -140,6 +142,30 @@ beforeEach(() => {
   createDestination.mockResolvedValue(settings());
   updateDestination.mockResolvedValue(settings());
   setSupplierCollection.mockResolvedValue(settings());
+});
+
+describe("Purchasing Ready Stock priority", () => {
+  it("keeps the chosen priority after a refused save and retries the same value", async () => {
+    settingsQuery.mockReturnValue({ data: settings({ readyStockPriority: "customer_delivery" }), isLoading: false, error: null });
+    setPriority.mockRejectedValueOnce(new Error("refused")).mockResolvedValueOnce(settings({ readyStockPriority: "proceed_date" }));
+    render(wrap(<OperationPurchasingSettings />));
+    const section = within(screen.getByTestId("ready-stock-priority-settings"));
+    fireEvent.click(section.getByRole("combobox", { name: "Priority" }));
+    fireEvent.click(screen.getByRole("option", { name: "Proceed Date" }));
+    fireEvent.click(section.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(section.getByRole("alert")).toHaveTextContent("Not confirmed"));
+    expect(section.getByRole("combobox")).toHaveTextContent("Proceed Date");
+    fireEvent.click(section.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(setPriority).toHaveBeenCalledTimes(2));
+    expect(setPriority.mock.calls.map(call => call[0])).toEqual([{ priority: "proceed_date" }, { priority: "proceed_date" }]);
+  });
+  it("does not offer a writable priority when the source is unavailable", () => {
+    settingsQuery.mockReturnValue({ data: settings({ readyStockPriority: null }), isLoading: false, error: null });
+    render(wrap(<OperationPurchasingSettings />));
+    const section = within(screen.getByTestId("ready-stock-priority-settings"));
+    expect(section.getByRole("combobox")).toBeDisabled();
+    expect(section.getByRole("button", { name: "Save" })).toBeDisabled();
+  });
 });
 
 describe("Purchasing → Settings", () => {

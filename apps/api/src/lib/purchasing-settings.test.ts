@@ -25,6 +25,17 @@ function fakeClient(rows: Record<string, unknown[]>): SupabaseClient {
   } as unknown as SupabaseClient;
 }
 
+describe("Ready Stock priority source", () => {
+  it.each(["customer_delivery", "proceed_date", null, "unsupported"])("keeps %s truthful without taking ordinary purchasing down", async value => {
+    const settings = await loadPurchasingSettings(fakeClient({ purchasing_settings: [{
+      order_by_buffer_days: 7, earliest_sell_days: 21, logistics_call_working_days: 1,
+      manual_purchase_min_delivery_days: 0, po_days: [1, 3, 5], ready_stock_priority: value,
+    }] }));
+    expect(settings.readyStockPriority).toBe(value === "customer_delivery" || value === "proceed_date" ? value : null);
+    expect(settings.orderByBufferDays).toBe(7);
+  });
+});
+
 describe("loadPurchasingSettings — Deliver To master data", () => {
   it("returns every destination and derives a warehouse-linked address", async () => {
     const settings = await loadPurchasingSettings(
