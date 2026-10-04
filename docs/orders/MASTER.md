@@ -6802,7 +6802,12 @@ this module owns the following business-specific application. Delivered evidence
   not write; successful save folds the editor. DO conditions are read-only and cannot release goods.
   Communication prepares drafts; timeline uses recorded instants with no MYT suffix or repeated actor.
   Closing preserves list filters, selection and scroll; SO full page retains deliberate Edit.
-  Implemented in this BUILD branch; CI, release and authenticated acceptance pending.
+  Card content uses the sole owner-rules2026-10-03/04 contract; its Drawer container is distinct from
+  Workspace Working Panel. Full-page navigation keeps `/operation/orders/so/:id`; existing
+  SalesOrderWorkspace supplies the responsive 50/50 form/document view, deliberate Edit and source
+  refresh after saving. Existing full-page contract/document checks105 passed; authenticated
+  card→full page→edit/preview→save→return proof remains pending. This release does not claim
+  Workspace or other-module adoption. Implemented in this BUILD branch; release acceptance pending.
 - Full page opens read-only until deliberate Edit. Fixed white identity header and slate-2 tabs
   sit above one scrolling left form and independent right PDF. Back preserves register context.
 - Items has five columns Item, Qty, Unit (RM), Disc (RM), Amount (RM). Name, code and config share

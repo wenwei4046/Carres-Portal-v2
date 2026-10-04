@@ -71,6 +71,20 @@ full instants and avatar identity without repeating names; its loading/error sta
 collapsed section. Communication only prepares drafts; attachments remain explicitly preview-only.
 This scoped adoption does not change tokens, phone navigation or Work contacts.
 
+**Reuse and verification boundary (2026-10-04):** `CompactModuleCard` owns card content;
+`Drawer` owns this Register overlay, not the Workspace Working Panel container. Modules provide
+facts, editors, actions and permissions through the kit API; a new missing shared capability returns
+to the shared UI owner rather than being drawn locally. The current contract is the owner-rules
+2026-10-03/04 contract in this file; a production commit is recorded only after release proof.
+SO ↗ continues to `/operation/orders/so/:id`. Its existing `SalesOrderWorkspace` supplies the
+responsive two-pane form/document view and deliberate Edit; successful saves end editing and refresh
+its source facts/revisions, while Back returns to the Register. This release does not change those
+mechanics or claim that one navigation click proves the whole save/return journey. Existing full-page
+contract/document tests passed (105 checks); authenticated continuous-journey proof remains pending.
+Workspace Working Panel and other modules have not adopted this adapter. Their placement, recorded
+contact channels, domain headers and approved full-page composition remain module-owned; customer/SO
+header assumptions must not be imposed on supplier POs or source-free purchasing objects.
+
 Delivery status: implemented on the isolated BUILD branch; release and authenticated verification
 remain pending. A /ui result does not prove this business entry.
 
