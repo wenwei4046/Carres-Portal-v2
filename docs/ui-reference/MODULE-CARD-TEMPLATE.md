@@ -106,7 +106,9 @@ Workspace Working Panel and other modules have not adopted this adapter. Their p
 contact channels, domain headers and approved full-page composition remain module-owned; customer/SO
 header assumptions must not be imposed on supplier POs or source-free purchasing objects.
 
-**PRODUCTION VERIFIED — scoped Sales Orders adoption, 2026-10-04.** PR #1871 merged as
+**Current bounded acceptance — 2026-10-04:** Orders MASTER owns the existing-path matrix. PR #1878 deployed086f23d with exact CI/deploy and independent five-surface proof; real entry verified its fact/template/context repairs and five widths. Completed SO-1362 Delivery still needs PR #1881 target proof. PR #1879 governs the subsequent header and Balance due correction. No complete-module claim follows from the card proof.
+
+**Initial production evidence — scoped Sales Orders adoption, 2026-10-04.** PR #1871 merged as
 `a9dbb6b8918e9337328eefccebe547ee1d2f4ab6`. CI `37189941545`, Deploy `37190758212` and independent five-surface
 revision verification passed. Sara · Principal used the real Listing Cards entry: Info showed the
 saved money; Delivery showed actual0/1 goods, Not assigned, Date not confirmed and No DO yet.
