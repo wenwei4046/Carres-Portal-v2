@@ -382,9 +382,9 @@ jobs; no new page, second work ledger or Receiving-specific calendar is required
 
 **Review conclusion.** No new owner business decision is required to resolve the findings above.
 The target is sufficiently explicit to explain the complete journey, but this is not a declaration
-of PLAN MISSION COMPLETE or production completion. The approved rules still need main-branch
-integration; the warehouse posting/identity model, Work projections, two-view presentation and
-runtime lifecycle proofs remain open. Do not turn these known gaps into new questions for Jess.
+of PLAN MISSION COMPLETE or production completion. Main-branch documentation integration alone
+does not deliver the warehouse posting/identity model, Work projections, two-view presentation or
+runtime lifecycle proofs; these remain open. Do not turn these known gaps into new questions for Jess.
 
 ---
 
