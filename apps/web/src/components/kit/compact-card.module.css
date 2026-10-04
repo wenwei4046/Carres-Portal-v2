@@ -44,7 +44,7 @@
 /* ---------- restore the browser defaults the reference relied on ---------- */
 .panel,
 .panel * { box-sizing: border-box; }
-.panel * { border: 0 none; }
+.panel :where(:not([data-kit])) { border: 0 none; }
 .panel table,
 .panel thead,
 .panel tbody,
