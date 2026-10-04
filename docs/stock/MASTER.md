@@ -700,8 +700,8 @@ ANY existing Site**, including `AL Sungai Buloh` and `HOUZS Balakong`. Creating 
 widened where a receipt can land. An earlier version of this section claimed that missing hours and
 a missing Site duty holder meant nothing could be received there — **that claim was false**; neither
 is a gate. The UI offers the `Receive` control on exactly the same global answer, so screen and
-server agree and no false door is drawn. **Whether receiving authority becomes per-Site is an owner
-decision and is not assumed here.**
+server agree and no false door is drawn. **This measures the existing Operation door. The approved Warehouse confirmation authority
+below is scoped to the actual Site and source; it does not change the Operation door implicitly.**
 
 **EVERYONE IN OPERATION MAY RECEIVE — owner ruling 2026-09-25. The SQL gate is BUILT ON BRANCH
 `build/receiving-closure` (migration 0601, not applied); the Warehouse Settings `Access` row is not built.**
@@ -716,6 +716,22 @@ Settings → `Access` shows this as `Receive goods · Everyone in Operation` by 
 to narrow it later. The database gate `receiving_require_post_authority` (GRN Duty · cover ·
 Operations Superuser) is overwritten by this ruling for posting; 0601 widens it to active Operation
 staff and the principal. Amend and Void Receiving keep the GRN Duty authority.
+
+**WAREHOUSE FINAL CONFIRMATION — OWNER-APPROVED TARGET / NOT BUILT, Jess 2026-10-04.**
+An individually authenticated Warehouse operator authorised for the source and actual Site may
+confirm final physical receipt through the one Receiving engine. Valid source, identities,
+quantities, condition, Site and required evidence cause automatic receipt posting and GRN creation;
+Operation does not approve normal receipts again. Operation retains direct receiving and handles
+source-linked differences. Receiving owns the formal posting; Stock projects accepted outcomes
+and applies existing reservation, eligibility and issue controls. Damaged/wrong goods remain held;
+missing goods remain outstanding. Unknown source, identity/Site mismatch, duplicates or missing
+required evidence preserve the report and block the invalid scope. Valid scope may complete only
+when safely separable. Supplier declarations alone never count as receipt. Repeated confirmation
+must never duplicate stock or GRNs. The company receiver and actual individual confirmer remain
+separate history facts. Warehouse gains no direct Inventory writer, GRN amendment/void, adjustment
+approval or Finance access. Purchasing MASTER §7.3 is the shared receipt contract. This ruling
+requires implementation and production proof; it does not activate NETS accounts or cut over live
+operations.
 
 **SITES ARE MAINTAINED IN WAREHOUSE SETTINGS — owner ruling 2026-09-25, APPROVED TARGET / NOT
 BUILT.** A `Sites` section lists every place with `Site name · Kind (Carres warehouse · Carres
@@ -745,8 +761,9 @@ a gap that does not exist. Only an `exact_unit` scope missing its minted identit
 and damage on counted stock is reported by QUANTITY because there is no Unit ID to name.
 
 An individually signed-in NETS operator uses Receiving to scan each actual Unit and record Received,
-Received with issue, rejected/not delivered or another governed receipt outcome. After the GRN is
-posted, Inbound updates from that authority:
+Received with issue, rejected/not delivered or another governed receipt outcome. Under the
+2026-10-04 approved target, valid final confirmation automatically posts through Receiving without
+a second Operation approval. After that GRN is posted, Inbound updates from that authority:
 
 - received acceptable Unit → Inventory at the actual receiving Site/current holder;
 - received with issue → Inventory under `Needs checking`, never Ready Stock;
@@ -1488,7 +1505,9 @@ Rack/Bin/Zone placement are rejected; receipt never makes a Unit Ready Stock wit
 
 **RECOMMENDED CARRES BUSINESS FLOW →** PO, Consignment, Return, Transfer or Repair supplies expected
 Units and actual work date; NETS Warehouse opens the linked Receiving Session; the individually
-identified operator scans and checks each Unit; accepted GRN facts project into Inventory. Normal
+identified operator scans and checks each Unit and explicitly confirms the final physical result;
+validated confirmation automatically creates the GRN through Receiving, without routine Operation
+reapproval. Accepted GRN facts project into Inventory. Normal
 received Units show actual Site/holder and are tested for eligibility; issue Units enter `Needs
 checking`; rejected/not-delivered Units do not enter physical Stock; partial receipt preserves both
 the accepted Units and outstanding expected Units; unknown or wrong-Site Units enter investigation.

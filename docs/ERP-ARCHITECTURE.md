@@ -80,6 +80,17 @@ identities and write no completion. Module filter rails do not copy those action
 `WORK TO DO` panel; SO Batch Purchase is the ruled example. The complete contract is
 [`purchasing/MASTER.md` §2.3 and §7](purchasing/MASTER.md) and its approved design record.
 
+**WAREHOUSE-CONFIRMED RECEIVING — OWNER-APPROVED TARGET / NOT BUILT, Jess 2026-10-04.**
+The authorised, individually identified Warehouse operator confirms the actual receipt at its
+permitted Site/source. Receiving validates source, identities, quantities, condition and required
+evidence, posts once and automatically creates the GRN; Stock projects the accepted consequences
+with its existing holds, reservations and eligibility rules. Operation retains direct receiving
+and handles differences; normal Warehouse receipts need no second Operation approval. Invalid
+scope remains an unposted report; supplier declarations alone never create stock. Warehouse gets
+no direct Inventory writer, amendment/void, adjustment approval or Finance authority. The complete
+receipt contract is Purchasing §7.3, mirrored by Stock §7. Approval is business target truth, not
+proof of implementation or permission for external NETS cutover.
+
 ---
 
 **SHOWROOM DOCUMENT PURPOSE — APPROVED TARGET / NOT BUILT, Jess 2026-09-29.**
