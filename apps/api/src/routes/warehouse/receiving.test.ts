@@ -149,16 +149,38 @@ describe("GET /api/warehouse/incoming", () => {
 });
 
 describe("GET /api/warehouse/receipts", () => {
+  const row = (i: number) => ({ id: `11111111-1111-4111-8111-${String(i).padStart(12,"0")}`, submitted_at: "2026-10-01T00:00:00+00:00", po_id: "PO-1001", claims: [] });
   it("wraps the RPC's array so the payload can grow a sibling key later", async () => {
-    const sb = makeSb({ data: [{ id: "r1", po_id: "PO-1001", claims: [] }] });
+    const sb = makeSb({ data: [row(1)] });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(userClient).mockReturnValue(sb as any);
     const res = await req("/api/warehouse/receipts", "GET", await warehouseJwt());
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({
-      receipts: [{ id: "r1", po_id: "PO-1001", claims: [] }],
+      receipts: [row(1)],
     });
-    expect(sb.rpc).toHaveBeenCalledWith("warehouse_my_receipts");
+    expect(sb.rpc).toHaveBeenCalledWith("warehouse_receipts_page", {p_before_at:null,p_before_id:null,p_limit:200});
+  });
+  it("loads an older unresolved report beyond the first 200 with an exact cursor", async () => {
+    const first = Array.from({length:200},(_,i)=>row(300-i));
+    const older = {...row(1),status:"draft",blockers:[{code:"receipt_evidence_not_available"}]};
+    const sb = makeSb({data:[]});
+    sb.rpc.mockResolvedValueOnce({data:first,error:null}).mockResolvedValueOnce({data:[older],error:null});
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const res = await req("/api/warehouse/receipts", "GET", await warehouseJwt());
+    expect(res.status).toBe(200);
+    expect((await res.json() as {receipts:unknown[]}).receipts).toEqual([...first,older]);
+    expect(sb.rpc).toHaveBeenNthCalledWith(2,"warehouse_receipts_page",{p_before_at:first[199]!.submitted_at,p_before_id:first[199]!.id,p_limit:200});
+  });
+  it.each(["failed", "missing", "repeated"])("does not report incomplete history as success when the next page is %s", async (kind) => {
+    const first = Array.from({length:200},(_,i)=>row(300-i));
+    const sb = makeSb({data:[]});
+    sb.rpc.mockResolvedValueOnce({data:first,error:null}).mockResolvedValueOnce(kind === "failed"
+      ? {data:null,error:{code:"42501",message:"Forbidden"}} : {data:kind === "missing" ? null : first,error:null});
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const res = await req("/api/warehouse/receipts", "GET", await warehouseJwt());
+    expect(res.status).toBe(kind === "failed" ? 403 : 502);
+    expect(await res.json()).not.toHaveProperty("receipts");
   });
 });
 

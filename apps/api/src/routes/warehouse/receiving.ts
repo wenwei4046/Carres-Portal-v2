@@ -80,12 +80,27 @@ warehouseReceivingRouter.get("/arrivals/:id/proof", requireWarehouse, async (c) 
  *  link, so a warehouse never needs read access to `supplier_claims` itself. */
 warehouseReceivingRouter.get("/receipts", requireWarehouse, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
-  const { data, error } = await sb.rpc("warehouse_my_receipts");
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
+  const receipts: Record<string, unknown>[] = [];
+  const seen = new Set<string>();
+  let beforeAt: string | null = null;
+  let beforeId: string | null = null;
+  // Stable (submitted_at,id) pagination: never silently report the first 200
+  // as complete history. Failure on any page discards the incomplete response.
+  for (let page = 0; page < 100; page++) {
+    const { data, error } = await sb.rpc("warehouse_receipts_page", {
+      p_before_at: beforeAt, p_before_id: beforeId, p_limit: 200,
+    });
+    if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+    const parsed = z.array(z.object({ id: z.string().uuid(), submitted_at: z.string().datetime({ offset: true }) }).passthrough()).max(200).safeParse(data);
+    if (!parsed.success || new Set(parsed.data.map((row) => row.id)).size !== parsed.data.length || parsed.data.some((row) => seen.has(row.id)))
+      return c.json({ error: "Receiving reports could not be loaded" }, 502);
+    for (const row of parsed.data) { seen.add(row.id); receipts.push(row); }
+    if (parsed.data.length < 200) return c.json({ receipts });
+    const last = parsed.data[parsed.data.length - 1]!;
+    beforeAt = last.submitted_at;
+    beforeId = last.id;
   }
-  return c.json({ receipts: data ?? [] });
+  return c.json({ error: "Receiving reports could not be loaded" }, 502);
 });
 
 /**

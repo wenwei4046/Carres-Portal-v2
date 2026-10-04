@@ -760,6 +760,24 @@ Six added local cases cover pending-source projection, other-Site isolation, sha
 accounts, upload-path enforcement and historical-proof access: 36 transaction cases pass. Forty
 Warehouse API tests cover the source and signing routes as well as final confirmation. This does
 not prove real Storage transport. The non-PO Warehouse form is connected on branch as recorded below.
+Four additional local receipt-leg cases now cover Customer Return, Failed Delivery return,
+Return from repair and Supplier replacement with real source links. Return/repair goods remain
+held; missing Units keep custody. Replacement retains a distinct Unit and its original-Unit link,
+leaves the original held goods and Claim open, and does not mutate commercial PO quantities.
+Each retry returns the same GRN. This is physical receipt-leg proof, not full Case/Repair/Claim
+completion or proof of replacement fulfilment of an unaccepted PO obligation.
+
+**Warehouse report history read — BUILT ON BRANCH / LOCAL SQL DRAFT, 2026-10-05.**
+The API now reads stable `(submitted_at, id)` pages rather than treating the newest 200 reports
+as complete. A page error, missing result, repeated page or exhausted safety bound returns failure,
+never a partial-success list. The draft reader requires an active individual Warehouse actor and
+scopes every page to that Site. A 205-report tied-timestamp transaction test proves complete,
+nonduplicated traversal and other-Site exclusion; shared/inactive actors are refused. Together
+with the added receipt legs, 43 local transaction cases pass; 44 Warehouse API tests pass,
+including an older blocked report and failed/missing/repeated continuation pages. The legacy
+zero-argument RPC remains a bounded compatibility wrapper, while the application uses the paged
+reader. This fixes list truncation, not the still-outstanding per-report revision/evidence history.
+SQL remains only in chat and the isolated local database, unapproved and unapplied to production.
 
 **Warehouse confirmation form — BUILT ON BRANCH / NOT DEPLOYED, 2026-10-05.**
 The PO form now calls the final-confirmation API with a stable save key. It uses kit Modal, Button,

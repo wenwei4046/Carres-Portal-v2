@@ -129,6 +129,30 @@ describe.skipIf(!databaseUrl)("authorised Warehouse final receipt (approved targ
     await db.end();
   });
 
+  it("pages more than 200 reports at a tied timestamp without hiding old blockers or another Site", async () => {
+    await q("reset role");
+    await q("insert into warehouse_receipts(warehouse_id,submitted_from,status,submitted_by,lines,goods_received_at,save_key,raw_report,submitted_at,validation_blockers) select $1,'warehouse','draft',$2,'[]'::jsonb,null,gen_random_uuid(),'{}'::jsonb,'2026-10-01T00:00:00Z'::timestamptz,'[{\"code\":\"receipt_evidence_not_available\"}]'::jsonb from generate_series(1,205)", [site,person]);
+    await q("insert into warehouse_receipts(warehouse_id,submitted_from,status,submitted_by,lines,goods_received_at,save_key,raw_report) values($1,'warehouse','draft',$2,'[]'::jsonb,null,gen_random_uuid(),'{}'::jsonb)", [otherSite,person]);
+    await as(person);
+    const first = (await q("select warehouse_receipts_page(null,null,200) as result")).rows[0]!.result as {id:string;submitted_at:string;blockers:unknown[]}[];
+    expect(first).toHaveLength(200);
+    const last = first[first.length-1]!;
+    const second = (await q("select warehouse_receipts_page($1,$2,200) as result", [last.submitted_at,last.id])).rows[0]!.result as typeof first;
+    expect(second).toHaveLength(5);
+    expect(new Set([...first,...second].map(row=>row.id)).size).toBe(205);
+    expect(second.every(row=>row.blockers.length===1)).toBe(true);
+    const end = second[second.length-1]!;
+    expect((await q("select warehouse_receipts_page($1,$2,200) as result", [end.submitted_at,end.id])).rows[0]!.result).toEqual([]);
+    expect((await request("select warehouse_receipts_page(null,$1,200) as result", [end.id])).ok).toBe(false);
+    expect((await request("select warehouse_receipts_page(null,null,201) as result", [])).ok).toBe(false);
+  });
+
+  it.each([group,disabled])("refuses saved-report history to a shared or inactive actor %s", async (actor) => {
+    await as(actor);
+    expect((await request("select warehouse_receipts_page(null,null,200) as result", [])).ok).toBe(false);
+    expect((await request("select warehouse_my_receipts() as result", [])).ok).toBe(false);
+  });
+
   it("lists only this Site's open arrival Units and removes only physically posted Units", async () => {
     const body = await setupArrival();
     const arrivals = async () => (await q("select warehouse_incoming_arrivals() as result")).rows[0]!.result;
@@ -225,6 +249,60 @@ describe.skipIf(!databaseUrl)("authorised Warehouse final receipt (approved targ
     await as(person);
     const own = (await q("select warehouse_my_receipts() reports")).rows[0]!.reports;
     expect(own).toContainEqual(expect.objectContaining({ id: first.result.id, arrival_source_id: body.arrival_source_id, source_no: `TRF-WCT-${hex}` }));
+  });
+
+  it.each([
+    ["customer-return", "on_hold", "customer_return"],
+    ["failed-delivery-return", "on_hold", "customer_return"],
+    ["repair-return", "on_hold", "inspection"],
+    ["supplier-replacement", "free", null],
+  ])("receives %s with its own lineage and physical controls", async (kind, status, holdReason) => {
+    const body = await setupArrival();
+    await q("reset role");
+    const caseId = uid("131");
+    const claimId = uid("132");
+    const repairId = uid("133");
+    const oldUnitId = uid("134");
+    if (kind === "customer-return" || kind === "failed-delivery-return") {
+      await q("insert into service_cases(id,case_no,customer_name) values($1,$2,'Local return customer')", [caseId, `CASE-WCT-${hex}`]);
+      await q("update arrival_sources set kind=$2,case_id=$3 where id=$1", [body.arrival_source_id,kind,caseId]);
+    } else if (kind === "repair-return") {
+      await q("insert into repair_orders(id,request_id,ro_no,ro_doc_date,supplier_id,pickup_site_id,return_site_id,created_by) values($1,$2,$3,current_date,$4,$5,$6,$7)",
+        [repairId,uid("135"),`RO-WCT-${hex}`,supplier,otherSite,site,person]);
+      await q("update arrival_sources set kind=$2,repair_order_id=$3 where id=$1", [body.arrival_source_id,kind,repairId]);
+    } else {
+      await q("insert into supplier_claims(id,po_id,supplier_id,sku,product_category,claim_type,qty,photos) values($1,$2,$3,$4,'other','other',1,$5::jsonb)", [claimId,po,supplier,sku,JSON.stringify([{ path: body.do_file_path }])]);
+      await q("insert into ops_stock_items(id,unit_code,sku,warehouse_id,status,hold_reason,held_at,identity_scope,source_ref) values($1,$2,$3,$4,'on_hold','inspection',now(),'unit','po_mint')",
+        [oldUnitId,`U8${run}-103-001`,sku,otherSite]);
+      await q("update arrival_sources set kind=$2,claim_id=$3 where id=$1", [body.arrival_source_id,kind,claimId]);
+      await q("update arrival_source_units set replaces_item_id=$3 where source_id=$1 and stock_item_id=$2", [body.arrival_source_id,unitIds[0],oldUnitId]);
+    }
+    await as(person);
+    const answer = await confirm(body);
+    if (!answer.ok) throw new Error(answer.reason);
+    expect(answer.result.status,JSON.stringify(answer.result.blockers)).toBe("posted");
+    const row = await receipt(answer.result.id);
+    expect(row.arrival_source_id).toBe(body.arrival_source_id);
+    expect(row.po_id).toBeNull();
+    const units = (await q("select id,unit_code,status,hold_reason,warehouse_id,holder_party_id from ops_stock_items where id=any($1::uuid[]) order by id", [unitIds])).rows;
+    expect(units[0]).toMatchObject({ id:unitIds[0],unit_code:codes[0],status,hold_reason:holdReason,warehouse_id:site,holder_party_id:company });
+    expect(units[1]).toMatchObject({ id:unitIds[1],unit_code:codes[1],status:"free",warehouse_id:otherSite });
+    expect((await q("select received_qty from purchase_order_lines where id=$1", [line])).rows[0]!.received_qty).toBe(0);
+    const source = (await q("select * from arrival_sources where id=$1", [body.arrival_source_id])).rows[0]!;
+    expect(source.kind).toBe(kind);
+    if (kind === "repair-return") expect(source.repair_order_id).toBe(repairId);
+    if (kind === "customer-return" || kind === "failed-delivery-return") expect(source.case_id).toBe(caseId);
+    if (kind === "supplier-replacement") {
+      expect(source.claim_id).toBe(claimId);
+      expect((await q("select replaces_item_id from arrival_source_units where source_id=$1 and stock_item_id=$2", [source.id,unitIds[0]])).rows[0]!.replaces_item_id).toBe(oldUnitId);
+      expect((await q("select status,warehouse_id from ops_stock_items where id=$1", [oldUnitId])).rows[0]).toEqual({status:"on_hold",warehouse_id:otherSite});
+      expect((await q("select status from supplier_claims where id=$1", [claimId])).rows[0]!.status).toBe("open");
+    }
+    await as(person);
+    const retry = await confirm(body);
+    if (!retry.ok) throw new Error(retry.reason);
+    expect(retry.result.id).toBe(row.id);
+    expect(retry.result.grn_no).toBe(row.grn_no);
   });
 
   it("preserves an arrival with a foreign proof path without promoting that path", async () => {
