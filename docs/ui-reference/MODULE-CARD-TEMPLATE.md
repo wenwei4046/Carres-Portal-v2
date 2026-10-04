@@ -78,8 +78,9 @@ or failed reads stay explicit. Customer date and optional time remain separate f
 Existing Delivery-owned `DeliveryDatesEdit` / `LogisticsDetailsEdit` forms are reused through their
 governed arrangement door, including reason/evidence rules, permission checks and server refusals.
 Their compact action row uses Cancel then Save; failure retains input and exposes its reason.
-Embedded kit controls keep the shared field skin (including visible dropdown/date borders); the
-card universal border reset and button reset must not override `data-kit` controls. Compact Customer fields use two columns
+Embedded kit controls must preserve their shared field skin; the card universal border reset and
+button reset exclude `data-kit`, and visible dropdown/date borders are production verified.
+UI MASTER §4.3 records the remaining native Input/Textarea cascade discrepancy (font/padding/radius/card-line border); do not claim that part already matches the canonical recipe unchanged. Compact Customer fields use two columns
 above 400px card width and one at 400px or below, without reserved blank rows. Compact condo input uses its
 two natural rows and omits the long instructional hint; evidence and all save gates remain.
 The compact Customer editor starts with no inferred information source and requires an actual choice;
