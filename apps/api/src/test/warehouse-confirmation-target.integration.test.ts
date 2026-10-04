@@ -8,7 +8,7 @@ import pg from "pg";
  * No production connection, real account, upload or migration is used here.
  * Set CARRES_RECEIVING_TARGET_DATABASE_URL to an isolated local migration replay.
  * Without it, these cases are SKIPPED, not proof of automatic confirmation.
- * Concurrent sessions and non-PO source coverage remain required before release.
+ * Concurrent sessions have a separate local-only suite; non-PO coverage remains required.
  */
 const databaseUrl = process.env.CARRES_RECEIVING_TARGET_DATABASE_URL ?? "";
 const local = /^postgres(ql)?:\/\/[^@/]*@?(localhost|127\.0\.0\.1|\[::1\])(:\d+)?\//.test(databaseUrl);
@@ -196,6 +196,29 @@ describe.skipIf(!databaseUrl)("authorised Warehouse final receipt (approved targ
     expect(row.grn_no).toBeNull();
     expect((await q("select received_qty from purchase_order_lines where id=$1", [line])).rows[0]!.received_qty).toBe(1);
     await expectVisibleReport(duplicate.result.id);
+  });
+
+  it("identifies the duplicate delivery note even after its first receipt fulfils the PO", async () => {
+    const complete = report({ lines: [{ id: line, units: codes.map((unit_code) => ({ unit_code, outcome: "received" })) }] });
+    const first = await confirm(complete);
+    if (!first.ok) throw new Error(first.reason);
+    expect(first.result.status).toBe("posted");
+    const duplicate = await confirm(complete, uid("91"));
+    if (!duplicate.ok) throw new Error(duplicate.reason);
+    expect(duplicate.result.blockers).toEqual([expect.objectContaining({ code: "duplicate_receipt" })]);
+    expect(duplicate.result.grn_no).toBeNull();
+  });
+
+  it("keeps received consignment goods supplier-owned", async () => {
+    await q("reset role");
+    await q("update purchase_orders set is_consignment=true where id=$1", [po]);
+    await as(person);
+    const answer = await confirm();
+    if (!answer.ok) throw new Error(answer.reason);
+    expect(answer.result.status, JSON.stringify(answer.result.blockers)).toBe("posted");
+    await q("reset role");
+    const stock = (await q("select status,ownership,warehouse_id from ops_stock_items where id=$1", [unitIds[0]])).rows[0]!;
+    expect(stock).toEqual({ status: "free", ownership: "supplier_consignment", warehouse_id: site });
   });
 
   it("corrects the same blocked session, preserves its original evidence in history, then posts once", async () => {

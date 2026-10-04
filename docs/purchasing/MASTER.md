@@ -644,15 +644,20 @@ showed three actual GRNs on 4 September (physical quantities 1, 2 and 1), with t
 absent; its exact GRN link opened the existing receipt/PDF page. On 17 August, expected PO-2053
 showed Pending Delivery Qty 1 and opened its exact Inbound source/Site/date. The selected day,
 Warehouse module and Carres Klang filter survived navigation. Phone 390×844 displayed the same
-Calendar and kept it open while selecting a date. One phone edge remains open: tapping a source
-already current leaves the Calendar covering it. The continuation adds an explicit record-open
-callback; the regression failed before the fix and 82 Calendar/shell tests pass afterward.
-That correction still requires its own production verification. No second Calendar page was
+Calendar and kept it open while selecting a date. PR #1909 adds the explicit record-open callback
+so tapping an already-current source also closes the phone Drawer. Its regression failed before
+the fix; 82 Calendar/shell tests pass afterward. Exact-head CI 37232519713 and deployment
+37233528958 succeeded; all five canonical endpoints independently converged to
+`4b9251664bbc66f3a9ab8052fca616c0f03478ce`. Authenticated live 390×844 acceptance opened
+GRN-260904-1064, reopened Calendar and tapped that same GRN: the Drawer closed and the receipt
+remained visible with the selected date retained. Screenshot: `/tmp/carres-calendar-phone-1909-live.png`. No second Calendar page was
 introduced and no receipt/stock write was made. Current module choices cover Warehouse and
 Delivery; broader module-event admission and automatic Warehouse posting are not claimed complete.
 The same phone preview exposed a full-GRN header/Linked PO display bypassing the shared short-year
-formatter. The continuation corrects both display sites; stored source IDs and historical PDFs
-remain unchanged. The existing full-page regression checks the short PO at both positions.
+formatter. PR #1909 corrects both display sites; stored source IDs and historical PDFs remain unchanged.
+The existing full-page regression checks the short PO at both positions. The live smoke receipt
+has an undated PO identifier, so year shortening at those positions is test-verified, not a
+claimed live year-bearing sample.
 Downloaded predecessor/current bundles prove `Filter by module` 0→1, the old
 `title:"Receiving",tone:"text-success"` block 1→0, and `Receiving Differences` control 1→1.
 
@@ -695,21 +700,26 @@ physical date or quantity is fabricated. Effective line Deliver To is checked as
 actual Site. This candidate currently exercises PO/CO-backed intake, not the complete source
 lifecycle, and is implementation evidence rather than a new approved business/schema ruling.
 
-The opt-in `warehouse-confirmation-target.integration.test.ts` now passes 18 local cases: valid
+The opt-in `warehouse-confirmation-target.integration.test.ts` now passes 20 local cases: valid
 automatic GRN and accepted/missing split; shared/disabled actor refusal; preserved missing-DO,
-unknown-source, unknown-Unit, all-missing and cross-Site reports; same-key replay; duplicate DO;
+unknown-source, unknown-Unit, all-missing and cross-Site reports; same-key replay; duplicate DO including a fully fulfilled PO; consignment ownership;
 same-session correction/history; stale and post-completion correction refusal; unknown physical
 date; foreign evidence isolation; damaged Unit hold with exact receipt Claim; and refusal of
 direct stock/check-in/amend authority. Restoring the old Warehouse submit function makes the seven
-original target gaps fail again; restoring the draft returns all 18 to green. All fixtures roll
-back, and zero test actors/reports remain. No production receipt, stock, storage upload or account
+original target gaps fail again; restoring the draft returned all 18 then-current cases to green.
+The two additional cases subsequently passed, including a fully fulfilled PO duplicate regression
+that failed before moving duplicate detection ahead of the closed-PO guard. This suite rolls back
+its fixtures. The separate `warehouse-confirmation-concurrency.integration.test.ts` passes two real
+concurrent-connection cases: the second connection demonstrably waits on the first transaction,
+then a same-key retry returns the original GRN, while a different-key duplicate DO remains an
+unposted report. Both prove one stock movement and one posted receipt. Its committed fixtures
+remain only in the disposable local database so independent connections can observe them. No production receipt, stock, storage upload or account
 was changed. Ordinary CI skips this suite without `CARRES_RECEIVING_TARGET_DATABASE_URL`; that
 skip is not acceptance. Existing 0601 baseline was 13/13 before the candidate and is now 12/13:
 its legacy Warehouse-count/Operation-check-in case still uses the old contract and does not prove
 the new flow. Existing Operation direct receipt/amendment checks continue to pass.
 
-Still required before an exact SQL review/release: genuine concurrent-session proof; non-PO source
-convergence; remaining quantity/issue/extra and authority boundaries; API/shared contracts,
+Still required before an exact SQL review/release: non-PO source convergence; remaining quantity/issue/extra and authority boundaries; API/shared contracts,
 Warehouse form and report history, Operation blocked-report/Work readers; exact reviewed SQL
 approval followed by the governed production probe/apply and delivery proof. The draft exists only
 in chat and the isolated local database, not in `supabase/migrations/`. The historical replay had

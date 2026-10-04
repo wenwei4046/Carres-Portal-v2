@@ -488,8 +488,11 @@ in production, reuses MonthCalendar and Select, separates expected/actual groups
 and preserves explicit Calendar day/module/location in source links. A local illustrative preview
 verified the module/location selectors, quantities and selected-date contrast. Operation's phone
 header opens the same Calendar in the existing Drawer; picking a date keeps it open and the
-selected day survives. Live phone testing found that opening an already-current source leaves
-the Drawer open; the tested explicit record-open callback correction is not yet deployed.
+selected day survives. PR #1909 corrected opening an already-current source with an explicit
+record-open callback. CI 37232519713 and deployment 37233528958 passed; all five canonical
+endpoints independently converged to `4b9251664bbc66f3a9ab8052fca616c0f03478ce`. Authenticated
+live 390×844 acceptance reopened Calendar on GRN-260904-1064 and tapped the same source: the
+Drawer closed, the receipt remained visible and the selected date was retained.
 Broader Calendar event-source admission is not complete. Local evidence: 119 shared schedule/Inbound/PO-date tests, 15 Inbound API tests, 48 shell tests,
 32 Calendar tests, Web/API typechecks and design lint;
 the 201-receipt fixture verifies register paging does not clip Calendar history. Full CI
