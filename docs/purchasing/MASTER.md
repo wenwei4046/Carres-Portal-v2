@@ -297,8 +297,12 @@ authenticated execution intentionally uses the same internal manager gate as oth
 Settings writes. The advisor's exposed-definer notice is intentional for this guarded RPC, not
 an unguarded grant. Nine loader, 30 Settings route, 39 Settings UI, 133 Register and nine hook
 tests passed; API/web type checks and design/migration guards passed. Full CI `37205634561` passed on exact head `10ba421a5515a1690698f59437048b49f6cbc5aa`.
-PR #1885 merged as `262d88b8966db29ac0c2a78de5adf3167eda49d9`; deployment and authenticated
-production acceptance of the new Settings UI remain required. This does not close
+PR #1885 merged as `262d88b8966db29ac0c2a78de5adf3167eda49d9`; deploy `37206517472` succeeded and independent smoke verification confirmed the exact SHA
+on all five canonical endpoints. Authenticated production Settings shows `Customer Requested
+Delivery Date`; the existing shared Operation account can read it but has the control disabled,
+with the existing named-manager explanation. No production setting was changed. Evidence:
+`/tmp/so-batch-priority-live-settings.png`. The source read, manager refusal and rolled-back SQL
+save/audit proof are distinct from a live manager Save journey, which was not performed. This does not close
 the full SO Batch boundary above.
 
 Authenticated production acceptance also found that the Batch Purchase Orders toolbar opened
@@ -323,11 +327,56 @@ Authenticated production matching of `SO-1365` read its real source and showed z
 Units at the default Klang location. Cancel restored the ordinary Listing; no reservation or
 issue was performed. The empty candidate list exposed `site:Carres Klang` as a label; the local
 correction retains the readable default location option even with zero candidates. Match and PO
-recovery controls now refuse interaction during the initial Register load. These corrections
-require release and production acceptance. Evidence of the discovered empty-stock state:
+recovery controls now refuse interaction during the initial Register load. PR #1887 merged as
+`96e7faf58b3a1591c6eacdf396965f2b0bf7829f`; deploy `37207938377` succeeded and independent
+five-entry SHA convergence passed. The corrected empty-stock label still requires direct
+production UI acceptance. Evidence of the discovered empty-stock state:
 `/tmp/so-batch-live-stock-empty.png`. Positive live stock selection, whole-scope acceptance,
 multiple selected live PDFs, Quick View and Table/Cards remain open; this bounded proof does
 not complete the mission.
+
+**Shared Quick View / Table / Cards — LOCAL BUILD, production acceptance pending, 2026-10-04.**
+The actual Register now opens the kit compact-card Drawer from SO No, row double-click or View.
+Its CompactModuleCard header reads exact Sales-owned SO facts; neighbouring search results,
+failed reads and placeholder data cannot supply another customer's phone, address or sales facts.
+Missing reads remain explicit with retry. Goods and stock selection use the existing item
+expansion; PO lineage remains separate in Order details. The panel issues only its own prepared
+SO scope, retaining other selected SOs, and recovers only its exact deduplicated existing POs.
+The explicit full-page door retains the source SO destination. Table and Cards share one DataGrid
+filter/sort scope, selection and footer; URL presentation/group parameters preserve cutoff/deep-link
+scope, and the kit remembers volatile Register context across object return. Supplier grouping
+uses the exact supplier set for each SO; multi-supplier SOs are never duplicated across groups.
+138 Register tests, four exact-header/failure/PDF-close tests and 23 whole-page issue/evidence/retry tests
+pass locally. Page journeys use distinct real-grid session keys between tests while retaining
+the same session across a journey's remounts; this prevents one test's search from hiding another
+test's SO without disabling production context retention. Type checking and design guard pass.
+Actual sample component acceptance confirms selected SO retention across Table/Cards and
+filtered `1 of 6 Sales Orders` parity on desktop and 390px. Evidence:
+`/tmp/so-batch-quick-view-ready.png`, `/tmp/so-batch-cards-filtered-desktop.png`,
+`/tmp/so-batch-cards-filtered-mobile.png`. The sample refuses every API write; it is not live
+issuance or reservation proof. Release and authenticated production walkthrough remain required.
+At 390px the module toolbar wraps its labelled controls; Purchase Orders is fully visible
+(x=20 to 142 within the 390px viewport), the page width remains 390px and keyboard Enter opens
+the result panel. This corrects a locally observed clipped toolbar control without changing the kit.
+After mainline integration the saved-source document preview uses the kit's current close callback;
+PDF close restores focus to the same source entry and reopening retains the SO panel. Its four
+adapter tests and four actual saved-document tests pass; the earlier CI type rejection is not
+accepted as delivery proof.
+The full CI then passed 4,030 API and 6,311 web tests but rejected one internal stock callback
+parameter as a visible banned word. The flag is now named `isPending`; approved PO Status copy
+and the guard remain unchanged. All 126 copy-guard tests and four compact-view tests pass locally;
+the fresh full CI is still required before release.
+
+**Additional authenticated stock acceptance, 2026-10-04.** In the actual `time=11:00` scope,
+manual whole-round matching offered SO-1368 exact Unit `U1-000-180` at Carres Klang (New,
+received 14 Aug, original reference `PO/2608-068`). The eligible suggestion appeared first;
+other unmatched SOs showed zero available. Ticking that Unit enabled Proceed and showed one
+selected SO. Clear then Cancel restored normal purchasing, with the individual item chooser still
+showing `1 available 0 reserved`. Its own location was Carres Klang; ticking enabled Choose Ready
+Unit and clearing returned to no Unit chosen. No Proceed/save/issue was performed. Evidence:
+`/tmp/so-batch-live-positive-stock-choice.png`, `/tmp/so-batch-live-individual-stock-choice.png`.
+The initial live Register load also showed Match and Purchase Orders disabled. These prove
+positive candidate/selection and read/loading behavior, not live reservation acceptance.
 
 ### SO Batch PO Status — owner-approved 2026-10-04
 

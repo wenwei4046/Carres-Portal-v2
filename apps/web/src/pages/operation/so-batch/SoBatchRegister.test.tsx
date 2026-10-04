@@ -316,7 +316,7 @@ function renderRegister(over: Partial<SoBatchPurchaseResponse> = {}, expandHisto
   const rendered = render(
     <QueryClientProvider client={client}>
       <MemoryRouter initialEntries={["/operation?tab=purchase"]}>
-        <SoBatchRegister data={data(over)} isLoading={isLoading} onIssue={onIssue} onOpenPurchaseOrders={onOpenPurchaseOrders} />
+        <SoBatchRegister sessionKey={expect.getState().currentTestName} data={data(over)} isLoading={isLoading} onIssue={onIssue} onOpenPurchaseOrders={onOpenPurchaseOrders} />
       </MemoryRouter>
     </QueryClientProvider>,
   );
@@ -328,6 +328,44 @@ it("refuses manual whole-round matching when the persisted priority source is un
   renderRegister({ readyStockPriority: null });
   expect(screen.getByRole("button", { name: "Match Ready Stock" })).toBeDisabled();
   expect(apiFetch).not.toHaveBeenCalled();
+});
+
+it("Cards shares the filtered Register and retains buying ticks when returning to Table", async () => {
+  renderRegister({ registerRows: [ORDER_O1, ORDER_O3], rows: [LEAF_O1, LEAF_O3] });
+  fireEvent.change(screen.getByRole("searchbox"), { target: { value: "Kimmy" } });
+  await waitFor(() => expect(screen.queryByTestId("so-batch-row-o3")).not.toBeInTheDocument());
+  fireEvent.click(screen.getByTestId("so-batch-select-o1"));
+  fireEvent.mouseDown(screen.getByRole("tab", { name: "Cards" }));
+  const card = screen.getByTestId("so-batch-card-o1");
+  expect(screen.queryByTestId("so-batch-card-o3")).not.toBeInTheDocument();
+  expect(within(card).getByRole("checkbox", { name: "Select SO-1318" })).toHaveAttribute("data-state", "checked");
+  fireEvent.mouseDown(screen.getByRole("tab", { name: "Table" }));
+  expect(screen.getByTestId("so-batch-select-o1")).toBeChecked();
+  fireEvent.click(screen.getByTestId("so-batch-select-o1"));
+  expect(screen.getByRole("searchbox")).toHaveValue("Kimmy");
+});
+
+it("Quick View issues only its own prepared scope while another SO stays selected", () => {
+  renderRegister({ registerRows: [ORDER_O1, ORDER_O3], rows: [LEAF_O1, LEAF_O3] });
+  fireEvent.click(screen.getByTestId("so-batch-select-o1"));
+  fireEvent.click(screen.getByTestId("so-batch-select-o3"));
+  fireEvent.click(screen.getByTestId("so-batch-so-link-o1"));
+  fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Issue PO" }));
+  expect(onIssue).toHaveBeenCalledTimes(1);
+  expect(onIssue.mock.calls[0]![0].map((selection: { demandId: string }) => selection.demandId)).toEqual([LEAF_O1.id]);
+  expect(screen.getByTestId("so-batch-select-o3")).toBeChecked();
+});
+
+it("Supplier grouping names the exact supplier set and never duplicates a multi-supplier SO", () => {
+  renderRegister({ registerRows: [ORDER_O1, ORDER_O8], rows: [LEAF_O1, LEAF_O8A, LEAF_O8B] });
+  fireEvent.keyDown(screen.getByRole("button", { name: "Page tools" }), { key: "Enter" });
+  fireEvent.click(screen.getByRole("menuitem", { name: "Group by: Supplier" }));
+  expect(screen.getByText("Hooka · Ohana")).toBeInTheDocument();
+  expect(screen.getAllByTestId("so-batch-row-o8")).toHaveLength(1);
+  expect(screen.getByTestId("so-batch-footer")).toHaveTextContent("2 Sales Orders");
+  fireEvent.mouseDown(screen.getByRole("tab", { name: "Cards" }));
+  expect(screen.getAllByTestId("so-batch-card-o8")).toHaveLength(1);
+  expect(screen.getByTestId("so-batch-footer")).toHaveTextContent("2 Sales Orders");
 });
 
 it("does not match or recover POs from an unfinished Register load", () => {
@@ -542,10 +580,15 @@ describe("one permanent row per proceeded Sales Order", () => {
     expect(screen.getByTestId("so-batch-po-link-o7")).toHaveTextContent("PO-20260822-3333");
   });
 
-  it("SO No and a single PO No are direct links to their objects", () => {
+  it("SO No opens the source Quick View and its deliberate Open leads to the full SO", () => {
     renderRegister();
     fireEvent.click(screen.getByTestId("so-batch-so-link-o1"));
+    const panel = screen.getByRole("dialog");
+    expect(within(panel).getByTestId("so-batch-card-o1")).toBeInTheDocument();
+    expect(navigate).not.toHaveBeenCalled();
+    fireEvent.click(within(panel).getByRole("button", { name: "Open full page" }));
     expect(navigate).toHaveBeenCalledWith("/operation/orders/so/o1");
+    fireEvent.click(within(panel).getByRole("button", { name: "Close panel" }));
     fireEvent.click(screen.getByTestId("so-batch-po-link-o3"));
     expect(navigate).toHaveBeenCalledWith("/operation/procurement?po=PO-20260820-4827");
   });
