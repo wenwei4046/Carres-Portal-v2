@@ -57,6 +57,11 @@ window.fetch = async (input, init) => {
   const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url, window.location.href);
   if (!url.pathname.startsWith("/api/")) return realFetch(input, init);
   if ((init?.method ?? "GET") !== "GET") return Response.json({ message: "Sample data · Local preview only" }, { status: 403 });
+  if (url.pathname === "/api/operation/orders") return Response.json({ orders: orders.map(order => ({
+    id: order.orderId, so: order.so, customer_name: order.customer, customer_phone: "Sample phone",
+    customer_address: "Sample address, Klang", placed_at: "2026-10-01T08:00:00+08:00",
+    outlets: { name: "Sample Sales Location" }, dealers: null, salespersons: { name: "Sample salesperson" },
+  })) });
   if (url.pathname.endsWith("email-capability")) return Response.json({ configured: false });
   if (url.pathname.endsWith("issued-round")) return Response.json({ poIds: samplePos.map(po => po.id) });
   if (url.pathname.endsWith("issued-today")) return Response.json({ today: "2026-10-05", pos: samplePos });

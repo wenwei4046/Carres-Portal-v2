@@ -2693,7 +2693,8 @@ PR #1295 is deployed and authenticated on all-five-converged `12d1a264bcf17cd9c8
 
 ### Customer summary cell — owner-approved 2026-10-04
 
-APPROVED UI TARGET / NOT BUILT. In the confirmed compact Delivery card, the final customer
+IMPLEMENTED in the shared CompactModuleCard and Sales Order adapter. This is a display rule,
+not evidence that an individual order has a customer-agreed date. In the compact Delivery card, the final customer
 leg's third summary title is `Customer`, replacing `Confirmed Delivery`. Its primary value is
 the customer-agreed operational date and, only when recorded, the agreed time/period on the
 same line: `31 Oct · 3:00 PM` or `31 Oct · Afternoon`. With no agreed time show only the date;
