@@ -1303,9 +1303,8 @@ export default function SalesOrdersRegister() {
             renderResults={cards ? (visible) => (
               <div className="grid grid-cols-1 gap-3 p-3 md:grid-cols-2 2xl:grid-cols-3" data-testid="sales-orders-cards">
                 {visible.map((row) => {
-                  // This list projection lacks identity_scope and outcome provenance.
-                  // It cannot distinguish counted stock from Unit fulfilment. The existing
-                  // rail stays on its governed projection; cards must not claim proof.
+                  // Both views use the existing register delivery projection;
+                  // scope-card readiness remains a separate final-leg fact.
                   return <div key={row.id} data-row-key={row.id} tabIndex={-1} className="min-w-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9" data-testid={`sales-order-card-${row.so}`}>
                     <Block title={`SO-${row.so}`} headerSlot={<div className="flex items-center gap-3">
                       <Checkbox id={`card-select-${row.id}`} ariaLabel={`Select SO-${row.so}`} checked={selected.has(row.id)} onCheckedChange={() => toggleRow(row.id)} />
@@ -1315,7 +1314,7 @@ export default function SalesOrdersRegister() {
                         <div className="col-span-2"><dt className="text-label text-kit-slate-11">Customer</dt><dd className="break-words">{row.customer}</dd></div>
                         <div><dt className="text-label text-kit-slate-11">Customer Requested Delivery Date</dt><dd>{row.customerDelivery ? fmtDate(row.customerDelivery) : ""}</dd></div>
                         <div className="col-span-2 order-last"><dt className="text-label text-kit-slate-11">Items</dt><dd className="min-w-0"><GoodsSummary row={row} onOpen={setGoodsTarget} /></dd></div>
-                        <div><dt className="text-label text-kit-slate-11">Delivery</dt><dd>Unavailable</dd></div>
+                        <div><dt className="text-label text-kit-slate-11">Delivery</dt><dd>{REGISTER_DELIVERY_CONDITIONS.find(condition => condition.key === registerDeliveryConditionOf(row.o.order_lines ?? [], row.o.allocated_units ?? []))?.label ?? "Not recorded"}</dd></div>
                         <div><dt className="text-label text-kit-slate-11">Total payable</dt><dd>{moneyCell(row.total)}</dd></div>
                         <div><dt className="text-label text-kit-slate-11">Balance due</dt><dd>{moneyCell(row.balance)}</dd></div>
                       </dl>

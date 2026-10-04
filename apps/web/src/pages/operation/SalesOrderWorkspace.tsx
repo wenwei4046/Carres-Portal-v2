@@ -3431,11 +3431,11 @@ function SalesOrderWorkspaceBody() {
                 value={draft.delivery_has_lift ? "Has lift" : "No lift"}
                 onValueChange={(v) => setField("delivery_has_lift", v === "Has lift")}
                 options={LIFT_OPTIONS.map((o) => ({ value: o, label: o }))} />
-              {formLocked ? <Fact label="Items needing stair carry" value={String(draft.delivery_stair_items ?? 0)} /> :
+              {formLocked ? <Fact label="Items needing stair carry" value={draft.delivery_stair_items == null ? "Not recorded" : String(draft.delivery_stair_items)} /> :
               <Input id="so-stair-items" label="Items needing stair carry" type="number" min={0}
                 max={stair?.itemsTotal}
                 hint={stair ? `0 to ${stair.itemsTotal}` : undefined}
-                value={String(draft.delivery_stair_items ?? 0)}
+                value={draft.delivery_stair_items == null ? "" : String(draft.delivery_stair_items)}
                 onChange={(e) =>
                   setField(
                     "delivery_stair_items",
@@ -3488,7 +3488,7 @@ function SalesOrderWorkspaceBody() {
               ) : <Fact label="Services" own={false} framed value={
                 <div className="flex flex-col gap-1">
                   {draft.addons.filter((a) => !a.removed).map((a) => (
-                    <div key={a.key}>{nameOfAddon(a.addon_key)}{configWords(a.attrs) ? ` · ${configWords(a.attrs)}` : ""} ×{a.qty}</div>
+                    <div key={a.key}>{servicesWords([a], nameOfAddon)}</div>
                   ))}
                 </div>
               } />}

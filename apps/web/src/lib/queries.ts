@@ -11098,6 +11098,8 @@ export interface TimelineEntry {
   action?: string | null;
   detail?: Record<string, unknown> | null;
   actor_name?: string | null;
+  actor_kind?: "human" | "system" | "missing";
+  actor_role?: string | null;
   occurred_at: string;
 }
 

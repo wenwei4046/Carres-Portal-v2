@@ -1546,11 +1546,12 @@ describe("the isolated shared-template pilot", () => {
     fireEvent.mouseDown(screen.getByRole("tab", { name: "Cards" }));
     expect(screen.getByRole("checkbox", { name: "Select SO-101" })).toBeChecked();
   });
-  it("does not convert sold stock without identity/outcome evidence into a delivered card", () => {
+  it("uses the governed register delivery projection in Cards instead of hardcoded unavailability", () => {
     listHookState.data = { orders: [order({ allocated_units: [{ sku: "B1201S-K", status: "sold", qty: 1 }] })] };
     mount("/operation/orders?view=cards");
-    expect(within(screen.getByTestId("sales-orders-cards")).getByText("Unavailable")).toBeInTheDocument();
-    expect(within(screen.getByTestId("sales-orders-cards")).queryByText("Fully delivered")).not.toBeInTheDocument();
+    const cardStatus = within(screen.getByTestId("sales-orders-cards")).getByText("Fully delivered");
+    expect(cardStatus).toBeInTheDocument();
+    expect(within(screen.getByTestId("sales-orders-cards")).queryByText("Unavailable")).not.toBeInTheDocument();
   });
   it("opens goods-only inspection with actual additional line count, never quantity", () => {
     listHookState.data = { orders: [order({ order_lines: [{ id: "l1", sku: "A", qty: 10, unit_price: 1 }, { id: "l2", sku: "B", qty: 20, unit_price: 1 }] })] };
