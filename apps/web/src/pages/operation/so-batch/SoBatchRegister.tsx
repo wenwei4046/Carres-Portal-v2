@@ -628,7 +628,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
     () => [...live].map(([demandId, allocations]) => ({ demandId, allocations })),
     [live],
   );
-  const stock = useWholeRoundReadyStock(dropTicksForLines);
+  const stock = useWholeRoundReadyStock(dropTicksForLines, data.readyStockPriority ?? "customer_delivery");
   const stockOffers = (orderId: string) => stock.offers.filter(offer => offer.orderId === orderId);
   const stockIds = (orderId: string) => stockOffers(orderId).flatMap(offer => offer.units.map(unit => unit.itemId));
   const displayRows = stock.active ? [...shown].sort((a, b) => Number(stockIds(b.orderId).length > 0) - Number(stockIds(a.orderId).length > 0) || compareOrderBy(a, b)) : shown;
@@ -1477,7 +1477,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
                 {stock.active ? <><Select id="round-stock-location" toolbar label="Stock Location" value={stock.location}
                   onValueChange={stock.setLocation} disabled={stock.busy} options={stock.locations} />
                   <Button size="sm" disabled={stock.busy} onClick={stock.clear}>Cancel</Button></>
-                  : <Button size="sm" loading={stock.busy} onClick={() => {
+                  : <Button size="sm" loading={stock.busy} disabled={data.readyStockPriority == null} title={data.readyStockPriority == null ? "Not available" : undefined} onClick={() => {
                     void stock.match(visibleOrders.current.filter(order => shown.some(row => row.orderId === order.orderId) && purchaseStatus(order) !== "Done"));
                   }}>Match Ready Stock</Button>}
                 {onOpenPurchaseOrders ? <Button size="sm" loading={purchaseOrdersLoading} onClick={() => {

@@ -324,6 +324,27 @@ function renderRegister(over: Partial<SoBatchPurchaseResponse> = {}, expandHisto
   return rendered;
 }
 
+it("refuses manual whole-round matching when the persisted priority source is unavailable", () => {
+  renderRegister({ readyStockPriority: null });
+  expect(screen.getByRole("button", { name: "Match Ready Stock" })).toBeDisabled();
+  expect(apiFetch).not.toHaveBeenCalled();
+});
+
+it("matches through actual Listing controls and ticking exposes Proceed without a reservation write", async () => {
+  apiFetch.mockResolvedValueOnce({ orderId: "o1", so: ORDER_O1.so, reference: "SO-1318",
+    lines: [{ orderLineId: "l1", sku: "A", item: "A", qty: 2, reservedQty: 0, reservedUnitCodes: [], onPoQty: 0, remainingQty: 2 }],
+    units: [{ itemId: KLANG, unitCode: "SAMPLE-UNIT-1", identityScope: "unit", sku: "A", condition: "new",
+      siteName: "Carres Klang", warehouseId: KLANG, holderName: null, ownership: "carres_owned", supplier: null,
+      qty: 1, dateIn: "2026-08-01", matchingLineIds: ["l1"], blocked: null, reservedForLineId: null }] } as unknown as SalesOrderExpansionResponse);
+  renderRegister({ readyStockPriority: "customer_delivery", registerRows: [ORDER_O1], rows: [LEAF_O1] });
+  fireEvent.click(screen.getByRole("button", { name: "Match Ready Stock" }));
+  await waitFor(() => expect(screen.getByRole("combobox", { name: "Stock Location" })).toHaveTextContent("Carres Klang"));
+  expect(screen.getByText("1 available")).toBeInTheDocument();
+  fireEvent.click(screen.getByTestId("so-batch-stock-select-o1"));
+  expect(screen.getByRole("button", { name: "Proceed", exact: true })).toBeEnabled();
+  expect(apiFetch.mock.calls.every(([, options]) => (options as { method?: string } | undefined)?.method !== "POST")).toBe(true);
+});
+
 beforeEach(() => {
   navigate.mockClear();
   onIssue.mockClear();

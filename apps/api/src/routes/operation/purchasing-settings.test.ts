@@ -104,6 +104,29 @@ describe("Purchasing Settings — PO windows (0585, MASTER §5.6.1)", () => {
   });
 });
 
+describe("Purchasing Settings — Ready Stock priority", () => {
+  it("uses the existing manager-gated SQL door and returns persisted source facts", async () => {
+    const rpc = vi.fn().mockResolvedValue({ error: null });
+    vi.mocked(userClient).mockReturnValue({ rpc } as never);
+    vi.mocked(loadPurchasingSettings).mockResolvedValue({ ...response, readyStockPriority: "proceed_date" });
+    const res = await testApp().request("/settings/ready-stock-priority", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ priority: "proceed_date" }) });
+    expect(res.status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("purchasing_set_ready_stock_priority", { p_priority: "proceed_date" });
+    expect(((await res.json()) as PurchasingSettingsResponse).readyStockPriority).toBe("proceed_date");
+  });
+  it("refuses an unsupported priority before calling SQL", async () => {
+    const rpc = vi.fn(); vi.mocked(userClient).mockReturnValue({ rpc } as never);
+    const res = await testApp().request("/settings/ready-stock-priority", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ priority: "supplier" }) });
+    expect(res.status).toBe(422); expect(rpc).not.toHaveBeenCalled();
+  });
+  it("preserves SQL's permission refusal instead of reporting a saved value", async () => {
+    const rpc = vi.fn().mockResolvedValue({ error: { code: "42501", message: "forbidden" } });
+    vi.mocked(userClient).mockReturnValue({ rpc } as never);
+    const res = await testApp().request("/settings/ready-stock-priority", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ priority: "proceed_date" }) });
+    expect(res.status).toBe(403);
+  });
+});
+
 describe("Purchasing Settings — Deliver To", () => {
   it("creates a future destination through the governed SQL door", async () => {
     const rpc = vi.fn().mockResolvedValue({ data: DESTINATION_ID, error: null });

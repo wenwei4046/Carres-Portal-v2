@@ -29,6 +29,7 @@ import {
   useSetSupplierChannel,
   useSetPurchasingNumber,
   useSetPurchasingPoDays,
+  useSetReadyStockPriority,
   useSetPurchasingPoWindows,
   useSetSupplierPoCutoff,
   useSetSupplierWorkWeek,
@@ -397,6 +398,9 @@ export default function OperationPurchasingSettings({
           />
         </div>
 
+        <div className="mb-8 max-w-[860px]" data-testid="ready-stock-priority-settings">
+          <ReadyStockPrioritySection key={data.readyStockPriority ?? "unavailable"} settings={data} canEdit={canEdit} />
+        </div>
         <div className="mb-8 max-w-[860px]" data-testid="deliver-to-settings">
           <Block
             title="Deliver To"
@@ -1193,6 +1197,29 @@ export default function OperationPurchasingSettings({
  * rewrites an issued PO; the SQL door records the old and new value, and the
  * history line reads it in clock words.
  */
+function ReadyStockPrioritySection({ settings, canEdit }: { settings: PurchasingSettingsResponse; canEdit: boolean }) {
+  const save = useSetReadyStockPriority();
+  const [draft, setDraft] = useState(settings.readyStockPriority ?? "");
+  const [problem, setProblem] = useState<string | null>(null);
+  return <Block title="Ready Stock" subtitle="Priority">
+    <div className="flex flex-wrap items-end gap-3 py-3">
+      <Select id="ready-stock-priority" label="Priority" value={draft}
+        disabled={!canEdit || settings.readyStockPriority == null || save.isPending}
+        onValueChange={value => setDraft(value as "customer_delivery" | "proceed_date")}
+        options={[{ value: "customer_delivery", label: "Customer Requested Delivery Date" }, { value: "proceed_date", label: "Proceed Date" }]} />
+      {canEdit && <Button loading={save.isPending} disabled={!draft || draft === settings.readyStockPriority || settings.readyStockPriority == null}
+        onClick={async () => {
+          setProblem(null);
+          try { await save.mutateAsync({ priority: draft as "customer_delivery" | "proceed_date" }); }
+          catch { setProblem("Not confirmed · Try again"); }
+        }}>Save</Button>}
+    </div>
+    {settings.readyStockPriority == null && <p className="text-meta text-kit-slate-11">Not available</p>}
+    {problem && <p role="alert" className="text-meta text-kit-red-11">{problem}</p>}
+    <ChangeLine settings={settings} settingKey="ready_stock_priority" />
+  </Block>;
+}
+
 function PoWindowsSection({
   settings,
   canEdit,

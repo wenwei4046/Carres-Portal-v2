@@ -969,6 +969,7 @@ export const soBatchPurchaseResponseSchema = z.object({
    */
   poWindowsUnavailable: z.boolean().optional(),
   poCutoffTimes: z.array(z.string()).optional(),
+  readyStockPriority: z.enum(["customer_delivery", "proceed_date"]).nullable().optional(),
   /** Read-only dated rounds from the same window stamps as Work. Counts are SOs, not units. */
   poRounds: z.array(z.object({ key: z.string(), unfinishedSoCount: z.number().int().nonnegative() })).optional(),
 });

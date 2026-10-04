@@ -145,6 +145,7 @@ export interface PurchasingDeliveryPartnerSetting {
 }
 
 export interface PurchasingSettings {
+  readyStockPriority?: "customer_delivery" | "proceed_date" | null;
   orderByBufferDays: number;
   earliestSellDays: number;
   logisticsCallWorkingDays: number;
@@ -450,6 +451,7 @@ const weekdayList = z
 export const purchasingCategorySchema = z.enum(PURCHASING_CATEGORIES);
 
 export const purchasingSettingsResponseSchema = z.object({
+  readyStockPriority: z.enum(["customer_delivery", "proceed_date"]).nullable().optional(),
   orderByBufferDays: z.number().int(),
   earliestSellDays: z.number().int(),
   logisticsCallWorkingDays: z.number().int(),
@@ -527,6 +529,7 @@ export const purchasingSettingsResponseSchema = z.object({
   canEdit: z.boolean(),
 });
 export type PurchasingSettingsResponse = z.infer<typeof purchasingSettingsResponseSchema>;
+export const purchasingSetReadyStockPriorityInput = z.object({ priority: z.enum(["customer_delivery", "proceed_date"]) });
 
 const purchasingDestinationName = z.string().trim().min(1).max(120);
 const purchasingDestinationAddress = z
@@ -753,6 +756,7 @@ export function settingValueLabel(
   if (raw === "") return null;
   if (settingKey === "supplier_work_week") return workWeekLabel(parsePgIntArray(raw));
   if (settingKey === "po_days") return weekdayListLabel(parsePgIntArray(raw));
+  if (settingKey === "ready_stock_priority") return raw === "customer_delivery" ? "Customer Requested Delivery Date" : raw === "proceed_date" ? "Proceed Date" : raw;
   if (settingKey === "po_windows") return poWindowsHistoryLabel(raw);
   if (settingKey === "supplier_po_cutoff") return clockWordOf(raw) ?? raw;
   return raw;
