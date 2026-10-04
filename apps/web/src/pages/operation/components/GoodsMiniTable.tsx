@@ -523,6 +523,7 @@ export default function GoodsMiniTable({
   soBatchGoodsLayout = false,
   manualPurchaseGoodsLayout = false,
   showStatus = false,
+  statusLabel = "Status",
   detailRow,
   showSku = true,
   showFromStock = false,
@@ -569,6 +570,7 @@ export default function GoodsMiniTable({
   manualPurchaseGoodsLayout?: boolean;
   /** `Need PO` / `No PO needed` — the need for a new document, not permission. */
   showStatus?: boolean;
+  statusLabel?: string;
   /**
    * ⭐ THE ROW THAT OPENS UNDER AN ITEM — owner ruling 2026-09-18.
    *
@@ -731,7 +733,7 @@ export default function GoodsMiniTable({
     orderedQty: { ...ORDERED_QTY_COLUMN },
     toBuy: { ...TO_BUY_COLUMN },
     orderBy: { key: "orderBy", label: "Order By", width: 104 },
-    status: { key: "status", label: "Status", width: 112 },
+    status: { key: "status", label: statusLabel, width: 112 },
     sourceUnit: { ...SOURCE_UNIT_COLUMN },
     receivedQty: { ...RECEIVED_QTY_COLUMN },
     damagedQty: { ...DAMAGED_QTY_COLUMN },

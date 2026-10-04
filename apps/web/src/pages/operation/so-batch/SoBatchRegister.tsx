@@ -27,9 +27,8 @@ import {
   soBatchLineReservedWhy,
   readyStockRefusalWord,
   soBatchOrderSafetyDays,
-  soBatchOrderStatusWord,
+  soBatchPurchaseStatus,
   soBatchOrderByAbsenceWord,
-  compareSoBatchPlanning,
   soBatchOrderSupplierNames,
   soBatchRailFacts,
   soBatchRailModel,
@@ -368,12 +367,13 @@ export interface SoBatchRegisterProps {
   hidden?: boolean;
   /** Hands the arrangement to the issue journey. This page creates nothing. */
   onIssue: (selections: SoBatchSelection[]) => void;
+  onOpenPurchaseOrders?: () => void;
   /** The PO window Work opened this page on (Purchasing §5.6.1): its name,
    *  and the way back to every window's demand. */
   scope?: { label: string; onClear: () => void; preselectKey?: string };
 }
 
-export default function SoBatchRegister({ data, isLoading, onIssue, initialSearch, hidden = false, scope, roundNavigation }: SoBatchRegisterProps) {
+export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurchaseOrders, initialSearch, hidden = false, scope, roundNavigation }: SoBatchRegisterProps) {
   const navigate = useNavigate();
   /* R8 — a `display:none` box forgets its scroll offset, and by the time a
      render hides it the offset already reads 0. So the offset is remembered
@@ -488,11 +488,11 @@ export default function SoBatchRegister({ data, isLoading, onIssue, initialSearc
   const orderByFacts = useMemo(() => new Map(orders.map((order) => [
     order.orderId, soBatchOrderPlanning(order, leafsByOrder.get(order.orderId) ?? []),
   ])), [orders, leafsByOrder]);
+  const purchaseStatus = useCallback((order: SoBatchOrderRow) =>
+    soBatchPurchaseStatus(order, leafsByOrder.get(order.orderId) ?? []), [leafsByOrder]);
   const compareOrderBy = useCallback((a: SoBatchOrderRow, b: SoBatchOrderRow) =>
-    compareSoBatchPlanning(
-      { plan: orderByFacts.get(a.orderId)!, so: a.so },
-      { plan: orderByFacts.get(b.orderId)!, so: b.so },
-    ), [orderByFacts]);
+    Number(purchaseStatus(a) === "Done") - Number(purchaseStatus(b) === "Done") ||
+    (a.proceededAt ?? "9999").localeCompare(b.proceededAt ?? "9999") || (b.so ?? 0) - (a.so ?? 0), [purchaseStatus]);
   /* `PO Safety Days`, one answer per row, over exactly the leaves the parent
      checkbox would tick. The SERVER measured every number in it. */
   const safetyDaysFacts = useMemo(() => new Map(orders.map((order) => [
@@ -513,9 +513,12 @@ export default function SoBatchRegister({ data, isLoading, onIssue, initialSearc
   const [filterRailOpen, setFilterRailVisible] = useFilterRailOpen(FILTER_RAIL_STORAGE_KEY, canvasRef);
   const railFacts = useMemo(() => soBatchRailFacts(orders, leafs), [orders, leafs]);
   const rail = useMemo(() => soBatchRailModel(railFacts, filter), [railFacts, filter]);
+  const orderMatchesTime = useCallback((order: SoBatchOrderRow, time: string) =>
+    [...(leafsByOrder.get(order.orderId) ?? []).map(leaf => leaf.poWindow), ...order.pos.map(po => po.poWindow)]
+      .some(key => key && parsePoWindowKey(key)?.time === time), [leafsByOrder]);
   const shown = useMemo(
-    () => orders.filter((o) => rail.visibleOrderIds.has(o.orderId)).sort(compareOrderBy),
-    [orders, rail.visibleOrderIds, compareOrderBy],
+    () => orders.filter(order => rail.visibleOrderIds.has(order.orderId) && (!roundNavigation?.selected || orderMatchesTime(order, roundNavigation.selected))).sort(compareOrderBy),
+    [orders, rail.visibleOrderIds, compareOrderBy, roundNavigation?.selected, orderMatchesTime],
   );
   const toggleTiming = useCallback((s: PurchaseDemandTimingState) => {
     setFilter((prev) => ({ ...prev, timing: prev.timing === s ? null : s }));
@@ -793,26 +796,9 @@ export default function SoBatchRegister({ data, isLoading, onIssue, initialSearc
   const columns = useMemo<DataGridColumn<SoBatchOrderRow>[]>(
     () => [
       {
-        /**
-         * ⭐ STATUS IS BACK, AND IT IS A DIFFERENT COLUMN — owner ruling
-         * 2026-09-18.
-         *
-         * What was retired was blank · `Partial` · `Ordered`: a generic
-         * progress badge for an arithmetic the row already showed under
-         * `PO No`, and an operator could act on none of the three. What is here
-         * now answers the one question a BUYING page exists for — *does this
-         * still need a purchase order?* — in the page's own two words.
-         *
-         * IT IS THE GROUPS' OWN READING, not a second one: the same
-         * `soBatchOrderPlanning().group` that puts the row under `To buy` or
-         * `No purchase needed`, so the word on the row and the heading above it
-         * can never disagree. And it is a NEED, never a permission: every
-         * coverage gate, every blocker and the issue door's own recomputation
-         * are untouched, and a row can read `Need PO` and still refuse the tick
-         * with its own stated reason.
-         */
+        /* Purchase quantity completion, separate from communication and receiving. */
         key: "status",
-        label: "Status",
+        label: "PO Status",
         /* The shared Purchasing field width (UI MASTER §6.8). ONE word, one
            line: every row keeps one height (owner ruling 2026-09-29). */
         width: REGISTER_FIELD_WIDTH.status, minWidth: 96,
@@ -825,15 +811,15 @@ export default function SoBatchRegister({ data, isLoading, onIssue, initialSearc
              expansion, on each item line; the row says it has one with the
              grid's left-edge stripe (`rowHighlight` below). */
           <span className="block" data-testid={`so-batch-status-${o.orderId}`}>
-            {soBatchOrderStatusWord(orderByFacts.get(o.orderId)!.group)}
+            {purchaseStatus(o)}
           </span>
         ),
-        filterValue: (o) => soBatchOrderStatusWord(orderByFacts.get(o.orderId)!.group),
+        filterValue: (o) => purchaseStatus(o),
         sortFn: (a, b) =>
-          soBatchOrderStatusWord(orderByFacts.get(a.orderId)!.group).localeCompare(
-            soBatchOrderStatusWord(orderByFacts.get(b.orderId)!.group),
+          purchaseStatus(a).localeCompare(
+            purchaseStatus(b),
           ),
-        exportValue: (o) => soBatchOrderStatusWord(orderByFacts.get(o.orderId)!.group),
+        exportValue: (o) => purchaseStatus(o),
       },
       {
         /* THE RECORD DATE leads (ui MASTER §6.7 rule 2, Jess 2026-09-17): the
@@ -1191,7 +1177,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue, initialSearc
         },
       },
     ],
-    [orderByFacts, safetyDaysFacts, compareOrderBy, stateWords,
+    [orderByFacts, safetyDaysFacts, compareOrderBy, purchaseStatus, stateWords,
       navigate,
       data.destinations,
       leafsByOrder,
@@ -1292,13 +1278,13 @@ export default function SoBatchRegister({ data, isLoading, onIssue, initialSearc
               the tick and the Ready Stock door. */}
           {roundNavigation && <FilterRailGroup title="Order time" icon="date" defaultOpen>
             {data.poWindowsUnavailable && <p className="px-2 py-2 text-meta text-kit-slate-11">Data not loaded</p>}
-            {roundNavigation.rounds.map(round => {
+            {(data.poCutoffTimes ?? [...new Set(roundNavigation.rounds.flatMap(round => {
               const window = parsePoWindowKey(round.key);
-              return window ? <FilterRailRow key={round.key} testId={`so-batch-round-${round.key}`}
-                label={poWindowTimeWord(window.time)} supportingText={fmtDate(window.date)}
-                count={round.unfinishedSoCount} title={`${round.unfinishedSoCount} unfinished Sales Orders`} active={roundNavigation.selected === round.key}
-                onClick={() => roundNavigation.onSelect(round.key)} /> : null;
-            })}
+              return window ? [window.time] : [];
+            }))]).map(time => <FilterRailRow key={time} testId={`so-batch-cutoff-${time}`}
+              label={poWindowTimeWord(time)}
+              count={orders.filter(order => purchaseStatus(order) !== "Done" && orderMatchesTime(order, time)).length}
+              active={roundNavigation.selected === time} onClick={() => roundNavigation.onSelect(time)} />)}
           </FilterRailGroup>}
           <FilterRailGroup title="PO Safety Days" icon="date" defaultOpen={!!roundNavigation}>
             {SO_BATCH_RAIL.timing.states.map((s) => (
@@ -1466,6 +1452,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue, initialSearc
             data-testid="so-batch-grid"
           >
             <DataGrid<SoBatchOrderRow>
+              toolbarEnd={onOpenPurchaseOrders ? <Button size="sm" onClick={onOpenPurchaseOrders}>Purchase Orders</Button> : undefined}
               appearance="reference"
               wrapToolbar
               palette="slate"
@@ -1483,7 +1470,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue, initialSearc
               searchPlaceholder={W.search}
               initialSearch={initialSearch}
               noMatchMessage={W.noMatch}
-              onClearConditions={() => setFilter(SO_BATCH_RAIL_CLEAR)}
+              onClearConditions={() => { setFilter(SO_BATCH_RAIL_CLEAR); if (roundNavigation?.selected) roundNavigation.onSelect(roundNavigation.selected); }}
               toolbarStart={
                 !filterRailOpen ? (
                   <ShowFiltersButton
@@ -1499,14 +1486,6 @@ export default function SoBatchRegister({ data, isLoading, onIssue, initialSearc
               warning={selectionHasPendingStock ? W.readyStockPendingBlocksIssue : undefined}
               emptyMessage={orders.length > 0 ? W.noMatch : W.empty}
               groupBanner={false}
-              fixedGroups={{
-                groups: [
-                  { key: "to-buy", label: W.groupToBuy, alwaysOpen: true },
-                  { key: "no-purchase-needed", label: W.groupNoPurchaseNeeded, initiallyCollapsed: true },
-                ],
-                groupOf: (o) => orderByFacts.get(o.orderId)!.group,
-                revealMatches: Object.values(filter).some((value) => value != null && value !== false),
-              }}
               /* The owner's approved order opens with `Status`, then the
                  date/identity pair §6.7 rule 2 fixes. All three are protected
                  from hiding and dragging; only the pair pins. */
@@ -1836,7 +1815,7 @@ function SoBatchOrderExpansion({
          (`soBatchOrderLineOutstandingQty`), never a second one. It states the
          need for a document; it grants no permission, and a line that reads
          `Need PO` can still refuse the tick with its own stated reason. */
-      status: soBatchOrderLineOutstandingQty(l) > 0 ? W.statusNeedPo : W.statusNoPoNeeded,
+      status: soBatchPurchaseStatus({ ...order, lines: [l] }, leaf ? [leaf] : []),
       /* Line two (owner ruling 2026-09-28): the leaf's own refusal, only
          beside `Need PO`, from the facts the refused tick reads. */
       ...(() => {
@@ -2009,6 +1988,7 @@ function SoBatchOrderExpansion({
 
   const goodsTable = (
     <GoodsMiniTable
+      statusLabel="PO Status"
       label={order.so == null ? "Goods on this order" : `Goods on SO-${order.so}`}
       lines={lines}
       /**

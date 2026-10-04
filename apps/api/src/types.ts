@@ -2,6 +2,9 @@ import type { Role } from "@carres/shared/domain";
 
 export type Bindings = {
   DEPLOY_SHA?: string;
+  RESEND_API_KEY?: string;
+  PO_EMAIL_FROM?: string;
+  PO_EMAIL_ENABLED?: string;
   SUPABASE_URL: string;
   SUPABASE_ANON_KEY: string;
   SUPABASE_SERVICE_ROLE_KEY: string;

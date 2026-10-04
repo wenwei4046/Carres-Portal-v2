@@ -351,11 +351,11 @@ const source = () => readFileSync(join(HERE, "SoBatchRegister.tsx"), "utf8");
    its records. One `<colgroup>` and one layout serve them all, so reading the
    first group's header reads the layout. */
 const groupHeaderCells = (root: ParentNode): HTMLElement[] => [
-  ...(root.querySelector<HTMLElement>('tr[data-testid^="grid-header-"]')?.querySelectorAll<HTMLElement>("th") ?? []),
+  ...(root.querySelector<HTMLElement>('thead tr:last-child')?.querySelectorAll<HTMLElement>("th") ?? []),
 ];
 describe("the approved columns, in the approved reading order", () => {
   const APPROVED = [
-    "Status",
+    "PO Status",
     "Proceed Date",
     "SO No",
     "PO Safety Days",
@@ -388,10 +388,10 @@ describe("the approved columns, in the approved reading order", () => {
     const text = groupHeaderCells(container).map((el) => el.textContent).join("|");
     expect(text).not.toContain("Partial");
     expect(text).not.toContain("Ordered");
-    expect(screen.getByTestId("so-batch-status-o1")).toHaveTextContent("Need PO");
+    expect(screen.getByTestId("so-batch-status-o1")).toHaveTextContent("Pending");
     /* A word is not a permission: eligibility still refuses the tick. */
     expect(screen.getByTestId("so-batch-select-o5")).toBeDisabled();
-    expect(screen.getByTestId("so-batch-status-o5")).toHaveTextContent("No PO needed");
+    expect(screen.getByTestId("so-batch-status-o5")).toHaveTextContent("Done");
   });
 
   it("retires `Order By` as a column and keeps it on the wire", () => {
@@ -444,7 +444,7 @@ describe("the approved columns, in the approved reading order", () => {
     const heads = groupHeaderCells(container);
     const data = heads.filter((th) => th.title);
     expect(data.slice(0, 4).map((th) => th.title)).toEqual([
-      "Status",
+      "PO Status",
       "Proceed Date",
       "SO No",
       "PO Safety Days",
@@ -468,7 +468,6 @@ describe("one permanent row per proceeded Sales Order", () => {
     renderRegister();
     const page = screen.getByTestId("so-batch-page").textContent ?? "";
     for (const banned of [
-      "Partial",
       "Ordered",
       "No buying needed",
       "Cannot buy",
@@ -1312,7 +1311,7 @@ describe("the expansion — the ONE shared child table", () => {
       .map((el) => (el.textContent ?? "").trim())
       .filter(Boolean);
     expect(heads).toEqual([
-      "Status",
+      "PO Status",
       "Category",
       "Qty",
       "Item",
@@ -1324,11 +1323,11 @@ describe("the expansion — the ONE shared child table", () => {
       expect(heads, gone).not.toContain(gone);
     }
     const line = within(box).getByTestId("so-batch-part-B1201S-Q");
-    expect(within(line).getByTestId("goods-status-l61")).toHaveTextContent("No PO needed");
+    expect(within(line).getByTestId("goods-status-l61")).toHaveTextContent("Done");
     expect(within(line).queryByRole("checkbox")).toBeNull();
     /* The customer's ORIGINAL quantity, never quietly rewritten. */
     expect(line).toHaveTextContent("2");
-    expect(screen.getByTestId("so-batch-status-o6")).toHaveTextContent("No PO needed");
+    expect(screen.getByTestId("so-batch-status-o6")).toHaveTextContent("Done");
   });
 
   it("an eligible line carries the existing destination editor — Split included", async () => {
@@ -1905,7 +1904,7 @@ describe("fourteen documents on a one-unit line", () => {
     /* This order's own lineage already carries every unit it required, so the
        row needs no NEW document and has no margin to state — the cell is
        BLANK, which is its own meaning and is never a `0`. */
-    expect(screen.getByTestId("so-batch-status-o14")).toHaveTextContent("No PO needed");
+    expect(screen.getByTestId("so-batch-status-o14")).toHaveTextContent("Done");
     expect(screen.getByTestId("so-batch-safety-days-o14")).toHaveTextContent("");
   });
 
@@ -2316,27 +2315,22 @@ describe("approved PO Safety Days column", () => {
 
 
 describe("two truthful groups on one permanent Register", () => {
-  it("starts with buying open and no-purchase-needed collapsed, preserving the total", () => {
+  it("retains unfinished and completed records without automatic grouping", () => {
     renderRegister({}, false);
-    expect(screen.getByText("To buy")).toBeInTheDocument();
-    expect(screen.getByText("No purchase needed")).toBeInTheDocument();
-    expect(screen.getByTestId("so-batch-row-o1")).toBeInTheDocument();
-    expect(screen.queryByTestId("so-batch-row-o5")).not.toBeInTheDocument();
+    expect(screen.queryByText("No purchase needed")).not.toBeInTheDocument();
+    for (const id of ["o1", "o3", "o4", "o5", "o6", "o7", "o8"]) expect(screen.getByTestId(`so-batch-row-${id}`)).toBeInTheDocument();
     expect(screen.getByTestId("so-batch-footer")).toHaveTextContent("7 Sales Orders");
-    fireEvent.click(screen.getByText("No purchase needed"));
-    expect(screen.getByTestId("so-batch-row-o5")).toBeInTheDocument();
-    expect(screen.getByTestId("so-batch-row-o6")).toBeInTheDocument();
   });
 });
 
 
 describe("search, clear and default buying order", () => {
-  it("sorts selectable dates ascending with descending SO ties before blocked demand", () => {
-    const rows = data().rows.map((r) => ({ ...r, orderBy: r.orderId === "o1" ? "2026-09-30" : "2026-09-16" }));
-    const { container } = renderRegister({ rows }, false);
-    const ids = [...container.querySelectorAll('[data-testid^="so-batch-row-"]')].map((r) => r.getAttribute("data-testid"));
-    expect(ids.indexOf("so-batch-row-o3")).toBeLessThan(ids.indexOf("so-batch-row-o1"));
-    expect(ids.indexOf("so-batch-row-o1")).toBeLessThan(ids.indexOf("so-batch-row-o4"));
+  it("sorts unfinished work by Proceed Date before completed work", () => {
+    const registerRows = data().registerRows.map(order => ({ ...order, proceededAt: order.orderId === "o1" ? "2026-09-01" : "2026-09-02" }));
+    const { container } = renderRegister({ registerRows }, false);
+    const ids = [...container.querySelectorAll('[data-testid^="so-batch-row-"]')].map(row => row.getAttribute("data-testid"));
+    expect(ids.indexOf("so-batch-row-o1")).toBeLessThan(ids.indexOf("so-batch-row-o3"));
+    expect(ids.indexOf("so-batch-row-o3")).toBeLessThan(ids.indexOf("so-batch-row-o5"));
   });
   it("search reveals a covered order and no match offers a complete clear", async () => {
     renderRegister({}, false);
@@ -2359,50 +2353,31 @@ describe("owner rulings R1–R6, 2026-09-16 — one table, two groups", () => {
     [...container.querySelectorAll("thead tr, tbody tr")].map((tr) =>
       tr.getAttribute("data-testid") ?? tr.textContent ?? "");
 
-  it("R1 — To buy is a heading above; No purchase needed is a collapsed button below", () => {
+  it("R1 — Done records remain visible below unfinished records", () => {
     const { container } = renderRegister({}, false);
-    const heading = screen.getByRole("heading", { name: /To buy/ });
-    expect(heading.tagName).not.toBe("BUTTON");
-    const toggle = screen.getByTestId("grid-group-toggle-no-purchase-needed");
-    expect(toggle.tagName).toBe("BUTTON");
-    expect(toggle).toHaveAttribute("aria-expanded", "false");
-    const order = rowsIn(container);
-    expect(order.indexOf("grid-group-to-buy")).toBeLessThan(order.indexOf("grid-group-no-purchase-needed"));
-    /* Remaining demand decides — partly bought o3 and blocked o4 buy; Ordered
-       o5, Ready-Stock-only o6 and fully linked o7 need nothing. */
-    for (const id of ["o1", "o3", "o4", "o8"]) expect(screen.getByTestId(`so-batch-row-${id}`)).toBeInTheDocument();
-    for (const id of ["o5", "o6", "o7"]) expect(screen.queryByTestId(`so-batch-row-${id}`)).not.toBeInTheDocument();
-    fireEvent.click(toggle);
-    expect(toggle).toHaveAttribute("aria-expanded", "true");
-    for (const id of ["o5", "o6", "o7"]) expect(screen.getByTestId(`so-batch-row-${id}`)).toBeInTheDocument();
+    expect(screen.queryByTestId("grid-group-toggle-no-purchase-needed")).not.toBeInTheDocument();
+    const rows = rowsIn(container).filter(row => row.startsWith("so-batch-row-"));
+    for (const id of ["o1", "o3", "o4", "o8"]) expect(rows.indexOf(`so-batch-row-${id}`)).toBeLessThan(rows.indexOf("so-batch-row-o6"));
+    expect(screen.getByTestId("so-batch-status-o6")).toHaveTextContent("Done");
+    expect(screen.getByTestId("so-batch-select-o6")).toBeDisabled();
   });
 
-  it("R1 — a search match inside the collapsed group is revealed, and clearing restores the collapse", async () => {
+  it("R1 — a search match inside the collapsed group is revealed, and clearing restores all retained records", async () => {
     renderRegister({}, false);
     const input = screen.getByTestId("search-box").querySelector("input")!;
     fireEvent.change(input, { target: { value: "STOCKED" } });
     expect(await screen.findByTestId("so-batch-row-o6")).toBeInTheDocument();
     fireEvent.click(screen.getByTestId("search-clear"));
-    await waitFor(() => expect(screen.queryByTestId("so-batch-row-o6")).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.getByTestId("so-batch-row-o6")).toBeInTheDocument());
     expect(input.value).toBe("");
   });
 
-  it("R2 — To buy reads Order By ascending, then Not planned, then SO No descending", () => {
-    const { container } = renderRegister({
-      rows: [
-        { ...LEAF_O1, orderBy: "2026-08-25" },
-        { ...LEAF_O3, orderBy: "2026-08-23" },
-        { ...LEAF_O8A, orderBy: "2026-08-30" },
-        { ...LEAF_O8B, orderBy: "2026-08-24" },
-        LEAF_O4,
-      ],
-    }, false);
-    const rows = rowsIn(container).filter((t) => t.startsWith("so-batch-row-"));
-    expect(rows).toEqual(["so-batch-row-o3", "so-batch-row-o8", "so-batch-row-o1", "so-batch-row-o4"]);
-    /* The DEFAULT READING ORDER is still the engine's Order By, even though
-       the column that prints is the margin: the sort is planning truth, not a
-       column's text (owner ruling R2, unchanged 2026-09-18). */
-    expect(screen.getByTestId("so-batch-safety-days-o4").textContent).toBe("Not planned");
+  it("R2 — planning urgency does not override Proceed Date order", () => {
+    const registerRows = data().registerRows.map(order => ({ ...order, proceededAt: order.orderId === "o4" ? "2026-08-01" : "2026-08-02" }));
+    const { container } = renderRegister({ registerRows }, false);
+    const rows = rowsIn(container).filter(row => row.startsWith("so-batch-row-"));
+    expect(rows[0]).toBe("so-batch-row-o4");
+    expect(screen.getByTestId("so-batch-safety-days-o4")).toHaveTextContent("Not planned");
   });
 
   it("R6 — the footer carries one total, singular for one order", () => {
@@ -2518,7 +2493,7 @@ describe("the two-line Status rule", () => {
   it("a To-buy order blocked by a missing SKU reads one word, a red stripe, and `Fix in Catalog` on the item line", async () => {
     renderRegister(blockedOrder("no_sku"));
     const cell = screen.getByTestId("so-batch-status-ob");
-    expect(cell).toHaveTextContent(/^Need PO$/);
+    expect(cell).toHaveTextContent(/^Pending$/);
     expect(screen.queryByTestId("so-batch-status-why-ob")).toBeNull();
     expect(rowOf("ob")).toHaveAttribute("data-row-highlight", "critical");
     expect(rowOf("ob").getAttribute("title")).toContain("SKU not found");
@@ -2558,7 +2533,7 @@ describe("the two-line Status rule", () => {
 
   it("a pool-covered line: blue stripe `{PO No} has {n} {Item} available.`, and `Use this PO` on the item line", async () => {
     renderRegister(coveredWithOffer({ poOffer: { poId: "PO260924-4827", qty: 2 } }));
-    expect(screen.getByTestId("so-batch-status-ob")).toHaveTextContent(/^Need PO$/);
+    expect(screen.getByTestId("so-batch-status-ob")).toHaveTextContent(/^Pending$/);
     expect(rowOf("ob")).toHaveAttribute("data-row-highlight", "info");
     expect(rowOf("ob").getAttribute("title")).toBe("PO260924-4827 has 2 Booqit King available.");
     const why = await itemLineWhy("ob", "lb1");
@@ -2614,7 +2589,7 @@ describe("the two-line Status rule", () => {
       ],
     });
     renderRegister({ rows: [], registerRows: [order] });
-    expect(screen.getByTestId("so-batch-status-or")).toHaveTextContent(/^No PO needed$/);
+    expect(screen.getByTestId("so-batch-status-or")).toHaveTextContent(/^Done$/);
     expect(rowOf("or")).toHaveAttribute("data-row-highlight", "info");
     expect(rowOf("or").getAttribute("title")).toBe("1 Booqit King on PO260924-4827 is reserved for this order.");
     expect(await itemLineWhy("or", "lr1"))
@@ -2623,7 +2598,7 @@ describe("the two-line Status rule", () => {
 
   it("a tickable order carries one word and no stripe", () => {
     renderRegister();
-    expect(screen.getByTestId("so-batch-status-o1")).toHaveTextContent(/^Need PO$/);
+    expect(screen.getByTestId("so-batch-status-o1")).toHaveTextContent(/^Pending$/);
     expect(rowOf("o1")).not.toHaveAttribute("data-row-highlight");
   });
 
@@ -2632,8 +2607,29 @@ describe("the two-line Status rule", () => {
     fireEvent.click(screen.getByTestId("so-batch-expand-ob"));
     const box = await screen.findByTestId("so-batch-inspector-ob");
     const status = within(box).getByTestId("goods-status-lb1").closest("td")!;
-    expect(status).toHaveTextContent("Need PO");
+    expect(status).toHaveTextContent("Pending");
     expect(status).toHaveTextContent("SKU not found");
     expect(within(status).getByRole("button", { name: "Fix in Catalog" })).toBeInTheDocument();
+  });
+});
+
+describe("Order time contains configured cutoffs, not dated occurrence records", () => {
+  it("shows two times once despite repeated dates and selects the time", () => {
+    const onSelect = vi.fn();
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(<QueryClientProvider client={client}><MemoryRouter>
+      <SoBatchRegister data={data({ poCutoffTimes: ["11:00", "16:00"], rows: data().rows.map(leaf => ({ ...leaf, poWindow: leaf.orderId === "o1" ? "2026-09-01T11:00" : leaf.orderId === "o3" ? "2026-09-04T11:00" : "2026-09-04T16:00" })) })} isLoading={false} onIssue={onIssue}
+        roundNavigation={{ selected: null, onSelect, rounds: [
+          { key: "2026-09-01T11:00", unfinishedSoCount: 1 },
+          { key: "2026-09-04T11:00", unfinishedSoCount: 2 },
+          { key: "2026-09-04T16:00", unfinishedSoCount: 1 },
+        ] }} />
+    </MemoryRouter></QueryClientProvider>);
+    expect(screen.getAllByText("11:00 AM")).toHaveLength(1);
+    expect(screen.getAllByText("4:00 PM")).toHaveLength(1);
+    expect(screen.getByText("11:00 AM").closest("button")).toHaveTextContent("2");
+    expect(screen.queryByText("Tue, 1 Sep")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText("11:00 AM"));
+    expect(onSelect).toHaveBeenCalledWith("11:00");
   });
 });

@@ -1,8 +1,13 @@
 import { Hono, type Context } from "hono";
+import { bodyLimit } from "hono/body-limit";
+import { preparePoEmailAttempt, recordPoEmailOutcome, readPoEmailAttempts } from "../../lib/po-email-attempts";
+import { sendSupplierPoEmail } from "../../lib/supplier-email";
+import { purchasingActorMayIssue } from "../../lib/purchasing-po-authority";
 import { arrivalConfirmationWorkCompletion, poSentWorkCompletion, supplierReplyWorkCompletion } from "../../lib/purchasing-work-completion";
 import { resolveActorNames } from "../../lib/actor-names";
 import {
   arrivalFromReadyDate,
+  parsePoWindowKey,
   assignPickupPartnerInput,
   cancelPoInput,
   chasePoEventInput,
@@ -16,6 +21,7 @@ import {
   recordSupplierAnswersInput,
   recordArrivalConfirmationInput,
   confirmPoSentInput,
+  supplierPoEmailInput,
   recordSendInput,
   revisePoInput,
   setMessageTemplateInput,
@@ -30,7 +36,7 @@ import {
 } from "@carres/shared";
 // renderPoPdf moved to apps/web/src/lib/pdf/render.ts (Workers WASM ban).
 import { requireOperation } from "../../lib/auth-guards";
-import { chunk } from "../../lib/purchase-demand-read";
+import { chunk, todayIso } from "../../lib/purchase-demand-read";
 import { supplierPoFactsOf, type SupplierFactRows } from "../../lib/supplier-card-facts";
 import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
@@ -1542,6 +1548,159 @@ operationPosRouter.get("/:id/units", requireOperation, async (c) => {
 // 2026-05-12 (Loo): browser renders @react-pdf locally (Workers WASM ban —
 // see render.ts note in apps/web/src/lib/pdf/).
 // Resume the existing document's send step without issuing another PO.
+function supplierEmailConfigured(c: Context<AppEnv>): boolean {
+  return c.env.PO_EMAIL_ENABLED === "true" && Boolean(c.env.RESEND_API_KEY && c.env.PO_EMAIL_FROM);
+}
+
+operationPosRouter.get("/email-capability", requireOperation, c => c.json({ configured: supplierEmailConfigured(c) }));
+
+operationPosRouter.get("/:id/email-attempts", requireOperation, async c => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const visible = await sb.from("purchase_orders").select("id").eq("id", c.req.param("id")).maybeSingle();
+  if (visible.error) { const m = mapPgError(visible.error); return c.json(m.body, m.status); }
+  if (!visible.data) return c.json({ code: "not_found" }, 404);
+  const read = await readPoEmailAttempts(c.env, visible.data.id);
+  if (read.error) return c.json({ code: "email_history_unavailable" }, 503);
+  const attempts = (read.data ?? []).flatMap(row => {
+    const evidence = row.po_email_attempts as unknown as { id: string; outcome: string; provider_id: string | null; recipient: string };
+    if (evidence.outcome === "failed") return [];
+    return [{ id: evidence.id, status: evidence.outcome === "dispatched" ? "dispatched" : "unknown",
+      providerId: evidence.provider_id ?? undefined, recipient: evidence.recipient,
+      documents: [{ id: row.po_id, version: row.po_version }] }];
+  });
+  return c.json({ attempts });
+});
+
+operationPosRouter.post("/supplier-email", requireOperation,
+  bodyLimit({ maxSize: 30 * 1024 * 1024 }), async (c) => {
+  if (!supplierEmailConfigured(c)) return c.json({ code: "email_not_configured", message: "Not available" }, 503);
+  const parsed = await parseJsonBody(c, supplierPoEmailInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const input = parsed.data;
+  const ids = input.documents.map(document => document.id);
+  if (new Set(ids).size !== ids.length) return c.json({ code: "duplicate_po" }, 422);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const permission = await purchasingActorMayIssue(sb, c.var.auth.id);
+  if (permission.error) { const m = mapPgError(permission.error); return c.json(m.body, m.status); }
+  if (!permission.mayIssue) return c.json({ code: "forbidden" }, 403);
+  const [poRead, supplierRead, sendRead] = await Promise.all([
+    sb.from("purchase_orders").select("id, supplier_id, version, status").in("id", ids),
+    sb.from("suppliers").select("contact_email").eq("id", input.supplierId).maybeSingle(),
+    sb.from("po_sends").select("po_id, po_version, recipient, channel, note").in("po_id", ids).eq("kind", "confirmed_sent"),
+  ]);
+  const readError = poRead.error ?? supplierRead.error ?? sendRead.error;
+  if (readError) { const m = mapPgError(readError); return c.json(m.body, m.status); }
+  if (supplierRead.data?.contact_email?.trim() !== input.recipient) return c.json({ code: "recipient_changed", message: "Check Suppliers" }, 409);
+  const pos = new Map((poRead.data ?? []).map(po => [po.id, po]));
+  for (const document of input.documents) {
+    const po = pos.get(document.id);
+    if (!po || po.supplier_id !== input.supplierId || po.status === "cancelled") return c.json({ code: "invalid_po_document" }, 422);
+    if ((po.version ?? 1) !== document.version) return c.json({ code: "stale_po_version", message: "Purchase order changed" }, 409);
+    const expectedFilename = `${document.id.replace(/[^a-zA-Z0-9._-]/g, "_")}-V${document.version}.pdf`;
+    if (document.filename !== expectedFilename) return c.json({ code: "invalid_po_document" }, 422);
+  }
+  const attempt = `po-email/${input.attemptId}`;
+  const history = sendRead.data ?? [];
+  const alreadySent = input.documents.filter(document => history.some(row => row.po_id === document.id && row.po_version === document.version));
+  const differentlySent = alreadySent.filter(document => !history.some(row => row.po_id === document.id && row.po_version === document.version && typeof row.note === "string" && row.note.includes(attempt)));
+  if (differentlySent.length && !input.resend) return c.json({ code: "already_sent", message: "PO sent to supplier", pos: differentlySent.map(document => document.id) }, 409);
+  // The mandatory listing comes from the server-validated document set, never a second UI selection.
+  const listing = input.documents.map(document => `${document.id} · V${document.version}`).join("\n");
+  const reservation = await preparePoEmailAttempt(c.env, c.var.auth.id, input);
+  if (reservation.error) {
+    // No provider call without a durable reservation. Existing/uncertain attempts
+    // remain blocked even when this request cannot recover their result.
+    return c.json({ code: "email_unknown", status: "unknown" }, 502);
+  }
+  const reserved = reservation.data as { created: boolean; status: string; providerId?: string };
+  if (reserved?.created !== true && (reserved?.created !== false || reserved.status !== "dispatched" || !reserved.providerId))
+    return c.json({ code: "email_unknown", status: "unknown" }, 502);
+  const result = !reserved.created && reserved.providerId
+    ? { status: "dispatched" as const, providerId: reserved.providerId }
+    : await sendSupplierPoEmail({ apiKey: c.env.RESEND_API_KEY, from: c.env.PO_EMAIL_FROM }, {
+    recipient: input.recipient, subject: input.subject, message: `${input.message}\n\n${listing}`,
+    attachments: input.documents.map(({ filename, content }) => ({ filename, content })), attemptKey: attempt,
+  });
+  if (reserved.created) {
+    const saved = await recordPoEmailOutcome(c.env, input.attemptId,
+      result.status === "invalid_payload" || result.status === "not_configured" ? "failed" : result.status,
+      result.status === "dispatched" ? result.providerId : undefined);
+    if (saved.error) return c.json({ code: "email_unknown", status: "unknown" }, 502);
+  }
+  if (result.status !== "dispatched") return c.json({ code: `email_${result.status}`, status: result.status }, result.status === "invalid_payload" ? 422 : 502);
+  // Reuse the one existing evidence/Work-completion door. No second po_sends writer.
+  const internal = new Hono<AppEnv>();
+  internal.use("*", async (child, next) => { child.set("auth", c.var.auth); await next(); });
+  internal.route("/", operationPosRouter);
+  const results = [];
+  for (const document of input.documents) {
+    const recorded = history.some(row => row.po_id === document.id && row.po_version === document.version && typeof row.note === "string" && row.note.includes(attempt));
+    if (recorded) { results.push({ id: document.id, version: document.version, recorded: true }); continue; }
+    try {
+      const response = await internal.request(`/${encodeURIComponent(document.id)}/confirm-sent`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ channel: "email", recipient: input.recipient, poVersion: document.version,
+          note: `Email dispatch ${result.providerId}; ${attempt}` }),
+      }, c.env);
+      results.push({ id: document.id, version: document.version, recorded: response.ok });
+    } catch {
+      results.push({ id: document.id, version: document.version, recorded: false });
+    }
+  }
+  // A failed evidence write never becomes "not sent": retry must reuse this same attempt/PDF set.
+  return c.json({ status: "dispatched", providerId: result.providerId, documents: results });
+});
+
+// Use Work's exact round projection; no second admission/window arithmetic.
+operationPosRouter.get("/issued-round", requireOperation, async (c) => {
+  const key = c.req.query("window");
+  if (!key || !parsePoWindowKey(key)) return c.json({ code: "invalid_param" }, 422);
+  const { poWindowSendFacts } = await import("./work");
+  const facts = await poWindowSendFacts(c, key);
+  return c.json({ poIds: facts.poIds });
+});
+
+// Today means issued SO Batch POs on the governed Malaysia date, across clock rounds.
+operationPosRouter.get("/issued-today", requireOperation, async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const today = todayIso();
+  const start = new Date(`${today}T00:00:00+08:00`);
+  const end = new Date(start.getTime() + 86_400_000);
+  const rows: Array<Record<string, unknown>> = [];
+  for (let from = 0; ; from += REGISTER_PAGE_SIZE) {
+    const result = await sb.from("purchase_orders")
+      .select("id, supplier_id, destination_id, version, placed_at")
+      .eq("purpose", "customer_sales").neq("status", "cancelled")
+      .gte("placed_at", start.toISOString()).lt("placed_at", end.toISOString())
+      .order("id").range(from, from + REGISTER_PAGE_SIZE - 1);
+    if (result.error) { const m = mapPgError(result.error); return c.json(m.body, m.status); }
+    const page = (result.data ?? []) as Array<Record<string, unknown>>;
+    rows.push(...page);
+    if (page.length < REGISTER_PAGE_SIZE) break;
+  }
+  if (!rows.length) return c.json({ today, pos: [] });
+  const [suppliers, destinations] = await Promise.all([
+    readEveryChunked<Record<string, unknown>, string>(rows.map(po => String(po.supplier_id)), ids =>
+      sb.from("suppliers").select("id, name, whatsapp_group_url, po_send_channel, contact_email, contact").in("id", ids)),
+    readEveryChunked<Record<string, unknown>, string>(rows.map(po => String(po.destination_id)), ids =>
+      sb.from("purchasing_destinations").select("id, name").in("id", ids)),
+  ]);
+  const lookupError = suppliers.error ?? destinations.error;
+  if (lookupError) { const m = mapPgError(lookupError); return c.json(m.body, m.status); }
+  const supplierById = new Map(suppliers.data.map(row => [row.id, row]));
+  const destinationById = new Map(destinations.data.map(row => [row.id, row]));
+  return c.json({ today, pos: rows.map(po => {
+    const supplier = supplierById.get(po.supplier_id);
+    return {
+      id: po.id, supplierId: po.supplier_id, supplierName: supplier?.name ?? null,
+      destinationId: po.destination_id, destination: destinationById.get(po.destination_id)?.name ?? null,
+      version: po.version, placedAt: po.placed_at,
+      whatsappGroupUrl: supplier?.whatsapp_group_url ?? null, contactEmail: supplier?.contact_email ?? null,
+      poSendChannel: supplier?.po_send_channel ?? null, contact: supplier?.contact ?? null,
+    };
+  }) });
+});
+
 operationPosRouter.get("/:id/issue-context", requireOperation, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
   const { data: po, error } = await sb.from("purchase_orders")

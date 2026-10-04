@@ -1377,6 +1377,8 @@ No recorded business date is silently moved to fit a calendar. Purchasing/Operat
 Office calendar (Mon–Fri); Receiving/GRN/Warehouse uses the Warehouse calendar (Mon–Sat); Sunday
 and Selangor public holidays are excluded.
 
+**SO Batch supplier bundle — owner-approved 2026-10-04.** After issue, keep separate numbered POs grouped by Supplier. Selected PO/version set controls both message and independent PDF attachments. Words: `This round` · `Today` · `Supplier` · `Select all` · `Download PDFs` · `Copy message` · `Open WhatsApp` · `Send Email`. Download PDFs produces a ZIP of separate PDFs, never a merged PDF. Real Email execution is exposed only after verified configuration and dispatch capability; preparation alone never records sending. Monthly Report remains deferred.
+
 **The SO Batch Purchase rail — owner-approved 2026-10-04.** Local navigation is Listing / deferred
 Report; factual groups are Order time and PO Safety Days. The existing Purchasing-owned Setup to
 fix exception appears only when affected SOs exist. Product, Supplier and Region filtering stays

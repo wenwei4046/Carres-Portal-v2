@@ -56,6 +56,8 @@ import Select from "@/components/kit/Select";
  * instead of offering a button that opens nothing.
  */
 export interface IssuedPo {
+  version?: number;
+  placedAt?: string;
   id: string;
   supplierId: string;
   supplierName: string | null;
@@ -143,7 +145,7 @@ export function confirmedSendFor(
   );
 }
 
-function refreshPurchasingReads() {
+export function refreshPurchasingReads() {
   void queryClient.invalidateQueries({ queryKey: ["operation", "pos"] });
   void queryClient.invalidateQueries({ queryKey: ["operation", "work"] });
   void queryClient.invalidateQueries({ queryKey: ["operation", "purchase", "today"] });
@@ -180,6 +182,9 @@ export default function PoIssueEvidence({
   layout = "panel",
   documentNo,
   onCancel,
+  hidePreparationTools = false,
+  mayConfirm = true,
+  recordedRecipient = false,
 }: {
   po: IssuedPo;
   /** The version of the document rendered beside this form. */
@@ -204,6 +209,12 @@ export default function PoIssueEvidence({
   /** The ruled document number (`PO260903-4316`), for the card's PO fact. */
   documentNo?: string;
   onCancel?: () => void;
+  /** A supplier bundle owns the one channel-preparation area; keep individual PDF and evidence. */
+  hidePreparationTools?: boolean;
+  /** Current document must have been reviewed; history remains readable beforehand. */
+  mayConfirm?: boolean;
+  /** Supplier result scope uses saved contacts; it cannot invent a recipient. */
+  recordedRecipient?: boolean;
 }) {
   /* The supplier's RECORDED channel is the default — the Work send line says
      `Click Email, send …` for an email-only supplier, so the form must not
@@ -239,8 +250,8 @@ export default function PoIssueEvidence({
       : channel === "email"
         ? po.contactEmail?.trim() || ""
         : "";
-  const recipient = typedRecipient ?? prefill;
-  const ready = recipient.trim().length > 0 && !saving && !confirmed;
+  const recipient = recordedRecipient ? prefill : typedRecipient ?? prefill;
+  const ready = mayConfirm && recipient.trim().length > 0 && !saving && !confirmed;
   const wa = doors?.whatsapp ?? null;
 
   async function copyMessage() {
@@ -336,7 +347,7 @@ export default function PoIssueEvidence({
       ...(mail ? [{ value: "email" as const, label: "Email", recipient: mail, shown: mail }] : []),
     ];
     const chosen = recorded.find((c) => c.value === channel) ?? recorded[0] ?? null;
-    const canSave = Boolean(chosen) && !saving && !confirmed;
+    const canSave = mayConfirm && Boolean(chosen) && !saving && !confirmed;
     const confirmRecorded = async () => {
       if (!chosen || !canSave) return;
       setSaving(true);
@@ -425,6 +436,7 @@ export default function PoIssueEvidence({
           Every door out of the Portal for this document lives here. They OPEN
           things; they record nothing and they complete nothing. */}
       <div className="mt-3 flex flex-wrap items-center gap-2">
+        {!hidePreparationTools && <>
         {wa ? (
           <a
             data-testid="po-open-whatsapp"
@@ -467,6 +479,7 @@ export default function PoIssueEvidence({
             Copy message
           </button>
         ) : null}
+        </>}
         {/* ⭐ A REAL PDF, NOT THE PAYLOAD BEHIND IT (closure §6). This link used
             to point at `/print-data`, so `Download PDF` handed the operator —
             and any supplier they forwarded it to — a JSON response. The same
@@ -501,7 +514,7 @@ export default function PoIssueEvidence({
           >
             <option value="whatsapp">WhatsApp</option>
             <option value="email">Email</option>
-            <option value="print">Printed</option>
+            {!recordedRecipient && <option value="print">Printed</option>}
           </select>
         </label>
         <label className="flex items-center justify-between gap-3 text-meta">
@@ -509,6 +522,7 @@ export default function PoIssueEvidence({
           <input
             className="h-7 min-w-[200px] rounded-control border border-kit-slate-6 px-1.5 text-meta"
             data-testid="so-batch-evidence-recipient"
+            readOnly={recordedRecipient}
             value={confirmed ? (confirmed.recipient ?? "") : recipient}
             disabled={!!confirmed}
             onChange={(e) => setTypedRecipient(e.target.value)}

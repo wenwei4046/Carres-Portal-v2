@@ -138,6 +138,24 @@ export const confirmPoSentInput = z.object({
 }).strict();
 export type ConfirmPoSentInput = z.infer<typeof confirmPoSentInput>;
 
+/** Human-confirmed supplier email: one selected supplier, independent rendered PO PDFs. */
+export const supplierPoEmailInput = z.object({
+  supplierId: z.string().uuid(),
+  recipient: z.string().trim().email().max(200),
+  subject: z.string().trim().min(1).max(200),
+  message: z.string().max(20_000),
+  attemptId: z.string().uuid(),
+  resend: z.boolean().default(false),
+  documents: z.array(z.object({
+    id: z.string().min(1).max(100),
+    version: z.number().int().positive(),
+    filename: z.string().min(1).max(200),
+    content: z.string().min(1).max(7_000_000),
+  }).strict()).min(1).max(25),
+}).strict();
+export type SupplierPoEmailInput = z.infer<typeof supplierPoEmailInput>;
+
+
 /**
  * PO Revisions (0364, Jess 2026-08-18) — POST /api/operation/pos/:id/revise →
  * `purchasing_revise_po`. A sent PO keeps its number and mints a version:

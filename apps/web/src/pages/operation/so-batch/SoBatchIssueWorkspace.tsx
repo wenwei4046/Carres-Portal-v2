@@ -1,4 +1,5 @@
 import layoutStyles from "./SoBatchRegister.module.css";
+import PoSupplierBundle from "./PoSupplierBundle";
 // design-standard: not-a-list-page — this is the 50/50 ISSUE surface
 // (CARD-2026-08-22-purchasing-02 §5), not a Register. Its table is the lines of
 // ONE purchase order being checked before it is sent, sitting beside that
@@ -68,6 +69,10 @@ export interface SoBatchIssueWorkspaceProps {
   onIssue?: () => Promise<{ pos: IssuedPo[] }>;
   /** The way back to the list this journey started from. Absent: SO Batch's. */
   backLabel?: string;
+  supplierBundle?: boolean;
+  roundWindow?: string;
+  /** SO result handoff: the retained register opens the same issued POs in its side panel. */
+  onIssued?: (pos: IssuedPo[]) => void;
 }
 
 type Mode = "review" | "evidence";
@@ -79,8 +84,12 @@ export default function SoBatchIssueWorkspace({
   onDone,
   onIssue,
   backLabel,
+  supplierBundle = false,
+  roundWindow,
+  onIssued,
 }: SoBatchIssueWorkspaceProps) {
   const [at, setAt] = useState(0);
+  const [bundlePreview, setBundlePreview] = useState<IssuedPo | null>(null);
   const [mode, setMode] = useState<Mode>("review");
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<{ wrong: string; todo: string } | null>(null);
@@ -260,6 +269,7 @@ export default function SoBatchIssueWorkspace({
             },
           );
       setPos(res.pos ?? []);
+      if (onIssued && res.pos?.length) { onIssued(res.pos); return; }
       setMode("evidence");
       setAt(0);
     } catch (e) {
@@ -307,6 +317,7 @@ export default function SoBatchIssueWorkspace({
       const po = await apiFetch<IssuedPo>(
         `/api/operation/pos/${encodeURIComponent(poId)}/issue-context`,
       );
+      if (onIssued) { onIssued([po]); return; }
       setPos([po]);
       setConfirmed(new Set());
       setAt(0);
@@ -348,8 +359,8 @@ export default function SoBatchIssueWorkspace({
       void loadEvidence(poId);
       setConfirmed((prev) => {
         const next = new Set(prev).add(poId);
-        if (next.size >= pos.length && pos.length > 0) onDone();
-        else {
+        if (!supplierBundle && next.size >= pos.length && pos.length > 0) onDone();
+        else if (!supplierBundle) {
           /* Move to the next document the supplier has not received. */
           const nextIdx = pos.findIndex((p) => !next.has(p.id));
           if (nextIdx >= 0) setAt(nextIdx);
@@ -357,12 +368,12 @@ export default function SoBatchIssueWorkspace({
         return next;
       });
     },
-    [pos, onDone, loadEvidence],
+    [pos, onDone, loadEvidence, supplierBundle],
   );
 
   const total = mode === "evidence" ? pos.length : documents.length;
   const idx = Math.min(at, Math.max(total - 1, 0));
-  const currentPo = mode === "evidence" ? pos[idx] : undefined;
+  const currentPo = mode === "evidence" ? bundlePreview ?? pos[idx] : undefined;
 
   const currentPoId = currentPo?.id ?? null;
   const [officialAttempt, setOfficialAttempt] = useState(0);
@@ -421,7 +432,7 @@ export default function SoBatchIssueWorkspace({
                 data-testid="so-batch-issue-prev"
                 className="h-7 rounded-control border border-kit-slate-6 px-2 text-meta disabled:opacity-40"
                 disabled={idx === 0}
-                onClick={() => setAt((i) => Math.max(0, i - 1))}
+                onClick={() => { setBundlePreview(null); setAt((i) => Math.max(0, i - 1)); }}
               >
                 Previous
               </button>
@@ -430,7 +441,7 @@ export default function SoBatchIssueWorkspace({
                 data-testid="so-batch-issue-next"
                 className="h-7 rounded-control border border-kit-slate-6 px-2 text-meta disabled:opacity-40"
                 disabled={idx >= total - 1}
-                onClick={() => setAt((i) => Math.min(total - 1, i + 1))}
+                onClick={() => { setBundlePreview(null); setAt((i) => Math.min(total - 1, i + 1)); }}
               >
                 Next
               </button>
@@ -578,12 +589,14 @@ export default function SoBatchIssueWorkspace({
             </>
           ) : currentPo ? (
             <>
+              {supplierBundle && <PoSupplierBundle pos={pos} roundWindow={roundWindow} onPreview={(_id, po) => setBundlePreview(po)} />}
               {/* The form appears only once the official document has rendered:
                  until then there is no version to declare, and a confirmation
                  without one is the defect 0378 closes. */}
               {pdfVersion != null && pdfUrl != null && paintedUrl === pdfUrl ? (
                 <PoIssueEvidence
                   po={currentPo}
+                  hidePreparationTools={supplierBundle}
                   version={pdfVersion}
                   /* PERSISTED rows, never this tab's memory (closure §8). */
                   evidence={evidence[currentPo.id] ?? []}

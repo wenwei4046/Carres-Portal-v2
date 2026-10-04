@@ -1558,6 +1558,7 @@ describe("the daily PO window of every demand line (Purchasing §5.6.1, owner ru
     // No Proceed time on record → no window is guessed.
     expect(stamped.o3).toEqual([null]);
     expect(body.poWindowsUnavailable).toBeUndefined();
+    expect(body.poCutoffTimes).toEqual(["11:30", "16:00"]);
   });
 
   it("a supplier's earlier cut-off is that supplier's own window; other suppliers keep theirs", async () => {
@@ -1596,6 +1597,7 @@ describe("the daily PO window of every demand line (Purchasing §5.6.1, owner ru
   it("unreadable window settings stamp nothing and SAY so — buying still works", async () => {
     const { body } = await rowsOf();
     expect(body.poWindowsUnavailable).toBe(true);
+    expect(body.poCutoffTimes).toBeUndefined();
     expect(body.rows.every((r) => r.poWindow == null)).toBe(true);
     expect(body.rows.length).toBeGreaterThan(0);
   });

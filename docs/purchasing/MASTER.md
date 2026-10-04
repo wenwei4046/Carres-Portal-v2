@@ -176,6 +176,26 @@ message sent; do not promote that report to a full live issue-to-send journey.
 
 ---
 
+**Order time — owner correction 2026-10-04.** The left rail lists the configured daily cutoffs once each, without dates or historical occurrence rows. A time choice filters retained SO records across dated occurrences of that time. Counts are unique unfinished SOs, never sums that duplicate an SO across dates or supplier lines. Dated Work deep-links retain their exact occurrence scope; this correction does not change admission arithmetic or saved cutoff settings.
+
+### SO Batch PO Status — owner-approved 2026-10-04
+
+Column/filter title: `PO Status`. In that named context use `Pending`, `Partial`, `Done`.
+Standalone cards, other pages and notifications use `PO Pending`, `PO Partial`, `PO Done`.
+Always spell `PO`, not `P.O.`. `Issue PO` remains the action verb.
+Calculate across every SO item and its exact supplier/PO lineage, not the presence of one PO.
+Exclude successfully confirmed eligible Ready Stock reservations from quantity requiring purchase.
+`Pending`: purchasing quantity remains and none of that required purchase quantity has been issued.
+`Partial`: some required purchase quantity has valid PO lineage and some remains unissued.
+`Done`: no required purchase quantity remains unissued, including an SO fully fulfilled by confirmed
+Ready Stock. Done expresses purchase-task quantity completion, not a claim that a PO exists, was
+sent or was received. Unconfirmed matches never qualify; failed/unknown coverage reads cannot
+produce Done. Pending/Partial remain above Done in the retained listing, ordered by Proceed Date.
+This overwrites the earlier SO Batch parent/item `Need PO` / `No PO needed` presentation;
+Manual Purchase's independent approval/request grouping is unchanged. Target approval is not build
+or production verification. Supplier communication evidence and Receiving remain separate facts.
+
+
 ## 3 · Whole-domain research audit
 
 ### 3.1 What was mined from 2990
@@ -1663,6 +1683,61 @@ summary. Action ownership uses structured avatar metadata.
 
 ### 8.2 Object Detail
 
+**SO Batch supplier documents/communication — OWNER-APPROVED 2026-10-04; TARGET / NOT DEPLOYED.**
+
+After successful SO Batch Issue PO, the same right-side result/Quick View panel shows the issued
+bundle: separate numbered POs, current versions and suppliers. A bundle is a result scope, not a
+new formal document, merged supplier PDF or second issue authority. Default scope is This round;
+Today explicitly selects POs issued today across rounds. Filter by Supplier, select individual POs
+or Select all within that supplier/scope. Selection drives the exact same PO/version set for the
+message listing and PDF files. Refreshing or changing selection updates both; never include another
+supplier's document, a draft, superseded version or unselected PO silently.
+
+Each PO remains one independent PDF. Download PDFs packages selected files into a ZIP for one
+bulk download; it never merges the PDFs. A per-PO PDF action remains. Purchase Orders Register
+supports finding/re-downloading selected POs through supplier/date filters using the same capability.
+SO Batch gives immediate access without requiring a second trip to that register.
+
+Every supplier supports both Email and WhatsApp in the approved communication target. The panel
+provides a channel selector, initially using the supplier's saved preferred channel, and permits
+switching without restricting either channel by supplier identity. Ohana currently preferring Email
+is an operating example, not an Email-only rule; other suppliers may also use Email. Contact details
+for each channel come from supplier authority. This ruling does not silently overwrite production
+supplier settings. Email panel shows saved recipient, editable prepared subject/message listing
+selected PO numbers/versions, and each independent selected PDF as an attachment. Send Email is
+an approved target; expose it as executable only when the actual email/attachment capability is
+verified. Its result records actual dispatch evidence/failure, never supplier receipt by inference.
+WhatsApp panel shows the corresponding prepared message with Download PDFs, Copy message and
+Open WhatsApp. Staff attach the independent PDFs and send externally; copying/downloading/opening
+proves preparation only, never sending. No automatic WhatsApp attachment/transmission is promised.
+
+Scope labels: This round / Today. Shared action labels: Download PDFs / Copy message /
+Open WhatsApp / Send Email. PO Status Pending/Partial/Done still measures issue quantity only;
+communication and receipt are independent facts. Batch failures remain per PO/version and retain
+successful results, so retry cannot silently resend every document. Use governed communication
+ownership, permissions and actual supplier contact authority; this approval commissions target
+truth, not a live external email, supplier-settings write or production transmission.
+
+**OWNER RULING — copy and adapt Houzs supplier Email capability, 2026-10-04.**
+Use the inspected real-email/PDF pattern as the proven reference for Carres, adapted to its existing
+PO/version, communication, permissions and supplier contact authorities. Any supplier with a valid
+saved Email may use Email sending; no supplier-name restriction. Without an Email, keep WhatsApp
+preparation/download available and direct contact maintenance to the supplier record; never fabricate
+a recipient. Default to the saved preferred channel and retain channel switching. For the approved
+supplier bundle panel, selected PO numbers/versions, message listing and independent PDF attachments
+must be the same set. One supplier Email may carry the selected separate PO PDFs; never merge them
+into one PDF or silently omit an attachment. Confirm recipient and selected documents before actual
+send, record actual actor/channel/recipient/PO-version set and outcome, and expose failure/retry
+without duplicate issue. Reuse short duplicate-send protection adapted to explicit resend and version
+semantics; email success means dispatch, not supplier receipt. PDF preparation failure prevents this
+send, with no summary-only fallback. This is approved copy/adapt target, not proof of Carres build,
+production deployment or authorization to send a real supplier order during research.
+
+**PRESENTATION PROPOSAL / NOT LAW.** The isolated local result-panel preview at
+`http://127.0.0.1:5178/so-batch-rail-preview.html?supplier-panel=1` is awaiting owner visual review.
+It does not approve legacy PR #1859 or completion of the Workspace Working Panel.
+
+
 - View is full width and usually one scroll: WORK, authoritative facts, lines/Units, source,
   connections, evidence, corrections and History.
 - Tabs exist only for parallel/reference surfaces: Document, Revisions where applicable, History and
@@ -1681,6 +1756,7 @@ summary. Action ownership uses structured avatar metadata.
 - **Entry and action clarity.** Loading must not flash a missing-Deliver-To warning. Status and selectable remaining demand must agree; a disabled choice explains the actual reason. Selection summary names Sales Orders, items, units and POs rather than an ambiguous selected count. The final action explicitly states how many POs the atomic batch creates, even while viewing document 1 of several. These are approved presentation corrections, not changes to grouping, MPR approval or issue/send authority.
 - **Implementation and readback, 2026-09-24 — DEPLOYED #1573 (`913ef00897e5da27bd4aa7be819a7e1f871dad3a`).** Shared review paints actual PDF pages with the Sales Order renderer, zoom/fit and decode retry; issuance waits for painting, and the final action names the whole batch. Both lanes carry server-projected provisional dates and supplier/destination facts. SO split draft quantities reuse the allocated-part quantity helper used by `composeDocumentLines`: an 11-item 10/1 allocation previews 10/1 rather than 11/11. Loading no longer asserts missing destinations; selection names Sales Orders, items, units and POs. Full CI `35961742802` passed on `d97ab18f3` (12,596 tests passed, 100 existing skips), as did deployment `35962708358`; all five canonical SHA endpoints converged. Negative controls caught a dropped PDF page and the old split quantities. Bundle fingerprints prove the old draft iframe disappeared, provisional-date copy appeared and preview/Back controls survived.
 - **Authenticated SO read-only proof.** Operation selected SO-1365 + SO-1363: 2 Sales Orders, 3 items, 3 units, 3 POs. All three draft selections changed their document facts and actual paper. At 1074px the two panes were 481px each; 150% paper measured 674px inside a 449px independently scrolling pane. At 390px the page stayed 390px wide and stacked 278px panes; Back retained both selections and the summary plus all actions remained visible. Server destination addresses and supplier-specific delivery dates were shown; missing supplier addresses linked to Suppliers, never invented. The temporary selection was cleared afterward. No final Issue, sending, upload, receiving or stock write occurred.
+- **LOCAL BUILD FACT — 2026-10-04, NOT DEPLOYED.** SO Batch supplier composition supports individual PO selection, same-set/version message and independent PDF ZIP download, current-round projection through Work, and Malaysia-date Today scope. A human-triggered Email route validates authority, saved recipient, supplier membership/current versions and prior sending before the adapted Resend transport. Each successful dispatch reuses the existing current-version confirmation/Work-completion door. Per-PO evidence failures retain known dispatch; the UI retries only those evidence writes, never the Email. An unknown transport outcome blocks silent resend and persists minimal attempt metadata in account-scoped browser session storage. No PDF bytes or credentials are stored there. 95 web issue/evidence/bundle/journey tests and 148 PO-route/provider tests passed. Subsequent Listing/cutoff coverage passed 150 web and 99 demand-route tests; supplier composition now passes 16 tests, including unreadable round refusal/retry and copying the editable message with precisely the selected PO versions. Issuance returns to the retained Listing and opens a supplier result Drawer; individual official PDF review uses the existing viewer Modal, not a Full Page object. Each result also provides Open full page into the existing exact PO object route; the PDF and object doors remain distinct. The object Back action restores the SO Batch cutoff URL and issued supplier-result scope; 73 combined SO Batch/PO object journey tests pass locally. Other Register-local presentation state across this object navigation remains a separate verification boundary. Close/reopen and rendered-version confirmation are covered by the journey tests. Readable supplier sending history survives another PO history read failure, with explicit unavailable evidence and retry. Configured real sender/provider verification, authenticated production lifecycle, complete shared object placement and rollout remain incomplete. Email remains unavailable without explicit verified configuration. This is not production completion or proof of an actual supplier transmission; migration 0649 and its server-only attempt RPCs now reserve the exact PO/version set and payload digest before provider dispatch, retain unknown outcomes, and recover known provider success without resending. The isolated local PostgreSQL verification passes 7 tests, the API route passes 143 tests, and supplier composition covers recovery after browser storage loss plus failed history reads. Migration 0649 was applied to Carres project kfprgpjpaffedghytstl on 2026-10-04 (tracker 20261004110741); both new tables have RLS enabled, authenticated browser INSERT denied and service-role reads allowed. The API/UI release and real-sender verification remain outstanding, so the complete production email lifecycle is still unverified.
 - **Verification boundary.** The authenticated MPR register has `Need PO 0`, so its issue walk was not manufactured; 189 full-page SO/MPR journey tests cover selection, refusals and preview readiness. No test or read-only view proves real issuance/receiving/sending. The exact-source versus generic PO-pool coverage discrepancy, remaining MPR composition/requester check, database-dependent work and the rest of the module remain open.
 
 - **ONE COMMUNICATION AREA PER DOCUMENT.** The doors out of the Portal (`Copy message`,
@@ -1902,16 +1978,11 @@ This document approves presentation, not unverified new storage fields, identifi
 **OWNER RULINGS R1–R8 — SO BATCH ROUND 1, APPROVED / LOCKED 2026-09-16.** Built in PR #1395.
 Fixture-walked in the real portal shell; the authenticated production walk is recorded in Card 11.
 
-- **R1 · One table, two groups.** `To buy` sits first, always open, and is a HEADING, never a
-  control; it stays visible with `0` while the Register holds records. `No purchase needed` sits
-  below, initially collapsed, and is a real disclosure button (`aria-expanded`). Grouping reads
-  REMAINING purchasing demand from the shared projection (`soBatchOrderPlanning` over
-  `soBatchOrderLineOutstandingQty`: customer quantity less current Ready Stock coverage less exact,
-  non-cancelled PO lineage), never the raw blank/partial/ordered status. Blocked, unverified and
-  pool-covered demand is never assumed bought, so it stays in `To buy`. PO-covered and
-  Ready-Stock-only orders (including orders that never had a PO) need no purchase. Search, column
-  filters and rail filters cover both groups; while any narrowing is active every group opens, and
-  clearing it returns the groups to the state the operator had before.
+- **R1 · One retained register — current owner ruling 2026-10-04.** Unfinished purchase work
+  appears first; completed work remains below. Default ordering uses Proceed Date within unfinished
+  work, with optional Supplier grouping. Free warehouse stock is an optional offer, never automatic
+  purchase exclusion. Deduct only actual SO-bound eligible Units and exact non-cancelled PO lineage.
+  Search and filters cover retained records. The earlier automatic non-purchase group is retired.
 - **R2 · Planning fact.** Order By remains the engine/detail date, not a parent column; the parent
   displays `PO Safety Days` under the shared dictionary. The planning date is the earliest over exactly the
   leaves the parent checkbox would tick; blank when nothing is left to buy. An undated `To buy`
@@ -1919,9 +1990,9 @@ Fixture-walked in the real portal shell; the authenticated production walk is re
   `Not planned` only when a leaf is blocked by missing setup (or an eligible leaf has no derivable
   date); `Coverage not checked` when whether an open PO covers a leaf could not be verified;
   `Already on a PO` when another open PO covers the remaining leaf. Setup is named first; an
-  unverified leaf is named before a covered one, because unknown must never read as covered. `To buy` reads selectable Order By ascending → `Not planned` →
-  SO No descending; `No purchase needed` reads SO No descending. Header sorting orders rows inside
-  each group, never across them. No client calendar arithmetic is admitted.
+  unverified leaf is named before a covered one, because unknown must never read as covered. Default ordering follows the current approved Blueprint: unfinished first, Proceed Date first;
+  optional stock-match results put proposed matches first within the selected round. Header sorting
+  and selectable grouping use the shared register grammar. No client calendar arithmetic is admitted.
 - **R3 · Columns** — see the column paragraph below; the saved layout key is
   `carres.soBatchPurchase.register.v5`, and only this register's key moved.
 - **R4 · Search** follows UI MASTER §6.7 (the responsive Register Search rule), adopted here first.
@@ -2130,22 +2201,19 @@ only rows satisfying both, never a widening OR.
 **Columns — OWNER RULING (Jess, 2026-09-18) · BUILT 2026-09-18, exactly in this order:**
 
 ```text
-Status · Proceed Date · SO No · PO Safety Days · Customer Requested Delivery Date ·
+PO Status · Proceed Date · SO No · PO Safety Days · Customer Requested Delivery Date ·
 Customer Delivery Location · Customer · Items · Supplier · Supplier Deliver To · PO No ·
 PO Delivery Date
 ```
 
 `Items` shows `{first item} + {n} more`, with all items available in expansion.
-The default sort is unchanged — groups, then the Order By urgency, then SO No — and the `To buy` /
-`No purchase needed` groups stay. `PO Safety Days` reads the remaining working-day margin defined in the shared COPY dictionary; the Order By date is not a goods-table column; underlying timing calculations remain unchanged. `Proceed Date` and `SO No` pin at canvas ≥768px; below 768px only `SO No`
+The default order is unfinished purchase work first, then Done, with Proceed Date ascending within each. All retained records remain visible; the former automatic purchase/no-purchase groups are retired. `PO Safety Days` reads the remaining working-day margin defined in the shared COPY dictionary; the Order By date is not a goods-table column; underlying timing calculations remain unchanged. `Proceed Date` and `SO No` pin at canvas ≥768px; below 768px only `SO No`
 pins. `Proceed Date` reads `orders.proceeded_at` (the actual hand-off), never
 `orders.proceed_date`. The build bumps the saved layout key so no stored arrangement keeps the old
 order; `leadingColumns` still refuses to hide or move the pair. Widths are measured at 1440 in the
 shell with the rail open during the build.
 
-- **Status is the new-PO need, not a generic Partial/Ordered progress badge.** Use `Need PO` /
-  `No PO needed`; retain the authoritative selection and coverage gates. Neither a status word
-  nor an unknown coverage read authorizes purchasing. Partial/Ordered footer tallies stay retired.
+- **PO Status** follows the owner-approved Pending / Partial / Done quantity contract above. The word does not authorize selection or assert supplier communication or Receiving. Unknown coverage cannot prove Done.
 - **Visible PO attribution comes ONLY from `po_line_sources`** — never `purchase_orders.so`,
   `so_refs`, or a global SKU/supplier/customer match. `PO Delivery Date` is
   `purchase_orders.official_delivery_date`, the ORIGINAL supplier-facing date stamped at birth and
