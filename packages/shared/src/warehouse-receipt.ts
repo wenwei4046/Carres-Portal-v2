@@ -501,8 +501,8 @@ export interface ReceivingArrivalEvidence {
   kind: "photo" | "video";
 }
 
-/** Extra goods are recorded separately: they never enter Inventory and never
- *  alter ordered/pending arithmetic (owner instruction §6). */
+/** Extra goods are recorded separately: they never become available stock or
+ *  alter ordered/pending arithmetic. Controlled custody is required by Purchasing §2.4. */
 export interface ReceivingExtraLine {
   sku: string;
   qty: number;

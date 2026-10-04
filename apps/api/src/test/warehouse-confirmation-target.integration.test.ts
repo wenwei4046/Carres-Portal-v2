@@ -129,6 +129,21 @@ describe.skipIf(!databaseUrl)("authorised Warehouse final receipt (approved targ
     await db.end();
   });
 
+  it("preserves unordered goods without increasing PO fulfilment or available stock", async () => {
+    const extraSku = `${sku}-UNORDERED`;
+    const result = await confirm(report({ extra_lines: [{ sku: extraSku, qty: 2, note: "Unordered goods physically present" }] }));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.result.status).toBe("posted");
+    const saved = await receipt(result.result.id);
+    expect(saved.extra_lines).toEqual([{ sku: extraSku, qty: 2, note: "Unordered goods physically present" }]);
+    expect((await q("select received_qty from purchase_order_lines where id=$1", [line])).rows[0]!.received_qty).toBe(1);
+    const stock = (await q("select status,identity_scope,qty from ops_stock_items where sku=$1", [extraSku])).rows;
+    expect(stock.filter(row => ["free", "reserved"].includes(row.status))).toEqual([]);
+    // This proves preservation/non-availability only; the custody gap is audited separately.
+    console.info("Extra-goods custody observation", { savedExtraQty: 2, stockRows: stock.length });
+  });
+
   it("pages more than 200 reports at a tied timestamp without hiding old blockers or another Site", async () => {
     await q("reset role");
     await q("insert into warehouse_receipts(warehouse_id,submitted_from,status,submitted_by,lines,goods_received_at,save_key,raw_report,submitted_at,validation_blockers) select $1,'warehouse','draft',$2,'[]'::jsonb,null,gen_random_uuid(),'{}'::jsonb,'2026-10-01T00:00:00Z'::timestamptz,'[{\"code\":\"receipt_evidence_not_available\"}]'::jsonb from generate_series(1,205)", [site,person]);
