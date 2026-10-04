@@ -394,11 +394,12 @@ describe("Purchase Orders Register", () => {
   });
   it("returns an issued PO object to its SO Batch cutoff and supplier result scope", () => {
     const pos = [{ id: "PO-20260828-4827", supplierId: "s1" }];
+    const preparation = { supplierId: "s1", selectedIds: [pos[0].id], channel: "email", scope: "round", subject: "Prepared", messageIntroduction: "Please confirm." };
     renderPage({ pathname: "/operation/procurement", search: "?po=PO-20260828-4827",
-      state: { soBatchReturn: { path: "/operation?tab=purchase&time=16%3A00", pos } } });
+      state: { soBatchReturn: { path: "/operation?tab=purchase&time=16%3A00", pos, preparation } } });
     expect(screen.getByTestId("purchase-order-object")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Back to Purchase Orders" }));
-    expect(navigate).toHaveBeenCalledWith("/operation?tab=purchase&time=16%3A00", { state: { soBatchIssuedPos: pos } });
+    expect(navigate).toHaveBeenCalledWith("/operation?tab=purchase&time=16%3A00", { state: { soBatchIssuedPos: pos, soBatchPreparation: preparation } });
   });
   it("returns from a card's PO object to the original Cards view and selection", () => {
     renderPage("/operation/procurement?view=cards");

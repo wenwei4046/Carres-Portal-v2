@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "@/lib/api";
 import type { PoTemplateData } from "@/lib/pdf/types";
-import PoSupplierBundle from "./PoSupplierBundle";
+import PoSupplierBundle, { readPoSupplierPreparation, type PoSupplierPreparation } from "./PoSupplierBundle";
 const api = vi.hoisted(() => vi.fn());
 const renderPdf = vi.hoisted(() => vi.fn());
 const zip = vi.hoisted(() => vi.fn());
@@ -133,8 +133,71 @@ describe("issued supplier bundle", () => {
     render(<PoSupplierBundle pos={pos} onPreview={preview} onOpenObject={open} />);
     await ready();
     fireEvent.click(screen.getAllByRole("button", { name: "Open full page" })[1]);
-    expect(open).toHaveBeenCalledWith("PO-002");
+    expect(open).toHaveBeenCalledWith("PO-002", expect.objectContaining({ supplierId: "s1", selectedIds: ["PO-001", "PO-002"] }), pos);
     expect(preview).not.toHaveBeenCalled();
+    expect(api.mock.calls.every(call => call.length === 1)).toBe(true);
+  });
+  it("restores the exact supplier, ticked subset and editable preparation after a full-object return, using fresh versions", async () => {
+    const open = vi.fn();
+    const view = render(<PoSupplierBundle pos={pos} onPreview={() => {}} onOpenObject={open} />);
+    await ready();
+    fireEvent.click(screen.getByLabelText("PO-001 · V1"));
+    fireEvent.change(screen.getByLabelText("Subject"), { target: { value: "Delivery request" } });
+    fireEvent.change(screen.getByLabelText("Message"), { target: { value: "Please confirm." } });
+    fireEvent.click(screen.getAllByRole("button", { name: "Open full page" })[1]);
+    const preparation = open.mock.calls[0][1] as PoSupplierPreparation;
+    view.unmount();
+    api.mockImplementation(async (path: string) => path.endsWith("email-capability") ? { configured: false }
+      : path.endsWith("/sends") ? { sends: [] } : { ...data(path.split("/").at(-2)!), version: 2 });
+    render(<PoSupplierBundle pos={[pos[2], pos[0], pos[1]]} initialPreparation={preparation} onPreview={() => {}} />);
+    await ready();
+    expect(screen.getByLabelText("Supplier")).toHaveTextContent("Hooka");
+    expect(screen.getByLabelText("PO-001 · V2")).not.toBeChecked();
+    expect(screen.getByLabelText("PO-002 · V2")).toBeChecked();
+    expect(screen.getByLabelText("Subject")).toHaveValue("Delivery request");
+    expect(screen.getByLabelText("Message")).toHaveValue("Please confirm.");
+    expect(screen.getByLabelText("PO No")).toHaveValue("PO-002 · V2");
+    expect(api.mock.calls.every(call => call.length === 1)).toBe(true);
+  });
+  it("refreshes Today on return and drops a selected PO that no longer belongs to that scope", async () => {
+    api.mockImplementation(async (path: string) => path.endsWith("issued-today") ? { pos: [pos[1]] }
+      : path.endsWith("email-capability") ? { configured: false } : path.endsWith("/sends") ? { sends: [] } : data(path.split("/").at(-2)!));
+    render(<PoSupplierBundle pos={pos} initialPreparation={{ supplierId: "s1", selectedIds: ["PO-001"],
+      channel: "email", scope: "today", subject: "Prepared", messageIntroduction: "" }} onPreview={() => {}} />);
+    await waitFor(() => {
+      expect(screen.getByLabelText("PO-002 · V1")).toBeInTheDocument();
+      expect(screen.queryByLabelText("PO-001 · V1")).not.toBeInTheDocument();
+    });
+    expect(screen.getByLabelText("PO-002 · V1")).not.toBeChecked();
+    expect(screen.getByRole("button", { name: "Download PDFs" })).toBeDisabled();
+  });
+  it("refuses malformed navigation presentation instead of treating it as prepared authority", () => {
+    expect(readPoSupplierPreparation({ supplierId: "s1", selectedIds: [null], channel: "email", scope: "round", subject: "", messageIntroduction: "" })).toBeUndefined();
+    expect(readPoSupplierPreparation({ supplierId: "s1", selectedIds: [], channel: "unknown", scope: "round", subject: "", messageIntroduction: "" })).toBeUndefined();
+  });
+  it("keeps restored Today preparation blocked through repeated source failures and retains the subset after retry", async () => {
+    let unavailable = true;
+    api.mockImplementation(async (path: string) => {
+      if (path.endsWith("issued-today")) {
+        if (unavailable) throw new Error("unavailable");
+        return { pos };
+      }
+      return path.endsWith("email-capability") ? { configured: false } : path.endsWith("/sends") ? { sends: [] } : data(path.split("/").at(-2)!);
+    });
+    render(<PoSupplierBundle pos={pos} initialPreparation={{ supplierId: "s1", selectedIds: ["PO-002"],
+      channel: "email", scope: "today", subject: "Prepared", messageIntroduction: "Please confirm." }} onPreview={() => {}} />);
+    await screen.findByText("Evidence could not be loaded");
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    await waitFor(() => expect(api.mock.calls.filter(([path]) => path.endsWith("issued-today"))).toHaveLength(2));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Try again" })).toBeEnabled());
+    expect(screen.getByRole("button", { name: "Download PDFs" })).toBeDisabled();
+    unavailable = false;
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    await ready();
+    expect(screen.getByLabelText("PO-001 · V1")).not.toBeChecked();
+    expect(screen.getByLabelText("PO-002 · V1")).toBeChecked();
+    expect(screen.getByLabelText("Subject")).toHaveValue("Prepared");
+    expect(screen.getByLabelText("Message")).toHaveValue("Please confirm.");
     expect(api.mock.calls.every(call => call.length === 1)).toBe(true);
   });
   it("opens the selected independent PO preview", async () => {

@@ -614,7 +614,8 @@ export default function PurchaseOrdersPage() {
             const returnUrl = new URL(batchReturn.path, "https://carres.invalid");
             if (returnUrl.origin === "https://carres.invalid" &&
                 (returnUrl.pathname === "/operation/to-order" || (returnUrl.pathname === "/operation" && returnUrl.searchParams.get("tab") === "purchase"))) {
-              navigate(`${returnUrl.pathname}${returnUrl.search}`, { state: { soBatchIssuedPos: batchReturn.pos } });
+              navigate(`${returnUrl.pathname}${returnUrl.search}`, { state: { soBatchIssuedPos: batchReturn.pos,
+                ...(batchReturn.preparation ? { soBatchPreparation: batchReturn.preparation } : {}) } });
               return;
             }
           }

@@ -400,6 +400,22 @@ unavailable beside readable SAMPLE-PO-002 V2, disabled preparation, then recover
 selected V1/V2 set via Try again. Evidence: `/tmp/so-batch-supplier-source-failure.png`.
 This correction is local build pending release; no destination address was invented or changed.
 
+**Supplier preparation return correction, 2026-10-04 — local build, production acceptance owed.**
+The authenticated Nice Future result opened exact `PO-20260903-7907` read-only with its original
+facts and PDF. Back retained `time=11:00` and PO result scope, but incorrectly selected the first
+supplier (Ohana) again. The corrected object return carries the chosen supplier, exact selected
+PO identities, channel, subject and message introduction as presentation state. Documents,
+current versions and sending evidence are read again from their owning endpoints; presentation
+state supplies no authority to issue or send. Returning from Today refreshes its current membership
+and drops selections no longer in that scope without automatically selecting replacement POs.
+Failed refresh blocks preparation; repeated retries preserve the supplier, subset and editable
+draft. Round and Today loading gates are independent so one completed read cannot prematurely
+enable preparation while the other is unresolved. Register URL/context retention remains shared
+kit behavior. No live PO, stock reservation, transmission or supplier address was changed for this
+verification. Local journey tests cover bundle restoration with fresh versions, removed Today
+membership, repeated failed-read recovery and both sides of the exact object return. Release and
+authenticated end-to-end return verification are still required.
+
 ### SO Batch PO Status — owner-approved 2026-10-04
 
 Column/filter title: `PO Status`. In that named context use `Pending`, `Partial`, `Done`.
