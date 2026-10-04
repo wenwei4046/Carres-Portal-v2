@@ -579,6 +579,14 @@ describe("one permanent row per proceeded Sales Order", () => {
     renderRegister();
     expect(screen.getByTestId("so-batch-po-link-o7")).toHaveTextContent("PO-260822-3333");
   });
+  it("the PO cell uses the actual version without changing the document navigation identity", () => {
+    renderRegister({ registerRows: data().registerRows.map(row => row.orderId === "o7"
+      ? { ...row, pos: row.pos.map(po => ({ ...po, version: 2 })) } : row) });
+    const link = screen.getByTestId("so-batch-po-link-o7");
+    expect(link).toHaveTextContent("PO-260822-3333-V2");
+    fireEvent.click(link);
+    expect(navigate).toHaveBeenCalledWith("/operation/procurement?po=PO-20260822-3333");
+  });
 
   it("SO No opens the source Quick View and its deliberate Open leads to the full SO", () => {
     renderRegister();

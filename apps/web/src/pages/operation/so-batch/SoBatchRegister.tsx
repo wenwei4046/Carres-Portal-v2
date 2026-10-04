@@ -205,6 +205,7 @@ function PoNumbersCell({ order }: { order: SoBatchOrderRow }) {
   if (numbers.length === 0) return null;
   if (numbers.length === 1) {
     const number = numbers[0]!;
+    const version = order.pos.find(po => po.poId === number)?.version;
     return (
       <button
         type="button"
@@ -215,7 +216,7 @@ function PoNumbersCell({ order }: { order: SoBatchOrderRow }) {
           navigate(`/operation/procurement?po=${encodeURIComponent(number)}`);
         }}
       >
-        {documentDisplayNumber(number)}
+        {documentDisplayNumber(`${number}${version == null ? "" : `-V${version}`}`)}
       </button>
     );
   }
@@ -1157,7 +1158,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
         ),
         searchValue: (o) => o.pos.map((p) => `${p.poId} ${documentDisplayNumber(p.poId)}`).join(" "),
         filterValue: (o) =>
-          summaryText(soBatchCellSummary(o.pos.map((p) => documentDisplayNumber(p.poId))), (n) => `${n} POs`) ?? "",
+          summaryText(soBatchCellSummary(o.pos.map((p) => documentDisplayNumber(`${p.poId}${p.version == null ? "" : `-V${p.version}`}`))), (n) => `${n} POs`) ?? "",
         exportValue: (o) => o.pos.map((p) => p.poId).join(" · "),
       },
       {

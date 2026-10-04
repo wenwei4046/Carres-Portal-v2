@@ -427,8 +427,10 @@ Supplier preparation checkbox/evidence/history labels and the supplier PDF viewe
 the same formatter with their actual version suffix. The formal PO heading and current-action
 number follow the same display. API identities, the message's original issued document references,
 official PDF content and filenames remain unchanged; no historical paper is regenerated. Supplier,
-Batch page and formal PO object journeys pass 106 tests locally before the additional dated-identity
-test. This adoption does not claim every Purchasing surface migrated. Full production release and
+Batch page and formal PO object journeys, Register and detail tests passed 271 cases after main
+integration; subsequent actual-version lineage coverage passed 165 Register/detail cases and one
+additional Register version/navigation test. Missing versions remain unclaimed. This adoption
+does not claim every Purchasing surface migrated. Full production release and
 the remaining governed display surfaces are still owed.
 
 **Quick View and Cards production acceptance, 2026-10-04.** PR1891's exact head
@@ -442,6 +444,9 @@ preparation containing only SO-1368; final issuance was not pressed. With SO-136
 selected, Table and Cards retained the same `3 of 32` search/cutoff scope and two selected SOs.
 The SO-1368 card opened only its own one-unit preparation; Back retained Cards, search, cutoff and
 both selections. Narrow-screen filters are an overlay and must be closed to reach controls beneath.
+Supplier grouping retained three unique SOs in both Table and Cards: one SO in the exact
+Hookka Industries / Ohana set and two in Nice Future, with `3 of 32` unchanged. The multi-supplier
+SO was not repeated in separate supplier groups. Evidence: `/tmp/so-batch-live-cards-supplier-group.png`.
 Evidence: `/tmp/so-batch-live-quick-view-source-pdf.png`,
 `/tmp/so-batch-live-quick-view-goods.png`, `/tmp/so-batch-live-quick-view-own-issue-preview.png`,
 `/tmp/so-batch-live-cards-filtered-selection.png`. This proves the real preparation/source/read

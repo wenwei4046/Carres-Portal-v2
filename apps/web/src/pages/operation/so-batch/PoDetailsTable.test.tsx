@@ -6,8 +6,8 @@
  * an audit register must never do: state as evidence something it inferred, or
  * drop something it could not explain.
  */
-import { describe, it, expect } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { describe, it, expect, vi } from "vitest";
+import { render, screen, within, fireEvent } from "@testing-library/react";
 import type { SoBatchOrderPoFact } from "@carres/shared";
 import PoDetailsTable, { poDetailRowsForLine } from "./PoDetailsTable";
 
@@ -335,6 +335,15 @@ describe("PoDetailsTable — the read-only presentation", () => {
     unitIds: ["U1-000-078"],
     unitCoverage: { "U1-000-078": PO_A.poId },
     unitLines: { "U1-000-078": "l1" },
+  });
+
+  it("shows only the actual document version and opens its unchanged stored identity", () => {
+    const onPoClick = vi.fn();
+    const versioned = base({ po: () => ({ ...PO_A, version: 2 }) });
+    render(<PoDetailsTable label="Purchase order details" rows={versioned} onPoClick={onPoClick} />);
+    fireEvent.click(screen.getByRole("button", { name: "PO-260904-4665-V2" }));
+    expect(onPoClick).toHaveBeenCalledWith("PO-20260904-4665");
+    expect(versioned[0]?.poNo).toBe("PO-20260904-4665");
   });
 
   it("leads with PO No and Unit ID, side by side, in full", () => {
