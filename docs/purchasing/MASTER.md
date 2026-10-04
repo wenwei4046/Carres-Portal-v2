@@ -288,8 +288,16 @@ the existing manager-gated, row-locked, audited Settings write door. The Setting
 the chosen value on failure; SO Batch receives that source value and refuses Match when it is
 unreadable. A match retains the priority read when it started, so changing Settings cannot move
 already-ticked Units onto another customer's order. Subsequent manual matches use the new value.
-The new Settings UI/route and allocation behavior are local implementation; migration application,
-full CI/deployment and authenticated production acceptance remain required. This does not close
+The new Settings UI/route and allocation behavior are local implementation. Migration 0650 was
+applied to the existing production project through the governed migration tool at tracker version
+`20261004132354`. A rolled-back SQL proof confirmed that an unauthenticated write is refused,
+an authorised principal can change the value and produces the exact old/new actor audit, and the
+original `customer_delivery` value remains after rollback. Anonymous execution is revoked;
+authenticated execution intentionally uses the same internal manager gate as other Purchasing
+Settings writes. The advisor's exposed-definer notice is intentional for this guarded RPC, not
+an unguarded grant. Nine loader, 30 Settings route, 39 Settings UI, 133 Register and nine hook
+tests passed; API/web type checks and design/migration guards passed. Full CI/deployment and
+authenticated production acceptance of the new Settings UI remain required. This does not close
 the full SO Batch boundary above.
 
 Authenticated production acceptance also found that the Batch Purchase Orders toolbar opened
