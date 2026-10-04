@@ -76,6 +76,18 @@ describe("StripeCollectModal", () => {
     expect(wa?.getAttribute("href")).toContain(encodeURIComponent(SESSION.url));
   });
 
+  it("the customer payment handoff uses the stored public reference without a second integer SO word", async () => {
+    createMutateAsync.mockResolvedValue({ session: SESSION });
+    render(<StripeCollectModal orderId="o-1" so={1174} publicReference="SO2610-0007"
+      total={2100} paid={500} customerName="Tan" customerPhone="012-3456789" onClose={() => {}} />);
+    expect(screen.getByText("Collect online · SO2610-0007")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("pos-stripe-create"));
+    await waitFor(() => expect(screen.getByTestId("pos-stripe-qr")).toBeInTheDocument());
+    const href = screen.getByText("WhatsApp").closest("a")!.getAttribute("href")!;
+    const text = new URL(href).searchParams.get("text")!;
+    expect(text).toContain("SO2610-0007");expect(text).not.toContain("SO-1174");
+  });
+
   it("flips to the paid stage from the status poll and refreshes order caches", async () => {
     // The mocked poll hook reports 'paid' immediately — the effect folds it in
     // regardless of which stage the modal is on (mirrors a WhatsApp'd link
