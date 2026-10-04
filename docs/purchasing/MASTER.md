@@ -445,6 +445,20 @@ original issued references. Search accepts original and shortened forms. Missing
 unclaimed; Unit IDs and supplier references are unchanged. This verifies the Batch adoption only,
 not every Purchasing display surface or the complete SO Batch delivery boundary above.
 
+**Ready Stock save — current production transaction proof, 2026-10-05.** The exact existing
+`so_batch_reserve_ready_units` door was exercised with eligible `U1-000-180` and SO-1368's exact
+item line inside a deliberately failing atomic SQL statement. It reserved one Unit, bound that
+exact line, wrote one usage record and reduced the line's remaining buying requirement from one
+to zero. Repeating the pick returned `unit_no_longer_free`. The mandatory final exception rolled
+back the entire statement; a separate fresh read proved the Unit free, its line binding null,
+remaining buying quantity one and no verification usage row. Evidence is
+`/tmp/so-batch-stock-save-rollback-proof.json`. This is database-door proof, not a claim that an
+operator saved a production reservation. No PO number or permanent Unit identity was minted.
+Current production draw/batch definition MD5s remain
+`72864ee598da7659dbd01281875edb8b` / `fde9ffbfcdd4472e29a6cac8aaebf395`.
+Exact-head CI 37215990410 also passed 45 isolated reservation SQL cases, 36 Ready Stock route
+cases and nine whole-round component cases; their boundaries remain distinct from this probe.
+
 **Quick View and Cards production acceptance, 2026-10-04.** PR1891's exact head
 `49f838c700a57bc9d996c287d378676757ffdc0e` passed full CI 37211199979. Its main merge
 `6ce2f07f24c46bbb543bf77f0f21e4890a801b08` passed deployment 37212252302 and an independent
