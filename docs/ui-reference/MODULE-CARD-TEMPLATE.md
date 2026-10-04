@@ -76,6 +76,10 @@ or failed reads stay explicit. Customer date and optional time remain separate f
 Existing Delivery-owned `DeliveryDatesEdit` / `LogisticsDetailsEdit` forms are reused through their
 governed arrangement door, including reason/evidence rules, permission checks and server refusals.
 Their compact action row uses Cancel then Save; failure retains input and exposes its reason.
+Embedded kit controls keep the shared field skin (including visible dropdown/date borders); the
+card button reset must not override `data-kit` controls. Compact Customer fields use two columns
+above 400px card width and one below, without reserved blank rows. Compact condo input uses its
+two natural rows and omits the long instructional hint; evidence and all save gates remain.
 The compact Customer editor starts with no inferred information source and requires an actual choice;
 the existing save door records contact/proxy separately from the logged-in recorder. Coverage-based
 Logistics preselection remains an unsaved assignment draft, labelled `Assign logistics`; the summary
