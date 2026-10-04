@@ -202,7 +202,7 @@ export interface CompactModuleCardProps {
   name: string;
   reference: string;
   /** Optional source-owned read-only document. Mounted only after the number is opened. */
-  document?: { label: string; preview: ReactNode };
+  document?: { label: string; preview: (onClose: () => void) => ReactNode };
   phone?: string;
   sales?: { orderDate: string; salesLocation: string; salesperson: string };
   address?: { area: string; full: string; facts?: { kind: "building" | "access"; label: string; value: string }[] };
@@ -224,6 +224,12 @@ export interface CompactModuleCardProps {
 export default function CompactModuleCard(p: CompactModuleCardProps) {
   const first = p.modules.find((m) => m.key === p.initialModule) ?? p.modules[0];
   const [documentOpen, setDocumentOpen] = useState(false);
+  const documentEntry = useRef<HTMLButtonElement>(null);
+  function closeDocument() {
+    setDocumentOpen(false);
+    selectModule(first);
+    documentEntry.current?.focus();
+  }
   const [moduleKey, setModuleKey] = useState(first.key);
   const [sales, setSales] = useState(!!first.opensHeaderDetails);
   const [address, setAddress] = useState(!!first.opensHeaderDetails);
@@ -265,7 +271,7 @@ export default function CompactModuleCard(p: CompactModuleCardProps) {
         <header className={s.header}>
           <div className={s.identity}>
             <div className={s.identityTitle}><strong>{p.name}</strong></div>
-            <small className={s.contactLine}><>{p.document ? <button type="button" className={s.documentNumber} title={p.document.label} aria-label={p.document.label} aria-expanded={documentOpen} aria-controls={`${ids}-document`} onClick={() => setDocumentOpen((v) => !v)}>{p.reference}</button> : <span>{p.reference}</span>}</>{p.phone ? <span className={s.phonePair}><Glyph name="phone" />{p.phone}</span> : null}</small>
+            <small className={s.contactLine}><>{p.document ? <button ref={documentEntry} type="button" className={s.documentNumber} title={p.document.label} aria-label={p.document.label} aria-expanded={documentOpen} aria-controls={`${ids}-document`} onClick={() => setDocumentOpen((v) => !v)}>{p.reference}</button> : <span>{p.reference}</span>}</>{p.phone ? <span className={s.phonePair}><Glyph name="phone" />{p.phone}</span> : null}</small>
             {p.sales ? (
               <button type="button" className={s.salesToggle} title={CARD_WORDS.orderDetails} aria-label={CARD_WORDS.orderDetails} aria-controls={`${ids}-sales`} aria-expanded={sales} onClick={() => setSales((v) => !v)}>
                 <span className={s.chevron}>{sales ? "▴" : "▾"}</span>
@@ -323,8 +329,7 @@ export default function CompactModuleCard(p: CompactModuleCardProps) {
           ) : null}
         </nav>
         {p.document && documentOpen ? <div id={`${ids}-document`} className={s.body} role="region" aria-label={p.document.label}>
-          <div className={s.buttons}><button type="button" onClick={() => setDocumentOpen(false)}>{CARD_WORDS.close}</button></div>
-          {p.document.preview}
+          {p.document.preview(closeDocument)}
         </div> : null}
         <article>
           <div className={s.body}>

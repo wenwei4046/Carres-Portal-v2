@@ -3,6 +3,16 @@ import { useEffect, useRef, useState } from "react";
 import * as pdfjs from "pdfjs-dist";
 import { paintPdfPages } from "@/lib/pdf/paint";
 import Button from "./Button";
+import Tooltip from "./Tooltip";
+import type { ReactNode } from "react";
+
+/** Source-owned identity/actions, also present while its PDF is loading or failed. */
+export function PdfPreviewHeader({ title, actions, onClose, closeLabel }: { title: string; actions?: ReactNode; onClose: () => void; closeLabel: string }) {
+  return <div className="mb-2 flex min-w-0 items-start gap-2">
+    <h3 className="min-w-0 flex-1 break-words text-body font-semibold">{title}</h3>
+    <div className="flex shrink-0 items-center gap-2">{actions}<Tooltip content={closeLabel}><Button size="sm" icon="close" iconOnly aria-label={closeLabel} onClick={onClose} /></Tooltip></div>
+  </div>;
+}
 
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
   "pdfjs-dist/build/pdf.worker.min.mjs", import.meta.url,

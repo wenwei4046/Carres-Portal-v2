@@ -71,7 +71,7 @@ export default function SalesOrderCompactView({ row, salesLocation, items, docum
   </dl>{statuses}{documents}</div>;
   return <div data-testid="sales-order-quick-view"><CompactModuleCard
     key={row.id} name={row.customer} reference={`SO-${row.so}`} phone={row.phone}
-    document={{ label: `Sales Order SO-${row.so}`, preview: <SalesOrderCardDocument orderId={row.id} reference={`SO-${row.so}`} /> }}
+    document={{ label: `Sales Order SO-${row.so}`, preview: (onClose) => <SalesOrderCardDocument orderId={row.id} reference={`SO-${row.so}`} onClose={onClose} /> }}
     sales={{ orderDate: fmtDate(row.ordered), salesLocation, salesperson: row.o.salespersons?.name ?? "Not recorded" }}
     address={{ area: row.deliveryLocation || "Not recorded", full: row.o.customer_address || "Not recorded", facts: [
       { kind: "building", label: "Building type", value: row.o.building_type || "Building type: Not recorded" },
@@ -80,7 +80,7 @@ export default function SalesOrderCompactView({ row, salesLocation, items, docum
       { kind: "access", label: "Items needing stair carry", value: `Items needing stair carry: ${row.o.delivery_stair_items ?? "Not recorded"}` },
     ] }}
     target={row.customerDelivery ? { date: fmtDateShort(row.customerDelivery), badge: `${Math.round((Date.parse(row.customerDelivery.slice(0, 10)) - Date.parse(appTodayIso())) / 86400000)}d` } : undefined}
-    openLabel="Open full page" onOpen={onOpen} onClose={onClose}
+    closeLabel="Close order" openLabel="Open full page" onOpen={onOpen} onClose={onClose}
     initialModule="info" modules={[
       { key: "info", label: "Info", opensHeaderDetails: true, summary: [{ key: "total", label: "Total", value: money(row.total) }, { key: "paid", label: "Paid", value: money(row.paid) }, { key: "outstanding", label: "Balance due", value: money(row.balance) }], items, details },
       { key: "delivery", label: "Delivery", summary: [stock, logistics, customer, doFact], items, communication: deliveryCommunication },
