@@ -641,7 +641,7 @@ Warehouse-owned full-population arrival read. Its expected/actual receipt separa
 tested and wired to the existing Quick Rail on branch. Line/batch date convergence and phone
 entry are also built on branch; production acceptance remains open; no second Calendar page is introduced.
 
-**Read-only production evidence, 2026-10-04:** `warehouse_submit_receipt` still files a report;
+**Read-only production evidence, rechecked 2026-10-05:** `warehouse_submit_receipt` still files a report;
 `warehouse_receipt_check_in` calls Operation's post-authority gate. The only current active
 Warehouse account has `is_person=false`; it is not proof of individually authorised Warehouse
 confirmation. Receipt JSON on current test rows has no `expected_qty` snapshot. Do not infer a
@@ -649,7 +649,28 @@ shipment's shortage from today's cumulative PO balance. Warehouse automatic post
 report preservation and individual actor/Site controls remain approved targets, not built.
 NETS account activation/cutover still requires its separate explicit authorisation.
 
-**Missed-arrival Work ownership — DEPLOYED, LIVE WORK SCENARIO NOT VERIFIED, 2026-10-05.**
+The measured database boundary must be covered as a whole before automatic confirmation is
+claimed delivered. `warehouse_submit_receipt` validates before inserting, so invalid scope is
+currently discarded. `receipt_has_one_source`, the nonempty-lines constraint and the mandatory
+physical-date column prevent retaining an unknown-source/empty/undated report in that row without
+inventing facts. Existing report history `warehouse_my_receipts` inner-joins the PO and supplier,
+so simply admitting an unlinked report would still hide it from Warehouse. Its reader must preserve
+the same authorised Site scope while displaying unresolved reports. The submit signature has no
+caller save key or revision; safe retry/correction must preserve session identity and original
+evidence. Existing duplicate-DO and one-submitted-session indexes must remain reconciled with that
+behaviour, not silently bypassed.
+
+The stock engine still has its Operation/Principal/Partner guard; Warehouse confirmation needs a
+scoped entry to that same engine, without widening the common amendment/void actor context.
+The posting authority helper and its column constraint currently permit no Warehouse actor value,
+so merely admitting the role would incorrectly label its confirmation as Operation staff. Actual
+individual, duty evidence and receiving company must remain distinct. Unvalidated raw attachment
+paths must not enter the fields the receipt reader signs with its service client; existing PO
+uploads live under their source's prefix in `delivery-orders`. These are measured implementation
+gaps against §7.3, not new business rulings. No SQL draft has been approved, migration written or
+production write performed for this automatic-confirmation work.
+
+**Missed-arrival Work ownership — DEPLOYED, BOUNDED LIVE ACCEPTANCE, 2026-10-05.**
 A supplier date without a physical report no longer creates Receiving Check in work. The existing
 Purchasing supplier-date-passed action owns that follow-up under PO Duty and opens the exact PO.
 It now reads the same per-line/split arrival authority as the register and day-before check,
@@ -660,7 +681,14 @@ Existing submitted physical reports retain their exact-session action and GRN Du
 correction does not implement individual Warehouse automatic confirmation or remove its database
 approval boundary. Local validation: 61 API Work/probe tests and 84 shared receipt/PO/Work tests;
 API typecheck and full CI passed. The correction deployed with #1907 and all five production
-proof endpoints converged; an authenticated missed-arrival Work scenario remains unverified.
+proof endpoints converged. Authenticated Team Work search for PO-2053 showed the exact Purchasing
+follow-up, `Ask Nice Future when the goods will arrive`, with the passed date Mon, 17 Aug. Its
+`Record supplier answer` opened the original H1401S Queen line, quantity 1; no Receiving check-in
+was manufactured from the passed date. The form was cancelled without saving. This establishes
+the missed-arrival action and its source door, not supplier-response completion. The same live
+view retained the old day-before reminder as another Missed action and displayed `Assigned to
+Name not recorded`; those bounded convergence/assignee findings were sent to the Work owner and
+remain open. No supplier was contacted and no duty assignment was changed.
 
 ### 2.5 Receiving end-to-end assurance review — 2026-10-04
 
@@ -672,8 +700,8 @@ business rules, UI words or external cutover. Existing authority answers ordinar
 
 **Resolution and evidence.** Purchasing §§7.1–7.4/9.4–9.7, Stock §7 and receipt blueprint,
 Workspace §6.1 action catalogue, UI §0/§5, COPY Receiving dictionary and Finance §§1–3.2 were
-cross-checked with the following implementation. `OperationReceiving.tsx` still has date,
-condition, category, Site and supplier rail groups, not the approved two-view rail.
+cross-checked with the following implementation. `OperationReceiving.tsx` now has the approved
+two-view rail deployed in #1907, with bounded runtime evidence recorded in §2.4.
 `apps/api/src/routes/warehouse/receiving.ts` submits a count; the Operation receipt route still
 provides the separate guarded check-in. Migration 0619's `receiving_actor_context()` admits an
 active individual Operation/Principal poster, not the newly approved Warehouse confirmation.
@@ -685,7 +713,7 @@ Purchase Invoice engine. No receipt, amendment, void, invoice or return was exec
 | Capability / lifecycle | Resolution and recommended Carres treatment | Acceptance or remaining uncertainty |
 |---|---|---|
 | Source and expected arrival | RESOLVED: PO/CO and other admitted sources own expected goods; supplier dates stay Purchasing-owned. A supplier dispatch/DO is evidence of supplier statement, not GRN. | Prove source-line and split-batch dates remain separate from actual arrival. No duplicate PO/Receiving ETA writer. |
-| Daily ownership and missed arrival | RESOLVED: Operation checks missing arrivals and contacts suppliers; Warehouse performs physical work. | CONTRADICTION FOUND: Workspace's older action table instructed check-in merely because a date passed. Its target is corrected. The Work feed correction is deployed in #1907 (2026-10-05), with live scenario acceptance still owed: actual submitted reports alone create Receiving work; missed arrivals use Purchasing/PO Duty and the existing per-line arrival authority. |
+| Daily ownership and missed arrival | RESOLVED: Operation checks missing arrivals and contacts suppliers; Warehouse performs physical work. | The incorrect date-only check-in projection is corrected and deployed in #1907; PO-2053 runtime acceptance in §2.4 verifies the supplier follow-up and exact answer form. Actual submitted reports alone create Receiving work. Work reminder/assignee presentation findings in §2.4 remain open. |
 | Warehouse identities and permissions | APPROVED TARGET / NOT BUILT: individually authenticated, source/Site-authorised confirmation, company receiver and individual actor distinct. | Existing role gates do not deliver the new rule. No broad Warehouse finance, adjustment, amend or void rights. |
 | Receipt entry and evidence | KEEP the source-prefilled one engine; confirm actual Unit outcomes or counted quantities, actual date/Site, DO and evidence. | No blank unrelated receipt, identity minting or supplier-reported automatic receipt. Missing evidence preserves an unposted report. |
 | Partial receipt and remaining quantity | RESOLVED: valid received scope completes; remaining acceptable supply stays outstanding. | Example: ordered 10, physically arrived 8 including 1 damaged means Received Qty 7, Damaged Qty 1, physically missing 2, Pending Delivery Qty 3. Never add damage to the 3 again. |
