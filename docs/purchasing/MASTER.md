@@ -1970,7 +1970,7 @@ band with the summary, `Clear`, PO Duty chip and `Issue PO` on the left, and val
 `Export Excel` at the far right. The primary action is never placed in a second bar below the table
 or at the bottom of the viewport.
 
-**Left rail — APPROVED / LOCKED, owner ruling 2026-10-04; delivery in progress.**
+**Left rail — APPROVED / LOCKED, owner ruling 2026-10-04; rail released, count acceptance correction in progress.**
 
 The bounded rail delivery uses the shared Sales Orders rail composition with local `Listing` /
 `Report` navigation. `Report` is a deferred destination: its contents are undecided, it remains
@@ -1994,13 +1994,32 @@ The local preview's illustrative clocks, counts and statuses are not production 
 
 **Delivery state:** isolated branch `codex/so-batch-rail-delivery` starts from `origin/main`, leaving
 the original preview and primary dirty checkout intact. The server now returns dated rounds using its existing window stamps plus the next two configured
-standard occurrences, with unique unfinished-SO counts (blocked uncovered demand remains counted).
+standard occurrences, with unique unfinished-SO counts from the Register's existing `soBatchOrderPlanning().group` judgement (blocked/unverified demand remains counted; completed PO/Stock coverage does not).
 The entire round projection survives a `?window=` read; the left rail selects that existing exact
 source scope without another API or admission engine. Date support text distinguishes repeated
 clock times. Product/Supplier/Region duplicate rail controls are removed from this adopter; shared
 column filters remain. The governed setup exception remains reachable. Planning calculations,
 PO/Stock writers and Work completion are unchanged. Local targeted API and web regression suites
-passed; production deployment and authenticated acceptance remain owed. Whole-round Ready Stock matching, Quick View issuance, supplier communication and full
+passed. Initial release PR #1872 merged at `229266efbcde77410e03af0fd868d4fd6be2541f`;
+CI `37191549985` and the exact merged-SHA production checks in `37192175114` passed,
+and all five deployed surfaces converged. Authenticated read-only acceptance on
+`/operation?tab=purchase` verified Listing/disabled Report, configured 11:00 AM/4:00 PM
+with dated rounds, 23 September → SO-1365 exact scope and toggle-back, 1–13 days left
+→ three SOs, and hide/show with the original 32-SO Register preserved. No Issue PO or
+supplier communication was executed. The original raw-demand round count overcounted
+completed historical orders; the acceptance correction reuses the same Register planning
+helper and its completed-history regression passes. Its production count verification
+remains owed. Authenticated narrow-window inspection (763px window) verified the rail
+leaves table flow when open and hide/show preserves the original Register; the shared
+rail remembers an explicitly opened preference. The window and page were restored.
+
+Delivery process finding: `gh pr merge --auto --merge` merged #1872 immediately while
+CI was pending because the repository did not enforce waiting. This was an engineering
+error, not approval to bypass the constitutional gate. Production still ran its full exact-SHA
+gate before publishing; no gate was removed or bypassed. Subsequent merges must wait for
+successful current-head CI explicitly.
+
+Whole-round Ready Stock matching, Quick View issuance, supplier communication and full
 SO Batch completion remain separate.
 
 
