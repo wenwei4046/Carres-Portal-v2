@@ -748,6 +748,18 @@ isolation and the own-report source identity. The shared transport carries arriv
 without inventing a PO. Existing arrival business transitions are retained; this does not prove
 all repair/return/replacement lifecycle fixtures or production function reconciliation. SQL stays
 only in chat and the isolated local database. API typecheck passes after this extension.
+The candidate now also supplies a scoped Warehouse non-PO arrival reader and proof-access helper.
+Only active individual Warehouse accounts at the destination's active Site/company may read pending
+source Units; posted physical Units and cancelled sources leave the pending read. Its API exposes
+no source editing and no supplier commercial data. Proof signing uses the user's JWT after source
+scope validation. Two additive draft Storage policies permit upload only to that source/current
+actor path and read only within the authorised destination Site. No update/delete grant is added;
+cancelled-source proof is read-only. Existing Operation access is unchanged. These policies are
+local-only and are part of the SQL still requiring review/approval, not applied production RLS.
+Six added local cases cover pending-source projection, other-Site isolation, shared/inactive
+accounts, upload-path enforcement and historical-proof access: 36 transaction cases pass. Forty
+Warehouse API tests cover the source and signing routes as well as final confirmation. This does
+not prove real Storage transport or the non-PO Warehouse form, which remains to be connected.
 
 **Warehouse confirmation form — BUILT ON BRANCH / NOT DEPLOYED, 2026-10-05.**
 The PO form now calls the final-confirmation API with a stable save key. It uses kit Modal, Button,

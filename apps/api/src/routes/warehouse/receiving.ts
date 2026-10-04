@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { z } from "zod";
 import { claimPhotoWire, warehouseSubmitReceiptInput, warehouseConfirmReceiptInput } from "@carres/shared";
 import { warehouseConfirmationReportToWire } from "@carres/shared/adapters";
 import { requireWarehouse } from "../../lib/auth-guards";
@@ -26,6 +27,52 @@ warehouseReceivingRouter.get("/incoming", requireWarehouse, async (c) => {
     return c.json(m.body, m.status);
   }
   return c.json(data ?? { warehouse: null, pos: [] });
+});
+
+/** Non-PO arrivals use their own source identities; no synthetic PO is made. */
+warehouseReceivingRouter.get("/arrivals", requireWarehouse, async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("warehouse_incoming_arrivals");
+  if (error) { const mapped = mapPgError(error); return c.json(mapped.body, mapped.status); }
+  if (!Array.isArray(data)) return c.json({ error: "Arrival sources could not be loaded" }, 502);
+  return c.json({ arrivals: data });
+});
+
+const arrivalProofInput = z.object({
+  mime_type: z.enum(["application/pdf", "image/jpeg", "image/png"]),
+  size_bytes: z.number().int().positive().max(10485760),
+}).strict();
+
+/** Scope is checked twice: the active individual/Site RPC, then user-JWT
+ * Storage RLS. No admin signing and no permission to create/change a source. */
+warehouseReceivingRouter.post("/arrivals/:id/proof", requireWarehouse, async (c) => {
+  const id = z.string().uuid().safeParse(c.req.param("id"));
+  if (!id.success) return c.json({ message: "Invalid source" }, 422);
+  const parsed = await parseJsonBody(c, arrivalProofInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const allowed = await sb.rpc("warehouse_arrival_proof_allowed", { p_source_id: id.data, p_require_open: true });
+  if (allowed.error) { const mapped = mapPgError(allowed.error); return c.json(mapped.body, mapped.status); }
+  if (allowed.data !== true) return c.json({ message: "The source is not available to this Warehouse" }, 403);
+  const ext = { "application/pdf": "pdf", "image/jpeg": "jpg", "image/png": "png" }[parsed.data.mime_type];
+  const path = `${id.data}/${c.var.auth.id}/${crypto.randomUUID()}.${ext}`;
+  const result = await sb.storage.from("arrival-proofs").createSignedUploadUrl(path);
+  if (result.error) return c.json({ message: result.error.message }, 500);
+  return c.json({ path, token: result.data.token });
+});
+
+warehouseReceivingRouter.get("/arrivals/:id/proof", requireWarehouse, async (c) => {
+  const id = z.string().uuid().safeParse(c.req.param("id"));
+  const path = c.req.query("path") ?? "";
+  if (!id.success || !path.startsWith(`${id.data}/`) || path.split("/").some((part) => part === ".." || !part))
+    return c.json({ message: "Invalid proof" }, 422);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const allowed = await sb.rpc("warehouse_arrival_proof_allowed", { p_source_id: id.data, p_require_open: false });
+  if (allowed.error) { const mapped = mapPgError(allowed.error); return c.json(mapped.body, mapped.status); }
+  if (allowed.data !== true) return c.json({ message: "The source is not available to this Warehouse" }, 403);
+  const result = await sb.storage.from("arrival-proofs").createSignedUrl(path, 3600);
+  if (result.error) return c.json({ message: result.error.message }, 500);
+  return c.json({ url: result.data.signedUrl });
 });
 
 /** What this warehouse has filed. Carries the claims each check-in opened —

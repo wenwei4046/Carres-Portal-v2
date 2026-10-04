@@ -491,3 +491,65 @@ describe("POST /api/warehouse/receipts/confirm", () => {
     expect(res.status).toBe(502);
   });
 });
+
+describe("Warehouse non-PO arrivals and source proof", () => {
+  it("reads the actor-scoped arrival source RPC without accepting a Site override", async () => {
+    const sb = makeSb({ data: [{ id: LINE, kind: "transfer", units: [] }] });
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const response = await req(`/api/warehouse/arrivals?site=${WH}`, "GET", await warehouseJwt());
+    expect(response.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("warehouse_incoming_arrivals");
+    expect(await response.json()).toEqual({ arrivals: [{ id: LINE, kind: "transfer", units: [] }] });
+  });
+  it("does not present a missing source RPC result as an empty arrival list", async () => {
+    const sb = makeSb();
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    expect((await req("/api/warehouse/arrivals", "GET", await warehouseJwt())).status).toBe(502);
+  });
+  it("requires Warehouse role for the arrival source list", async () => {
+    expect((await req("/api/warehouse/arrivals", "GET", await makeJwt("dealer"))).status).toBe(403);
+    expect(userClient).not.toHaveBeenCalled();
+  });
+  function proofClient(allowed: boolean) {
+    const storage = { createSignedUploadUrl: vi.fn().mockResolvedValue({ data: { token: "test-token" }, error: null }),
+      createSignedUrl: vi.fn().mockResolvedValue({ data: { signedUrl: "https://example.test/proof" }, error: null }) };
+    const sb = { ...makeSb({ data: allowed }), storage: { from: vi.fn(() => storage) } };
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    return { sb, storage };
+  }
+  it("signs a proof only after Site authority and keeps the actor in the path", async () => {
+    const { sb, storage } = proofClient(true);
+    const response = await req(`/api/warehouse/arrivals/${LINE}/proof`, "POST", await warehouseJwt(), { mime_type: "image/jpeg", size_bytes: 1024 });
+    expect(response.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("warehouse_arrival_proof_allowed", { p_source_id: LINE, p_require_open: true });
+    expect(sb.storage.from).toHaveBeenCalledWith("arrival-proofs");
+    expect(storage.createSignedUploadUrl).toHaveBeenCalledWith(expect.stringMatching(new RegExp(`^${LINE}/u1/[0-9a-f-]+\\.jpg$`)));
+  });
+  it("never signs a proof when Site authority refuses", async () => {
+    const { storage } = proofClient(false);
+    const response = await req(`/api/warehouse/arrivals/${LINE}/proof`, "POST", await warehouseJwt(), { mime_type: "image/jpeg", size_bytes: 1024 });
+    expect(response.status).toBe(403);
+    expect(storage.createSignedUploadUrl).not.toHaveBeenCalled();
+  });
+  it("rejects unsupported evidence before requesting authority or an upload token", async () => {
+    const { sb, storage } = proofClient(true);
+    const response = await req(`/api/warehouse/arrivals/${LINE}/proof`, "POST", await warehouseJwt(), { mime_type: "text/html", size_bytes: 1024 });
+    expect(response.status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
+    expect(storage.createSignedUploadUrl).not.toHaveBeenCalled();
+  });
+  it("can read historical proof through current Site authority without reopening a cancelled source", async () => {
+    const { sb, storage } = proofClient(true);
+    const path = `${LINE}/u1/proof.jpg`;
+    const response = await req(`/api/warehouse/arrivals/${LINE}/proof?path=${encodeURIComponent(path)}`, "GET", await warehouseJwt());
+    expect(response.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("warehouse_arrival_proof_allowed", { p_source_id: LINE, p_require_open: false });
+    expect(storage.createSignedUrl).toHaveBeenCalledWith(path, 3600);
+  });
+  it.each([`${WH}/u1/proof.jpg`, `${LINE}/../proof.jpg`])("refuses unrelated or invalid proof path %s", async (path) => {
+    const { sb, storage } = proofClient(true);
+    expect((await req(`/api/warehouse/arrivals/${LINE}/proof?path=${encodeURIComponent(path)}`, "GET", await warehouseJwt())).status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
+    expect(storage.createSignedUrl).not.toHaveBeenCalled();
+  });
+});

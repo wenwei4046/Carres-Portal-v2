@@ -129,6 +129,68 @@ describe.skipIf(!databaseUrl)("authorised Warehouse final receipt (approved targ
     await db.end();
   });
 
+  it("lists only this Site's open arrival Units and removes only physically posted Units", async () => {
+    const body = await setupArrival();
+    const arrivals = async () => (await q("select warehouse_incoming_arrivals() as result")).rows[0]!.result;
+    const before = await arrivals();
+    expect(before).toContainEqual(expect.objectContaining({ id: body.arrival_source_id, source_no: `TRF-WCT-${hex}`,
+      units: expect.arrayContaining(unitIds.map((id) => expect.objectContaining({ id }))) }));
+    expect(JSON.stringify(before)).not.toContain("supplier_id");
+    const posted = await confirm(body);
+    expect(posted.ok && posted.result.status).toBe("posted");
+    const after = await arrivals();
+    expect(after.find((row: { id: string }) => row.id === body.arrival_source_id).units.map((u: { id: string }) => u.id)).toEqual([unitIds[1]]);
+    await q("reset role");
+    await q("update arrival_sources set cancelled_at=now(),cancel_reason='Local cancelled source' where id=$1", [body.arrival_source_id]);
+    await as(person);
+    expect((await arrivals()).some((row: { id: string }) => row.id === body.arrival_source_id)).toBe(false);
+  });
+
+  it("does not list another Site's arrival source", async () => {
+    const body = await setupArrival(otherSite);
+    const rows = (await q("select warehouse_incoming_arrivals() as result")).rows[0]!.result;
+    expect(rows.some((row: { id: string }) => row.id === body.arrival_source_id)).toBe(false);
+  });
+
+  it.each([group, disabled])("refuses arrival reads from a shared or inactive Warehouse account %s", async (actor) => {
+    const body = await setupArrival();
+    await as(actor);
+    const result = await request("select warehouse_incoming_arrivals() as result", []);
+    expect(result.ok).toBe(false);
+    expect((await q("select warehouse_arrival_proof_allowed($1,true) allowed", [body.arrival_source_id])).rows[0]!.allowed).toBe(false);
+    const upload = await request("insert into storage.objects(id,bucket_id,name,owner) values($1,'arrival-proofs',$2,$3) returning name as result", [uid("125"), `${body.arrival_source_id}/${actor}/blocked.jpg`, actor]);
+    expect(upload.ok).toBe(false);
+  });
+
+  it("admits proof upload only for the individual's own Site and own path", async () => {
+    const body = await setupArrival();
+    const source = body.arrival_source_id;
+    expect((await q("select warehouse_arrival_proof_allowed($1,true) allowed", [source])).rows[0]!.allowed).toBe(true);
+    const ownPath = `${source}/${person}/physical.jpg`;
+    const own = await request("insert into storage.objects(id,bucket_id,name,owner) values($1,'arrival-proofs',$2,$3) returning name as result", [uid("121"), ownPath, person]);
+    expect(own.ok).toBe(true);
+    const forged = await request("insert into storage.objects(id,bucket_id,name,owner) values($1,'arrival-proofs',$2,$3) returning name as result", [uid("122"), `${source}/${group}/forged.jpg`, person]);
+    expect(forged.ok).toBe(false);
+    const malformed = await request("insert into storage.objects(id,bucket_id,name,owner) values($1,'arrival-proofs',$2,$3) returning name as result", [uid("123"), `not-a-source/${person}/bad.jpg`, person]);
+    expect(malformed.ok).toBe(false);
+    await q("reset role");
+    await q("update arrival_sources set cancelled_at=now(),cancel_reason='Local cancelled source' where id=$1", [source]);
+    await as(person);
+    expect((await q("select warehouse_arrival_proof_allowed($1,true) allowed", [source])).rows[0]!.allowed).toBe(false);
+    expect((await q("select name from storage.objects where bucket_id='arrival-proofs' and name=$1", [ownPath])).rows).toHaveLength(1);
+    const afterCancel = await request("insert into storage.objects(id,bucket_id,name,owner) values($1,'arrival-proofs',$2,$3) returning name as result", [uid("124"), `${source}/${person}/late.jpg`, person]);
+    expect(afterCancel.ok).toBe(false);
+  });
+
+  it("refuses another Site's proof even when its source and storage path are known", async () => {
+    const body = await setupArrival(otherSite);
+    const source = body.arrival_source_id;
+    expect((await q("select warehouse_arrival_proof_allowed($1,true) allowed", [source])).rows[0]!.allowed).toBe(false);
+    expect((await q("select name from storage.objects where bucket_id='arrival-proofs' and name=$1", [body.do_file_path])).rows).toHaveLength(0);
+    const upload = await request("insert into storage.objects(id,bucket_id,name,owner) values($1,'arrival-proofs',$2,$3) returning name as result", [uid("121"), `${source}/${person}/foreign.jpg`, person]);
+    expect(upload.ok).toBe(false);
+  });
+
   it("posts a transfer into the same preserved session without changing PO quantities and retries once", async () => {
     const body = await setupArrival();
     const first = await confirm(body);
