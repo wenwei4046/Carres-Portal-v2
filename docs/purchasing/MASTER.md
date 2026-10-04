@@ -3713,6 +3713,16 @@ in Workspace. Workspace remains a projection of the same source actions, not a p
 placing or following a PO. Conversation is Chinese; reusable design blocks and interface text
 are English. Do not produce another HTML attempt before the content/action journey is reviewed.
 
+**OWNER CONFIRMED 2026-10-04 — SO Batch Purchase versus Manual Purchase.** The 10:15 AM and
+4:00 PM entries open SO Batch Purchase for the eligible customer-order buying demand in that round,
+with secured-stock and exact existing-PO coverage deducted. The owner confirmed that clicking a
+round displays its consolidated buying list. “Reserve customer” describes the customer-order buying
+scope; it does not mean buying again for goods already secured by an eligible reserved Unit.
+Manual Purchase is an as-needed authorised request, not a compulsory daily round. Its approved
+request/approval/PO issue and actual-sending rules remain unchanged. Do not present Manual Purchase
+as a third daily task or silently add its demand to a customer-only SO Batch round.
+This confirms round/list behaviour and domain separation, not the rest of the proposed page layout.
+
 **PROPOSAL / NOT LAW — page composition for owner review.** Reuse the owner's supplied Sales Order
 page template. The left tray exposes the two current PO windows (10:15 AM and 4:00 PM), preserving
 existing required Listing/Monthly demand access and the approved PO follow-up filters. A window
