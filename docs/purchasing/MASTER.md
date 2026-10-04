@@ -85,7 +85,7 @@ existing governed Monthly demand capability.
 
 `Order time` is the approved heading for daily cutoff rows `10:15 AM` / `4:00 PM`.
 Do not display `PO rounds`, `Order rounds` or `Daily orders` as competing names.
-Retain the existing `Order timing` capability separately: it describes early purchasing and
+Retain the existing planning/safety capability separately: it describes early purchasing and
 production/safety margin, not a clock round. The owner explicitly requires these planning filters
 to remain. Owner correction 2026-10-04 approves the shortened planning labels for the current HTML and
 shared dictionary: `Order early`, `14 days left`, `1–13 days left`, `0 days left`,
@@ -93,8 +93,8 @@ shared dictionary: `Order early`, `14 days left`, `1–13 days left`, `0 days le
 rail. Owner browser correction approves `PO Safety Days` as this planning group heading, replacing
 `Order timing`. This is naming only, not a scheduling change. Replace long labels throughout this SO Batch surface,
 including table absence text where it expresses the same production-shortfall fact. Keys,
-calculations, calendars and eligibility remain unchanged; icons never substitute for these words. Proceed-based automatic round admission versus planned Order By admission
-is still under review; this naming approval does not resolve that scheduling contradiction or
+calculations, calendars and eligibility remain unchanged; icons never substitute for these words. Actual Proceed time governs round admission under the approved Blueprint and §5.6.1;
+Order By remains a planning fact, never an unlock gate (§9.1). Naming approval does not
 approve the earlier clock-only preview as the complete rail. Do not retire timing filters to
 simplify the preview. Apply existing holiday/calendar authority to whichever scheduling policy is
 finally approved.
@@ -3930,17 +3930,17 @@ Delivery/Stock/Payment grouping labels are not automatically Purchasing truth. C
 remain accessible under the established SO Batch register law. This replaces the earlier fixed
 supplier-group presentation in this recovery section.
 
-**OWNER-DESIGNATED LATEST MODULE CARD REFERENCE — 2026-10-04.** Jess explicitly designated
-`http://127.0.0.1:5459/confirmed-module-card-handoff.html` as the latest confirmed reference.
-The exact self-contained source is retained at `docs/ui-reference/confirmed-module-card-handoff.html`
-(SHA-256 `fca84f58d7a4687fe00fa79ba2e137d18d8983d3721d96a4667b3742ce2ce487`). For Purchasing module-card composition, use this source instead of earlier
-Delivery-card snapshots: shared identity/header and summary grammar, module navigation, Items,
-Communication and Timeline, preserving the complete stylesheet/cascade and interaction states.
-Translate only module-owned facts/actions. The reference opens Info with order facts/address visible;
-Delivery opens these collapsed; Items, Communication and Timeline initially collapse. Example
-Delivery stock is explicitly a layout sample. Do not claim this source proves production kit
-integration, real purchase-task completion or live data. This module-card reference does not
-replace the approved Sales Orders register/left-rail template or the PO full-page real-PDF law.
+**SHARED MODULE CARD — current governed implementation.** Use `CompactModuleCard` and
+`docs/ui-reference/MODULE-CARD-TEMPLATE.md` under the current UI MASTER. Shared implementation
+was merged in `a9dbb6b8918e9337328eefccebe547ee1d2f4ab6`; a local reference HTML is not a second
+implementation or current design authority. Reuse the shared identity/header, summary, navigation,
+Items, Communication and Timeline grammar and its interactions. SO Batch keeps its source
+SO/customer identity; a formal PO keeps its PO/version, supplier and destination identity; an MPR
+keeps its request identity, requester and purpose. Do not fabricate a customer or Sales Order for
+an internal request. Translate only module-owned facts/actions. Shared kit delivery does not
+prove Purchasing page integration, business completion or live data. The card contract does not
+replace the approved Sales Orders register/left-rail grammar, the PO full-page real-PDF law or
+Workspace's separately governed Working Panel. Unaccepted legacy Quick View work remains unaccepted.
 
 **OWNER CORRECTION 2026-10-04 — complementary left rail and column filters.**
 The SO Batch left rail presents useful aggregate information and round access not already
@@ -3949,8 +3949,9 @@ Supplier column filters there. Each factual listing column retains its shared Da
 aggregate summaries use the same filtered result and distinguish record counts from quantities.
 The hand-drawn 5462 HTML is rejected review material, not an approved template or implementation.
 Reuse actual shared Sales Orders rail/grid components for the replacement review; the exact
-new summary selection remains a proposal until reviewed. Existing required Listing/Monthly demand
-capabilities remain available; a bounded round preview does not retire them.
+new summary selection remains a proposal until reviewed. SO Batch navigation is `Listing` / `Report`; monthly Report content is deferred under the
+latest owner ruling. Other modules retain their governed Monthly demand. A bounded round preview
+does not establish complete SO Batch delivery.
 
 **OWNER CORRECTION 2026-10-04 — optional warehouse Ready Stock matching.**
 Customer demand defaults to purchase. Unassigned warehouse stock is an offer, never authority to
