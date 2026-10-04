@@ -577,7 +577,15 @@ describe("one permanent row per proceeded Sales Order", () => {
 
   it("a numbered but unsent PO still shows under PO No", () => {
     renderRegister();
-    expect(screen.getByTestId("so-batch-po-link-o7")).toHaveTextContent("PO-20260822-3333");
+    expect(screen.getByTestId("so-batch-po-link-o7")).toHaveTextContent("PO-260822-3333");
+  });
+  it("the PO cell uses the actual version without changing the document navigation identity", () => {
+    renderRegister({ registerRows: data().registerRows.map(row => row.orderId === "o7"
+      ? { ...row, pos: row.pos.map(po => ({ ...po, version: 2 })) } : row) });
+    const link = screen.getByTestId("so-batch-po-link-o7");
+    expect(link).toHaveTextContent("PO-260822-3333-V2");
+    fireEvent.click(link);
+    expect(navigate).toHaveBeenCalledWith("/operation/procurement?po=PO-20260822-3333");
   });
 
   it("SO No opens the source Quick View and its deliberate Open leads to the full SO", () => {
@@ -1353,14 +1361,14 @@ describe("the expansion — the ONE shared child table", () => {
     const details = within(box).getByTestId("po-details-table");
     const rowFor = (poNo: string) =>
       within(details).getByRole("button", { name: poNo }).closest("tr")!;
-    const first = rowFor("PO-20260820-1111");
+    const first = rowFor("PO-260820-1111");
     expect(first).toHaveTextContent("Hooka");
     expect(first).toHaveTextContent("Carres Klang");
     expect(first).toHaveTextContent("10 Sep");
     /* The document's own state, in the one Purchasing vocabulary — the fact
        that tells fourteen delivered documents from fourteen outstanding ones. */
     expect(first).toHaveTextContent("Completed");
-    const second = rowFor("PO-20260821-2222");
+    const second = rowFor("PO-260821-2222");
     expect(second).toHaveTextContent("Ohana");
     expect(second).toHaveTextContent("AL Sungai Buloh");
     expect(second).toHaveTextContent("Waiting for goods from supplier");
@@ -1369,18 +1377,13 @@ describe("the expansion — the ONE shared child table", () => {
     expect(within(details).queryByRole("combobox")).toBeNull();
   });
 
-  it("a full PO number is never shortened, and stays readable in the record", async () => {
+  it("displays the shared short-year PO number and opens the unchanged stored identity", async () => {
     renderRegister();
     fireEvent.click(screen.getByTestId("so-batch-expand-o5"));
     const box = await screen.findByTestId("so-batch-inspector-o5");
     const details = within(box).getByTestId("po-details-table");
-    /* `PO-20260820-1111`, never `PO-260820-1111`: no numbering change is
-       approved, and a shortened number names a document that does not exist. */
-    expect(
-      within(details).getByRole("button", { name: "PO-20260820-1111" }),
-    ).toBeInTheDocument();
-    /* `PO-260820-1111` is the six-digit short form a "tidier" column invents. */
-    expect(details.textContent).not.toMatch(/PO-\d{6}-/);
+    fireEvent.click(within(details).getByRole("button", { name: "PO-260820-1111" }));
+    expect(navigate).toHaveBeenCalledWith("/operation/procurement?po=PO-20260820-1111");
   });
 
   it("an order with no purchase order has no details section at all", async () => {
@@ -1459,7 +1462,7 @@ describe("the expansion — the ONE shared child table", () => {
        with its goods pairs them wrongly. */
     const row = unit.closest("tr")!;
     const cells = [...row.querySelectorAll("td")];
-    expect(cells[0]).toHaveTextContent("PO-20260820-1111");
+    expect(cells[0]).toHaveTextContent("PO-260820-1111");
     expect(cells[1]).toHaveTextContent("U1-000-777");
     expect(row).toHaveAttribute("data-row", "record");
     expect(within(row).queryByRole("checkbox")).toBeNull();
@@ -1820,8 +1823,8 @@ describe("a demand with several Unit records", () => {
     fireEvent.click(screen.getByTestId("so-batch-expand-o3"));
     const box = await screen.findByTestId("so-batch-inspector-o3");
     const first = (await within(box).findByText("U1-000-101")).closest("tr")!;
-    expect(within(first).getByRole("button", { name: "PO-20260820-4827" })).toBeInTheDocument();
-    expect(first).not.toHaveTextContent("PO-20260821-1190");
+    expect(within(first).getByRole("button", { name: "PO-260820-4827" })).toBeInTheDocument();
+    expect(first).not.toHaveTextContent("PO-260821-1190");
   });
 });
 
@@ -2427,6 +2430,15 @@ describe("two truthful groups on one permanent Register", () => {
 
 
 describe("search, clear and default buying order", () => {
+  it.each(["PO-20260822-3333", "PO-260822-3333"])("finds the same SO by original or displayed PO identity: %s", async query => {
+    renderRegister({}, false);
+    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search" }), { target: { value: query } });
+    await waitFor(() => expect(screen.queryByTestId("so-batch-row-o1")).not.toBeInTheDocument());
+    expect(screen.getByTestId("so-batch-row-o7")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("so-batch-po-link-o7"));
+    expect(navigate).toHaveBeenCalledWith("/operation/procurement?po=PO-20260822-3333");
+  });
   it("sorts unfinished work by Proceed Date before completed work", () => {
     const registerRows = data().registerRows.map(order => ({ ...order, proceededAt: order.orderId === "o1" ? "2026-09-01" : "2026-09-02" }));
     const { container } = renderRegister({ registerRows }, false);

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { documentDisplayNumber } from "@carres/shared";
 import Button from "@/components/kit/Button";
 import Checkbox from "@/components/kit/Checkbox";
 import Select from "@/components/kit/Select";
@@ -21,6 +22,22 @@ type EmailAttempt = {
   documents: Array<{ id: string; version: number; recorded: boolean }>;
 };
 
+/** Presentation only. Fresh owning reads still supply every document/version and send fact. */
+export type PoSupplierPreparation = {
+  supplierId: string; selectedIds: string[]; channel: "email" | "whatsapp";
+  subject: string; messageIntroduction: string; scope: "round" | "today"; roundWindow?: string;
+};
+export function readPoSupplierPreparation(value: unknown): PoSupplierPreparation | undefined {
+  if (!value || typeof value !== "object") return;
+  const state = value as Partial<PoSupplierPreparation>;
+  if (typeof state.supplierId !== "string" || !Array.isArray(state.selectedIds) || !state.selectedIds.every(id => typeof id === "string")
+    || (state.channel !== "email" && state.channel !== "whatsapp") || (state.scope !== "round" && state.scope !== "today")
+    || typeof state.subject !== "string" || typeof state.messageIntroduction !== "string"
+    || (state.roundWindow !== undefined && typeof state.roundWindow !== "string")) return;
+  return { supplierId: state.supplierId, selectedIds: [...new Set(state.selectedIds)], channel: state.channel,
+    subject: state.subject, messageIntroduction: state.messageIntroduction, scope: state.scope, roundWindow: state.roundWindow };
+}
+
 function readEmailAttempts(key: string): EmailAttempt[] {
   try {
     const value: unknown = JSON.parse(sessionStorage.getItem(key) ?? "[]");
@@ -34,26 +51,36 @@ function readEmailAttempts(key: string): EmailAttempt[] {
 }
 
 /** Same issued POs, grouped for supplier preparation and human-triggered dispatch. */
-export default function PoSupplierBundle({ pos, onPreview, roundWindow, onEvidenceChanged, onOpenObject }: {
+export default function PoSupplierBundle({ pos, onPreview, roundWindow, onEvidenceChanged, onOpenObject, initialPreparation }: {
   pos: readonly IssuedPo[];
   roundWindow?: string;
   onPreview: (id: string, po: IssuedPo) => void;
   onEvidenceChanged?: () => void;
-  onOpenObject?: (id: string) => void;
+  onOpenObject?: (id: string, preparation: PoSupplierPreparation, sourcePos: readonly IssuedPo[]) => void;
+  initialPreparation?: PoSupplierPreparation;
 }) {
   const userId = useAuth(state => state.user?.id ?? "unidentified");
   const attemptsKey = `carres-po-email-attempts:${userId}`;
   const attemptsStorageKey = useRef(attemptsKey);
-  const [scope, setScope] = useState("round");
+  const [scope, setScope] = useState(initialPreparation?.scope ?? "round");
   const [roundPos, setRoundPos] = useState<readonly IssuedPo[] | null>(null);
-  const [todayPos, setTodayPos] = useState<readonly IssuedPo[]>([]);
-  const [scopeLoading, setScopeLoading] = useState(false);
+  const [todayPos, setTodayPos] = useState<readonly IssuedPo[]>(initialPreparation?.scope === "today" ? pos : []);
+  const [todayLoading, setScopeLoading] = useState(initialPreparation?.scope === "today");
+  const [roundLoading, setRoundLoading] = useState(false);
+  const [returnedPos, setReturnedPos] = useState<readonly IssuedPo[] | null>(null);
+  const [returnedLoading, setReturnedLoading] = useState(initialPreparation?.scope === "round" && !roundWindow);
+  const [returnedUnavailable, setReturnedUnavailable] = useState(false);
+  const [returnedRefresh, setReturnedRefresh] = useState(0);
+  const scopeLoading = todayLoading || roundLoading || returnedLoading;
+  const [scopeUnavailable, setScopeUnavailable] = useState(false);
   const [roundUnavailable, setRoundUnavailable] = useState(false);
   const [roundRefresh, setRoundRefresh] = useState(0);
-  const activePos = scope === "today" ? todayPos : roundPos ?? pos;
+  const activePos = scope === "today" ? todayPos : roundPos ?? returnedPos ?? pos;
   const groups = useMemo(() => [...new Map(activePos.map(po => [po.supplierId, po.supplierName ?? "Supplier"])).entries()], [activePos]);
-  const [supplier, setSupplier] = useState(pos[0]?.supplierId ?? "");
-  const [selected, setSelected] = useState<Set<string>>(() => new Set(pos.filter(po => po.supplierId === supplier).map(po => po.id)));
+  const [supplier, setSupplier] = useState(initialPreparation?.supplierId ?? pos[0]?.supplierId ?? "");
+  const [selected, setSelected] = useState<Set<string>>(() => new Set(initialPreparation
+    ? initialPreparation.selectedIds.filter(id => pos.some(po => po.id === id && po.supplierId === supplier))
+    : pos.filter(po => po.supplierId === supplier).map(po => po.id)));
   const [documents, setDocuments] = useState<Record<string, PoTemplateData>>({});
   const [documentsLoading, setDocumentsLoading] = useState(true);
   const [documentFailures, setDocumentFailures] = useState<Array<{ id: string; message: string }>>([]);
@@ -62,14 +89,14 @@ export default function PoSupplierBundle({ pos, onPreview, roundWindow, onEviden
   const [historyLoading, setHistoryLoading] = useState(true);
   const [historyRefresh, setHistoryRefresh] = useState(0);
   const [historyFailed, setHistoryFailed] = useState<string[]>([]);
-  const [channel, setChannel] = useState(pos[0]?.poSendChannel === "email" ? "email" : "whatsapp");
+  const [channel, setChannel] = useState(initialPreparation?.channel ?? (pos[0]?.poSendChannel === "email" ? "email" : "whatsapp"));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [resend, setResend] = useState(false);
   const [emailConfigured, setEmailConfigured] = useState(false);
-  const [subject, setSubject] = useState("Carres · Purchase Orders");
-  const [messageIntroduction, setMessageIntroduction] = useState("");
+  const [subject, setSubject] = useState(initialPreparation?.subject ?? "Carres · Purchase Orders");
+  const [messageIntroduction, setMessageIntroduction] = useState(initialPreparation?.messageIntroduction ?? "");
   const [emailAttempts, setEmailAttempts] = useState<EmailAttempt[]>(() => readEmailAttempts(attemptsKey));
   const supplierPos = useMemo(() => activePos.filter(po => po.supplierId === supplier), [activePos, supplier]);
   const picked = supplierPos.filter(po => selected.has(po.id));
@@ -77,7 +104,7 @@ export default function PoSupplierBundle({ pos, onPreview, roundWindow, onEviden
   const message = picked.filter(po => documents[po.id]).map(po => `${documents[po.id].po_number} · V${documents[po.id].version}`).join("\n");
   const preparedMessage = [messageIntroduction.trim(), message].filter(Boolean).join("\n\n");
   const doors = contact ? doorsForIssuedPo(contact, preparedMessage) : null;
-  const ready = picked.length > 0 && picked.every(po => documents[po.id]) && !documentsLoading && !busy && !scopeLoading && !(scope === "round" && roundUnavailable);
+  const ready = picked.length > 0 && picked.every(po => documents[po.id]) && !documentsLoading && !busy && !scopeLoading && !scopeUnavailable && !(scope === "round" && (roundUnavailable || returnedUnavailable));
   const selectedAttempts = emailAttempts.filter(attempt => attempt.documents.some(document => picked.some(po => po.id === document.id && documents[po.id]?.version === document.version)));
   const emailOutcome = selectedAttempts.some(attempt => attempt.status === "unknown") ? "unknown" : selectedAttempts.length ? "dispatched" : null;
   const alreadySent = emailOutcome === "dispatched" || picked.some(po => documents[po.id] && confirmedSendFor(sendHistory[po.id] ?? [], documents[po.id].version));
@@ -164,15 +191,50 @@ export default function PoSupplierBundle({ pos, onPreview, roundWindow, onEviden
   }, [supplierPos, historyRefresh, emailConfigured]);
 
   useEffect(() => {
+    if (initialPreparation?.scope !== "round" || roundWindow) return;
+    let cancelled = false;
+    setReturnedLoading(true);
+    setReturnedUnavailable(false);
+    void Promise.all([...new Set(pos.map(po => po.id))].map(async id => {
+      const po = await apiFetch<IssuedPo>(`/api/operation/pos/${encodeURIComponent(id)}/issue-context`);
+      if (po.id !== id || typeof po.supplierId !== "string" || !po.supplierId) throw new Error("invalid_po_context");
+      return po;
+    })).then(rows => {
+      if (cancelled) return;
+      setReturnedPos(rows);
+      setSelected(previous => new Set([...previous].filter(id => rows.some(po => po.id === id && po.supplierId === initialPreparation.supplierId))));
+    }).catch(() => { if (!cancelled) setReturnedUnavailable(true); })
+      .finally(() => { if (!cancelled) setReturnedLoading(false); });
+    return () => { cancelled = true; };
+  }, [initialPreparation, pos, roundWindow, returnedRefresh]);
+
+  useEffect(() => {
+    if (initialPreparation?.scope !== "today") return;
+    let cancelled = false;
+    apiFetch<{ pos: IssuedPo[] }>("/api/operation/pos/issued-today").then(result => {
+      if (cancelled) return;
+      if (!Array.isArray(result.pos) || result.pos.some(po => !po || typeof po.id !== "string" || typeof po.supplierId !== "string")) throw new Error("invalid_po_scope");
+      setTodayPos(result.pos);
+      setSelected(previous => new Set([...previous].filter(id => result.pos.some(po => po.id === id && po.supplierId === initialPreparation.supplierId))));
+    }).catch(() => { if (!cancelled) setScopeUnavailable(true); })
+      .finally(() => { if (!cancelled) setScopeLoading(false); });
+    return () => { cancelled = true; };
+  }, [initialPreparation]);
+
+  useEffect(() => {
     if (!roundWindow) return;
     let cancelled = false;
-    setScopeLoading(true);
+    setRoundLoading(true);
     setRoundUnavailable(false);
     apiFetch<{ poIds: string[] }>(`/api/operation/pos/issued-round?window=${encodeURIComponent(roundWindow)}`)
-      .then(result => Promise.all(result.poIds.map(id => apiFetch<IssuedPo>(`/api/operation/pos/${encodeURIComponent(id)}/issue-context`))))
+      .then(result => Promise.all([...new Set(result.poIds)].map(async id => {
+        const po = await apiFetch<IssuedPo>(`/api/operation/pos/${encodeURIComponent(id)}/issue-context`);
+        if (po.id !== id || !po.supplierId) throw new Error("invalid_po_context");
+        return po;
+      })))
       .then(rows => { if (!cancelled) setRoundPos(rows); })
       .catch(() => { if (!cancelled) setRoundUnavailable(true); })
-      .finally(() => { if (!cancelled) setScopeLoading(false); });
+      .finally(() => { if (!cancelled) setRoundLoading(false); });
     return () => { cancelled = true; };
   }, [roundWindow, roundRefresh]);
 
@@ -184,21 +246,30 @@ export default function PoSupplierBundle({ pos, onPreview, roundWindow, onEviden
     setError(null);
   }
 
-  async function changeScope(next: string) {
+  async function changeScope(next: "round" | "today", preservePreparation = false) {
     if (busy || scopeLoading) return;
     setScopeLoading(true);
     setError(null);
+    setScopeUnavailable(false);
     try {
       const rows = next === "today"
-        ? (await apiFetch<{ pos: IssuedPo[] }>("/api/operation/pos/issued-today")).pos : roundPos ?? pos;
+        ? (await apiFetch<{ pos: IssuedPo[] }>("/api/operation/pos/issued-today")).pos : roundPos ?? returnedPos ?? pos;
+      if (!Array.isArray(rows) || rows.some(po => !po || typeof po.id !== "string" || typeof po.supplierId !== "string")) throw new Error("invalid_po_scope");
       if (next === "today") setTodayPos(rows);
       setScope(next);
+      if (preservePreparation) {
+        setSelected(previous => new Set([...previous].filter(id => rows.some(po => po.id === id && po.supplierId === supplier))));
+        return;
+      }
       const first = rows[0];
       setSupplier(first?.supplierId ?? "");
       setSelected(new Set(rows.filter(po => po.supplierId === first?.supplierId).map(po => po.id)));
       setChannel(first?.poSendChannel === "email" ? "email" : "whatsapp");
       setCopied(false);
-    } catch { setError("Could not load the preview. Try again on the document."); }
+    } catch {
+      if (scope === "today") setScopeUnavailable(true);
+      setError("Could not load the preview. Try again on the document.");
+    }
     finally { setScopeLoading(false); }
   }
 
@@ -291,23 +362,34 @@ export default function PoSupplierBundle({ pos, onPreview, roundWindow, onEviden
 
   return <Block title="Purchase orders">
     <div className="flex flex-col gap-3" data-testid="po-supplier-bundle">
-      <Select id="po-bundle-scope" label="Purchase orders" value={scope} disabled={busy || scopeLoading} onValueChange={value => void changeScope(value)} options={[{ value: "round", label: roundWindow ? "This round" : "Purchase orders" }, { value: "today", label: "Today" }]} />
+      <Select id="po-bundle-scope" label="Purchase orders" value={scope} disabled={busy || scopeLoading} onValueChange={value => void changeScope(value === "today" ? "today" : "round")} options={[{ value: "round", label: roundWindow ? "This round" : "Purchase orders" }, { value: "today", label: "Today" }]} />
       <Select id="po-bundle-supplier" label="Supplier" value={supplier} onValueChange={changeSupplier}
         disabled={busy || scopeLoading} options={groups.map(([value, label]) => ({ value, label }))} />
       {scope === "round" && roundUnavailable && <div role="alert" className="flex flex-col gap-2">
         <p className="text-meta text-kit-red-11">Evidence could not be loaded</p>
         <Button disabled={scopeLoading} onClick={() => setRoundRefresh(value => value + 1)}>Try again</Button>
       </div>}
+      {scope === "round" && returnedUnavailable && <div role="alert" className="flex flex-col gap-2">
+        <p className="text-meta text-kit-red-11">Evidence could not be loaded</p>
+        <Button disabled={scopeLoading || busy} onClick={() => setReturnedRefresh(value => value + 1)}>Try again</Button>
+      </div>}
+      {scopeUnavailable && <div role="alert" className="flex flex-col gap-2">
+        <p className="text-meta text-kit-red-11">Evidence could not be loaded</p>
+        <Button disabled={scopeLoading || busy} onClick={() => void changeScope("today", true)}>Try again</Button>
+      </div>}
       <Checkbox id="po-bundle-all" label="Select all" disabled={busy || scopeLoading || !supplierPos.length} checked={supplierPos.length > 0 && picked.length === supplierPos.length ? true : picked.length ? "indeterminate" : false}
         onCheckedChange={checked => { setSelected(new Set(checked ? supplierPos.map(po => po.id) : [])); setCopied(false); }} />
       {supplierPos.map(po => <div key={po.id} className="flex flex-col gap-2 border-t border-kit-slate-5 pt-3">
         <div className="flex items-center justify-between gap-2">
-        <Checkbox id={`po-bundle-${po.id}`} label={documents[po.id] ? `${documents[po.id].po_number} · V${documents[po.id].version}` : po.id}
+        <Checkbox id={`po-bundle-${po.id}`} label={documents[po.id] ? documentDisplayNumber(`${documents[po.id].po_number}-V${documents[po.id].version}`) : documentDisplayNumber(po.id)}
           disabled={busy} checked={selected.has(po.id)} onCheckedChange={checked => {
             setSelected(previous => { const next = new Set(previous); if (checked) next.add(po.id); else next.delete(po.id); return next; }); setCopied(false);
           }} />
         <div className="flex items-center gap-2"><Button variant="neutral" size="sm" onClick={() => onPreview(po.id, po)}>Open PDF</Button>
-        {onOpenObject && <Button variant="neutral" size="sm" onClick={() => onOpenObject(po.id)}>Open full page</Button>}</div>
+        {onOpenObject && <Button variant="neutral" size="sm" onClick={() => onOpenObject(po.id, {
+          supplierId: supplier, selectedIds: picked.map(po => po.id), channel: channel === "email" ? "email" : "whatsapp",
+          subject, messageIntroduction, scope, roundWindow,
+        }, activePos)}>Open full page</Button>}</div>
         </div>
         <p className="text-body">{documents[po.id]?.destination?.name ?? po.destination}</p>
         {documents[po.id]?.so_refs?.length ? <p className="text-meta text-kit-slate-11">SO {documents[po.id].so_refs!.join(", ")}</p> : null}
@@ -316,10 +398,10 @@ export default function PoSupplierBundle({ pos, onPreview, roundWindow, onEviden
         </p>}
       </div>)}
       {documentFailures.length > 0 && <div role="alert" className="flex flex-col gap-2">
-        {documentFailures.map(failure => <p key={failure.id} className="text-meta text-kit-red-11">{failure.id} · {failure.message}</p>)}
+        {documentFailures.map(failure => <p key={failure.id} className="text-meta text-kit-red-11">{documentDisplayNumber(failure.id)} · {failure.message}</p>)}
         <Button disabled={documentsLoading || busy} onClick={() => setDocumentRefresh(value => value + 1)}>Try again</Button>
       </div>}
-      <Select id="po-bundle-channel" label="Communication channel" value={channel} onValueChange={setChannel}
+      <Select id="po-bundle-channel" label="Communication channel" value={channel} onValueChange={value => setChannel(value === "email" ? "email" : "whatsapp")}
         disabled={busy}
         options={[{ value: "whatsapp", label: "WhatsApp" }, { value: "email", label: "Email" }]} />
       <Input id="po-bundle-recipient" label="To" readOnly value={channel === "email" ? contact?.contactEmail ?? "" : contact?.whatsappGroupUrl ?? contact?.contact ?? ""} />
@@ -345,7 +427,7 @@ export default function PoSupplierBundle({ pos, onPreview, roundWindow, onEviden
       {emailOutcome === "unknown" && <p role="status" className="text-meta text-kit-amber-11">Sending not confirmed</p>}
       {emailAttempts.filter(attempt => attempt.status === "dispatched").map(emailEvidence => <div key={emailEvidence.id} className="flex flex-col gap-2">
         <p className="text-strong">PO sent to supplier · Email</p>
-        {emailEvidence.documents.map(document => <p key={document.id} className="text-meta text-kit-slate-11">{document.id} · V{document.version} · {document.recorded ? "PO sent to supplier" : "Not confirmed · Try again"}</p>)}
+        {emailEvidence.documents.map(document => <p key={document.id} className="text-meta text-kit-slate-11">{documentDisplayNumber(`${document.id}-V${document.version}`)} · {document.recorded ? "PO sent to supplier" : "Not confirmed · Try again"}</p>)}
         {emailEvidence.documents.some(document => !document.recorded) && <Button disabled={busy} onClick={() => void recordDispatchedEmail(emailEvidence)}>Save</Button>}
       </div>)}
       {copied && <p className="text-meta text-kit-slate-11">Copied. Contact result is unchanged.</p>}
@@ -357,7 +439,7 @@ export default function PoSupplierBundle({ pos, onPreview, roundWindow, onEviden
       {supplierPos.some(po => sendHistory[po.id]?.length) && <Block title="History">
         {supplierPos.flatMap(po => (sendHistory[po.id] ?? []).map((event, index) => <div key={`${po.id}-${index}`} className="flex flex-col gap-1">
           <p className="text-strong">{event.kind === "confirmed_sent" ? "PO sent to supplier" : `${CHANNEL_WORD[event.channel] ?? event.channel} opened`}</p>
-          <p className="text-body">{po.id}{event.po_version ? ` · V${event.po_version}` : ""} · {CHANNEL_WORD[event.channel] ?? event.channel}</p>
+          <p className="text-body">{documentDisplayNumber(`${po.id}${event.po_version ? `-V${event.po_version}` : ""}`)} · {CHANNEL_WORD[event.channel] ?? event.channel}</p>
           <p className="text-meta text-kit-slate-11">{fmtDate(event.sent_at, { time: true })}{event.sent_by_name ? ` · ${event.sent_by_name}` : ""}</p>
         </div>))}
       </Block>}

@@ -398,7 +398,74 @@ again rereads the same supplier document identities without issuing, reserving o
 35 supplier preparation/archive tests pass. Actual write-rejecting sample UI shows SAMPLE-PO-001
 unavailable beside readable SAMPLE-PO-002 V2, disabled preparation, then recovery of the same
 selected V1/V2 set via Try again. Evidence: `/tmp/so-batch-supplier-source-failure.png`.
-This correction is local build pending release; no destination address was invented or changed.
+PR1895's exact head `a08d9e88a3b569a08eaf4ea58d8b2a0445e9e01d` passed full CI
+37212749130. Main merge `88c6386ecbc73a71ea5c174935d1fb2571277f5c` passed deployment
+37213740791 and an independent five-entry convergence probe. Authenticated search `7907` retained
+12 SOs; Ohana's two failed sources now show their exact PO and the governed address/Settings
+reason with Try again. Retrying does not invent an address or enable preparation of unreadable
+documents. Nice Future retains its three actual V1 documents and the earlier sending evidence
+separately; selecting only `PO-20260903-7907` produced
+`/Users/chaichiewlim/Downloads/Purchase-orders-Nice_Future.zip` with exactly
+`PO-20260903-7907-V1.pdf` (31,165 bytes). Its timestamp, archive CRC, PDF header and EOF passed.
+Evidence: `/tmp/so-batch-live-supplier-address-refusal.png`. No destination address, issuance,
+reservation or supplier transmission was changed for this verification. Missing source addresses
+and actual sender/provider verification remain operational gaps, not successful transmissions.
+
+**Supplier preparation return correction, 2026-10-04 — local build, production acceptance owed.**
+The authenticated Nice Future result opened exact `PO-20260903-7907` read-only with its original
+facts and PDF. Back retained `time=11:00` and PO result scope, but incorrectly selected the first
+supplier (Ohana) again. The corrected object return carries the chosen supplier, exact selected
+PO identities, channel, subject and message introduction as presentation state. Documents,
+current versions and sending evidence are read again from their owning endpoints; presentation
+state supplies no authority to issue or send. Returning from Today refreshes its current membership
+and drops selections no longer in that scope without automatically selecting replacement POs.
+Failed refresh blocks preparation; repeated retries preserve the supplier, subset and editable
+draft. Round and Today loading gates are independent so one completed read cannot prematurely
+enable preparation while the other is unresolved. Register URL/context retention remains shared
+kit behavior. No live PO, stock reservation, transmission or supplier address was changed for this
+verification. Local journey tests cover bundle restoration with fresh versions, removed Today
+membership, repeated failed-read recovery and both sides of the exact object return. Release and
+authenticated end-to-end return verification are still required. A restored undated Round also
+refreshes every exact PO's owning issue context before preparation becomes available, so the
+current supplier contact replaces cached routing state. A mismatched or failed source read blocks
+preparation; Try again retains the chosen subset and editable draft. The fresh-contact and
+failed-source retry regressions passed with the complete 54 bundle/page tests on 2026-10-05.
+
+**SO Batch document display adoption, 2026-10-04 — local build, production proof owed.**
+The Register PO cell/context door, its exact-source Quick View lineage and expanded PO details
+reuse `documentDisplayNumber` for Carres-owned dated PO display. Original and shortened numbers
+both find the same retained SO. Navigation, lineage keys, API inputs and exported original identities
+remain unchanged; Unit IDs and supplier-owned references are not formatted. The older tests that
+forbade short-year presentation have been replaced by the approved global ruling and checks that
+the displayed short number opens the original stored PO. 164 Register/detail tests pass locally.
+Supplier preparation checkbox/evidence/history labels and the supplier PDF viewer heading reuse
+the same formatter with their actual version suffix. The formal PO heading and current-action
+number follow the same display. API identities, the message's original issued document references,
+official PDF content and filenames remain unchanged; no historical paper is regenerated. Supplier,
+Batch page and formal PO object journeys, Register and detail tests passed 271 cases after main
+integration; subsequent actual-version lineage coverage passed 165 Register/detail cases and one
+additional Register version/navigation test. Missing versions remain unclaimed. This adoption
+does not claim every Purchasing surface migrated. Full production release and
+the remaining governed display surfaces are still owed.
+
+**Quick View and Cards production acceptance, 2026-10-04.** PR1891's exact head
+`49f838c700a57bc9d996c287d378676757ffdc0e` passed full CI 37211199979. Its main merge
+`6ce2f07f24c46bbb543bf77f0f21e4890a801b08` passed deployment 37212252302 and an independent
+five-entry production convergence probe. Authenticated SO-1368 Quick View read its own phone,
+address, Sales Location and salesperson. Its actual saved SO PDF rendered; Close PDF restored focus
+to the same document entry, and reopening retained the SO panel. Items showed exact B1201S King,
+Nice Future, Carres Klang and `1 available 0 reserved`. Selecting it opened a one-unit/one-PO
+preparation containing only SO-1368; final issuance was not pressed. With SO-1365 and SO-1368 both
+selected, Table and Cards retained the same `3 of 32` search/cutoff scope and two selected SOs.
+The SO-1368 card opened only its own one-unit preparation; Back retained Cards, search, cutoff and
+both selections. Narrow-screen filters are an overlay and must be closed to reach controls beneath.
+Supplier grouping retained three unique SOs in both Table and Cards: one SO in the exact
+Hookka Industries / Ohana set and two in Nice Future, with `3 of 32` unchanged. The multi-supplier
+SO was not repeated in separate supplier groups. Evidence: `/tmp/so-batch-live-cards-supplier-group.png`.
+Evidence: `/tmp/so-batch-live-quick-view-source-pdf.png`,
+`/tmp/so-batch-live-quick-view-goods.png`, `/tmp/so-batch-live-quick-view-own-issue-preview.png`,
+`/tmp/so-batch-live-cards-filtered-selection.png`. This proves the real preparation/source/read
+journey, not completed live issuing, saving stock or transmitting to a supplier.
 
 ### SO Batch PO Status — owner-approved 2026-10-04
 

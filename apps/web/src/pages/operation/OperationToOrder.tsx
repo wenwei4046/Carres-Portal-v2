@@ -16,6 +16,7 @@ import Button from "@/components/kit/Button";
 import SoBatchRegister from "./so-batch/SoBatchRegister";
 import SoBatchIssueWorkspace from "./so-batch/SoBatchIssueWorkspace";
 import PoSupplierResultPanel, { useVisiblePoResults } from "./so-batch/PoSupplierResultPanel";
+import { readPoSupplierPreparation } from "./so-batch/PoSupplierBundle";
 import type { IssuedPo } from "./components/PoIssueEvidence";
 
 /**
@@ -58,9 +59,10 @@ export default function OperationToOrder() {
   const [selections, setSelections] = useState<SoBatchSelection[] | null>(null);
   const [issuedPos, setIssuedPos] = useState<IssuedPo[]>(restoredPos);
   const [resultsOpen, setResultsOpen] = useState(restoredPos.length > 0);
-  const [resultRoundWindow, setResultRoundWindow] = useState<string | undefined>(windowParts ? scopeWindow! : undefined);
+  const [resultPreparation, setResultPreparation] = useState(() => readPoSupplierPreparation(location.state?.soBatchPreparation));
+  const [resultRoundWindow, setResultRoundWindow] = useState<string | undefined>(resultPreparation?.roundWindow ?? (windowParts ? scopeWindow! : undefined));
   const visiblePoResults = useVisiblePoResults(pos => {
-    setIssuedPos(pos); setResultRoundWindow(undefined); setResultsOpen(true);
+    setIssuedPos(pos); setResultPreparation(undefined); setResultRoundWindow(undefined); setResultsOpen(true);
   }, () => setResultsOpen(false));
 
   /**
@@ -156,7 +158,7 @@ export default function OperationToOrder() {
           destinations={data.destinations}
           onBack={backToBuying}
           onDone={finish}
-          onIssued={pos => { setIssuedPos(pos); setResultRoundWindow(windowParts ? scopeWindow! : undefined); setResultsOpen(true); finish(); }}
+          onIssued={pos => { setIssuedPos(pos); setResultPreparation(undefined); setResultRoundWindow(windowParts ? scopeWindow! : undefined); setResultsOpen(true); finish(); }}
         />
       )}
       <SoBatchRegister
@@ -189,7 +191,7 @@ export default function OperationToOrder() {
         purchaseOrdersLoading={visiblePoResults.isPending}
       />
       {resultsOpen && <PoSupplierResultPanel open onOpenChange={setResultsOpen} pos={issuedPos}
-        roundWindow={resultRoundWindow} onChanged={finish} />}
+        roundWindow={resultRoundWindow} initialPreparation={resultPreparation} onChanged={finish} />}
     </>
   );
 }
