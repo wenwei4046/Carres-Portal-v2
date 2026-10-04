@@ -349,15 +349,22 @@ or production verification. Supplier communication evidence and Receiving remain
 
 ### Receiving delivery state — 2026-10-04
 
-**BUILD IN PROGRESS; not production-verified.** Shared two-digit-year GRN display and
-original/short register search are merged in #1890 (`0b2b37ba4`); exact-head full CI
-`37208414732` passed. Production deployment and authenticated acceptance are pending.
+**BUILD IN PROGRESS; partial production acceptance.** Shared two-digit-year GRN display and
+original/short register search shipped in #1890 (`0b2b37ba4`). Exact-head full CI
+`37208414732` and deployment `37209394804` passed; all five production surfaces converged.
+Authenticated browser acceptance on 2026-10-04 found the same receipt using both
+`GRN-20260904-1064` and `GRN-260904-1064`, with the short number in the register and full
+record heading. Supplier DO `DO-SMOKE-B` and Unit `U1-000-064` remained unchanged.
+The historical event display still used the original number; its presentation-only correction
+is in the pending Working Panel slice. Issued historical PDFs were not changed.
 Stored identities, supplier references and Unit IDs are unchanged; other modules still need
 explicit adoption, so this does not establish system-wide completion.
 
 The Receiving Working Panel is **BUILT ON BRANCH / NOT PRODUCTION VERIFIED**: row selection
 uses the existing `Drawer` + `CompactModuleCard`, receipt-only quantities, actual arrival facts,
 source-owned evidence and history, and `Open full page` to the existing GRN/PDF/edit object.
+Local shared-kit preview verified the receipt header, cancellation indicator and details
+disclosure at 366px; authenticated panel acceptance still awaits delivery.
 The list remains mounted. Refreshed quantities and goods use the same receipt payload; old Unit
 results without a source-line identity remain unavailable rather than being joined by SKU.
 Cancelled receipts retain their indicator; ordinary GRNs gain no Completed/Valid badge.
