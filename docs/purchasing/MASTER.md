@@ -2202,22 +2202,19 @@ only rows satisfying both, never a widening OR.
 **Columns — OWNER RULING (Jess, 2026-09-18) · BUILT 2026-09-18, exactly in this order:**
 
 ```text
-Status · Proceed Date · SO No · PO Safety Days · Customer Requested Delivery Date ·
+PO Status · Proceed Date · SO No · PO Safety Days · Customer Requested Delivery Date ·
 Customer Delivery Location · Customer · Items · Supplier · Supplier Deliver To · PO No ·
 PO Delivery Date
 ```
 
 `Items` shows `{first item} + {n} more`, with all items available in expansion.
-The default sort is unchanged — groups, then the Order By urgency, then SO No — and the `To buy` /
-`No purchase needed` groups stay. `PO Safety Days` reads the remaining working-day margin defined in the shared COPY dictionary; the Order By date is not a goods-table column; underlying timing calculations remain unchanged. `Proceed Date` and `SO No` pin at canvas ≥768px; below 768px only `SO No`
+The default order is unfinished purchase work first, then Done, with Proceed Date ascending within each. All retained records remain visible; the former automatic purchase/no-purchase groups are retired. `PO Safety Days` reads the remaining working-day margin defined in the shared COPY dictionary; the Order By date is not a goods-table column; underlying timing calculations remain unchanged. `Proceed Date` and `SO No` pin at canvas ≥768px; below 768px only `SO No`
 pins. `Proceed Date` reads `orders.proceeded_at` (the actual hand-off), never
 `orders.proceed_date`. The build bumps the saved layout key so no stored arrangement keeps the old
 order; `leadingColumns` still refuses to hide or move the pair. Widths are measured at 1440 in the
 shell with the rail open during the build.
 
-- **Status is the new-PO need, not a generic Partial/Ordered progress badge.** Use `Need PO` /
-  `No PO needed`; retain the authoritative selection and coverage gates. Neither a status word
-  nor an unknown coverage read authorizes purchasing. Partial/Ordered footer tallies stay retired.
+- **PO Status** follows the owner-approved Pending / Partial / Done quantity contract above. The word does not authorize selection or assert supplier communication or Receiving. Unknown coverage cannot prove Done.
 - **Visible PO attribution comes ONLY from `po_line_sources`** — never `purchase_orders.so`,
   `so_refs`, or a global SKU/supplier/customer match. `PO Delivery Date` is
   `purchase_orders.official_delivery_date`, the ORIGINAL supplier-facing date stamped at birth and

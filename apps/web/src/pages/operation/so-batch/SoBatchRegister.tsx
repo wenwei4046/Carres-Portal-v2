@@ -27,9 +27,8 @@ import {
   soBatchLineReservedWhy,
   readyStockRefusalWord,
   soBatchOrderSafetyDays,
-  soBatchOrderStatusWord,
+  soBatchPurchaseStatus,
   soBatchOrderByAbsenceWord,
-  compareSoBatchPlanning,
   soBatchOrderSupplierNames,
   soBatchRailFacts,
   soBatchRailModel,
@@ -489,11 +488,11 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
   const orderByFacts = useMemo(() => new Map(orders.map((order) => [
     order.orderId, soBatchOrderPlanning(order, leafsByOrder.get(order.orderId) ?? []),
   ])), [orders, leafsByOrder]);
+  const purchaseStatus = useCallback((order: SoBatchOrderRow) =>
+    soBatchPurchaseStatus(order, leafsByOrder.get(order.orderId) ?? []), [leafsByOrder]);
   const compareOrderBy = useCallback((a: SoBatchOrderRow, b: SoBatchOrderRow) =>
-    compareSoBatchPlanning(
-      { plan: orderByFacts.get(a.orderId)!, so: a.so },
-      { plan: orderByFacts.get(b.orderId)!, so: b.so },
-    ), [orderByFacts]);
+    Number(purchaseStatus(a) === "Done") - Number(purchaseStatus(b) === "Done") ||
+    (a.proceededAt ?? "9999").localeCompare(b.proceededAt ?? "9999") || (b.so ?? 0) - (a.so ?? 0), [purchaseStatus]);
   /* `PO Safety Days`, one answer per row, over exactly the leaves the parent
      checkbox would tick. The SERVER measured every number in it. */
   const safetyDaysFacts = useMemo(() => new Map(orders.map((order) => [
@@ -794,26 +793,9 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
   const columns = useMemo<DataGridColumn<SoBatchOrderRow>[]>(
     () => [
       {
-        /**
-         * ⭐ STATUS IS BACK, AND IT IS A DIFFERENT COLUMN — owner ruling
-         * 2026-09-18.
-         *
-         * What was retired was blank · `Partial` · `Ordered`: a generic
-         * progress badge for an arithmetic the row already showed under
-         * `PO No`, and an operator could act on none of the three. What is here
-         * now answers the one question a BUYING page exists for — *does this
-         * still need a purchase order?* — in the page's own two words.
-         *
-         * IT IS THE GROUPS' OWN READING, not a second one: the same
-         * `soBatchOrderPlanning().group` that puts the row under `To buy` or
-         * `No purchase needed`, so the word on the row and the heading above it
-         * can never disagree. And it is a NEED, never a permission: every
-         * coverage gate, every blocker and the issue door's own recomputation
-         * are untouched, and a row can read `Need PO` and still refuse the tick
-         * with its own stated reason.
-         */
+        /* Purchase quantity completion, separate from communication and receiving. */
         key: "status",
-        label: "Status",
+        label: "PO Status",
         /* The shared Purchasing field width (UI MASTER §6.8). ONE word, one
            line: every row keeps one height (owner ruling 2026-09-29). */
         width: REGISTER_FIELD_WIDTH.status, minWidth: 96,
@@ -826,15 +808,15 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
              expansion, on each item line; the row says it has one with the
              grid's left-edge stripe (`rowHighlight` below). */
           <span className="block" data-testid={`so-batch-status-${o.orderId}`}>
-            {soBatchOrderStatusWord(orderByFacts.get(o.orderId)!.group)}
+            {purchaseStatus(o)}
           </span>
         ),
-        filterValue: (o) => soBatchOrderStatusWord(orderByFacts.get(o.orderId)!.group),
+        filterValue: (o) => purchaseStatus(o),
         sortFn: (a, b) =>
-          soBatchOrderStatusWord(orderByFacts.get(a.orderId)!.group).localeCompare(
-            soBatchOrderStatusWord(orderByFacts.get(b.orderId)!.group),
+          purchaseStatus(a).localeCompare(
+            purchaseStatus(b),
           ),
-        exportValue: (o) => soBatchOrderStatusWord(orderByFacts.get(o.orderId)!.group),
+        exportValue: (o) => purchaseStatus(o),
       },
       {
         /* THE RECORD DATE leads (ui MASTER §6.7 rule 2, Jess 2026-09-17): the
@@ -1192,7 +1174,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
         },
       },
     ],
-    [orderByFacts, safetyDaysFacts, compareOrderBy, stateWords,
+    [orderByFacts, safetyDaysFacts, compareOrderBy, purchaseStatus, stateWords,
       navigate,
       data.destinations,
       leafsByOrder,
@@ -1501,14 +1483,6 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
               warning={selectionHasPendingStock ? W.readyStockPendingBlocksIssue : undefined}
               emptyMessage={orders.length > 0 ? W.noMatch : W.empty}
               groupBanner={false}
-              fixedGroups={{
-                groups: [
-                  { key: "to-buy", label: W.groupToBuy, alwaysOpen: true },
-                  { key: "no-purchase-needed", label: W.groupNoPurchaseNeeded, initiallyCollapsed: true },
-                ],
-                groupOf: (o) => orderByFacts.get(o.orderId)!.group,
-                revealMatches: Object.values(filter).some((value) => value != null && value !== false),
-              }}
               /* The owner's approved order opens with `Status`, then the
                  date/identity pair §6.7 rule 2 fixes. All three are protected
                  from hiding and dragging; only the pair pins. */
@@ -1838,7 +1812,7 @@ function SoBatchOrderExpansion({
          (`soBatchOrderLineOutstandingQty`), never a second one. It states the
          need for a document; it grants no permission, and a line that reads
          `Need PO` can still refuse the tick with its own stated reason. */
-      status: soBatchOrderLineOutstandingQty(l) > 0 ? W.statusNeedPo : W.statusNoPoNeeded,
+      status: soBatchPurchaseStatus({ ...order, lines: [l] }, leaf ? [leaf] : []),
       /* Line two (owner ruling 2026-09-28): the leaf's own refusal, only
          beside `Need PO`, from the facts the refused tick reads. */
       ...(() => {
@@ -2011,6 +1985,7 @@ function SoBatchOrderExpansion({
 
   const goodsTable = (
     <GoodsMiniTable
+      statusLabel="PO Status"
       label={order.so == null ? "Goods on this order" : `Goods on SO-${order.so}`}
       lines={lines}
       /**

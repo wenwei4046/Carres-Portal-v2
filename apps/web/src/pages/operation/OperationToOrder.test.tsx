@@ -330,7 +330,7 @@ describe("the whole journey — tick, arrange, issue, prove it arrived", () => {
     // document and the refused tick say what the word used to.)
     await waitFor(() => expect(screen.getByTestId("so-batch-page")).toBeInTheDocument());
     fireEvent.click(screen.getByRole("button", { name: "Close" }));
-    fireEvent.click(await screen.findByText("No purchase needed"));
+    expect(screen.getByTestId("so-batch-status-o1")).toHaveTextContent("Done");
     await waitFor(() =>
       expect(screen.getByTestId("so-batch-po-link-o1")).toHaveTextContent("PO-2041"),
     );
