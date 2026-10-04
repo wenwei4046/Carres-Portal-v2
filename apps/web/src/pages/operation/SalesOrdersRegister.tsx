@@ -677,11 +677,11 @@ function ExpandedLines({ row, inspection = false, compact = false }: { row: Regi
     })),
   ];
   if (compact) return <div className="max-h-64 overflow-auto"><table className="w-full text-body" aria-label={`Items on SO-${row.so}`}>
-    <thead className="sticky top-0 bg-kit-slate-3 text-label text-kit-slate-11"><tr><th className="p-2 text-left">Item</th><th className="p-2 text-right">Qty</th><th className="p-2 text-right">Amount</th><th className="p-2 text-left">Stock Status</th></tr></thead>
+    <thead className="sticky top-0 bg-kit-slate-3 text-label text-kit-slate-11"><tr><th className="p-2 text-left">Item</th><th className="p-2 text-right">Qty</th><th className="p-2 text-right">Unit price</th><th className="p-2 text-right">Amount</th><th className="p-2 text-left">Stock Status</th></tr></thead>
     <tbody>{miniLines.map((line, index) => {
       const source = index < lines.length ? lines[index] : addons[index - lines.length];
-      const stock = line.selectable === false ? "Not applicable" : STOCK_STATUSES.find(status => status.key === stockStatusOf(row, line.sku))!.label;
-      return <tr key={line.key} className="border-b border-kit-slate-5"><td className="p-2">{line.item}{line.itemDetail && <div className="text-meta text-kit-slate-11">{line.itemDetail}</div>}</td><td className="p-2 text-right">{line.qty}</td><td className="p-2 text-right whitespace-nowrap">{source.unit_price == null ? "Not recorded" : <Money value={Number(source.unit_price) * line.qty} />}</td><td className="p-2"><StatusPill tone={salesOrderStatusTone(stock)}>{stock}</StatusPill></td></tr>;
+      const stock = line.selectable === false ? "Service" : STOCK_STATUSES.find(status => status.key === stockStatusOf(row, line.sku))!.label;
+      return <tr key={line.key} className="border-b border-kit-slate-5"><td className="p-2">{line.item}{line.itemDetail && <div className="text-meta text-kit-slate-11">{line.itemDetail}</div>}</td><td className="p-2 text-right">{line.qty}</td><td className="p-2 text-right whitespace-nowrap">{source.unit_price == null ? "Not recorded" : Number(source.unit_price).toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td><td className="p-2 text-right whitespace-nowrap">{source.unit_price == null ? "Not recorded" : (Number(source.unit_price) * line.qty).toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td><td className="p-2"><StatusPill tone={salesOrderStatusTone(stock)}>{stock}</StatusPill></td></tr>;
     })}</tbody>
   </table></div>;
   if (inspection) return <div className="space-y-3" data-testid="goods-side-inspection">

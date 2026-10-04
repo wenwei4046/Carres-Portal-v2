@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, act } from "@testing-library/react";
-import { LogisticsDetailsEdit } from "./DeliveryBrief";
+import { DeliveryDatesEdit, LogisticsDetailsEdit } from "./DeliveryBrief";
 import type { DeliveryMonitorCard } from "../delivery-monitor";
 
 const save = vi.fn();
@@ -93,6 +93,7 @@ describe("compact Logistics save lifecycle", () => {
   it("keeps a refused save and its input, folds only on success, and Cancel never writes", async () => {
     const done = vi.fn();
     mount("Alex", "ABC 123", true, done);
+    expect(screen.queryByTestId("delivery-brief-chase-message")).toBeNull();
     fireEvent.change(screen.getByLabelText("ETA"), { target: { value: "15:10" } });
     save.mockRejectedValueOnce(new Error("Server refused this change"));
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Save" })); });
@@ -105,5 +106,23 @@ describe("compact Logistics save lifecycle", () => {
     save.mockClear();
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(save).not.toHaveBeenCalled();
+  });
+});
+
+describe("compact Customer contact evidence", () => {
+  it("requires an actual source choice and records a proxy independently of the recorder", async () => {
+    const done = vi.fn();
+    const card = { orderId: "order-1", scopeId: "order-1#0", leg: 0, logisticsPartnerId: "nets", logisticsPartnerName: "NETS", confirmedDate: "2026-10-31", confirmedTime: null, scope: { customerDeliveryIso: "2026-10-31", arrangement: {}, o: {} } } as unknown as DeliveryMonitorCard;
+    render(<DeliveryDatesEdit card={card} compact layout="grid" onDone={done} />);
+    expect(screen.getByRole("combobox", { name: /Information received from/ })).toHaveTextContent("Pick one");
+    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+    pick("Information received from", "Operation on behalf of NETS");
+    save.mockRejectedValueOnce(new Error("Reply refused"));
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Save" })); });
+    expect(screen.getByRole("alert")).toHaveTextContent("Reply refused");
+    expect(screen.getByRole("combobox", { name: /Information received from/ })).toHaveTextContent("Operation on behalf of NETS");
+    expect(done).not.toHaveBeenCalled();
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Save" })); });
+    expect(save).toHaveBeenCalledWith(expect.objectContaining({ informationReceivedFrom: "operation_on_behalf", partnerId: "nets", confirmedDate: "2026-10-31" })); expect(done).toHaveBeenCalledTimes(1);
   });
 });

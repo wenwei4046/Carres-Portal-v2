@@ -3557,7 +3557,7 @@ The master contract being documented does not mean every module has migrated or 
 
 ## §4.3 · Compact module card — owner rules 2026-10-03 / 2026-10-04
 
-**OWNER CONFIRMED · SHARED KIT BUILT · SALES ORDERS QUICK VIEW PRODUCTION VERIFIED.** Every module card
+**OWNER CONFIRMED · SHARED KIT BUILT · INITIAL SALES ORDERS ADOPTION PRODUCTION VERIFIED; AUDIT CORRECTIONS IN BUILD.** Every module card
 uses the kit [`CompactModuleCard`](../../apps/web/src/components/kit/CompactModuleCard.tsx) (live on
 `/ui#compact-card` with Info and Delivery). Never copy reference HTML or CSS into a page. The
 complete rules, the sample-data boundary and the deviations from the reference page live in
@@ -3575,7 +3575,9 @@ fewest lines, four at most; one editor at a time, folded on success, kept on fai
 without a zone suffix while the full instant is kept; nothing in a module repeats the header, a date,
 the sales facts or a completion note.
 
-**Scoped production evidence — 2026-10-04:** PR #1871 merged as `a9dbb6b8918e9337328eefccebe547ee1d2f4ab6`;
+**2026-10-04 scoped acceptance correction — BUILD, production proof pending:** the sole `docs/ui-reference/MODULE-CARD-TEMPLATE.md` governs the Orders follow-up: source details separate from Items, real short-date/countdown, phone pair wrapping, explicit building/access facts, module-owned recipients/templates and compact editors retaining all validation/evidence. The earlier a9dbb6b production proof covers the initial adoption only; it does not close these measured omissions. Workspace and other-module adoption remain outside this release.
+
+**Initial adoption production evidence — 2026-10-04:** PR #1871 merged as `a9dbb6b8918e9337328eefccebe547ee1d2f4ab6`;
 exact-head CI `37189941545` and production Deploy `37190758212` passed. Independent
 `verify-production.mjs` confirmed that SHA on both Pages projects, both ERP/POS canonical domains
 and API health. Sara · Principal opened the actual Listing Cards quick view, with truthful Info

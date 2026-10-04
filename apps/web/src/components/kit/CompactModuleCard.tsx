@@ -171,10 +171,14 @@ export interface CardModule {
   /** The module's own summary facts — as many cells as it has facts. */
   summary?: CardFact[];
   items?: ReactNode;
+  /** Source-owned facts and document lineage, separate from goods/services. */
+  details?: ReactNode;
+  /** Each module names its own recipient; null disables communication. */
+  communication?: CardCommunication | null;
   /** Info opens sales facts and address on selection; other modules leave them closed. */
   opensHeaderDetails?: boolean;
 }
-export interface CardRecipient { value: string; label: string; phone?: string }
+export interface CardRecipient { value: string; label: string; phone?: string; whatsappUrl?: string }
 export interface CardTemplate { key: string; label: string; body: string }
 export interface CardTimelineEvent {
   id: string;
@@ -223,6 +227,7 @@ export default function CompactModuleCard(p: CompactModuleCardProps) {
   const [moduleKey, setModuleKey] = useState(first.key);
   const [sales, setSales] = useState(!!first.opensHeaderDetails);
   const [address, setAddress] = useState(!!first.opensHeaderDetails);
+  const [details, setDetails] = useState(false);
   const [items, setItems] = useState(!!p.initiallyOpen?.items);
   const [comm, setComm] = useState(!!p.initiallyOpen?.communication);
   const [timeline, setTimeline] = useState(!!p.initiallyOpen?.timeline);
@@ -234,6 +239,7 @@ export default function CompactModuleCard(p: CompactModuleCardProps) {
   function selectModule(m: CardModule) {
     setModuleKey(m.key);
     setItems(false);
+    setDetails(false);
     setEditing(null);
     setMarked(null);
     setSales(!!m.opensHeaderDetails);
@@ -249,6 +255,7 @@ export default function CompactModuleCard(p: CompactModuleCardProps) {
     if (f.editor) setEditing(f.key);
   }
   const close = () => { setEditing(null); setMarked(null); };
+  const communication = mod.communication === undefined ? p.communication : mod.communication;
   const summary = mod.summary ?? [];
   const editingFact = summary.find((f) => f.key === editing);
 
@@ -258,7 +265,7 @@ export default function CompactModuleCard(p: CompactModuleCardProps) {
         <header className={s.header}>
           <div className={s.identity}>
             <div className={s.identityTitle}><strong>{p.name}</strong></div>
-            <small className={s.contactLine}><>{p.document ? <button type="button" className={s.documentNumber} title={p.document.label} aria-label={p.document.label} aria-expanded={documentOpen} aria-controls={`${ids}-document`} onClick={() => setDocumentOpen((v) => !v)}>{p.reference}</button> : <span>{p.reference}</span>}</>{p.phone ? <><Glyph name="phone" /><span>{p.phone}</span></> : null}</small>
+            <small className={s.contactLine}><>{p.document ? <button type="button" className={s.documentNumber} title={p.document.label} aria-label={p.document.label} aria-expanded={documentOpen} aria-controls={`${ids}-document`} onClick={() => setDocumentOpen((v) => !v)}>{p.reference}</button> : <span>{p.reference}</span>}</>{p.phone ? <span className={s.phonePair}><Glyph name="phone" />{p.phone}</span> : null}</small>
             {p.sales ? (
               <button type="button" className={s.salesToggle} title={CARD_WORDS.orderDetails} aria-label={CARD_WORDS.orderDetails} aria-controls={`${ids}-sales`} aria-expanded={sales} onClick={() => setSales((v) => !v)}>
                 <span className={s.chevron}>{sales ? "▴" : "▾"}</span>
@@ -304,14 +311,15 @@ export default function CompactModuleCard(p: CompactModuleCardProps) {
             <button key={m.key} type="button" disabled={m.disabled} className={m.key === mod.key ? s.selected : undefined} aria-current={m.key === mod.key ? "page" : undefined} onClick={() => selectModule(m)}>{m.label}</button>
           ))}
           <span className={s.navSpacer} />
-          {p.communication ? (
+          {communication ? (
             <button type="button" className={`${s.toggle} ${s.toggleFirst}`} aria-label={CARD_WORDS.communication} title={CARD_WORDS.communication} aria-controls={`${ids}-comm`} aria-expanded={comm} onClick={() => setComm((v) => !v)}><Glyph name="message" /></button>
           ) : null}
+          {mod.details ? <button type="button" className={s.toggle} aria-label={`${mod.label} · ${CARD_WORDS.orderDetails}`} title={CARD_WORDS.orderDetails} aria-controls={`${ids}-details`} aria-expanded={details} onClick={() => setDetails(value => !value)}>⋯</button> : null}
           {mod.items ? (
-            <button type="button" className={`${s.toggle} ${s.toggleItems} ${p.communication ? "" : s.toggleFirst}`} aria-label={CARD_WORDS.items} title={CARD_WORDS.items} aria-controls={`${ids}-items`} aria-expanded={items} onClick={() => setItems((v) => !v)}><Glyph name="box" /></button>
+            <button type="button" className={`${s.toggle} ${s.toggleItems} ${communication ? "" : s.toggleFirst}`} aria-label={CARD_WORDS.items} title={CARD_WORDS.items} aria-controls={`${ids}-items`} aria-expanded={items} onClick={() => setItems((v) => !v)}><Glyph name="box" /></button>
           ) : null}
           {p.timeline ? (
-            <button type="button" className={`${s.toggle} ${s.toggleTimeline} ${p.communication || mod.items ? "" : s.toggleFirst}`} title={CARD_WORDS.timeline} aria-label={timeline ? CARD_WORDS.hideTimeline : CARD_WORDS.showTimeline} aria-expanded={timeline} onClick={() => setTimeline((v) => !v)}><Glyph name="history" /></button>
+            <button type="button" className={`${s.toggle} ${s.toggleTimeline} ${communication || mod.items ? "" : s.toggleFirst}`} title={CARD_WORDS.timeline} aria-label={timeline ? CARD_WORDS.hideTimeline : CARD_WORDS.showTimeline} aria-expanded={timeline} onClick={() => setTimeline((v) => !v)}><Glyph name="history" /></button>
           ) : null}
         </nav>
         {p.document && documentOpen ? <div id={`${ids}-document`} className={s.body} role="region" aria-label={p.document.label}>
@@ -333,10 +341,11 @@ export default function CompactModuleCard(p: CompactModuleCardProps) {
               </div>
             ) : null}
             {editingFact?.editor ? <div className={s.editor}>{editingFact.editor(close)}</div> : null}
+            {mod.details && details ? <div id={`${ids}-details`}>{mod.details}</div> : null}
             {mod.items && items ? <div id={`${ids}-items`}>{mod.items}</div> : null}
           </div>
         </article>
-        {p.communication && comm ? <CardCommunicationPanel id={`${ids}-comm`} config={p.communication} onClose={() => setComm(false)} /> : null}
+        {communication && comm ? <CardCommunicationPanel key={mod.key} id={`${ids}-comm`} config={communication} onClose={() => setComm(false)} /> : null}
         {p.timeline && timeline ? <CardTimeline events={p.timeline} status={p.timelineStatus} timeZone={p.timeZone ?? CARD_TIME_ZONE} onClose={() => setTimeline(false)} /> : null}
       </section>
     </div>
@@ -390,7 +399,8 @@ function CardCommunicationPanel({ id, config, onClose }: { id: string; config: C
   const moreButton = useRef<HTMLButtonElement | null>(null);
   const uid = useId();
   const knownPhones = useMemo(() => Object.fromEntries(config.recipients.filter((r) => r.phone).map((r) => [r.value, r.phone as string])), [config.recipients]);
-  const link = draftLink(channel, recipient, message, subject, knownPhones);
+  const group = config.recipients.find(r => r.value === recipient)?.whatsappUrl;
+  const link = channel === "whatsapp" && group && /^https:\/\/chat\.whatsapp\.com\//.test(group) ? group : draftLink(channel, recipient, message, subject, knownPhones);
 
   useEffect(() => { if (picker) searchInput.current?.focus(); }, [picker]);
   /* Escape or a press outside closes the ⋯ menu; Escape returns focus to ⋯. */

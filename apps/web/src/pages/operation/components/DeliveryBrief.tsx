@@ -210,7 +210,7 @@ export function DeliveryDatesEdit({
   const [date, setDate] = useState<string | null>(card.confirmedDate);
   const [time, setTime] = useState<string | undefined>(card.confirmedTime ?? undefined);
   const [from, setFrom] = useState<InformationReceivedFrom | undefined>(
-    partner ? "partner" : "customer",
+    compact ? undefined : partner ? "partner" : "customer",
   );
   const [proofPath, setProofPath] = useState<string | null>(arrangement?.reply_proof_path ?? null);
   const holidays = useMemo(() => myHolidaySet(), []);
@@ -219,7 +219,7 @@ export function DeliveryDatesEdit({
   const later = laterThanRequested(date, requestedIso);
   const needsReply = later && !proofPath;
   const dayRefused = date && (isSundayIso(date) || holidays.has(date)) ? MONITOR_COPY.notDeliveryDay : undefined;
-  const canSave = Boolean(date) && !needsReply && !dayRefused && !save.isPending && !proof.busy;
+  const canSave = Boolean(date) && (!compact || Boolean(from)) && !needsReply && !dayRefused && !save.isPending && !proof.busy;
 
   const fromOptions = [
     ...(partner ? [{ value: "partner", label: partner }] : []),
@@ -283,7 +283,9 @@ export function DeliveryDatesEdit({
       <Select
         id={`delivery-brief-from-${card.scopeId}`}
         label={MONITOR_COPY.informationReceivedFrom}
-        value={from}
+        required={compact}
+        placeholder={MONITOR_COPY.pickOne}
+        value={from ?? ""}
         onValueChange={(v) => setFrom(v as InformationReceivedFrom)}
         options={fromOptions}
       />
@@ -466,7 +468,7 @@ export function LogisticsDetailsEdit({
     >
       <Select
         id={`delivery-brief-partner-${card.scopeId}`}
-        label={MONITOR_COPY.partner}
+        label={compact && !card.logisticsPartnerId ? MONITOR_COPY.assignLogistics : MONITOR_COPY.partner}
         value={partnerId}
         onValueChange={pickPartner}
         placeholder={MONITOR_COPY.pickOne}
@@ -484,7 +486,7 @@ export function LogisticsDetailsEdit({
           required
         />
       ) : null}
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+      <div className={compact ? "grid grid-cols-2 gap-3" : "grid grid-cols-1 gap-3 md:grid-cols-2"}>
         <Select
           id={`delivery-brief-driver-${card.scopeId}`}
           label={MONITOR_COPY.driverName}
@@ -515,13 +517,14 @@ export function LogisticsDetailsEdit({
         <Textarea
           id={`delivery-brief-condo-${card.scopeId}`}
           label={MONITOR_COPY.condoRegistration}
+          rows={compact ? 2 : 3}
           hint={MONITOR_COPY.condoRegistrationHint}
           value={condo}
           onChange={(e) => setCondo(e.target.value)}
         />
       ) : null}
       {/* The chase — prepared words, never confirmation (Card 05). */}
-      <div className="flex flex-col gap-1 rounded-control border border-kit-slate-5 bg-kit-slate-3 p-2" data-testid="delivery-brief-chase">
+      {!compact ? <div className="flex flex-col gap-1 rounded-control border border-kit-slate-5 bg-kit-slate-3 p-2" data-testid="delivery-brief-chase">
         <pre className="whitespace-pre-wrap font-sans text-body text-kit-slate-12" data-testid="delivery-brief-chase-message">
           {chaseMessage}
         </pre>
@@ -554,7 +557,7 @@ export function LogisticsDetailsEdit({
             });
           }}
         />
-      </div>
+      </div> : <ReplyProofField id={`delivery-brief-logistics-proof-${card.scopeId}`} path={proofPath} busy={proof.busy} error={proof.error} onFile={file => { void proof.upload(file).then(path => { if (path) setProofPath(path); }); }} />}
       {compact ? <CardEditorButtons onSave={() => void submit()} onCancel={onDone} error={saveError} disabled={!canSave} /> : <div className="flex items-center gap-2">
         <Button variant="primary" size="sm" type="submit" disabled={!canSave} data-testid="delivery-brief-save-logistics">
           {card.logisticsPartnerId ? MONITOR_COPY.changeLogistics : MONITOR_COPY.assignLogistics}
