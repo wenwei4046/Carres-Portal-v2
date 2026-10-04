@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { readFileSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { SoBatchOrderRow, SoBatchPurchaseResponse } from "@carres/shared";
@@ -58,6 +58,20 @@ import OperationToOrder from "./OperationToOrder";
 
 const KLANG = "11111111-1111-4111-8111-111111111111";
 const HERE = dirname(fileURLToPath(import.meta.url));
+function officialDocument(version = 1) {
+  return { po_number: "PO-2041", po_id: "PO-2041", version, lines: [],
+    supplier: { name: "Hooka", address: null, contact: null },
+    destination: { name: "Carres Klang", address: "Klang" }, issue_date: "2026-08-22",
+    delivery_instructions: null, eta_date: "2026-09-18", terms: null };
+}
+async function openIssuedDocument() {
+  await screen.findByTestId("po-supplier-result-panel");
+  fireEvent.click(screen.getByRole("button", { name: "Open PDF", exact: true }));
+  await screen.findByTestId("so-batch-evidence-PO-2041");
+  await waitFor(() => expect(screen.getByTestId("so-batch-evidence-confirm")).toBeEnabled());
+  fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Close", exact: true }));
+}
+
 
 /** The o1 order row — Card 02-B: the parent grain the Register draws. */
 function orderRow(over: Partial<SoBatchOrderRow> = {}): SoBatchOrderRow {
@@ -261,14 +275,17 @@ describe("the whole journey — tick, arrange, issue, prove it arrived", () => {
                 supplierId: "s-hooka",
                 supplierName: "Hooka",
                 destinationId: KLANG,
-                destination: "Carres Klang",
+                destination: "Carres Klang", whatsappGroupUrl: "https://chat.whatsapp.com/test-supplier",
               },
             ],
           })
-        : Promise.resolve({ po_number: "PO-2041", po_id: "PO-2041", version: 1, lines: [] }),
+         : path.includes("print-data") ? Promise.resolve(officialDocument())
+          : path.endsWith("/sends") ? Promise.resolve({ sends: [] })
+          : path.endsWith("email-capability") ? Promise.resolve({ configured: false })
+          : Promise.resolve(payload()),
     );
     await clickIssue();
-    await screen.findByTestId("so-batch-evidence-PO-2041");
+    await openIssuedDocument();
     expect(screen.getByTestId("so-batch-evidence-PO-2041")).toHaveTextContent(
       "PO-2041 · PO V1 · Sending not confirmed",
     );
@@ -279,7 +296,8 @@ describe("the whole journey — tick, arrange, issue, prove it arrived", () => {
       path.includes("confirm-sent")
         ? Promise.resolve({ ok: true })
         : path.includes("print-data")
-          ? Promise.resolve({ po_number: "PO-2041", po_id: "PO-2041", version: 1, lines: [] })
+          ? Promise.resolve(officialDocument())
+          : path.endsWith("/sends") ? Promise.resolve({ sends: [{ kind: "confirmed_sent", channel: "whatsapp", po_version: 1, recipient: "https://chat.whatsapp.com/test-supplier", sent_at: "2026-08-22T10:00:00Z", sent_by_name: "Sample staff" }] })
           : /* Card 02-B — the buy leaves the LEAF listing, but the Sales
                Order's row is PERMANENT: it comes back Ordered, with its PO. */
             Promise.resolve(
@@ -304,15 +322,14 @@ describe("the whole journey — tick, arrange, issue, prove it arrived", () => {
               }),
             ),
     );
-    fireEvent.change(screen.getByTestId("so-batch-evidence-recipient"), {
-      target: { value: "Hooka Purchasing Group" },
-    });
+    expect(screen.getByTestId("so-batch-evidence-recipient")).toHaveAttribute("readonly");
     fireEvent.click(screen.getByTestId("so-batch-evidence-confirm"));
-    // Confirmed → back to buying, and the Register re-reads the server. The
+    // Confirmation retains the result; closing returns to the same register. The
     // ordered Sales Order REMAINS — one permanent row, now carrying its
     // document. (`Status` was retired as a presentation on 2026-09-11: the
     // document and the refused tick say what the word used to.)
     await waitFor(() => expect(screen.getByTestId("so-batch-page")).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: "Close", exact: true }));
     fireEvent.click(await screen.findByText("No purchase needed"));
     await waitFor(() =>
       expect(screen.getByTestId("so-batch-po-link-o1")).toHaveTextContent("PO-2041"),
@@ -328,13 +345,15 @@ describe("the whole journey — tick, arrange, issue, prove it arrived", () => {
             pos: [
               {
                 id: "PO-2041", supplierId: "s-hooka", supplierName: "Hooka",
-                destinationId: KLANG, destination: "Carres Klang",
+                destinationId: KLANG, destination: "Carres Klang", whatsappGroupUrl: "https://chat.whatsapp.com/test-supplier",
               },
             ],
           })
         : path.includes("print-data")
           ? /* A REVISED purchase order — Version 3 is what the operator sees. */
-            Promise.resolve({ po_number: "PO-2041", po_id: "PO-2041", version: 3, lines: [] })
+            Promise.resolve(officialDocument(3))
+          : path.endsWith("/sends") ? Promise.resolve({ sends: [] })
+          : path.endsWith("email-capability") ? Promise.resolve({ configured: false })
           : Promise.resolve(payload()),
     );
     renderPage();
@@ -343,13 +362,11 @@ describe("the whole journey — tick, arrange, issue, prove it arrived", () => {
     fireEvent.click(screen.getByTestId("so-batch-issue"));
     await screen.findByTestId("so-batch-issue-workspace");
     await clickIssue();
-    await screen.findByTestId("so-batch-evidence-PO-2041");
+    await openIssuedDocument();
     expect(screen.getByTestId("so-batch-evidence-PO-2041")).toHaveTextContent("PO V3");
 
     apiFetch.mockClear();
-    fireEvent.change(screen.getByTestId("so-batch-evidence-recipient"), {
-      target: { value: "Hooka Purchasing Group" },
-    });
+    expect(screen.getByTestId("so-batch-evidence-recipient")).toHaveAttribute("readonly");
     fireEvent.click(screen.getByTestId("so-batch-evidence-confirm"));
     await waitFor(() =>
       expect(

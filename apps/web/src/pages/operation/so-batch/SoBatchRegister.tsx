@@ -368,12 +368,13 @@ export interface SoBatchRegisterProps {
   hidden?: boolean;
   /** Hands the arrangement to the issue journey. This page creates nothing. */
   onIssue: (selections: SoBatchSelection[]) => void;
+  onOpenPurchaseOrders?: () => void;
   /** The PO window Work opened this page on (Purchasing §5.6.1): its name,
    *  and the way back to every window's demand. */
   scope?: { label: string; onClear: () => void; preselectKey?: string };
 }
 
-export default function SoBatchRegister({ data, isLoading, onIssue, initialSearch, hidden = false, scope, roundNavigation }: SoBatchRegisterProps) {
+export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurchaseOrders, initialSearch, hidden = false, scope, roundNavigation }: SoBatchRegisterProps) {
   const navigate = useNavigate();
   /* R8 — a `display:none` box forgets its scroll offset, and by the time a
      render hides it the offset already reads 0. So the offset is remembered
@@ -1466,6 +1467,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue, initialSearc
             data-testid="so-batch-grid"
           >
             <DataGrid<SoBatchOrderRow>
+              toolbarEnd={onOpenPurchaseOrders ? <Button size="sm" onClick={onOpenPurchaseOrders}>Purchase Orders</Button> : undefined}
               appearance="reference"
               wrapToolbar
               palette="slate"

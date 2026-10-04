@@ -15,6 +15,8 @@ import { fmtDate } from "@/lib/fmt-date";
 import Button from "@/components/kit/Button";
 import SoBatchRegister from "./so-batch/SoBatchRegister";
 import SoBatchIssueWorkspace from "./so-batch/SoBatchIssueWorkspace";
+import PoSupplierResultPanel from "./so-batch/PoSupplierResultPanel";
+import type { IssuedPo } from "./components/PoIssueEvidence";
 
 /**
  * SO BATCH PURCHASE — the orchestrator, and nothing else
@@ -52,6 +54,8 @@ export default function OperationToOrder() {
   const scopeWindow = searchParams.get("window");
   const windowParts = scopeWindow ? parsePoWindowKey(scopeWindow) : null;
   const [selections, setSelections] = useState<SoBatchSelection[] | null>(null);
+  const [issuedPos, setIssuedPos] = useState<IssuedPo[]>([]);
+  const [resultsOpen, setResultsOpen] = useState(false);
 
   /**
    * THE PAYLOAD IS PARSED, NOT TRUSTED.
@@ -146,6 +150,7 @@ export default function OperationToOrder() {
           destinations={data.destinations}
           onBack={backToBuying}
           onDone={finish}
+          onIssued={pos => { setIssuedPos(pos); setResultsOpen(true); finish(); }}
         />
       )}
       <SoBatchRegister
@@ -173,7 +178,10 @@ export default function OperationToOrder() {
           },
         }}
         onIssue={setSelections}
+        onOpenPurchaseOrders={() => setResultsOpen(true)}
       />
+      {resultsOpen && <PoSupplierResultPanel open onOpenChange={setResultsOpen} pos={issuedPos}
+        roundWindow={windowParts ? scopeWindow! : undefined} onChanged={finish} />}
     </>
   );
 }

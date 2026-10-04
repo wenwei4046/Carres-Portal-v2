@@ -20,7 +20,7 @@ const pos = [
 function data(id: string) { return { po_id: id, po_number: id, version: 1 } as PoTemplateData; }
 beforeEach(() => {
   sessionStorage.clear();
-  api.mockReset().mockImplementation(async (path: string) => path.endsWith("email-capability") ? { configured: false } : data(path.split("/").at(-2)!));
+  api.mockReset().mockImplementation(async (path: string) => path.endsWith("email-capability") ? { configured: false } : path.endsWith("/sends") ? { sends: [] } : data(path.split("/").at(-2)!));
   const pdf = new Blob(["%PDF-1.4"], { type: "application/pdf" });
   Object.defineProperty(pdf, "arrayBuffer", { value: async () => new TextEncoder().encode("%PDF-1.4").buffer });
   renderPdf.mockReset().mockResolvedValue(pdf);
@@ -40,6 +40,24 @@ describe("issued supplier bundle", () => {
     expect(screen.queryByLabelText("PO-003 · V1")).not.toBeInTheDocument();
     expect(api.mock.calls.every(call => call.length === 1)).toBe(true);
   });
+  it("retains readable history when another PO fails and retries that unknown read", async () => {
+    let unavailable = true;
+    api.mockImplementation(async (path: string) => {
+      if (path.endsWith("/sends")) {
+        if (path.includes("PO-002") && unavailable) throw new Error("unavailable");
+        return { sends: path.includes("PO-001") ? [{ kind: "confirmed_sent", channel: "email", po_version: 1, sent_at: "2026-10-05T02:20:00Z" }] : [] };
+      }
+      if (path.endsWith("email-capability")) return { configured: false };
+      return data(path.split("/").at(-2)!);
+    });
+    render(<PoSupplierBundle pos={pos} onPreview={() => {}} />);
+    expect(await screen.findByRole("alert")).toHaveTextContent("PO-002 · Evidence could not be loaded");
+    expect(screen.getAllByText("PO sent to supplier").length).toBeGreaterThan(0);
+    unavailable = false;
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
+    expect(screen.getByText("Sending not confirmed")).toBeInTheDocument();
+  });
   it("keeps message and archive on the same individual selection", async () => {
     render(<PoSupplierBundle pos={pos} onPreview={() => {}} />);
     await ready();
@@ -54,7 +72,7 @@ describe("issued supplier bundle", () => {
     const open = vi.fn();
     render(<PoSupplierBundle pos={pos} onPreview={open} />);
     await ready();
-    fireEvent.click(screen.getAllByRole("button", { name: "Open" })[1]);
+    fireEvent.click(screen.getAllByRole("button", { name: "Open PDF" })[1]);
     expect(open).toHaveBeenCalledWith("PO-002", pos[1]);
   });
   it("loads Today across rounds without mixing it into This round", async () => {
@@ -96,6 +114,7 @@ describe("human-triggered supplier email", () => {
   function configured(outcome: unknown) {
     api.mockImplementation(async (path: string, init?: RequestInit) => {
       if (path.endsWith("email-capability")) return { configured: true };
+      if (path.endsWith("/sends")) return { sends: [] };
       if (path.endsWith("supplier-email")) {
         if (outcome instanceof Error) throw outcome;
         return outcome;

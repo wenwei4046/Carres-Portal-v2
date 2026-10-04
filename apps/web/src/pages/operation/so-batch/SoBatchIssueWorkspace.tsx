@@ -71,6 +71,8 @@ export interface SoBatchIssueWorkspaceProps {
   backLabel?: string;
   supplierBundle?: boolean;
   roundWindow?: string;
+  /** SO result handoff: the retained register opens the same issued POs in its side panel. */
+  onIssued?: (pos: IssuedPo[]) => void;
 }
 
 type Mode = "review" | "evidence";
@@ -84,6 +86,7 @@ export default function SoBatchIssueWorkspace({
   backLabel,
   supplierBundle = false,
   roundWindow,
+  onIssued,
 }: SoBatchIssueWorkspaceProps) {
   const [at, setAt] = useState(0);
   const [bundlePreview, setBundlePreview] = useState<IssuedPo | null>(null);
@@ -266,6 +269,7 @@ export default function SoBatchIssueWorkspace({
             },
           );
       setPos(res.pos ?? []);
+      if (onIssued && res.pos?.length) { onIssued(res.pos); return; }
       setMode("evidence");
       setAt(0);
     } catch (e) {
@@ -313,6 +317,7 @@ export default function SoBatchIssueWorkspace({
       const po = await apiFetch<IssuedPo>(
         `/api/operation/pos/${encodeURIComponent(poId)}/issue-context`,
       );
+      if (onIssued) { onIssued([po]); return; }
       setPos([po]);
       setConfirmed(new Set());
       setAt(0);
