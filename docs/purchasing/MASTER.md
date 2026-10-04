@@ -233,8 +233,9 @@ original-information/current-PDF composition is now built locally using existing
 components; 54 PO Register/object tests pass, including the actual shared DataGrid opening a PO,
 read-only opening, separate explicit issue
 work and cancelled-document refusal. Desktop actual-component sample acceptance shows equal facts/PDF panes with the real PDF renderer
-(`/tmp/so-batch-po-readonly-split-preview.png`); the local fixture rejects all writes. Narrow-screen
-acceptance and production proof remain open. A real-grid facet callback render loop found during
+(`/tmp/so-batch-po-readonly-split-preview.png`); the local fixture rejects all writes. At 390px the original facts stack above the PDF and the complete paper fits the pane
+(`/tmp/so-batch-po-readonly-mobile-preview.png`). The shared canvas hook now retains paper aspect
+ratio while fitting the current pane across resize. Production proof remains open. A real-grid facet callback render loop found during
 this walk was corrected by retaining unchanged membership, with a real-grid integration regression. Existing individual stock reservation, guarded issue and current-version evidence
 are reusable authorities, not permission to infer whole-round or shared-panel completion.
 

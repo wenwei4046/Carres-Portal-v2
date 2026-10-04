@@ -23,7 +23,7 @@ useAuth.setState({
   user: { email: "operation@carres.com" } as never,
 });
 
-function po(overrides: Record<string, unknown>) {
+function po(overrides: Record<string, unknown>): Record<string, unknown> {
   return {
     supplier_id: "supplier-1",
     warehouse_id: "warehouse-1",
@@ -222,11 +222,11 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     const source = POS.find(po => po.id === decodeURIComponent(print[1]!));
     if (!source) return Response.json({}, { status: 404 });
     return Response.json({
-      po_id: source.id, po_number: source.id, version: source.version ?? 1,
+      po_id: String(source.id), po_number: String(source.id), version: Number(source.version ?? 1),
       issue_date: "2026-09-01", eta_date: "2026-09-12",
       supplier: { name: "Hooka", address: "Sample supplier address", contact: "Sample contact" },
       destination: { name: "Carres Klang", address: "Sample warehouse address" },
-      issued_by: "Sample staff", so_refs: [4001],
+      issued_by: "Sample staff", so_refs: [4001], delivery_instructions: "Local sample only",
       lines: [{ sku: "MAT-K-001", description: "Cody King", qty: 3, unit: "pcs", identity_mode: "quantity" }],
       terms: "Sample data only. No purchase was placed.",
     } satisfies PoTemplateData);

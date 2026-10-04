@@ -332,7 +332,7 @@ describe("Purchase Orders Register", () => {
     const errors = vi.spyOn(console, "error").mockImplementation(() => {});
     try {
       renderPage();
-      fireEvent.click(await screen.findByRole("button", { name: "PO-20260828-4827", exact: true }));
+      fireEvent.click(await screen.findByRole("button", { name: /^PO-20260828-4827$/ }));
       expect(await screen.findByTestId("purchase-order-object")).toBeInTheDocument();
       expect(screen.getByTestId("po-document-panes")).toHaveAttribute("data-layout", "50-50");
       expect(errors.mock.calls.flat().join(" ")).not.toContain("Maximum update depth");
