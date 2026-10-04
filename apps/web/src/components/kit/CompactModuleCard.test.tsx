@@ -1,18 +1,44 @@
 /**
- * CompactModuleCard — the confirmed reference's interaction contract
- * (UI MASTER §4.3). Pixel parity is proven separately by
- * scripts/compact-card-parity.mjs and scripts/compact-card-states.mjs.
+ * CompactModuleCard — the interaction contract of UI MASTER §4.3 (owner rules
+ * 2026-10-04). Pixel parity with the owner's reference page is proven
+ * separately by scripts/compact-card-states.mjs.
  */
 import { fireEvent, render, screen, within } from "@testing-library/react";
+import { useState } from "react";
 import { describe, expect, it } from "vitest";
-import CompactModuleCard, { CARD_WORDS, draftLink, type CardTimelineEvent, type SavedTemplate, type TemplateStore } from "./CompactModuleCard";
+import CompactModuleCard, { CARD_WORDS, CardEditorButtons, draftLink, formatCardTime, type CardModule, type CardTimelineEvent, type SavedTemplate, type TemplateStore } from "./CompactModuleCard";
 
-const EVENT: CardTimelineEvent = { id: "e1", actorName: "Jess", actorInitial: "J", summary: "Payment received · RM1,380", date: "2026-09-30", dateLabel: "30 Sep 2026", timeLabel: null, result: "RC3009263735" };
+const PAID: CardTimelineEvent = { id: "e1", actorName: "Jess", actorInitial: "J", summary: "{payment}", at: "2026-09-30T08:08:32.181911Z", result: "{receipt}" };
+const DATE_ONLY: CardTimelineEvent = { id: "e2", actorName: "Jess", actorInitial: "J", summary: "{dated}", date: "2026-09-30", dateLabel: "30 Sep 2026", result: "{ref}" };
 
 function memoryStore(initial: SavedTemplate[] = []): TemplateStore {
   let data = initial;
   return { load: () => data, save: (next) => { data = next; return true; } };
 }
+
+/** A Delivery-like editor whose Save fails while the input is empty. */
+function PartnerEditor({ close }: { close: () => void }) {
+  const [v, setV] = useState("");
+  return (
+    <>
+      <input aria-label="{partner input}" value={v} onChange={(e) => setV(e.target.value)} />
+      <CardEditorButtons onCancel={close} onSave={() => { if (v) close(); }} />
+    </>
+  );
+}
+
+const MODULES: CardModule[] = [
+  { key: "info", label: "Info", opensHeaderDetails: true, summary: [{ key: "t", label: "Total", value: "{total}" }, { key: "p", label: "Paid", value: "{paid}" }, { key: "o", label: "Outstanding", value: "{outstanding}" }], items: <p>{"{order items}"}</p> },
+  {
+    key: "delivery", label: "Delivery",
+    summary: [
+      { key: "stock", label: "Stock", value: "{ready}", opensItems: true },
+      { key: "logistics", label: "Logistics", value: "{partner}", editable: true, editor: (close) => <PartnerEditor close={close} /> },
+      { key: "date", label: "Confirmed Delivery", value: "{date}", editable: true, editor: () => <p>{"{date editor}"}</p> },
+    ],
+    items: <p>{"{delivery items}"}</p>,
+  },
+];
 
 function card(extra: Partial<Parameters<typeof CompactModuleCard>[0]> = {}) {
   return render(
@@ -20,15 +46,12 @@ function card(extra: Partial<Parameters<typeof CompactModuleCard>[0]> = {}) {
       name="{customer}"
       reference="{order}"
       phone="{phone}"
-      modules={[{ key: "info", label: "Info", disabled: true }, { key: "delivery", label: "Delivery" }]}
-      currentModule="delivery"
-      facts={[
-        { key: "stock", label: "Stock", value: "{ready}", opensItems: true },
-        { key: "logistics", label: "Logistics", value: "{partner}", editable: true, editor: (close) => <button type="button" onClick={close}>{"{editor}"}</button> },
-      ]}
-      items={<p>{"{items}"}</p>}
+      sales={{ orderDate: "{order date}", salesLocation: "{location}", salesperson: "{salesperson}" }}
+      address={{ area: "{area}", full: "{full address}" }}
+      modules={MODULES}
+      initialModule="info"
       communication={{ recipients: [{ value: "{customer} · +60123456789", label: "Customer", phone: "+60123456789" }], templates: [{ key: "t", label: "{template}", body: "{body}" }], store: memoryStore() }}
-      timeline={[EVENT]}
+      timeline={[PAID, DATE_ONLY]}
       {...extra}
     />,
   );
@@ -39,63 +62,119 @@ describe("draftLink — opens a draft, never sends", () => {
     expect(draftLink("whatsapp", "019-8337 2393", "hi")).toBe("https://wa.me/601983372393?text=hi");
     expect(draftLink("whatsapp", "not a phone", "hi")).toBe("");
   });
-  it("maps a chosen contact to its phone", () => {
-    expect(draftLink("whatsapp", "A · +60123456789", "x", "", { "A · +60123456789": "+60123456789" })).toBe("https://wa.me/60123456789?text=x");
-  });
   it("builds mailto only for a valid address, with subject", () => {
     expect(draftLink("email", "a@b.co", "body", "Sub")).toBe("mailto:a%40b.co?subject=Sub&body=body");
     expect(draftLink("email", "a@b", "body")).toBe("");
   });
 });
 
-describe("CompactModuleCard", () => {
-  it("keeps Communication, items and Timeline closed until their header icons are pressed", () => {
+describe("formatCardTime — the instant is kept, no zone suffix", () => {
+  it("shows day and time in Malaysia and keeps seconds in the title", () => {
+    expect(formatCardTime(PAID.at as string)).toEqual({ short: "30 Sep · 4:08 PM", full: "30 Sep 2026, 4:08:32 PM" });
+  });
+  it("never writes MYT", () => {
+    const t = formatCardTime("2026-12-31T23:59:59Z");
+    expect(`${t.short} ${t.full}`).not.toMatch(/MYT|GMT|\+08/);
+    expect(t.short).toBe("1 Jan · 7:59 AM");
+  });
+});
+
+describe("CompactModuleCard — shared header", () => {
+  it("Info opens sales facts and address; the toggle is a chevron with no visible words", () => {
     card();
-    expect(screen.queryByText(CARD_WORDS.communication, { selector: "h2" })).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: CARD_WORDS.communication }));
-    expect(screen.getByText(CARD_WORDS.communication, { selector: "h2" })).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Show delivery items" }));
-    expect(screen.getByText("{items}")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: CARD_WORDS.showTimeline }));
-    expect(screen.getByText(CARD_WORDS.timeline, { selector: "h2" })).toBeTruthy();
+    const toggle = screen.getByRole("button", { name: CARD_WORDS.orderDetails });
+    expect(toggle.textContent).toBe("▴");
+    expect(screen.getByText("{location}")).toBeTruthy();
+    expect(screen.getByText(CARD_WORDS.salesperson)).toBeTruthy();
+    expect(screen.getByText("{full address}")).toBeTruthy();
+    fireEvent.click(toggle);
+    expect(toggle.textContent).toBe("▾");
+    expect(screen.queryByText("{location}")).toBeNull();
+    expect(screen.getByText("{full address}")).toBeTruthy();
   });
 
-  it("opens one inline editor per fact and folds it on close", () => {
-    card();
-    const cell = screen.getByRole("button", { name: /Logistics/ });
-    fireEvent.click(cell);
-    expect(cell.getAttribute("aria-expanded")).toBe("true");
-    fireEvent.click(screen.getByText("{editor}"));
-    expect(screen.queryByText("{editor}")).toBeNull();
+  it("another module starts with sales facts and address closed", () => {
+    card({ initialModule: "delivery" });
+    expect(screen.queryByText("{location}")).toBeNull();
+    expect(screen.queryByText("{full address}")).toBeNull();
   });
 
-  it("Stock opens the item list instead of an editor", () => {
+  it("switching module resets header details to that module's default and closes items and editors", () => {
     card();
+    fireEvent.click(screen.getByRole("button", { name: CARD_WORDS.items }));
+    expect(screen.getByText("{order items}")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Delivery" }));
+    expect(screen.queryByText("{order items}")).toBeNull();
+    expect(screen.queryByText("{location}")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Info" }));
+    expect(screen.getByText("{location}")).toBeTruthy();
+  });
+});
+
+describe("CompactModuleCard — summary and editors", () => {
+  it("renders only the module's own facts, label above value", () => {
+    card();
+    expect(screen.getAllByText(/^\{(total|paid|outstanding)\}$/)).toHaveLength(3);
+    expect(screen.queryByText("{ready}")).toBeNull();
+    const total = screen.getByText("{total}").parentElement as HTMLElement;
+    expect(total.firstElementChild?.textContent).toBe("Total");
+  });
+
+  it("opens one editor at a time", () => {
+    card({ initialModule: "delivery" });
+    fireEvent.click(screen.getByRole("button", { name: /Logistics/ }));
+    expect(screen.getByLabelText("{partner input}")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /Confirmed Delivery/ }));
+    expect(screen.queryByLabelText("{partner input}")).toBeNull();
+    expect(screen.getByText("{date editor}")).toBeTruthy();
+  });
+
+  it("a failed save keeps the editor and its input; a successful save folds it", () => {
+    card({ initialModule: "delivery" });
+    fireEvent.click(screen.getByRole("button", { name: /Logistics/ }));
+    fireEvent.click(screen.getByRole("button", { name: CARD_WORDS.save }));
+    const input = screen.getByLabelText("{partner input}") as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "NETS" } });
+    fireEvent.click(screen.getByRole("button", { name: CARD_WORDS.cancel }));
+    fireEvent.click(screen.getByRole("button", { name: /Logistics/ }));
+    fireEvent.change(screen.getByLabelText("{partner input}"), { target: { value: "NETS" } });
+    fireEvent.click(screen.getByRole("button", { name: CARD_WORDS.save }));
+    expect(screen.queryByLabelText("{partner input}")).toBeNull();
+  });
+
+  it("Stock opens the module's items instead of an editor", () => {
+    card({ initialModule: "delivery" });
     fireEvent.click(screen.getByRole("button", { name: /Stock/ }));
-    expect(screen.getByText("{items}")).toBeTruthy();
+    expect(screen.getByText("{delivery items}")).toBeTruthy();
+  });
+});
+
+describe("CompactModuleCard — Communication and Timeline", () => {
+  it("keeps Items, Communication and Timeline closed by default", () => {
+    card();
+    expect(screen.queryByText("{order items}")).toBeNull();
+    expect(screen.queryByText(CARD_WORDS.communication, { selector: "h2" })).toBeNull();
+    expect(screen.queryByText(CARD_WORDS.timeline, { selector: "h2" })).toBeNull();
   });
 
-  it("puts the channel in the Communication header and shows Subject for Email only", () => {
+  it("Email alone shows Subject; channel sits in the Communication header", () => {
     card({ initiallyOpen: { communication: true } });
     expect(screen.queryByLabelText(CARD_WORDS.subject)).toBeNull();
     fireEvent.change(screen.getByRole("combobox", { name: CARD_WORDS.channel }), { target: { value: "email" } });
     expect(screen.getByLabelText(CARD_WORDS.subject)).toBeTruthy();
-    expect(screen.getByRole("button", { name: CARD_WORDS.openEmail })).toBeTruthy();
   });
 
-  it("enables Open WhatsApp only for a usable recipient", () => {
+  it("Escape and an outside press close the ⋯ menu; Escape returns focus to ⋯", () => {
     card({ initiallyOpen: { communication: true } });
-    const open = screen.getByRole("button", { name: CARD_WORDS.openWhatsApp }) as HTMLButtonElement;
-    expect(open.disabled).toBe(true);
-    fireEvent.change(screen.getByLabelText(CARD_WORDS.to), { target: { value: "{customer} · +60123456789" } });
-    expect(open.disabled).toBe(false);
-  });
-
-  it("keeps template actions behind Message ⋯", () => {
-    card({ initiallyOpen: { communication: true } });
+    const more = screen.getByRole("button", { name: CARD_WORDS.messageOptions });
+    fireEvent.click(more);
+    expect(screen.getByRole("button", { name: CARD_WORDS.findTemplate })).toBeTruthy();
+    fireEvent.keyDown(document, { key: "Escape" });
     expect(screen.queryByRole("button", { name: CARD_WORDS.findTemplate })).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: CARD_WORDS.messageOptions }));
-    for (const w of [CARD_WORDS.findTemplate, CARD_WORDS.saveAsTemplate, CARD_WORDS.manageTemplates]) expect(screen.getByRole("button", { name: w })).toBeTruthy();
+    expect(document.activeElement).toBe(more);
+    fireEvent.click(more);
+    fireEvent.pointerDown(document.body);
+    expect(screen.queryByRole("button", { name: CARD_WORDS.findTemplate })).toBeNull();
   });
 
   it("refuses a duplicate template name", () => {
@@ -109,18 +188,26 @@ describe("CompactModuleCard", () => {
     expect(screen.getByText(CARD_WORDS.nameUsed)).toBeTruthy();
   });
 
-  it("shows the actor as an avatar and never invents a missing time", () => {
+  it("shows a recorded instant without MYT and keeps the full instant", () => {
     card({ initiallyOpen: { timeline: true } });
-    expect(screen.getByLabelText(CARD_WORDS.recordedBy("Jess")).textContent).toBe("J");
-    const item = screen.getByText(EVENT.summary).closest("li") as HTMLElement;
+    const item = screen.getByText("{payment}").closest("li") as HTMLElement;
+    const time = within(item).getByText("30 Sep · 4:08 PM");
+    expect(time.getAttribute("datetime")).toBe(PAID.at);
+    expect(time.getAttribute("title")).toBe("Recorded 30 Sep 2026, 4:08:32 PM");
+    expect(item.textContent).not.toMatch(/MYT/);
+    expect(within(item).queryByText(/Time unavailable/)).toBeNull();
+  });
+
+  it("states a missing time instead of inventing one", () => {
+    card({ initiallyOpen: { timeline: true } });
+    const item = screen.getByText("{dated}").closest("li") as HTMLElement;
     expect(within(item).getByText("30 Sep 2026").tagName).toBe("TIME");
     expect(within(item).getByText(`· ${CARD_WORDS.timeUnavailable}`)).toBeTruthy();
     expect(item.textContent).not.toMatch(/\d{1,2}:\d{2}/);
   });
 
-  it("shows a recorded time beside the date", () => {
-    card({ initiallyOpen: { timeline: true }, timeline: [{ ...EVENT, timeLabel: "2:05 pm MYT" }] });
-    expect(screen.getByText("30 Sep 2026, 2:05 pm MYT")).toBeTruthy();
-    expect(screen.queryByText(`· ${CARD_WORDS.timeUnavailable}`)).toBeNull();
+  it("shows the actor as an avatar with the name in its label", () => {
+    card({ initiallyOpen: { timeline: true } });
+    expect(screen.getAllByLabelText(CARD_WORDS.recordedBy("Jess"))[0].textContent).toBe("J");
   });
 });

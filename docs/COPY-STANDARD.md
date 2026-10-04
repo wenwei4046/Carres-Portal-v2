@@ -4948,6 +4948,26 @@ predicates stay with Purchasing MASTER §9.3 and their source owners. A missing 
 
 Use `Amendment No`, not `Amendment status`. Genuine absence is `No amendment`, without a link; unnumbered recorded amendments use `Not recorded`, unread source `Unavailable`. Never print an internal UUID as a document number. Related columns: `PO No`, `DO No`, `Invoice No`, `Receipt No`; genuine receipt absence `Receipt not recorded`. Page tools: `Group by: None`, `Group by: Delivery Status`, `Group by: Stock Status`, `Group by: Payment Status`.
 
+## Compact module card words — owner confirmed 2026-10-03 / 2026-10-04 · kit component built on branch
+
+The words of UI MASTER §4.3's card, as confirmed on the owner's reference pages. They live once in
+`CARD_WORDS` (`components/kit/CompactModuleCard.tsx`); a module adds only its own facts and editors.
+
+| Where | Words |
+|---|---|
+| Header | accessible names `Order details` (the ▾/▴, no visible words) · `Delivery address` · `Open order` · `Close panel`; sales facts `Order date` · `Sales Location` · `Salesperson` |
+| Module bar | `Order modules` · icon names `Communication` · `Items` · `Show timeline` / `Hide timeline` |
+| Info summary | `Total` · `Paid` · `Outstanding`; order items `Item` · `Qty` · `Unit price` · `Amount` |
+| Delivery summary | `Stock` · `Logistics ▾` · `Confirmed Delivery ▾` · `DO`; empty values `No logistics picked` · `No confirmed date` · `Data not loaded`; editors `Assign logistics` · `Choose company` · `Record delivery arrangement` · `Customer Requested Delivery Date` · `Contact result` · `Choose result` · `Next follow-up` · `Confirmed Time · optional` · `Not specified` · `Morning` · `Afternoon` · `Specific time` · `Delivery Order` · `Stock ready` · `Payment cleared` · `Customer confirmed date`; buttons `Cancel` · `Save` |
+| Communication | `Communication` · `Communication channel` · `WhatsApp` · `Email` · `To` · `Subject` · `Message` · `Message options` · `Find template…` · `Save as template…` · `Manage templates…` · `Find template` · `Search templates` · `Choose template` · `Save template` · `Name` · `Saved templates` · `No saved templates yet.` · `Attach evidence` · `Evidence · none attached` · `Evidence · {n} attached (preview only)` · `Copy message` · `Open WhatsApp` · `Open email` |
+| Communication placeholders | `Choose contact or enter phone (+country code)` · `Enter email address` · `Enter email subject` · `Draft a message` |
+| Communication answers | `Copied. Contact result is unchanged.` · `Select the message and copy it.` · `Template saved in this browser.` · `Enter a template name.` · `Write a message first.` · `This name is already used. Choose another name.` · `Could not save in this browser.` · `Replace the current draft with this template?` |
+| Accessible names and small controls | `Close communication` · `Close timeline` · `Close save template` · `Message template` · `Remove {file name}` · `Close` · `Delete` (a saved template) |
+| Timeline | `Timeline` · `Recorded by {name}` (avatar label) · time `{d Mon} · {h:mm AM/PM}` with no zone suffix, title `Recorded {d Mon yyyy}, {h:mm:ss AM/PM}` · date only: `{d Mon yyyy}` and `· Time unavailable`, title `{d Mon yyyy} · Exact time unavailable` |
+
+Never on this card: `Order info` as visible text, `MYT`, a "saved" completion note, a repeated
+explanation under the DO conditions.
+
 ## Finance (Chew)
 
 Words for Finance's own screens, approved by **Chew** (Finance) as recorded in [`docs/finance/MASTER.md`](finance/MASTER.md). They are added beside the rest of this dictionary and change none of its other entries.

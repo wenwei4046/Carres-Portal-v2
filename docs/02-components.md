@@ -441,20 +441,23 @@ keeps arrival evidence at receipt scope; no Unit attribution is inferred.
 
 ## CompactModuleCard
 
-**Purpose.** The owner-confirmed compact module card (UI MASTER §4.3, 2026-10-03): customer header,
-module tabs, a four-cell fact strip with inline editors, items, Communication and Timeline. Built
-2026-10-04 on `/ui#compact-card`; no production page uses it yet.
+**Purpose.** The owner-confirmed compact module card (UI MASTER §4.3): one shared customer header
+(sales facts behind ▾, address, target date), module tabs, the module's own summary cells, inline
+editors, items, Communication and Timeline. Live on `/ui#compact-card` with Info and Delivery; no
+production page uses it yet.
 
-**Contract.** The owning module passes its facts (`label`, `value`, optional `editor` or
-`opensItems`), item list, recipients, message templates and timeline events (actor, summary, date,
-time only when recorded, result). The card owns arrangement and interaction only: it never writes a
-record, never marks a message sent, keeps saved templates in the browser and uploads no file. Editor
-content uses `CardEditorButtons` and `compactCardStyles`.
+**Contract.** The card takes the header facts once and a list of modules; each module passes its own
+summary facts (`label`, `value`, optional `editor` or `opensItems`), items and whether it opens the
+header details (Info does). Communication takes recipients, templates and a template store; Timeline
+takes events with the recorded ISO instant (`at`) or a date only. The card owns arrangement and
+interaction: it never writes a record or marks a message sent, keeps saved templates in the browser
+and uploads no file. Editors close only when the module reports a successful save.
+`CardEditorButtons`, `CardChecklist` and `compactCardStyles` style module content inside it.
 
-**Proof.** `scripts/compact-card-parity.mjs` (measured reference JSON, five widths) and
-`scripts/compact-card-states.mjs` (14 more states against the reference page) must report no
-difference after any change. Palette, font, radius and its drawn glyphs are the reference's own and
-await the owner's token decision; they live in one block of `compact-card.module.css`.
+**Proof.** `scripts/compact-card-states.mjs` against `docs/ui-reference/module-card-reference.html`:
+18 states × 5 widths, no unexplained difference; deviations are listed in
+`docs/ui-reference/MODULE-CARD-TEMPLATE.md`. Palette, font, radius and glyphs await the owner's token
+decision and live in one block of `compact-card.module.css`.
 
 ---
 

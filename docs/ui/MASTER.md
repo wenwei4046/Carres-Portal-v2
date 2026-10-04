@@ -41,7 +41,7 @@ before quoting. Built is not the same as owner-verified on every page.
 | Fact cards | `Block` — the one object card (§4.1) · `Panel` · `StatusPill` · `EmptyState` · `Loading` | `components/kit/*` | LOCKED · built |
 | Orders list / drawer band | `SectionPanel` (cream band) — that surface only, not a general card | `components/SectionPanel.tsx` | Governed by §4.1; not a `Block` duplicate |
 | Dialogs and panels | `Modal` · `Drawer` (incl. quick view) · `Toast` · `PdfPreview` · `SavedEvidenceViewer` | `components/kit/*` | Built |
-| **Compact module card** (header, module tabs, four facts, editors, items, Communication, Timeline) | **`CompactModuleCard`** — pass the module's own facts, editors, recipients, templates, events | `components/kit/CompactModuleCard.tsx` · `/ui#compact-card` · reference `docs/ui-reference/` | Owner confirmed 2026-10-03 (§4.3) · component built, pixel parity proven · **no production page uses it yet** · palette/font/radius await the owner's token decision |
+| **Compact module card** (shared customer header, module tabs, module summary, editors, items, Communication, Timeline) | **`CompactModuleCard`** — pass the header facts once and each module's own facts, editors and items | `components/kit/CompactModuleCard.tsx` · `/ui#compact-card` · contract `docs/ui-reference/MODULE-CARD-TEMPLATE.md` | Owner rules 2026-10-03/04 (§4.3) · built on branch, parity proven against the owner's reference page · **no production page uses it yet** · palette/font/radius await the token decision |
 | Work right-panel Communication | `WorkCommunication` — recorded channels only | `pages/operation/work/WorkCommunication.tsx` | Owner ruling 2026-09-17 · built; differs from the compact card's editable `To` (open owner question) |
 | Record history | §5 three-rank grammar 13/12/11 | this MASTER §5 | LOCKED · no shared component; each page draws it |
 
@@ -49,8 +49,9 @@ before quoting. Built is not the same as owner-verified on every page.
 (→ `Button`), `Field` (→ kit inputs / `field-recipe`), `PageHeader` (→ `PageShell`). Their remaining
 pages move only after the owner approves a before/after preview, because each swap changes what the
 operator sees. **Deleted 2026-10-04:** the `carres-design` agent skill and
-`docs/ui-reference/po-supplier-reply-mock.html`. `docs/ui-reference/` now holds only the confirmed
-compact-card reference that `CompactModuleCard` is proven against.
+`docs/ui-reference/po-supplier-reply-mock.html`; 2026-10-04 the Delivery-only card reference, superseded by
+the shared-header handoff. `docs/ui-reference/` holds only the compact-card contract, its reference page
+and measurements.
 
 ---
 
@@ -3555,30 +3556,25 @@ verified are separate claims; include scope and evidence for each.
 **Scope boundary:** the accepted shell/register/object/quick-view recipe is confirmed. Order Route compact-card redesign and Monthly Demand planning composition are governed separately by Orders MASTER; their current local work is not a universal kit pattern or part of this listing release. No complete2990 comparison is claimed.
 The master contract being documented does not mean every module has migrated or been verified.
 
-## §4.3 · Confirmed compact module card — 2026-10-03
+## §4.3 · Compact module card — owner rules 2026-10-03 / 2026-10-04
 
-**OWNER CONFIRMED 2026-10-03 · KIT COMPONENT BUILT 2026-10-04 · NO PRODUCTION PAGE ADOPTED YET.**
-Use the kit component [`CompactModuleCard`](../../apps/web/src/components/kit/CompactModuleCard.tsx)
-(live on `/ui#compact-card`). Never copy the reference HTML/CSS into a page. The reference files in
-[`docs/ui-reference/`](../ui-reference/DELIVERY-CARD-TEMPLATE.md) are the proof target only:
-`scripts/compact-card-parity.mjs` matches every element of `delivery-card-measurements.json` at the
-five widths, and `scripts/compact-card-states.mjs` matches the live reference page in 14 more states
-(Email, ⋯ menu, Find template, naming dialog, Manage templates, three editors, items, address,
-Timeline). Run both after any change to the component.
+**OWNER CONFIRMED · KIT COMPONENT BUILT ON BRANCH · NO PRODUCTION PAGE ADOPTED YET.** Every module card
+uses the kit [`CompactModuleCard`](../../apps/web/src/components/kit/CompactModuleCard.tsx) (live on
+`/ui#compact-card` with Info and Delivery). Never copy reference HTML or CSS into a page. The
+complete rules, the sample-data boundary and the deviations from the reference page live in
+[`MODULE-CARD-TEMPLATE.md`](../ui-reference/MODULE-CARD-TEMPLATE.md); the reference page
+`module-card-reference.html` is the proof target of `scripts/compact-card-states.mjs`
+(18 states × 5 widths, no unexplained difference).
 
-Composition: grey customer header (name, order, phone · address · target date · Open/Close) · module
-tabs with Communication / items / Timeline icons · one four-cell fact strip whose cells open inline
-editors (Cancel then blue Save at right) · items · Communication then Timeline below. Communication:
-channel select in its header, `To` with the known contact or a typed phone/email, Subject for Email
-only, Message ⋯ for Find / Save as / Manage templates, a 320px naming dialog, one attachment entry,
-`Copy message` and `Open WhatsApp`/`Open email` at right. Timeline: 28px actor avatar (name in its
-label), summary and date/time on line one, result on line two, missing time stated, never invented.
-Links open drafts and never mark anything sent. Saved templates live in that browser only; files are
-not uploaded. Each module passes its own facts, editors, recipients, templates and events and keeps
-its own business gates; the card's width rules follow the card, so it works in a drawer.
+In one line each: one shared customer header with sales facts behind a ▾/▴ (no words), address with
+its own toggle, target date, Open and Close; Info opens sales facts and address, other modules start
+closed; summary cells are label above value, left aligned, only the module's own facts (Info
+`Total · Paid · Outstanding`, Delivery `Stock · Logistics · Confirmed Delivery · DO`); values take the
+fewest lines, four at most; one editor at a time, folded on success, kept on failure, `Cancel` then
+`Save` at right; DO one condition per line; items, Communication and Timeline start closed; times show
+without a zone suffix while the full instant is kept; nothing in a module repeats the header, a date,
+the sales facts or a completion note.
 
-**Open, recorded, not approved:** (1) palette, font, radius and drawn glyphs are the reference's own,
-not `01-design-tokens.md` — owner reviewing the side-by-side preview; (2) the editable `To` differs
-from the Work panel's recorded-channels-only rule; (3) reference defects listed in
-`DELIVERY-CARD-TEMPLATE.md` (⋯ menu has no Escape, 32px controls at phone width, fixed 56px header
-with long names) are reproduced faithfully and change only with an owner-approved preview.
+**Open, recorded, not approved:** palette, font, radius and glyphs are the reference's own (token
+decision pending); 40px phone touch targets shown for review only; the editable `To` differs from the
+Work panel's recorded-channels-only rule.
