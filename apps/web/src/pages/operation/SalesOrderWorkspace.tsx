@@ -1061,11 +1061,12 @@ export default function SalesOrderWorkspace() {
 
 function SalesOrderNumberDoor({ so, search }: { so: number; search: string }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const resolved = useSalesOrderIdByNumber(so);
   const id = resolved.data?.id ?? null;
   useEffect(() => {
-    if (id) navigate(`/operation/orders/so/${id}${search}`, { replace: true });
-  }, [id, navigate, search]);
+    if (id) navigate(`/operation/orders/so/${id}${search}`, { replace: true, state: location.state });
+  }, [id, navigate, search, location.state]);
   if (resolved.isError) return <SalesOrderAbsence />;
   return (
     <div className="flex h-full items-center justify-center" data-testid="so-number-door">
@@ -1112,9 +1113,9 @@ function SalesOrderWorkspaceBody() {
         next.delete("edit");
         return next;
       },
-      { replace: true },
+      { replace: true, state: location.state },
     );
-  }, [params, setParams]);
+  }, [params, setParams, location.state]);
 
   const detailQ = useOperationOrder(isNew ? null : (orderId ?? null));
   /* ── THE CREATE DOOR ASKS THE CATALOG (2026-08-21) ───────────────────────
@@ -2188,7 +2189,7 @@ function SalesOrderWorkspaceBody() {
         else next.delete("route");
         return next;
       },
-      { replace: true },
+      { replace: true, state: location.state },
     );
     if (view === "Order Route") return;
     if (view === "Order") {
@@ -2453,7 +2454,7 @@ function SalesOrderWorkspaceBody() {
               const next = new URLSearchParams(prev);
               next.delete("revision");
               return next;
-            }, { replace: true });
+            }, { replace: true, state: location.state });
           }}
           data-testid="workspace-back-to-current"
         >
