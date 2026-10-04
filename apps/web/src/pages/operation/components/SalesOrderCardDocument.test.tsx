@@ -33,7 +33,7 @@ describe("saved SO document lifecycle", () => {
     expect(screen.getByTestId("pdf")).toHaveAttribute("data-src", "blob:saved");
     expect(screen.getByRole("heading", { name: "Sales order PDF · SO-1" })).toBeVisible();
     expect(screen.getByRole("button", { name: "Download" })).toBeEnabled();
-    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function () {
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (this: HTMLAnchorElement) {
       expect(this.href).toBe("blob:saved");
       expect(this.download).toBe("SO-1.pdf");
     });
