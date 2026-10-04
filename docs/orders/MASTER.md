@@ -134,9 +134,7 @@ prints `Not recorded` beside a Yes / No answer and `No {field word}` otherwise, 
 (`describeRevisionChanges`, so History, Revisions and the amendment request change together). The
 object header is two rows below 768px, measured at 375 / 390 / 743 with no overlap and no sideways
 scroll; `Print` is its icon below 480px and `⋮` is 40px.
-**Not built in B:** a line 3 note longer than one line still wraps whole instead of ending in `…`
-through `OverflowText` — the ledger is not a Register row and the engine's component is not mounted
-there yet.
+**Line3 note correction — BUILD, target-release proof pending2026-10-04:** History and Revisions reuse the existing Register `OverflowText`: only a cut line opens whole. A revision keeps one version door; its note expansion sits outside that button, so no nested button or accidental version selection is introduced. Other modules retain the default shared rank rendering. Ledger/revision/form checks136 passed; the cut-note interaction test proves complete text and no version action.
 
 **Scope C · SO page locked state — BUILT 2026-09-28, production walk owed.** ONE lock
 (`formLocked`): View and a historical version are the same locked presentation. Measured on the
@@ -235,7 +233,7 @@ answers per order `obligations` through `completionOfOrder` (the ONE composition
 group says it could not read. **Monthly demand Export BUILT 2026-09-28:** the view's own Row 2 carries
 `Export` alone (no Search, no Columns) and writes the `By month` table as on screen (`Monthly demand
 {first} to {last} {date}.xlsx`; `Unavailable` stays a word). **Not built in F:** a custom date range;
-search and multi-selection in the Dealer group (a kit admission first). **Measured gaps:**
+Sales Location search awaits kit admission; multi-selection is not the current approved target. **Source coverage to reconcile with Purchasing/Stock:**
 SO Batch Purchase reads only `proceed_order` orders and only Mattress / Bedframe / Sofa lines, so
 `To buy` is `0` for an Accessory or a `Not in catalog` line; a Unit sold before 0471 names no line
 and is matched to the first line of its SKU.
@@ -610,7 +608,7 @@ each view exposes only its own controls. Do not add a second handmade rail.
   rail (owner ruling 2026-09-28). These are read-only factual filters, not a mutable
   overall status, work queue or new status/group column. Service case filters read Service's truth.
   Unknown underlying facts must not be classified as completed or no cases.
-- Monthly demand: starting month, 3/6-month period with explicit first/last month and year;
+- Monthly demand: starting month,1–6-month period with explicit first/last month and year;
   Sales Location, customer delivery State / City, actual catalog product categories.
   The requested-delivery-date basis remains explicit. Delivery/completion/service-case filters
   do not appear here and do not silently carry over from the list.
@@ -618,12 +616,7 @@ each view exposes only its own controls. Do not add a second handmade rail.
   approval inferred from silence. Click a selected facet again to deselect; a select retains All;
   no chosen values means All. Month/period controls retain their selected reporting window.
   This does not remove the shared active-condition/list-toolbar clear control or alter other pages.
-- Dealer supports search and multi-selection; selected choices remain visible. Product-category
-  selection may also narrow to several actual categories. This SO-specific approved target exceeds
-  the existing single-slot FilterRailSelect: its multi-select interaction is NOT BUILT and must be
-  admitted through governed kit design before application implementation. Do not change other
-  modules' single-selection behaviour as a side effect. New English copy remains subject to COPY
-  reconciliation; this approval is not a claim that all illustrated wording is registered.
+- Sales Location and Product category use the single-choice kit controls under the current owner ruling. All retains several locations; a chosen row can be unchosen. A new search interaction requires kit admission before implementation.
 - Source classifications are catalog-owned; never print Other goods. Missing classifications are
   traceable data errors, not silently omitted physical demand. Services are separate from Qty.
 
@@ -6803,7 +6796,7 @@ The acceptance matrix records current implementation and proof, not a new Bluepr
   Services read Service for stock. Building type, Floor, named Lift and stair carry stay recorded
   facts; missing stair carry is Not recorded, never a fabricated0.
 - Delivery reads the existing Monitor projection for the final customer leg, excluding services
-  from goods readiness. Only operation/principal may edit unsettled, non-cancelled scopes and the
+  from goods readiness. Known-order viewing retains completed source facts without adding them to Monitor work. Only operation/principal may edit unsettled, non-cancelled and non-completed scopes and the
   existing server gates remain authoritative. Customer date/time is separate from crew ETA.
   Customer information source starts at Pick one and requires an actual choice; the writer keeps
   contact/proxy evidence separate from the logged-in recorder. Logistics coverage preselection is
@@ -6831,34 +6824,63 @@ The acceptance matrix records current implementation and proof, not a new Bluepr
   resolution retain the Register return state. Cancel/Back preserves the original list context.
   Source receipts remain unconfirmed until Stock proves an exact-line posted, non-void receipt.
 
-**Current release evidence — production-verified repair / existing-path acceptance continues.** PR #1878 exact head
-`633a3c783e175d3e4b35b433b3c939ae6c3d1220` passed CI37198797912 and merged as
-`086f23d0a10ff9144d13f4cfc130c2f8c2394dc6`. Deploy37199668418 succeeded; independent verification matched all five production revision surfaces.
-Register/adapter/service checks,9 API identity checks,4 number-door/context checks and101 existing
-FullPage/document checks passed; the final shared session/return run passed105 checks.
-These counts are scoped checks, not evidence of a live business save.
+**Current release evidence — production-verified existing-path acceptance, 2026-10-04.**
+PR #1881 exact head `ee8cf695cb9790321efeeaa5fbaac0e05e43ce1e` passed full CI37201089568
+and merged as `f7857f6af3f1b6b7870b927db32d2bd9bc3f4232`. Deploy37202073286 succeeded;
+independent verification matched both Pages projects, both canonical domains and API health.
+166 Delivery scope/Monitor/compact checks and web typecheck passed locally; full exact-head and
+merged-version checks passed in the pipeline. PR #1878's086f23d proof covers the earlier fact,
+template, identity and context repairs (CI37198797912, Deploy37199668418, five-surface convergence).
+The matrix keeps the measured revision explicit; these checks do not prove a live business save.
 
 | Existing operating surface | Measured evidence and current acceptance | Boundary / responsible owner |
 |---|---|---|
 | Listing/search/selection → Table/Cards → quick view | Real Principal SO-1368; saved money and lineage, goods-only Items, separate details; selection/search return covered by real walks and Register checks. On086f23d Cards reads Not delivered, matching Table; search1368, Cards and selection survive all four views and Edit/Cancel/Back. | Orders + shared Register; loaded scope remains explicit |
-| Customer/Logistics editors and DO | Pick one with disabled Save; unsaved NETS coverage suggestion, Cancel returns Not assigned; actual0/1 goods, Date not confirmed, No DO yet and non-interactive conditions. Failure/retry is tested. | Delivery owns writes and release gates; no live Save performed |
-| Formal FullPage → Edit → Cancel → Back | Real saved PDF and equal752px panes at1800px were verified on the adopted template. On086f23d unknown stair carry reads Not recorded and Edit stays blank; Services prints King ×2 once; all four views retain return context. | Orders owns commercial edits; no live full-page Save performed |
+| Customer/Logistics editors and DO | Pick one with disabled Save; unsaved NETS coverage suggestion, Cancel returns Not assigned; actual0/1 goods, Date not confirmed, No DO yet and non-interactive conditions. The same Customer/Logistics Cancel path was rechecked onf7857f6 as Logistics · Operation. Failure/retry is tested. | Delivery owns writes and release gates; no live Save performed |
+| Formal FullPage → Edit → Cancel → Back | Real saved PDF and equal752px panes at1800px were verified on the adopted template. On086f23d unknown stair carry reads Not recorded and Edit stays blank; Services prints King ×2 once; all four views retain return context. Onf7857f6 the saved PDF, equal752px panes, blank Edit/null read, counted Services and Cancel/Back were rechecked. | Orders owns commercial edits; no live full-page Save performed |
 | Revisions / History / Order Route | Real SO-1368 original/current revision and Jess · Principal history; goods/Delivery/Payment owner doors. Real SO-1362 has two legs, two issued DOs, delivered-to-customer and paid-in-full; missing final photo remains visible. | Orders read-only fan-in; receiving/void/amendment and older revision live variants are not all certified by this walk |
 | Communication / Timeline | Current backend libraries read; on086f23d Standard reminder renders REF: SO-1368 and recorded events identify Jess. Recorded timestamps and role/read-error checks are covered by tests. | Payment/Delivery own templates and messages; no send, settings change or attachment upload |
 | Monthly demand | Oct2026 shows11 total/not-delivered goods; on086f23d the month door automatically clears old1368 search; after clearing retained selection,7 orders reconcile Mattress4/Bedframe3/Sofa2/Accessory2. | Orders owns report; filtered category/source coverage and exceptional receipts remain broader ScopeF acceptance, not certified by this single month |
 | Existing Workspace Working Panel | Real Team Work search1368 names the order and the SO button renders its saved document. It uses the existing Work composition and file drawer. | Workspace-owned surface; this release does not claim shared-card adoption or a new formal-object door there |
 | Permissions, refusals and read failures | 086f23d browser proof began as Sara · Principal; the browser session changed externally to Logistics · Operation, after which a fresh full path retained search/view/selection. This is not controlled role impersonation. API dealer rejection and adapter finance/read-failure cases pass; existing form refusal/retry preserves evidence. | Orders/Delivery/shared guards; no additional controlled role acceptance is claimed |
 
-**Measured completed-order defect — BUILD:** real086f23d SO-1362 has two DOs and a completed customer leg in Order Route, but compact Delivery reads Not recorded. The shared Monitor projection excludes completed orders by its work-entry rule. The repair retains completed facts only for known-order object reads, keeps Monitor entry unchanged, excludes cancelled orders, and closes all writers for completed orders. Target-release proof remains owed. Long-name Info on086f23d was checked at1146/480/440/420/390px with no page horizontal overflow. The shared header/Balance due visual correction is separately owned by PR #1879; its governing changes are preserved, not claimed as086f23d visual proof.
+**Completed-order projection — BUILT / PRODUCTION VERIFIED:** known-order reads retain completed
+Delivery facts through the same builder; Monitor keeps its open-work entry rule, cancelled orders
+stay excluded and completed writers stay closed. Onf7857f6 SO-1362 compact Delivery shows Stock1/1,
+AL,17 Sept ·2 PM to5 PM and DO-130926-3223; Customer and Logistics have no editor door. DO conditions
+remain non-interactive. Order Route separately retains NETS/DO-130926-0842 on the transit leg and
+AL/DO-130926-3223 on the customer leg, plus the truthful missing final photo. Before/after Monitor
+both show96 Work to do,0 Delivery schedule and no1362 search match. SO-1368 retains0/1 goods,
+Not assigned, Date not confirmed, No DO yet, Pick one/disabled Save and unsaved NETS suggestion;
+Cancel keeps the saved facts. Completed Delivery was checked at1146/480/440/420/390px without page
+horizontal overflow. The target includes PR #1879's separately approved shared header and Balance
+due correction; its governing tokens/composition remain the shared authority.
 
-**Remaining module boundary:** the current listing/quick-view/full-order repair is the acceptance
-slice, not completion of every approved evolution. New SO/Subscription number allocation and the
-separate amendment-number authority remain their recorded target/gap (§0.1). ScopeA–F exceptional
-source/permission/historical variants retain their named production obligations until measured.
-Workspace and supplier/source-free purchasing objects keep their own headers, contacts and workflows.
-Live Save/send, historical-issued-file retrieval beyond the inspected version and Print/Download
-completion are not claimed. Engineering owns follow-up acceptance in each owning module; a new
-business record, outbound message or printing proof requires its existing explicit authorization.
+**Safe refusal/recovery acceptance — completed locally on the current source:**37 web checks
+(`SalesOrderReadFailure`, route query, Delivery fleet forms, historical documents, number door)
+and39 API checks (by-number, route goods, changes, revision documents, Timeline) passed. These cover
+403 without retry,404,500/retry, owner-read degradation without fabricated facts, scoped reads,
+no-change/refused/mixed amendments, historical signature/receipt cutoffs, existing-document reissue
+refusal, source/proxy separation and Cancel retaining input. The exact full CI/deploy also passed.
+They use isolated/mocked reads/writers; a passing route test is not a database rollback proof.
+
+**Whole-module remaining acceptance and capability register — concrete ownership, not a complete-module claim:**
+
+| Class | Specific remaining item / current truth | Existing owner and next action |
+|---|---|---|
+| Approved capability, current implementation gap | New SO and SUB allocation formats in§0.1 are not implemented; existing identities and `(n)` revision presentation are preserved. | Orders/Sales Portal with Rental: deliver the approved allocator/reference compatibility as its own vertical slice; prove collision handling, saved-number preservation and new formal documents in an isolated environment before production rollout. This card/read-path proof does not implement numbering. |
+| Current authority resolved; a separate future policy is absent | Existing unnumbered amendment documents read Not recorded, confirmed absence No amendment. An SO revision or UUID cannot become a public Amendment No. | Orders keeps the existing identity/absence rules and verifies an existing numbered/unnumbered amendment read when one is available. A new public numbering policy needs an explicit owner ruling only if that new capability is commissioned; no numbering choice is needed to preserve the existing workflow. |
+| Approved existing UI gap, now repaired in this branch | Long History/Revisions detail did not use the admitted one-line full-value door. | Orders:136 ledger/revision/form checks passed; release the shared OverflowText adoption and verify existing History/Revisions entry. A real long-note variant remains distinct from the rendered cut-note test. |
+| Cross-module source gap | Delivery MASTER's current measured block includes earlier-leg arrival enforcement, independent split-trip arrangement and one scheduled-date writer. Order Route reads the owner records; this release does not add a release writer. | Delivery BUILD owns those guards/records: prove leg2 refusal before leg1 arrival, trip-specific carrier/date and the one scheduling source in isolated fixtures, then verify its production slice. Orders retests the same route after that source changes. |
+| Cross-module source reconciliation | Orders§0A3/F records PO quantity/source-lineage, shared-line receipt allocation and pre0471 Unit-to-line ambiguity. Current Batch revisions must be checked before calling any older limitation an extant gap. | Purchasing/Stock own source identity: reconcile current PO revision/receipt/Unit bindings against their MASTERs, prove no duplicate coverage per SO line, then recheck Orders Route/monthly counts. Orders does not repair supplier or Unit ledgers from a read view. |
+| Safe isolated verification still owed | Actual SQL rollback/serialization with commercial, stock and money consequences is not proved by mock route tests; all-role source RLS and exceptional historical/void/split variants are not certified by the two real reader sessions. | Orders/API with the affected source owners: use throwaway Postgres plus controlled ERP fixtures to assert refused/concurrent changes leave every stored ledger unchanged and reader roles cannot cross scope. Current-main local Postgres verification passed15 amendment-lane and5 internal duty-holder checks. The10 unproceed checks did not run because the disposable replay lacks their required PO fixture; these are not passes. Fresh replay retains7 historical migration failures, so it is not upgrade proof. Review-only PR1834 already records55 candidate-branch SQL checks, including concurrency and rollback; that evidence is reusable research, not current-main or production certification. Complete the missing fixtures and current-main coverage separately; this release changes no SQL or RLS. No production fault injection or role grant is authorised by this acceptance. |
+| Safe report/read verification still owed | Monthly category/location combinations, unknown source coverage, legacy ambiguous lines, and an issued historical file beyond the inspected current version. | Orders reads existing records and scoped fixtures: reconcile each report drill-down/export model with its exact contributing population; retrieve the exact stored historical file where present, preserve truthful absence where absent. The unfiltered October7-order/11-goods proof closes only that measured case. |
+| Real business action required for additional production evidence | Live full-page correction/amendment approval/cancellation and Delivery save, outbound messages, attachment upload, PDF download/printing completion. | Orders/Delivery/Payment/Documents retain their existing writers. Engineering first completes isolated success/refusal/rollback verification; production proof follows a separately authorised real operation, without creating or changing a customer order just for this UI acceptance. Saved PDF rendering is already verified. |
+| Intentional scope and presentation boundary | Monthly multi-selection is withdrawn by the current single-choice owner ruling; Work's existing panel/document drawer is not this Register Drawer. New forecast, Copy/New office SO and other-module header adoption are not part of this release. | Orders/UI/Workspace preserve their governed controls and owner boundaries; do not turn these intentional choices into implementation gaps or import customer headers into supplier/source-free objects. |
+
+The current Register/quick-view/formal-object repair and its safe acceptance are delivered within
+these bounds. This is a reusable UI and read-path baseline, not certification of the whole module,
+all approved evolution, every role or every live business action.
 
 ### Solid SO status pills — owner confirmed 2026-10-02
 
