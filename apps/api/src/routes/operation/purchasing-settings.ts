@@ -4,6 +4,7 @@ import {
   purchasingCreateDestinationInput,
   purchasingSetNumberInput,
   purchasingSetPoDaysInput,
+  purchasingSetReadyStockPriorityInput,
   purchasingSetPoWindowsInput,
   purchasingSetSupplierPoCutoffInput,
   purchasingSetProductionDaysInput,
@@ -147,6 +148,14 @@ purchasingSettingsRouter.put("/po-days", requireOperationOrPrincipal, async (c) 
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
   const sb = userClient(c.env, c.var.auth.jwt);
   const { error } = await sb.rpc("purchasing_set_po_days", { p_days: parsed.data.days });
+  if (error) return fail(c, error);
+  return respondWithSettings(c);
+});
+
+purchasingSettingsRouter.put("/ready-stock-priority", requireOperationOrPrincipal, async (c) => {
+  const parsed = await parseJsonBody(c, purchasingSetReadyStockPriorityInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const { error } = await userClient(c.env, c.var.auth.jwt).rpc("purchasing_set_ready_stock_priority", { p_priority: parsed.data.priority });
   if (error) return fail(c, error);
   return respondWithSettings(c);
 });

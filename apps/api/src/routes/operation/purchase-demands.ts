@@ -936,6 +936,7 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
     /* Card 02-A — the governed Safety days value, so the rail words follow
        the one setting. The browser prints it; the arithmetic stayed here. */
     safetyDays: settings.orderByBufferDays,
+    readyStockPriority: settings.readyStockPriority ?? null,
     ...(poWindowsUnavailable ? { poWindowsUnavailable: true } : {}),
     ...(poCutoffTimes ? { poCutoffTimes } : {}),
     ...(poRounds ? { poRounds } : {}),

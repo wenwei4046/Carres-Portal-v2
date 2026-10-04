@@ -118,6 +118,7 @@ export {
   purchasingSetSupplierCollectionInput,
   purchasingSetNumberInput,
   purchasingSetPoDaysInput,
+  purchasingSetReadyStockPriorityInput,
   purchasingSetPoWindowsInput,
   purchasingSetSupplierPoCutoffInput,
   clockWordOf,
