@@ -60,9 +60,10 @@ another operating model. Approved target is not proof that the current page impl
 6. Quick View supports the owning task. Optional full page is 50/50: before issue, prepared purchase
    details and Draft PO PDF; after issue, formal PO/current version and its real PDF. Viewing is not
    editing. Source SO links remain accessible. No formal PO number exists before successful issue.
-7. Send each actual current PO PDF to its supplier and record recipient, channel, actor, time and
-   version. PDF generation is not sending. Purchase work completes when its demand is covered and
-   the relevant current PO PDFs have confirmed sending; completed records stay in the register.
+7. Use each actual current PO PDF for supplier communication. Copying a message or downloading
+   a PDF does not prove sending; manual sending declarations and any channel evidence remain separate
+   document facts. SO Batch PO Status Done depends only on the approved quantity/issue contract below,
+   never on inferred sending. Done records remain in the register.
 8. Normally await warehouse delivery; supplier reply is not a mandatory purchase-completion gate.
    Supplier problems and overdue goods follow their specific exception rules. Receiving records
    actual accepted/rejected quantities and evidence; partial receipt retains outstanding quantities.
