@@ -29,6 +29,7 @@ import {
   type PurchaseOrderRegisterInput,
   GOODS_ABSENCE_WORDS,
   GOODS_CATEGORY_WORDS,
+  documentDisplayNumber,
   poDocumentNumberOf,
 } from "@carres/shared";
 import { Link, useNavigate, useSearchParams, useLocation } from "react-router-dom";
@@ -1515,7 +1516,7 @@ function PurchaseOrderObject({
                 lives HERE, once, beside `number · party`. The `Status` and
                 `PO Version` facts are retired from the grid. */}
             <h1 className="text-page font-semibold text-kit-slate-12">
-              <span className="font-mono">{poDocumentNumberOf(po.id, row.facts.version)}</span> · {row.supplierName}
+              <span className="font-mono">{documentDisplayNumber(`${po.id}-V${row.facts.version}`)}</span> · {row.supplierName}
               <span className="ml-3 inline-block whitespace-nowrap align-middle text-body font-normal text-kit-slate-11" data-testid="po-object-state">
                 {row.facts.operationStatus ?? row.facts.documentState}
               </span>
@@ -1784,7 +1785,9 @@ function CurrentAction({ row, owner, onIssue }: { row: RegisterRow; owner: { use
   const state = row.facts.operationStatus;
   if (state === "Cancelled" || (state === "Completed" && !onIssue)) return null;
   const fact = row.work?.problem ?? (onIssue ? "Sending not confirmed" : null);
-  const action = row.work?.action ?? (onIssue ? `Send ${poDocumentNumberOf(row.id, row.facts.version)} to ${row.supplierName}` : null);
+  const displayedNumber = documentDisplayNumber(`${row.id}-V${row.facts.version}`);
+  const action = row.work?.action?.replace(poDocumentNumberOf(row.id, row.facts.version), displayedNumber)
+    ?? (onIssue ? `Send ${displayedNumber} to ${row.supplierName}` : null);
   const nextArrival = row.answerSummary.date ?? row.po.official_delivery_date ?? null;
   return (
     <Block title="Current action">

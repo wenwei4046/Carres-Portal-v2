@@ -31,6 +31,18 @@ beforeEach(() => {
 });
 async function ready() { await waitFor(() => expect(screen.getByRole("button", { name: "Download PDFs" })).toBeEnabled()); }
 describe("issued supplier bundle", () => {
+  it("displays the shared dated PO/version while preserving the actual supplier document identity", async () => {
+    const dated = { ...pos[0], id: "PO-20260903-7907" };
+    const open = vi.fn();
+    render(<PoSupplierBundle pos={[dated]} onPreview={() => {}} onOpenObject={open} />);
+    await ready();
+    expect(screen.getByLabelText("PO-260903-7907-V1")).toBeChecked();
+    expect(screen.getByLabelText("PO No")).toHaveValue("PO-20260903-7907 · V1");
+    fireEvent.click(screen.getByRole("button", { name: "Open full page" }));
+    expect(open).toHaveBeenCalledWith(dated.id, expect.objectContaining({ selectedIds: [dated.id] }), [dated]);
+    expect(api).toHaveBeenCalledWith(`/api/operation/pos/${dated.id}/print-data`);
+    expect(api.mock.calls.every(call => call.length === 1)).toBe(true);
+  });
   it("retains readable documents, refuses a selected failed source and retries the exact supplier set without writing", async () => {
     let unavailable = true;
     api.mockImplementation(async (path: string) => {
@@ -42,7 +54,7 @@ describe("issued supplier bundle", () => {
     });
     render(<PoSupplierBundle pos={pos} onPreview={() => {}} />);
     expect(await screen.findByRole("alert")).toHaveTextContent("PO-002 · Could not be loaded");
-    expect(screen.getByLabelText("PO-001 · V1")).toBeChecked();
+    expect(screen.getByLabelText("PO-001-V1")).toBeChecked();
     expect(screen.getByRole("button", { name: "Download PDFs" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Copy message" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Send Email" })).toBeDisabled();
@@ -86,7 +98,7 @@ describe("issued supplier bundle", () => {
     expect(screen.getByLabelText("PO No")).toHaveValue("PO-001 · V1\nPO-002 · V1");
     expect(screen.getByLabelText("To")).toHaveValue("supplier@example.invalid");
     expect(screen.getByRole("button", { name: "Send Email" })).toBeDisabled();
-    expect(screen.queryByLabelText("PO-003 · V1")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("PO-003-V1")).not.toBeInTheDocument();
     expect(api.mock.calls.every(call => call.length === 1)).toBe(true);
   });
   it("retains readable history when another PO fails and retries that unknown read", async () => {
@@ -110,7 +122,7 @@ describe("issued supplier bundle", () => {
   it("keeps message and archive on the same individual selection", async () => {
     render(<PoSupplierBundle pos={pos} onPreview={() => {}} />);
     await ready();
-    fireEvent.click(screen.getByLabelText("PO-002 · V1"));
+    fireEvent.click(screen.getByLabelText("PO-002-V1"));
     expect(screen.getByLabelText("PO No")).toHaveValue("PO-001 · V1");
     fireEvent.click(screen.getByRole("button", { name: "Download PDFs" }));
     await waitFor(() => expect(zip).toHaveBeenCalledOnce());
@@ -123,7 +135,7 @@ describe("issued supplier bundle", () => {
     render(<PoSupplierBundle pos={pos} onPreview={() => {}} />);
     await ready();
     fireEvent.change(screen.getByLabelText("Message"), { target: { value: "Please confirm delivery." } });
-    fireEvent.click(screen.getByLabelText("PO-002 · V1"));
+    fireEvent.click(screen.getByLabelText("PO-002-V1"));
     fireEvent.click(screen.getByRole("button", { name: "Copy message" }));
     await waitFor(() => expect(copy).toHaveBeenCalledWith("Please confirm delivery.\n\nPO-001 · V1"));
   });
@@ -141,7 +153,7 @@ describe("issued supplier bundle", () => {
     const open = vi.fn();
     const view = render(<PoSupplierBundle pos={pos} onPreview={() => {}} onOpenObject={open} />);
     await ready();
-    fireEvent.click(screen.getByLabelText("PO-001 · V1"));
+    fireEvent.click(screen.getByLabelText("PO-001-V1"));
     fireEvent.change(screen.getByLabelText("Subject"), { target: { value: "Delivery request" } });
     fireEvent.change(screen.getByLabelText("Message"), { target: { value: "Please confirm." } });
     fireEvent.click(screen.getAllByRole("button", { name: "Open full page" })[1]);
@@ -152,8 +164,8 @@ describe("issued supplier bundle", () => {
     render(<PoSupplierBundle pos={[pos[2], pos[0], pos[1]]} initialPreparation={preparation} onPreview={() => {}} />);
     await ready();
     expect(screen.getByLabelText("Supplier")).toHaveTextContent("Hooka");
-    expect(screen.getByLabelText("PO-001 · V2")).not.toBeChecked();
-    expect(screen.getByLabelText("PO-002 · V2")).toBeChecked();
+    expect(screen.getByLabelText("PO-001-V2")).not.toBeChecked();
+    expect(screen.getByLabelText("PO-002-V2")).toBeChecked();
     expect(screen.getByLabelText("Subject")).toHaveValue("Delivery request");
     expect(screen.getByLabelText("Message")).toHaveValue("Please confirm.");
     expect(screen.getByLabelText("PO No")).toHaveValue("PO-002 · V2");
@@ -165,10 +177,10 @@ describe("issued supplier bundle", () => {
     render(<PoSupplierBundle pos={pos} initialPreparation={{ supplierId: "s1", selectedIds: ["PO-001"],
       channel: "email", scope: "today", subject: "Prepared", messageIntroduction: "" }} onPreview={() => {}} />);
     await waitFor(() => {
-      expect(screen.getByLabelText("PO-002 · V1")).toBeInTheDocument();
-      expect(screen.queryByLabelText("PO-001 · V1")).not.toBeInTheDocument();
+      expect(screen.getByLabelText("PO-002-V1")).toBeInTheDocument();
+      expect(screen.queryByLabelText("PO-001-V1")).not.toBeInTheDocument();
     });
-    expect(screen.getByLabelText("PO-002 · V1")).not.toBeChecked();
+    expect(screen.getByLabelText("PO-002-V1")).not.toBeChecked();
     expect(screen.getByRole("button", { name: "Download PDFs" })).toBeDisabled();
   });
   it("refuses malformed navigation presentation instead of treating it as prepared authority", () => {
@@ -194,8 +206,8 @@ describe("issued supplier bundle", () => {
     unavailable = false;
     fireEvent.click(screen.getByRole("button", { name: "Try again" }));
     await ready();
-    expect(screen.getByLabelText("PO-001 · V1")).not.toBeChecked();
-    expect(screen.getByLabelText("PO-002 · V1")).toBeChecked();
+    expect(screen.getByLabelText("PO-001-V1")).not.toBeChecked();
+    expect(screen.getByLabelText("PO-002-V1")).toBeChecked();
     expect(screen.getByLabelText("Subject")).toHaveValue("Prepared");
     expect(screen.getByLabelText("Message")).toHaveValue("Please confirm.");
     expect(api.mock.calls.every(call => call.length === 1)).toBe(true);
@@ -243,8 +255,8 @@ describe("issued supplier bundle", () => {
       return data(path.split("/").at(-2)!);
     });
     render(<PoSupplierBundle pos={[pos[0]]} roundWindow="2026-10-05T10:15" onPreview={() => {}} />);
-    await waitFor(() => expect(screen.getByLabelText("PO-earlier · V1")).toBeInTheDocument());
-    expect(screen.getByLabelText("PO-earlier · V1")).not.toBeChecked();
+    await waitFor(() => expect(screen.getByLabelText("PO-earlier-V1")).toBeInTheDocument());
+    expect(screen.getByLabelText("PO-earlier-V1")).not.toBeChecked();
     expect(screen.getByLabelText("PO No")).toHaveValue("PO-001 · V1");
   });
   it("does not download or mark sent if rendering fails", async () => {
@@ -277,7 +289,7 @@ describe("human-triggered supplier email", () => {
     configured({ status: "dispatched", providerId: "email-1", documents: [{ id: "PO-001", version: 1, recorded: true }] });
     render(<PoSupplierBundle pos={pos} onPreview={() => {}} />);
     await ready();
-    fireEvent.click(screen.getByLabelText("PO-002 · V1"));
+    fireEvent.click(screen.getByLabelText("PO-002-V1"));
     fireEvent.change(screen.getByLabelText("Subject"), { target: { value: "Carres purchase" } });
     fireEvent.change(screen.getByLabelText("Message"), { target: { value: "Please arrange delivery." } });
     fireEvent.click(screen.getByRole("button", { name: "Send Email" }));

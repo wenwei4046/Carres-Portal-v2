@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { documentDisplayNumber } from "@carres/shared";
 import Button from "@/components/kit/Button";
 import Checkbox from "@/components/kit/Checkbox";
 import Select from "@/components/kit/Select";
@@ -354,7 +355,7 @@ export default function PoSupplierBundle({ pos, onPreview, roundWindow, onEviden
         onCheckedChange={checked => { setSelected(new Set(checked ? supplierPos.map(po => po.id) : [])); setCopied(false); }} />
       {supplierPos.map(po => <div key={po.id} className="flex flex-col gap-2 border-t border-kit-slate-5 pt-3">
         <div className="flex items-center justify-between gap-2">
-        <Checkbox id={`po-bundle-${po.id}`} label={documents[po.id] ? `${documents[po.id].po_number} · V${documents[po.id].version}` : po.id}
+        <Checkbox id={`po-bundle-${po.id}`} label={documents[po.id] ? documentDisplayNumber(`${documents[po.id].po_number}-V${documents[po.id].version}`) : documentDisplayNumber(po.id)}
           disabled={busy} checked={selected.has(po.id)} onCheckedChange={checked => {
             setSelected(previous => { const next = new Set(previous); if (checked) next.add(po.id); else next.delete(po.id); return next; }); setCopied(false);
           }} />
@@ -371,7 +372,7 @@ export default function PoSupplierBundle({ pos, onPreview, roundWindow, onEviden
         </p>}
       </div>)}
       {documentFailures.length > 0 && <div role="alert" className="flex flex-col gap-2">
-        {documentFailures.map(failure => <p key={failure.id} className="text-meta text-kit-red-11">{failure.id} · {failure.message}</p>)}
+        {documentFailures.map(failure => <p key={failure.id} className="text-meta text-kit-red-11">{documentDisplayNumber(failure.id)} · {failure.message}</p>)}
         <Button disabled={documentsLoading || busy} onClick={() => setDocumentRefresh(value => value + 1)}>Try again</Button>
       </div>}
       <Select id="po-bundle-channel" label="Communication channel" value={channel} onValueChange={value => setChannel(value === "email" ? "email" : "whatsapp")}
@@ -400,7 +401,7 @@ export default function PoSupplierBundle({ pos, onPreview, roundWindow, onEviden
       {emailOutcome === "unknown" && <p role="status" className="text-meta text-kit-amber-11">Sending not confirmed</p>}
       {emailAttempts.filter(attempt => attempt.status === "dispatched").map(emailEvidence => <div key={emailEvidence.id} className="flex flex-col gap-2">
         <p className="text-strong">PO sent to supplier · Email</p>
-        {emailEvidence.documents.map(document => <p key={document.id} className="text-meta text-kit-slate-11">{document.id} · V{document.version} · {document.recorded ? "PO sent to supplier" : "Not confirmed · Try again"}</p>)}
+        {emailEvidence.documents.map(document => <p key={document.id} className="text-meta text-kit-slate-11">{documentDisplayNumber(`${document.id}-V${document.version}`)} · {document.recorded ? "PO sent to supplier" : "Not confirmed · Try again"}</p>)}
         {emailEvidence.documents.some(document => !document.recorded) && <Button disabled={busy} onClick={() => void recordDispatchedEmail(emailEvidence)}>Save</Button>}
       </div>)}
       {copied && <p className="text-meta text-kit-slate-11">Copied. Contact result is unchanged.</p>}
@@ -412,7 +413,7 @@ export default function PoSupplierBundle({ pos, onPreview, roundWindow, onEviden
       {supplierPos.some(po => sendHistory[po.id]?.length) && <Block title="History">
         {supplierPos.flatMap(po => (sendHistory[po.id] ?? []).map((event, index) => <div key={`${po.id}-${index}`} className="flex flex-col gap-1">
           <p className="text-strong">{event.kind === "confirmed_sent" ? "PO sent to supplier" : `${CHANNEL_WORD[event.channel] ?? event.channel} opened`}</p>
-          <p className="text-body">{po.id}{event.po_version ? ` · V${event.po_version}` : ""} · {CHANNEL_WORD[event.channel] ?? event.channel}</p>
+          <p className="text-body">{documentDisplayNumber(`${po.id}${event.po_version ? `-V${event.po_version}` : ""}`)} · {CHANNEL_WORD[event.channel] ?? event.channel}</p>
           <p className="text-meta text-kit-slate-11">{fmtDate(event.sent_at, { time: true })}{event.sent_by_name ? ` · ${event.sent_by_name}` : ""}</p>
         </div>))}
       </Block>}

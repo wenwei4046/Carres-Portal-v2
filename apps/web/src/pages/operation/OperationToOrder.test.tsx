@@ -324,7 +324,7 @@ describe("the whole journey — tick, arrange, issue, prove it arrived", () => {
     await screen.findByTestId("po-supplier-result-panel");
     expect(screen.getByLabelText("Subject")).toHaveValue("Prepared");
     expect(screen.getByLabelText("Message")).toHaveValue("Please confirm.");
-    await waitFor(() => expect(screen.getByLabelText("PO-2041 · V1")).toBeChecked());
+    await waitFor(() => expect(screen.getByLabelText("PO-2041-V1")).toBeChecked());
     expect(apiFetch.mock.calls.some(([, options]) => options?.method === "POST")).toBe(false);
   });
   it("walks from a ticked line to confirmed supplier evidence", async () => {

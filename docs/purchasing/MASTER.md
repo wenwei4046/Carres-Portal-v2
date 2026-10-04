@@ -423,8 +423,29 @@ both find the same retained SO. Navigation, lineage keys, API inputs and exporte
 remain unchanged; Unit IDs and supplier-owned references are not formatted. The older tests that
 forbade short-year presentation have been replaced by the approved global ruling and checks that
 the displayed short number opens the original stored PO. 164 Register/detail tests pass locally.
-This bounded adoption does not claim supplier messages, historical PDFs or every Purchasing
-surface migrated. Full production release and the remaining governed display surfaces are still owed.
+Supplier preparation checkbox/evidence/history labels and the supplier PDF viewer heading reuse
+the same formatter with their actual version suffix. The formal PO heading and current-action
+number follow the same display. API identities, the message's original issued document references,
+official PDF content and filenames remain unchanged; no historical paper is regenerated. Supplier,
+Batch page and formal PO object journeys pass 106 tests locally before the additional dated-identity
+test. This adoption does not claim every Purchasing surface migrated. Full production release and
+the remaining governed display surfaces are still owed.
+
+**Quick View and Cards production acceptance, 2026-10-04.** PR1891's exact head
+`49f838c700a57bc9d996c287d378676757ffdc0e` passed full CI 37211199979. Its main merge
+`6ce2f07f24c46bbb543bf77f0f21e4890a801b08` passed deployment 37212252302 and an independent
+five-entry production convergence probe. Authenticated SO-1368 Quick View read its own phone,
+address, Sales Location and salesperson. Its actual saved SO PDF rendered; Close PDF restored focus
+to the same document entry, and reopening retained the SO panel. Items showed exact B1201S King,
+Nice Future, Carres Klang and `1 available 0 reserved`. Selecting it opened a one-unit/one-PO
+preparation containing only SO-1368; final issuance was not pressed. With SO-1365 and SO-1368 both
+selected, Table and Cards retained the same `3 of 32` search/cutoff scope and two selected SOs.
+The SO-1368 card opened only its own one-unit preparation; Back retained Cards, search, cutoff and
+both selections. Narrow-screen filters are an overlay and must be closed to reach controls beneath.
+Evidence: `/tmp/so-batch-live-quick-view-source-pdf.png`,
+`/tmp/so-batch-live-quick-view-goods.png`, `/tmp/so-batch-live-quick-view-own-issue-preview.png`,
+`/tmp/so-batch-live-cards-filtered-selection.png`. This proves the real preparation/source/read
+journey, not completed live issuing, saving stock or transmitting to a supplier.
 
 ### SO Batch PO Status — owner-approved 2026-10-04
 
