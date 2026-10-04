@@ -132,6 +132,18 @@ or production verification. Supplier communication evidence and Receiving remain
 
 ### Supplier documents and communication — owner-approved 2026-10-04
 
+**PRESENTATION PROPOSAL / NOT LAW — 2026-10-04.** The local owner-review preview at
+`http://127.0.0.1:5178/so-batch-rail-preview.html?supplier-panel=1` retains the existing
+SO table and rail and composes the existing right-side Drawer with kit Blocks, Supplier/scope
+selection, per-PO version/source/destination, independent sample PDF preview, editable Email
+subject/message, corresponding attachment filenames, WhatsApp preparation and sample History.
+This is a reviewable post-issue presentation of the approved operating model below; it is not
+a production Working Panel completion or an acceptance of legacy PR #1859. All data are sample
+and outbound/download actions remain disabled. Owner visual review remains outstanding.
+Falsifier: if staff cannot identify the supplier, exact selected PO/version set and sending
+evidence without losing their listing context, change the composition before production.
+
+
 After successful SO Batch Issue PO, the same right-side result/Quick View panel shows the issued
 bundle: separate numbered POs, current versions and suppliers. A bundle is a result scope, not a
 new formal document, merged supplier PDF or second issue authority. Default scope is This round;
