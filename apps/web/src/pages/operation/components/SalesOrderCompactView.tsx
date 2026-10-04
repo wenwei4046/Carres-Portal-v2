@@ -1,5 +1,6 @@
 /** Real register quick view. Presentation only; Delivery's existing forms own writes. */
 import type { ReactNode } from "react";
+import { LIFT_OPTIONS } from "@carres/shared";
 import CompactModuleCard, { CardChecklist, type CardFact } from "@/components/kit/CompactModuleCard";
 import { useAuth } from "@/lib/auth";
 import { useOrderTimeline } from "@/lib/queries";
@@ -43,9 +44,9 @@ export default function SalesOrderCompactView({ row, salesLocation, items, docum
     document={{ label: `Sales Order SO-${row.so}`, preview: <SalesOrderCardDocument orderId={row.id} reference={`SO-${row.so}`} /> }}
     sales={{ orderDate: fmtDate(row.ordered), salesLocation, salesperson: row.o.salespersons?.name ?? "Not recorded" }}
     address={{ area: row.deliveryLocation || "Not recorded", full: row.o.customer_address || "Not recorded", facts: [
-      { kind: "building", label: "Floor", value: String(row.o.delivery_floor ?? "Not recorded") },
-      { kind: "access", label: "Lift", value: row.o.delivery_has_lift == null ? "Not recorded" : row.o.delivery_has_lift ? "Yes" : "No" },
-      { kind: "access", label: "Stair carry items", value: String(row.o.delivery_stair_items ?? "Not recorded") },
+      { kind: "building", label: "Floor", value: row.o.delivery_floor == null ? "Floor: Not recorded" : `Floor ${row.o.delivery_floor}` },
+      { kind: "access", label: "Lift", value: row.o.delivery_has_lift == null ? "Not recorded" : LIFT_OPTIONS[row.o.delivery_has_lift ? 1 : 0] },
+      { kind: "access", label: "Items needing stair carry", value: `Items needing stair carry: ${row.o.delivery_stair_items ?? "Not recorded"}` },
     ] }}
     target={row.customerDelivery ? { date: fmtDate(row.customerDelivery) } : undefined}
     openLabel="Open full page" onOpen={onOpen} onClose={onClose}

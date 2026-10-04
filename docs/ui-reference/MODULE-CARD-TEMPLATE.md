@@ -80,13 +80,28 @@ SO ↗ continues to `/operation/orders/so/:id`. Its existing `SalesOrderWorkspac
 responsive two-pane form/document view and deliberate Edit; successful saves end editing and refresh
 its source facts/revisions, while Back returns to the Register. This release does not change those
 mechanics or claim that one navigation click proves the whole save/return journey. Existing full-page
-contract/document tests passed (105 checks); authenticated continuous-journey proof remains pending.
+contract/document tests passed (105 checks); authenticated navigation, Edit/Cancel, formal preview
+and Back are verified below. A live successful save is not claimed.
 Workspace Working Panel and other modules have not adopted this adapter. Their placement, recorded
 contact channels, domain headers and approved full-page composition remain module-owned; customer/SO
 header assumptions must not be imposed on supplier POs or source-free purchasing objects.
 
-Delivery status: implemented on the isolated BUILD branch; release and authenticated verification
-remain pending. A /ui result does not prove this business entry.
+**PRODUCTION VERIFIED — scoped Sales Orders adoption, 2026-10-04.** PR #1871 merged as
+`a9dbb6b8918e9337328eefccebe547ee1d2f4ab6`. CI `37189941545`, Deploy `37190758212` and independent five-surface
+revision verification passed. Sara · Principal used the real Listing Cards entry: Info showed the
+saved money; Delivery showed actual0/1 goods, Not assigned, Date not confirmed and No DO yet.
+Customer form opened and Cancel preserved those facts; DO conditions remained non-interactive.
+The SO number rendered the saved formal document. Info/Delivery were photographed at
+1146/480/440/420/390px with no page overflow. Full-page navigation produced equal752px panes at
+1800px, formal PDF remained visible through Edit/Cancel, and Back restored search1368 and Cards.
+137 targeted card/Register tests and105 existing full-page checks passed before release.
+No live record was changed for a save test; success/failure/Cancel are covered by tests, not claimed
+as a live save. No Print/Download was invoked; physical printing remains unverified.
+The compact Drawer's accessible hidden identity contains no focusable duplicate Close; its visible
+card controls own initial focus and Close. The regression covers initial focus, Escape and return;
+its targeted kit/dialog suite passed23 checks. Source-backed address facts name Floor, No lift/Has
+lift (shared LIFT_OPTIONS) and Items needing stair carry rather than presenting bare numbers or Yes/No.
+A /ui result alone still does not prove a business entry.
 
 ## Differences from the reference page (125 checks: 25 states × 5 widths)
 

@@ -41,7 +41,7 @@ before quoting. Built is not the same as owner-verified on every page.
 | Fact cards | `Block` — the one object card (§4.1) · `Panel` · `StatusPill` · `EmptyState` · `Loading` | `components/kit/*` | LOCKED · built |
 | Orders list / drawer band | `SectionPanel` (cream band) — that surface only, not a general card | `components/SectionPanel.tsx` | Governed by §4.1; not a `Block` duplicate |
 | Dialogs and panels | `Modal` · `Drawer` (incl. quick view) · `Toast` · `PdfPreview` · `SavedEvidenceViewer` | `components/kit/*` | Built |
-| **Compact module card** (shared customer header, module tabs, module summary, editors, items, Communication, Timeline) | **`CompactModuleCard`** — pass the header facts once and each module's own facts, editors and items | `components/kit/CompactModuleCard.tsx` · `/ui#compact-card` · contract `docs/ui-reference/MODULE-CARD-TEMPLATE.md` | Owner rules 2026-10-03/04 (§4.3) · built on branch, parity proven against the owner's reference page · **Sales Orders quick-view adoption implemented; release verification pending** · palette/font/radius await the token decision |
+| **Compact module card** (shared customer header, module tabs, module summary, editors, items, Communication, Timeline) | **`CompactModuleCard`** — pass the header facts once and each module's own facts, editors and items | `components/kit/CompactModuleCard.tsx` · `/ui#compact-card` · contract `docs/ui-reference/MODULE-CARD-TEMPLATE.md` | Owner rules 2026-10-03/04 (§4.3) · built on branch, parity proven against the owner's reference page · **Sales Orders quick-view production verified (PR #1871; §4.3 evidence)** · palette/font/radius await the token decision |
 | Work right-panel Communication | `WorkCommunication` — recorded channels only | `pages/operation/work/WorkCommunication.tsx` | Owner ruling 2026-09-17 · built; differs from the compact card's editable `To` (open owner question) |
 | Record history | §5 three-rank grammar 13/12/11 | this MASTER §5 | LOCKED · no shared component; each page draws it |
 
@@ -3557,7 +3557,7 @@ The master contract being documented does not mean every module has migrated or 
 
 ## §4.3 · Compact module card — owner rules 2026-10-03 / 2026-10-04
 
-**OWNER CONFIRMED · SHARED KIT BUILT · SALES ORDERS ADOPTION IMPLEMENTED, RELEASE PENDING.** Every module card
+**OWNER CONFIRMED · SHARED KIT BUILT · SALES ORDERS QUICK VIEW PRODUCTION VERIFIED.** Every module card
 uses the kit [`CompactModuleCard`](../../apps/web/src/components/kit/CompactModuleCard.tsx) (live on
 `/ui#compact-card` with Info and Delivery). Never copy reference HTML or CSS into a page. The
 complete rules, the sample-data boundary and the deviations from the reference page live in
@@ -3574,6 +3574,22 @@ fewest lines, four at most; one editor at a time, folded on success, kept on fai
 `Save` at right; DO one condition per line; items, Communication and Timeline start closed; times show
 without a zone suffix while the full instant is kept; nothing in a module repeats the header, a date,
 the sales facts or a completion note.
+
+**Scoped production evidence — 2026-10-04:** PR #1871 merged as `a9dbb6b8918e9337328eefccebe547ee1d2f4ab6`;
+exact-head CI `37189941545` and production Deploy `37190758212` passed. Independent
+`verify-production.mjs` confirmed that SHA on both Pages projects, both ERP/POS canonical domains
+and API health. Sara · Principal opened the actual Listing Cards quick view, with truthful Info
+money and Delivery source facts, Customer form/Cancel and read-only DO checks. Saved SO document
+rendered from its number; no Print or Download was invoked. Info and Delivery were photographed at
+1146/480/440/420/390px without page overflow. The existing full page rendered equal752px panes at
+1800px, retained the formal PDF through Edit/Cancel, and Back restored search1368 and Cards.
+Successful/refused-save behavior is tested; no live business record was changed to test a save.
+This change also removes the hidden duplicate Close from the compact Drawer: its sr-only region
+holds title/description only, so first focus reaches a visible card control. The regression covers
+visible initial focus, Escape and return to the opener; other Drawer/Modal headers retain Close.
+Address facts use governed explicit Floor and lift/stair wording rather than bare1/No values.
+This evidence covers card content and its Register Drawer, not Workspace Working Panel or
+other-module adoption. The sole contract records the reusable API and verification boundary.
 
 **Open, recorded, not approved:** palette, font, radius and glyphs are the reference's own (token
 decision pending); 40px phone touch targets shown for review only; the editable `To` differs from the
