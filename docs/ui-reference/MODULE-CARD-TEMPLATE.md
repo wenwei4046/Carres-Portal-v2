@@ -11,6 +11,8 @@ and `/ui-kit/delivery-card.html` answer with a 301 that keeps the query string) 
 geometry, text and styles, and must report **no unexplained difference**.
 `module-card-measurements.json` holds reference and component heights per state and width.
 
+**Measurement lookup:** UI MASTER §4.3 “Compact-card measurements” records the complete source dimensions, responsive rules, live evidence and pending reference values. It is the single lookup; do not create another page-local measurement guide. Historical state-height JSON is parity evidence, not fixed card height.
+
 ## Rules
 
 **Shared Header colour — owner approved 2026-10-04:** use existing Radix slate-12 background, white primary text and countdown, slate-4 contact text, slate-11 dividers/hover. Countdown uses the existing label token (11px/500/14px), with no pale badge fill. Focus is visibly white inside the dark header. Only the identity Header changes; address details, tabs, summary and body stay light. Every CompactModuleCard consumer inherits this treatment; no per-module copy. This scoped approval does not decide the remaining card palette, font or radius.
