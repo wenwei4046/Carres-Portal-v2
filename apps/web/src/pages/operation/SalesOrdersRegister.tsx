@@ -52,6 +52,7 @@ import {
   registerDeliveryConditionOf,
   type RegisterDeliveryCondition,
   monthlyDemandOf,
+  monthlyDemandCategoryOf,
   monthlyDemandWindowOf,
   type MonthlyDemandCategory,
   type MonthlyDemandRow,
@@ -409,13 +410,13 @@ function useNarrowCanvas(): [(node: HTMLDivElement | null) => void, boolean] {
  *
  * The chosen view and Monthly demand's filters live in the URL, so a link
  * reproduces what the operator saw. Monthly demand's filters are read only in
- * that view and never carry into the Order list.
+ * that view. Switching views clears them; an explicit month drill-down preserves its contributing scope.
  */
 const MONTHLY_PARAMS = ["start", "months", "dealer", "state", "city", "category"] as const;
 /* The Order list's own rail (Orders MASTER §Left rail, owner approved
    2026-09-22). Read-only FACT filters: none is a status or a work queue. */
 /* Requested delivery presets approved by the owner on 2026-10-01. */
-const LIST_PARAMS = ["dealer", "state", "city", "delivery", "completion", "obligations", "cases", "requested", "payment", "stock"] as const;
+const LIST_PARAMS = ["dealer", "state", "city", "delivery", "completion", "obligations", "cases", "requested", "payment", "stock", "category"] as const;
 /** SO receipt, delivery and payment presentation; no business calculations. */
 function salesOrderStatusTone(label: string): "success" | "info" | "warning" | "neutral" {
   if (["Fully received", "Fully delivered", "Paid in full"].includes(label)) return "success";
@@ -878,14 +879,19 @@ export default function SalesOrdersRegister() {
       }),
     [writeParams, demandQ.data],
   );
-  /* A month is a door: the Order list, narrowed to that month. */
+  /* A month is an explicit drill-down, distinct from switching views: keep
+     the report scope and drop stale list search/presentation conditions. */
   const openMonth = useCallback(
     (row: MonthlyDemandRow) => {
       if (!row.month) return;
       const value = row.kind === "month" ? row.month : `${row.kind}:${row.month}`;
-      navigate(`/operation/orders?requested=${encodeURIComponent(value)}`);
+      const params = new URLSearchParams({ requested: value });
+      for (const [key, selected] of [["dealer", dealer], ["state", deliveryState], ["city", deliveryCity], ["category", category]] as const) {
+        if (selected) params.set(key, selected);
+      }
+      navigate(`/operation/orders?${params}`);
     },
-    [navigate],
+    [navigate, dealer, deliveryState, deliveryCity, category],
   );
   const requested = view === "list" ? requestedNarrowingOf(urlParams.get("requested")) : null;
   const [requestedRange, setRequestedRange] = useState<[string, string]>(["", ""]);
@@ -896,6 +902,8 @@ export default function SalesOrdersRegister() {
   const listDelivery: RegisterDeliveryCondition | null = monthly
     ? null
     : REGISTER_DELIVERY_CONDITIONS.find((c) => c.key === urlParams.get("delivery"))?.key ?? null;
+  const listCategory = !monthly && (MONTHLY_DEMAND_CATEGORIES as readonly string[]).includes(urlParams.get("category") ?? "")
+    ? urlParams.get("category") as MonthlyDemandCategory : null;
   const listStock = monthly ? null : STOCK_STATUSES.find(p => p.key === urlParams.get("stock"))?.key ?? null;
   const listPayment = monthly ? null : PAYMENT_STATUSES.find(p => p.key === urlParams.get("payment"))?.key ?? null;
   const listObligations: ListObligations | null = null;
@@ -997,6 +1005,7 @@ export default function SalesOrdersRegister() {
         .filter((r) => !listDealer.length || listDealer.includes(salesLocationOf(r.o)))
         .filter((r) => !listState.length || listState.includes(r.o.customer_address_state?.trim() ?? ""))
         .filter((r) => !listCity.length || listCity.includes(r.o.customer_address_city?.trim() ?? ""))
+        .filter((r) => !listCategory || (r.o.order_lines ?? []).some(line => monthlyDemandCategoryOf(line) === listCategory && Number(line.qty) > 0))
         .filter(
           (r) =>
             !listDelivery ||
@@ -1009,10 +1018,11 @@ export default function SalesOrdersRegister() {
         .filter(r => !listStock || stockStatusOf(r) === listStock)
         .sort((a, b) => (b.proceeded ?? "").localeCompare(a.proceeded ?? "")),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [all, requested?.kind, requested?.month, listDealer, listState, listCity, listDelivery, listObligations, listCases, listPayment, listStock, registerFacts],
+    [all, requested?.kind, requested?.month, listDealer, listState, listCity, listDelivery, listObligations, listCases, listPayment, listStock, listCategory, registerFacts],
   );
   const activeConditions = useMemo(() => {
     const list = [
+      listCategory && { key: "category", label: `Product category: ${listCategory}`, onClear: () => setParam("category", null) },
       listStock && { key: "stock", label: `Stock Status: ${STOCK_STATUSES.find(p => p.key === listStock)!.label}`, onClear: () => setParam("stock", null) },
       listPayment && { key: "payment", label: `Payment Status: ${PAYMENT_STATUSES.find(p => p.key === listPayment)!.label}`, onClear: () => setParam("payment", null) },
       requested && {
@@ -1041,7 +1051,7 @@ export default function SalesOrdersRegister() {
     ].filter((c): c is { key: string; label: string; onClear: () => void } => Boolean(c));
     return list.length > 0 ? list : undefined;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [requested?.kind, requested?.month, setParam, chooseListState, listDealer, listState, listCity, listDelivery, listObligations, listCases, listPayment, listStock]);
+  }, [requested?.kind, requested?.month, setParam, chooseListState, listDealer, listState, listCity, listDelivery, listObligations, listCases, listPayment, listStock, listCategory]);
   /* `{n} of {m}` — `m` is the SERVER's count of the Sales Orders this user may
      read (rentals excluded, search not applied), carried on every list answer,
      so a search answered before any unsearched load still has it and a created

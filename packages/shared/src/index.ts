@@ -53,6 +53,7 @@ export {
 export {
   MONTHLY_DEMAND_CATEGORIES,
   monthlyDemandOf,
+  monthlyDemandCategoryOf,
   monthlyDemandWindowOf,
   type MonthlyDemandCategory,
   type MonthlyDemandFilters,

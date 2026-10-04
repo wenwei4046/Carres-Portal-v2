@@ -108,17 +108,17 @@ Workspace Working Panel and other modules have not adopted this adapter. Their p
 contact channels, domain headers and approved full-page composition remain module-owned; customer/SO
 header assumptions must not be imposed on supplier POs or source-free purchasing objects.
 
-**Current bounded production acceptance — 2026-10-04:** PR #1881 deployed
-`f7857f6af3f1b6b7870b927db32d2bd9bc3f4232` after exact CI37201089568, Deploy37202073286 and
-independent five-surface convergence. Orders MASTER owns the existing-path acceptance matrix,
-including086f23d's source/template/context/monthly proof. Onf7857f6 completed SO-1362 retains AL,
-customer date and its final DO as read-only facts; open SO-1368 keeps its existing forms and Cancel
-truth. Monitor remains96 open work records and does not admit completed1362. Five completed-Delivery
-widths have no page overflow; the formal object has equal752px panes and retains PDF through
-Edit/Cancel/Back. The target includes the separately approved PR #1879 header/Balance due correction.
-Initial focus is a visible document control; hidden identity has no duplicate Close. Shared guards
-cover focus/Escape/opener return and read failures. Live Save/send, Print/Download completion,
-Workspace adoption and all exceptional/role/historical variants remain outside this proof.
+**Current bounded production acceptance — 2026-10-04:** PR1883 deployed
+`7f662b505c0e1c64853a295a587218626046cd7e` after exact CI37204713835, Deploy37205596250 and
+independent five-surface convergence. Orders MASTER owns the measured existing-path matrix,
+including priorf7857f6 completed/open Delivery, Monitor, widths and formal-object proof and086f23d's
+source/template/context/monthly evidence. The new target verifies real390px History long-note
+expansion/Escape without nested buttons or page overflow, original/current Revisions and return to
+Cards/search1368. A live Revisions long-note sample was absent;136 functional checks prove that
+cut-note variant and no accidental version selection. PR1879's approved header/Balance due law
+remains preserved. Live Save/send, Print/Download, Workspace/other-module adoption and exceptional
+role/historical variants remain outside this proof. Orders' separately observed filtered monthly
+drill-down defect is BUILD until its own release; this card proof does not certify the whole module.
 A /ui result alone does not prove a business entry; the actual Orders entry supplies this evidence.
 
 ## Differences from the reference page (125 checks: 25 states × 5 widths)
