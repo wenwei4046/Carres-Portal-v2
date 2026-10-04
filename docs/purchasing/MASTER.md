@@ -398,7 +398,18 @@ again rereads the same supplier document identities without issuing, reserving o
 35 supplier preparation/archive tests pass. Actual write-rejecting sample UI shows SAMPLE-PO-001
 unavailable beside readable SAMPLE-PO-002 V2, disabled preparation, then recovery of the same
 selected V1/V2 set via Try again. Evidence: `/tmp/so-batch-supplier-source-failure.png`.
-This correction is local build pending release; no destination address was invented or changed.
+PR1895's exact head `a08d9e88a3b569a08eaf4ea58d8b2a0445e9e01d` passed full CI
+37212749130. Main merge `88c6386ecbc73a71ea5c174935d1fb2571277f5c` passed deployment
+37213740791 and an independent five-entry convergence probe. Authenticated search `7907` retained
+12 SOs; Ohana's two failed sources now show their exact PO and the governed address/Settings
+reason with Try again. Retrying does not invent an address or enable preparation of unreadable
+documents. Nice Future retains its three actual V1 documents and the earlier sending evidence
+separately; selecting only `PO-20260903-7907` produced
+`/Users/chaichiewlim/Downloads/Purchase-orders-Nice_Future.zip` with exactly
+`PO-20260903-7907-V1.pdf` (31,165 bytes). Its timestamp, archive CRC, PDF header and EOF passed.
+Evidence: `/tmp/so-batch-live-supplier-address-refusal.png`. No destination address, issuance,
+reservation or supplier transmission was changed for this verification. Missing source addresses
+and actual sender/provider verification remain operational gaps, not successful transmissions.
 
 **Supplier preparation return correction, 2026-10-04 — local build, production acceptance owed.**
 The authenticated Nice Future result opened exact `PO-20260903-7907` read-only with its original
