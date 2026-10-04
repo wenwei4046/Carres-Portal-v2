@@ -733,9 +733,17 @@ describe("PUT /:orderId — the in-panel writes (CARD 11, Delivery MASTER §8.6)
     expect(contact.result_key).toBe("confirmed");
   });
 
-  it("a day that is NOT later needs no reply, and the partner's own answer is recorded as the partner's", async () => {
+  it("an earlier arrangement also requires the customer's WhatsApp reply", async () => {
+    const { upserts } = mockSb([{ data: { id: ORDER_A, delivery_date: "2026-09-25", delivery_date_tbd: false } }]);
+    const res = await save({ partnerId: NETS, confirmedDate: "2026-09-24" });
+    expect(res.status).toBe(409);
+    expect(((await res.json()) as { code: string }).code).toBe("earlier_date_needs_reply_proof");
+    expect(upserts).toHaveLength(0);
+  });
+
+  it("the originally requested day needs no changed-date reply, and the partner's own answer is recorded as the partner's", async () => {
     const { inserts } = mockSb([
-      { data: { id: ORDER_A, delivery_date: "2026-09-25", delivery_date_tbd: false } },
+      { data: { id: ORDER_A, delivery_date: "2026-09-24", delivery_date_tbd: false } },
       { data: [] },
       { data: [{ id: ORDER_A, delivery_partner_id: NETS, ops_assigned_logistic: null }] },
       { data: { ...savedArrangement, confirmed_date: "2026-09-24", reply_proof_path: null } },
@@ -756,7 +764,7 @@ describe("PUT /:orderId — the in-panel writes (CARD 11, Delivery MASTER §8.6)
 
   it("a DATE without a time is an agreement — the contact records Confirmed, not another date", async () => {
     const { inserts } = mockSb([
-      { data: { id: ORDER_A, delivery_date: "2026-09-25", delivery_date_tbd: false } },
+      { data: { id: ORDER_A, delivery_date: "2026-09-24", delivery_date_tbd: false } },
       { data: [] },
       { data: [{ id: ORDER_A, delivery_partner_id: NETS, ops_assigned_logistic: null }] },
       { data: { ...savedArrangement, confirmed_date: "2026-09-24", confirmed_time: null, reply_proof_path: null } },

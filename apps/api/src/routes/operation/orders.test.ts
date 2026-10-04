@@ -2583,12 +2583,12 @@ describe("Sales Order amendment decision lane", () => {
 
     it("adds the sender's real name to the live request", async () => {
       const body = await read(client({ sender: SENDER, names: [{ id: SENDER, name: "Mei Ling" }] }));
-      expect(body.amendment).toEqual({ ...live, submitted_by_name: "Mei Ling" });
+      expect(body.amendment).toEqual({ ...live, submitted_by: SENDER, submitted_by_name: "Mei Ling", gates: null });
     });
 
     it("never invents a person: an unresolved sender stays unnamed and the request still reads", async () => {
       expect((await read(client({ sender: SENDER, names: [] }))).amendment.submitted_by_name).toBeNull();
-      expect((await read(client({ senderError: true }))).amendment).toEqual({ ...live, submitted_by_name: null });
+      expect((await read(client({ senderError: true }))).amendment).toEqual({ ...live, submitted_by: null, submitted_by_name: null, gates: null });
     });
 
     it("returns no amendment untouched", async () => {
@@ -2698,11 +2698,11 @@ describe("Sales Order amendment decision lane", () => {
       env,
     );
     expect(res.status).toBe(422);
-    expect(rpc).not.toHaveBeenCalled();
+    expect(rpc).not.toHaveBeenCalledWith("sales_order_decide_amendment", expect.any(Object));
   });
 
-  it("does not expose the decision door to operation", async () => {
-    const rpc = vi.fn();
+  it("lets the database refuse Operation when Sales Approver is required", async () => {
+    const rpc = vi.fn(async (name: string) => name === "sales_order_amendment_work" ? { data: [], error: null } : { data: null, error: { code: "42501", message: "Sales Approver", details: "sales_approver_required" } });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(userClient).mockReturnValue({ rpc } as any);
     const jwt = await makeJwt("operation");
@@ -2715,7 +2715,7 @@ describe("Sales Order amendment decision lane", () => {
       env,
     );
     expect(res.status).toBe(403);
-    expect(rpc).not.toHaveBeenCalled();
+    expect(rpc).toHaveBeenCalledWith("sales_order_decide_amendment", expect.any(Object));
   });
 });
 

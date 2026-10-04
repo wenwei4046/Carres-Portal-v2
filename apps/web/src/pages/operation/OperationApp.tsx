@@ -1,3 +1,4 @@
+import { useAddressedActivity } from "@/lib/use-addressed-activity";
 import { useEffect, useState } from "react";
 import { Menu } from "lucide-react";
 import {
@@ -120,6 +121,7 @@ import type { MovementsFilters } from "@/lib/queries";
  * proto's `movementsPrefill` state in `reference/proto/operation.jsx` line 15.
  */
 export default function OperationApp() {
+  useAddressedActivity();
   const location = useLocation();
   const phone = usePhone();
   const [menuOpen, setMenuOpen] = useState(false);

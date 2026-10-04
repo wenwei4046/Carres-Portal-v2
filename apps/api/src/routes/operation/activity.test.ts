@@ -54,6 +54,7 @@ describe("GET /api/operation/activity — who acted, named", () => {
       fn === "actor_display_names" ? { data: opts.staff ?? [], error: null } : { data: null, error: null },
     );
     const appUsers = vi.fn();
+    const addressedFilter = vi.fn();
     return {
       sb: {
         from: vi.fn((table: string) => {
@@ -68,6 +69,7 @@ describe("GET /api/operation/activity — who acted, named", () => {
                   ? (opts.sellers ?? [])
                   : [];
           chain.select = vi.fn(() => chain);
+          chain.eq = vi.fn((field, value) => { addressedFilter(field, value); return chain; });
           chain.order = vi.fn(() => chain);
           chain.limit = vi.fn(async () => ({ data: rows, error: null }));
           chain.in = vi.fn(async () => ({ data: rows, error: null }));
@@ -77,20 +79,28 @@ describe("GET /api/operation/activity — who acted, named", () => {
       },
       rpc,
       appUsers,
+      addressedFilter,
     };
   }
 
-  async function read(opts: Parameters<typeof sbWith>[0], role = "operation") {
+  async function read(opts: Parameters<typeof sbWith>[0], role = "operation", addressed = false) {
     const m = sbWith(opts);
     vi.mocked(userClient).mockReturnValue(m.sb as never);
     const res = await app.fetch(
-      new Request("http://t/api/operation/activity", {
+      new Request(`http://t/api/operation/activity${addressed ? "?addressed=me" : ""}`, {
         headers: { Authorization: `Bearer ${await makeJwt(role)}` },
       }),
       env,
     );
     return { res, rows: (await res.json()) as Array<{ actor_name: string | null }>, ...m };
   }
+
+  it("addresses the feed to the authenticated PIC before applying the limit", async () => {
+    const { res, addressedFilter, sb } = await read({}, "operation", true);
+    expect(res.status).toBe(200);
+    expect(addressedFilter).toHaveBeenCalledWith("detail->>recipient_id", "u1");
+    expect(sb.from).not.toHaveBeenCalledWith("order_annotations");
+  });
 
   it("names a PRINCIPAL actor to an operation reader — the defect itself", async () => {
     const { res, rows } = await read({ staff: [{ id: PRINCIPAL, name: "Jess" }] });

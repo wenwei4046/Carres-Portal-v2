@@ -1,3 +1,4 @@
+import { earlyDeliveryRefusal } from "../../lib/early-delivery";
 import { Hono, type Context } from "hono";
 import { HTTPException } from "hono/http-exception";
 import {
@@ -86,6 +87,7 @@ type ArrangementRow = {
   confirmed_time: string | null;
   expected_arrival: string | null;
   logistics_note: string | null;
+  reply_proof_path?: string | null;
 };
 
 /** Is this whole-order row assigned to ME through the order's own columns? */
@@ -113,7 +115,7 @@ async function scopePartnerOf(
   const [{ data: arr }, { data: ord, error }] = await Promise.all([
     sb
       .from("ops_delivery_arrangements")
-      .select("id, order_id, leg, partner_id, confirmed_date, confirmed_time, expected_arrival, logistics_note")
+      .select("id, order_id, leg, partner_id, confirmed_date, confirmed_time, expected_arrival, logistics_note, reply_proof_path")
       .eq("order_id", orderId)
       .eq("leg", leg)
       .maybeSingle(),
@@ -265,6 +267,18 @@ partnerDeliveriesRouter.put("/:orderId/arrangement", async (c) => {
   const scope = await scopePartnerOf(sb, orderId, leg, me);
   if (!scope.order || !scope.mine) {
     return c.json({ error: "not_found", message: "Delivery not found" }, 404);
+  }
+
+  const requested = scope.order.delivery_date_tbd ? null : scope.order.delivery_date;
+  const earlier = Boolean(parsed.data.confirmedDate && requested && parsed.data.confirmedDate < requested);
+  if (earlier && parsed.data.confirmedDate) {
+    // This portal has no customer-evidence upload door. It may retain an
+    // evidenced arrangement, but cannot invent acceptance of a new early date.
+    if (scope.arrangement?.confirmed_date !== parsed.data.confirmedDate || !scope.arrangement.reply_proof_path) {
+      return c.json({ error: "Save scheduled delivery: upload the WhatsApp reply", code: "earlier_date_needs_reply_proof" }, 409);
+    }
+    const refusal = await earlyDeliveryRefusal(sb, orderId, parsed.data.confirmedDate);
+    if (refusal) return c.json({ error: refusal, code: "early_delivery_not_ready" }, 409);
   }
 
   const { error } = await sb.from("ops_delivery_arrangements").upsert(
