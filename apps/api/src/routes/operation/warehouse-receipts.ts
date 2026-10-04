@@ -215,6 +215,7 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
      (`buildGrnRegisterView`) for facets and the slice, then reads the full
      record for just that page. Everything else keeps the legacy shape. ── */
   if (c.req.query("scope") === "grn") {
+    const exportAll = c.req.query("export") === "1";
     const limit = Math.min(
       Math.max(1, Math.floor(Number(c.req.query("limit")) || GRN_PAGE_DEFAULT)),
       GRN_PAGE_MAX,
@@ -557,7 +558,7 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
       };
     });
 
-    const view = buildGrnRegisterView(factRows, sel, offset, limit);
+    const view = buildGrnRegisterView(factRows, sel, exportAll ? 0 : offset, exportAll ? Math.max(1, factRows.length) : limit);
     // Dropdown choices cover the complete authorised population narrowed by the
     // existing rail/search. Current column choices remain available to clear.
     const choiceIds = new Set(buildGrnRegisterView(factRows, { ...sel, columns: null }, 0, Math.max(1, factRows.length)).pageIds);
@@ -599,7 +600,7 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
       ),
     ];
     const userNames = new Map<string, string>();
-    if (pageUserIds.length > 0) {
+    if (!exportAll && pageUserIds.length > 0) {
       const { data: users } = await sb
         .from("app_users")
         .select("id, name")
@@ -614,7 +615,7 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
        the register says so on the cell instead of printing `Counted stock`
        over goods that are individually tracked (COPY-STANDARD). */
     let unitReadFailed = false;
-    if (view.pageIds.length > 0) {
+    if (!exportAll && view.pageIds.length > 0) {
       try {
         const results = await readByIds<{
           receipt_id: string;
@@ -686,7 +687,7 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
       .map((r) => r.do_file_path as string | null)
       .filter((p): p is string => typeof p === "string" && p.length > 0);
     const doUrls = new Map<string, string>();
-    if (doPaths.length > 0) {
+    if (!exportAll && doPaths.length > 0) {
       try {
         const admin = adminClient(c.env);
         const { data: signed } = await admin.storage
@@ -733,7 +734,7 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
               ...lines.flatMap((l) => refsByLine.get(l.id) ?? []),
             ]),
           ],
-          unit_ids_by_line: unitReadFailed
+          unit_ids_by_line: exportAll || unitReadFailed
             ? null
             : Object.fromEntries(
                 unitsByReceiptLine.get(r.id as string) ??
@@ -767,7 +768,7 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
           opens_claims: warehouseReceiptOpensClaims(lines),
         };
       }),
-      page: { offset, limit, total: view.total },
+      page: { offset: exportAll ? 0 : offset, limit: exportAll ? view.total : limit, total: view.total },
       facets: view.facets,
       column_values: columnValues,
       /* The expansion's item words and governed categories, resolved once for

@@ -1,3 +1,4 @@
+import { toast } from "sonner";
 import { matchesRegisterColumnFilters, type DatePreset, type RegisterColumnQuery } from "@carres/shared";
 // DataGrid — THE REGISTER ENGINE (Law 13: one engine for every Carres
 // register — Sales Orders · Delivery Orders · Purchase Orders · Receiving ·
@@ -306,6 +307,8 @@ export type DataGridProps<T> = {
       appended automatically. (Wei Siang 2026-06-20 — storageKey filenames like
       "pr-g-so-list-layout-v1" read like junk.) */
   exportName?: string;
+  /** Full filtered population for paged registers; selection export stays selected-only. */
+  loadExportRows?: () => Promise<T[]>;
   onRowDoubleClick?: (row: T) => void;
   /** Commander 2026-05-28 — single-click anywhere on a row fires this (in
       addition to the highlight). Cells that stopPropagation (checkboxes,
@@ -730,6 +733,7 @@ function DataGridInner<T>({
   rowDrag,
   searchPlaceholder = "Search…",
   exportName,
+  loadExportRows,
   onRowDoubleClick,
   onRowClick,
   rowStyle,
@@ -1897,6 +1901,24 @@ function DataGridInner<T>({
     [deriveTable],
   );
 
+  const [exportLoading, setExportLoading] = useState(false);
+  const exportBusy = useRef(false);
+  const exportCurrentView = async (format: "excel" | "pdf") => {
+    if (exportBusy.current) return;
+    exportBusy.current = true;
+    setExportLoading(true);
+    try {
+      const exportPopulation = loadExportRows ? await loadExportRows() : sortedRows;
+      if (format === "excel") await exportRows(exportPopulation);
+      else await exportPdfRows(exportPopulation);
+    } catch {
+      toast.error("The list could not be exported. Try again.");
+    } finally {
+      exportBusy.current = false;
+      setExportLoading(false);
+    }
+  };
+
   // ── Sort handlers ─────────────────────────────────────────────────
   const toggleSort = (key: string) => {
     setLayout((l) => {
@@ -3033,7 +3055,7 @@ function DataGridInner<T>({
               }
               return next;
             })}
-            disabled={sortedRows.length === 0}
+            disabled={exportLoading || sortedRows.length === 0}
             aria-haspopup="menu"
             aria-expanded={outputMenuOpen}
           >
@@ -3059,7 +3081,7 @@ function DataGridInner<T>({
                 role="menuitem"
                 onClick={() => {
                   setOutputMenuOpen(false);
-                  void exportRows(sortedRows);
+                  void exportCurrentView("excel");
                 }}
               >
                 Excel
@@ -3070,7 +3092,7 @@ function DataGridInner<T>({
                 role="menuitem"
                 onClick={() => {
                   setOutputMenuOpen(false);
-                  void exportPdfRows(sortedRows);
+                  void exportCurrentView("pdf");
                 }}
               >
                 PDF
@@ -3265,7 +3287,7 @@ function DataGridInner<T>({
         {presentationTools && <div className={styles.pageTools}>
           <DropdownMenu label="Page tools" trigger={<Button ref={pageToolsRef} iconOnly icon="overflow" aria-label="Page tools" />}
             items={[
-              { key: "export", label: "Export", icon: "download", disabled: sortedRows.length === 0, onSelect: () => {
+              { key: "export", label: "Export", icon: "download", disabled: exportLoading || sortedRows.length === 0, onSelect: () => {
                 const r = pageToolsRef.current?.getBoundingClientRect();
                 if (r) setOutputMenuPos({ top: r.bottom + 4, right: window.innerWidth - r.right });
                 requestAnimationFrame(() => { setOutputMenuOpen(true); requestAnimationFrame(() => document.querySelector<HTMLElement>('[data-testid="register-output-menu"] button')?.focus()); });

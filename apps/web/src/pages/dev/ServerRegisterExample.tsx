@@ -18,6 +18,7 @@ export default function ServerRegisterExample() {
   return <div className="flex flex-col gap-2">
     <DataGrid appearance="reference" presentationTools groupBanner={false} allowColumnGrouping={false} rows={all.slice(offset, offset + 5)} columns={COLUMNS} rowKey={row => row.id}
       storageKey="ui.server-register.example" searchPlaceholder="Search preview records…" onSearchChange={find}
+      exportName="Preview records" loadExportRows={async () => all}
       serverColumns={{ values: { supplier: ["Preview supplier A", "Preview supplier B"] }, onChange: change }}
       statusSummary={() => `${all.length} preview record${all.length === 1 ? "" : "s"}`} />
     <div className="flex gap-2"><Button disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - 5))}>Previous</Button><Button disabled={offset + 5 >= all.length} onClick={() => setOffset(offset + 5)}>Next</Button></div>

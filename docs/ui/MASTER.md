@@ -2724,6 +2724,15 @@ The `/ui` paged-register example exposes a supplier found only at record 61 whil
 loaded. Filter/reset and numeric sorting must be proved beyond page 1; local tests and preview
 are not production acceptance. PR #1899 deployed through `719653ea0`; the live narrow-screen check found the shared filter outside the viewport. The correction on the current build branch anchors the menu to its button, constrains it within an 8px viewport inset and returns focus on Escape. The 366px preview placed it at 158–358px and selected/cleared the record-61 supplier successfully; production acceptance is still owed. This does not establish all-record Export or grouped pagination.
 
+**Paged-register export — BUILT ON BRANCH / NOT PRODUCTION VERIFIED, 2026-10-05.**
+`DataGrid loadExportRows` is the shared optional full-population reader for a paged register.
+It uses the existing Excel/PDF column derivation/renderers; the owning reader must return the
+complete authorised current filtered/sorted population. It does not change row-selection export.
+Read/render failure shows `The list could not be exported. Try again.` and produces no partial
+file. Export prevents duplicate in-flight starts and leaves the displayed page untouched.
+Receiving is the first adapter. The `/ui` paged example exported an actual 61-row workbook while
+five rows were loaded, then a one-row workbook for its record-61 supplier; live acceptance is owed.
+
 🟡 **FACET COUNTS ARE SPELT THREE WAYS, AND THAT IS ONE FACT WITH THREE ANSWERS — found
 2026-09-20.** Purchase Orders §9.3 says a facet's number "describes the whole register, never what
 another facet happens to have selected"; Purchase Returns §9.6 says counts "respect the other

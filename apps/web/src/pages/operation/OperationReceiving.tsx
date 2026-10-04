@@ -15,6 +15,7 @@ import {
 } from "@carres/shared";
 import {
   useOperationGrnRegister,
+  fetchGrnRegisterExport,
   useOperationPos,
   useOperationSuppliers,
   useOperationWarehouse,
@@ -143,7 +144,7 @@ export default function OperationReceiving() {
     setOffset(0);
   }, [filterKey]);
 
-  const registerQ = useOperationGrnRegister({
+  const registerFilters = {
     offset,
     limit: presentation === "cards" ? 12 : 50,
     columns: columnQuery,
@@ -155,7 +156,8 @@ export default function OperationReceiving() {
     to: toSel,
     cancelled: cancelledSel,
     q: search,
-  });
+  };
+  const registerQ = useOperationGrnRegister(registerFilters);
 
   const rows = useMemo(
     () => registerQ.data?.receipts ?? [],
@@ -1078,6 +1080,7 @@ export default function OperationReceiving() {
               storageKey="carres.receiving.register.v2"
               rowKey={(r) => r.id}
               exportName="Receiving"
+              loadExportRows={() => fetchGrnRegisterExport(registerFilters)}
               searchPlaceholder="GRN, PO, supplier or DO number…"
               isLoading={registerQ.isLoading || registerQ.isFetching}
               onSearchChange={changeSearch}

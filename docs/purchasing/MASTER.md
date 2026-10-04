@@ -534,7 +534,7 @@ its wall-clock Settings result with fixed requested dates, which coincided after
 The test-only repair fixes its PO clock and preserves the date-ownership assertions; all 95 tests
 in that file passed locally. Covering deployment `37216102072` succeeded at `719653ea0`; all five canonical surfaces converged. Live Receiving exposed complete supplier choices, but at 545px the shared filter menu opened beyond the right edge (left 534px/right 724px). Interactive acceptance therefore remains incomplete until the central UI correction ships. Full-result export and the two-view rail remain unfinished.
 
-**Table/Cards and shared Page tools — BUILT ON BRANCH / NOT PRODUCTION VERIFIED, 2026-10-05.**
+**Table/Cards and shared Page tools — MERGED #1901 / NOT PRODUCTION VERIFIED, 2026-10-05.**
 Receiving reuses the existing segmented Table/Cards control, shared DataGrid Page tools and
 `ReceivingCompactView` in both Cards and the right Working Panel. Both presentations keep the
 same search, column filters and sort; changing presentation starts at page 1. Table pages contain
@@ -543,8 +543,20 @@ the complete authorised filtered population. Open full page retains the register
 Columns and Export use the shared Page tools menu; Cards introduces no second receipt editor.
 Party/receiver facts awaiting a detail read show Loading or Unavailable, never false absence.
 81 local Receiving/card journey tests passed, including filter preservation across presentations
-and keyboard access to Page tools. The central filter correction anchors to its button, clamps to the viewport and returns focus on Escape. A 366px preview measured the menu at 158–358px; selecting Supplier B found record 61 and Clear restored all 61. The complete register plus Receiving/card targeted run passed 171 tests. Full exact-head CI and live acceptance are owed. This does not deliver
+and keyboard access to Page tools. The central filter correction anchors to its button, clamps to the viewport and returns focus on Escape. A 366px preview measured the menu at 158–358px; selecting Supplier B found record 61 and Clear restored all 61. The complete register plus Receiving/card targeted run passed 171 tests. Full exact-head CI `37217770861` passed on `c4f8b10ec`; #1901 merged as `5c04b6625`. Deployment `37218697773` and live acceptance are owed. This does not deliver
 the Receiving Differences view or Warehouse automatic posting.
+
+**Complete filtered-result export — BUILT ON BRANCH / NOT PRODUCTION VERIFIED, 2026-10-05.**
+Receiving supplies the shared DataGrid export loader with the current search, rail/column filters
+and sort. The existing authorised GRN reader resolves the complete result in one request,
+ignoring display offset/page size; it does not sign receipt files or load Unit expansion for this
+list export. Excel/PDF keep the same shared visible-column order, values and renderer. Selection
+export remains selected-only. Failed or incomplete reads create no partial file and permit retry;
+a second click cannot start a duplicate export. The register page/presentation stays in place.
+Local browser-generated workbooks contained 61 records with five loaded, then exactly the one
+record for Supplier B. API tests prove full-population filtering/sort; client tests refuse an
+incomplete response. The combined register/Receiving suite passed 176 tests and the receipt API
+suite passed 61. Full CI and production acceptance remain owed.
 
 **Read-only production evidence, 2026-10-04:** `warehouse_submit_receipt` still files a report;
 `warehouse_receipt_check_in` calls Operation's post-authority gate. The only current active
