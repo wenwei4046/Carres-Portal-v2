@@ -989,8 +989,12 @@ preservation and non-availability, but fails §2.4's controlled-custody target. 
 protects those existing invariants and is explicitly not proof of complete extra-goods handling.
 Current inputs carry only SKU/quantity/note, so they cannot establish an exact Unit identity.
 Completion must connect the governed custody/source-search path without inventing PO provenance,
-ownership, Unit IDs or a formal Claim for unmatched goods (§9.5). Warehouse chat alignment is in
-progress; the release remains incomplete. All fixture writes rolled back; no production data changed.
+ownership, Unit IDs or a formal Claim for unmatched goods (§9.5). Warehouse chat independently confirmed the missing custody/source-search loop against Stock
+MASTER §§3–6: existing Unit/arrival primitives are reusable only with verified source identities;
+unknown goods require a separate custody record whose identity is not a Stock Unit ID. This is an
+approved implementation gap, not a new business-rule question. The full 53-case local target suite
+passes, including this bounded preservation regression; the release remains incomplete. All fixture
+writes rolled back; no production data changed.
 
 Still required before an exact SQL review/release: remaining non-PO downstream lifecycle and
 source-resolution audit, extra-goods custody and authority boundaries, full Warehouse
