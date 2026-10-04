@@ -42,6 +42,7 @@ import SupplierReplySection, { batchWord } from "./SupplierReplySection";
 import { Modal } from "../components/Modal";
 import { apiFetch } from "@/lib/api";
 import { fmtDate } from "@/lib/fmt-date";
+import { prepareSelectedPoDocuments, zipPoBundle } from "@/lib/purchasing/po-bundle";
 import { renderPoPdf } from "@/lib/pdf/render";
 import { usePdfCanvases } from "@/lib/pdf/use-pdf-canvases";
 /* The Sales Order's card: same heading face, same border, same padding. The
@@ -434,6 +435,8 @@ export default function PurchaseOrdersPage() {
      float over the very rows the operator came to read. */
   const canvasRef = useRef<HTMLDivElement>(null);
   const [railOpen, setRailVisible] = useFilterRailOpen("carres.purchaseOrders.filterRail", canvasRef);
+  const [bundleBusy, setBundleBusy] = useState(false);
+  const [facetCandidates, setFacetCandidates] = useState<RegisterRow[]>([]);
   const [pdfProblem, setPdfProblem] = useState<string | null>(null);
   /* The PO whose receipts are open. `{n} receipt dates` and `{n} GRNs` are
      two doors into the SAME list, because they are two facts about one set of
@@ -1011,6 +1014,29 @@ export default function PurchaseOrdersPage() {
     },
   ];
 
+  async function downloadSelectedPdfs() {
+    if (bundleBusy) return;
+    const candidates = new Set(facetCandidates.map(row => row.id));
+    const selection = visibleRows.filter(row => candidates.has(row.id) && selectedKeys.has(row.id));
+    if (!selection.length) return;
+    setBundleBusy(true); setPdfProblem(null);
+    let url: string | undefined;
+    try {
+      const documents = await prepareSelectedPoDocuments(selection.map(row => ({ id: row.id,
+        supplierId: row.po.supplier_id, version: row.facts.version })),
+        id => apiFetch<PoTemplateData>(`/api/operation/pos/${encodeURIComponent(id)}/print-data`), renderPoPdf);
+      url = URL.createObjectURL(await zipPoBundle(documents));
+      const link = document.createElement("a");
+      link.href = url; link.download = "Purchase-orders.zip";
+      document.body.appendChild(link); link.click(); link.remove();
+    } catch {
+      setPdfProblem("The official PDF could not be downloaded");
+    } finally {
+      if (url) URL.revokeObjectURL(url);
+      setBundleBusy(false);
+    }
+  }
+
   const contextMenu = (row: RegisterRow): DataGridContextMenuItem[] => [
     { label: "View", onClick: () => openObject(row) },
     {
@@ -1101,7 +1127,7 @@ export default function PurchaseOrdersPage() {
               rowHeight={32}
               presentationKey={cards ? "cards" : "table"}
               toolbarEnd={presentationTabs}
-              selectionPrimary={presentationTabs}
+              selectionPrimary={<>{presentationTabs}<Button size="sm" loading={bundleBusy} disabled={bundleBusy} onClick={() => void downloadSelectedPdfs()}>Download PDFs</Button></>}
               selectable={{ selectedKeys, onToggle: toggleRow,
                 onToggleAll: (keys, allSelected) => setSelectedKeys((previous) => {
                   const next = new Set(previous);
@@ -1128,6 +1154,8 @@ export default function PurchaseOrdersPage() {
               palette="slate"
               searchPresentation="responsive"
               rows={visibleRows}
+              facetRows={allRows}
+              onFacetRowsChange={setFacetCandidates}
               columns={columns}
               /* v2 — the nine-column date-first register replaces v1's twelve. */
               storageKey="carres.purchaseOrders.register.v2"

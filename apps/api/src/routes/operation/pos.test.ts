@@ -3298,6 +3298,14 @@ describe("supplier email dispatch", () => {
     expect(response.status).toBe(404);
     expect(readPoEmailAttempts).not.toHaveBeenCalled();
   });
+  it("returns a definite server failure for recovery without claiming a sent document", async () => {
+    vi.mocked(userClient).mockReturnValue({ from: () => ({ select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { id: "PO-001" }, error: null }) }) }) }) } as never);
+    vi.mocked(readPoEmailAttempts).mockResolvedValue({ data: [{ po_id: "PO-001", po_version: 1,
+      po_email_attempts: { id: attemptId, outcome: "failed", provider_id: null, recipient: body.recipient } }], error: null } as never);
+    const response = await app.fetch(new Request("http://localhost/api/operation/pos/PO-001/email-attempts", { headers: { Authorization: `Bearer ${await makeJwt("operation")}` } }), enabledEnv);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ attempts: [{ id: attemptId, status: "failed", recipient: body.recipient, documents: [{ id: "PO-001", version: 1 }] }] });
+  });
   it("never dispatches when the durable reservation fails", async () => {
     database();
     vi.mocked(preparePoEmailAttempt).mockResolvedValue({ data: null, error: { message: "unavailable" } } as never);

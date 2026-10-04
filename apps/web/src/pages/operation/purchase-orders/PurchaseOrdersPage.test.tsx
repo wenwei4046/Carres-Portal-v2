@@ -1,4 +1,5 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { useEffect } from "react";
+import { fireEvent, render, screen, within, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -147,7 +148,10 @@ const queryData = {
 };
 
 vi.mock("@/components/register/DataGrid", () => ({
-  DataGrid: ({ rows, columns, onRowDoubleClick, statusSummary, fixedGroups, leadingColumns, personalLayouts, activeConditions, expandable, toolbarEnd, renderResults, selectable }: any) => (
+  DataGrid: ({ rows, columns, onRowDoubleClick, statusSummary, fixedGroups, leadingColumns, personalLayouts, activeConditions, expandable, toolbarEnd, renderResults, selectable, selectionPrimary, onFacetRowsChange }: any) => {
+    const rowScope = rows.map((row: any) => row.id).join("|");
+    useEffect(() => { onFacetRowsChange?.(rows); }, [rowScope, onFacetRowsChange]);
+    return (
     <div
       data-testid="register-grid"
       data-groups={fixedGroups?.groups.map((g: any) => g.key).join(",")}
@@ -155,7 +159,7 @@ vi.mock("@/components/register/DataGrid", () => ({
       data-leading={leadingColumns ? `${leadingColumns.date},${leadingColumns.identity}` : undefined}
       data-personal-layouts={personalLayouts ? "1" : undefined}
     >
-      {toolbarEnd}
+      {rows.some((row: any) => selectable?.selectedKeys.has(row.id)) ? selectionPrimary : toolbarEnd}
       {renderResults?.(rows)}
       <div data-testid="register-conditions">{(activeConditions ?? []).map((c: any) => c.label).join(" | ")}</div>
       <div data-testid="register-columns">{columns.filter((c: any) => !c.defaultHidden).map((c: any) => c.label).join(" | ")}</div>
@@ -172,7 +176,7 @@ vi.mock("@/components/register/DataGrid", () => ({
       ))}
       {statusSummary?.(rows, rows.filter((row: any) => selectable?.selectedKeys.has(row.id)))}
     </div>
-  ),
+  ); },
 }));
 
 vi.mock("../PurchasingTabs", () => ({
@@ -254,6 +258,8 @@ vi.mock("../components/PoIssueEvidence", () => ({
 }));
 
 vi.mock("@/lib/api", () => ({ apiFetch: vi.fn().mockResolvedValue({}) }));
+vi.mock("@/lib/purchasing/po-bundle", () => ({ prepareSelectedPoDocuments: vi.fn(), zipPoBundle: vi.fn() }));
+import { prepareSelectedPoDocuments, zipPoBundle } from "@/lib/purchasing/po-bundle";
 vi.mock("@/lib/pdf/render", () => ({ renderPoPdf: vi.fn() }));
 
 import PurchaseOrdersPage from "./PurchaseOrdersPage";
@@ -353,6 +359,24 @@ describe("Purchase Orders Register", () => {
     expect(screen.getByRole("checkbox", { name: "Select PO-20260828-4827" })).toBeChecked();
   });
 
+  it("downloads only the selected PO versions from the register", async () => {
+    vi.mocked(prepareSelectedPoDocuments).mockReset().mockResolvedValue([]);
+    vi.mocked(zipPoBundle).mockReset().mockResolvedValue(new Blob(["zip"], { type: "application/zip" }));
+    const create = vi.fn(() => "blob:po-pack"); const revoke = vi.fn();
+    const oldCreate = URL.createObjectURL; const oldRevoke = URL.revokeObjectURL;
+    URL.createObjectURL = create; URL.revokeObjectURL = revoke;
+    const download = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+    try {
+      renderPage("/operation/procurement?view=cards");
+      fireEvent.click(screen.getByRole("checkbox", { name: "Select PO-20260828-4827" }));
+      fireEvent.click(screen.getByRole("button", { name: "Download PDFs" }));
+      await waitFor(() => expect(download).toHaveBeenCalledOnce());
+      expect(prepareSelectedPoDocuments).toHaveBeenCalledWith([{ id: "PO-20260828-4827", supplierId: "supplier-1", version: 2 }], expect.any(Function), expect.any(Function));
+      expect(revoke).toHaveBeenCalledWith("blob:po-pack");
+    } finally {
+      download.mockRestore(); URL.createObjectURL = oldCreate; URL.revokeObjectURL = oldRevoke;
+    }
+  });
   it("returns an issued PO object to its SO Batch cutoff and supplier result scope", () => {
     const pos = [{ id: "PO-20260828-4827", supplierId: "s1" }];
     renderPage({ pathname: "/operation/procurement", search: "?po=PO-20260828-4827",
