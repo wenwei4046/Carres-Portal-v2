@@ -20,6 +20,7 @@ import PreviewFrame from "./preview-frame";
 import { appTodayIso } from "@/lib/fmt-date";
 import StaffDuties from "@/pages/operation/StaffDuties";
 import WarehouseIncoming from "@/pages/warehouse/WarehouseIncoming";
+import ReceivingRecord from "@/pages/operation/components/ReceivingRecord";
 import "@/index.css";
 
 /** ?page=duties | report | warehouse — defaults to the Receiving register. */
@@ -438,7 +439,12 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   }] });
   if (url.includes("/api/warehouse/incoming")) return json(WAREHOUSE_INCOMING);
   if (url.includes("/api/operation/warehouse-receipts/duty")) return json(DUTY);
-  if (url.includes(`/api/operation/warehouse-receipts/${POSTED}`)) return json(DETAIL);
+  if (url.includes(`/api/operation/warehouse-receipts/${POSTED}`)) return json(PAGE === "blocked-report" ? {
+    ...DETAIL, receipt: {...DETAIL.receipt,status:"draft",grn_no:null,lines:[],raw_report:{note:"Driver reported two goods"},
+      blockers:[{code:"receipt_evidence_not_available",message:"Delivery note is missing"}]},
+    events:[{id:"report-corrected",receipt_id:POSTED,event:"resubmitted",event_at:"2026-10-04T17:30:00Z",actor_name:"Warehouse operator",payload:{}},
+      {id:"report-saved",receipt_id:POSTED,event:"submitted",event_at:"2026-10-04T17:00:00Z",actor_name:"Warehouse operator",payload:{}}],
+  } : DETAIL);
   if (url.includes(`/api/operation/warehouse-receipts/${SUBMITTED}`))
     return json({
       receipt: { ...SUBMITTED_ROW, unit_results: [] },
@@ -557,6 +563,8 @@ createRoot(document.getElementById("root")!).render(
                 <StaffDuties />
               ) : PAGE === "report" ? (
                 <OperationReceivingReport />
+              ) : PAGE === "blocked-report" ? (
+                <ReceivingRecord sessionId={POSTED} onBack={() => {}} />
               ) : PAGE === "warehouse" ? (
                 <WarehouseIncoming />
               ) : (

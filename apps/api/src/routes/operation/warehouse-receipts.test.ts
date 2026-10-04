@@ -1168,6 +1168,29 @@ describe("GET /:id — one Receiving Session / GRN record", () => {
     },
   );
 
+  it("includes receipt corrections older than the first 1000 history events", async () => {
+    const tables = detailTables();
+    const events = Array.from({length:1001},(_,i)=>({ ...tables.receiving_events.list.data[0], id:`event-${i}`,event:i===1000?"submitted":"resubmitted",payload:{report:{note:`Physical observation ${i}`}} }));
+    const sb = makeSb({...tables,receiving_events:{listByRange:(from,to)=>({data:events.slice(from,to+1),error:null})}});
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const res = await req(`/api/operation/warehouse-receipts/${RECEIPT}`, "GET", await makeJwt("operation"));
+    expect(res.status).toBe(200);
+    const body = await res.json() as {events:{id:string;payload:unknown}[]};
+    expect(body.events).toHaveLength(1001);
+    expect(body.events[1000]).toMatchObject({id:"event-1000",payload:{report:{note:"Physical observation 1000"}}});
+  });
+
+  it("refuses partial receipt history when its older page cannot be read", async () => {
+    const tables = detailTables();
+    const sb = makeSb({...tables,receiving_events:{listByRange:(from)=>from===0
+      ? {data:Array.from({length:1000},(_,i)=>({...tables.receiving_events.list.data[0],id:`event-${i}`})),error:null}
+      : {data:null,error:{code:"42501",message:"History unavailable"}}}});
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const res = await req(`/api/operation/warehouse-receipts/${RECEIPT}`, "GET", await makeJwt("operation"));
+    expect(res.status).toBe(403);
+    expect(await res.json()).not.toHaveProperty("receipt");
+  });
+
   it("keeps unknown lineage unassigned and suppresses counted-stock technical IDs", async () => {
     const tables = detailTables();
     const sb = makeSb({
@@ -1814,4 +1837,3 @@ describe("GET /duty — posting and amend/void are two answers (0601)", () => {
     expect(res.status).toBe(403);
   });
 });
-

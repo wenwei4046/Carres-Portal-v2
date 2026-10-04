@@ -1224,11 +1224,14 @@ warehouseReceiptsRouter.get("/:id", requireOperation, async (c) => {
       .select("stock_item_id, unit_code, outcome, issue_kind, note")
       .eq("receipt_id", id)
       .order("unit_code"),
-    sb
+    readAllPages((from, to) => sb
       .from("receiving_events")
       .select("id, receipt_id, event, actor_id, event_at, payload")
       .eq("receipt_id", id)
-      .order("event_at", { ascending: false }),
+      .order("event_at", { ascending: false }).order("id", { ascending: false })
+      .range(from, to)).then((result) => "rows" in result
+        ? { data: result.rows, error: null }
+        : { data: null, error: "error" in result ? result.error : { code: "XX000", message: "Receiving history could not be loaded completely" } }),
     r.po_id ? sb
       .from("purchase_orders")
       .select(

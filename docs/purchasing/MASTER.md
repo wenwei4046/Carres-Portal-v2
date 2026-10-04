@@ -779,6 +779,19 @@ zero-argument RPC remains a bounded compatibility wrapper, while the application
 reader. This fixes list truncation, not the still-outstanding per-report revision/evidence history.
 SQL remains only in chat and the isolated local database, unapproved and unapplied to production.
 
+**Operation blocked-report History — BUILT ON BRANCH / NOT DEPLOYED, 2026-10-05.**
+The existing Receiving History section is now outside the posted/review-only branch, so a
+preserved unposted report shows its submitted/corrected events and real actor. Event dates use
+the shared formatter with the actual Kuala Lumpur time, including UTC-to-local day rollover.
+The raw-report branch suppresses the contradictory `Not sent yet` badge and retains its explicit
+saved-report/no-GRN notice. The detail API reads all bounded History pages in stable date/id order;
+an unreadable later page fails the detail rather than claiming a complete history. Tests cover
+1,001 events and a failed second page: 71 receipt-route tests and 75 Receiving UI tests pass.
+Local illustrative 390×844 preview verifies visible correction/submission history, correct local
+time, no duplicate status badge and 390px document/scroll width. Evidence:
+`/tmp/carres-blocked-receiving-history-local.jpg`. This is event-list visibility, not yet complete
+per-revision physical-fact/evidence inspection or Warehouse-side report-history acceptance.
+
 **Warehouse confirmation form — BUILT ON BRANCH / NOT DEPLOYED, 2026-10-05.**
 The PO form now calls the final-confirmation API with a stable save key. It uses kit Modal, Button,
 Checkbox and TableScroller, preserves unknown quantities/date, retains missing Unit outcomes,

@@ -226,7 +226,7 @@ export default function ReceivingRecord({
             {r.supplier_name ?? ""} · <span className="font-mono">{documentDisplayNumber(r.po_id ?? "")}</span>
           </div>
         </div>
-        {r.status !== "posted" && <span
+        {r.status !== "posted" && !(r.status === "draft" && r.raw_report != null) && <span
           data-testid="receiving-record-state"
           className={[
             "shrink-0 rounded-full px-2.5 py-0.5 text-label font-medium",
@@ -540,70 +540,69 @@ export default function ReceivingRecord({
               onClose={() => setVoiding(false)}
             />
           )}
-
-          {/* ── History — the three-rank record grammar, append-only ──── */}
-          <Section title="History">
-            {events.length === 0 ? (
-              <div className="text-label text-kit-slate-9">
-                No receiving activity yet.
-              </div>
-            ) : (
-              <ul className="flex flex-col gap-2" data-testid="record-history">
-                {events.map((e) => (
-                  <li key={e.id}>
-                    <div className="text-body font-semibold text-kit-slate-12">
-                      {receivingEventLabel(e.event)}
-                    </div>
-                    <div className="text-meta text-kit-slate-11">
-                      {e.actor_name ?? "Staff identity not recorded"} ·{" "}
-                      {fmtDate(e.event_at.slice(0, 10))}
-                    </div>
-                    {e.payload?.reason ? (
-                      <div className="text-label font-normal text-kit-slate-11">
-                        {e.payload.reason}
-                      </div>
-                    ) : e.payload?.grn_no ? (
-                      <div className="text-label font-normal text-kit-slate-11">
-                        {documentDisplayNumber(e.payload.grn_no)}
-                        {e.payload.units_counted != null
-                          ? ` · ${e.payload.units_counted} unit(s)`
-                          : ""}
-                      </div>
-                    ) : null}
-                    {e.event === "amended" && e.payload?.before ? (
-                      /* Only the AFFECTED facts compare side by side. */
-                      <div className="mt-1 grid max-w-md grid-cols-2 gap-2 rounded-card border border-kit-slate-5 p-2 text-label">
-                        <div>
-                          <div className="uppercase tracking-wide text-kit-slate-9">
-                            Original
-                          </div>
-                          {Object.entries(e.payload.before).map(([k, v]) => (
-                            <div key={k} className="text-kit-slate-11">
-                              {comparisonValue(v)}
-                            </div>
-                          ))}
-                        </div>
-                        <div>
-                          <div className="uppercase tracking-wide text-kit-slate-9">
-                            Correction
-                          </div>
-                          {Object.entries(
-                            (e.payload.after ?? {}) as Record<string, unknown>,
-                          ).map(([k, v]) => (
-                            <div key={k} className="text-kit-slate-12">
-                              {comparisonValue(v)}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ) : null}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Section>
         </>
       )}
+      {/* ── History — the three-rank record grammar, append-only ──── */}
+      <Section title="History">
+        {events.length === 0 ? (
+          <div className="text-label text-kit-slate-9">
+            No receiving activity yet.
+          </div>
+        ) : (
+          <ul className="flex flex-col gap-2" data-testid="record-history">
+            {events.map((e) => (
+              <li key={e.id}>
+                <div className="text-body font-semibold text-kit-slate-12">
+                  {receivingEventLabel(e.event)}
+                </div>
+                <div className="text-meta text-kit-slate-11">
+                  {e.actor_name ?? "Staff identity not recorded"} ·{" "}
+                  {fmtDate(e.event_at, { time: true })}
+                </div>
+                {e.payload?.reason ? (
+                  <div className="text-label font-normal text-kit-slate-11">
+                    {e.payload.reason}
+                  </div>
+                ) : e.payload?.grn_no ? (
+                  <div className="text-label font-normal text-kit-slate-11">
+                    {documentDisplayNumber(e.payload.grn_no)}
+                    {e.payload.units_counted != null
+                      ? ` · ${e.payload.units_counted} unit(s)`
+                      : ""}
+                  </div>
+                ) : null}
+                {e.event === "amended" && e.payload?.before ? (
+                  /* Only the AFFECTED facts compare side by side. */
+                  <div className="mt-1 grid max-w-md grid-cols-2 gap-2 rounded-card border border-kit-slate-5 p-2 text-label">
+                    <div>
+                      <div className="uppercase tracking-wide text-kit-slate-9">
+                        Original
+                      </div>
+                      {Object.entries(e.payload.before).map(([k, v]) => (
+                        <div key={k} className="text-kit-slate-11">
+                          {comparisonValue(v)}
+                        </div>
+                      ))}
+                    </div>
+                    <div>
+                      <div className="uppercase tracking-wide text-kit-slate-9">
+                        Correction
+                      </div>
+                      {Object.entries(
+                        (e.payload.after ?? {}) as Record<string, unknown>,
+                      ).map(([k, v]) => (
+                        <div key={k} className="text-kit-slate-12">
+                          {comparisonValue(v)}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        )}
+      </Section>
     </div>
   );
 

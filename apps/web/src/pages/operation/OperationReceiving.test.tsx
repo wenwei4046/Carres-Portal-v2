@@ -1363,15 +1363,21 @@ describe("ReceivingRecord — the posted GRN, the review, the two doors", () => 
     );
 
   it("shows an unposted raw report and its blocker without GRN totals or approval controls", () => {
-    h.sessionDetail = postedDetail({ receipt: { status: "draft", grn_no: null,
+    h.sessionDetail = {...postedDetail({ receipt: { status: "draft", grn_no: null,
       raw_report: { po_id: "UNVALIDATED" }, lines: [],
-      blockers: [{ code: "receipt_date_missing", message: "Goods Received Date is not recorded" }] } });
+      blockers: [{ code: "receipt_date_missing", message: "Goods Received Date is not recorded" }] } }),
+      events: [{id:"saved-report-event",receipt_id:"r-posted",event:"resubmitted",
+        event_at:"2026-10-04T17:30:00Z",actor_name:"Warehouse individual",payload:{}}]};
     renderRecord();
     expect(screen.getByRole("status")).toHaveTextContent("Receiving report saved. No GRN created.");
+    expect(screen.queryByTestId("receiving-record-state")).not.toBeInTheDocument();
     expect(screen.getByText("Goods Received Date is not recorded")).toBeVisible();
     expect(screen.queryByRole("button", { name: "Save Receiving" })).not.toBeInTheDocument();
     expect(screen.queryByText("Receiving Summary")).not.toBeInTheDocument();
     expect(screen.queryByText("UNVALIDATED")).not.toBeInTheDocument();
+    expect(screen.getByTestId("record-history")).toHaveTextContent("Count submitted again");
+    expect(screen.getByTestId("record-history")).toHaveTextContent("Warehouse individual");
+    expect(screen.getByTestId("record-history")).toHaveTextContent("Mon, 5 Oct 01:30");
   });
 
   it("keeps an unreadable saved arrival photo visible and opens the shared viewer with its GRN source", async () => {
