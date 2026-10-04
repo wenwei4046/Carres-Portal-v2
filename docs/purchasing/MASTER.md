@@ -569,7 +569,11 @@ records; this view does not decide Claim/Return completion or provide manual Don
 Explicit unposted reports have no generated GRN identity; the Working Panel says Receiving /
 Not issued, retains the record ID for navigation, and shows recorded Unit outcomes/recount reason.
 Existing posted/cancelled historical GRN identities remain unchanged. View changes do not borrow
-the other view's cached population. Full UI/production acceptance remains owed.
+the other view's cached population. Full UI/production acceptance remains owed. Full CI run
+37224938706 passed shared/API suites but exposed one obsolete dictionary test requiring the
+retired Supplier rail group. That guard now verifies the shared Supplier column filter and rejects
+the retired rail placement; the 101-test Receiving/dictionary/panel run passes. The same PR now
+includes the missed-arrival ownership correction below and requires fresh exact-head full CI.
 
 Complete server-side column filtering and sorting are
 **PRODUCTION VERIFIED, 2026-10-05** through the shared `DataGrid serverColumns` contract and
