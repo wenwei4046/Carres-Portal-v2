@@ -186,7 +186,7 @@ describe("the Work feed — one delivery-day reader and one assignment reader", 
     });
   const confirmOf = (items: ReturnType<typeof projectSalesOrdersFromModuleFacts>) =>
     items.find((i) => i.ruleKey === "confirm_delivery_date" && i.object.id === "order-yj");
-  const words = (item: ReturnType<typeof confirmOf>) => [item?.action, item?.recipient, item?.result].filter(Boolean).join(" ");
+  const words = (item: ReturnType<typeof confirmOf>) => [item?.action, item?.recipient, item?.requiredResult].filter(Boolean).join(" ");
 
   it("the company named on the arrangement is the one the act names — never the order row's stale column", () => {
     const items = feed({
