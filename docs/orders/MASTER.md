@@ -944,7 +944,7 @@ VISUAL     one shared register grammar · NO create button (owner 2026-09-27: or
 STATES     skeleton · `Sales orders could not be loaded` + `Try again` · `No sales orders yet` only
            when the permitted population itself is empty (`salesOrderTotal` 0; unknown → the
            unsearched load) · `No sales orders match these filters` + `Clear filters` when a search,
-           a header filter or a rail choice left nothing (rail case BUILT 2026-10-06, SO BUILD-1b)
+           a header filter or a rail choice left nothing (rail case BUILT 2026-10-06, PR #1942)
 NARROW     toolbar wraps and stays usable · grid scrolls itself · no page sideways scroll
 ```
 
@@ -1043,7 +1043,7 @@ absence are distinct; failed reads offer Retry and never render `Not allocated`.
 The normal toolbar exposes Search, Export and Columns with labels, wrapping on narrow containers.
 Server search recognises the displayed `SO-1319` number as well as bare `1319`;
 customer names and imported references are not parsed as partial SO numbers.
-**Phone search — BUILT 2026-10-06 (SO BUILD-1b):** a term that is 8–15 digits once spaces, dashes,
+**Phone search — BUILT 2026-10-06 (SO BUILD-1b, [PR #1942](https://github.com/wenwei4046/Carres-Portal-v2/pull/1942); the PR carries the merge SHA and deploy proof):** a term that is 8–15 digits once spaces, dashes,
 brackets and a leading `+` are removed is also a phone. The Worker reads `id, customer_phone` over the
 list's own scope through the caller's RLS and matches on digits — typed digits inside the stored
 digits, or the shared `phoneKeyMy` national core (leading `60` and trunk `0` removed) inside the stored
