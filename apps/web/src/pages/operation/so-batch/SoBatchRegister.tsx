@@ -979,24 +979,24 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
       {
         key: "requestedDelivery",
         label: W.colRequestedDelivery,
-        headerLines: ["Customer Requested", "Delivery Date"],
+        headerLines: ["Customer’s original", "requested delivery"],
         width: REGISTER_FIELD_WIDTH.customerRequestedDeliveryDate, minWidth: 118,
         sortable: true,
         chooserGroup: "Order",
         accessor: (o) => (
           <span data-testid={`so-batch-requested-${o.orderId}`}>
-            {o.requestedDeliveryDate ? (
-              fmtDate(o.requestedDeliveryDate)
+            {o.originalRequestedDeliveryDate ? (
+              fmtDate(o.originalRequestedDeliveryDate)
             ) : (
-              <Absent>No delivery date yet</Absent>
+              <Absent>{NOT_RECORDED}</Absent>
             )}
           </span>
         ),
-        dateValue: (o) => o.requestedDeliveryDate,
+        dateValue: (o) => o.originalRequestedDeliveryDate,
         filterType: "date",
         sortFn: (a, b) =>
-          (a.requestedDeliveryDate ?? "").localeCompare(b.requestedDeliveryDate ?? ""),
-        exportValue: (o) => o.requestedDeliveryDate ?? "",
+          (a.originalRequestedDeliveryDate ?? "").localeCompare(b.originalRequestedDeliveryDate ?? ""),
+        exportValue: (o) => o.originalRequestedDeliveryDate ?? "",
       },
       {
         /* The CUSTOMER's locality — never the supplier's destination. The one
@@ -1545,20 +1545,21 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
               renderResults={presentation === "cards" ? visible => <div className="grid grid-cols-1 gap-3 p-3 xl:grid-cols-2" data-testid="so-batch-cards">
                 {visible.map(o => <div key={o.orderId} data-row-key={o.orderId}>{compactView(o)}</div>)}
               </div> : undefined}
-              toolbarEnd={<span className="flex min-w-0 flex-wrap items-center gap-2">
+              toolbarEnd={<div className={`${styles.toolbarTools} flex min-w-0 flex-wrap items-center gap-2`}>
                 {viewSwitch}
                 {stock.active ? <><Select id="round-stock-location" toolbar label="Stock Location" value={stock.location}
                   onValueChange={stock.setLocation} disabled={stock.busy} options={stock.locations} />
-                  <Button size="sm" disabled={stock.busy} onClick={stock.clear}>Cancel</Button></>
-                  : <Button size="sm" loading={stock.busy} disabled={isLoading || data.readyStockPriority == null} title={data.readyStockPriority == null ? "Not available" : undefined} onClick={() => {
+                  <Button disabled={stock.busy} onClick={stock.clear}>Cancel</Button></>
+                  : <Button loading={stock.busy} disabled={isLoading || data.readyStockPriority == null} title={data.readyStockPriority == null ? "Not available" : undefined} onClick={() => {
                     void stock.match(visibleOrders.current.filter(order => shown.some(row => row.orderId === order.orderId) && purchaseStatus(order) !== "Done"));
                   }}>Match Ready Stock</Button>}
-                {onOpenPurchaseOrders ? <Button size="sm" loading={purchaseOrdersLoading} disabled={isLoading} onClick={() => {
+                {onOpenPurchaseOrders ? <Button loading={purchaseOrdersLoading} disabled={isLoading} onClick={() => {
                 const visibleIds = new Set(shown.map(order => order.orderId));
                 onOpenPurchaseOrders([...new Set(visibleOrders.current.filter(order => visibleIds.has(order.orderId))
                   .flatMap(order => order.pos.map(po => po.poId)))]);
               }}>Purchase Orders</Button> : null}
-              </span>}
+              </div>}
+              rowHeight={32}
               appearance="reference"
               wrapToolbar
               palette="slate"

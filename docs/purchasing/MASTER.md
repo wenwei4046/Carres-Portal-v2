@@ -180,6 +180,29 @@ message sent; do not promote that report to a full live issue-to-send journey.
 
 ### SO Batch complete delivery boundary — owner-approved 2026-10-04
 
+**Bounded presentation correction — owner confirmed 2026-10-05; BUILD, production proof pending.**
+SO Batch adopts the confirmed SO-derived shared listing recipe: 32px desktop baseline rows,
+12px body/18px line height, natural growth for complete wrapped facts; 40px desktop toolbar with
+responsive wrapping. Table/Cards belongs after Search in the existing right tools cluster; all
+labels and supported controls remain reachable. This adoption is scoped to SO Batch; no shared
+component behaviour or other module changes are commissioned. Listing/disabled Report stays;
+Match Ready Stock remains in its existing toolbar cluster pending the separate owner discussion.
+
+The listing heading is `Customer’s original requested delivery`, in two lines `Customer’s original`
+/ `requested delivery`, using the preserved revision-1 SO request for display, date filtering,
+sorting and export. Missing/TBD original evidence remains absent; never substitute a later request.
+The existing current-request field remains separate and still supplies purchasing planning and
+stock-priority arithmetic. This presentation correction does not change cutoffs, carryover, counts,
+completion/sending, Safety Days, stock eligibility/reservation or multi-PO interaction. The independent
+field-width delivery retains registry ownership. No live issue, supplier send, reservation or settings
+write is authorised for acceptance.
+
+**Measured local whole-shell evidence — 2026-10-05:** at1063×694,825×694 and390×694,
+the real OperationApp/SoBatchRegister fixture shows all toolbar controls within the listing,
+Search before Table/Cards, the right Page tools control and contained table scrolling. A single-line
+desktop row is32px; complete two-line facts naturally grow. The responsive rail retains its existing
+overlay/hide/show contract. This is seeded local evidence, not authenticated production acceptance.
+
 This BUILD mission is the complete approved SO Batch operating journey, not only its rail preview.
 The approved owner rulings carried by the Purchasing page-content review are persisted here for
 execution. Missing implementation does not reopen these decisions.
@@ -2825,7 +2848,7 @@ only rows satisfying both, never a widening OR.
 **Columns — OWNER RULING (Jess, 2026-09-18) · BUILT 2026-09-18, exactly in this order:**
 
 ```text
-PO Status · Proceed Date · SO No · PO Safety Days · Customer Requested Delivery Date ·
+PO Status · Proceed Date · SO No · PO Safety Days · Customer’s original requested delivery ·
 Customer Delivery Location · Customer · Items · Supplier · Supplier Deliver To · PO No ·
 PO Delivery Date
 ```

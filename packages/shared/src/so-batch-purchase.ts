@@ -125,7 +125,7 @@ export const SO_BATCH_PURCHASE_WORDS = {
    * destination INSTRUCTED TO THE SUPPLIER.
    */
   colDeliveryLocation: "Customer Delivery Location",
-  colRequestedDelivery: "Customer Requested Delivery Date",
+  colRequestedDelivery: "Customer’s original requested delivery",
   colSupplier: "Supplier",
   /** The goods summary: `{first item} + {n} more`, every item in expansion. */
   colItems: "Items",
@@ -803,6 +803,8 @@ export interface SoBatchOrderRow {
   proceededAt: string | null;
   /** `orders.delivery_date` — the customer's current request. */
   requestedDeliveryDate: IsoDate | null;
+  /** Preserved revision 1 request; display/filter/export only. */
+  originalRequestedDeliveryDate?: IsoDate | null;
   /** The customer's delivery locality, formatted by the shared web rule. */
   deliveryCity: string | null;
   deliveryState: string | null;
@@ -820,6 +822,7 @@ export const soBatchOrderRowSchema = z.object({
   status: z.enum(["blank", "partial", "ordered"]),
   proceededAt: z.string().nullable(),
   requestedDeliveryDate: z.string().nullable(),
+  originalRequestedDeliveryDate: z.string().nullable().optional(),
   deliveryCity: z.string().nullable(),
   deliveryState: z.string().nullable(),
   pos: z.array(

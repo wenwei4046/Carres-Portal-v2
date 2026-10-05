@@ -46,6 +46,14 @@ import { todayIsoMYT } from "./today";
  * userClient / RLS is the security boundary throughout — never service_role.
  */
 
+/** Same preserved revision-1 source as the Sales Order listing; no fallback. */
+export function originalRequestDate(revisions: unknown): string | null {
+  if (!Array.isArray(revisions)) return null;
+  const header = revisions.find(revision => revision?.revision === 1)?.snapshot?.header;
+  if (!header || header.delivery_date_tbd || typeof header.delivery_date !== "string") return null;
+  return /^\d{4}-\d{2}-\d{2}/.test(header.delivery_date) ? header.delivery_date.slice(0, 10) : null;
+}
+
 export function todayIso(): string {
   return todayIsoMYT();
 }
@@ -162,6 +170,8 @@ export interface RegisterOrderFact {
   customer: string | null;
   /** The customer's promised day. `null` when TBD or never set. */
   delivery: string | null;
+  /** Version 1 request for display only; never replaces buying arithmetic. */
+  originalRequestedDelivery?: string | null;
   /** Who owns the customer conversation (`orders.salesperson_id`). */
   salespersonId: string | null;
   /** Card 02-B — `place` is not proceeded, and the order Register must know. */
@@ -506,7 +516,7 @@ export async function loadToOrder(
       // `customer_address_city/state` are Card 02-B's Delivery Location facts,
       // read here because the row is already being fetched — the To Order
       // projection ignores them, so the workspace response is unchanged.
-      "id, so, customer_name, status, delivery_date, delivery_date_tbd, placed_at, created_at, proceed_date, proceeded_at, salesperson_id, customer_address_city, customer_address_state",
+      "id, so, customer_name, status, delivery_date, delivery_date_tbd, placed_at, created_at, proceed_date, proceeded_at, salesperson_id, customer_address_city, customer_address_state, original_request:sales_order_revisions(revision,snapshot)",
     )
     /**
      * ⭐ THE PROCEEDED-ORDER BOUNDARY (Card 02-C, RESOLVED FROM AUTHORITY,
@@ -521,6 +531,7 @@ export async function loadToOrder(
      * by name. Until 2026-08-27 this read admitted `place` too, which let the
      * rail count orders Purchasing could not legitimately buy.
      */
+    .eq("original_request.revision", 1)
     .eq("status", "proceed_order");
   if (orderErr) {
     const m = mapPgError(orderErr);
@@ -650,6 +661,7 @@ export async function loadToOrder(
       delivery: o.delivery_date_tbd
         ? null
         : (((o.delivery_date as string | null) ?? null)?.slice(0, 10) ?? null),
+      originalRequestedDelivery: originalRequestDate(o.original_request),
       salespersonId: (o.salesperson_id as string | null) ?? null,
       status: (o.status as string | null) ?? null,
       proceededAt: (o.proceeded_at as string | null) ?? null,
