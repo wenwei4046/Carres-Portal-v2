@@ -1917,6 +1917,18 @@ describe("extra-goods custody evidence", () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ receipt: parent, custody: [observation], notes: [], actorNames: {}, siteNames: {} });
   });
+  it.each([null, "", "   "])("keeps custody and notes readable when labels are missing (%s)", async name => {
+    const note = { id: SAVE_KEY, custody_id: observation.id, note: "Checking supplier", actor_id: LINE, recorded_at: "2026-10-05T00:00:00Z" };
+    const response = await read({
+      warehouse_receipts: { single: { data: parent, error: null } },
+      receiving_extra_custody: { list: { data: [observation], error: null } },
+      receiving_extra_custody_notes: { list: { data: [note], error: null } },
+      warehouses: { list: { data: [{ id: SITE, name }], error: null } },
+      app_users: { list: { data: [{ id: LINE, name }], error: null } },
+    });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ receipt: parent, custody: [observation], notes: [note], actorNames: {}, siteNames: {} });
+  });
   it("does not expose custody when the parent is inaccessible", async () => {
     expect((await read({})).status).toBe(404);
   });

@@ -1224,7 +1224,7 @@ warehouseReceiptsRouter.get("/:id/extra-custody", requireOperation, async (c) =>
     .eq("receipt_id", id.data).order("extra_ordinal").order("id").range(from, to));
   if (!("rows" in result)) return c.json({ message: "Custody records could not be read completely" }, 503);
   const siteIds = [...new Set(result.rows.map(row => row.actual_site_id).filter((id): id is string => typeof id === "string"))];
-  const sites = siteIds.length ? await readAllPages<{ id: string; name: string }>((from, to) => sb
+  const sites = siteIds.length ? await readAllPages<{ id: string; name: string | null }>((from, to) => sb
     .from("warehouses").select("id,name").in("id", siteIds).order("id").range(from, to)) : { rows: [] };
   if (!("rows" in sites)) return c.json({ message: "Custody locations could not be read completely" }, 503);
   const custodyIds = result.rows.map(row => row.id as string);
@@ -1233,12 +1233,12 @@ warehouseReceiptsRouter.get("/:id/extra-custody", requireOperation, async (c) =>
     .in("custody_id", custodyIds).order("recorded_at").order("id").range(from, to)) : { rows: [] };
   if (!("rows" in notes)) return c.json({ message: "Custody notes could not be read completely" }, 503);
   const actorIds = [...new Set(notes.rows.map(row => row.actor_id).filter((id): id is string => typeof id === "string"))];
-  const actors = actorIds.length ? await readAllPages<{ id: string; name: string }>((from, to) => sb
+  const actors = actorIds.length ? await readAllPages<{ id: string; name: string | null }>((from, to) => sb
     .from("app_users").select("id,name").in("id", actorIds).order("id").range(from, to)) : { rows: [] };
   if (!("rows" in actors)) return c.json({ message: "Note recorders could not be read completely" }, 503);
   return c.json({ receipt, custody: result.rows, notes: notes.rows,
-    actorNames: Object.fromEntries(actors.rows.map(actor => [actor.id, actor.name])),
-    siteNames: Object.fromEntries(sites.rows.map(site => [site.id, site.name])) });
+    actorNames: Object.fromEntries(actors.rows.flatMap(actor => actor.name?.trim() ? [[actor.id, actor.name]] : [])),
+    siteNames: Object.fromEntries(sites.rows.flatMap(site => site.name?.trim() ? [[site.id, site.name]] : [])) });
 });
 
 warehouseReceiptsRouter.get("/:id", requireOperation, async (c) => {
