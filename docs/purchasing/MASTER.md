@@ -940,7 +940,7 @@ preview with illustrative API responses verified the blocked message and edit-cl
 It exposed 403px item content in a 354px container; the shared TableScroller now contains its
 404px content within a 356px region. Screenshot: `/tmp/carres-warehouse-confirmation-phone-local.png`.
 This is local UI/transport evidence, not a real Warehouse login, upload or stock receipt.
-Own unposted PO reports now reopen with the same save key, receipt and revision. The bounded
+Own unposted PO reports now reopen with the same save key, receipt and revision. A saved exact-Unit report with an absent outcome now keeps that result Not recorded and its derived quantities unknown; it no longer invents Not received. The regression failed against the former fallback and now proves preservation plus explicit correction on the same receipt/revision. All 22 Warehouse Incoming tests and Web typecheck pass locally; this remains branch-only. The bounded
 shared decoder preserves unknown counts, exact Unit photo bindings, arrival proof and extra goods;
 six decoder tests pass. A reopened form requires fresh confirmation. Previously reported goods
 missing from the current source are retained and saving is disabled, preventing confirmation of

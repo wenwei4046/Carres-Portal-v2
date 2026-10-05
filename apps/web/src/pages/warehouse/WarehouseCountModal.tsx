@@ -40,7 +40,7 @@ const GRID = "1fr 76px 78px 72px 76px";
 /** One physical result per governed expected Unit — the same three outcomes
  *  the ops Session records (ERP-ARCHITECTURE §3.4). */
 type UnitState = {
-  outcome: ReceivingUnitOutcome;
+  outcome: ReceivingUnitOutcome | null;
   issueKind: "damaged" | "wrong_item";
 };
 
@@ -95,9 +95,8 @@ export default function WarehouseCountModal({ po, onClose, saved }: Props) {
     return m;
   }, [po.expected_units, po.lines]);
 
-  /** Prefilled `received` up to the line's remaining count — a complete
-   *  delivery is zero typing — and `not_received` beyond it (the same rule
-   *  the ops Session applies). */
+  /** New forms retain the source-prefilled proposal until explicit confirmation.
+   * Saved reports restore only recorded outcomes; an unanswered Unit stays unknown. */
   const [unitStates, setUnitStates] = useState<Record<string, UnitState>>(() => {
     const o: Record<string, UnitState> = {};
     for (const l of po.lines ?? []) {
@@ -108,7 +107,7 @@ export default function WarehouseCountModal({ po, onClose, saved }: Props) {
       units.forEach((u, i) => {
         const previous = storedLines.find((line) => line.id === l.id)?.units?.find((item) => item.unitCode === u.unit_code);
         o[u.id] = {
-          outcome: previous?.outcome ?? (saved ? "not_received" : i < cap ? "received" : "not_received"),
+          outcome: previous?.outcome ?? (saved ? null : i < cap ? "received" : "not_received"),
           issueKind: previous?.issueKind ?? "damaged",
         };
       });
@@ -119,7 +118,7 @@ export default function WarehouseCountModal({ po, onClose, saved }: Props) {
     setUnitStates((s) => ({
       ...s,
       [id]: {
-        ...(s[id] ?? { outcome: "not_received", issueKind: "damaged" }),
+        ...(s[id] ?? { outcome: null, issueKind: "damaged" }),
         ...patch,
       },
     }));
@@ -140,7 +139,7 @@ export default function WarehouseCountModal({ po, onClose, saved }: Props) {
           wrongItemQty = 0;
           for (const u of units) {
             const st = unitStates[u.id];
-            if (!st || st.outcome === "not_received") continue;
+            if (!st?.outcome || st.outcome === "not_received") continue;
             if (st.outcome === "received") receivedNow += 1;
             else if (st.issueKind === "wrong_item") wrongItemQty += 1;
             else damagedQty += 1;
@@ -182,6 +181,7 @@ export default function WarehouseCountModal({ po, onClose, saved }: Props) {
   const [savedReport, setSavedReport] = useState<WarehouseConfirmationResult | null>(saved?.result ?? null);
   const [confirmed, setConfirmed] = useState(false);
   const saving = useRef(false);
+  const unitResultsKnown = (lineId: string) => (unitsByLine.get(lineId) ?? []).every((unit) => Boolean(unitStates[unit.id]?.outcome));
   const report: WarehouseConfirmationReportInput = {
     ...saved?.report,
     poId: po.po_id, doNumber: doNumber.trim(), doFilePath,
@@ -192,16 +192,17 @@ export default function WarehouseCountModal({ po, onClose, saved }: Props) {
       return (source && pendingOf(source) > 0) || (unitsByLine.get(line.id)?.length ?? 0) > 0;
     }).map((line) => ({
       id: line.id,
-      receivedNow: (unitsByLine.get(line.id)?.length ?? 0) ? line.receivedNow : recv[line.id] ?? null,
-      damagedQty: (unitsByLine.get(line.id)?.length ?? 0) ? line.damagedQty : dmg[line.id] ?? null,
-      wrongItemQty: (unitsByLine.get(line.id)?.length ?? 0) ? line.wrongItemQty : wrong[line.id] ?? null,
+      receivedNow: (unitsByLine.get(line.id)?.length ?? 0) ? (unitResultsKnown(line.id) ? line.receivedNow : null) : recv[line.id] ?? null,
+      damagedQty: (unitsByLine.get(line.id)?.length ?? 0) ? (unitResultsKnown(line.id) ? line.damagedQty : null) : dmg[line.id] ?? null,
+      wrongItemQty: (unitsByLine.get(line.id)?.length ?? 0) ? (unitResultsKnown(line.id) ? line.wrongItemQty : null) : wrong[line.id] ?? null,
       damagedPhotos: [...line.damagedPhotos, ...(storedLines.find((item) => item.id === line.id)?.damagedPhotos ?? []).filter((photo) => typeof photo !== "string")],
       wrongItemPhotos: [...line.wrongItemPhotos, ...(storedLines.find((item) => item.id === line.id)?.wrongItemPhotos ?? []).filter((photo) => typeof photo !== "string")],
       wrongItemClaimType: line.wrongItemClaimType ?? undefined,
-      units: (unitsByLine.get(line.id) ?? []).map((unit) => {
+      units: (unitsByLine.get(line.id) ?? []).flatMap((unit) => {
         const state = unitStates[unit.id];
-        return { unitCode: unit.unit_code, note: storedLines.find((item) => item.id === line.id)?.units?.find((item) => item.unitCode === unit.unit_code)?.note, outcome: state?.outcome ?? "not_received",
-          ...(state?.outcome === "received_with_issue" ? { issueKind: state.issueKind } : {}) };
+        if (!state?.outcome) return [];
+        return [{ unitCode: unit.unit_code, note: storedLines.find((item) => item.id === line.id)?.units?.find((item) => item.unitCode === unit.unit_code)?.note, outcome: state.outcome,
+          ...(state.outcome === "received_with_issue" ? { issueKind: state.issueKind } : {}) }];
       }),
     })),
   };
@@ -346,9 +347,9 @@ export default function WarehouseCountModal({ po, onClose, saved }: Props) {
                     style={{ gridColumn: "3 / 6" }}
                     data-testid={`warehouse-derived-${l.sku}`}
                   >
-                    {v?.receivedNow ?? 0} good
+                    {unitResultsKnown(l.id) ? <>{v?.receivedNow ?? 0} good
                     {damagedNow > 0 ? ` · ${damagedNow} damaged` : ""}
-                    {wrongNow > 0 ? ` · ${wrongNow} wrong item` : ""}
+                    {wrongNow > 0 ? ` · ${wrongNow} wrong item` : ""}</> : "Not recorded"}
                   </div>
                 ) : (
                   <>
@@ -415,7 +416,7 @@ export default function WarehouseCountModal({ po, onClose, saved }: Props) {
                   flex rows with big selects — this form lives on a phone. */}
               {units.map((u) => {
                 const st = unitStates[u.id] ?? {
-                  outcome: "not_received" as const,
+                  outcome: null,
                   issueKind: "damaged" as const,
                 };
                 return (
@@ -428,16 +429,17 @@ export default function WarehouseCountModal({ po, onClose, saved }: Props) {
                       {u.unit_code}
                     </span>
                     <select
-                      value={st.outcome}
+                      value={st.outcome ?? ""}
                       onChange={(e) =>
                         setUnit(u.id, {
-                          outcome: e.target.value as ReceivingUnitOutcome,
+                          outcome: (e.target.value || null) as ReceivingUnitOutcome | null,
                         })
                       }
                       aria-label={`Outcome for ${u.unit_code}`}
                       data-testid={`warehouse-unit-outcome-${u.unit_code}`}
                       className="flex-1 min-w-[150px] px-2 py-1.5 border border-base-300 rounded-[4px] text-meta bg-white outline-none focus:border-base-500"
                     >
+                      <option value="" disabled>Not recorded</option>
                       {(
                         [
                           "received",
