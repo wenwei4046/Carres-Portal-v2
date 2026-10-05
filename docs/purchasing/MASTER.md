@@ -2615,13 +2615,21 @@ Fixture-walked in the real portal shell; the authenticated production walk is re
   registry, the registry names the convergence it owes; closing it is this page's own round.
   Customer, Supplier, Delivery Location and Deliver To never ellipsise: a long value takes an inline
   second line, so the full value is readable by keyboard and touch with no hover title.
-  **Width convergence — owner-approved 2026-10-05; implemented on release branch,
-  production verification pending.** SO Batch parent definitions now reference the existing
+  **Width convergence — owner-approved 2026-10-05; DEPLOYED #1914,
+  authenticated post-release verification pending.** SO Batch parent definitions now reference the existing
   `REGISTER_FIELD_WIDTH` entries for Proceed Date, SO No, PO Safety Days, Customer Requested
   Delivery Date, Customer Delivery Location, Customer, Items, Supplier, Supplier Deliver To,
   PO No and PO Delivery Date. Existing header minimums, wrapping, facts, export readers and
   `carres.soBatchPurchase.register.v7` remain unchanged; valid saved personal widths still win,
   and Reset columns restores registry defaults. Registry values and shared behavior are unchanged.
+  PR head `4647cb3c8a142eb49a79e7ea581b60c8dffabb86` passed complete CI
+  `37255018325` (including 141 SO Batch tests and 10 group-header tests), merged as
+  `7d0fa709cfb4a03b7d970d00792f89b5eb3bdc68`; deployment `37266274278` completed
+  successfully with exact-SHA convergence. Authenticated pre-release 825×694 measurement
+  confirmed independent old widths and no page-level overflow, but is not acceptance of this
+  release. Post-release 825×694/390 widths, scrolling, identity/header readability and saved
+  layout/reset verification remain owed: browser input/CDP timed out, then the desktop browser
+  service became unavailable. No production PO, stock or communication write was performed.
   This closes only width-reference drift; destination and Safety Days drafts remain unreleased.
 - **R8 · Issue workspace.** `Back to buying` returns to the SAME Register — it stays mounted and
   hidden behind the workspace, keeping search, rail filters, open groups, ticks and scroll offset,
