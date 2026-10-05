@@ -126,7 +126,7 @@ describe("Sales Order page — `{n} orders ›` counts what the Register door op
   });
 
   it("a failed count read hides the door, prints no guessed number and keeps the chip", async () => {
-    answer({ probe: { existing: true, matches: 4 }, count: () => Promise.reject(new ApiError(500, "Sales orders could not be counted.")) });
+    answer({ probe: { existing: true, matches: 4 }, count: () => Promise.reject(new ApiError(500, "Sales orders could not be counted.", { code: "count_unavailable" })) });
     mount();
     await settled();
     expect(chip().textContent).toBe("Existing customer");
