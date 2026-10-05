@@ -941,8 +941,10 @@ COLUMNS    resize · reorder · hide · visible `Reset columns` · personal, bro
 ACTIONS    every act reachable from the order detail (View = open · Print · Cancel SO; Edit on the page);
            right-click and Menu key / Shift+F10 are shortcuts only · no row buttons
 VISUAL     one shared register grammar · NO create button (owner 2026-09-27: orders are born in the Sales Portal)
-STATES     skeleton · `Sales orders could not be loaded` + `Try again` · `No sales orders yet` ·
-           `No sales orders match these filters` + `Clear filters`
+STATES     skeleton · `Sales orders could not be loaded` + `Try again` · `No sales orders yet` only
+           when the permitted population itself is empty (`salesOrderTotal` 0; unknown → the
+           unsearched load) · `No sales orders match these filters` + `Clear filters` when a search,
+           a header filter or a rail choice left nothing (rail case BUILT 2026-10-06, SO BUILD-1b)
 NARROW     toolbar wraps and stays usable · grid scrolls itself · no page sideways scroll
 ```
 
@@ -1041,6 +1043,17 @@ absence are distinct; failed reads offer Retry and never render `Not allocated`.
 The normal toolbar exposes Search, Export and Columns with labels, wrapping on narrow containers.
 Server search recognises the displayed `SO-1319` number as well as bare `1319`;
 customer names and imported references are not parsed as partial SO numbers.
+**Phone search — BUILT 2026-10-06 (SO BUILD-1b):** a term that is 8–15 digits once spaces, dashes,
+brackets and a leading `+` are removed is also a phone. The Worker reads `id, customer_phone` over the
+list's own scope through the caller's RLS and matches on digits — typed digits inside the stored
+digits, or the shared `phoneKeyMy` national core (leading `60` and trunk `0` removed) inside the stored
+one — so `+60123456789`, `0123456789`, `012-345 6789` and a stored `123456789` find each other. A failed
+phone read fails the search; it is never answered as no order. Name and SO-number search are unchanged.
+**Known gap (shared engine, not in this slice):** the engine still re-filters the server's answer by the
+typed text against the row's phone and its digits. On screen, a phone shows when it is typed as stored or
+as the stored digits without punctuation, and the Sales Order page's `Existing customer · {n} orders ›`
+link (it carries the stored phone) lands on the orders; a different punctuation or the other country-code
+form (`+60…` against a stored `0…`) is found by the server and then hidden by that re-filter.
 **Several PO numbers print like Items — OWNER RULING 2026-09-27 (Jess: "show all PO No like +"):** the
 first document number as its own link, then `+ {n} more` (`PO-20260902-8370 + 1 more`), the `+ {n} more`
 being the door to the popover that lists every number as a link; the count-only entry (`2 Purchase

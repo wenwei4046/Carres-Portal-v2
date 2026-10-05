@@ -4994,7 +4994,7 @@ Workspace message availability: `Message not available` replaces a placeholder d
 
 | Sales Orders pilot page-tools overflow (owner approved 2026-10-01) | `Page tools` (accessible trigger/menu name); `Export` · `Columns` with existing submenu words | Order business actions in page-tools menu |
 
-| Sales Orders pilot compact search (owner approved 2026-10-01) | `Search orders…`; accessible scope `Search sales orders by SO number, customer or imported reference` | Unverified whole-database phone/item search claim |
+| Sales Orders pilot compact search (owner approved 2026-10-01; scope words follow what the server matches — linked document numbers since PR #1850, phone digits since 2026-10-06) | `Search orders…`; accessible scope `Search sales orders by SO number, customer, phone, imported reference or linked document number` | Unverified whole-database item search claim · naming a field the server search does not match |
 
 ### Accepted Sales Orders shared template — 2026-10-01
 
