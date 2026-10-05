@@ -2,10 +2,11 @@
  * SALES ORDER `Stock Status` · LOCAL WALK SCENARIO — DEV ONLY, every write
  * SIMULATED (owner rulings 2026-10-05, relayed by the controller).
  *
- * Import this module AFTER whatever owns `window.fetch` in a preview (the
- * Tasks walk's `tasks-fixtures.ts`, or `so-stock-status-preview.tsx`'s own
- * base): it wraps the fetch it finds and answers only the reads and the two
- * writes its scenario owns, passing everything else through.
+ * ONE LINK (owner, 2026-10-05): it is mounted INSIDE the Tasks walk —
+ * `tasks-preview.tsx` imports this module right AFTER `./tasks-fixtures` (so it
+ * wraps the fetch the Tasks walk owns) and renders `<StockStatusWalkPanel />`
+ * beside its Banner. It answers only the reads and writes its scenario owns
+ * and passes everything else through; there is no separate page.
  *
  *   reads    /api/operation/orders                       its orders added
  *            /api/operation/orders/register-facts        Stock Status for every
