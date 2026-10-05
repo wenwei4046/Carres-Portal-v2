@@ -60,6 +60,7 @@ not a current pattern: do not copy it from a neighbouring page. Live examples ar
 | Orders list / drawer band | `SectionPanel` (cream band) — that surface only, not a general card | `components/SectionPanel.tsx` | Not a `Block` duplicate |
 | Work right-panel Communication | `WorkCommunication` — recorded channels only | `pages/operation/work/WorkCommunication.tsx` | Built; differs from the card's editable `To` (§7.2) |
 | Record history | §5.2 three-rank grammar | this MASTER | LOCKED · no shared component; each page draws it |
+| Right Quick Rail | `OperationRightRail` | `pages/operation/components/OperationRightRail.tsx` | §5 · `Calendar` · `Tasks` · `Activity`, icon only — owner ruling 2026-10-05, NOT BUILT (production shows Calendar · My Work · Activity with labels) |
 
 **Retired — do not import; a test blocks new use** (`components/retired-components.test.ts`): `Btn`
 (→ `Button`), `Field` (→ kit inputs / `field-recipe`), `PageHeader` (→ `PageShell`). Their remaining
@@ -163,6 +164,8 @@ coverage per module (§4.3, §6.1). Tests or shared-component imports alone do n
 | The left rail (mission rule, recipe, per-module status) | §6.1 |
 | The right Working Panel | §4.3 (rules in `MODULE-CARD-TEMPLATE.md`, numbers in 01 §7.6) |
 | Which tab the panel opens on (page-owned main work tab) | §4.3.1 |
+| Default page work, `Tasks` and the one right area | §4.3.5 · §5 |
+| Row right-click (`View` · `Print`) and click behaviour per register | §6.5 |
 | Standalone versus embedded Sales Order card | §4.3.3 |
 | Columns and other modules' facts on my list | §6.3 |
 | Row expansion | §6.9 (goods tables §6.8) |
@@ -732,6 +735,20 @@ numbers join 01 §7.6 and its rules join the card contract when it merges).
 | Warehouse | a `Warehouse` tab in the shared panel | APPROVED TARGET / NOT BUILT (§0.2) | Stock MASTER |
 | Workspace Work right panel | Workspace §5.10 composition | Governed by `docs/workspace/MASTER.md` §5.10 (deployed §5.9 Logistics; rest NOT BUILT); not yet aligned to this card | Workspace MASTER |
 
+### §4.3.5 · Default page work and `Tasks` share one right area — owner-approved 2026-10-05
+
+- **Default work presentation — APPROVED DIRECTION, localhost first, NOT BUILT.** Entering a module
+  page, the right Working Panel shows that page's **highest-priority actionable work** from the
+  existing Work / module task sources (owner, permissions, completion facts) — no new task engine, and
+  never guessed from the current table filter. Purchasing priority: earliest `Missed` → today's due
+  round → next round. Nothing is ticked, ordered, reserved or sent automatically. A task the operator
+  navigates to by hand stays selected across a refresh; a draft is never lost. When there is no work,
+  the panel says so plainly (COPY word needed) and record viewing stays available.
+- **One right area — APPROVED / NOT BUILT.** The page's work and the global `Tasks` view (§5) switch
+  in the SAME right area — never two stacked panels — and a way back to the page's work is always
+  present. Selecting a row never silently changes the object open in Tasks; `View` opens the full
+  document (§6.5 row actions).
+
 **Open items on the card** are in §7: the compact-card token decision, 40px phone tabs, the editable
 `To` versus Work's recorded channels, the native Input/Textarea cascade, the preview-versus-kit
 differences, ↗ only with `onOpen`, the link-style button inside the card and "several SOs → list first".
@@ -780,30 +797,29 @@ PAYMENT     the customer-facing 50/50 composition is used only while editing a c
 
 # §5 · The right Quick Rail
 
-**APPROVED TARGET / NOT BUILT (owner direction 2026-09-24).** Three quick-reference doors:
-**Calendar · Customers · Activity** (`Customers` admitted in COPY 2026-09-26).
+**Final owner ruling 2026-10-05 (Jess) · APPROVED / NOT BUILT.** The rail has three doors, **all icon
+only** — the tooltip and the accessible name carry the word: **`Calendar` · `Tasks` · `Activity`.**
 
-- **Calendar door — icon only (owner ruling 2026-10-05):** no visible word; tooltip and accessible name
-  keep `Calendar`. Calendar is the one shared quick calendar for every module (approved 2026-10-04).
-- **The rail's My Work door becomes Customers** — the customer quick check (approved 2026-09-24/26);
-  APPROVED TARGET / NOT BUILT, production still mounts My Work.
-- **Detailed content blueprint incomplete:** the complete right-rail blueprint (Calendar · Customers ·
-  Activity) is being prepared for owner review; the
-  [discussion Card](../cards/SHARED-UI-calendar-work-activity-discussion.md) is the current PROPOSAL.
-  Whether Customers and Activity are also icon-only is PROPOSAL (§7.4), not law.
+- **`Tasks` replaces My Work** with the same icon, size, hit area and selected style. It opens the
+  signed-in person's cross-module work **in the same right area as the page's work** (§4.3.5), read
+  from the one Work source (owner, permissions, completion facts); Workspace stays the formal
+  `My Task` / `Team Work` destination. Never a second task list or engine.
+- **There is no `Customers` door.** Customer information is reached inside Tasks through the
+  `Sales Order` tab, which shows the customer's information. This overwrites the 2026-09-24/26
+  "My Work → Customers" ruling.
+- **`Calendar`** is the one shared quick calendar for every module (owner-approved 2026-10-04).
+- **`Activity`:** detailed content blueprint incomplete — it is being prepared for owner review.
+- Module Quick Schedule is handled last.
 
-Every portal shows the rail and each person sees only what their permissions allow (today it is mounted only in the Operation
-shell — a build gap; scoping for external portals is PROPOSAL in the
-[discussion Card](../cards/SHARED-UI-calendar-work-activity-discussion.md)). Formal Work stays at its
-Workspace destination; no Work badge on the rail. **Measured 2026-10-05:** `OperationRightRail.tsx`
-still mounts Calendar, My Work (`TasksPanel`) and Activity — the difference is a build gap, not a
+Every portal shows the rail and each person sees only what their permissions allow (today it is
+mounted only in the Operation shell — a build gap). **Measured 2026-10-05:** `OperationRightRail.tsx`
+still mounts Calendar, My Work (`TasksPanel`) and Activity with visible labels — a build gap, not a
 competing design.
 
 **One job, two doors (owner-confirmed 2026-09-25).** A job can be done from Work or on its owning
 module page; both use the same module action and write the same record. Done means the source fact
 exists — the Work item closes everywhere; nobody presses `Done`. The rail only reflects and links:
-Activity shows who · when · what; the customer's history shows the event; Calendar changes only when a
-dated arrangement changes. No rail door performs or completes a job.
+Activity shows who · when · what; Calendar changes only when a dated arrangement changes. No rail door performs or completes a job.
 
 **Calendar (owner-confirmed 2026-09-25; shared all-module calendar owner-approved 2026-10-04, NOT
 BUILT).** One right-rail Calendar, never a calendar page per module. `All modules` shows only
@@ -828,18 +844,12 @@ Warehouse     1 arriving                  ›  ?tab=warehouse-arrival-schedule&d
 Payment       2 promised payments         ›  Payment Monitor ?day=
 ```
 
-**Customers (owner-confirmed 2026-09-26).** Read only: search by name, phone or saved order number
-(exact phone/number first, then name; nothing opens by itself); `Matched by phone` versus a separate
-`Possible match`, never merged; permissions decide what exists; the selected customer's orders and
-recorded history link to their sources; Logistics contact reads as the company's act recorded on its
-behalf. A different job from Work's Customer card (Workspace §5.10); both read the same records.
-
 **Activity** previews recent append-only events within the person's permissions and links to their
 objects; it never replaces an object's History. No stored value reaches the screen untranslated and no
 `—` stands in for a value (COPY-STANDARD).
 
-**Frozen:** the rail reads and links; a source module owns every change and completion; selecting a
-customer never silently filters Calendar or Activity; a filter can narrow access, never widen it.
+**Frozen:** the rail reads and links; a source module owns every change and completion; a filter can
+narrow access, never widen it.
 **A page never resolves Duty** (owner ruling 2026-09-01): every action surface renders the resolved
 owner from the one Work Engine Action contract (`../ERP-ARCHITECTURE.md` Law F.1); only Settings →
 Staff & Duties edits assignments.
@@ -1045,6 +1055,7 @@ actions. **A component existing is not whole-page adoption** — each page prove
 | Grouping | SUPPORTED | `fixedGroups` (governed, §6.10) · `initialGroupBy` · `allowColumnGrouping` · `countsInGroup`; optional `Group by` via `pageToolsItems` | Sales Orders optional grouping released (PR #1850); the choice rides the route parameters — browser/account persistence beyond the URL is not built; one grouping at a time, never duplicating a record across groups |
 | Expansion | SUPPORTED | `expandable` (`renderExpansion` · `flush` · `alignToColumn` · `fitExpansionToViewport` · `trigger` · `defaultExpandedKeys` · `revealExpandedKey`) + `GoodsMiniTable` + connector | §6.9 |
 | Identity link | SUPPORTED (page-rendered cell) | `leadingColumns.identity` + the page's link cell · `onRowClick` · `onRowDoubleClick` | No generic identity-link prop; Enter = double-click |
+| Row right-click menu | engine SUPPORTED · shared `View · Print` set APPROVED TARGET / NOT BUILT | `contextMenu` (Shift+F10 / Menu key) | Per-register menus today in §6.5; SO menu missing in code (§7.2) |
 | Export (current view) | SUPPORTED | Excel and list PDF from one derivation: column `exportValue` · `exportLabel` · `exportName`; selection exports the ticked rows | List PDF in-page preview PRODUCTION VERIFIED (#1911) |
 | Paged full-population export | SUPPORTED | `loadExportRows` | Receiving first; PRODUCTION VERIFIED for Excel (#1905, `a087fec9`); live PDF-list download of a paged register not claimed |
 | Server-side column filter/sort | SUPPORTED | `serverColumns { values, onChange }` + shared `register-column-query` | PRODUCTION VERIFIED on Receiving (#1899/#1901, `5c04b662`) |
@@ -1131,6 +1142,28 @@ The local filter/mission rail recipe is §6.1; this section holds the register's
   (`Export Excel ({n})`). A one-record action disappears on multi-select. With rows ticked, Export can
   also produce the documents those rows own (`Print {n} sales orders`, one governed page per order,
   assembled server-side) — never confused with the list output.
+- **Row actions — owner-approved 2026-10-05, APPROVED TARGET / NOT BUILT unless the table below says
+  a register has it.** The shared row right-click menu (also Shift+F10 / the Menu key) offers
+  **`View`** — opens the full document's 50/50 read-first view page, which carries an `Edit` button;
+  editing starts only when `Edit` is pressed — and **`Print`**, which enters the existing print flow.
+  Right-click stays a shortcut, never the only door. The identity-number click, row single-click and
+  double-click keep each register's CURRENT approved behaviour (below). The embedded Sales Order is
+  unchanged: SO No → saved PDF, ↗ → full SO page. Sales Orders' approved row menu is Orders law:
+  `Edit · View · Print · ─ Cancel SO` (Orders MASTER, register close-out 2026-09-26).
+
+  | Register (measured in code 2026-10-05) | Single click | Double click | Right-click menu today |
+  |---|---|---|---|
+  | Sales Orders | compact SO card (Working Panel) | full SO page | none in code since #1838 (`contextMenu={undefined}`), although Orders law approves `Edit · View · Print · ─ Cancel SO` — REAL GAP (§7.2) |
+  | SO Batch Purchase | none (selection and expansion) | compact SO Batch card | `View` (compact card) · `Open {PO}` when exactly one PO |
+  | Purchase Orders | none | PO object | `View` (PO object) · `Download official PDF` |
+  | Manual Purchase Request | none | request detail | `View` (request detail) · `Open {PO}` when exactly one PO |
+  | Receiving | compact GRN card | none | none |
+  | Delivery Orders | none (▸ opens the DO brief in place) | the DO | `View` · `Open SO-{n}` · `Open Order Route` |
+  | Delivery Monitor | none (▸ opens the delivery brief) | none | `Assign logistics` (unassigned only) · `Open SO-{n}` · `Open Order Route` · `Open {DO}` |
+  | Supplier Claims | none | the claim | none |
+  | Warehouse stock register | none | the Unit | none |
+  | Finance listings | none | the record (per Finance MASTER) | page-specific; not reviewed here |
+
 - **The three message kinds — only one may move the table.** ① **Selection** replaces the toolbar.
   ② **Warning** — a real business blocker as a 40px band between toolbar and table (`DataGrid
   warning`: `role="alert"`, amber), only while its fact is true; never a permanent band or KPI strip.
@@ -1406,6 +1439,7 @@ into the section it belongs to, and this list loses it.
 | Shared Select long option at 390px | measured right edge 420.72px beyond the viewport (research file §9) | Kit fix |
 | WarehouseIncoming modal close | focus lands on the page, not the Count trigger (research file §9) | Adopt `DialogFrame` focus return |
 | Picker inside a dialog renders UNDER it | a real P1 defect, approved, not built | Kit fix |
+| Sales Orders row menu missing in code | Orders law (register close-out 2026-09-26, BUILT 2026-09-28) approves `Edit · View · Print · ─ Cancel SO`; the accepted-template build #1838 set `contextMenu={undefined}`, so production has no row menu | Orders lane restores it, aligned with the shared `View` (50/50 read-first) and `Print` rule |
 | Stock Status column truncates its pill | Live SO register 2026-10-05: the 120px Stock Status width cuts every `Receipt unconfirmed` pill (natural width >103px of content) — content must decide width (Constitution §2) | GAP: re-measure and widen the registry role in the SO round |
 
 ## §7.3 · KIT GAPs — admit once, never draw locally
@@ -1432,7 +1466,6 @@ into the section it belongs to, and this list loses it.
 
 | Proposal | Source | Falsifier / decision owed |
 |---|---|---|
-| Customers and Activity rail doors icon-only, like Calendar (controller recommends yes, for consistency) | controller 2026-10-05 | Owner decision with the complete right-rail blueprint |
 | Reduced motion: animations respect the operator's reduced-motion setting | consolidation review 2026-10-05 | Owner/kit decision; no rule until approved |
 | Confirm before an act that cannot be undone, in COPY wording | consolidation review 2026-10-05 | Any word change goes through COPY |
 | Compact-card token decision: the card's palette, font family, radius, drawn glyphs and red error line are the reference's own, not 01 (values in 01 §7.6) | card contract | Owner token decision |
@@ -1449,7 +1482,7 @@ into the section it belongs to, and this list loses it.
 
 ## §7.5 · Approved targets not yet built (shared)
 
-Quick Rail Calendar · Customers · Activity and the all-module calendar filters (§5) · `Assigned to` /
+Quick Rail `Calendar` · `Tasks` · `Activity` icon-only doors, Tasks in the right area, and the all-module calendar filters (§5) · `Assigned to` /
 `Completed by` wording (§5.1) · mission entries on module rails (§6.1) · `Warehouse` tab (§4.3.4) ·
 personal saved-layout rollout (§6.7) · facet-count convergence (§6.7) · SO dealer/product multi-select
 rail · the flame repoint `--primary` → blue (594 sites; needs its own card and a visual approval) ·
