@@ -164,7 +164,7 @@ coverage per module (§4.3, §6.1). Tests or shared-component imports alone do n
 | The left rail (mission rule, recipe, per-module status) | §6.1 |
 | The right Working Panel | §4.3 (rules in `MODULE-CARD-TEMPLATE.md`, numbers in 01 §7.6) |
 | Which tab the panel opens on (page-owned main work tab) | §4.3.1 |
-| Default page work, `Tasks` and the one right area | §4.3.5 · §5 |
+| Default page work and `Tasks` (layout under research) | §4.3.5 · §5 |
 | Row right-click (ONE ROW MENU `View` · `Print`) and click behaviour per register | §6.7 rule 5 · §6.5 |
 | Standalone versus embedded Sales Order card | §4.3.3 |
 | Columns and other modules' facts on my list | §6.3 |
@@ -738,7 +738,7 @@ hidden parts, states and entry points: the contract's "Embedded presentation"; n
 | Warehouse | a `Warehouse` tab in the shared panel | APPROVED TARGET / NOT BUILT (§0.2) | Stock MASTER |
 | Workspace Work right panel | Workspace §5.10 composition | Governed by `docs/workspace/MASTER.md` §5.10 (deployed §5.9 Logistics; rest NOT BUILT); not yet aligned to this card | Workspace MASTER |
 
-### §4.3.5 · Default page work and `Tasks` share one right area — owner-approved 2026-10-05
+### §4.3.5 · Default page work and `Tasks` — owner direction 2026-10-05
 
 - **Default work presentation — APPROVED DIRECTION, localhost first, NOT BUILT.** Entering a module
   page, the right Working Panel shows that page's **highest-priority actionable work** from the
@@ -747,10 +747,13 @@ hidden parts, states and entry points: the contract's "Embedded presentation"; n
   round → next round. Nothing is ticked, ordered, reserved or sent automatically. A task the operator
   navigates to by hand stays selected across a refresh; a draft is never lost. When there is no work,
   the panel says so plainly (COPY word needed) and record viewing stays available.
-- **One right area — APPROVED / NOT BUILT.** The page's work and the global `Tasks` view (§5) switch
-  in the SAME right area — never two stacked panels — and a way back to the page's work is always
-  present. Selecting a row never silently changes the object open in Tasks; `View` opens the full
-  document (§6.5 row actions).
+- **Page work and `Tasks` — APPROVED DIRECTION, NOT BUILT.** The page's own work and the global
+  `Tasks` view (§5) never show as two stacked panels; a way back to the page's work is always present;
+  selecting a row never silently changes the object open in Tasks; `View` opens the full document
+  (§6.7 rule 5).
+- **PROPOSAL / UNDER RESEARCH — not law:** how Tasks coexists with Calendar, Activity and the page's
+  work. The owner requires Calendar to stay quickly viewable while handling a task; "Tasks replaces the
+  page's work in the same area" is not decided (§7.4).
 
 **Open items on the card** are in §7: the compact-card token decision, 40px phone tabs, the editable
 `To` versus Work's recorded channels, the native Input/Textarea cascade, the preview-versus-kit
@@ -804,13 +807,17 @@ PAYMENT     the customer-facing 50/50 composition is used only while editing a c
 **Final owner ruling 2026-10-05 (Jess) · APPROVED / NOT BUILT.** The rail has three doors, **all icon
 only** — the tooltip and the accessible name carry the word: **`Calendar` · `Tasks` · `Activity`.**
 
-- **`Tasks` replaces My Work** with the same icon, size, hit area and selected style. It opens the
-  signed-in person's cross-module work **in the same right area as the page's work** (§4.3.5), read
-  from the one Work source (owner, permissions, completion facts); Workspace stays the formal
-  `My Task` / `Team Work` destination. Never a second task list or engine.
-- **There is no `Customers` door.** Customer information is reached inside Tasks through the
-  `Sales Order` tab, which shows the customer's information. This overwrites the 2026-09-24/26
-  "My Work → Customers" ruling.
+- **`Tasks` replaces the My Work door** with the same icon, size, hit area and selected style. It shows
+  the signed-in person's cross-module work read from the one Work source (owner, permissions,
+  completion facts); Workspace stays the formal `My Task` / `Team Work` destination. Never a second task
+  list or engine. **APPROVED DIRECTION:** the page's own work and Tasks never show as two stacked panels
+  (§4.3.5). **PROPOSAL / UNDER RESEARCH:** how Tasks coexists with Calendar, Activity and the page's
+  work — the owner requires Calendar to stay quickly viewable while handling a task; whether Tasks
+  replaces the page's work in the same area is not decided (§7.4).
+- **No `Customers` door** (Jess, 2026-10-05: *"sorry remove customer due to task inside got sales order
+  tab to show all customer info"*). The linked customer's information is reached through the
+  `Sales Order` tab inside Tasks. This removes the 2026-09-24/26 rail DOOR only; the customer-lookup
+  CAPABILITY keeps its approval and its placement is OPEN (below).
 - **`Calendar`** is the one shared quick calendar for every module (owner-approved 2026-10-04).
 - **`Activity`:** detailed content blueprint incomplete — it is being prepared for owner review.
 - Module Quick Schedule is handled last.
@@ -823,7 +830,8 @@ competing design.
 **One job, two doors (owner-confirmed 2026-09-25).** A job can be done from Work or on its owning
 module page; both use the same module action and write the same record. Done means the source fact
 exists — the Work item closes everywhere; nobody presses `Done`. The rail only reflects and links:
-Activity shows who · when · what; Calendar changes only when a dated arrangement changes. No rail door performs or completes a job.
+Activity shows who · when · what; the customer's recorded history shows the event; Calendar changes
+only when a dated arrangement changes. No rail door performs or completes a job.
 
 **Calendar (owner-confirmed 2026-09-25; shared all-module calendar owner-approved 2026-10-04, NOT
 BUILT).** One right-rail Calendar, never a calendar page per module. `All modules` shows only
@@ -847,6 +855,20 @@ Delivery      2 scheduled deliveries      ›  Delivery Monitor ?date=
 Warehouse     1 arriving                  ›  ?tab=warehouse-arrival-schedule&date=
 Payment       2 promised payments         ›  Payment Monitor ?day=
 ```
+
+**Customer lookup — capability APPROVED 2026-09-24/26; rail door removed 2026-10-05; placement OPEN.**
+Find a caller by name, phone or saved order number (SO/SUB, including historical forms) across all
+their orders and recorded history. Read only: changing details, recording a contact result or taking
+money is done on the source record through its own module action; no edit, note or completion
+control. Exact phone or number matches rank first, then name matches; nothing opens by itself.
+`Matched by phone` where the canonical phone links records; a name-only hit is a `Possible match`, kept
+separate and never merged into one person, balance or entitlement. Permissions decide what exists:
+results, counts and suggestions never reveal a customer or order the person may not see. Delivery
+contact by the Logistics company reads as the company's act recorded on its behalf, never a Carres
+call. A different job from Work's Customer card (Workspace §5.10); both read the same source records and
+neither keeps a second copy. Selecting a customer never silently filters Calendar or Activity.
+**Where the cross-order caller lookup now lives is OPEN** — PROPOSAL: Tasks → `Sales Order` tab covers
+the linked SO only; a full caller search across all a customer's orders has no placement yet (§7.2).
 
 **Activity** previews recent append-only events within the person's permissions and links to their
 objects; it never replaces an object's History. No stored value reaches the screen untranslated and no
@@ -1047,7 +1069,7 @@ actions. **A component existing is not whole-page adoption** — each page prove
 | Search | SUPPORTED | built-in box; `searchPlaceholder` · `searchScope` · `initialSearch` · `onSearchChange` · `searchPresentation="responsive"` (`Search: {query}` chip) | 220×32 desktop under the template; the accessible hint names only fields actually searched; server search is the page's reader |
 | Table / Cards | SUPPORTED | `presentationTools` + `renderResults` (Cards consume the grid's exact sorted/filtered result) · `presentationKey` | Adopted: Sales Orders, SO Batch, Purchase Orders, Receiving. Kit `Tabs` segmented with `Table2` / `LayoutGrid` icons and visible words |
 | Page tools `⋯` | SUPPORTED | `presentationTools` menu: Export · `outputActions` · `pageToolsItems` · Columns | Entries icon + text; page tools never write business records |
-| Columns (show/hide, grouped chooser) | SUPPORTED — parent columns only | column `defaultHidden` · `chooserGroup` · `chooserGroupOrder` | Expansion columns are not listed (§6.3, KIT GAP) |
+| Columns (show/hide, grouped chooser) | SUPPORTED — parent columns only; default-hidden columns stay hidden (PR #1927 `a78e527c4`, MERGED, deploy verification pending) | column `defaultHidden` · `chooserGroup` · `chooserGroupOrder` | Expansion columns are not listed (§6.3, KIT GAP) |
 | Sort | SUPPORTED | column `sortable` · `sortFn` · `onSortChange` | 12px arrow; grouped listings sort the whole register once |
 | Per-column filter | SUPPORTED | column `filterable` · `filterType` · `filterValue` · `dateValue` · `numberValue` | Every filter matches its column type (dates get presets and Between…); paged registers use `serverColumns` |
 | Active conditions | SUPPORTED | `activeConditions` · `onClearConditions` · `reserveConditionRow` | One removable strip for rail + column + search conditions; neutral `Clear all` |
@@ -1225,6 +1247,10 @@ recorded in §6.0; the compact card in §4.3.4.
    A layout saves order, widths, visibility and sort ONLY — never search, filters or group state;
    `Reset columns` restores the company layout (and clears sort). Browser-remembered layout per page key
    applies everywhere. Rollout beyond Purchase Orders waits for owner acceptance of the pilot.
+   **One layout rule (MERGED, deploy verification pending):** `register/DataGrid`: every layout writer
+   passes through one rule (`settleLayout`) — on a pristine layout pin, drag, hide or show changes only
+   that column and default-hidden columns stay hidden until shown; an arranged layout keeps an empty
+   hidden literal; `Reset columns` alone returns to pristine (PR #1927, `a78e527c4`).
 5. **ONE ROW MENU (owner 2026-10-05) — APPROVED / BUILD IN PROGRESS.** Every register's right-click
    menu starts `View · Print` from the shared `documentRowMenu` helper — View opens the record's full
    read-first document page (Edit only when pressed), Print runs that record's existing print flow; an
@@ -1448,6 +1474,7 @@ into the section it belongs to, and this list loses it.
 | WarehouseIncoming modal close | focus lands on the page, not the Count trigger (research file §9) | Adopt `DialogFrame` focus return |
 | Picker inside a dialog renders UNDER it | a real P1 defect, approved, not built | Kit fix |
 | Production Sales Orders register has no row menu | Since #1838 (accepted-template build, `c926e3f7`) set `contextMenu={undefined}`, production has no row menu | APPROVED TARGET / NOT BUILT — the shared row-menu build restores it as `View · Print · ─ Cancel SO` (§6.7 rule 5) |
+| **Customer lookup placement** | The caller-lookup capability (name/phone/order number across all a customer's orders and recorded history) is approved 2026-09-24/26; its rail door was removed 2026-10-05. Tasks → `Sales Order` tab shows only the linked SO's customer | Owner decision on where the cross-order lookup lives (PROPOSAL in §5) |
 | Stock Status column truncates its pill | Live SO register 2026-10-05: the 120px Stock Status width cuts every `Receipt unconfirmed` pill (natural width >103px of content) — content must decide width (Constitution §2) | GAP: re-measure and widen the registry role in the SO round |
 
 ## §7.3 · KIT GAPs — admit once, never draw locally
@@ -1474,6 +1501,7 @@ into the section it belongs to, and this list loses it.
 
 | Proposal | Source | Falsifier / decision owed |
 |---|---|---|
+| How `Tasks` coexists with Calendar, Activity and the page's work (same-area replacing is one option, not decided); Calendar must stay quickly viewable while handling a task | owner direction 2026-10-05 | Under research; owner review |
 | Reduced motion: animations respect the operator's reduced-motion setting | consolidation review 2026-10-05 | Owner/kit decision; no rule until approved |
 | Confirm before an act that cannot be undone, in COPY wording | consolidation review 2026-10-05 | Any word change goes through COPY |
 | Compact-card token decision: the card's palette, font family, radius, drawn glyphs and red error line are the reference's own, not 01 (values in 01 §7.6) | card contract | Owner token decision |
@@ -1489,7 +1517,7 @@ into the section it belongs to, and this list loses it.
 
 ## §7.5 · Approved targets not yet built (shared)
 
-Quick Rail `Calendar` · `Tasks` · `Activity` icon-only doors, Tasks in the right area, and the all-module calendar filters (§5) · `Assigned to` /
+Quick Rail `Calendar` · `Tasks` · `Activity` icon-only doors (Tasks layout under research) and the all-module calendar filters (§5) · `Assigned to` /
 `Completed by` wording (§5.1) · mission entries on module rails (§6.1) · `Warehouse` tab (§4.3.4) ·
 personal saved-layout rollout (§6.7) · facet-count convergence (§6.7) · SO dealer/product multi-select
 rail · the flame repoint `--primary` → blue (594 sites; needs its own card and a visual approval) ·

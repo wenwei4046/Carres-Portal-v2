@@ -2052,8 +2052,9 @@ delay planning and phone), Delivery (partner contact result, scheduled/delivered
 decision), and their source communication evidence.
 
 **Relation to customer information in the right rail (UI MASTER §5):** this card is one mission's
-customer-facing exception; customer information is reached through the `Sales Order` tab inside Tasks
-(owner ruling 2026-10-05). Both read the same Sales Orders / Delivery / Payment records; neither stores a copy.
+customer-facing exception; the linked customer's information is reached through the `Sales Order` tab
+inside Tasks (owner ruling 2026-10-05), and the customer-lookup capability (all their orders and recorded
+history, approved 2026-09-26) keeps its approval with its placement open (UI MASTER §5). Both read the same Sales Orders / Delivery / Payment records; neither stores a copy.
 
 #### Supplier card
 
