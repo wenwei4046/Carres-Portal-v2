@@ -11,6 +11,10 @@
  * items and Timeline start closed. Info opens sales facts and address; every
  * other module starts with them closed.
  *
+ * EMBEDDED presentation (owner 2026-10-05): the same card inside a host module's
+ * tab — light identity area, no Close, no module tabs, address and sales facts
+ * always open, items shown at once. The host owns the outer Header and tabs.
+ *
  * The card owns arrangement and interaction only. It writes no record, never
  * marks a message sent, keeps saved message templates in the browser and
  * uploads no file. Business gates stay with the owning module.
@@ -168,6 +172,12 @@ export interface CardFact {
 export interface CardModule {
   key: string;
   label: string;
+  /**
+   * Complete module-owned read-only composition, using shared kit exports — e.g. a host's
+   * `Sales Order` tab holding embedded SO cards. Drawn full width after the module body;
+   * a module with only `content` draws no body inset of its own.
+   */
+  content?: ReactNode;
   disabled?: boolean;
   /** The module's own summary facts — as many cells as it has facts. */
   summary?: CardFact[];
@@ -202,6 +212,14 @@ export interface CardCommunication {
   namePlaceholder?: string;
 }
 export interface CompactModuleCardProps {
+  /**
+   * `standalone` (default): the card owns the dark identity Header, module tabs and Close.
+   * `embedded`: the same record inside a HOST's module tab (UI MASTER §4.3). The host owns
+   * the outer Header and tabs, so this card draws a light identity area with no Close, no
+   * module tabs and no disclosure toggles: address and sales facts are always open and the
+   * first module's items show at once. Standalone rules are untouched by this mode.
+   */
+  presentation?: "standalone" | "embedded";
   name: string;
   reference: string;
   /** Exceptional document state only; normal records need no badge. */
@@ -213,6 +231,7 @@ export interface CompactModuleCardProps {
   address?: { area: string; full: string; hideArea?: boolean; facts?: { kind: "building" | "access"; label: string; value: string }[] };
   target?: { date: string; badge?: string; label?: string; labelLines?: string[] };
   openLabel?: string;
+  /** The full-page door. A record with no full page passes none, and no ↗ is drawn. */
   onOpen?: () => void;
   closeLabel?: string;
   onClose?: () => void;
@@ -229,6 +248,7 @@ export interface CompactModuleCardProps {
 }
 
 export default function CompactModuleCard(p: CompactModuleCardProps) {
+  const embedded = p.presentation === "embedded";
   const first = p.modules.find((m) => m.key === p.initialModule) ?? p.modules[0];
   const [documentOpen, setDocumentOpen] = useState(false);
   const documentEntry = useRef<HTMLButtonElement>(null);
@@ -238,8 +258,12 @@ export default function CompactModuleCard(p: CompactModuleCardProps) {
     documentEntry.current?.focus();
   }
   const [moduleKey, setModuleKey] = useState(first.key);
-  const [sales, setSales] = useState(!!first.opensHeaderDetails);
-  const [address, setAddress] = useState(!!first.opensHeaderDetails);
+  const [salesState, setSales] = useState(!!first.opensHeaderDetails);
+  const [addressState, setAddress] = useState(!!first.opensHeaderDetails);
+  /* Embedded: open by presentation, never by state. Closing the PDF or a module
+     reset cannot fold them, and there is no toggle that could reopen them. */
+  const sales = embedded || salesState;
+  const address = embedded || addressState;
   const [details, setDetails] = useState(false);
   const [items, setItems] = useState(!!p.initiallyOpen?.items);
   const [comm, setComm] = useState(!!p.initiallyOpen?.communication);
@@ -271,34 +295,36 @@ export default function CompactModuleCard(p: CompactModuleCardProps) {
   const communication = mod.communication === undefined ? p.communication : mod.communication;
   const summary = mod.summary ?? [];
   const editingFact = summary.find((f) => f.key === editing);
+  /* A module that is ONLY `content` owns its whole composition, inset included. */
+  const bodyShown = !mod.content || summary.length > 0 || !!mod.items || !!mod.details;
 
   return (
     <div className={s.cq}>
-      <section className={s.panel}>
+      <section className={embedded ? `${s.panel} ${s.embedded}` : s.panel} data-presentation={embedded ? "embedded" : undefined}>
         <header className={s.header} data-layout={!p.address && !p.target ? "identity" : p.address?.hideArea ? "no-area" : undefined}>
           <div className={s.identity}>
             <div className={s.identityTitle}><strong>{p.name}</strong></div>
             <small className={s.contactLine}><>{p.document ? <button ref={documentEntry} type="button" className={s.documentNumber} title={p.document.label} aria-label={p.document.label} aria-expanded={documentOpen} aria-controls={`${ids}-document`} onClick={() => setDocumentOpen((v) => !v)}>{p.reference}</button> : <span>{p.reference}</span>}</>{p.phone ? <span className={s.phonePair}><Glyph name="phone" />{p.phone}</span> : null}</small>
             {p.referenceStatus ? <small className={s.referenceStatus}>{p.referenceStatus}</small> : null}
-            {p.sales ? (
+            {p.sales && !embedded ? (
               <button type="button" className={s.salesToggle} title={CARD_WORDS.orderDetails} aria-label={CARD_WORDS.orderDetails} aria-controls={`${ids}-sales`} aria-expanded={sales} onClick={() => { if (p.address?.hideArea) setAddress(!sales); setSales(v => !v); }}>
                 <span className={s.chevron}>{sales ? "▴" : "▾"}</span>
               </button>
             ) : null}
           </div>
-          <div className={s.addressBox} hidden={p.address?.hideArea}>
+          {embedded ? null : <div className={s.addressBox} hidden={p.address?.hideArea}>
             {p.address ? (
               <button type="button" className={s.addressButton} aria-label={CARD_WORDS.address} title={p.address.full} aria-expanded={address} onClick={() => setAddress((v) => !v)}>
                 <Glyph name="pin" /><span>{p.address.area}</span><span className={s.chevron} aria-hidden="true">{address ? "▴" : "▾"}</span>
               </button>
             ) : null}
-          </div>
+          </div>}
           <div className={s.target}>
             {p.target ? <><span className={s.targetLabel} title={p.target.label}>{p.target.labelLines?.map(line => <span key={line}>{line}</span>)}</span><b>{p.target.label && p.target.badge ? <><small title="Calendar days from Proceed date to customer’s original requested delivery">{p.target.badge}</small><span aria-hidden="true">·</span></> : null}<Glyph name="calendar" />{p.target.date}</b>{!p.target.label && p.target.badge ? <small className={s.badge}>{p.target.badge}</small> : null}</> : null}
           </div>
           <div className={s.actions}>
-            <button type="button" aria-label={p.openLabel ?? "Open order"} title={p.openLabel ?? "Open order"} onClick={p.onOpen}>↗</button>
-            <button type="button" aria-label={p.closeLabel ?? "Close panel"} title={p.closeLabel ?? "Close panel"} onClick={p.onClose}>×</button>
+            {p.onOpen ? <button type="button" aria-label={p.openLabel ?? "Open order"} title={p.openLabel ?? "Open order"} onClick={p.onOpen}>↗</button> : null}
+            {embedded ? null : <button type="button" aria-label={p.closeLabel ?? "Close panel"} title={p.closeLabel ?? "Close panel"} onClick={p.onClose}>×</button>}
           </div>
         </header>
         {p.address && address ? (
@@ -321,7 +347,7 @@ export default function CompactModuleCard(p: CompactModuleCardProps) {
             <div className={s.salesFact}><span className={s.salesLabel}>{CARD_WORDS.salesperson}</span><strong>{p.sales.salesperson}</strong></div>
           </div>
         ) : null}
-        <nav className={s.moduleNav} aria-label={p.modulesLabel ?? CARD_WORDS.modules}>
+        {embedded ? null : <nav className={s.moduleNav} aria-label={p.modulesLabel ?? CARD_WORDS.modules}>
           {p.modules.map((m) => (
             <button key={m.key} type="button" disabled={m.disabled} className={m.key === mod.key ? s.selected : undefined} aria-current={m.key === mod.key ? "page" : undefined} onClick={() => selectModule(m)}>{m.label}</button>
           ))}
@@ -336,12 +362,12 @@ export default function CompactModuleCard(p: CompactModuleCardProps) {
           {p.timeline ? (
             <button type="button" className={`${s.toggle} ${s.toggleTimeline} ${communication || mod.items ? "" : s.toggleFirst}`} title={CARD_WORDS.timeline} aria-label={timeline ? CARD_WORDS.hideTimeline : CARD_WORDS.showTimeline} aria-expanded={timeline} onClick={() => setTimeline((v) => !v)}><Glyph name="history" /></button>
           ) : null}
-        </nav>
+        </nav>}
         {p.document && documentOpen ? <div id={`${ids}-document`} className={s.body} role="region" aria-label={p.document.label}>
           {p.document.preview(closeDocument)}
         </div> : null}
         <article>
-          <div className={s.body}>
+          {bodyShown ? <div className={s.body}>
             {summary.length ? (
               <div className={s.strip} data-cells={summary.length}>
                 {summary.map((f) => (f.editor || f.opensItems ? (
@@ -356,8 +382,10 @@ export default function CompactModuleCard(p: CompactModuleCardProps) {
             ) : null}
             {editingFact?.editor ? <div className={s.editor}>{editingFact.editor(close)}</div> : null}
             {mod.details && details ? <div id={`${ids}-details`}>{mod.details}</div> : null}
-            {mod.items && items ? <div id={`${ids}-items`}>{mod.items}</div> : null}
-          </div>
+            {/* Embedded: items show at once, with no Items toggle to open them. */}
+            {mod.items && (embedded || items) ? <div id={`${ids}-items`}>{mod.items}</div> : null}
+          </div> : null}
+          {mod.content}
         </article>
         {communication && comm ? <CardCommunicationPanel key={mod.key} id={`${ids}-comm`} config={communication} onClose={() => setComm(false)} /> : null}
         {p.timeline && timeline ? <CardTimeline events={p.timeline} status={p.timelineStatus} timeZone={p.timeZone ?? CARD_TIME_ZONE} onClose={() => setTimeline(false)} /> : null}
