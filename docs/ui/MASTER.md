@@ -60,8 +60,9 @@ and measurements.
 **Shared Register PDF preview — BRANCH ONLY, 2026-10-05.** DataGrid now composes the existing
 Modal and lazy PdfPreview after asynchronous export rendering, instead of relying on a new tab
 that may be blocked silently. Download remains available, and the blob is released on close or
-unmount. The 93 register tests pass. Receiving's actual local PDF paints, but the existing wide
-list template has long-reference overlap and actual browser download remains unverified. This is
+unmount. The 93 register tests pass. Receiving's actual local PDF paints. Long tokens now wrap using the PDF font metrics; generated
+PDF readback proves 15-column boundaries, identity preservation and 65 records across page breaks.
+The original template fails this boundary check. Actual browser download remains unverified. This is
 not complete PDF acceptance or production delivery. Evidence: Purchasing MASTER §7 receiving
 release notes and `/tmp/carres-receiving-list-pdf-local.png`.
 

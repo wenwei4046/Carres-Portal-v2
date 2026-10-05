@@ -1027,9 +1027,12 @@ The authenticated live list PDF action opened no preview or error. The shared Da
 The branch now uses existing Modal + lazy PdfPreview and a Download control; blob lifetime follows
 the preview instead of expiring after one minute. All 93 register tests pass, including complete
 population, no popup dependency and cleanup on close. Actual local sample PDF rendering reached
-Page 1 of 1 (`/tmp/carres-receiving-list-pdf-local.png`). The visual check found long document
-references overlap adjacent columns in the existing list template; this remains a release defect.
-Browser download observation timed out, so download is not verified. No production change occurred.
+Page 1 of 1 (`/tmp/carres-receiving-list-pdf-local.png`). The list template now wraps oversized tokens using the actual PDF font metrics without inserting
+hyphens or altering identities. Generated-PDF readback proves all 15 column boundaries, complete
+identity characters and all 65 records across page breaks; the original template fails the same
+boundary test. Two rendering tests and three export tests pass; Web typecheck passes. The local
+preview confirms separated references (`/tmp/carres-receiving-list-pdf-fitted-local.png`). Browser
+download observation timed out, so download is not verified. No production change occurred.
 
 Still required before an exact SQL review/release: remaining non-PO downstream lifecycle and
 source-resolution audit, extra-goods custody and authority boundaries, full Warehouse

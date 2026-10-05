@@ -15,7 +15,7 @@
  * the widest cell so a `Not recorded` column cannot claim the same width as a
  * customer name.
  */
-import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
+import { Document, Page, Text, View, StyleSheet, Font } from "@react-pdf/renderer";
 
 export interface RegisterListTemplateData {
   /** The destination's own word — `Sales Orders`. */
@@ -68,6 +68,27 @@ function widths(headers: string[], rows: string[][]): number[] {
   return raw.map((w) => (w / total) * 100);
 }
 
+/** Break only tokens wider than their cell, using the actual PDF font metrics.
+ * Newlines are layout only: never insert a hyphen into a document identity. */
+function fitCell(text: string, percent: number, fontSize: number, bold = false): string {
+  const font = Font.getFont({ fontFamily: "Helvetica", fontWeight: bold ? 700 : 400 }).data;
+  const limit = (841.89 - 48) * percent / 100 - 8 - 0.5;
+  const measure = (value: string) => font
+    ? font.layout(value).advanceWidth * fontSize / font.unitsPerEm
+    : Array.from(value).length * fontSize;
+  return text.replace(/\S+/gu, word => {
+    if (measure(word) <= limit) return word;
+    const parts: string[] = [];
+    let part = "";
+    for (const character of word) {
+      if (part && measure(part + character) > limit) { parts.push(part); part = ""; }
+      part += character;
+    }
+    if (part) parts.push(part);
+    return parts.join("\n");
+  });
+}
+
 export function RegisterListTemplate(data: RegisterListTemplateData) {
   const w = widths(data.headers, data.rows);
   return (
@@ -80,8 +101,8 @@ export function RegisterListTemplate(data: RegisterListTemplateData) {
 
         <View style={styles.headRow} fixed>
           {data.headers.map((h, i) => (
-            <Text key={h + i} style={[styles.headCell, { width: `${w[i]}%` }]}>
-              {h}
+            <Text key={h + i} hyphenationCallback={word => [word]} style={[styles.headCell, { width: `${w[i]}%` }]}>
+              {fitCell(h, w[i]!, 7.5, true)}
             </Text>
           ))}
         </View>
@@ -89,8 +110,8 @@ export function RegisterListTemplate(data: RegisterListTemplateData) {
         {data.rows.map((row, ri) => (
           <View key={ri} style={styles.row} wrap={false}>
             {data.headers.map((h, i) => (
-              <Text key={h + i} style={[styles.cell, { width: `${w[i]}%` }]}>
-                {row[i] ?? ""}
+              <Text key={h + i} hyphenationCallback={word => [word]} style={[styles.cell, { width: `${w[i]}%` }]}>
+                {fitCell(row[i] ?? "", w[i]!, 8)}
               </Text>
             ))}
           </View>
