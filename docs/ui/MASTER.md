@@ -3351,6 +3351,9 @@ Purchasing §9.3; quantity-managed lines have none. Do not infer new selection c
 
 ## §6.10 · GROUP-LOCAL HEADERS — OWNER RULING, Jess 2026-09-18 · BUILT 2026-09-18 (#1462)
 
+**Group selection correction — implemented locally, 2026-10-05 / NOT PRODUCTION VERIFIED.** A group-local header checkbox selects only selectable records inside that group; a flat header selects all selectable visible records. Checkbox state uses the same scope. Production SO Batch reproduction showed clicking Nice Future also selected the Hookka/Ohana group because the shared header used the full sorted result. DataGrid now passes each group's record set to its header; regression coverage includes a selected sibling group and an unselectable row. No business eligibility or Issue payload rule is relaxed.
+
+
 **This ruling SUPERSEDES the earlier single global header above all groups.** A governed grouped
 listing reads, per group:
 
