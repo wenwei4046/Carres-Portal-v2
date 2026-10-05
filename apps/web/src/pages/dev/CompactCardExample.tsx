@@ -61,10 +61,7 @@ function customerSummary(a: Arrangement): { value: string; status?: string } {
   const extra = a.slot === "Specific time" && a.time ? timeLabel(a.time) : a.slot === "Morning" || a.slot === "Afternoon" ? a.slot : "";
   return { value: extra ? `${dayLabel(a.date)} · ${extra}` : dayLabel(a.date), status: "Date confirmed" };
 }
-function daysToTarget() {
-  const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kuala_Lumpur" }).format(new Date());
-  return Math.round((Date.parse(`${TARGET}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / 86400000);
-}
+function daysToTarget() { return 31; }
 function timeOptions() {
   const out = [<option key="" value="">Choose time</option>];
   for (let h = 8; h <= 20; h++) for (const m of [0, 30]) {
@@ -190,8 +187,8 @@ export default function CompactCardExample() {
           reference="SO-1368"
           phone="019-83372393"
           sales={{ orderDate: "30 Sep 2026", proceedDate: "30 Sep 2026", salesLocation: "Carres Kota Damansara", salesperson: "Alvin" }}
-          address={{ area: "Ampang", full: preset === "infoLong" ? "Unit A-18-08, Block A, Residensi Example Heights, Jalan Example Utama 12, Taman Example Permai, 68000 Ampang, Selangor, Malaysia" : "1888. jalan Pillow, 68000 Ampang, Selangor", facts: [{ kind: "building", label: "Building", value: "Condo · Floor 1" }, { kind: "access", label: "Access", value: "No lift" }] }}
-          target={{ date: "31 Oct", badge: `${days}d` }}
+          address={{ area: "Ampang", hideArea: true, full: preset === "infoLong" ? "Unit A-18-08, Block A, Residensi Example Heights, Jalan Example Utama 12, Taman Example Permai, 68000 Ampang, Selangor, Malaysia" : "1888. jalan Pillow, 68000 Ampang, Selangor", facts: [{ kind: "building", label: "Building", value: "Condo · Floor 1" }, { kind: "access", label: "Access", value: "No lift" }] }}
+          target={{ date: "31 Oct", badge: `${days}d`, label: "Customer’s original requested delivery date", labelLines: ["Customer’s original", "requested date"] }}
           onOpen={() => window.open(SAMPLE_ORDER_PATH, "_blank", "noopener")}
           onClose={() => setClosed(true)}
           initialModule={p.module}

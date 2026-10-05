@@ -4980,6 +4980,8 @@ The words of UI MASTER §4.3's card, as confirmed on the owner's reference pages
 | Where | Words |
 |---|---|
 | Header | accessible names `Order details` (the ▾/▴, no visible words) · `Delivery address` · `Open order` · `Close panel`; sales facts `SO Doc Date` · `Proceed date` · `Sales Location` · `Salesperson` |
+| Current requested-date table and filters | `Customer Requested Delivery Date` means the currently recorded requested date. `Customer’s original requested date` means version 1’s preserved request; never rename the mutable table/filter field original without adopting its source and filter semantics. Customer-confirmed date and Logistics ETA remain separate. |
+| SO access facts | Group building and floor on one line, lift and positive `Stair carry: {n} items` on the next; omit missing or zero stair carry. |
 | SO requested-date header | `Customer’s original` / `requested date` (two small lines); `{n}d` = original requested date minus Proceed date in calendar days, never a today-based countdown. Example `30 Sep` → `31 Oct` = `31d`; missing either date omits the count. Tooltip: `Customer’s original requested delivery date` |
 | Module bar | `Order modules` · icon names `Communication` · `Items` · `Show timeline` / `Hide timeline` |
 | Info summary | `Total payable` · `Paid to date` · `Balance due`; order items `Item` · `Qty` · `Unit price` · `Amount` |

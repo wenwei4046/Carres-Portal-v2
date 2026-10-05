@@ -6,8 +6,8 @@ import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
 import { renderPaymentTemplate, type PaymentTemplateRow } from "@carres/shared/payment-templates";
 import { useAuth } from "@/lib/auth";
-import { useDeliveryPartners, useDeliverySettings, useOrderTimeline } from "@/lib/queries";
-import { appTodayIso, fmtDate, fmtDateShort } from "@/lib/fmt-date";
+import { useDeliveryPartners, useDeliverySettings, useOrderTimeline, useSalesOrderRevisions } from "@/lib/queries";
+import { fmtDate, fmtDateShort } from "@/lib/fmt-date";
 import { useDeliveryScopeCard } from "../delivery-scope-card";
 import { describeActivity } from "./activity-display";
 import { DeliveryDatesEdit, LogisticsDetailsEdit } from "./DeliveryBrief";
@@ -17,6 +17,13 @@ import { chaseMessageFor } from "../delivery-chase";
 import { useGoodsName } from "../work/goods-name";
 import type { RegisterRow } from "../sales-order-columns";
 
+/** Calendar-date duration, independent of today and actual handoff time. */
+export function originalRequestDays(proceed: string | null | undefined, requested: string | null | undefined): number | null {
+  if (!proceed || !requested) return null;
+  const parse = (date: string) => { const key = date.slice(0, 10); if (!/^\d{4}-\d{2}-\d{2}$/.test(key)) return NaN; const value = Date.parse(`${key}T00:00:00Z`); return Number.isFinite(value) && new Date(value).toISOString().slice(0, 10) === key ? value : NaN; };
+  const days = (parse(requested) - parse(proceed)) / 86400000;
+  return Number.isInteger(days) && days >= 0 ? days : null;
+}
 export default function SalesOrderCompactView({ row, salesLocation, items, onOpen, onClose }: {
   row: RegisterRow; salesLocation: string; items: ReactNode; onOpen: () => void; onClose: () => void;
 }) {
@@ -24,6 +31,10 @@ export default function SalesOrderCompactView({ row, salesLocation, items, onOpe
   const leg = Math.max(0, ...(row.o.delivery_stops ?? []).map(stop => stop.leg));
   const delivery = useDeliveryScopeCard(row.id, leg, row.o);
   const timeline = useOrderTimeline(row.id);
+  const revisions = useSalesOrderRevisions(row.id);
+  const original = revisions.data?.revisions.find(r => r.revision === 1)?.snapshot.header;
+  const requested = original && !original.delivery_date_tbd && typeof original.delivery_date === "string" ? original.delivery_date : null;
+  const days = originalRequestDays(row.o.proceed_date, requested);
   const settings = useDeliverySettings();
   const partners = useDeliveryPartners();
   const nameOf = useGoodsName();
@@ -67,13 +78,13 @@ export default function SalesOrderCompactView({ row, salesLocation, items, onOpe
     key={row.id} name={row.customer} reference={`SO-${row.so}`} phone={row.phone}
     document={{ label: `Sales Order SO-${row.so}`, preview: (onClose) => <SalesOrderCardDocument orderId={row.id} reference={`SO-${row.so}`} onClose={onClose} /> }}
     sales={{ orderDate: fmtDate(row.ordered), proceedDate: row.o.proceed_date ? fmtDate(row.o.proceed_date) : "Not recorded", salesLocation, salesperson: row.o.salespersons?.name ?? "Not recorded" }}
-    address={{ area: row.deliveryLocation || "Not recorded", full: row.o.customer_address || "Not recorded", facts: [
+    address={{ area: row.deliveryLocation || "Not recorded", hideArea: true, full: row.o.customer_address || "Not recorded", facts: [
       { kind: "building", label: "Building type", value: row.o.building_type || "Building type: Not recorded" },
       { kind: "building", label: "Floor", value: row.o.delivery_floor == null ? "Floor: Not recorded" : `Floor ${row.o.delivery_floor}` },
       { kind: "access", label: "Lift", value: row.o.delivery_has_lift == null ? "Lift: Not recorded" : LIFT_OPTIONS[row.o.delivery_has_lift ? 1 : 0] },
-      { kind: "access", label: "Items needing stair carry", value: `Items needing stair carry: ${row.o.delivery_stair_items ?? "Not recorded"}` },
+      ...(row.o.delivery_stair_items && row.o.delivery_stair_items > 0 ? [{ kind: "access" as const, label: "Stair carry", value: `Stair carry: ${row.o.delivery_stair_items} items` }] : []),
     ] }}
-    target={row.customerDelivery ? { date: fmtDateShort(row.customerDelivery), badge: `${Math.round((Date.parse(row.customerDelivery.slice(0, 10)) - Date.parse(appTodayIso())) / 86400000)}d` } : undefined}
+    target={{ date: requested ? fmtDateShort(requested) : revisions.isLoading ? "Loading…" : revisions.isError ? "Unavailable" : "Not recorded", badge: days === null ? undefined : `${days}d`, label: "Customer’s original requested delivery date", labelLines: ["Customer’s original", "requested date"] }}
     closeLabel="Close order" openLabel="Open full page" onOpen={onOpen} onClose={onClose}
     initialModule="info" modules={[
       { key: "info", label: "Info", opensHeaderDetails: true, summary: [{ key: "total", label: "Total payable", value: money(row.total) }, { key: "paid", label: "Paid to date", value: money(row.paid) }, { key: "outstanding", label: "Balance due", value: money(row.balance) }], items },

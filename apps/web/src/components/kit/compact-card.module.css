@@ -174,7 +174,7 @@
 .actions { display: flex; }
 .panel .actions button { width: 32px; height: 32px; font-size: 18px; }
 
-.addressDetail { display: grid; grid-template-columns: minmax(0, 1fr) 150px; gap: 12px; align-items: start; padding: 8px 12px; background: var(--cc-soft); border-top: 1px solid var(--cc-line); font-size: 12px; }
+.addressDetail { display: grid; grid-template-columns: minmax(0, 1fr) 200px; gap: 12px; align-items: start; padding: 8px 12px; background: var(--cc-soft); border-top: 1px solid var(--cc-line); font-size: 12px; }
 .fullAddress { display: flex; align-items: flex-start; gap: 6px; min-width: 0; overflow-wrap: anywhere; }
 .fullAddress svg { flex: none; margin-top: 1px; stroke-width: 1.6; }
 .locationFacts { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
@@ -426,3 +426,11 @@ aside.section { background: var(--cc-surface); }
   .addressDetail { grid-template-columns: minmax(0, 1fr); }
   .locationFacts { flex-direction: row; flex-wrap: wrap; gap: 4px 12px; }
 }
+
+/* Compact access and original request header: owner approved 2026-10-05. */
+.header[data-layout="no-area"] { grid-template-columns: minmax(0, 1fr) 122px 64px; }
+.target:has(.targetLabel span) { height: auto; gap: 2px; }
+.targetLabel { display: flex; flex-direction: column; font-size: 10px; line-height: 11px; color: var(--cc-line); }
+.targetLabel:empty { display: none; }
+.target b small { font-size: 11px; font-weight: 500; }
+@container (max-width: 440px) { .header[data-layout="no-area"] { grid-template-columns: minmax(0, 1fr) 106px 60px; } .targetLabel { font-size: 9px; } }
