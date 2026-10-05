@@ -40,7 +40,7 @@ import WarehouseUnitProblemReport from "./WarehouseUnitProblemReport";
 
 /** The lineage's own words. Every one names a PHYSICAL change, because that is
  *  all `stock_unit_events` records (0366). */
-const EVENT_LABEL: Record<string, string> = {
+export const EVENT_LABEL: Record<string, string> = {
   unit_created: "Unit created",
   unit_born: "Unit created",
   status_changed: "Status changed",
@@ -72,7 +72,7 @@ export interface UnitIssue {
   } | null;
 }
 
-const OWNER_RULE_WORD: Record<string, string> = {
+export const OWNER_RULE_WORD: Record<string, string> = {
   grn_duty: "GRN Duty",
   issue_triage_duty: "Issue Triage Duty",
   issue_review_approver: "Issue Review Approver",

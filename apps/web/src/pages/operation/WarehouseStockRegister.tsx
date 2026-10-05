@@ -28,7 +28,11 @@ import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
 import ModuleHeader from "./components/ModuleHeader";
 import { FilterRail, FilterRailGroup, FilterRailRow, useFilterRailOpen } from "./components/workspace-rail";
 import Button from "@/components/kit/Button";
+import Block from "@/components/kit/Block";
+import Drawer from "@/components/kit/Drawer";
+import Tabs from "@/components/kit/Tabs";
 import WarehouseUnitDetail from "./WarehouseUnitDetail";
+import WarehouseUnitCompactView from "./components/WarehouseUnitCompactView";
 
 /**
  * INVENTORY — the one current Unit Register.
@@ -75,6 +79,20 @@ function matchesView(u: StockRegisterUnit, view: InventoryView) {
       return true;
   }
 }
+
+/** Shared module page flow (UI MASTER, owner ruling 2026-10-05): the rail's top
+ *  holds the record views; column facts (status, category, ownership) stay in
+ *  the table header. `?view=reserved` keeps working for old links. */
+const RAIL_VIEWS: readonly { value: InventoryView; label: string }[] = [
+  { value: "all", label: "Inventory" },
+  { value: "ready", label: "Ready Stock" },
+  { value: "display", label: "Showroom Display" },
+  { value: "service", label: "Service Case" },
+  { value: "history", label: "History" },
+];
+
+/** Group by Product: one heading per product, its Units under it. */
+const productKeyOf = (u: StockRegisterUnit) => u.productName ?? u.sku;
 
 const CATEGORY_LABEL: Record<string, string> = {
   mattress: "Mattress",
@@ -175,6 +193,14 @@ export default function WarehouseStockRegister({ showroom = false }: { showroom?
   );
 
   const [search, setSearch] = useState("");
+  const [quickUnit, setQuickUnit] = useState<StockRegisterUnit | null>(null);
+  const cards = !showroom && params.get("present") === "cards";
+  const groupByProduct = !showroom && params.get("group") === "product";
+  function setParam(key: "present" | "group", value: string | null) {
+    const next = new URLSearchParams(params);
+    if (value === null) next.delete(key); else next.set(key, value);
+    setParams(next, { replace: true });
+  }
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const [gridRevision, setGridRevision] = useState(0);
   const now = useMemo(() => new Date(), []);
@@ -512,6 +538,16 @@ export default function WarehouseStockRegister({ showroom = false }: { showroom?
           }}
         />
       )}
+      {quickUnit && !selectedUnit ? (
+        <Drawer variant="compact-card" open onOpenChange={(open) => { if (!open) setQuickUnit(null); }}
+          title={`${unitIdOf(quickUnit) ?? quickUnit.sku} · ${quickUnit.productName ?? quickUnit.sku}`}>
+          <WarehouseUnitCompactView
+            unit={quickUnit}
+            onOpen={() => { const id = unitIdOf(quickUnit); setQuickUnit(null); if (id) navigate(unitHref(id)); }}
+            onClose={() => setQuickUnit(null)}
+          />
+        </Drawer>
+      ) : null}
       {/* Keep the grid mounted: its search, column filters and viewport belong
           to this visit, including browser Back from the selected Unit. */}
       <div hidden={!!selectedUnit} className={selectedUnit ? "hidden" : "flex min-h-0 flex-1 flex-col"}>
@@ -529,7 +565,38 @@ export default function WarehouseStockRegister({ showroom = false }: { showroom?
           />
         )}
         <div ref={canvasRef} className="flex min-h-0 flex-1" data-testid="stock-register">
-          {railOpen ? (
+          {railOpen && !showroom ? (
+            <FilterRail
+              className="so-template-rail"
+              testId="stock-rail"
+              ariaLabel="Inventory views and missions"
+              onHide={() => setRailOpen(false)}
+              header={(
+                <div className="so-rail-navigation">
+                  <Tabs fill orientation="vertical" label="Inventory view"
+                    value={RAIL_VIEWS.some((v) => v.value === view) && status !== "Incoming" && status !== "Cannot sell" ? view : ""}
+                    onValueChange={(next) => (next === "all" ? clearAll() : setView(next as InventoryView))}
+                    tabs={RAIL_VIEWS.map((v) => ({ value: v.value, label: v.label, icon: v.value === "history" ? "history" : v.value === "display" ? "warehouse" : "goods" }))} />
+                </div>
+              )}
+            >
+              <FilterRailGroup title="Missions" icon="flag" defaultOpen chosen={null}>
+                <FilterRailRow
+                  testId="rail-mission-problems"
+                  label="Problems to check"
+                  active={status === "Cannot sell"}
+                  count={sourceReady ? counts.byStatus.get("Cannot sell") ?? 0 : undefined}
+                  onClick={() => setStatus("Cannot sell")}
+                />
+                <FilterRailRow
+                  testId="rail-mission-incoming"
+                  label={sourceReady ? stillToArriveLine(incomingCount) ?? "Nothing still to arrive" : "Still to arrive"}
+                  active={status === "Incoming"}
+                  onClick={() => setStatus("Incoming")}
+                />
+              </FilterRailGroup>
+            </FilterRail>
+          ) : railOpen ? (
             <FilterRail testId="stock-rail" onHide={() => setRailOpen(false)}>
               <FilterRailGroup title="Stock" icon="order">
                 {STOCK_VIEWS.map(([key, label]) => (
@@ -665,6 +732,43 @@ export default function WarehouseStockRegister({ showroom = false }: { showroom?
                     navigate(`/operation?${query}`);
                   },
                 }] : undefined}
+                {...(showroom ? {} : {
+                  palette: "slate" as const,
+                  searchPresentation: "responsive" as const,
+                  labelledToolbar: true,
+                  presentationTools: true,
+                  allowColumnGrouping: false,
+                  pageToolsItems: [
+                    { key: "group-none", label: `Group by: None${groupByProduct ? "" : " ✓"}`, separatorBefore: true, onSelect: () => setParam("group", null) },
+                    { key: "group-product", label: `Group by: Product${groupByProduct ? " ✓" : ""}`, onSelect: () => setParam("group", "product") },
+                  ],
+                  fixedGroups: groupByProduct ? {
+                    groups: [...new Set(rows.map(productKeyOf))].sort((a, b) => a.localeCompare(b)).map((key) => ({ key, label: key })),
+                    groupOf: productKeyOf,
+                  } : undefined,
+                  presentationKey: cards ? "cards" : "table",
+                  toolbarEnd: <Tabs variant="segmented" label="Inventory view" value={cards ? "cards" : "table"}
+                    onValueChange={(next) => setParam("present", next === "cards" ? "cards" : null)}
+                    tabs={[{ value: "table", label: "Table", icon: "table" }, { value: "cards", label: "Cards", icon: "cards" }]} />,
+                  renderResults: cards ? (visible: StockRegisterUnit[]) => (
+                    <div className="grid grid-cols-1 gap-3 p-3 md:grid-cols-2 2xl:grid-cols-3" data-testid="inventory-cards">
+                      {visible.map((u) => (
+                        <div key={u.id} data-row-key={u.id} className="min-w-0">
+                          <Block title={unitIdOf(u) ?? u.sku} headerSlot={<Button size="touch" variant="ghost" onClick={() => setQuickUnit(u)}>View</Button>}>
+                            <dl className="grid min-w-0 grid-cols-2 gap-3 text-body">
+                              <div className="col-span-2"><dt className="text-label text-kit-slate-11">Item</dt><dd className="break-words">{u.productName ?? u.sku}{u.qty > 1 ? ` ×${u.qty}` : ""}</dd></div>
+                              <div><dt className="text-label text-kit-slate-11">Inventory Status</dt><dd>{inventoryStatusOf(u) ?? UNIT_LIFECYCLE_OUTCOME_LABEL[u.lifecycleOutcome as UnitLifecycleOutcome] ?? u.lifecycleOutcome}</dd></div>
+                              <div><dt className="text-label text-kit-slate-11">Stock Location</dt><dd>{u.siteName ?? "Not recorded"}</dd></div>
+                              <div><dt className="text-label text-kit-slate-11">Stock Condition</dt><dd>{stockConditionOf(u)}</dd></div>
+                              <div><dt className="text-label text-kit-slate-11">SO No</dt><dd>{u.reservedRef ?? "No SO"}</dd></div>
+                            </dl>
+                          </Block>
+                        </div>
+                      ))}
+                    </div>
+                  ) : undefined,
+                  onRowClick: (u: StockRegisterUnit) => setQuickUnit(u),
+                })}
                 exportName="Inventory"
                 searchPlaceholder="Unit ID, item, SO No, PO No or supplier…"
                 isLoading={isLoading || !data}
@@ -672,7 +776,8 @@ export default function WarehouseStockRegister({ showroom = false }: { showroom?
                 /* ⭐ The owner's order puts Unit ID seventh; once the sheet scrolls
                    the identity pins after the gutter and the facts slide under it. */
                 stickyIdentity={{ columnKey: "unitCode" }}
-                rowHeight={40}
+                /* Accepted shared template: 32px desktop rows; the Showroom page keeps its own. */
+                rowHeight={showroom ? 40 : 32}
                 groupBanner={false}
                 chooserGroupOrder={["Dates", "Documents", "Unit", "Movement"]}
                 onRowDoubleClick={(u) => {
