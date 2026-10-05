@@ -2123,6 +2123,18 @@ Staff selects purpose
 
 ### 7.3 Receiving and later defect
 
+**Register list PDF — BUILT ON RELEASE BRANCH / NOT YET DEPLOYED, 2026-10-05.**
+The authenticated Receiving list PDF action opened no preview or error. The shared grid previously
+called `window.open` after asynchronous population loading/rendering and ignored a blocked return.
+It now composes existing Modal + lazy PdfPreview with Download; blob lifetime follows the preview.
+The PDF template wraps oversized tokens using actual font metrics without changing document
+identity characters. Generated-PDF readback verifies 15 column boundaries and all 65 sample records
+exactly once across page breaks; the original template fails the same boundary check. All 93 grid
+tests, two PDF render tests and Web typecheck pass on the originating branch. Local actual preview:
+`/tmp/carres-receiving-list-pdf-fitted-local.png`. Exact release-head CI, production preview and
+browser download acceptance remain required. This release changes no receipt writes, SQL or RLS;
+Warehouse automatic confirmation and extra-goods resolution remain in separate draft PR1910.
+
 ```text
 PO/CO carries the official Deliver To and original PO Delivery Date
 → supplier provides its Supplier DO and may provide a changed Supplier Confirmed Delivery Date
