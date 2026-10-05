@@ -45,6 +45,8 @@ import {
   type ReactNode,
   type MouseEvent,
   Fragment,
+  lazy,
+  Suspense,
   createContext,
   memo,
   useCallback,
@@ -59,6 +61,8 @@ import { Search, Columns3, RotateCcw, Filter, ChevronDown, ChevronRight, X, Chec
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { appTodayIso } from "@/lib/fmt-date";
 import Button from "@/components/kit/Button";
+import Modal from "@/components/kit/Modal";
+const RegisterPdfPreview = lazy(() => import("@/components/kit/PdfPreview"));
 import Icon from "@/components/kit/Icon";
 import DropdownMenu from "@/components/kit/DropdownMenu";
 import Popover from "@/components/kit/Popover";
@@ -1880,8 +1884,12 @@ function DataGridInner<T>({
     [deriveTable],
   );
 
-  /** The current view as a PDF — same derived cells, opened in a new tab so the
-   *  operator can read it before deciding to save or print it. */
+  const [pdfPreview, setPdfPreview] = useState<{ src: string; title: string } | null>(null);
+  const exportMounted = useRef(true);
+  useEffect(() => { exportMounted.current = true; return () => { exportMounted.current = false; }; }, []);
+  useEffect(() => () => { if (pdfPreview) URL.revokeObjectURL(pdfPreview.src); }, [pdfPreview]);
+
+  /** Preview in the shared viewer: async rendering must not depend on popups. */
   const exportPdfRows = useCallback(
     async (whichRows: T[]) => {
       if (whichRows.length === 0) return;
@@ -1894,9 +1902,8 @@ function DataGridInner<T>({
         rows,
         printedAt: new Date().toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" }),
       });
-      const url = URL.createObjectURL(blob);
-      window.open(url, "_blank");
-      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      if (!exportMounted.current) return;
+      setPdfPreview({ src: URL.createObjectURL(blob), title: stem });
     },
     [deriveTable],
   );
@@ -3934,6 +3941,18 @@ function DataGridInner<T>({
         </div>
       )}
     </div>
+    {pdfPreview && <Modal open width="viewer" title={`${pdfPreview.title} · PDF`}
+      onOpenChange={open => { if (!open) setPdfPreview(null); }}
+      footer={<Button onClick={() => {
+        const link = document.createElement("a");
+        link.href = pdfPreview.src;
+        link.download = `${pdfPreview.title}.pdf`;
+        link.click();
+      }}>Download</Button>}>
+      <Suspense fallback={<p role="status">Loading…</p>}>
+        <RegisterPdfPreview src={pdfPreview.src} title={pdfPreview.title} />
+      </Suspense>
+    </Modal>}
     </DataGridRowExpansionContext.Provider>
   );
 }

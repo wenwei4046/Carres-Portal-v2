@@ -1021,6 +1021,16 @@ width 390/390. Evidence: `/tmp/carres-extra-custody-phone-local.png`. This is sa
 proof, not live evidence transport or complete Warehouse template acceptance. Resolution actions
 and the complete correction/acceptance/hand-back journey remain owed.
 
+**Register PDF delivery — BRANCH FIX / ACCEPTANCE INCOMPLETE, 2026-10-05.**
+The authenticated live list PDF action opened no preview or error. The shared DataGrid called
+`window.open` only after asynchronous population loading/rendering and ignored a blocked return.
+The branch now uses existing Modal + lazy PdfPreview and a Download control; blob lifetime follows
+the preview instead of expiring after one minute. All 93 register tests pass, including complete
+population, no popup dependency and cleanup on close. Actual local sample PDF rendering reached
+Page 1 of 1 (`/tmp/carres-receiving-list-pdf-local.png`). The visual check found long document
+references overlap adjacent columns in the existing list template; this remains a release defect.
+Browser download observation timed out, so download is not verified. No production change occurred.
+
 Still required before an exact SQL review/release: remaining non-PO downstream lifecycle and
 source-resolution audit, extra-goods custody and authority boundaries, full Warehouse
 listing/keyboard acceptance and real evidence transport. Source forms,
