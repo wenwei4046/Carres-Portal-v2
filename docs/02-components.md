@@ -456,7 +456,7 @@ interaction: it never writes a record or marks a message sent, keeps saved templ
 and uploads no file. Editors close only when the module reports a successful save.
 `CardEditorButtons`, `CardChecklist` and `compactCardStyles` style module content inside it.
 
-**Proof.** Adoption status per module is UI MASTER §4.3.3; rules are in
+**Proof.** Adoption status per module is UI MASTER §4.3.4; rules are in
 `docs/ui-reference/MODULE-CARD-TEMPLATE.md`; measurements are in 01 §7.6. The earlier18-state reference comparison is historical
 fidelity evidence, not proof of the re-ruled5Oct2026 layout. Palette, font, radius and glyphs await the owner's token
 decision and live in one block of `compact-card.module.css`.

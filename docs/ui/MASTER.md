@@ -50,7 +50,7 @@ not a current pattern: do not copy it from a neighbouring page. Live examples ar
 | Register / listing | `register/DataGrid` | `components/register/DataGrid.tsx` | §6.0 · §6.2 · SO-derived template owner accepted 2026-10-01 · built; adoption per page |
 | Goods expansion | `GoodsMiniTable` + connector | `pages/operation/components/GoodsMiniTable.tsx` · `ConnectedSections.tsx` | §6.9 · built |
 | Simple and document tables | `DataTable` · `DocumentTable` · `TotalsSummary` · `TableScroller` | `components/kit/*` · `components/TableScroller.tsx` | §3 · built |
-| **Compact module card** (the right Working Panel: identity header, Info and module tabs, module summary, editors, Items, Communication, Timeline) | **`CompactModuleCard`** in kit `Drawer variant="compact-card"` — pass the header facts once and each module's own facts, editors and items | `components/kit/CompactModuleCard.tsx` · `/ui#compact-card` · contract `docs/ui-reference/MODULE-CARD-TEMPLATE.md` | §4.3 · shared component built · Sales Orders adoption PRODUCTION VERIFIED 2026-10-05 (PR #1893/#1896/#1897, `2ce91e2d`) · other modules per §4.3 table |
+| **Compact module card** (the right Working Panel: identity header, the page's main work tab and related tabs, module summary, editors, Items, Communication, Timeline) | **`CompactModuleCard`** in kit `Drawer variant="compact-card"` — pass the header facts once and each module's own facts, editors and items | `components/kit/CompactModuleCard.tsx` · `/ui#compact-card` · contract `docs/ui-reference/MODULE-CARD-TEMPLATE.md` | §4.3 · shared component built · Sales Orders adoption PRODUCTION VERIFIED 2026-10-05 (PR #1893/#1896/#1897, `2ce91e2d`) · other modules per §4.3 table |
 | Object header + tabs | `SalesOrderTabs` recipe | `pages/operation/SalesOrderTabs.tsx` | §4.1 · accepted; page-owned — no generic ObjectHeader/ObjectPage kit API (KIT GAP) |
 | Object facts | `Block` — the one card · `Panel` · `StatusPill` · `EmptyState` · `Loading` | `components/kit/*` | LOCKED · built |
 | Forms | `Input` · `Textarea` · `Select` · `SearchInput` · `Checkbox` · `DatePicker` · `FieldFrame` | `components/kit/*`, `field-recipe.ts` | LOCKED · built |
@@ -91,7 +91,7 @@ module tabs and the Info structure retained as in Sales Order. Warehouse work us
 (Persisted by PR #1918, `1b43419e7`.)
 
 ```
-module entry → left mission rail → one shared listing → right Working Panel (Info + module tab)
+module entry → left mission rail → one shared listing → right Working Panel (the page's main work tab)
              → the module's action and result → return to the list with its context retained
 ```
 
@@ -102,8 +102,10 @@ module entry → left mission rail → one shared listing → right Working Pane
 - **Listing** (§6.0, §6.2): one shared DataGrid and one interaction contract. Modules differ by record
   grain, default columns, optional columns, data, business filters, permissions and actions — never
   by a module-local grid or an invented layout.
-- **Right Working Panel** (§4.3): the shared Sales Order-derived `CompactModuleCard`. Keep its Info
-  structure and interaction grammar; add the module's own tab with source-owned facts and actions.
+- **Right Working Panel** (§4.3): the shared Sales Order-derived `CompactModuleCard`. Its structure,
+  style and interaction are shared; it opens on the page's own main work tab (owner 2026-10-05,
+  §4.3.1), with source-owned facts and actions. Whether `Info` stays on each module's panel and what
+  it holds is still open (owner, §7.2).
   Never fabricate Sales Order or customer facts for a record whose source has none. Reusing the
   structure never transfers write ownership.
 - **Completing work:** the module's authorised work happens in its tab, with the existing approved
@@ -118,7 +120,7 @@ module entry → left mission rail → one shared listing → right Working Pane
 
 **Adoption acceptance:** compare the actual module page top to bottom against the Sales Orders
 reference at the operator's viewport and a narrow layout. Verify the mission source independently of
-table loading/filtering, the listing interactions, record-to-panel opening, Info and the module tab,
+table loading/filtering, the listing interactions, record-to-panel opening, the main work tab selected by default,
 authorised edit/preview/result, source scope and retained return state. Record verified and missing
 coverage per module (§4.3, §6.1). Tests or shared-component imports alone do not prove adoption.
 
@@ -153,7 +155,8 @@ coverage per module (§4.3, §6.1). Tests or shared-component imports alone do n
 | The listing (template on one page) | §6.0, then §6.2 for the capability table |
 | The left rail (mission rule, recipe, per-module status) | §6.1 |
 | The right Working Panel | §4.3 (rules in `MODULE-CARD-TEMPLATE.md`, numbers in 01 §7.6) |
-| Standalone versus embedded Sales Order card | §4.3.2 |
+| Which tab the panel opens on (page-owned main work tab) | §4.3.1 |
+| Standalone versus embedded Sales Order card | §4.3.3 |
 | Columns and other modules' facts on my list | §6.3 |
 | Row expansion | §6.9 (goods tables §6.8) |
 | The full object page | §4.1 |
@@ -274,7 +277,7 @@ documents; it may not implement application code).
 
 | Role | Reading / action sequence | Carres sources | Forbidden shortcut |
 |---|---|---|---|
-| Register | shell → mission rail → search/tools + listing → Working Panel (Info + module tab) → approved work/edit/preview → retained list context | DataGrid, workspace-rail, CompactModuleCard; Sales Orders is the reference | page-local grid or panel clone; a different layout without a proven constraint and owner approval |
+| Register | shell → mission rail → search/tools + listing → Working Panel (the page's main work tab) → approved work/edit/preview → retained list context | DataGrid, workspace-rail, CompactModuleCard; Sales Orders is the reference | page-local grid or panel clone; a different layout without a proven constraint and owner approval |
 | Object detail | identity/version → object views → grouped facts → action doors → documents and history | Block, DocumentTable, TotalsSummary; SalesOrderWorkspace, PurchaseOrdersPage, WarehouseUnitDetail | forcing the order-specific DetailShell on other objects; disabled-looking inputs for read-only facts |
 | Task / operation | exact source and goods scope → current task and owner → checks/input → missing requirements → one submission → recorded result, remaining work, handoff | ReceivingWorkspace, WarehouseIncoming, WarehouseOutboundWork; Block | an extra approval or duplicate form to mimic a reference; warehouse submission ≠ posted GRN; loaded ≠ driver-confirmed |
 | Form | grouped inputs → conditional requirements → field feedback + one blocker explanation → submit → success/error/conflict | Block, FieldFrame, Input, Select, DatePicker, EvidenceUploadField, Modal | local colour/control/storage wrappers; losing valid input on failure |
@@ -528,7 +531,7 @@ StatusPill · Tabs · Textarea · Toast · Tooltip · TotalsSummary`, plus `regi
 
 ```
 INSPECT    row expansion            the record's goods and related facts; ↑↓ moves · Esc closes (§6.9)
-WORK       right Working Panel      Info + module tab; quick work in place of the list (§4.3)
+WORK       right Working Panel      the page's main work tab; quick work in place of the list (§4.3)
 OBJECT     full object page         read-first View · deliberate Edit · Revisions · History · Route
 DOCUMENT   document preview         the saved/current document the other party receives (§4.4)
 ```
@@ -657,8 +660,8 @@ PRODUCTION VERIFIED.** The right Working Panel is the kit **`CompactModuleCard`*
 return focus; the card owns its visible identity and Close; closing preserves the register context).
 Never copy reference HTML or CSS into a page; never draw a lookalike panel.
 
-- **Its shell, the same for every module:** identity Header → `Info` tab and the module tabs →
-  helper entries (`Items`, `Communication`, `Timeline`) → module summary cells → one inline editor at
+- **Its shell, the same for every module:** identity Header → the page's main work tab (selected by
+  default) and its related tabs → helper entries (`Items`, `Communication`, `Timeline`) → module summary cells → one inline editor at
   a time. Responsive rules follow the **card's** width, not the viewport.
 - **The rules of the card** (header facts, sales facts, Info and module defaults, summary cells,
   editors, DO conditions, Items, Communication, Timeline, the SO document preview, the dark Header
@@ -667,13 +670,26 @@ Never copy reference HTML or CSS into a page; never draw a lookalike panel.
   [01 §7.6](../01-design-tokens.md#76-compact-module-card--compactmodulecard); its words in
   COPY-STANDARD "Compact module card words" (`CARD_WORDS`); `/ui#compact-card` shows it live.
 
-### §4.3.1 · The outer identity belongs to the host module
+### §4.3.1 · Each page opens its own main work tab — owner-approved 2026-10-05
+
+**The right Working Panel on each module page shows that page's own main work tab, selected by
+default when the panel opens.** The panel structure, style and interaction are shared; each page
+supplies its own identity, work content and authorised actions. Purchasing examples: SO Batch page →
+main tab `SO Batch`; Purchase Orders page → `Purchase Order`; Manual Purchase page → `Manual Purchase`.
+A related `Sales Order` tab keeps its approved capability and uses the shared embedded SO component
+(§4.3.3). There is no generic `Purchasing` main tab. **Info:** whether it stays and what it holds is
+still open (owner). **Words:** `Purchase Order` is a COPY business noun; `SO Batch` (COPY page name
+`SO Batch Purchase`) and `Manual Purchase` (owner rename 2026-09-23 to `Manual Purchase Request`) are
+owner-approved labels that stay off screens until the owner settles the word (REAL GAP, §7.2). The
+Sales Orders page's standalone SO card keeps `Info · Delivery` (§4.3.3).
+
+### §4.3.2 · The outer identity belongs to the host module
 
 The Header always describes the **main record that is open**, with the shared structure and style:
 a Sales Order is the customer (name · SO No · phone · `Customer’s original` / `requested delivery`);
 a Purchase Order is the supplier · PO No (with its PO state); a purchasing round is the round time and
-date (with `Missed` / `Done` through `referenceStatus`); a GRN is the supplier and GRN No. **`Info`
-always describes that main record.** No customer, address, amount or date is fabricated where the
+date (with `Missed` / `Done` through `referenceStatus`); a GRN is the supplier and GRN No. Where a panel
+has `Info`, it always describes that main record (whether each panel keeps Info is open, §4.3.1). No customer, address, amount or date is fabricated where the
 source has none (empty header slots collapse). Module work lives in its own tab; write ownership stays
 with the owning module, and the panel only reaches its existing governed doors. A module tab reads its
 own source; a missing or failed read stays explicit inside that tab. Current work in a tab uses the
@@ -681,7 +697,7 @@ existing task identity, duty/person and source action: fact, blocker and authori
 together; exception inputs sit beside the affected field or goods; submission feedback distinguishes
 pending review from completed stock, payment, delivery or approval. No new panel engine.
 
-### §4.3.2 · Standalone and embedded Sales Order — owner-approved 2026-10-05
+### §4.3.3 · Standalone and embedded Sales Order — owner-approved 2026-10-05
 
 | | Standalone SO card | Embedded SO (`Sales Order` tab inside a host panel) |
 |---|---|---|
@@ -696,20 +712,21 @@ embedded presentation's code and exact measurements are being delivered by the c
 branch `codex/embedded-sales-order-tab`** (BUILD IN PROGRESS at the time of writing; its measured
 numbers join 01 §7.6 and its rules join the card contract when it merges).
 
-### §4.3.3 · Adoption by module
+### §4.3.4 · Adoption by module
 
 | Module / host | Panel | Status | Evidence / owner |
 |---|---|---|---|
 | Sales Orders register (Table and Cards) | standalone SO card, `SalesOrderCompactView`; Info · Delivery | PRODUCTION VERIFIED 2026-10-05 for the confirmed corrections; the 2026-10-05 Info layout (#1915) and the original-date header (#1919/#1920, `9294659a2`) are DEPLOYED with live acceptance not yet recorded | PR #1893/#1896/#1897 merge `2ce91e2d` (deploy 37213753695); Orders MASTER owns the business path |
 | Delivery tab (inside the SO card) | `DeliveryBrief` summary + Delivery-owned editors | DEPLOYED with the SO card; editors reuse Delivery's governed doors | Delivery MASTER |
-| SO Batch Purchase quick view / Cards | `SoBatchCompactView` | DEPLOYED (#1891); its header still shows the current request with a today-based countdown — the original-date fix is LOCAL ONLY in the Purchasing lane | Purchasing MASTER §9.1 |
+| SO Batch Purchase quick view / Cards | `SoBatchCompactView`; target main tab `SO Batch` (§4.3.1) | DEPLOYED (#1891); its header still shows the current request with a today-based countdown — the original-date fix is LOCAL ONLY in the Purchasing lane | Purchasing MASTER §9.1 |
 | Receiving (GRN) | `ReceivingCompactView`: supplier/source + GRN No, `referenceStatus` `Cancelled` | DEPLOYED (#1894); wrapped summary labels PRODUCTION VERIFIED (#1906, `d4cca587`) | Purchasing MASTER §9.4 |
-| Purchase Orders (PO working panel) | supplier · PO No + PO state; `Info · Purchasing` + `Sales Order` tab (§4.3.2 embedded) | `Sales Order` tab owner-approved; Info/Purchasing layout PROPOSAL, localhost first; a `GRN` tab pending owner decision; PO quick panel NOT BUILT (stale PR #1859 not authorised) | Purchasing MASTER §9.3 |
-| SO Batch purchasing round | round time/date + `Missed` / `Done`; `Info · Purchasing` | layout PROPOSAL, localhost only; **whether it has a `Sales Order` tab is a REAL GAP — conflicting owner words (§7.2)** | Purchasing MASTER §5.6.1 |
+| Purchase Orders (PO working panel) | supplier · PO No + PO state; main tab `Purchase Order` (selected by default) + related `Sales Order` tab (§4.3.3 embedded); Info open (§4.3.1) | main tab owner-approved 2026-10-05; `Sales Order` tab owner-approved; content layout PROPOSAL, localhost first; a `GRN` tab pending owner decision; PO quick panel NOT BUILT (stale PR #1859 not authorised) | Purchasing MASTER §9.3 |
+| SO Batch page panel (purchasing round) | round time/date + `Missed` / `Done`; main tab `SO Batch` (word pending, §7.2); Info open (§4.3.1) | main tab owner-approved 2026-10-05; content layout PROPOSAL, localhost only; **whether it has a `Sales Order` tab is a REAL GAP — conflicting owner words (§7.2)** | Purchasing MASTER §5.6.1 |
+| Manual Purchase Request page | main tab `Manual Purchase` (word pending, §7.2) + related `Sales Order` tab where a source SO exists | APPROVED TARGET / NOT BUILT (owner 2026-10-05) | Purchasing MASTER §9.2 |
 | Warehouse | a `Warehouse` tab in the shared panel | APPROVED TARGET / NOT BUILT (§0.2) | Stock MASTER |
 | Workspace Work right panel | Workspace §5.10 composition | Governed by `docs/workspace/MASTER.md` §5.10 (deployed §5.9 Logistics; rest NOT BUILT); not yet aligned to this card | Workspace MASTER |
 
-**Open items on the card** are in §7: the compact-card token decision, 40px phone tabs, the editable
+**Open items on the panel and card** are in §7 (the main-tab words and Info are REAL GAPs in §7.2): the compact-card token decision, 40px phone tabs, the editable
 `To` versus Work's recorded channels, the native Input/Textarea cascade, the preview-versus-kit
 differences, ↗ only with `onOpen`, the link-style button inside the card and "several SOs → list first".
 
@@ -1130,7 +1147,7 @@ Register — find truth, never assign work" and "Sales Order accepted shared UI 
 does not repeat them. It is a truth register, not Work and not a dashboard. Creation stays in the
 Sales Portal (no New Sales Order or Copy order in Operation). Production history: the ERP shell and
 SO reference were verified 2026-08-14 (PR #795, `759d49ef`); the accepted 2026-10-01 template is
-recorded in §6.0; the compact card in §4.3.3.
+recorded in §6.0; the compact card in §4.3.4.
 
 ## §6.7 · Shared listing standard — owner approved 2026-09-16, staged adoption
 
@@ -1361,8 +1378,10 @@ into the section it belongs to, and this list loses it.
 | Gap | The conflict | Next step |
 |---|---|---|
 | **`Proceed Date` names two facts** | Register first column `Proceed Date` = `orders.proceeded_at` (actual hand-off; Orders MASTER, COPY SO Batch row). SO page / PDF / Work `Proceed Date` = `orders.proceed_date` (planned production start). Card `Proceed date` = `proceed_date`. One word, two facts | Owner word decision (COPY) |
-| **Round panel `Sales Order` tab** | The relayed handoff says round and PO panels both get it; the Purchasing chat reports Jess's later word "round = Info · Purchasing is enough, source SOs inside Purchasing, SO number opens the full SO panel". Conflicting owner words — recorded as approved neither way. (The PO panel's `Sales Order` tab stays owner-approved.) | Owner answer via the controller |
+| **Round panel `Sales Order` tab** | The relayed handoff says round and PO panels both get it; the Purchasing chat reports Jess's later word that the round needs no separate `Sales Order` tab — its source SOs are listed inside its own work tab and each SO number opens the full SO panel. Conflicting owner words — recorded as approved neither way. (The PO panel's `Sales Order` tab stays owner-approved.) | Owner answer via the controller |
 | **Owner-confirmed standalone SO preview versus the kit — 3 differences** | Preview (`127.0.0.1:5465 sales-order-requested-date-preview.html`, owner-confirmed 2026-10-05) versus kit: (1) money facts centred vs left aligned — the kit follows the card contract's summary-cell rule (left aligned, the reference's centring was recorded as a defect); (2) Proceed date cell 12/13px weight 400 vs 11/12px weight 500 — the kit follows 01 §7.6 (label 11, value 12/17 weight 500); (3) four equal sales columns vs `1fr 1fr 1.55fr .75fr` — the written owner rule says only "four columns above 440px", the kit follows 01 §7.6. Neither side wins automatically | Owner / controller decides; then card contract and 01 §7.6 update once |
+| **Main work tab words** | Owner-approved 2026-10-05: `SO Batch` and `Manual Purchase` as main tab labels; COPY governs `SO Batch Purchase` (BUY page name) and `Manual Purchase Request` (owner rename 2026-09-23, "was `Manual Purchase`"). `Purchase Order` is already a COPY noun. The two labels stay off screens until the owner settles the word | Owner word decision (COPY) |
+| **`Info` on module panels** | The 2026-10-05 main-tab rule neither adds nor removes Info: whether Info stays on each module's panel and what it holds is open | Owner decision |
 | Card editable `To` vs Work recorded channels | `CompactModuleCard` Communication offers an editable `To`; Work's `WorkCommunication` allows recorded channels only (owner ruling 2026-09-17) | Owner decision |
 | `Jump to…` empty word | The locked contract prints `No results`; COPY-STANDARD rule 5 lists `No results` as the ✘ empty-state example. Reconcilable (a search matched nothing; a worklist is empty) but COPY does not yet carry that split | COPY ruling |
 | Facet counts spelt three ways | PO §9.3 (whole register), Purchase Returns §9.6 (respect other dimensions), Supplier Claims §9.5 (complete searched/filtered set) versus §6.7's one reading | Converge each page in its own round |
@@ -1403,7 +1422,7 @@ into the section it belongs to, and this list loses it.
 | Expansion-only Columns (opt-in goods columns, OFF by default) | Purchasing 2026-10-05 | Owner has not decided (§6.3) |
 | "Several SOs → list first, then one" inside a host panel | Purchasing 2026-10-05 | Owner decision |
 | ↗ renders only when the page passes `onOpen` | Purchasing (LOCAL ONLY); being delivered by the controlled build | Record as built after it merges |
-| PO working panel and round panel Info/Purchasing layouts; SO Batch round rail; `Match Ready Stock` placement; SO Batch optional goods columns replacing the details table | Purchasing lane, localhost | Owner review in the Purchasing lane |
+| PO working panel and round panel content layouts; SO Batch round rail; `Match Ready Stock` placement; SO Batch optional goods columns replacing the details table | Purchasing lane, localhost | Owner review in the Purchasing lane |
 | Filled primary button on blue-11 (white on blue-9 measures 3.26:1); darker semantic foregrounds for small labels | research file §8 | Real component samples + owner review |
 | Field-card typography 16/14/12 (Houzs Loading List) versus 15/13/12 | 2026-10-01 | Same-content comparison |
 | Cards grid: container minimum 320, three columns ≥984, two ≥652 | 01 §8.1 | Sample review |
@@ -1413,7 +1432,7 @@ into the section it belongs to, and this list loses it.
 ## §7.5 · Approved targets not yet built (shared)
 
 Quick Rail Calendar · Customers · Activity and the all-module calendar filters (§5) · `Assigned to` /
-`Completed by` wording (§5.1) · mission entries on module rails (§6.1) · `Warehouse` tab (§4.3.3) ·
+`Completed by` wording (§5.1) · mission entries on module rails (§6.1) · `Warehouse` tab (§4.3.4) ·
 personal saved-layout rollout (§6.7) · facet-count convergence (§6.7) · SO dealer/product multi-select
 rail · the flame repoint `--primary` → blue (594 sites; needs its own card and a visual approval) ·
 `base-*` → kit palette (4,661 sites; page by page with the page migrations, never globally) · real
