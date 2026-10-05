@@ -256,13 +256,23 @@ export default function PortalSidebar({ drawer = false }: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Manually-opened AREA groups (in addition to the always-open active area).
+  // Manually-opened AREA groups (in addition to the active area).
   const [opened, setOpened] = useState<Set<PortalArea>>(new Set());
-  const isOpen = (area: PortalArea) => area === activeArea || opened.has(area);
+  // THE AREA YOU ARE IN FOLDS (Chew, 2026-10-03; Finance MASTER §4). Its
+  // title folds it and opens it again. The fold names its area, so another
+  // area you jump to always opens; each area has its own rail, so coming back
+  // or reloading opens it too.
+  const [foldedArea, setFoldedArea] = useState<PortalArea | null>(null);
+  const isOpen = (area: PortalArea) =>
+    area === activeArea ? foldedArea !== area : opened.has(area);
 
   function toggleGroup(group: PortalNavGroup) {
-    if (group.area === activeArea) return; // active area stays open
+    if (group.area === activeArea) {
+      setFoldedArea((prev) => (prev === group.area ? null : group.area));
+      return;
+    }
     // First click on a non-active area: jump into it (its dashboard).
+    setFoldedArea(null);
     navigate(areaDefaultHref(group));
     setOpened((prev) => new Set(prev).add(group.area));
   }
@@ -966,22 +976,28 @@ export default function PortalSidebar({ drawer = false }: {
               return (
                 <div key={group.area}>
                   {multi && (
+                    /* A folded area has hidden the page you are on, so its
+                       title is the one blue mark the rail keeps (the module
+                       rule above: tree shut → the parent is lit). */
                     <button
                       type="button"
+                      data-testid={`nav-area-${group.area}`}
+                      aria-expanded={open}
                       onClick={() => toggleGroup(group)}
-                      className={`w-full flex items-center justify-between px-3.5 pb-1.5 pt-1 text-label uppercase tracking-[0.16em] font-semibold ${
-                        group.area === activeArea
-                          ? "text-base-700 cursor-default"
-                          : "text-base-500 hover:text-base-700 cursor-pointer"
+                      className={`w-full flex items-center justify-between px-3.5 pb-1.5 pt-1 text-label uppercase tracking-[0.16em] font-semibold cursor-pointer ${
+                        group.area !== activeArea
+                          ? "text-base-500 hover:text-base-700"
+                          : open
+                            ? "text-base-700"
+                            : "text-kit-blue-9"
                       }`}
                     >
                       <span>{group.label}</span>
-                      {group.area !== activeArea && (
-                        <ChevronDown
-                          size={12}
-                          className={`transition-transform ${open ? "" : "-rotate-90"}`}
-                        />
-                      )}
+                      <ChevronDown
+                        size={12}
+                        aria-hidden="true"
+                        className={`transition-transform ${open ? "" : "-rotate-90"}`}
+                      />
                     </button>
                   )}
 

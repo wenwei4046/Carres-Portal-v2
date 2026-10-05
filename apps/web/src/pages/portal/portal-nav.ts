@@ -43,6 +43,7 @@ import {
   Landmark,
   BookOpenText,
   Hourglass,
+  TrendingUp,
   type LucideIcon,
 } from "lucide-react";
 import type { Role } from "@carres/shared/domain";
@@ -100,7 +101,10 @@ export type PortalSection =
   | "Receivables"
   | "Bank & Cards"
   | "Ledger"
-  | "Reports";
+  | "Reports"
+  /* Forecast has one page, so it draws as a plain row after Reports
+   * (Chew, 2026-10-03). It has no module row until a second page joins it. */
+  | "Forecast";
 
 /** Rail order of the sections. The queue index's own order, unchanged. */
 export const SECTION_ORDER: ReadonlyArray<PortalSection> = [
@@ -122,6 +126,7 @@ export const SECTION_ORDER: ReadonlyArray<PortalSection> = [
   "Bank & Cards",
   "Ledger",
   "Reports",
+  "Forecast",
 ];
 
 /**
@@ -188,9 +193,8 @@ export const PORTAL_MODULES: ReadonlyArray<PortalModule> = [
   { section: "Suppliers", label: "Suppliers", icon: Truck },
   { section: "Master Data", label: "Master Data", icon: Library },
   /* THE FINANCE MODULES (Chew, 2026-10-03; docs/finance/MASTER.md §4). Each
-   * module wears its flagship page's face, the same law as above. A module
-   * with one page draws no parent row (navBlocks), so Reports stays a plain
-   * row until a second report page joins it. */
+   * module wears its flagship page's face, the same law as above. Reports
+   * holds one row per report (Chew, 2026-10-03), Profit and Loss first. */
   { section: "Payables", label: "Payables", icon: ArrowUpRight },
   { section: "Receivables", label: "Receivables", icon: ArrowDownLeft },
   { section: "Bank & Cards", label: "Bank & Cards", icon: CreditCard },
@@ -631,19 +635,20 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       },
       // 0477 — a supplier's bill and the voucher that pays it. What is still
       // unpaid per supplier is the `ap` row above (and the third listing of the
-      // Bills toolbar switch).
-      {
-        key: "bills",
-        label: "Bills",
-        icon: Receipt,
-        financePath: "/finance/bills",
-        section: "Payables",
-      },
+      // Bills toolbar switch). Payment Vouchers sits above Bills, as in Chew's
+      // menu (2026-10-03).
       {
         key: "payment-vouchers",
         label: "Payment Vouchers",
         icon: Banknote,
         financePath: "/finance/payment-vouchers",
+        section: "Payables",
+      },
+      {
+        key: "bills",
+        label: "Bills",
+        icon: Receipt,
+        financePath: "/finance/bills",
         section: "Payables",
       },
       // 0645 — staff ask Finance to pay a bill; Finance answers here (Chew 2026-10-03).
@@ -714,13 +719,20 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       { key: "general-ledger", label: "General Ledger", icon: BookOpenText, financePath: "/finance/ledger/general-ledger", section: "Ledger" },
       { key: "trial-balance", label: "Trial Balance", icon: Scale, financePath: "/finance/ledger/trial-balance", section: "Ledger" },
       { key: "self-check", label: "Self-check", icon: BadgeCheck, financePath: "/finance/ledger/self-check", section: "Ledger" },
-      {
-        key: "reports",
-        label: "Reports",
-        icon: BarChart3,
-        financePath: "/finance/reports",
-        section: "Reports",
-      },
+      // One row per report, in Chew's order (2026-10-03). The Profit and Loss
+      // and the Balance Sheet are two pages; `/finance/reports` opens the first.
+      { key: "profit-and-loss", label: "Profit and Loss", icon: BarChart3, financePath: "/finance/reports/profit-and-loss", section: "Reports" },
+      { key: "balance-sheet", label: "Balance Sheet", icon: Scale, financePath: "/finance/reports/balance-sheet", section: "Reports" },
+      { key: "cash-flow", label: "Cash Flow", icon: ArrowLeftRight, financePath: "/finance/reports/cash-flow", section: "Reports" },
+      { key: "ap-aging", label: "AP Aging", icon: Hourglass, financePath: "/finance/reports/ap-aging", section: "Reports" },
+      { key: "collection", label: "Collection", icon: HandCoins, financePath: "/finance/reports/collection", section: "Reports" },
+      { key: "card-charges", label: "Card charges", icon: CreditCard, financePath: "/finance/reports/card-charges", section: "Reports" },
+      { key: "dealer-commission", label: "Dealer commission", icon: Users, financePath: "/finance/reports/dealer-commission", section: "Reports" },
+      { key: "stock-value", label: "Stock value", icon: Boxes, financePath: "/finance/reports/stock-value", section: "Reports" },
+      // Payment MASTER §16: Reports → Payment, Payment's own report, unchanged.
+      { key: "payment-report", label: "Payment", icon: Wallet, financePath: "/finance/reports/payment", section: "Reports" },
+      // 0646 — a month's plan beside its actual; its own row after Reports.
+      { key: "forecast", label: "Forecast", icon: TrendingUp, financePath: "/finance/reports/forecast", section: "Forecast" },
     ],
   },
   {

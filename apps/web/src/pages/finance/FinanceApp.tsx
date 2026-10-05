@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 // Unified Internal Portal (2026-06-30) — shared role-aware rail.
 import PortalSidebar from "@/pages/portal/PortalSidebar";
 import { useAuth } from "@/lib/auth";
@@ -38,6 +38,16 @@ import ApOutstanding from "./payables/ApOutstanding";
 import SupplierFinancePage from "./payables/SupplierFinancePage";
 import SupplierCreditNotes from "./payables/SupplierCreditNotes";
 import PaymentRequests from "./payment-requests/PaymentRequests";
+
+/** `/finance/reports` held both statements on one page. It now opens the Profit
+ *  and Loss, or the Balance Sheet when the address asked for a day, keeping
+ *  every value the address carried (Chew, 2026-10-03). */
+function ReportsRedirect() {
+  const { search } = useLocation();
+  const params = new URLSearchParams(search);
+  const page = params.has("asOf") || params.has("bsView") ? "balance-sheet" : "profit-and-loss";
+  return <Navigate to={`/finance/reports/${page}${search}`} replace />;
+}
 
 /**
  * Finance (HQ Internal) shell — sidebar + main routing area.
@@ -117,7 +127,11 @@ export default function FinanceApp() {
           <Route path="invoices"  element={<LegacyPaymentRedirect to="/finance/monitor" />} />
           <Route path="refunds"   element={<Navigate to="/finance/payments" replace />} />
           <Route path="recon"     element={<Navigate to="/finance/payments" replace />} />
-          <Route path="reports"   element={financeOnly(<FinanceReports />)} />
+          {/* Chew 2026-10-03: the Profit and Loss and the Balance Sheet are
+              two pages, each a row under Reports. */}
+          <Route path="reports"   element={<ReportsRedirect />} />
+          <Route path="reports/profit-and-loss" element={financeOnly(<FinanceReports statement="pl" />)} />
+          <Route path="reports/balance-sheet" element={financeOnly(<FinanceReports statement="bs" />)} />
           {/* Payment MASTER §16 — Reports → Payment: the six approved
               read-only listings over the same register wires. */}
           <Route path="reports/payment" element={financeOnly(<FinancePaymentReport />)} />

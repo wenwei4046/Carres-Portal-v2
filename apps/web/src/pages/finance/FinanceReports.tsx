@@ -1,8 +1,10 @@
 /**
- * Finance → Reports. The Profit and Loss for a period and the Balance Sheet
- * on a day, both read from the ledger (gl_profit_and_loss and
- * gl_balance_sheet), a twelve-month trend of the Profit and Loss, plus the
- * door to Reports → Payment.
+ * Finance → Reports → Profit and Loss, and → Balance Sheet: two pages, one
+ * rail row each (Chew, 2026-10-03; Finance MASTER §4). The Profit and Loss for
+ * a period with a twelve-month trend, and the Balance Sheet on a day, both read
+ * from the ledger (gl_profit_and_loss and gl_balance_sheet). Every other report,
+ * Reports → Payment among them, is its own row on the rail, so this page keeps
+ * no list of doors.
  *
  * Every figure is a ledger sum served by the API; the page adds nothing up.
  * Each account line opens the Journal narrowed to that account and dates.
@@ -191,27 +193,54 @@ function StatementByMonth({ statement, count, onCount, today, dept, deptWord }: 
   </div>;
 }
 
-export default function FinanceReports() {
-  const [params, setParams] = useSearchParams();
-  const today = appTodayIso();
-  const { from, to } = readPeriod(params, today);
-  const asOf = readDay(params.get("asOf")) ?? today;
+/** The two statements, each its own page under Reports. */
+export type Statement = "pl" | "bs";
+const STATEMENT_WORD: Record<Statement, string> = { pl: "Profit and Loss", bs: "Balance Sheet" };
+const STATEMENT_ID: Record<Statement, string> = { pl: "profit-and-loss", bs: "balance-sheet" };
 
+export default function FinanceReports({ statement }: { statement: Statement }) {
+  const word = STATEMENT_WORD[statement];
+  return <div className="flex h-full min-h-0 flex-col">
+    <ModuleHeader destinationHeader testId={`${STATEMENT_ID[statement]}-destination-header`} word={word} docTitle={`${word} · Carres`} />
+    <div className="min-h-0 flex-1 overflow-auto p-6">
+      {statement === "pl" ? <ProfitAndLossPage /> : <BalanceSheetPage />}
+    </div>
+  </div>;
+}
+
+const NotStarted = () => <div role="alert" className="text-body">
+  <p>The ledger has no start date yet. Nothing can be totalled.</p>
+</div>;
+
+const GoLiveLine = ({ goLive }: { goLive: string }) =>
+  <p className="text-body text-kit-slate-11" data-testid="reports-go-live">Since {fmtDate(goLive)} · No opening balances</p>;
+
+/** What both statements keep in the address: the department, the view and its months. */
+function useReportAddress() {
+  const [params, setParams] = useSearchParams();
   const [dept, setDept] = useDepartmentParam();
   const { data: departments = [] } = useDepartments();
-  const deptWord = departmentWord(dept, departments);
-  const pl = useProfitAndLoss(from, to, dept);
-  const bs = useBalanceSheet(asOf, dept);
-  const notStarted = notStartedError(pl.error) || notStartedError(bs.error);
-  const goLive = pl.data?.goLiveOn ?? bs.data?.goLiveOn ?? null;
-  const plReport = pl.data;
-  const bsReport = bs.data;
-
   const edit = (change: (next: URLSearchParams) => void) => setParams((before) => {
     const next = new URLSearchParams(before);
     change(next);
     return next;
   });
+  // `?plView=month` · `?plMonths=6`: the view and its months stay in the address, as the dates do.
+  const pickView = (key: "plView" | "bsView", v: string) => edit((next) => {
+    if (v === "month") next.set(key, "month"); else next.delete(key);
+  });
+  const pickCount = (key: "plMonths" | "bsMonths", v: string) => edit((next) => next.set(key, String(readMonthCount(v))));
+  return { params, edit, pickView, pickCount, dept, setDept, deptWord: departmentWord(dept, departments), today: appTodayIso() };
+}
+
+function ProfitAndLossPage() {
+  const { params, edit, pickView, pickCount, dept, setDept, deptWord, today } = useReportAddress();
+  const { from, to } = readPeriod(params, today);
+  const pl = useProfitAndLoss(from, to, dept);
+  const plReport = pl.data;
+  if (notStartedError(pl.error)) return <NotStarted />;
+  const goLive = plReport?.goLiveOn ?? null;
+
   const pickMonth = (ym: string) => {
     if (!/^\d{4}-\d{2}$/.test(ym)) return;
     edit((next) => {
@@ -235,188 +264,102 @@ export default function FinanceReports() {
       next.set("from", iso < from ? iso : from);
     });
   };
-  const pickAsOf = (iso: string | null) => {
-    if (iso) edit((next) => next.set("asOf", iso));
-  };
 
   const month = wholeMonth(from, to);
   const plView = params.get("plView") === "month" ? "month" : "period";
-  const bsView = params.get("bsView") === "month" ? "month" : "day";
-  // `?plView=month` · `?plMonths=6`: the view and its months stay in the address, as the dates do.
-  const pickView = (key: "plView" | "bsView", v: string) => edit((next) => {
-    if (v === "month") next.set(key, "month"); else next.delete(key);
-  });
-  const pickCount = (key: "plMonths" | "bsMonths", v: string) => edit((next) => next.set(key, String(readMonthCount(v))));
 
-  return <div className="flex h-full min-h-0 flex-col">
-    <ModuleHeader destinationHeader testId="reports-destination-header" word="Reports" docTitle="Reports · Carres" />
-    <div className="min-h-0 flex-1 overflow-auto p-6">
-      <div className="flex flex-col gap-6">
-        {/* Payment MASTER §16: Reports → Payment is a destination of this
-            page, not a hidden route. */}
-        <Link to="/finance/reports/payment" data-testid="reports-payment-door"
-          className="flex items-center justify-between rounded-card border border-border bg-card px-4 py-3 hover:bg-muted/40">
-          <span>
-            <span className="block text-meta font-semibold">Payment</span>
-            <span className="block text-label text-muted-foreground">
-              Money received · Customer balances · Storage charged and collected · Storage
-              waived · Payment corrections · Money needing review</span>
-          </span>
-          <span className="text-label text-muted-foreground">Open →</span>
-        </Link>
-        <Link to="/finance/reports/dealer-commission" data-testid="reports-dealer-commission-door"
-          className="flex items-center justify-between rounded-card border border-border bg-card px-4 py-3 hover:bg-muted/40">
-          <span>
-            <span className="block text-meta font-semibold">Dealer commission</span>
-            <span className="block text-label text-muted-foreground">
-              Commission on collected · Commission still to collect · Rebate this month · Quota left</span>
-          </span>
-          <span className="text-label text-muted-foreground">Open →</span>
-        </Link>
-        <Link to="/finance/reports/card-charges" data-testid="reports-card-charges-door"
-          className="flex items-center justify-between rounded-card border border-border bg-card px-4 py-3 hover:bg-muted/40">
-          <span>
-            <span className="block text-meta font-semibold">Card charges</span>
-            <span className="block text-label text-muted-foreground">
-              Sales total · Fee · Paid into bank · Fee % · by month and card company</span>
-          </span>
-          <span className="text-label text-muted-foreground">Open →</span>
-        </Link>
-        {/* 0638 (Chew 2026-10-03): the same door, in the same words' shape. */}
-        <Link to="/finance/reports/cash-flow" data-testid="reports-cash-flow-door"
-          className="flex items-center justify-between rounded-card border border-border bg-card px-4 py-3 hover:bg-muted/40">
-          <span>
-            <span className="block text-meta font-semibold">Cash Flow</span>
-            <span className="block text-label text-muted-foreground">
-              Inflow · Outflow · Net cash flow · Carried forward · by cash and bank account</span>
-          </span>
-          <span className="text-label text-muted-foreground">Open →</span>
-        </Link>
-        {/* 0640 (Chew 2026-10-03): the same door. */}
-        <Link to="/finance/reports/ap-aging" data-testid="reports-ap-aging-door"
-          className="flex items-center justify-between rounded-card border border-border bg-card px-4 py-3 hover:bg-muted/40">
-          <span>
-            <span className="block text-meta font-semibold">AP Aging</span>
-            <span className="block text-label text-muted-foreground">
-              Balance · This month to 4 months and over · Not tied to a bill · by supplier on a day</span>
-          </span>
-          <span className="text-label text-muted-foreground">Open →</span>
-        </Link>
-        {/* 0644 (Chew 2026-10-03): the same door. */}
-        <Link to="/finance/reports/collection" data-testid="reports-collection-door"
-          className="flex items-center justify-between rounded-card border border-border bg-card px-4 py-3 hover:bg-muted/40">
-          <span>
-            <span className="block text-meta font-semibold">Collection</span>
-            <span className="block text-label text-muted-foreground">
-              Deposit · Deposit % · Balance paid · Outstanding · by salesperson</span>
-          </span>
-          <span className="text-label text-muted-foreground">Open →</span>
-        </Link>
-        {/* 0643 (Chew 2026-10-03): the same door. Provisional until Stock confirms its month-end count. */}
-        <Link to="/finance/reports/stock-value" data-testid="reports-stock-value-door"
-          className="flex items-center justify-between rounded-card border border-border bg-card px-4 py-3 hover:bg-muted/40">
-          <span>
-            <span className="block text-meta font-semibold">Stock value</span>
-            <span className="block text-label text-muted-foreground">
-              Warehouse · Showroom · In transit · Sent for repair · at a month end, provisional</span>
-          </span>
-          <span className="text-label text-muted-foreground">Open →</span>
-        </Link>
-        {/* 0646 (Chew 2026-10-03): the same door. Built last, as Chew asked. */}
-        <Link to="/finance/reports/forecast" data-testid="reports-forecast-door"
-          className="flex items-center justify-between rounded-card border border-border bg-card px-4 py-3 hover:bg-muted/40">
-          <span>
-            <span className="block text-meta font-semibold">Forecast</span>
-            <span className="block text-label text-muted-foreground">
-              Plan · % of income · Actual · Difference · by account, one month at a time</span>
-          </span>
-          <span className="text-label text-muted-foreground">Open →</span>
-        </Link>
-
-        {notStarted ? <div role="alert" className="text-body">
-          <p>The ledger has no start date yet. Nothing can be totalled.</p>
-        </div> : <>
-          {goLive && <p className="text-body text-kit-slate-11" data-testid="reports-go-live">
-            Since {fmtDate(goLive)} · No opening balances
-          </p>}
-          <DepartmentFilter value={dept} onChange={setDept} />
-
-          {/* grid-cols-1 lets a wide By month table scroll inside its panel, not the page. */}
-          <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-2">
-            <Panel title="Profit and Loss">
-              <div className="flex flex-col gap-4">
-                <Tabs label="Profit and Loss view" tabs={VIEWS.pl} value={plView} onValueChange={(v) => pickView("plView", v)} />
-                {plView === "month" ? <StatementByMonth statement="pl" count={readMonthCount(params.get("plMonths"))}
-                  onCount={(v) => pickCount("plMonths", v)} today={today} dept={dept} deptWord={deptWord} />
-                : <>
-                <div className="flex flex-wrap items-end gap-3">
-                  <div className="w-40">
-                    <Select id="reports-pl-month" label="Month" value={month ?? ""} onValueChange={pickMonth}
-                      placeholder="Custom Date Range"
-                      options={monthChoices(goLive, today, month).map((m) => ({ value: m, label: fmtMonth(m) }))} />
-                  </div>
-                  <div className="w-40">
-                    <DatePicker id="reports-pl-from" label="From" value={from} onChange={pickFrom} />
-                  </div>
-                  <div className="w-40">
-                    <DatePicker id="reports-pl-to" label="Up to" value={to} minDate={from} onChange={pickTo} />
-                  </div>
-                  <ExportStatement testId="profit-and-loss-export" word="profit and loss"
-                    build={plReport?.status === "ok" ? () => statementExport(plReport, deptWord) : null} />
-                </div>
-                {pl.isError ? <ReadFailed testId="profit-and-loss-failed"
-                  sentence="The profit and loss could not be loaded. Try again."
-                  retrying={pl.isFetching} onRetry={() => void pl.refetch()} />
-                : <StatementTable label="Profit and Loss" testId="profit-and-loss"
-                  sections={plReport?.status === "ok" ? plReport.sections : []}
-                  loading={pl.isPending}
-                  empty={plReport?.status === "before_go_live" ? beforeGoLive(plReport.goLiveOn) : nothingInPeriod("INCOME")}
-                  nothing={nothingInPeriod}
-                  accountHref={(code) => ledgerAccountHref(code, from, to)}
-                  bottomLine={plReport?.status === "ok" ? { label: "Net result", amount: plReport.net } : null} />}
-                </>}
-              </div>
-            </Panel>
-
-            <Panel title="Balance Sheet">
-              <div className="flex flex-col gap-4">
-                <Tabs label="Balance Sheet view" tabs={VIEWS.bs} value={bsView} onValueChange={(v) => pickView("bsView", v)} />
-                {bsView === "month" ? <StatementByMonth statement="bs" count={readMonthCount(params.get("bsMonths"))}
-                  onCount={(v) => pickCount("bsMonths", v)} today={today} dept={dept} deptWord={deptWord} />
-                : <>
-                <div className="flex flex-wrap items-end gap-3">
-                  <div className="w-40">
-                    <DatePicker id="reports-bs-as-of" label="As of" value={asOf} onChange={pickAsOf} />
-                  </div>
-                  <ExportStatement testId="balance-sheet-export" word="balance sheet"
-                    build={bsReport?.status === "ok" ? () => statementExport(bsReport, deptWord) : null} />
-                </div>
-                {bsReport?.status === "ok" && !bsReport.balances && <div role="status" data-testid="balance-sheet-differs"
-                  className="flex flex-wrap items-center gap-2 rounded-control bg-kit-amber-3 px-4 py-2 text-body text-kit-amber-11">
-                  ⚠ Assets differ from liabilities plus equity by {rm(Math.abs(bsReport.difference))}.
-                  <Link className="underline underline-offset-2" to="/finance/ledger/self-check">Open Self-check</Link>
-                </div>}
-                {bs.isError ? <ReadFailed testId="balance-sheet-failed"
-                  sentence="The balance sheet could not be loaded. Try again."
-                  retrying={bs.isFetching} onRetry={() => void bs.refetch()} />
-                : <StatementTable label="Balance Sheet" testId="balance-sheet"
-                  sections={bsReport?.status === "ok" ? bsReport.sections : []}
-                  loading={bs.isPending}
-                  empty={bsReport?.status === "before_go_live" ? beforeGoLive(bsReport.goLiveOn) : nothingOnDay("ASSET")}
-                  nothing={nothingOnDay}
-                  accountHref={(code) => ledgerAccountHref(code, bsReport?.goLiveOn ?? null, asOf)}
-                  lineNote={paidBeforeInvoiceNote}
-                  bottomLine={null} />}
-                </>}
-              </div>
-            </Panel>
+  // grid-cols-1 lets a wide By month table scroll inside its panel, not the page.
+  return <div className="grid grid-cols-1 gap-6">
+    {goLive && <GoLiveLine goLive={goLive} />}
+    <DepartmentFilter value={dept} onChange={setDept} />
+    <Panel title="Profit and Loss">
+      <div className="flex flex-col gap-4">
+        <Tabs label="Profit and Loss view" tabs={VIEWS.pl} value={plView} onValueChange={(v) => pickView("plView", v)} />
+        {plView === "month" ? <StatementByMonth statement="pl" count={readMonthCount(params.get("plMonths"))}
+          onCount={(v) => pickCount("plMonths", v)} today={today} dept={dept} deptWord={deptWord} />
+        : <>
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="w-40">
+            <Select id="reports-pl-month" label="Month" value={month ?? ""} onValueChange={pickMonth}
+              placeholder="Custom Date Range"
+              options={monthChoices(goLive, today, month).map((m) => ({ value: m, label: fmtMonth(m) }))} />
           </div>
-
-          {goLive && <Panel title="Profit and Loss · Last 12 months">
-            <ProfitAndLossTrend goLive={goLive} today={today} dept={dept} />
-          </Panel>}
+          <div className="w-40">
+            <DatePicker id="reports-pl-from" label="From" value={from} onChange={pickFrom} />
+          </div>
+          <div className="w-40">
+            <DatePicker id="reports-pl-to" label="Up to" value={to} minDate={from} onChange={pickTo} />
+          </div>
+          <ExportStatement testId="profit-and-loss-export" word="profit and loss"
+            build={plReport?.status === "ok" ? () => statementExport(plReport, deptWord) : null} />
+        </div>
+        {pl.isError ? <ReadFailed testId="profit-and-loss-failed"
+          sentence="The profit and loss could not be loaded. Try again."
+          retrying={pl.isFetching} onRetry={() => void pl.refetch()} />
+        : <StatementTable label="Profit and Loss" testId="profit-and-loss"
+          sections={plReport?.status === "ok" ? plReport.sections : []}
+          loading={pl.isPending}
+          empty={plReport?.status === "before_go_live" ? beforeGoLive(plReport.goLiveOn) : nothingInPeriod("INCOME")}
+          nothing={nothingInPeriod}
+          accountHref={(code) => ledgerAccountHref(code, from, to)}
+          bottomLine={plReport?.status === "ok" ? { label: "Net result", amount: plReport.net } : null} />}
         </>}
       </div>
-    </div>
+    </Panel>
+
+    {goLive && <Panel title="Profit and Loss · Last 12 months">
+      <ProfitAndLossTrend goLive={goLive} today={today} dept={dept} />
+    </Panel>}
+  </div>;
+}
+
+function BalanceSheetPage() {
+  const { params, edit, pickView, pickCount, dept, setDept, deptWord, today } = useReportAddress();
+  const asOf = readDay(params.get("asOf")) ?? today;
+  const bs = useBalanceSheet(asOf, dept);
+  const bsReport = bs.data;
+  if (notStartedError(bs.error)) return <NotStarted />;
+  const goLive = bsReport?.goLiveOn ?? null;
+
+  const pickAsOf = (iso: string | null) => {
+    if (iso) edit((next) => next.set("asOf", iso));
+  };
+  const bsView = params.get("bsView") === "month" ? "month" : "day";
+
+  return <div className="grid grid-cols-1 gap-6">
+    {goLive && <GoLiveLine goLive={goLive} />}
+    <DepartmentFilter value={dept} onChange={setDept} />
+    <Panel title="Balance Sheet">
+      <div className="flex flex-col gap-4">
+        <Tabs label="Balance Sheet view" tabs={VIEWS.bs} value={bsView} onValueChange={(v) => pickView("bsView", v)} />
+        {bsView === "month" ? <StatementByMonth statement="bs" count={readMonthCount(params.get("bsMonths"))}
+          onCount={(v) => pickCount("bsMonths", v)} today={today} dept={dept} deptWord={deptWord} />
+        : <>
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="w-40">
+            <DatePicker id="reports-bs-as-of" label="As of" value={asOf} onChange={pickAsOf} />
+          </div>
+          <ExportStatement testId="balance-sheet-export" word="balance sheet"
+            build={bsReport?.status === "ok" ? () => statementExport(bsReport, deptWord) : null} />
+        </div>
+        {bsReport?.status === "ok" && !bsReport.balances && <div role="status" data-testid="balance-sheet-differs"
+          className="flex flex-wrap items-center gap-2 rounded-control bg-kit-amber-3 px-4 py-2 text-body text-kit-amber-11">
+          ⚠ Assets differ from liabilities plus equity by {rm(Math.abs(bsReport.difference))}.
+          <Link className="underline underline-offset-2" to="/finance/ledger/self-check">Open Self-check</Link>
+        </div>}
+        {bs.isError ? <ReadFailed testId="balance-sheet-failed"
+          sentence="The balance sheet could not be loaded. Try again."
+          retrying={bs.isFetching} onRetry={() => void bs.refetch()} />
+        : <StatementTable label="Balance Sheet" testId="balance-sheet"
+          sections={bsReport?.status === "ok" ? bsReport.sections : []}
+          loading={bs.isPending}
+          empty={bsReport?.status === "before_go_live" ? beforeGoLive(bsReport.goLiveOn) : nothingOnDay("ASSET")}
+          nothing={nothingOnDay}
+          accountHref={(code) => ledgerAccountHref(code, bsReport?.goLiveOn ?? null, asOf)}
+          lineNote={paidBeforeInvoiceNote}
+          bottomLine={null} />}
+        </>}
+      </div>
+    </Panel>
   </div>;
 }
