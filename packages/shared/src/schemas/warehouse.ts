@@ -44,8 +44,8 @@ export const warehouseSubmitReceiptInput = z
       )
       .max(30)
       .optional(),
-    /** 0426 — extra goods, recorded separately; never Inventory, never
-     *  pending arithmetic. */
+    /** 0426 — extra goods, recorded separately; never available stock or
+     *  pending arithmetic. Controlled custody is governed by Purchasing §2.4. */
     extraLines: z
       .array(
         z.object({
@@ -108,3 +108,66 @@ export const warehouseReceiptReturnInput = z
 export type WarehouseReceiptReturnInput = z.infer<
   typeof warehouseReceiptReturnInput
 >;
+
+/** Final physical report. Missing business facts must reach the receipt engine
+ * unchanged so it can retain the report with blockers. Shape/size validation is
+ * still enforced here; actor, Site, source and posting authority remain in SQL. */
+export const warehouseConfirmationReportInput = warehouseSubmitReceiptInput.partial().extend({
+  arrivalSourceId: z.string().uuid().nullish(),
+  handoverPerson: z.string().max(200).optional(),
+  arrivalUnits: z.array(z.object({
+    stockItemId: z.string().uuid(),
+    outcome: z.enum(["received", "received_with_issue", "not_received"]),
+    issueKind: z.enum(["damaged", "wrong_item"]).optional(),
+    note: z.string().max(300).optional(),
+  }).strict()).max(200).optional(),
+  poId: z.string().max(100).nullish(),
+  actualSiteId: z.string().uuid().nullish(),
+  doNumber: z.string().max(64).nullish(),
+  doFilePath: z.string().max(500).nullish(),
+  goodsReceivedTime: z.string().datetime({ offset: true }).nullish(),
+  goodsReceivedAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullish(),
+  lines: z.array(warehouseSubmitReceiptInput.shape.lines.element.extend({
+    id: z.string().max(100).nullish(),
+    receivedNow: z.number().int().nonnegative().nullish(),
+    damagedQty: z.number().int().nonnegative().nullish(),
+    wrongItemQty: z.number().int().nonnegative().nullish(),
+  }).strict()).max(500).optional(),
+}).strict();
+
+export const warehouseConfirmReceiptInput = z.object({
+  saveKey: z.string().uuid(),
+  receiptId: z.string().uuid().optional(),
+  revision: z.number().int().nonnegative().optional(),
+  report: warehouseConfirmationReportInput,
+}).strict().refine((value) => (value.receiptId === undefined) === (value.revision === undefined), {
+  message: "Receipt and revision must be supplied together",
+});
+export type WarehouseConfirmationReportInput = z.infer<typeof warehouseConfirmationReportInput>;
+export type WarehouseConfirmReceiptInput = z.infer<typeof warehouseConfirmReceiptInput>;
+
+
+/** Confirmation either produces a GRN or preserves the physical report. */
+export interface WarehouseConfirmationResult {
+  id: string;
+  receipt_id: string;
+  status: "draft" | "posted";
+  grn_no: string | null;
+  revision: number;
+  blockers: Array<{ code: string; message: string }>;
+  already_saved: boolean;
+}
+
+export const receivingExtraCustodyNote = z.object({
+  id: z.string(), custody_id: z.string(), note: z.string(), actor_id: z.string(),
+  recorded_at: z.string(), request_key: z.string(),
+});
+
+/** Read-only physical custody evidence; no inventory identity or disposition. */
+export const receivingExtraCustodyEvidence = z.object({
+  custody: z.array(z.object({ id: z.string(), reported_sku: z.string(), reported_qty: z.number().int().positive(),
+    reported_note: z.string().nullable(), actual_site_id: z.string(), goods_received_at: z.string() })),
+  siteNames: z.record(z.string()),
+  notes: z.array(receivingExtraCustodyNote.omit({ request_key: true })),
+  actorNames: z.record(z.string()),
+});

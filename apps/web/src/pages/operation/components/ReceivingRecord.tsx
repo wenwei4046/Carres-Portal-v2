@@ -32,6 +32,9 @@ import {
 import { renderGrnPdf } from "@/lib/pdf/render";
 import { usePdfCanvases } from "@/lib/pdf/use-pdf-canvases";
 import DropdownMenu from "@/components/kit/DropdownMenu";
+import ReceivingExtraCustody from "@/components/receiving/ReceivingExtraCustody";
+import ReceivingReportHistory from "@/components/receiving/ReceivingReportHistory";
+import Button from "@/components/kit/Button";
 import SavedEvidenceViewer from "@/components/kit/SavedEvidenceViewer";
 import DOFileUploadField from "@/components/DOFileUploadField";
 import ArrivalEvidenceUploadField from "@/components/ArrivalEvidenceUploadField";
@@ -75,6 +78,7 @@ export default function ReceivingRecord({
   const q = useReceivingSessionDetail(sessionId);
   const dutyQ = useReceivingDuty();
   const [amending, setAmending] = useState(false);
+  const [reportEventId, setReportEventId] = useState<string | null>(null);
   const [evidenceId, setEvidenceId] = useState<string | null>(null);
   const [voiding, setVoiding] = useState(false);
   const [draft, setDraft] = useState<AmendFormDraft | null>(null);
@@ -226,7 +230,7 @@ export default function ReceivingRecord({
             {r.supplier_name ?? ""} · <span className="font-mono">{documentDisplayNumber(r.po_id ?? "")}</span>
           </div>
         </div>
-        {r.status !== "posted" && <span
+        {r.status !== "posted" && !(r.status === "draft" && r.raw_report != null) && <span
           data-testid="receiving-record-state"
           className={[
             "shrink-0 rounded-full px-2.5 py-0.5 text-label font-medium",
@@ -248,7 +252,14 @@ export default function ReceivingRecord({
         </div>
       )}
 
-      {amending && draft && r.po_id ? (
+      {r.status === "draft" && r.raw_report != null ? (
+        <Section title="Receiving">
+          <p role="status" className="text-body text-kit-slate-12">Receiving report saved. No GRN created.</p>
+          {(r.blockers ?? []).map((blocker) => <p key={blocker.code} className="text-body text-kit-red-9">{blocker.message}</p>)}
+          <Prop label="Warehouse">{r.warehouse_name ?? "Not recorded"}</Prop>
+          <Prop label="Count submitted">{fmtDate(r.submitted_at)} · {r.submitted_by_name ?? "Staff identity not recorded"}</Prop>
+        </Section>
+      ) : amending && draft && r.po_id ? (
         <AmendPanel
           receipt={{ ...r, po_id: r.po_id }}
           lines={lines}
@@ -444,17 +455,19 @@ export default function ReceivingRecord({
                 ) : null}
               </div>
             ))}
-            {(r.extra_lines ?? []).map((x, i) => (
+            {(r.status !== "posted" && r.status !== "voided" ? r.extra_lines ?? [] : []).map((x, i) => (
               <div key={`x${i}`} className="receiving-item-row flex flex-wrap gap-2 py-1 text-body border-b border-kit-slate-4">
                 <span className="flex-1 min-w-0 font-mono text-kit-slate-12 break-words">
                   {x.sku}
                 </span>
                 <span className="w-40 text-right tabular-nums text-kit-amber-11">
-                  {x.qty} extra, not Inventory
+                  {x.qty} extra
                 </span>
               </div>
             ))}
           </Section>
+
+          {(r.status === "posted" || r.status === "voided") && <ReceivingExtraCustody receiptId={sessionId} />}
 
           {/* ── Consequences ──────────────────────────────────────────── */}
           {r.status === "posted" && (
@@ -533,70 +546,73 @@ export default function ReceivingRecord({
               onClose={() => setVoiding(false)}
             />
           )}
-
-          {/* ── History — the three-rank record grammar, append-only ──── */}
-          <Section title="History">
-            {events.length === 0 ? (
-              <div className="text-label text-kit-slate-9">
-                No receiving activity yet.
-              </div>
-            ) : (
-              <ul className="flex flex-col gap-2" data-testid="record-history">
-                {events.map((e) => (
-                  <li key={e.id}>
-                    <div className="text-body font-semibold text-kit-slate-12">
-                      {receivingEventLabel(e.event)}
-                    </div>
-                    <div className="text-meta text-kit-slate-11">
-                      {e.actor_name ?? "Staff identity not recorded"} ·{" "}
-                      {fmtDate(e.event_at.slice(0, 10))}
-                    </div>
-                    {e.payload?.reason ? (
-                      <div className="text-label font-normal text-kit-slate-11">
-                        {e.payload.reason}
-                      </div>
-                    ) : e.payload?.grn_no ? (
-                      <div className="text-label font-normal text-kit-slate-11">
-                        {documentDisplayNumber(e.payload.grn_no)}
-                        {e.payload.units_counted != null
-                          ? ` · ${e.payload.units_counted} unit(s)`
-                          : ""}
-                      </div>
-                    ) : null}
-                    {e.event === "amended" && e.payload?.before ? (
-                      /* Only the AFFECTED facts compare side by side. */
-                      <div className="mt-1 grid max-w-md grid-cols-2 gap-2 rounded-card border border-kit-slate-5 p-2 text-label">
-                        <div>
-                          <div className="uppercase tracking-wide text-kit-slate-9">
-                            Original
-                          </div>
-                          {Object.entries(e.payload.before).map(([k, v]) => (
-                            <div key={k} className="text-kit-slate-11">
-                              {comparisonValue(v)}
-                            </div>
-                          ))}
-                        </div>
-                        <div>
-                          <div className="uppercase tracking-wide text-kit-slate-9">
-                            Correction
-                          </div>
-                          {Object.entries(
-                            (e.payload.after ?? {}) as Record<string, unknown>,
-                          ).map(([k, v]) => (
-                            <div key={k} className="text-kit-slate-12">
-                              {comparisonValue(v)}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ) : null}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Section>
         </>
       )}
+      {reportEventId && <ReceivingReportHistory receiptId={sessionId} events={events}
+        initialEventId={reportEventId} evidenceBasePath={`/api/operation/warehouse-receipts/${sessionId}`}
+        onClose={()=>setReportEventId(null)}/>}
+      {/* ── History — the three-rank record grammar, append-only ──── */}
+      <Section title="History">
+        {events.length === 0 ? (
+          <div className="text-label text-kit-slate-9">
+            No receiving activity yet.
+          </div>
+        ) : (
+          <ul className="flex flex-col gap-2" data-testid="record-history">
+            {events.map((e) => (
+              <li key={e.id}>
+                <div className="text-body font-semibold text-kit-slate-12">
+                  {receivingEventLabel(e.event)}
+                </div>
+                <div className="text-meta text-kit-slate-11">
+                  {e.actor_name ?? "Staff identity not recorded"} ·{" "}
+                  {fmtDate(e.event_at, { time: true })}
+                </div>
+                {e.payload?.reason ? (
+                  <div className="text-label font-normal text-kit-slate-11">
+                    {e.payload.reason}
+                  </div>
+                ) : e.payload?.grn_no ? (
+                  <div className="text-label font-normal text-kit-slate-11">
+                    {documentDisplayNumber(e.payload.grn_no)}
+                    {e.payload.units_counted != null
+                      ? ` · ${e.payload.units_counted} unit(s)`
+                      : ""}
+                  </div>
+                ) : null}
+                {e.payload?.report != null && <Button onClick={()=>setReportEventId(e.id)}>View</Button>}
+                {e.event === "amended" && e.payload?.before ? (
+                  /* Only the AFFECTED facts compare side by side. */
+                  <div className="mt-1 grid max-w-md grid-cols-2 gap-2 rounded-card border border-kit-slate-5 p-2 text-label">
+                    <div>
+                      <div className="uppercase tracking-wide text-kit-slate-9">
+                        Original
+                      </div>
+                      {Object.entries(e.payload.before).map(([k, v]) => (
+                        <div key={k} className="text-kit-slate-11">
+                          {comparisonValue(v)}
+                        </div>
+                      ))}
+                    </div>
+                    <div>
+                      <div className="uppercase tracking-wide text-kit-slate-9">
+                        Correction
+                      </div>
+                      {Object.entries(
+                        (e.payload.after ?? {}) as Record<string, unknown>,
+                      ).map(([k, v]) => (
+                        <div key={k} className="text-kit-slate-12">
+                          {comparisonValue(v)}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        )}
+      </Section>
     </div>
   );
 

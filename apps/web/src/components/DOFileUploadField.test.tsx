@@ -13,12 +13,24 @@ vi.mock("../lib/supabase", () => ({
   },
 }));
 import { apiFetch } from "../lib/api";
+import { supabase } from "../lib/supabase";
 
 beforeEach(() => {
   vi.mocked(apiFetch).mockReset();
+  vi.mocked(supabase.storage.from).mockClear();
 });
 
 describe("DOFileUploadField", () => {
+  it("uses the Warehouse source proof door and arrival bucket for a non-PO upload", async () => {
+    vi.mocked(apiFetch).mockResolvedValue({ token: "tok", path: "source/person/proof.pdf" });
+    const done = vi.fn();
+    render(<DOFileUploadField poId="" arrivalSourceId="source" warehouseArrival doNumber="HANDOVER-1" onUploaded={done} />);
+    fireEvent.change(screen.getByLabelText("Handover proof"), { target: { files: [new File(["pdf"], "proof.pdf", { type: "application/pdf" })] } });
+    await waitFor(() => expect(done).toHaveBeenCalledWith("source/person/proof.pdf"));
+    expect(apiFetch).toHaveBeenCalledWith("/api/warehouse/arrivals/source/proof", expect.objectContaining({ method: "POST" }));
+    expect(supabase.storage.from).toHaveBeenCalledWith("arrival-proofs");
+  });
+
   it("rejects file > 10MB client-side", async () => {
     const onUploaded = vi.fn();
     render(<DOFileUploadField poId="PO-100" doNumber="DO-1" onUploaded={onUploaded} />);

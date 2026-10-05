@@ -302,9 +302,12 @@ import {
   type SupplierClaimMove,
   type SupplierClaimUnit,
   type WarehouseIncomingResponse,
+  type WarehouseIncomingArrival,
   type WarehouseReceiptLine,
   type WarehouseReceiptRow,
   type WarehouseSubmitReceiptInput,
+  type WarehouseConfirmReceiptInput,
+  type WarehouseConfirmationResult,
   type StockRegisterUnit,
   // 0379 — Delivery's own arrangement (owner correction 2026-08-24).
   type DeliveryArrangementRow,
@@ -4215,6 +4218,14 @@ export function useWarehouseIncoming(
   });
 }
 
+export function useWarehouseArrivals() {
+  return useQuery({
+    queryKey: ["warehouse-portal", "arrivals"],
+    queryFn: () => apiFetch<{ arrivals: WarehouseIncomingArrival[] }>("/api/warehouse/arrivals"),
+    staleTime: 30_000,
+  });
+}
+
 /** What this warehouse filed, and what became of it — including the claims each
  *  check-in opened. */
 export function useWarehouseMyReceipts(
@@ -4260,9 +4271,35 @@ export function useWarehouseSubmitReceiptMutation(
   });
 }
 
+/** Final physical confirmation. A blocked report is a saved result too; refresh
+ * both Warehouse reads and Receiving/Stock projections after either outcome. */
+export function useWarehouseConfirmReceiptMutation() {
+  const qc = useQueryClient();
+  return useMutation<WarehouseConfirmationResult, ApiError, WarehouseConfirmReceiptInput>({
+    mutationFn: (body) => apiFetch<WarehouseConfirmationResult>("/api/warehouse/receipts/confirm", {
+      method: "POST", body: JSON.stringify(body),
+    }),
+    onSuccess: async () => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: qk.warehousePortal.incoming() }),
+        qc.invalidateQueries({ queryKey: ["warehouse-portal", "arrivals"] }),
+        qc.invalidateQueries({ queryKey: qk.warehousePortal.receipts() }),
+        qc.invalidateQueries({ queryKey: ["operation", "warehouse-receipts"] }),
+        qc.invalidateQueries({ queryKey: ["operation", "warehouse-inbound"] }),
+        qc.invalidateQueries({ queryKey: ["operation", "warehouse-schedule"] }),
+        qc.invalidateQueries({ queryKey: qk.operation.warehouse(), exact: true }),
+        qc.invalidateQueries({ queryKey: ["operation", "pos"] }),
+        qc.invalidateQueries({ queryKey: ["operation", "supplier-claims"] }),
+      ]);
+    },
+  });
+}
+
 /** The ops queue row: one filed count, with the names a human needs and the
  *  one sentence the shared module composes. */
 export interface WarehouseReceiptQueueRow {
+  raw_report?: unknown;
+  blockers?: Array<{ code: string; message: string }>;
   arrival_source_id?: string | null;
   id: string;
   po_id: string | null;
@@ -8678,6 +8715,8 @@ export interface ReceivingSession {
 
 /** One entry of the ONE history (RECEIVING-INFORMATION-MODEL §6). */
 export interface ReceivingEvent {
+  line_labels?: Record<string, string>;
+  unit_labels?: Record<string, string>;
   id: string;
   receipt_id: string;
   event:
@@ -8690,6 +8729,7 @@ export interface ReceivingEvent {
   event_at: string;
   actor_name: string | null;
   payload: {
+    report?: unknown;
     do_number?: string;
     goods_received_at?: string;
     units_counted?: number;

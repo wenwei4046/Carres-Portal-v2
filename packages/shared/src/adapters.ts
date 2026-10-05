@@ -1,6 +1,7 @@
 /**
  * Adapters: snake_case DB rows → camelCase domain objects.
  */
+import { warehouseConfirmationReportInput } from "./schemas/warehouse";
 import type * as DB from "./db-types";
 import type * as D from "./domain";
 import type { CreateOrderInput } from "./schemas/orders";
@@ -1063,3 +1064,65 @@ export const rentalUnitEventFromRow = (r: DB.RentalUnitEventRow): D.RentalUnitEv
   actor: r.actor,
   occurredAt: r.occurred_at,
 });
+
+
+/** Receipt evidence preserves absent/null counts; neither means counted zero. */
+export function warehouseConfirmationReportToWire(r: import("./schemas/warehouse").WarehouseConfirmationReportInput) {
+  const photo = (p: string | { path: string; unitCode: string }) =>
+    typeof p === "string" ? p : { path: p.path, unit_code: p.unitCode };
+  return {
+    po_id: r.poId, actual_site_id: r.actualSiteId,
+    arrival_source_id: r.arrivalSourceId, handover_person: r.handoverPerson,
+    arrival_units: r.arrivalUnits?.map((unit) => ({
+      stock_item_id: unit.stockItemId, outcome: unit.outcome, issue_kind: unit.issueKind, note: unit.note,
+    })),
+    do_number: r.doNumber, do_file_path: r.doFilePath, note: r.note,
+    goods_received_time: r.goodsReceivedTime, goods_received_at: r.goodsReceivedAt,
+    arrival_evidence: r.arrivalEvidence, extra_lines: r.extraLines,
+    lines: r.lines?.map((line) => ({
+      id: line.id, received_now: line.receivedNow, damaged_qty: line.damagedQty,
+      wrong_item_qty: line.wrongItemQty, wrong_item_claim_type: line.wrongItemClaimType,
+      damaged_photos: line.damagedPhotos?.map(photo),
+      wrong_item_photos: line.wrongItemPhotos?.map(photo),
+      units: line.units?.map((unit) => ({
+        unit_code: unit.unitCode, outcome: unit.outcome, issue_kind: unit.issueKind, note: unit.note,
+      })),
+    })),
+  };
+}
+
+/** Decode our preserved physical report without inventing any missing facts. */
+export function warehouseConfirmationReportFromWire(value: unknown) {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return null;
+  const obj = (v: unknown): Record<string, unknown> =>
+    v !== null && typeof v === "object" && !Array.isArray(v) ? v as Record<string, unknown> : {};
+  const r = obj(value);
+  const photos = (v: unknown) => Array.isArray(v) ? v.map((entry) => {
+    if (typeof entry === "string") return entry;
+    const p = obj(entry);
+    return { path: p.path, unitCode: p.unit_code };
+  }) : v;
+  const report = {
+    poId: r.po_id, actualSiteId: r.actual_site_id, arrivalSourceId: r.arrival_source_id,
+    handoverPerson: r.handover_person, doNumber: r.do_number, doFilePath: r.do_file_path,
+    goodsReceivedTime: r.goods_received_time, goodsReceivedAt: r.goods_received_at,
+    note: r.note ?? undefined, arrivalEvidence: r.arrival_evidence, extraLines: r.extra_lines,
+    arrivalUnits: Array.isArray(r.arrival_units) ? r.arrival_units.map((entry) => {
+      const u = obj(entry);
+      return { stockItemId: u.stock_item_id, outcome: u.outcome, issueKind: u.issue_kind ?? undefined, note: u.note ?? undefined };
+    }) : r.arrival_units,
+    lines: Array.isArray(r.lines) ? r.lines.map((entry) => {
+      const l = obj(entry);
+      return { id: l.id, receivedNow: l.received_now, damagedQty: l.damaged_qty, wrongItemQty: l.wrong_item_qty,
+        damagedPhotos: photos(l.damaged_photos), wrongItemPhotos: photos(l.wrong_item_photos),
+        wrongItemClaimType: l.wrong_item_claim_type ?? undefined,
+        units: Array.isArray(l.units) ? l.units.map((entry) => {
+          const u = obj(entry);
+          return { unitCode: u.unit_code, outcome: u.outcome, issueKind: u.issue_kind ?? undefined, note: u.note ?? undefined };
+        }) : l.units,
+      };
+    }) : r.lines,
+  };
+  const parsed = warehouseConfirmationReportInput.safeParse(report);
+  return parsed.success ? parsed.data : null;
+}

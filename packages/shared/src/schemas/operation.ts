@@ -369,8 +369,8 @@ export const officeReceiveInput = z.object({
     )
     .max(30)
     .optional(),
-  /** 0426 — extra goods, recorded separately; never Inventory, never pending
-   *  arithmetic. */
+  /** 0426 — extra goods, recorded separately; never available stock or pending
+   *  arithmetic. Controlled custody is governed by Purchasing §2.4. */
   extraLines: z
     .array(
       z.object({

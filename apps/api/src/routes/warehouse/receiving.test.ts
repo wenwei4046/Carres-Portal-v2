@@ -16,8 +16,8 @@ import { userClient } from "../../lib/supabase";
 /**
  * R6 — /api/warehouse/* (the third external portal).
  *
- * What these tests are really about: the warehouse's surface is THREE RPCs and
- * nothing else, and a login that is not a scoped warehouse never reaches them.
+ * Warehouse routes use their scoped RPCs; other roles never reach the writers.
+ * Confirmation transport tests do not substitute for real database authority tests.
  */
 
 const env = {
@@ -149,16 +149,92 @@ describe("GET /api/warehouse/incoming", () => {
 });
 
 describe("GET /api/warehouse/receipts", () => {
+  const row = (i: number) => ({ id: `11111111-1111-4111-8111-${String(i).padStart(12,"0")}`, submitted_at: "2026-10-01T00:00:00+00:00", po_id: "PO-1001", claims: [] });
   it("wraps the RPC's array so the payload can grow a sibling key later", async () => {
-    const sb = makeSb({ data: [{ id: "r1", po_id: "PO-1001", claims: [] }] });
+    const sb = makeSb({ data: [row(1)] });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(userClient).mockReturnValue(sb as any);
     const res = await req("/api/warehouse/receipts", "GET", await warehouseJwt());
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({
-      receipts: [{ id: "r1", po_id: "PO-1001", claims: [] }],
+      receipts: [row(1)],
     });
-    expect(sb.rpc).toHaveBeenCalledWith("warehouse_my_receipts");
+    expect(sb.rpc).toHaveBeenCalledWith("warehouse_receipts_page", {p_before_at:null,p_before_id:null,p_limit:200});
+  });
+  it("loads an older unresolved report beyond the first 200 with an exact cursor", async () => {
+    const first = Array.from({length:200},(_,i)=>row(300-i));
+    const older = {...row(1),status:"draft",blockers:[{code:"receipt_evidence_not_available"}]};
+    const sb = makeSb({data:[]});
+    sb.rpc.mockResolvedValueOnce({data:first,error:null}).mockResolvedValueOnce({data:[older],error:null});
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const res = await req("/api/warehouse/receipts", "GET", await warehouseJwt());
+    expect(res.status).toBe(200);
+    expect((await res.json() as {receipts:unknown[]}).receipts).toEqual([...first,older]);
+    expect(sb.rpc).toHaveBeenNthCalledWith(2,"warehouse_receipts_page",{p_before_at:first[199]!.submitted_at,p_before_id:first[199]!.id,p_limit:200});
+  });
+  it.each(["failed", "missing", "repeated"])("does not report incomplete history as success when the next page is %s", async (kind) => {
+    const first = Array.from({length:200},(_,i)=>row(300-i));
+    const sb = makeSb({data:[]});
+    sb.rpc.mockResolvedValueOnce({data:first,error:null}).mockResolvedValueOnce(kind === "failed"
+      ? {data:null,error:{code:"42501",message:"Forbidden"}} : {data:kind === "missing" ? null : first,error:null});
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const res = await req("/api/warehouse/receipts", "GET", await warehouseJwt());
+    expect(res.status).toBe(kind === "failed" ? 403 : 502);
+    expect(await res.json()).not.toHaveProperty("receipts");
+  });
+});
+
+describe("GET Warehouse receipt history", () => {
+  const receiptId="11111111-1111-4111-8111-111111111111";
+  const event=(i:number)=>({id:`22222222-2222-4222-8222-${String(i).padStart(12,"0")}`,receipt_id:receiptId,event_at:"2026-10-01T00:00:00Z",event:"submitted",actor_name:"Receiver",payload:{report:{note:"Saved fact"}}});
+  it("reads all own-report events with stable continuation",async()=>{
+    const first=Array.from({length:200},(_,i)=>event(300-i));
+    const sb=makeSb({data:[]});
+    sb.rpc.mockResolvedValueOnce({data:first,error:null}).mockResolvedValueOnce({data:[event(1)],error:null});
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const res=await req(`/api/warehouse/receipts/${receiptId}/history`,"GET",await warehouseJwt());
+    expect(res.status).toBe(200);
+    expect((await res.json() as {events:unknown[]}).events).toEqual([...first,event(1)]);
+    expect(sb.rpc).toHaveBeenNthCalledWith(2,"warehouse_receipt_history_page",{p_receipt_id:receiptId,p_before_at:first[199]!.event_at,p_before_id:first[199]!.id,p_limit:200});
+  });
+  it.each(["foreign", "missing", "denied"])("refuses %s history rather than exposing it",async(kind)=>{
+    const sb=makeSb(kind==="denied"?{error:{code:"42501",message:"Not available"}}:{data:kind==="missing"?null:[{...event(1),receipt_id:"33333333-3333-4333-8333-333333333333"}]});
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const res=await req(`/api/warehouse/receipts/${receiptId}/history`,"GET",await warehouseJwt());
+    expect(res.status).toBe(kind==="denied"?403:502);
+    expect(await res.json()).not.toHaveProperty("events");
+  });
+  it("rejects invalid report identity before querying",async()=>{
+    const sb=makeSb({data:[]});vi.mocked(userClient).mockReturnValue(sb as any);
+    const res=await req("/api/warehouse/receipts/not-an-id/history","GET",await warehouseJwt());
+    expect(res.status).toBe(422);expect(sb.rpc).not.toHaveBeenCalled();
+  });
+});
+
+describe("Warehouse report evidence",()=>{
+  const receipt="11111111-1111-4111-8111-111111111111";
+  const event="22222222-2222-4222-8222-222222222222";
+  const path="PO-1001/proof.jpg";
+  const url=`/api/warehouse/receipts/${receipt}/history/${event}/evidence?path=${encodeURIComponent(path)}`;
+  function client(bucket:unknown){
+    const sign=vi.fn().mockResolvedValue({data:{signedUrl:"https://example.test/proof.jpg"},error:null});
+    const sb={...makeSb({data:bucket}),storage:{from:vi.fn(()=>({createSignedUrl:sign}))}};
+    vi.mocked(userClient).mockReturnValue(sb as never);return {sb,sign};
+  }
+  it.each(["delivery-orders","arrival-proofs"])("signs the exact recorded path with user authority in %s",async(bucket)=>{
+    const {sb,sign}=client(bucket);
+    const res=await req(url,"GET",await warehouseJwt());
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("warehouse_receipt_evidence_bucket",{p_receipt_id:receipt,p_event_id:event,p_path:path});
+    expect(sb.storage.from).toHaveBeenCalledWith(bucket);expect(sign).toHaveBeenCalledWith(path,3600);
+  });
+  it.each([null,"private-bucket"])("refuses absent or unexpected evidence authority %s",async(bucket)=>{
+    const {sb,sign}=client(bucket);const res=await req(url,"GET",await warehouseJwt());
+    expect(res.status).toBe(403);expect(sb.storage.from).not.toHaveBeenCalled();expect(sign).not.toHaveBeenCalled();
+  });
+  it("keeps Storage denial visible after successful source validation",async()=>{
+    const {sign}=client("delivery-orders");sign.mockResolvedValue({data:null,error:{message:"Denied"}} as never);
+    const res=await req(url,"GET",await warehouseJwt());expect(res.status).toBe(502);expect(await res.json()).not.toHaveProperty("url");
   });
 });
 
@@ -397,5 +473,159 @@ describe("POST /api/warehouse/receipts", () => {
     );
     expect(res.status).toBeGreaterThanOrEqual(400);
     expect(JSON.stringify(await res.json())).toContain("already waiting");
+  });
+});
+
+const confirmationKey = "11111111-1111-4111-8111-111111111190";
+describe("POST /api/warehouse/receipts/confirm", () => {
+  it("preserves incomplete evidence and returns the engine's blockers without guessing zero or today", async () => {
+    const blocked = { id: LINE, status: "draft", grn_no: null, revision: 0, blockers: [{ code: "receipt_quantity_unknown" }] };
+    const sb = makeSb({ data: blocked });
+    vi.mocked(userClient).mockReturnValue(sb as unknown as ReturnType<typeof userClient>);
+    const res = await req("/api/warehouse/receipts/confirm", "POST", await warehouseJwt(), {
+      saveKey: confirmationKey,
+      report: { poId: null, doNumber: "", lines: [{ id: LINE, receivedNow: 1, damagedQty: null }] },
+    });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual(blocked);
+    expect(sb.rpc).toHaveBeenCalledTimes(1);
+    expect(sb.rpc.mock.calls[0]![0]).toBe("warehouse_confirm_receipt");
+    // Check the actual serialised transport, where absent keys stay absent.
+    const args = JSON.parse(JSON.stringify(sb.rpc.mock.calls[0]![1]));
+    expect(args).toEqual({
+      p_save_key: confirmationKey, p_receipt_id: null, p_revision: null,
+      p_report: { po_id: null, do_number: "", lines: [{ id: LINE, received_now: 1, damaged_qty: null }] },
+    });
+  });
+
+  it("carries a non-PO arrival and its exact Unit outcomes through the same confirmation door", async () => {
+    const sb = makeSb({ data: { id: LINE, status: "posted", blockers: [] } });
+    vi.mocked(userClient).mockReturnValue(sb as unknown as ReturnType<typeof userClient>);
+    const res = await req("/api/warehouse/receipts/confirm", "POST", await warehouseJwt(), {
+      saveKey: confirmationKey, report: {
+        arrivalSourceId: LINE, actualSiteId: WH, handoverPerson: "Driver",
+        arrivalUnits: [{ stockItemId: LINE, outcome: "received_with_issue", issueKind: "damaged" }],
+      },
+    });
+    expect(res.status).toBe(200);
+    const args = JSON.parse(JSON.stringify(sb.rpc.mock.calls.find(call=>call[0]==="warehouse_confirm_receipt")![1]));
+    expect(args.p_report).toEqual({ arrival_source_id: LINE, actual_site_id: WH,
+      handover_person: "Driver", arrival_units: [{ stock_item_id: LINE, outcome: "received_with_issue", issue_kind: "damaged" }],
+    });
+    expect(args.p_report).not.toHaveProperty("po_id");
+  });
+
+  it("passes caller identity for retries and exact revision for a correction", async () => {
+    const sb = makeSb({ data: { id: LINE, status: "posted", grn_no: "GRN-261005-0001", revision: 2, blockers: [] } });
+    vi.mocked(userClient).mockReturnValue(sb as unknown as ReturnType<typeof userClient>);
+    const res = await req("/api/warehouse/receipts/confirm", "POST", await warehouseJwt(), {
+      saveKey: confirmationKey, receiptId: LINE, revision: 1,
+      report: { ...validBody, actualSiteId: WH, goodsReceivedTime: "2026-10-04T09:00:00+08:00" },
+    });
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("warehouse_confirm_receipt", expect.objectContaining({
+      p_save_key: confirmationKey, p_receipt_id: LINE, p_revision: 1,
+      p_report: expect.objectContaining({ actual_site_id: WH, goods_received_time: "2026-10-04T09:00:00+08:00" }),
+    }));
+  });
+
+  it.each([
+    { report: {} },
+    { saveKey: confirmationKey, receiptId: LINE, report: {} },
+    { saveKey: confirmationKey, revision: 0, report: {} },
+    { saveKey: confirmationKey, report: { postedBy: LINE } },
+    { saveKey: confirmationKey, report: { lines: Array.from({ length: 501 }, () => ({ id: LINE })) } },
+  ])("rejects malformed or authority-injecting input before any RPC", async (body) => {
+    const sb = makeSb();
+    vi.mocked(userClient).mockReturnValue(sb as unknown as ReturnType<typeof userClient>);
+    const res = await req("/api/warehouse/receipts/confirm", "POST", await warehouseJwt(), body);
+    expect(res.status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
+
+  it.each(["operation", "principal", "supplier", "dealer"])("refuses %s at the final-confirmation door", async (role) => {
+    const sb = makeSb();
+    vi.mocked(userClient).mockReturnValue(sb as unknown as ReturnType<typeof userClient>);
+    const res = await req("/api/warehouse/receipts/confirm", "POST", await makeJwt(role), { saveKey: confirmationKey, report: {} });
+    expect(res.status).toBe(403);
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
+
+  it("does not fall back to queued receiving when the final-confirmation RPC is unavailable", async () => {
+    const sb = makeSb({ error: { code: "PGRST202", message: "Could not find warehouse_confirm_receipt" } });
+    vi.mocked(userClient).mockReturnValue(sb as unknown as ReturnType<typeof userClient>);
+    const res = await req("/api/warehouse/receipts/confirm", "POST", await warehouseJwt(), { saveKey: confirmationKey, report: {} });
+    expect(res.status).toBeGreaterThanOrEqual(400);
+    expect(sb.rpc).toHaveBeenCalledTimes(1);
+    expect(sb.rpc.mock.calls[0]![0]).toBe("warehouse_confirm_receipt");
+  });
+
+  it("does not claim success when the engine returns no receipt", async () => {
+    const sb = makeSb();
+    vi.mocked(userClient).mockReturnValue(sb as unknown as ReturnType<typeof userClient>);
+    const res = await req("/api/warehouse/receipts/confirm", "POST", await warehouseJwt(), { saveKey: confirmationKey, report: {} });
+    expect(res.status).toBe(502);
+  });
+});
+
+describe("Warehouse non-PO arrivals and source proof", () => {
+  it("reads the actor-scoped arrival source RPC without accepting a Site override", async () => {
+    const sb = makeSb({ data: [{ id: LINE, kind: "transfer", units: [] }] });
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const response = await req(`/api/warehouse/arrivals?site=${WH}`, "GET", await warehouseJwt());
+    expect(response.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("warehouse_incoming_arrivals");
+    expect(await response.json()).toEqual({ arrivals: [{ id: LINE, kind: "transfer", units: [] }] });
+  });
+  it("does not present a missing source RPC result as an empty arrival list", async () => {
+    const sb = makeSb();
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    expect((await req("/api/warehouse/arrivals", "GET", await warehouseJwt())).status).toBe(502);
+  });
+  it("requires Warehouse role for the arrival source list", async () => {
+    expect((await req("/api/warehouse/arrivals", "GET", await makeJwt("dealer"))).status).toBe(403);
+    expect(userClient).not.toHaveBeenCalled();
+  });
+  function proofClient(allowed: boolean) {
+    const storage = { createSignedUploadUrl: vi.fn().mockResolvedValue({ data: { token: "test-token" }, error: null }),
+      createSignedUrl: vi.fn().mockResolvedValue({ data: { signedUrl: "https://example.test/proof" }, error: null }) };
+    const sb = { ...makeSb({ data: allowed }), storage: { from: vi.fn(() => storage) } };
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    return { sb, storage };
+  }
+  it("signs a proof only after Site authority and keeps the actor in the path", async () => {
+    const { sb, storage } = proofClient(true);
+    const response = await req(`/api/warehouse/arrivals/${LINE}/proof`, "POST", await warehouseJwt(), { mime_type: "image/jpeg", size_bytes: 1024 });
+    expect(response.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("warehouse_arrival_proof_allowed", { p_source_id: LINE, p_require_open: true });
+    expect(sb.storage.from).toHaveBeenCalledWith("arrival-proofs");
+    expect(storage.createSignedUploadUrl).toHaveBeenCalledWith(expect.stringMatching(new RegExp(`^${LINE}/u1/[0-9a-f-]+\\.jpg$`)));
+  });
+  it("never signs a proof when Site authority refuses", async () => {
+    const { storage } = proofClient(false);
+    const response = await req(`/api/warehouse/arrivals/${LINE}/proof`, "POST", await warehouseJwt(), { mime_type: "image/jpeg", size_bytes: 1024 });
+    expect(response.status).toBe(403);
+    expect(storage.createSignedUploadUrl).not.toHaveBeenCalled();
+  });
+  it("rejects unsupported evidence before requesting authority or an upload token", async () => {
+    const { sb, storage } = proofClient(true);
+    const response = await req(`/api/warehouse/arrivals/${LINE}/proof`, "POST", await warehouseJwt(), { mime_type: "text/html", size_bytes: 1024 });
+    expect(response.status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
+    expect(storage.createSignedUploadUrl).not.toHaveBeenCalled();
+  });
+  it("can read historical proof through current Site authority without reopening a cancelled source", async () => {
+    const { sb, storage } = proofClient(true);
+    const path = `${LINE}/u1/proof.jpg`;
+    const response = await req(`/api/warehouse/arrivals/${LINE}/proof?path=${encodeURIComponent(path)}`, "GET", await warehouseJwt());
+    expect(response.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("warehouse_arrival_proof_allowed", { p_source_id: LINE, p_require_open: false });
+    expect(storage.createSignedUrl).toHaveBeenCalledWith(path, 3600);
+  });
+  it.each([`${WH}/u1/proof.jpg`, `${LINE}/../proof.jpg`])("refuses unrelated or invalid proof path %s", async (path) => {
+    const { sb, storage } = proofClient(true);
+    expect((await req(`/api/warehouse/arrivals/${LINE}/proof?path=${encodeURIComponent(path)}`, "GET", await warehouseJwt())).status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
+    expect(storage.createSignedUrl).not.toHaveBeenCalled();
   });
 });

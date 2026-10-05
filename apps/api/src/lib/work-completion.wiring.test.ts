@@ -28,6 +28,12 @@ vi.mock("./purchasing-work-completion", async (importOriginal) => {
   };
 });
 
+vi.mock("./warehouse-repair-return-work",()=>({
+  withWarehouseRepairReturnCompletion: (c:{json:(body:unknown)=>Response},sourceId:string|undefined)=>
+    c.json({wired:["repair_order.return_date_passed"],sourceId}),
+}));
+const {default: warehouseReceivingRouter}=await import("../routes/warehouse/receiving");
+
 const { default: ordersRouter } = await import("../routes/orders");
 const { default: toOrderRouter } = await import("../routes/operation/to-order");
 const { default: operationPosRouter } = await import("../routes/operation/pos");
@@ -37,9 +43,10 @@ const { default: orderControlRouter } = await import("../routes/operation/order-
 function mount(role: string) {
   const app = new Hono<AppEnv>();
   app.use("*", async (c, next) => {
-    c.set("auth", { id: "u", email: "u@carres.test", role, dealerId: null, jwt: "jwt" } as never);
+    c.set("auth", { id: "u", email: "u@carres.test", role, dealerId: null, warehouseId:role==="warehouse"?"11111111-0000-4000-8000-000000000001":null, jwt: "jwt" } as never);
     await next();
   });
+  app.route("/api/warehouse",warehouseReceivingRouter);
   app.route("/api/orders", ordersRouter);
   app.route("/api/operation/orders", operationOrdersRouter);
   app.route("/api/operation/orders", orderControlRouter);
@@ -84,4 +91,12 @@ describe("the Sales Orders doors that complete Work", () => {
   it("the delay decision completes delay_planning", async () => {
     expect(await post(mount("operation"), `/api/operation/orders/${ORDER}/delay-decision`)).toEqual({ wired: ["delay_planning"] });
   });
+});
+
+it("Warehouse final confirmation carries the source-scoped return consequence after its role and input guards",async()=>{
+  const body=JSON.stringify({saveKey:ORDER,report:{arrivalSourceId:ORDER}});
+  const response=await mount("warehouse").request("/api/warehouse/receipts/confirm",{method:"POST",headers:{"Content-Type":"application/json"},body});
+  expect(await response.json()).toEqual({wired:["repair_order.return_date_passed"],sourceId:ORDER});
+  const refused=await mount("operation").request("/api/warehouse/receipts/confirm",{method:"POST",headers:{"Content-Type":"application/json"},body});
+  expect(refused.status).toBe(403);
 });

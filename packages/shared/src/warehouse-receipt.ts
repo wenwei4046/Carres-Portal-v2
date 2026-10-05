@@ -29,6 +29,7 @@
  * PURE — no I/O, no clock.
  */
 import { docNumber } from "./doc-number";
+import { mytDayOf } from "./customer-card";
 import { documentDisplayNumber } from "./document-display";
 import { catalogCategoryWordOf } from "./line-category";
 import {
@@ -301,6 +302,11 @@ export function warehouseReceiptOpensClaims(
  *  `claims` is present only once ops has checked it in. */
 export interface WarehouseReceiptRow {
   id: string;
+  raw_report?: unknown;
+  save_key?: string | null;
+  blockers?: Array<{ code: string; message: string }>;
+  arrival_source_id?: string | null;
+  source_no?: string | null;
   po_id: string;
   supplier_name: string | null;
   do_number: string;
@@ -398,6 +404,18 @@ export interface WarehouseIncomingPo {
   open_receipt_id: string | null;
 }
 
+/** Destination-Site scoped non-PO receipt source; no commercial fields. */
+export interface WarehouseIncomingArrival {
+  id: string;
+  source_no: string;
+  kind: Exclude<import("./arrival-source").ArrivalSourceType, "supplier-delivery">;
+  expected_date: string;
+  to_site_id: string;
+  from_site_name: string | null;
+  party_name: string | null;
+  units: Array<{ id: string; unit_code: string; sku: string }>;
+}
+
 export interface WarehouseIncomingResponse {
   warehouse: { id: string; name: string } | null;
   pos: WarehouseIncomingPo[];
@@ -469,6 +487,19 @@ export const RECEIVING_UNIT_OUTCOME_LABEL: Record<ReceivingUnitOutcome, string> 
     not_received: "Not received",
   };
 
+/** Observed non-PO Unit results, not PO quantities or a claim of complete receipt. */
+export function warehouseArrivalReportSummary(
+  units: readonly { stockItemId: string; outcome: ReceivingUnitOutcome }[] | null | undefined,
+): string {
+  if (!units?.length || new Set(units.map(unit => unit.stockItemId)).size !== units.length)
+    return "Not recorded";
+  return (Object.keys(RECEIVING_UNIT_OUTCOME_LABEL) as ReceivingUnitOutcome[])
+    .flatMap(outcome => {
+      const count = units.filter(unit => unit.outcome === outcome).length;
+      return count ? [`${RECEIVING_UNIT_OUTCOME_LABEL[outcome]} · ${count}`] : [];
+    }).join(" · ");
+}
+
 export interface ReceivingUnitResult {
   stock_item_id: string;
   unit_code: string;
@@ -483,8 +514,8 @@ export interface ReceivingArrivalEvidence {
   kind: "photo" | "video";
 }
 
-/** Extra goods are recorded separately: they never enter Inventory and never
- *  alter ordered/pending arithmetic (owner instruction §6). */
+/** Extra goods are recorded separately: they never become available stock or
+ *  alter ordered/pending arithmetic. Controlled custody is required by Purchasing §2.4. */
 export interface ReceivingExtraLine {
   sku: string;
   qty: number;
@@ -667,6 +698,10 @@ export const RECEIVING_WORK_WORDS = {
 } as const;
 
 export interface ReceivingWorkSource {
+  blocked?: readonly {
+    id: string; sourceLabel: string; submitted_at: string;
+    blockers: readonly { code: string; message: string }[];
+  }[];
   /** Actual submitted physical reports awaiting the existing receipt action. */
   submitted: readonly {
     id: string;
@@ -688,7 +723,7 @@ export function receivingWorkItems(
   todayIso: string,
   workingDaysLate: (dueIso: string) => number,
 ): Array<{
-  ruleKey: "receiving.check_in";
+  ruleKey: "receiving.check_in" | "receiving.resolve_report";
   module: "receiving";
   soRef: string;
   orderId: string;
@@ -711,7 +746,7 @@ export function receivingWorkItems(
     : { ownerName: null, ownerUserId: null, ownerDuty: "GRN Duty" };
   const out: ReturnType<typeof receivingWorkItems> = [];
   for (const r of src.submitted) {
-    const due = r.goods_received_at ?? r.submitted_at.slice(0, 10);
+    const due = r.goods_received_at ?? mytDayOf(r.submitted_at);
     out.push({
       ruleKey: "receiving.check_in",
       module: "receiving",
@@ -726,6 +761,17 @@ export function receivingWorkItems(
       workingDaysLate: due && today > due ? workingDaysLate(due) : 0,
       receiptId: r.id,
       poId: r.po_id,
+    });
+  }
+  for (const r of src.blocked ?? []) {
+    // Submission time starts the follow-up; it is not a physical arrival date.
+    const due = mytDayOf(r.submitted_at);
+    out.push({
+      ruleKey: "receiving.resolve_report", module: "receiving",
+      soRef: `Receiving · ${r.sourceLabel}`, orderId: r.id,
+      action: "Open Receiving", ...owner, tone: "warning", locked: false, broken: false,
+      dueIso: due, workingDaysLate: due && today > due ? workingDaysLate(due) : 0,
+      receiptId: r.id, poId: r.sourceLabel,
     });
   }
   return out;

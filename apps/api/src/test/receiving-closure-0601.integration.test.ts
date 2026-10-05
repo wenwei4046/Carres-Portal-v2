@@ -7,9 +7,10 @@ import pg from "pg";
  * 2026-09-25, 2026-09-28):
  *
  *   post      any active Operation staff member posts (no GRN Duty needed);
- *             the Warehouse role is refused
+ *             Warehouse cannot use the Office door; its authorised final
+ *             confirmation posts automatically through the Receiving engine
  *   time      Goods Received Date is a time point, captured at the Office
- *             receipt and at the Warehouse count; never in the future
+ *             receipt and Warehouse final confirmation; never in the future
  *   receiver  a partner-run Site names its operating company; a Carres-run
  *             Site names the Carres staff member who saved
  *   amend     exact Units named both ways; the system never picks one;
@@ -36,6 +37,8 @@ const SUPPLIER = uid("51");
 const WH = uid("61");
 const SHOWROOM = uid("62");
 const NETS = uid("71");
+const DESTINATION = uid("63");
+const SHOWROOM_DESTINATION = uid("64");
 const PO = `PO-IT1-${HEX}`;
 const PO2 = `PO-IT2-${HEX}`;
 const PO3 = `PO-IT3-${HEX}`;
@@ -116,9 +119,11 @@ describe.skipIf(!URL)("a GRN names who received it and when (real PostgreSQL, 06
     await q("insert into workspace_duty_assignments (duty_key, holder_id, effective_from) values ('grn_duty', $1, (now() at time zone 'Asia/Kuala_Lumpur')::date - 1)", [OP]);
     await q("insert into orders (id, so, dealer_id, customer_name, customer_phone, status, source_system) values ($1, $2, $3, 'IT customer', '0120000000', 'proceed_order', 'autocount')", [ORDER, SO, uid("f1")]);
     await q("insert into order_lines (id, order_id, sku, qty, unit_price) values ($1, $2, $3, 1, 1000)", [ORDER_LINE, ORDER, SKU]);
+    await q("insert into purchasing_destinations (id,name,warehouse_id,active) values ($1,$2,$3,true),($4,$5,$6,true)",
+      [DESTINATION,`IT Klang destination ${HEX}`,WH,SHOWROOM_DESTINATION,`IT Showroom destination ${HEX}`,SHOWROOM]);
     for (const [po, line, wh] of [[PO, LINE, WH], [PO2, LINE2, SHOWROOM], [PO3, LINE3, WH]] as const) {
-      await q("insert into purchase_orders (id, supplier_id, warehouse_id, status, placed_at) values ($1, $2, $3, 'open', now() - interval '3 days')", [po, SUPPLIER, wh]);
-      await q("insert into purchase_order_lines (id, po_id, sku, qty, received_qty, identity_mode) values ($1, $2, $3, $4, 0, 'exact_unit')", [line, po, SKU, po === PO ? 3 : 1]);
+      await q("insert into purchase_orders (id, supplier_id, warehouse_id, destination_id, status, placed_at) values ($1, $2, $3, $4, 'open', now() - interval '3 days')", [po, SUPPLIER, wh,wh===WH?DESTINATION:SHOWROOM_DESTINATION]);
+      await q("insert into purchase_order_lines (id, po_id, sku, qty, received_qty, identity_mode, destination_id) values ($1, $2, $3, $4, 0, 'exact_unit', null)", [line, po, SKU, po === PO ? 3 : 1]);
     }
     for (const [id, po, line, wh] of [
       ...U.map((id) => [id, PO, LINE, WH] as const),
@@ -130,6 +135,7 @@ describe.skipIf(!URL)("a GRN names who received it and when (real PostgreSQL, 06
         [id, code(id), SKU, wh, po, line],
       );
     }
+    await q("insert into storage.objects (id,bucket_id,name,owner) values ($1,'delivery-orders',$2,$3)", [uid("f2"),`${PO3}/do.jpg`,WAREHOUSE_USER]);
     await q("set local session_replication_role = origin");
   });
   afterAll(async () => {
@@ -162,7 +168,7 @@ describe.skipIf(!URL)("a GRN names who received it and when (real PostgreSQL, 06
     expect((await unitRow(U[2]!)).status).toBe("incoming");
   });
 
-  it("the Warehouse role may not post, and a future arrival is refused", async () => {
+  it("Warehouse cannot use the Office receipt door, and a future arrival is refused", async () => {
     await as(WAREHOUSE_USER);
     const refused = await officeReceive(PO2, LINE2, [lineRow(U2, "received")], SHOWROOM, null, uid("e2"));
     expect(refused.ok).toBe(false);
@@ -201,7 +207,7 @@ describe.skipIf(!URL)("a GRN names who received it and when (real PostgreSQL, 06
     expect(refused.ok).toBe(false);
   });
 
-  it("the Warehouse count carries its arrival time; any Operation staff member checks it in", async () => {
+  it("Warehouse final confirmation posts with its arrival time and company without Operation approval", async () => {
     await as(WAREHOUSE_USER);
     const arrived = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
     const sub = await attempt(
@@ -209,15 +215,20 @@ describe.skipIf(!URL)("a GRN names who received it and when (real PostgreSQL, 06
       [PO3, `DO-${PO3}`, `${PO3}/do.jpg`, JSON.stringify([{ id: LINE3, received_now: 0, units: [lineRow(U3, "received")] }]), arrived],
     );
     expect(sub.ok, sub.ok ? "" : sub.why).toBe(true);
-    const id = rowOf<{ id: string }>(sub).id;
-    await as(OP2);
-    const posted = await attempt("select public.warehouse_receipt_check_in($1::uuid, null) as r", [id]);
-    expect(posted.ok, posted.ok ? "" : posted.why).toBe(true);
+    const result = rowOf<{ id: string; status: string; grn_no: string; blockers: unknown[] }>(sub);
+    expect(result.status, JSON.stringify(result.blockers)).toBe("posted");
+    expect(result.grn_no).toBeTruthy();
+    const id = result.id;
     await owner();
     const rec = await receipt(id);
     expect(new Date(rec.goods_received_time as string).toISOString()).toBe(arrived);
-    expect(rec.posted_authority).toBe("operation_staff");
+    expect(rec.posted_authority).toBe("warehouse_confirmation");
+    expect(rec.posted_by).toBe(WAREHOUSE_USER);
+    // Legacy review audit fields mirror the physical posting actor, not an Operation approval.
+    expect(rec.reviewed_by).toBe(WAREHOUSE_USER);
+    expect(rec.reviewed_by).not.toBe(OP2);
     expect(rec.received_by_name).toBe(NETS_NAME);
+    expect((await unitRow(U3)).status).toBe("free");
   });
 
   it("an amendment must state the version it starts from", async () => {

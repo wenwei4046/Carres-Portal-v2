@@ -22,6 +22,7 @@ import {
   type PoDatePromise,
   type WarehouseReceiptLine,
 } from "@carres/shared";
+import { warehouseConfirmationReportFromWire } from "@carres/shared/adapters";
 import { requireOperation } from "../../lib/auth-guards";
 import { mapPgError, parseJsonBody, readAllPages } from "../../lib/route-helpers";
 import { isMissingRelationError } from "../../lib/optional-relation";
@@ -111,7 +112,9 @@ const SIGNED_URL_TTL_SECONDS = 3600;
 type ReceiptRow = Record<string, unknown>;
 
 /**
- * GET / — `?status=submitted|returned|posted|voided|all` (default `submitted`).
+ * GET / — `?status=submitted|draft|unresolved|returned|posted|voided|all`.
+ * Default `submitted` preserves the legacy review queue. Work uses `unresolved`
+ * with complete bounded pagination for submitted and preserved draft reports.
  *
  * Defaults to the OPEN queue for the same reason R3's claim list defaults to
  * open: this is a worklist, and a worklist that opens on settled rows is a
@@ -151,6 +154,7 @@ const RECEIPT_FIELDS_0601 =
   "goods_received_time, received_by_kind, received_by_name, revision";
 const RECEIPT_SELECT_0601 = `id, arrival_source_id, ${RECEIPT_FIELDS}, ${RECEIPT_FIELDS_0601}`;
 const RECEIPT_SELECT = `id, arrival_source_id, ${RECEIPT_FIELDS}`;
+const RECEIPT_SELECT_REPORT = `${RECEIPT_SELECT_0601}, raw_report, validation_blockers`;
 /** `arrival_source_id` lands with the arrival-source tables, still an
  *  unnumbered draft (docs/stock/MASTER.md §13.9). Until they exist every
  *  receipt is PO-backed — which is what production holds — so the register
@@ -164,7 +168,7 @@ async function readReceipts<T>(run: (select: string) => Promise<T>): Promise<T> 
   // 0601's columns first; a schema that does not carry them yet (the Worker
   // deploys on merge, the migration is applied through its governed path)
   // still opens every record, reading `Time not recorded` and no receiver.
-  for (const select of [RECEIPT_SELECT_0601, RECEIPT_SELECT]) {
+  for (const select of [RECEIPT_SELECT_REPORT, RECEIPT_SELECT_0601, RECEIPT_SELECT]) {
     try {
       return await run(select);
     } catch (error) {
@@ -786,6 +790,7 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
           do_file_url: r.do_file_path
             ? (doUrls.get(r.do_file_path as string) ?? null)
             : null,
+          blockers: r.validation_blockers ?? [],
           summary: warehouseReceiptSummary(lines),
           opens_claims: warehouseReceiptOpensClaims(lines),
         };
@@ -802,7 +807,7 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
 
   const raw = (c.req.query("status") ?? "submitted").toLowerCase();
   const status = (
-    ["submitted", "returned", "posted", "voided", "all"] as const
+    ["submitted", "draft", "unresolved", "returned", "posted", "voided", "all"] as const
   ).includes(raw as never)
     ? raw
     : "submitted";
@@ -814,7 +819,7 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
   // actual_site_id · arrival_evidence · extra_lines · the posted
   // duty-evidence trio · void_* are what the Register and the GRN record read.
   const listRead = async (select: string) => {
-    let q = sb
+    const makeQuery = () => sb
       .from("warehouse_receipts")
       .select(select)
       // The register is a HISTORY, so it sorts by the BUSINESS date — when
@@ -822,7 +827,15 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
       // The submitted stamp only breaks ties.
       .order("goods_received_at", { ascending: false })
       .order("submitted_at", { ascending: false })
-      .limit(
+      .order("id");
+    if (status === "unresolved") {
+      const result = await readAllPages<ReceiptRow>((from, to) =>
+        makeQuery().in("status", ["submitted", "draft"]).range(from, to));
+      if ("error" in result) throw result.error;
+      if (!("rows" in result)) throw new Error("Receiving reports could not be loaded completely");
+      return result.rows;
+    }
+    let q = makeQuery().limit(
         Math.min(
           Math.max(1, Math.floor(Number(c.req.query("limit")) || DEFAULT_LIMIT)),
           MAX_LIMIT,
@@ -1029,7 +1042,8 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
           : null,
         // Composed by the shared module so the ops queue and the warehouse's
         // own list describe one receipt with one sentence.
-        summary: warehouseReceiptSummary(lines),
+        blockers: r.validation_blockers ?? [],
+        summary: r.status === "draft" && r.raw_report ? "Receiving report saved. No GRN created." : warehouseReceiptSummary(lines),
         // Said out loud BEFORE the button is pressed: a check-in with an issue
         // files cases against a supplier.
         opens_claims: warehouseReceiptOpensClaims(lines),
@@ -1148,10 +1162,85 @@ warehouseReceiptsRouter.get("/receiver", requireOperation, async (c) => {
   });
 });
 
-/**
- * GET /:id — one Receiving Session / GRN record: the row, its per-Unit
- * results and its append-only events, names resolved.
- */
+/** Original saved event evidence, authorised through the caller at every read. */
+warehouseReceiptsRouter.get("/:id/history/:eventId/evidence", requireOperation, async (c) => {
+  const parsed=z.object({id:z.string().uuid(),eventId:z.string().uuid(),path:z.string().min(1).max(500)})
+    .safeParse({id:c.req.param("id"),eventId:c.req.param("eventId"),path:c.req.query("path")});
+  if(!parsed.success || parsed.data.path.split("/").some(part=>!part || part===".."))
+    return c.json({message:"Invalid evidence"},422);
+  const {id,eventId,path}=parsed.data;
+  const sb=userClient(c.env,c.var.auth.jwt);
+  const receipt=await sb.from("warehouse_receipts").select("id").eq("id",id).maybeSingle();
+  if(receipt.error){const mapped=mapPgError(receipt.error);return c.json(mapped.body,mapped.status);}
+  if(!receipt.data) return c.json({message:"Receipt not found"},404);
+  const event=await sb.from("receiving_events").select("id, receipt_id, payload")
+    .eq("id",eventId).eq("receipt_id",id).maybeSingle();
+  if(event.error){const mapped=mapPgError(event.error);return c.json(mapped.body,mapped.status);}
+  if(!event.data || event.data.receipt_id!==id || event.data.id!==eventId)
+    return c.json({message:"Evidence could not be loaded"},403);
+  const report=warehouseConfirmationReportFromWire(event.data.payload?.report);
+  const source=report?.poId ?? report?.arrivalSourceId;
+  const recorded=report && (report.doFilePath===path || report.arrivalEvidence?.some(file=>file.path===path) ||
+    report.lines?.some(line=>[...(line.damagedPhotos ?? []),...(line.wrongItemPhotos ?? [])]
+      .some(file=>(typeof file==="string"?file:file.path)===path)));
+  if(!source || !path.startsWith(`${source}/`) || !recorded)
+    return c.json({message:"Evidence could not be loaded"},403);
+  const signed=await sb.storage.from(report.poId?"delivery-orders":"arrival-proofs").createSignedUrl(path,3600);
+  if(signed.error || !signed.data?.signedUrl) return c.json({message:"Evidence could not be loaded"},502);
+  return c.json({url:signed.data.signedUrl});
+});
+
+warehouseReceiptsRouter.post("/:id/extra-custody/:custodyId/notes", requireOperation, async (c) => {
+  const ids = z.object({ id: z.string().uuid(), custodyId: z.string().uuid() }).safeParse(c.req.param());
+  if (!ids.success) return c.json({ message: "Invalid Receiving" }, 422);
+  const input = await parseJsonBody(c, z.object({ note: z.string().trim().min(1).max(2000), key: z.string().uuid() }).strict());
+  if (!input.ok) return c.json(input.body, input.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const scope = await sb.from("receiving_extra_custody").select("id")
+    .eq("id", ids.data.custodyId).eq("receipt_id", ids.data.id).maybeSingle();
+  if (scope.error) { const mapped = mapPgError(scope.error); return c.json(mapped.body, mapped.status); }
+  if (!scope.data) return c.json({ message: "Custody record not found" }, 404);
+  const result = await sb.rpc("receiving_extra_custody_note", {
+    p_custody_id: ids.data.custodyId, p_note: input.data.note, p_key: input.data.key,
+  });
+  if (result.error) { const mapped = mapPgError(result.error); return c.json(mapped.body, mapped.status); }
+  return c.json(result.data);
+});
+
+// Custody survives receipt correction/void: return the original observation and
+// the current parent state together; never infer stock availability from either.
+warehouseReceiptsRouter.get("/:id/extra-custody", requireOperation, async (c) => {
+  const id = z.string().uuid().safeParse(c.req.param("id"));
+  if (!id.success) return c.json({ message: "Invalid Receiving" }, 422);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data: receipt, error } = await sb.from("warehouse_receipts")
+    .select("id,status,grn_no,extra_lines,actual_site_id,warehouse_id")
+    .eq("id", id.data).maybeSingle();
+  if (error) { const mapped = mapPgError(error); return c.json(mapped.body, mapped.status); }
+  if (!receipt) return c.json({ error: "receipt not found" }, 404);
+  const result = await readAllPages<Record<string, unknown>>((from, to) => sb
+    .from("receiving_extra_custody")
+    .select("id,receipt_id,extra_ordinal,reported_sku,reported_qty,reported_note,actual_site_id,holder_party_id,recorded_by,recorded_at,goods_received_at")
+    .eq("receipt_id", id.data).order("extra_ordinal").order("id").range(from, to));
+  if (!("rows" in result)) return c.json({ message: "Custody records could not be read completely" }, 503);
+  const siteIds = [...new Set(result.rows.map(row => row.actual_site_id).filter((id): id is string => typeof id === "string"))];
+  const sites = siteIds.length ? await readAllPages<{ id: string; name: string | null }>((from, to) => sb
+    .from("warehouses").select("id,name").in("id", siteIds).order("id").range(from, to)) : { rows: [] };
+  if (!("rows" in sites)) return c.json({ message: "Custody locations could not be read completely" }, 503);
+  const custodyIds = result.rows.map(row => row.id as string);
+  const notes = custodyIds.length ? await readAllPages<Record<string, unknown>>((from, to) => sb
+    .from("receiving_extra_custody_notes").select("id,custody_id,note,actor_id,recorded_at")
+    .in("custody_id", custodyIds).order("recorded_at").order("id").range(from, to)) : { rows: [] };
+  if (!("rows" in notes)) return c.json({ message: "Custody notes could not be read completely" }, 503);
+  const actorIds = [...new Set(notes.rows.map(row => row.actor_id).filter((id): id is string => typeof id === "string"))];
+  const actors = actorIds.length ? await readAllPages<{ id: string; name: string | null }>((from, to) => sb
+    .from("app_users").select("id,name").in("id", actorIds).order("id").range(from, to)) : { rows: [] };
+  if (!("rows" in actors)) return c.json({ message: "Note recorders could not be read completely" }, 503);
+  return c.json({ receipt, custody: result.rows, notes: notes.rows,
+    actorNames: Object.fromEntries(actors.rows.flatMap(actor => actor.name?.trim() ? [[actor.id, actor.name]] : [])),
+    siteNames: Object.fromEntries(sites.rows.flatMap(site => site.name?.trim() ? [[site.id, site.name]] : [])) });
+});
+
 warehouseReceiptsRouter.get("/:id", requireOperation, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
   const id = c.req.param("id");
@@ -1211,18 +1300,21 @@ warehouseReceiptsRouter.get("/:id", requireOperation, async (c) => {
       .select("stock_item_id, unit_code, outcome, issue_kind, note")
       .eq("receipt_id", id)
       .order("unit_code"),
-    sb
+    readAllPages((from, to) => sb
       .from("receiving_events")
       .select("id, receipt_id, event, actor_id, event_at, payload")
       .eq("receipt_id", id)
-      .order("event_at", { ascending: false }),
-    sb
+      .order("event_at", { ascending: false }).order("id", { ascending: false })
+      .range(from, to)).then((result) => "rows" in result
+        ? { data: result.rows, error: null }
+        : { data: null, error: "error" in result ? result.error : { code: "XX000", message: "Receiving history could not be loaded completely" } }),
+    r.po_id ? sb
       .from("purchase_orders")
       .select(
         "id, supplier_id, warehouse_id, destination_id, is_consignment, suppliers(name), purchase_order_lines(id, sku, qty, received_qty, damaged_qty, wrong_item_qty)",
       )
       .eq("id", r.po_id as string)
-      .maybeSingle(),
+      .maybeSingle() : Promise.resolve({ data: null, error: null }),
   ]);
 
   // A missing read must never produce a seemingly complete formal receipt.
@@ -1234,6 +1326,22 @@ warehouseReceiptsRouter.get("/:id", requireOperation, async (c) => {
   const { data: units } = unitsRead;
   const { data: evs } = eventsRead;
   const { data: po } = poRead;
+  // Resolve only IDs actually present in saved reports, through Operation RLS.
+  // Labels supplement the original snapshot; they never replace its quantities.
+  const reports=(evs ?? []).map(e=>warehouseConfirmationReportFromWire((e as {payload?:{report?:unknown}}).payload?.report));
+  const reportLineIds=[...new Set(reports.flatMap(report=>(report?.lines ?? []).flatMap(line=>line.id?[line.id]:[])))];
+  const reportUnitIds=[...new Set(reports.flatMap(report=>(report?.arrivalUnits ?? []).map(unit=>unit.stockItemId)))];
+  let reportLines: Array<{id:string;sku:string}> = [];
+  let reportUnits: Array<{id:string;unit_code:string}> = [];
+  try {
+    [reportLines,reportUnits]=await Promise.all([
+      readByIds(reportLineIds,ids=>sb.from("purchase_order_lines").select("id, sku").in("id",ids)),
+      readByIds(reportUnitIds,ids=>sb.from("ops_stock_items").select("id, unit_code").in("id",ids)),
+    ]);
+  } catch(error) {const mapped=mapPgError(error as never);return c.json(mapped.body,mapped.status);}
+  const reportLineLabels=Object.fromEntries(reportLines.map(line=>[line.id,line.sku]));
+  const reportUnitLabels=Object.fromEntries(reportUnits.map(unit=>[unit.id,unit.unit_code]));
+
   const itemIds = [...new Set((units ?? []).map((u) => u.stock_item_id as string))];
   let items: Array<{ id: string; po_line_id: string | null; identity_scope: string | null }> = [];
   try {
@@ -1381,6 +1489,7 @@ warehouseReceiptsRouter.get("/:id", requireOperation, async (c) => {
   return c.json({
     receipt: {
       ...r,
+      blockers: r.validation_blockers ?? [],
       supplier_name: sup?.name ?? null,
       warehouse_name:
         typeof r.warehouse_id === "string"
@@ -1402,9 +1511,13 @@ warehouseReceiptsRouter.get("/:id", requireOperation, async (c) => {
     related_records: await relatedRead,
     line_info: lineInfo,
     po: po ?? null,
-    events: ((evs ?? []) as Array<Record<string, unknown>>).map((e) => ({
+    events: ((evs ?? []) as Array<Record<string, unknown>>).map((e,index) => ({
       ...e,
       actor_name: name(e.actor_id),
+      line_labels: Object.fromEntries((reports[index]?.lines ?? []).flatMap(line=>
+        line.id && reportLineLabels[line.id] ? [[line.id,reportLineLabels[line.id]]] : [])),
+      unit_labels: Object.fromEntries((reports[index]?.arrivalUnits ?? []).flatMap(unit=>
+        reportUnitLabels[unit.stockItemId] ? [[unit.stockItemId,reportUnitLabels[unit.stockItemId]]] : [])),
     })),
   });
 });

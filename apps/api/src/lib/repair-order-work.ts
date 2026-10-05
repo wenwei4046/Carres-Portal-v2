@@ -25,6 +25,7 @@ import {
   REPAIR_ORDER_WORK_RULE,
   projectRepairOrderWork,
   repairOrderConsentOutstanding,
+  repairOrderReturnReceiptResult,
   type OperationWorkItem,
   type RepairOrderDetail,
   type WorkspaceDutyResolution,
@@ -92,9 +93,7 @@ export function repairOrderWorkResult(ruleKey: string, ro: RepairOrderDetail | n
       return ro.supplier_received_at ? `repair_orders.supplier_received_at=${ro.supplier_received_at}` : null;
     case REPAIR_ORDER_WORK_RULE.returnDatePassed: {
       if (ro.cancelled_at) return `repair_orders.cancelled_at=${ro.cancelled_at}`;
-      if (ro.units.length === 0 || ro.units.some((u) => !u.goods_received_date)) return null;
-      const grns = [...new Set(ro.units.map((u) => u.grn_no).filter((g): g is string => Boolean(g)))].sort();
-      return `grn=${grns.join(",") || "posted"}`;
+      return repairOrderReturnReceiptResult(ro);
     }
     case REPAIR_ORDER_WORK_RULE.ownerConsent: {
       if (ro.cancelled_at || repairOrderConsentOutstanding(ro).length > 0) return null;
@@ -129,6 +128,28 @@ export function repairOrderWorkCompletion(
   }, deps);
 }
 
+/** Receipt completion is caused by this request's final GRN, never by a concurrent
+ * return or cancellation. All evidence is read with the Operation caller's RLS. */
+export async function operationReturnReceiptCompleted(
+  c: Context<AppEnv>, roId: string, sourceId: string, since: string,
+): Promise<boolean> {
+  let body: { id?: string; status?: string };
+  try { body = await c.res.clone().json(); } catch { return false; }
+  if (body.status !== "posted" || !body.id) return false;
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data: receipt, error } = await sb.from("warehouse_receipts")
+    .select("id,grn_no,posted_at").eq("id", body.id).eq("arrival_source_id", sourceId)
+    .eq("posted_by", c.var.auth.id).eq("status", "posted").maybeSingle();
+  if (error) throw new Error("Receipt completion evidence unavailable");
+  const postedAt = Date.parse(receipt?.posted_at ?? "");
+  if (!receipt?.grn_no || !Number.isFinite(postedAt) || postedAt < Date.parse(since)) return false;
+  const { data: event, error: eventError } = await sb.from("receiving_events")
+    .select("id").eq("receipt_id", body.id).eq("event", "posted")
+    .eq("actor_id", c.var.auth.id).eq("payload->>repair_return_completed_ro", roId).limit(1).maybeSingle();
+  if (eventError) throw new Error("Receipt completion marker unavailable");
+  return !!event;
+}
+
 /** In front of Receiving's arrival post: a repair-return source names its RO;
  *  every other arrival source observes nothing. */
 export function repairOrderReturnWorkCompletion(
@@ -142,7 +163,14 @@ export function repairOrderReturnWorkCompletion(
         .from("arrival_sources").select("repair_order_id").eq("id", sourceId).maybeSingle();
       if (error) throw new Error(error.message);
       const roId = (data as { repair_order_id: string | null } | null)?.repair_order_id ?? null;
-      return roId ? [{ spec: repairOrderCompletionSpec([REPAIR_ORDER_WORK_RULE.returnDatePassed]), objectIds: [roId] }] : [];
+      if (!roId) return [];
+      const spec = repairOrderCompletionSpec([REPAIR_ORDER_WORK_RULE.returnDatePassed]);
+      spec.readFacts = async (context, id, since) =>
+        await operationReturnReceiptCompleted(context, id, sourceId, since)
+          ? readRepairOrderDetail(context, id) : null;
+      // Cancellation belongs to the RO cancellation door, not a receipt writer.
+      spec.result = (_rule, facts) => facts ? repairOrderReturnReceiptResult(facts) : null;
+      return [{ spec, objectIds: [roId] }];
     },
   }, deps);
 }

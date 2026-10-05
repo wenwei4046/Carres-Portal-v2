@@ -644,19 +644,24 @@ showed three actual GRNs on 4 September (physical quantities 1, 2 and 1), with t
 absent; its exact GRN link opened the existing receipt/PDF page. On 17 August, expected PO-2053
 showed Pending Delivery Qty 1 and opened its exact Inbound source/Site/date. The selected day,
 Warehouse module and Carres Klang filter survived navigation. Phone 390×844 displayed the same
-Calendar and kept it open while selecting a date. One phone edge remains open: tapping a source
-already current leaves the Calendar covering it. The continuation adds an explicit record-open
-callback; the regression failed before the fix and 82 Calendar/shell tests pass afterward.
-That correction still requires its own production verification. No second Calendar page was
+Calendar and kept it open while selecting a date. PR #1909 adds the explicit record-open callback
+so tapping an already-current source also closes the phone Drawer. Its regression failed before
+the fix; 82 Calendar/shell tests pass afterward. Exact-head CI 37232519713 and deployment
+37233528958 succeeded; all five canonical endpoints independently converged to
+`4b9251664bbc66f3a9ab8052fca616c0f03478ce`. Authenticated live 390×844 acceptance opened
+GRN-260904-1064, reopened Calendar and tapped that same GRN: the Drawer closed and the receipt
+remained visible with the selected date retained. Screenshot: `/tmp/carres-calendar-phone-1909-live.png`. No second Calendar page was
 introduced and no receipt/stock write was made. Current module choices cover Warehouse and
 Delivery; broader module-event admission and automatic Warehouse posting are not claimed complete.
 The same phone preview exposed a full-GRN header/Linked PO display bypassing the shared short-year
-formatter. The continuation corrects both display sites; stored source IDs and historical PDFs
-remain unchanged. The existing full-page regression checks the short PO at both positions.
+formatter. PR #1909 corrects both display sites; stored source IDs and historical PDFs remain unchanged.
+The existing full-page regression checks the short PO at both positions. The live smoke receipt
+has an undated PO identifier, so year shortening at those positions is test-verified, not a
+claimed live year-bearing sample.
 Downloaded predecessor/current bundles prove `Filter by module` 0→1, the old
 `title:"Receiving",tone:"text-success"` block 1→0, and `Receiving Differences` control 1→1.
 
-**Read-only production evidence, 2026-10-04:** `warehouse_submit_receipt` still files a report;
+**Read-only production evidence, rechecked 2026-10-05:** `warehouse_submit_receipt` still files a report;
 `warehouse_receipt_check_in` calls Operation's post-authority gate. The only current active
 Warehouse account has `is_person=false`; it is not proof of individually authorised Warehouse
 confirmation. Receipt JSON on current test rows has no `expected_qty` snapshot. Do not infer a
@@ -664,7 +669,398 @@ shipment's shortage from today's cumulative PO balance. Warehouse automatic post
 report preservation and individual actor/Site controls remain approved targets, not built.
 NETS account activation/cutover still requires its separate explicit authorisation.
 
-**Missed-arrival Work ownership — DEPLOYED, LIVE WORK SCENARIO NOT VERIFIED, 2026-10-05.**
+The measured database boundary must be covered as a whole before automatic confirmation is
+claimed delivered. `warehouse_submit_receipt` validates before inserting, so invalid scope is
+currently discarded. `receipt_has_one_source`, the nonempty-lines constraint and the mandatory
+physical-date column prevent retaining an unknown-source/empty/undated report in that row without
+inventing facts. Existing report history `warehouse_my_receipts` inner-joins the PO and supplier,
+so simply admitting an unlinked report would still hide it from Warehouse. Its reader must preserve
+the same authorised Site scope while displaying unresolved reports. The submit signature has no
+caller save key or revision; safe retry/correction must preserve session identity and original
+evidence. Existing duplicate-DO and one-submitted-session indexes must remain reconciled with that
+behaviour, not silently bypassed.
+
+The stock engine still has its Operation/Principal/Partner guard; Warehouse confirmation needs a
+scoped entry to that same engine, without widening the common amendment/void actor context.
+The posting authority helper and its column constraint currently permit no Warehouse actor value,
+so merely admitting the role would incorrectly label its confirmation as Operation staff. Actual
+individual, duty evidence and receiving company must remain distinct. Unvalidated raw attachment
+paths must not enter the fields the receipt reader signs with its service client; existing PO
+uploads live under their source's prefix in `delivery-orders`. These are measured implementation
+gaps against §7.3, not new business rulings. No SQL draft has been approved, migration written or
+production write performed for this automatic-confirmation work.
+
+**Automatic confirmation implementation — LOCAL SQL DRAFT / NOT APPROVED / NOT DEPLOYED,
+2026-10-05.** The chat-only candidate compiles on an isolated PostgreSQL 17 replay. It keeps one
+private stock/session engine behind separately guarded Operation and Warehouse doors, with an
+active individual/Site gate, a caller-held save key, optimistic report correction, original report
+history, safe raw evidence separate from signed receipt fields, explicit blockers and a distinct
+Warehouse confirming authority. Invalid scope remains an unposted Receiving Session; no source,
+physical date or quantity is fabricated. Effective line Deliver To is checked as well as the
+actual Site. This candidate now exercises PO/CO-backed intake and a non-PO transfer through the existing
+arrival receipt engine. Repair/customer-return/replacement lifecycle coverage is not yet proven;
+this remains implementation evidence rather than a new approved business/schema ruling.
+
+The opt-in `warehouse-confirmation-target.integration.test.ts` now passes 30 local cases: valid
+automatic GRN and accepted/missing split; shared/disabled actor refusal; preserved missing-DO,
+unknown-source, unknown-Unit, all-missing and cross-Site reports; same-key replay; duplicate DO including a fully fulfilled PO; consignment ownership;
+same-session correction/history; stale and post-completion correction refusal; unknown physical
+date; foreign evidence isolation; damaged Unit hold with exact receipt Claim; and refusal of
+direct stock/check-in/amend authority. Restoring the old Warehouse submit function makes the seven
+original target gaps fail again; restoring the draft returned all 18 then-current cases to green.
+The two additional cases subsequently passed, including a fully fulfilled PO duplicate regression
+that failed before moving duplicate detection ahead of the closed-PO guard. This suite rolls back
+its fixtures. Three additional unknown-quantity regressions failed against the initial candidate:
+missing damage/wrong counts could be treated as zero and post. The candidate now requires all
+three explicit category counts for quantity-mode lines, preserves the incomplete report and
+returns `receipt_quantity_unknown` without stock movement. Unit-mode counts remain derived from
+explicit Unit outcomes. The 23 PO/CO transaction cases passed together with both concurrency cases before the arrival
+extension; the current combined run passes 30 transaction cases and both concurrency cases.
+The separate `warehouse-confirmation-concurrency.integration.test.ts` passes two real
+concurrent-connection cases: the second connection demonstrably waits on the first transaction,
+then a same-key retry returns the original GRN, while a different-key duplicate DO remains an
+unposted report. Both prove one stock movement and one posted receipt. Its committed fixtures
+remain only in the disposable local database so independent connections can observe them. No production receipt, stock, storage upload or account
+was changed. Ordinary CI skips this suite without `CARRES_RECEIVING_TARGET_DATABASE_URL`; that
+skip is not acceptance. The 0601 receipt-closure suite now passes 13/13 against the local candidate,
+together with all 50 target transaction cases (63 total). Its former Warehouse-count/Operation-check-in
+expectation is replaced by the approved final-confirmation contract: a posted GRN, actual Warehouse
+actor, recorded physical time, partner-company receiver and received Unit stock state before any
+Operation call. Legacy reviewed-by audit fields mirror that same physical actor, not an Operation
+approval. Fixture POs use explicit destinations at their test Sites and an actual local proof object;
+they no longer inherit an unrelated default destination. The Office-door Warehouse refusal,
+Operation direct receipts, time validation, exact-Unit amendments and version checks remain intact.
+All fixture writes roll back; `/tmp/receiving-closure-target-convergence.log` records the run.
+
+**Repair-return Work consequence — BUILT ON BRANCH / NOT DEPLOYED, 2026-10-05.**
+Warehouse final confirmation now wraps its existing receipt writer with the shared Completed mechanism.
+A server-only reader first checks the individual caller's arrival-source permission, then reads only
+that source-linked RO's return identity, target, Unit/posted-GRN facts and exact Work occurrence history.
+No Operation-role impersonation, Warehouse RO endpoint, commercial detail response or new role grant
+is introduced. Supplier name is used internally for the existing Work projection; prices, quotes,
+replies, consents and evidence are not read. Pagination failures remain unknown, never false completion.
+
+The full Work feed and this minimal receipt probe use the same extracted return projection and
+physical-return completion predicate. History resolves the current occurrence generation through
+the existing reader. The existing writer records the actual Warehouse actor only when the occurrence
+was open before the write, disappears afterward, all required Units have valid physical return facts,
+and this newly posted GRN belongs to that source/actor, contributes a required Unit and carries
+the server-generated repair-return completion marker. The arrival engine locks the RO before its
+source and records that marker only on the GRN making the physical return incomplete-to-complete
+transition. A partial receipt whose later read observes another actor's final receipt cannot claim
+completion. Cancellation,
+partial return, blocked/refused report, another actor/source, stale replay, absent GRN and unrelated
+receipt contribution cannot count as this Warehouse completion. A recorder failure is logged without
+undoing or misreporting a successfully posted receipt. The normal PO Duty task ownership is unchanged.
+
+The original 117 targeted API checks passed across Warehouse routes, the then-18-case return adapter suite, original
+RO completion, Work lifecycle/generation, probes and route wiring. Nine shared projection tests pass,
+including equality between the minimal probe and the full feed. API and Shared typechecks pass.
+The source reader is tested with authorised/denied/cancelled/non-repair sources and filters foreign or
+not-received results; the actual generation resolver is exercised after an earlier completion. These
+are local adapter/projection checks alongside the real receipt-engine tests, not a production
+Warehouse repair-return write or full live Completed-ledger journey. The corrected adapter now passes
+19 cases, including another GRN completing between the write and follow-up read. Three real
+concurrent-connection cases pass: same-key retry, duplicate DO, and two actors returning separate
+Units through different sources for one RO. Only the final GRN carries the completion marker.
+Restoring the pre-marker engine makes that last test fail; restoring the candidate makes it pass.
+The target/closure/adapter combined run passes 84 cases (52 + 13 + 19). The two additional target
+cases prove counted goods enter free stock when accepted and held stock with a linked Claim when
+damaged. The local replay required restoration of the existing quantity-key function and Unit-code
+constraint/trigger from migration 0453; the function body was reconciled read-only to production
+MD5 `7b6e70d7cfee68be65bef8c783404b2e`. This is a local test dependency repair, not a new production
+change or a clean whole-chain replay. Production acceptance remains.
+
+**Operation arrival completion causality — BUILT ON BRANCH / NOT DEPLOYED, 2026-10-05.**
+Operation's arrival receipt completion now requires the same server-generated final-GRN marker.
+It reads the exact returned receipt and marker through the caller's RLS, requiring this source,
+actor, posted status, GRN and a posting time no earlier than the request. The physical-return
+predicate excludes cancellation; cancellation completion stays with the RO cancellation door.
+Another actor's final return, a delayed partial read, stale replay and unknown evidence do not
+receive completion credit. Thirteen focused evidence tests plus seven existing RO and nineteen
+Warehouse adapter tests pass (39 total). The Warehouse review chat independently passed its
+19 tests and closed the adapter finding; it did not independently run the SQL concurrency proof.
+These changes depend on the unapproved SQL candidate and are not production acceptance.
+
+**Confirmation transport — BUILT ON BRANCH / NOT DEPLOYED, 2026-10-05.**
+The bounded shared confirmation schema and `/api/warehouse/receipts/confirm` preserve absent/null
+physical counts and dates instead of manufacturing zero or now. The caller supplies the save key;
+a correction supplies the same receipt and revision together. The route forwards the user's JWT
+and calls only `warehouse_confirm_receipt`; a missing function or failed call cannot silently fall
+back to the old Operation-review queue. It returns the engine's posted result or preserved-report
+blockers, and refuses an empty success result. Thirty-one Warehouse route tests pass, including non-PO source/Unit transport, unknown
+facts, correction identity, role refusal, authority injection, bounded lines and no fallback.
+API and Shared typechecks pass. The Warehouse form connection below is now built on branch; neither may deploy ahead of its
+reviewed database engine. No live final-confirmation claim is made.
+
+**Non-PO arrival convergence — LOCAL SQL DRAFT / NOT APPROVED / NOT DEPLOYED, 2026-10-05.**
+The candidate extracts the existing arrival receipt body behind its guarded Operation wrapper;
+Warehouse confirmation enters that same engine only with its preserved draft, individual actor,
+active Site/company and a source addressed to that Site. It updates the original session instead
+of creating another receipt. Seven local transaction checks cover a transfer, exact missing-Unit
+custody, unchanged commercial PO count, same-key retry, same-session missing-proof correction,
+other-Site refusal, issue hold, Operation-door refusal, duplicate handover note, foreign proof
+isolation and the own-report source identity. The shared transport carries arrival source/Units
+without inventing a PO. Existing arrival business transitions are retained; this does not prove
+all downstream repair/return/replacement completion. Read-only production reconciliation on
+2026-10-05 confirms `receiving_arrival_post(uuid,jsonb)` has normalised body MD5
+`94f32438418de444dc3f62c7fd70e0b8`, exactly the retained original used for this extraction and the
+draft's precondition guard. This verifies the starting engine, not the new candidate in production.
+SQL stays only in chat and the isolated local database. API typecheck passes after this extension.
+The candidate now also supplies a scoped Warehouse non-PO arrival reader and proof-access helper.
+Only active individual Warehouse accounts at the destination's active Site/company may read pending
+source Units; posted physical Units and cancelled sources leave the pending read. Its API exposes
+no source editing and no supplier commercial data. Proof signing uses the user's JWT after source
+scope validation. Two additive draft Storage policies permit upload only to that source/current
+actor path and read only within the authorised destination Site. No update/delete grant is added;
+cancelled-source proof is read-only. Existing Operation access is unchanged. These policies are
+local-only and are part of the SQL still requiring review/approval, not applied production RLS.
+Six added local cases cover pending-source projection, other-Site isolation, shared/inactive
+accounts, upload-path enforcement and historical-proof access: 36 transaction cases pass. Forty
+Warehouse API tests cover the source and signing routes as well as final confirmation. This does
+not prove real Storage transport. The non-PO Warehouse form is connected on branch as recorded below.
+Four additional local receipt-leg cases now cover Customer Return, Failed Delivery return,
+Return from repair and Supplier replacement with real source links. Return/repair goods remain
+held; missing Units keep custody. Replacement retains a distinct Unit and its original-Unit link,
+leaves the original held goods and Claim open, and does not mutate commercial PO quantities.
+Each retry returns the same GRN. This is physical receipt-leg proof, not full Case/Repair/Claim
+completion or proof of replacement fulfilment of an unaccepted PO obligation.
+
+**Warehouse report history read — BUILT ON BRANCH / LOCAL SQL DRAFT, 2026-10-05.**
+The API now reads stable `(submitted_at, id)` pages rather than treating the newest 200 reports
+as complete. A page error, missing result, repeated page or exhausted safety bound returns failure,
+never a partial-success list. The draft reader requires an active individual Warehouse actor and
+scopes every page to that Site. A 205-report tied-timestamp transaction test proves complete,
+nonduplicated traversal and other-Site exclusion; shared/inactive actors are refused. Together
+with the added receipt legs, 43 local transaction cases pass; 44 Warehouse API tests pass,
+including an older blocked report and failed/missing/repeated continuation pages. The legacy
+zero-argument RPC remains a bounded compatibility wrapper, while the application uses the paged
+reader. This fixes list truncation, not the still-outstanding per-report revision/evidence history.
+SQL remains only in chat and the isolated local database, unapproved and unapplied to production.
+
+**Operation blocked-report History — BUILT ON BRANCH / NOT DEPLOYED, 2026-10-05.**
+The existing Receiving History section is now outside the posted/review-only branch, so a
+preserved unposted report shows its submitted/corrected events and real actor. Event dates use
+the shared formatter with the actual Kuala Lumpur time, including UTC-to-local day rollover.
+The raw-report branch suppresses the contradictory `Not sent yet` badge and retains its explicit
+saved-report/no-GRN notice. The detail API reads all bounded History pages in stable date/id order;
+an unreadable later page fails the detail rather than claiming a complete history. Tests cover
+1,001 events and a failed second page: 71 receipt-route tests and 75 Receiving UI tests pass.
+Local illustrative 390×844 preview verifies visible correction/submission history, correct local
+time, no duplicate status badge and 390px document/scroll width. Evidence:
+`/tmp/carres-blocked-receiving-history-local.jpg`. This is event-list visibility, not yet complete
+live per-revision evidence transport or Warehouse-side authenticated report-history acceptance.
+Operation snapshot inspection is connected on branch below.
+
+**Warehouse report snapshot reader — BUILT API / LOCAL SQL DRAFT, 2026-10-05.**
+`/api/warehouse/receipts/:id/history` uses an active-individual, exact-Site SQL reader and stable
+event-date/id pagination. Only event identity/time, the actual actor's name and whitelisted report,
+revision, reason and GRN fields are projected; internal Stock before/after records and Duty payloads
+are excluded. A missing, foreign or incomplete response fails rather than returning partial history.
+Original and corrected report snapshots compare exactly, including explicit null/unknown facts.
+The initial local projection incorrectly stripped nested nulls; the regression test caught it and
+the candidate now preserves the original report JSON. A 202-event tied-timestamp case verifies
+complete traversal. Together, 45 local receipt transaction tests and 49 Warehouse API tests pass.
+This supplies the history read contract; the Warehouse history UI is connected as recorded below,
+while evidence viewing is connected on branch below. SQL remains unapproved, chat-only and unapplied to production.
+
+**Warehouse saved-report facts — BUILT ON BRANCH / NOT DEPLOYED, 2026-10-05.**
+Every My receiving row has a History door independent of the current Incoming list. The kit Modal
+uses the governed three-rank history grammar; View opens that event's bounded report snapshot.
+The kit DocumentTable displays reported quantity counts, exact Unit outcomes/notes and extra goods.
+Null counts remain `Not recorded`, explicit zero remains zero, and date-only reports retain unknown
+time. No receiving/approval control appears. The local SQL reader resolves only the report's
+source/Site-authorised SKU and Unit labels, never displaying technical UUIDs as Unit IDs or reading
+another Site's item labels. Original saved facts are not replaced with current Incoming quantities.
+Four history component tests plus 27 existing Warehouse flow tests pass; 45 local transaction tests
+pass with own-source label and foreign-Site label-isolation checks. Local illustrative 390×844
+preview shows the report facts, keyboard return to History and a 388px dialog with no horizontal
+overflow: `/tmp/carres-warehouse-history-facts-local.jpg`. This is report-fact inspection, not
+real Warehouse login acceptance or production delivery. Saved evidence is connected below.
+
+**Warehouse saved-report evidence — BUILT ON BRANCH / LOCAL SQL DRAFT, 2026-10-05.**
+The report History snapshot opens its handover proof and saved photos/videos through the existing
+SavedEvidenceViewer. Each request names the exact receipt, event and recorded path. The local
+SQL helper checks the active individual, Site, source and exact event membership, returning only
+one of the two allowed buckets. The API signs with the caller's own Storage permissions; it never
+uses an administrative signing bypass. Original unknown facts and Unit evidence bindings remain.
+Photo/video navigation resolves each file on demand; unopened files show Loading, actual failures
+retain Try again. No new component, approval, receipt writer or stock authority is introduced.
+
+Local evidence exposed an existing PO Storage policy mismatch: Warehouse could not read the PO
+row used by its old policy. The candidate adds bounded PO evidence insert/read policies through
+an active-individual, effective-destination-Site helper. Reads additionally require current uploader
+ownership or an exact saved own-Site report reference. Unrelated other-uploader files, forged
+uploaders, inactive/shared actors and other Sites are refused. Current Storage `owner_id` is used,
+with deprecated `owner` fallback for legacy rows; current ownership takes precedence. This follows
+[Supabase's ownership contract](https://supabase.com/docs/guides/storage/security/ownership).
+No Storage schema change, update/delete permission or production policy change is included.
+
+50 real local receipt transaction tests, 54 Warehouse API route tests and 12 targeted history/shared
+viewer tests pass. Both application typechecks pass, including the final navigation extension. Local illustrative 390×844 acceptance opens
+Photo 1 then Next to Video 2 without a false error; video metadata/media loads (readyState 4,
+no media error), and native controls are present. Playback itself and real uploaded-file transport
+are not claimed. Screenshot: `/tmp/carres-warehouse-evidence-phone-local.jpg`.
+SQL remains chat-only, unapproved and unapplied to production. This does not close
+source-resolution workflow, live repair-return Work acceptance,
+full Warehouse listing acceptance or the production release gate.
+
+**Operation saved-report inspection — BUILT ON BRANCH / NOT DEPLOYED, 2026-10-05.**
+Operation's existing receipt History opens any saved report event through the same ReceivingReportHistory
+composition as Warehouse. The original report supplies quantities, physical date/time, notes and
+Unit outcomes; current source quantities never replace it. Source labels are read only for report
+IDs through Operation RLS; failures fail the detail read. Evidence names the exact receipt/event/path,
+checks readable receipt and event membership/source prefix, then signs using the caller's Storage
+permissions. No administrative signing bypass, Warehouse access to the Operation door, receipt
+approval or stock action is added. The shared viewer's query cache separates audience endpoints.
+
+83 Operation receipt-route tests pass, including exact saved proof/photo/condition access, non-PO
+bucket selection, foreign-event/unrecorded-path/unreadable-receipt refusal, Warehouse refusal,
+Storage-denial handling, original Unit labels and failed label reads. 76 Receiving UI and eight
+shared report-history tests pass, including opening the saved event from a blocked report and
+using the Operation evidence endpoint without calling Warehouse. API and Web typechecks and
+design-standard checks pass. A local illustrative 390px walk opens the original saved report,
+loads its photo and closes back through report to receipt with focus restored. Screenshot:
+`/tmp/carres-operation-report-snapshot-local.jpg`. Real signed-file transport and production
+acceptance remain unverified; this is not permission to merge the SQL-dependent draft.
+
+**Warehouse confirmation rollout safety — LOCAL SQL CANDIDATE, 2026-10-05.**
+An old open page's `warehouse_submit_receipt` call preserves one unposted report and an explicit
+confirmation blocker; it cannot imply the new final physical confirmation. Retrying returns the
+same report. The new confirmation door can reopen and finalise that same report/revision. A real
+PostgreSQL regression failed against the earlier compatibility wrapper (it posted immediately)
+and passes with preservation-only behavior. The 55 target and three concurrent receipt scenarios
+pass on the disposable database. Existing Office receipt/amendment/date evidence remains covered
+by 13 passing real-database checks. No production receipt, account or permission was changed.
+
+**Warehouse confirmation form — BUILT ON BRANCH / NOT DEPLOYED, 2026-10-05.**
+The PO form now calls the final-confirmation API with a stable save key. It uses kit Modal, Button,
+Checkbox and TableScroller, preserves unknown quantities/date, retains missing Unit outcomes,
+and requires confirmation of the exact displayed draft. Any edit clears confirmation; saving locks
+fields. Only an actual posted result with a GRN closes the form. An unposted result displays its
+blockers and retains its receipt/revision for correction. An uncertain response retries the same
+key. Expected Units match their exact PO-line binding; the SKU fallback is removed. Warehouse reads
+and Receiving/Stock/Calendar projections invalidate after the result. COPY now follows the approved
+Warehouse final-confirmation flow rather than the old routine Operation-review wording.
+Web typecheck and design-standard checks pass. Twenty-one actual-component tests pass for this
+form/Incoming/own-report surface, including blocked correction,
+unknown facts, network retry, confirmation invalidation and posted-GRN closure. Local 390×844
+preview with illustrative API responses verified the blocked message and edit-clears-confirmation.
+It exposed 403px item content in a 354px container; the shared TableScroller now contains its
+404px content within a 356px region. Screenshot: `/tmp/carres-warehouse-confirmation-phone-local.png`.
+This is local UI/transport evidence, not a real Warehouse login, upload or stock receipt.
+Own unposted PO reports now reopen with the same save key, receipt and revision. A saved exact-Unit report with an absent outcome now keeps that result Not recorded and its derived quantities unknown; it no longer invents Not received. The regression failed against the former fallback and now proves preservation plus explicit correction on the same receipt/revision. A saved Received with issue result also keeps an absent issue kind unknown instead of assigning Damaged; its observed outcome remains in the submitted report and derived totals stay unknown. Both regressions fail against their previous defaults. All 23 Warehouse Incoming tests and Web typecheck pass locally; this remains branch-only. The bounded
+shared decoder preserves unknown counts, exact Unit photo bindings, arrival proof and extra goods;
+six decoder tests pass. A reopened form requires fresh confirmation. Previously reported goods
+missing from the current source are retained and saving is disabled, preventing confirmation of
+invisible facts. Loading, read failure and unavailable correction sources are distinguished beside
+the action; source failures offer retry. The rendered reopen/correct test proves the same session
+and evidence are sent again. Source-disappearance resolution, complete report history,
+and broader page/keyboard acceptance remain owed. The own-report list still has its legacy table
+and PageHeader; this bounded correction does not claim complete shared-template adoption.
+
+**Non-PO Warehouse form — BUILT ON BRANCH / NOT DEPLOYED, 2026-10-05.**
+Incoming includes destination-scoped arrival sources alongside POs. The shared-kit modal records
+each exact Unit explicitly; results and actual date start unknown, and optional time is never
+manufactured. Handover proof uses the Warehouse-scoped signing route. Saved reports reopen with
+their original source, evidence, notes, save key and revision; source disappearance blocks saving.
+Editing clears confirmation, uncertain retries retain identity, and only a posted result with a
+GRN closes the form. A blocked response keeps its report and reason visible without claiming a GRN.
+Thirty-one component/upload tests pass, including six non-PO journeys. The 390×844 local preview
+verified explicit received/missing outcomes, the blocked-report message, edit-clears-confirmation
+and shared date selection; the modal measured 388px client/scroll width with no horizontal overflow.
+The walk found and corrected simultaneous saved/not-saved messaging. Evidence:
+`/tmp/carres-warehouse-arrival-phone-local.jpg`. This uses illustrative API responses, not a real
+Warehouse login, proof upload, stock receipt or production acceptance. Broader source lifecycle,
+report history and complete Warehouse listing-template acceptance remain outstanding.
+The Warehouse report list now summarises non-PO reports from their saved exact-Unit outcomes,
+separating Received, Received with issue and Not received. It no longer reads an empty PO-line
+array as `0 good`; absent or duplicate Unit evidence remains Not recorded. This is observed report
+content, not a PO-fulfilment or claim-completion calculation. The 29 Warehouse form/list tests and
+38 shared receipt tests pass, including a posted non-PO issue report and a missing-report case.
+
+**Operation preserved-report visibility — BUILT ON BRANCH / NOT DEPLOYED, 2026-10-05.**
+Operation receipt reads carry the saved raw report and engine blockers without promoting raw
+source/evidence to validated links or signed files. Work reads submitted and draft reports through
+complete bounded pagination, instead of the first 200 records; read failure remains failure.
+Only Warehouse drafts with preserved reports and explicit blockers create `receiving.resolve_report`.
+GRN Duty coordinates that exact report through `Open Receiving`; Warehouse retains physical
+correction and Operation retains supplier follow-up. The submission's Kuala Lumpur business day
+starts the follow-up, never an invented goods-arrival day. Posted receipts and ordinary Office
+drafts create no such action. The exact unposted report shows the saved-report notice, blocker,
+Warehouse and submitter; it shows no GRN totals or routine approval control. Detail reads no longer
+query a fictitious PO for a source-less draft or non-PO receipt. This is visibility and source-door
+coverage, not a claim that all blocker-resolution actions/history/evidence review are complete.
+Validation: 69 receipt-route tests (including 1,001 unresolved reports and permission failure),
+50 Work projection tests, 12 Work probe tests, 79 shared Work/receipt tests and 75 Receiving UI
+tests pass. API/Web typechecks and design-standard checks pass. No production SQL or data changed.
+
+**Extra-goods custody — LOCAL SQL CANDIDATE / INCOMPLETE, 2026-10-05.**
+The original local reproduction saved two unordered pieces in receipt JSON with zero Stock rows.
+The candidate now captures a separate `receiving_extra_custody` record on posting: receipt and
+extra-line ordinal, reported SKU/quantity/note, evidenced actual Site, recorded Site holder,
+physical date and posting actor. The record ID is not a Stock Unit ID; it creates no ownership,
+PO fulfilment, available inventory or payable. Same-receipt retries preserve one record.
+Read access is Operation or active individual Warehouse staff at that Site; authenticated callers
+cannot write custody directly. These policies exist only in the disposable local database and
+unapproved chat draft, not production or a migration file.
+
+Warehouse chat independently confirmed that unknown goods cannot use source-linked arrival/Unit
+primitives until provenance is verified. The governing target remains §2.4 and §9.5, not a new
+business question. The complete custody lifecycle is **not finished**: source investigation,
+acceptance/hand-back evidence, correction/void consequences and operator presentation remain owed.
+The initial custody regression proves capture, Site/actor facts, retry uniqueness and refusal of
+shared/inactive readers while preserving PO and availability arithmetic. The full 53-case local
+receipt target run passes; all fixture writes roll back. This is bounded local proof, not release
+acceptance or a claim that the extra-goods workflow is complete.
+Operation now has an exact-receipt custody evidence reader through caller RLS. It returns the
+original custody observation beside the current receipt status/extra lines, including a voided
+parent; no known holder is invented from a missing one. Inaccessible parents return not found,
+failed custody reads fail explicitly, and Warehouse cannot enter this Operation investigation door.
+A local structural check proves clearing/voiding the parent does not erase the custody observation;
+it is not a test of the production amendment/void business authorisation. The 53 local transaction
+and 87 Operation receipt-route tests pass together (140).
+The Receiving record now renders original extra-goods custody through the shared DocumentTable,
+including quantity, recorded arrival Site/date and note. Posted/voided records use this evidence
+section instead of duplicating raw extra rows in Items. Unknown Site names stay Not recorded;
+failed or malformed reads show an explicit retry. The endpoint resolves readable Site labels
+without returning internal IDs as labels. Five component scenarios cover normal, unknown, failed,
+malformed and empty evidence; the 390×844 illustrative local preview has document client/scroll
+width 390/390. Evidence: `/tmp/carres-extra-custody-phone-local.png`. This is sample-data layout
+proof, not live evidence transport or complete Warehouse template acceptance. Resolution actions
+and the complete correction/acceptance/hand-back journey remain owed.
+
+Still required before an exact SQL review/release: remaining non-PO downstream lifecycle and
+source-resolution audit, extra-goods custody and authority boundaries, full Warehouse
+listing/keyboard acceptance and real evidence transport. Source forms,
+preserved report history and Operation blocked-report/Work readers are implemented on the branch;
+they still require authenticated production acceptance. Exact reviewed SQL approval must precede
+the governed production probe/apply and dependent delivery proof. The draft exists only
+in chat and the isolated local database, not in `supabase/migrations/`. The historical replay had
+seven failures (0149, 0317, 0339, 0398a, 0453, 0561, 0588); the relevant original receipt bodies
+were reconciled to production before drafting, not a clean whole-chain replay.
+
+**Extra-goods investigation notes — LOCAL CANDIDATE / NOT DEPLOYED, 2026-10-05.**
+The candidate provides append-only Operation investigation evidence on an exact custody record.
+It records actual individual actor/time and a caller save key; an identical retry returns the same
+note, while changed evidence under the same key is refused. Warehouse cannot write these notes;
+the note read policy is Operation-only, keeping supplier/commercial investigation outside Warehouse
+access. An Operation API checks the exact receipt/custody pair, rejects disposition fields and calls
+the guarded writer with the user's JWT. The custody reader includes complete bounded note history;
+a failed history read fails explicitly. Saving a note changes no custody quantity, Stock, PO, Claim,
+acceptance or return result. No supplier message is sent. The shared Modal/Textarea editor now opens from the exact extra-goods row. It preserves text and
+save key across uncertain save, close/reopen and retry; only a matching confirmed response clears
+the draft. History shows the actual recorder/time and wrapped note, with unknown names explicit.
+The 82 Receiving UI/component tests and 95 API receipt-route tests pass. Full CI at `3a689f64f` found one unpublished note-metadata colour token; it is corrected to the governed slate-11 secondary text. The palette guard and six custody component regressions pass locally; full CI remains required. Missing or blank
+recorder/Site names are omitted from label maps so the existing Not recorded fallback preserves
+the custody and note history; three API regressions cover null, empty and whitespace labels. The 390×844 illustrative
+preview saved a note and displayed its recorder/history; the initial horizontally scrolling history
+was replaced by the existing wrapped history grammar. Screenshot:
+`/tmp/carres-extra-custody-note-phone-local.png`. This proves sample UI behavior only; no supplier
+message or production write occurred. Formal resolution remains unfinished. SQL is retained in
+the chat-only draft and disposable local database.
+
+**Missed-arrival Work ownership — DEPLOYED, BOUNDED LIVE ACCEPTANCE, 2026-10-05.**
 A supplier date without a physical report no longer creates Receiving Check in work. The existing
 Purchasing supplier-date-passed action owns that follow-up under PO Duty and opens the exact PO.
 It now reads the same per-line/split arrival authority as the register and day-before check,
@@ -675,7 +1071,14 @@ Existing submitted physical reports retain their exact-session action and GRN Du
 correction does not implement individual Warehouse automatic confirmation or remove its database
 approval boundary. Local validation: 61 API Work/probe tests and 84 shared receipt/PO/Work tests;
 API typecheck and full CI passed. The correction deployed with #1907 and all five production
-proof endpoints converged; an authenticated missed-arrival Work scenario remains unverified.
+proof endpoints converged. Authenticated Team Work search for PO-2053 showed the exact Purchasing
+follow-up, `Ask Nice Future when the goods will arrive`, with the passed date Mon, 17 Aug. Its
+`Record supplier answer` opened the original H1401S Queen line, quantity 1; no Receiving check-in
+was manufactured from the passed date. The form was cancelled without saving. This establishes
+the missed-arrival action and its source door, not supplier-response completion. The same live
+view retained the old day-before reminder as another Missed action and displayed `Assigned to
+Name not recorded`; those bounded convergence/assignee findings were sent to the Work owner and
+remain open. No supplier was contacted and no duty assignment was changed.
 
 ### 2.5 Receiving end-to-end assurance review — 2026-10-04
 
@@ -687,8 +1090,8 @@ business rules, UI words or external cutover. Existing authority answers ordinar
 
 **Resolution and evidence.** Purchasing §§7.1–7.4/9.4–9.7, Stock §7 and receipt blueprint,
 Workspace §6.1 action catalogue, UI §0/§5, COPY Receiving dictionary and Finance §§1–3.2 were
-cross-checked with the following implementation. `OperationReceiving.tsx` still has date,
-condition, category, Site and supplier rail groups, not the approved two-view rail.
+cross-checked with the following implementation. `OperationReceiving.tsx` now has the approved
+two-view rail deployed in #1907, with bounded runtime evidence recorded in §2.4.
 `apps/api/src/routes/warehouse/receiving.ts` submits a count; the Operation receipt route still
 provides the separate guarded check-in. Migration 0619's `receiving_actor_context()` admits an
 active individual Operation/Principal poster, not the newly approved Warehouse confirmation.
@@ -700,7 +1103,7 @@ Purchase Invoice engine. No receipt, amendment, void, invoice or return was exec
 | Capability / lifecycle | Resolution and recommended Carres treatment | Acceptance or remaining uncertainty |
 |---|---|---|
 | Source and expected arrival | RESOLVED: PO/CO and other admitted sources own expected goods; supplier dates stay Purchasing-owned. A supplier dispatch/DO is evidence of supplier statement, not GRN. | Prove source-line and split-batch dates remain separate from actual arrival. No duplicate PO/Receiving ETA writer. |
-| Daily ownership and missed arrival | RESOLVED: Operation checks missing arrivals and contacts suppliers; Warehouse performs physical work. | CONTRADICTION FOUND: Workspace's older action table instructed check-in merely because a date passed. Its target is corrected. The Work feed correction is deployed in #1907 (2026-10-05), with live scenario acceptance still owed: actual submitted reports alone create Receiving work; missed arrivals use Purchasing/PO Duty and the existing per-line arrival authority. |
+| Daily ownership and missed arrival | RESOLVED: Operation checks missing arrivals and contacts suppliers; Warehouse performs physical work. | The incorrect date-only check-in projection is corrected and deployed in #1907; PO-2053 runtime acceptance in §2.4 verifies the supplier follow-up and exact answer form. Actual submitted reports alone create Receiving work. Work reminder/assignee presentation findings in §2.4 remain open. |
 | Warehouse identities and permissions | APPROVED TARGET / NOT BUILT: individually authenticated, source/Site-authorised confirmation, company receiver and individual actor distinct. | Existing role gates do not deliver the new rule. No broad Warehouse finance, adjustment, amend or void rights. |
 | Receipt entry and evidence | KEEP the source-prefilled one engine; confirm actual Unit outcomes or counted quantities, actual date/Site, DO and evidence. | No blank unrelated receipt, identity minting or supplier-reported automatic receipt. Missing evidence preserves an unposted report. |
 | Partial receipt and remaining quantity | RESOLVED: valid received scope completes; remaining acceptable supply stays outstanding. | Example: ordered 10, physically arrived 8 including 1 damaged means Received Qty 7, Damaged Qty 1, physically missing 2, Pending Delivery Qty 3. Never add damage to the 3 again. |
@@ -2123,17 +2526,18 @@ Staff selects purpose
 
 ### 7.3 Receiving and later defect
 
-**Register list PDF — BUILT ON RELEASE BRANCH / NOT YET DEPLOYED, 2026-10-05.**
-The authenticated Receiving list PDF action opened no preview or error. The shared grid previously
-called `window.open` after asynchronous population loading/rendering and ignored a blocked return.
-It now composes existing Modal + lazy PdfPreview with Download; blob lifetime follows the preview.
-The PDF template wraps oversized tokens using actual font metrics without changing document
-identity characters. Generated-PDF readback verifies 15 column boundaries and all 65 sample records
-exactly once across page breaks; the original template fails the same boundary check. All 93 grid
-tests, two PDF render tests and Web typecheck pass on the originating branch. Local actual preview:
-`/tmp/carres-receiving-list-pdf-fitted-local.png`. Exact release-head CI, production preview and
-browser download acceptance remain required. This release changes no receipt writes, SQL or RLS;
-Warehouse automatic confirmation and extra-goods resolution remain in separate draft PR1910.
+**Register list PDF — PRODUCTION-VERIFIED, 2026-10-05 (#1911).**
+Shared DataGrid now opens the existing Modal + lazy PdfPreview after export rendering and provides
+Download. Oversized tokens wrap within their PDF columns without changing identity characters.
+Exact-head CI and production run `37248636367` passed; both Pages projects, both custom web domains
+and API converged to `5604b06d142221215ae9a64e45926dacf4fe01b4`. Authenticated Receiving export
+rendered all seven current register rows in the preview. Download saved the real 4,325-byte PDF
+(`/Users/chaichiewlim/Downloads/Receiving (1).pdf`, 09:00 MYT); text readback confirms seven records
+and the cancelled marker. Screenshot: `/tmp/carres-receiving-pdf-1911-live.png`. Downloaded bundle
+comparison: preview title 0→1, popup call in Register export 1→0, export-error control 1→1.
+The 15-column and 65-record generated-PDF checks cover overflow and page breaks beyond this live
+seven-row case. This release changes no SQL, receipt authority or Stock writer; Warehouse automatic
+confirmation and extra-goods resolution remain unfinished in draft #1910.
 
 ```text
 PO/CO carries the official Deliver To and original PO Delivery Date

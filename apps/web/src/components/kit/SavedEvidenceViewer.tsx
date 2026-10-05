@@ -7,6 +7,8 @@ export interface SavedEvidenceFile {
   id: string;
   kind: "photo" | "video";
   url: string | null;
+  /** Resolve an unopened file through onRetry when first selected. */
+  loadOnOpen?: boolean;
   /** Recorded source and event, never inferred from the current operator. */
   context: string;
   unitCodes?: readonly string[];
@@ -40,7 +42,19 @@ function EvidenceMedia({ file, label, onRetry }: {
 }) {
   const [src, setSrc] = useState(file.url);
   const [attempt, setAttempt] = useState(0);
-  const [status, setStatus] = useState<"loading" | "ready" | "error">(file.url ? "loading" : "error");
+  const [status, setStatus] = useState<"loading" | "ready" | "error">(file.url || file.loadOnOpen ? "loading" : "error");
+  const initialRead = useRef({ file, onRetry });
+  useEffect(() => {
+    const initial = initialRead.current;
+    if (initial.file.url || !initial.file.loadOnOpen) return;
+    let cancelled = false;
+    void initial.onRetry(initial.file.id).then((url) => {
+      if (cancelled) return;
+      setSrc(url);
+      setStatus(url ? "loading" : "error");
+    }).catch(() => { if (!cancelled) setStatus("error"); });
+    return () => { cancelled = true; };
+  }, []);
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const media = useRef<HTMLDivElement>(null);

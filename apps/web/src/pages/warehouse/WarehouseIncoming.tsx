@@ -1,9 +1,11 @@
 import { useState } from "react";
-import { poReceivingProgress } from "@carres/shared";
-import { useWarehouseIncoming } from "@/lib/queries";
+import { ARRIVAL_SOURCE_TYPES, documentDisplayNumber, type WarehouseIncomingArrival, poReceivingProgress } from "@carres/shared";
+import { useWarehouseArrivals, useWarehouseIncoming } from "@/lib/queries";
 import { fmtDate } from "@/lib/fmt-date";
 import PageHeader from "@/components/PageHeader";
 import WarehouseCountModal from "./WarehouseCountModal";
+import WarehouseArrivalModal from "./WarehouseArrivalModal";
+import Button from "@/components/kit/Button";
 
 /**
  * WarehouseIncoming — R6: what is coming to THIS warehouse, and the form to
@@ -22,6 +24,8 @@ export default function WarehouseIncoming() {
   const [countPoId, setCountPoId] = useState<string | null>(null);
   const { data, isLoading, isError, error, refetch } = useWarehouseIncoming();
 
+  const arrivals = useWarehouseArrivals();
+  const [arrival, setArrival] = useState<WarehouseIncomingArrival | null>(null);
   const pos = data?.pos ?? [];
   const countPo = countPoId
     ? (pos.find((p) => p.po_id === countPoId) ?? null)
@@ -74,8 +78,7 @@ export default function WarehouseIncoming() {
         className="mb-3"
       />
       <div className="text-body text-base-600 mb-[18px]">
-        Goods on their way here. Count what the driver brings, then Carres checks
-        it in.
+        Goods on their way here. Count what the driver brings.
       </div>
 
       <div className="bg-white border border-base-200 rounded overflow-auto">
@@ -85,15 +88,15 @@ export default function WarehouseIncoming() {
         >
           <thead className="bg-base-700 border-b-2 border-primary text-white">
             <tr>
-              <Th>PO</Th>
-              <Th>Factory</Th>
+              <Th>Document</Th>
+              <Th>Party</Th>
               <Th>Items</Th>
               <Th>Expected</Th>
               <Th> </Th>
             </tr>
           </thead>
           <tbody>
-            {pos.length === 0 && (
+            {pos.length === 0 && !arrivals.isLoading && !arrivals.isError && !arrivals.data?.arrivals?.length && (
               <tr>
                 <td colSpan={5} className="p-12 text-center text-meta text-base-500">
                   Nothing is on its way here right now.
@@ -119,7 +122,7 @@ export default function WarehouseIncoming() {
                   data-testid="warehouse-incoming-row"
                 >
                   <td className="px-4 py-3 whitespace-nowrap font-mono font-semibold text-base-900">
-                    {po.po_id}
+                    {documentDisplayNumber(po.po_id)}
                   </td>
                   <td className="px-4 py-3 text-base-800">
                     {po.supplier_name ?? ""}
@@ -163,10 +166,23 @@ export default function WarehouseIncoming() {
                 </tr>
               );
             })}
+            {arrivals.isLoading && <tr><td colSpan={5}>Loading…</td></tr>}
+            {arrivals.isError && <tr><td colSpan={5}>
+              Could not be loaded <Button onClick={() => void arrivals.refetch()}>Try again</Button>
+            </td></tr>}
+            {(arrivals.data?.arrivals ?? []).map((source) => <tr key={source.id} className="border-t border-base-100 align-top" data-testid="warehouse-arrival-row">
+              <td className="px-4 py-3 font-mono">{documentDisplayNumber(source.source_no)}
+                <div className="text-meta">{ARRIVAL_SOURCE_TYPES.find(([key]) => key === source.kind)?.[1]}</div></td>
+              <td className="px-4 py-3">{source.party_name ?? "Not recorded"}</td>
+              <td className="px-4 py-3 tabular-nums">{source.units.length}</td>
+              <td className="px-4 py-3">{fmtDate(source.expected_date)}</td>
+              <td className="px-4 py-3"><Button onClick={() => setArrival(source)}>Open Receiving</Button></td>
+            </tr>)}
           </tbody>
         </table>
       </div>
 
+      {arrival && <WarehouseArrivalModal source={arrival} onClose={() => setArrival(null)} />}
       {countPo && (
         <WarehouseCountModal po={countPo} onClose={() => setCountPoId(null)} />
       )}

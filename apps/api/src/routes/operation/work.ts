@@ -885,24 +885,22 @@ export function projectOverpaymentReviewWork(input: {
 
 export function receivingWorkSourceFromModuleFacts(data: {
   receipts: Array<{
-    id: string;
-    po_id: string;
-    supplier_name: string | null;
-    status: string;
-    goods_received_at?: string;
-    submitted_at: string;
+    id: string; po_id: string | null; supplier_name: string | null; status: string;
+    goods_received_at?: string; submitted_at: string; submitted_from?: string;
+    source_no?: string | null; raw_report?: unknown;
+    blockers?: Array<{ code: string; message: string }>;
   }>;
 }): ReceivingWorkSource {
+  const blocked = data.receipts.filter((row) => row.status === "draft" &&
+    row.submitted_from === "warehouse" && row.raw_report != null && (row.blockers?.length ?? 0) > 0)
+    .map((row) => ({ id: row.id, sourceLabel: row.po_id ?? row.source_no ?? "Receiving",
+      submitted_at: row.submitted_at, blockers: row.blockers! }));
   return {
-    submitted: data.receipts
-      .filter((row) => row.status === "submitted")
-      .map((row) => ({
-        id: row.id,
-        po_id: row.po_id,
-        supplier_name: row.supplier_name,
-        goods_received_at: row.goods_received_at,
-        submitted_at: row.submitted_at,
-      })),
+    submitted: data.receipts.filter((row) => row.status === "submitted").map((row) => ({
+      id: row.id, po_id: row.po_id ?? row.source_no ?? "Receiving", supplier_name: row.supplier_name,
+      goods_received_at: row.goods_received_at, submitted_at: row.submitted_at,
+    })),
+    ...(blocked.length ? { blocked } : {}),
   };
 }
 
@@ -1178,8 +1176,10 @@ export function projectReceivingWork(input: {
         id: item.receiptId,
         label: item.poId,
       },
-      // Only an actual submitted physical report reaches this projection.
-      problem: "Goods arrived · GRN not posted",
+      // A submitted legacy report or an explicitly preserved validation blocker.
+      problem: item.ruleKey === "receiving.resolve_report"
+        ? input.source.blocked?.find((row) => row.id === item.receiptId)?.blockers.map((b) => b.message).join(" · ") ?? "Receiving report saved. No GRN created."
+        : "Goods arrived · GRN not posted",
       recipient: supplier,
       requiredResult: "GRN posted",
       destination: `/operation?tab=receiving&session=${encodeURIComponent(item.receiptId)}`,
@@ -1586,7 +1586,7 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
       }>(internal, "/manual-purchase", c),
       readInternal<{ receipts: Parameters<typeof receivingWorkSourceFromModuleFacts>[0]["receipts"] }>(
         internal,
-        "/warehouse-receipts?status=submitted",
+        "/warehouse-receipts?status=unresolved",
         c,
       ),
       readInternal<{ pos: PurchaseOrderArrivalSource[] }>(
@@ -1808,7 +1808,7 @@ export interface WorkLedger {
 }
 
 const LEDGER_CHUNK = 200;
-const LEDGER_COLUMNS =
+export const LEDGER_COLUMNS =
   "id, occurrence_id, event, actor_id, at, channel, contact_kind, contact_id, reply_due_on, result_reference, source_version, action_on, object_label";
 /** `YYYY-MM-DD` moved by whole days — string arithmetic, no clock. */
 function addDaysIsoUtc(iso: string, days: number): string {
@@ -1820,7 +1820,7 @@ function addDaysIsoUtc(iso: string, days: number): string {
 /** How far back the Completed read reaches, in calendar days. */
 export const WORK_COMPLETED_WINDOW_DAYS = 60;
 
-function ledgerRow(r: Record<string, unknown>): WorkOccurrenceEvent {
+export function ledgerRow(r: Record<string, unknown>): WorkOccurrenceEvent {
   return workOccurrenceEventSchema.parse({
     id: r.id, occurrenceId: r.occurrence_id, event: r.event, actorId: r.actor_id, at: r.at,
     channel: r.channel, contactKind: r.contact_kind, contactId: r.contact_id,
@@ -1926,7 +1926,7 @@ const MAX_WORK_GENERATIONS = 20;
  */
 export async function readWorkLedger(
   c: Context<AppEnv>,
-  ledger: WorkLedger,
+  ledger: Pick<WorkLedger,"read">,
   baseIds: readonly string[],
 ): Promise<{ currentId: Map<string, string>; events: WorkOccurrenceEvent[] }> {
   const currentId = new Map(baseIds.map((id) => [id, id]));

@@ -67,6 +67,7 @@ type TableCfg = {
   /** Answer according to the SELECTED columns — lets a test reproduce a
    *  deployed schema that does not carry one optional column. */
   listBySelect?: (columns: string) => Result;
+  listByRange?: (from: number, to: number) => Result;
 };
 
 function makeSb(
@@ -83,6 +84,8 @@ function makeSb(
       const builder: Record<string, unknown> = {};
       const chain = () => builder;
       for (const m of ["eq", "in", "order", "limit", "range"]) builder[m] = vi.fn(chain);
+      let bounds: [number, number] = [0, 999];
+      builder.range = vi.fn((from: number, to: number) => { bounds = [from, to]; return builder; });
       // GET /:id reads one row — resolves to the table's `single` config.
       builder.maybeSingle = vi.fn(() =>
         Promise.resolve(cfg.single ?? { data: null, error: null }),
@@ -107,7 +110,7 @@ function makeSb(
         reject?: (e: unknown) => unknown,
       ) =>
         Promise.resolve(
-          cfg.listBySelect?.(selectedColumns) ??
+          cfg.listByRange?.(...bounds) ?? cfg.listBySelect?.(selectedColumns) ??
             cfg.list ?? { data: [], error: null },
         ).then(resolve, reject);
       return builder;
@@ -216,6 +219,49 @@ describe("who may review a warehouse count", () => {
 });
 
 describe("GET /api/operation/warehouse-receipts", () => {
+  it("reads unresolved reports beyond the first thousand without a silent Work cutoff", async () => {
+    const row = { ...RECEIPT_ROW, po_id: null, do_file_path: null, lines: [], status: "draft", submitted_from: "warehouse",
+      raw_report: {}, validation_blockers: [{ code: "receipt_date_missing", message: "Goods Received Date is not recorded" }] };
+    const rows = Array.from({ length: 1001 }, (_, i) => ({ ...row, id: `report-${i}` }));
+    const ranges: number[] = [];
+    const sb = makeSb({ ...opsTables(row), warehouse_receipts: { listByRange: (from, to) => {
+      ranges.push(from); return { data: rows.slice(from, to + 1), error: null };
+    } } });
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const response = await req("/api/operation/warehouse-receipts?status=unresolved", "GET", await makeJwt("operation"));
+    expect(response.status).toBe(200);
+    const body = await response.json() as { receipts: Array<{ id: string }> };
+    expect(body.receipts).toHaveLength(1001);
+    expect(body.receipts[1000]?.id).toBe("report-1000");
+    expect(ranges).toEqual([0, 1000]);
+  });
+
+  it("reads unresolved physical reports with their blockers and no fabricated received summary", async () => {
+    const raw = { po_id: "UNVALIDATED", do_file_path: "foreign/proof.jpg" };
+    const row = { ...RECEIPT_ROW, status: "draft", submitted_from: "warehouse", po_id: null,
+      do_file_path: null, lines: [], raw_report: raw,
+      validation_blockers: [{ code: "receipt_date_missing", message: "Goods Received Date is not recorded" }] };
+    const sb = makeSb(opsTables(row));
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const spy = vi.spyOn(sb, "from");
+    const response = await req("/api/operation/warehouse-receipts?status=unresolved", "GET", await makeJwt("operation"));
+    expect(response.status).toBe(200);
+    const body = await response.json() as { receipts: Array<Record<string, unknown>> };
+    expect(body.receipts[0]).toMatchObject({ raw_report: raw, blockers: row.validation_blockers,
+      po_id: null, do_file_url: null, summary: "Receiving report saved. No GRN created." });
+    const query = spy.mock.results[0].value;
+    expect(query.in).toHaveBeenCalledWith("status", ["submitted", "draft"]);
+    expect(query.range).toHaveBeenCalled();
+    expect(query.limit).not.toHaveBeenCalled();
+  });
+
+  it("does not turn permission failure reading unresolved reports into an empty queue", async () => {
+    const sb = makeSb({ warehouse_receipts: { list: { data: null, error: { code: "42501", message: "Not allowed" } } } });
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const response = await req("/api/operation/warehouse-receipts?status=unresolved", "GET", await makeJwt("operation"));
+    expect(response.status).toBe(403);
+  });
+
   it("names an arrival source without inventing a purchase order", async () => {
     const tables = {
       ...opsTables(),
@@ -1122,6 +1168,29 @@ describe("GET /:id — one Receiving Session / GRN record", () => {
     },
   );
 
+  it("includes receipt corrections older than the first 1000 history events", async () => {
+    const tables = detailTables();
+    const events = Array.from({length:1001},(_,i)=>({ ...tables.receiving_events.list.data[0], id:`event-${i}`,event:i===1000?"submitted":"resubmitted",payload:{report:{note:`Physical observation ${i}`}} }));
+    const sb = makeSb({...tables,receiving_events:{listByRange:(from,to)=>({data:events.slice(from,to+1),error:null})}});
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const res = await req(`/api/operation/warehouse-receipts/${RECEIPT}`, "GET", await makeJwt("operation"));
+    expect(res.status).toBe(200);
+    const body = await res.json() as {events:{id:string;payload:unknown}[]};
+    expect(body.events).toHaveLength(1001);
+    expect(body.events[1000]).toMatchObject({id:"event-1000",payload:{report:{note:"Physical observation 1000"}}});
+  });
+
+  it("refuses partial receipt history when its older page cannot be read", async () => {
+    const tables = detailTables();
+    const sb = makeSb({...tables,receiving_events:{listByRange:(from)=>from===0
+      ? {data:Array.from({length:1000},(_,i)=>({...tables.receiving_events.list.data[0],id:`event-${i}`})),error:null}
+      : {data:null,error:{code:"42501",message:"History unavailable"}}}});
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const res = await req(`/api/operation/warehouse-receipts/${RECEIPT}`, "GET", await makeJwt("operation"));
+    expect(res.status).toBe(403);
+    expect(await res.json()).not.toHaveProperty("receipt");
+  });
+
   it("keeps unknown lineage unassigned and suppresses counted-stock technical IDs", async () => {
     const tables = detailTables();
     const sb = makeSb({
@@ -1769,3 +1838,130 @@ describe("GET /duty — posting and amend/void are two answers (0601)", () => {
   });
 });
 
+describe("Operation saved report evidence",()=>{
+  const EVENT="55555555-5555-4555-8555-555555555555";
+  const path="PO-1001/saved.jpg";
+  function evidenceClient(report:unknown, overrides:{receipt?:boolean;eventReceipt?:string;storageError?:boolean}={}) {
+    const sb=makeSb({
+      warehouse_receipts:{single:{data:overrides.receipt===false?null:{id:RECEIPT},error:null}},
+      receiving_events:{single:{data:{id:EVENT,receipt_id:overrides.eventReceipt ?? RECEIPT,payload:{report}},error:null}},
+    });
+    const createSignedUrl=vi.fn().mockResolvedValue(overrides.storageError?{data:null,error:{message:"Denied"}}:{data:{signedUrl:"https://example.test/saved"},error:null});
+    const storage={from:vi.fn(()=>({createSignedUrl}))};
+    vi.mocked(userClient).mockReturnValue({...sb,storage} as never);
+    return {storage,createSignedUrl};
+  }
+  const url=(file=path)=>`/api/operation/warehouse-receipts/${RECEIPT}/history/${EVENT}/evidence?path=${encodeURIComponent(file)}`;
+  it.each(["do", "photo", "condition"])("signs the exact saved %s using the caller",async kind=>{
+    const report={po_id:"PO-1001",...(kind==="do"?{do_file_path:path}:kind==="photo"?{arrival_evidence:[{path,kind:"photo"}]}:{lines:[{id:LINE,damaged_photos:[{path,unit_code:"U1-000-001"}]}]})};
+    const client=evidenceClient(report);
+    const result=await req(url(),"GET",await makeJwt("operation"));
+    expect(result.status).toBe(200);expect(await result.json()).toEqual({url:"https://example.test/saved"});
+    expect(client.storage.from).toHaveBeenCalledWith("delivery-orders");
+    expect(client.createSignedUrl).toHaveBeenCalledWith(path,3600);
+  });
+  it("uses the non-PO source bucket for recorded arrival proof",async()=>{
+    const file=`${SITE}/proof.pdf`;const client=evidenceClient({arrival_source_id:SITE,do_file_path:file});
+    expect((await req(url(file),"GET",await makeJwt("operation"))).status).toBe(200);
+    expect(client.storage.from).toHaveBeenCalledWith("arrival-proofs");
+  });
+  it.each(["unrecorded", "wrong-source", "foreign-event", "unreadable-receipt"])("refuses %s before signing",async reason=>{
+    const client=evidenceClient({po_id:reason==="wrong-source"?"PO-OTHER":"PO-1001",do_file_path:path},
+      {eventReceipt:reason==="foreign-event"?SITE:undefined,receipt:reason!=="unreadable-receipt"});
+    const result=await req(url(reason==="unrecorded"?"PO-1001/other.jpg":path),"GET",await makeJwt("operation"));
+    expect(result.status).toBe(reason==="unreadable-receipt"?404:403);
+    expect(client.storage.from).not.toHaveBeenCalled();
+  });
+  it("retains Storage denial instead of signing as administrator",async()=>{
+    const client=evidenceClient({po_id:"PO-1001",do_file_path:path},{storageError:true});
+    expect((await req(url(),"GET",await makeJwt("operation"))).status).toBe(502);
+    expect(client.createSignedUrl).toHaveBeenCalledTimes(1);
+  });
+  it("refuses Warehouse at the Operation door",async()=>{
+    const client=evidenceClient({po_id:"PO-1001",do_file_path:path});
+    expect((await req(url(),"GET",await makeJwt("warehouse"))).status).toBe(403);
+    expect(client.storage.from).not.toHaveBeenCalled();
+  });
+});
+
+describe("Operation original report labels",()=>{
+  it.each([false,true])("preserves report facts and fails a label read honestly (failure=%s)",async failure=>{
+    const report={arrival_source_id:SITE,arrival_units:[{stock_item_id:LINE,outcome:"not_received"}],goods_received_time:null,note:"Original facts"};
+    const sb=makeSb({
+      warehouse_receipts:{single:{data:{...RECEIPT_ROW,po_id:null,do_file_path:null,lines:[],status:"draft"},error:null}},
+      receiving_events:{list:{data:[{id:SAVE_KEY,receipt_id:RECEIPT,event:"submitted",payload:{report}}],error:null}},
+      ops_stock_items:{list:{data:failure?null:[{id:LINE,unit_code:"U1-000-123"}],error:failure?{code:"XX000",message:"Unavailable"}:null}},
+    });
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const result=await req(`/api/operation/warehouse-receipts/${RECEIPT}`,"GET",await makeJwt("operation"));
+    if(failure){expect(result.status).toBeGreaterThanOrEqual(400);return;}
+    expect(result.status).toBe(200);
+    const body=await result.json() as {events:Array<{payload:{report:unknown};unit_labels:Record<string,string>}>};
+    expect(body.events[0]?.payload.report).toEqual(report);
+    expect(body.events[0]?.unit_labels).toEqual({[LINE]:"U1-000-123"});
+  });
+});
+
+
+describe("extra-goods custody evidence", () => {
+  async function read(tables: Record<string, TableCfg>, role = "operation") {
+    vi.mocked(userClient).mockReturnValue(makeSb(tables) as never);
+    return req(`/api/operation/warehouse-receipts/${RECEIPT}/extra-custody`, "GET", await makeJwt(role));
+  }
+  const parent = { id: RECEIPT, status: "voided", grn_no: "GRN-1", extra_lines: [] };
+  const observation = { id: "custody-1", receipt_id: RECEIPT, reported_sku: "UNKNOWN",
+    reported_qty: 2, actual_site_id: SITE, holder_party_id: null };
+  it("retains the custody observation beside a voided/corrected parent without inventing a holder", async () => {
+    const response = await read({ warehouse_receipts: { single: { data: parent, error: null } },
+      receiving_extra_custody: { list: { data: [observation], error: null } } });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ receipt: parent, custody: [observation], notes: [], actorNames: {}, siteNames: {} });
+  });
+  it.each([null, "", "   "])("keeps custody and notes readable when labels are missing (%s)", async name => {
+    const note = { id: SAVE_KEY, custody_id: observation.id, note: "Checking supplier", actor_id: LINE, recorded_at: "2026-10-05T00:00:00Z" };
+    const response = await read({
+      warehouse_receipts: { single: { data: parent, error: null } },
+      receiving_extra_custody: { list: { data: [observation], error: null } },
+      receiving_extra_custody_notes: { list: { data: [note], error: null } },
+      warehouses: { list: { data: [{ id: SITE, name }], error: null } },
+      app_users: { list: { data: [{ id: LINE, name }], error: null } },
+    });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ receipt: parent, custody: [observation], notes: [note], actorNames: {}, siteNames: {} });
+  });
+  it("does not expose custody when the parent is inaccessible", async () => {
+    expect((await read({})).status).toBe(404);
+  });
+  it("does not turn custody read failure into an empty list", async () => {
+    const response = await read({ warehouse_receipts: { single: { data: parent, error: null } },
+      receiving_extra_custody: { list: { data: null, error: { message: "unavailable" } } } });
+    expect(response.status).toBe(503);
+  });
+  it("Warehouse cannot enter the Operation investigation door", async () => {
+    expect((await read({}, "warehouse")).status).toBe(403);
+  });
+});
+
+
+describe("extra-goods investigation note", () => {
+  async function save(body: unknown, role="operation", visible=true) {
+    const sb = makeSb({ receiving_extra_custody: { single: { data: visible ? { id: LINE } : null, error: null } } }, { data: { id: "note" } });
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const response = await req(`/api/operation/warehouse-receipts/${RECEIPT}/extra-custody/${LINE}/notes`, "POST", await makeJwt(role), body);
+    return { response, sb };
+  }
+  it("uses the caller's owning note writer with a stable key", async () => {
+    const {response,sb}=await save({note:" Supplier checking source ",key:SAVE_KEY});
+    expect(response.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("receiving_extra_custody_note",{p_custody_id:LINE,p_note:"Supplier checking source",p_key:SAVE_KEY});
+  });
+  it.each([{note:"",key:SAVE_KEY},{note:"Check",key:"wrong"},{note:"Check",key:SAVE_KEY,status:"accepted"}])("refuses malformed or disposition payload %j",async body=>{
+    const {response,sb}=await save(body);expect(response.status).toBe(422);expect(sb.rpc).not.toHaveBeenCalled();
+  });
+  it("refuses Warehouse and inaccessible receipt/custody pairs",async()=>{
+    for(const [role,visible,status] of [["warehouse",true,403],["operation",false,404]] as const){
+      const {response,sb}=await save({note:"Check",key:SAVE_KEY},role,visible);
+      expect(response.status).toBe(status);expect(sb.rpc).not.toHaveBeenCalled();
+    }
+  });
+});

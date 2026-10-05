@@ -20,6 +20,8 @@ import PreviewFrame from "./preview-frame";
 import { appTodayIso } from "@/lib/fmt-date";
 import StaffDuties from "@/pages/operation/StaffDuties";
 import WarehouseIncoming from "@/pages/warehouse/WarehouseIncoming";
+import ReceivingRecord from "@/pages/operation/components/ReceivingRecord";
+import WarehouseReceiptHistory from "@/pages/warehouse/WarehouseReceiptHistory";
 import "@/index.css";
 
 /** ?page=duties | report | warehouse — defaults to the Receiving register. */
@@ -387,10 +389,10 @@ const WAREHOUSE_INCOMING = {
         },
       ],
       expected_units: [
-        { id: "eu1", unit_code: "U1-000-201", sku: "BF02-Q Queen Bedframe", status: "incoming" },
-        { id: "eu2", unit_code: "U1-000-202", sku: "BF02-Q Queen Bedframe", status: "incoming" },
-        { id: "eu3", unit_code: "U1-000-203", sku: "BF02-Q Queen Bedframe", status: "incoming" },
-        { id: "eu4", unit_code: "U1-000-204", sku: "BF02-Q Queen Bedframe", status: "incoming" },
+        { id: "eu1", unit_code: "U1-000-201", sku: "BF02-Q Queen Bedframe", status: "incoming", po_line_id: "l2" },
+        { id: "eu2", unit_code: "U1-000-202", sku: "BF02-Q Queen Bedframe", status: "incoming", po_line_id: "l2" },
+        { id: "eu3", unit_code: "U1-000-203", sku: "BF02-Q Queen Bedframe", status: "incoming", po_line_id: "l2" },
+        { id: "eu4", unit_code: "U1-000-204", sku: "BF02-Q Queen Bedframe", status: "incoming", po_line_id: "l2" },
       ],
     },
   ],
@@ -407,6 +409,7 @@ const PO_RECEIVING = {
   ],
 };
 
+const custodyNotes: Record<string, string>[] = [];
 const realFetch = window.fetch.bind(window);
 window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   const url =
@@ -416,6 +419,16 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });
+  if (url.includes("/extra-custody/") && url.endsWith("/notes") && init?.method === "POST") {
+    const body = JSON.parse(String(init.body));
+    const note = { id: "preview-note", custody_id: "preview-custody", note: body.note,
+      request_key: body.key, actor_id: "preview-actor", recorded_at: new Date().toISOString() };
+    custodyNotes.push(note); return json(note);
+  }
+  if (url.includes("/extra-custody")) return json({ notes: custodyNotes, actorNames: { "preview-actor": "Shasha" }, siteNames: { [WH]: "Carres Klang" }, custody: PAGE === "custody" ? [
+    { id: "preview-custody", reported_sku: "Unordered pillow", reported_qty: 2,
+      reported_note: "Supplier sent two extra pieces", actual_site_id: WH, goods_received_at: "2026-10-05" },
+  ] : [] });
   if (PAGE.startsWith("calendar") && url.includes("/api/operation/warehouse/inbound")) return json({
     sites: [{ id: WH, name: "Carres Klang" }, { id: WH2, name: "AL Sungai Buloh" }],
     arrivalCalendar: { undatedReceipts: 0, events: [
@@ -426,9 +439,33 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   if (PAGE.startsWith("calendar") && url.includes("/api/operation/orders")) return json({ orders: [] });
   if (PAGE.startsWith("calendar") && url.includes("/api/operation/partners")) return json({ partners: [] });
   if (url.includes("/api/operation/workspace-duties")) return json(WORKSPACE_DUTIES);
+  if (url.includes("/api/warehouse/receipts/confirm")) return json({
+    id: SUBMITTED, receipt_id: SUBMITTED, status: "draft", grn_no: null, revision: 0,
+    blockers: [{ code: "do_file_required", message: "Delivery note is missing" }], already_saved: false,
+  });
+  if (url.includes("/api/warehouse/arrivals")) return json({ arrivals: [{
+    id: "77777777-7777-4777-8777-777777777777", source_no: "TR-20261005-1234", kind: "transfer",
+    expected_date: "2026-10-05", to_site_id: WH2, from_site_name: "Carres Klang", party_name: "Warehouse company",
+    units: [{ id: "88888888-8888-4888-8888-888888888888", unit_code: "U1-000-201", sku: "BF02-Q Queen Bedframe" },
+      { id: "99999999-9999-4999-8999-999999999999", unit_code: "U1-000-202", sku: "BF02-Q Queen Bedframe" }],
+  }] });
   if (url.includes("/api/warehouse/incoming")) return json(WAREHOUSE_INCOMING);
+  if (url.includes(`/api/warehouse/receipts/${POSTED}/history/report-history/evidence`)) return json({url:url.includes("clip")?"/ui-evidence-example.mp4":"/carres-wordmark.png"});
+  if (url.includes(`/api/warehouse/receipts/${POSTED}/history`)) return json({events:[{
+    id:"report-history",receipt_id:POSTED,event:"submitted",event_at:"2026-10-04T17:30:00Z",actor_name:"Aina",
+    line_labels:{[WH]:"MS01-K"},unit_labels:{},payload:{report:{po_id:"PO-20261005-1234",do_number:"DO-1234",
+      goods_received_at:"2026-10-05",goods_received_time:null,note:"Driver reported a shortage",do_file_path:"PO-20261005-1234/document.png",
+      arrival_evidence:[{path:"PO-20261005-1234/photo.jpg",kind:"photo"},{path:"PO-20261005-1234/clip.mp4",kind:"video"}],
+      lines:[{id:WH,received_now:6,damaged_qty:2,wrong_item_qty:null}]}}
+  }]});
+  if (url.includes(`/api/operation/warehouse-receipts/${POSTED}/history/`) && url.includes("/evidence?")) return json({url:"/carres-wordmark.png"});
   if (url.includes("/api/operation/warehouse-receipts/duty")) return json(DUTY);
-  if (url.includes(`/api/operation/warehouse-receipts/${POSTED}`)) return json(DETAIL);
+  if (url.includes(`/api/operation/warehouse-receipts/${POSTED}`)) return json(PAGE === "blocked-report" ? {
+    ...DETAIL, receipt: {...DETAIL.receipt,status:"draft",grn_no:null,lines:[],raw_report:{note:"Driver reported two goods"},
+      blockers:[{code:"receipt_evidence_not_available",message:"Delivery note is missing"}]},
+    events:[{id:"report-corrected",receipt_id:POSTED,event:"resubmitted",event_at:"2026-10-04T17:30:00Z",actor_name:"Warehouse operator",payload:{}},
+      {id:"report-saved",receipt_id:POSTED,event:"submitted",event_at:"2026-10-04T17:00:00Z",actor_name:"Warehouse operator",line_labels:{[WH]:"MS01-K"},payload:{report:{po_id:"PO-20261005-1234",note:"Original supplier delivery report",goods_received_at:"2026-10-05",goods_received_time:null,lines:[{id:WH,received_now:2,damaged_qty:0,wrong_item_qty:null}],arrival_evidence:[{path:"PO-20261005-1234/photo.jpg",kind:"photo"}]}}}],
+  } : DETAIL);
   if (url.includes(`/api/operation/warehouse-receipts/${SUBMITTED}`))
     return json({
       receipt: { ...SUBMITTED_ROW, unit_results: [] },
@@ -547,6 +584,10 @@ createRoot(document.getElementById("root")!).render(
                 <StaffDuties />
               ) : PAGE === "report" ? (
                 <OperationReceivingReport />
+              ) : PAGE === "warehouse-history" ? (
+                <WarehouseReceiptHistory receiptId={POSTED} onClose={()=>{}}/>
+              ) : (PAGE === "blocked-report" || PAGE === "custody") ? (
+                <ReceivingRecord sessionId={POSTED} onBack={() => {}} />
               ) : PAGE === "warehouse" ? (
                 <WarehouseIncoming />
               ) : (
