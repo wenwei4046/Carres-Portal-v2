@@ -64,7 +64,7 @@ import { openFinanceExceptions } from "./finance-exception";
 import { paymentDeadlineOf } from "./logistics-card";
 import type { DeliveryHandoverKind, DeliveryOrderAttemptFact } from "./delivery-order-status";
 import {
-  deliveryJourneyProgressFromStatus,
+  deliveryFailed,
   deliveryWorkStatusOf,
   type DeliveryStatusSpell,
 } from "./delivery-work-status";
@@ -1710,15 +1710,17 @@ function scopeDeliverDraft(
     missingFacts: [],
     todayIso: null,
   };
+  /* The status IS the progress: the one function already speaks the transfer
+     ladder for an intermediate leg, so no second label pass runs here. */
   const status = deliveryWorkStatusOf(facts, ROUTE_SPELL);
-  const progress = deliveryJourneyProgressFromStatus(status, facts);
   const done = status.kind === "delivered" || status.kind === "arrived";
+  const failed = deliveryFailed(status.kind);
   const latest = [...scope.attempts].sort((a, b) => b.recordedAt.localeCompare(a.recordedAt))[0];
   const second = done
     ? dated(scope.transfer ? "Arrived" : "Delivered", latest?.recordedAt?.slice(0, 10) ?? null)
-    : status.kind === "failed"
+    : failed
       ? (latest?.reason ?? status.reasonLabel ?? status.second)
-      : status.kind === "confirmed"
+      : status.kind === "confirmed" || status.kind === "transfer_scheduled"
         ? dated("Scheduled", scope.confirmedDate)
         : status.second;
   return {
@@ -1726,10 +1728,10 @@ function scopeDeliverDraft(
     kind: "deliver",
     title: "DELIVER",
     complete: done,
-    blocked: status.kind === "failed",
-    lines: [progress.label, second],
+    blocked: failed,
+    lines: [status.label, second],
     action:
-      status.kind === "failed"
+      failed
         ? {
             ownerKey: "delivery",
             label: "Arrange new delivery date",

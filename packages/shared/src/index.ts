@@ -1428,6 +1428,10 @@ export {
 // 2026-08-15) and a caller prints the actual weekday + date through `fmtDate`.
 export {
   bookingDayOf,
+  scheduledDeliveryOf,
+  assignedLogisticsIdOf,
+  type ScheduledDelivery,
+  type ScheduledDeliveryRead,
   carrierDayLoads,
   carrierDayNote,
   daysInRange,
@@ -2141,15 +2145,21 @@ export {
 } from "./delivery-order-status";
 // DELIVERY WORK's own status ladder — the OPERATION's progress, deliberately a
 // different vocabulary from the document's (owner correction 2026-08-24).
-// `Created` belongs to the Register and may never appear on the workspace.
+// ONE status function and ONE label function print every surface (Delivery
+// MASTER §8.4, owner ruling 2026-09-25).
 export {
   deliveryWorkStatusOf,
   deliveryJourneyProgressOf,
-  deliveryJourneyProgressFromStatus,
   deliveryWorkStatusLabelOf,
+  askForResultLine,
+  deliveryResultRecorded,
+  deliveryFailed,
+  deliveryGoodsMoved,
   DELIVERY_WORK_STATUS_KINDS,
   DELIVERY_WORK_STATUS_TONE,
   LOGISTICS_ROLE_WORD,
+  TRANSFER_STOP_ROLE_WORD,
+  type DeliveryStatusWords,
   type DeliveryWorkStatus,
   type DeliveryWorkStatusKind,
   type DeliveryWorkStatusInput,
