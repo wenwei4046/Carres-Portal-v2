@@ -924,6 +924,15 @@ loads its photo and closes back through report to receipt with focus restored. S
 `/tmp/carres-operation-report-snapshot-local.jpg`. Real signed-file transport and production
 acceptance remain unverified; this is not permission to merge the SQL-dependent draft.
 
+**Warehouse confirmation rollout safety — LOCAL SQL CANDIDATE, 2026-10-05.**
+An old open page's `warehouse_submit_receipt` call preserves one unposted report and an explicit
+confirmation blocker; it cannot imply the new final physical confirmation. Retrying returns the
+same report. The new confirmation door can reopen and finalise that same report/revision. A real
+PostgreSQL regression failed against the earlier compatibility wrapper (it posted immediately)
+and passes with preservation-only behavior. The 55 target and three concurrent receipt scenarios
+pass on the disposable database. Existing Office receipt/amendment/date evidence remains covered
+by 13 passing real-database checks. No production receipt, account or permission was changed.
+
 **Warehouse confirmation form — BUILT ON BRANCH / NOT DEPLOYED, 2026-10-05.**
 The PO form now calls the final-confirmation API with a stable save key. It uses kit Modal, Button,
 Checkbox and TableScroller, preserves unknown quantities/date, retains missing Unit outcomes,
@@ -1020,19 +1029,6 @@ malformed and empty evidence; the 390×844 illustrative local preview has docume
 width 390/390. Evidence: `/tmp/carres-extra-custody-phone-local.png`. This is sample-data layout
 proof, not live evidence transport or complete Warehouse template acceptance. Resolution actions
 and the complete correction/acceptance/hand-back journey remain owed.
-
-**Register PDF delivery — BRANCH FIX / ACCEPTANCE INCOMPLETE, 2026-10-05.**
-The authenticated live list PDF action opened no preview or error. The shared DataGrid called
-`window.open` only after asynchronous population loading/rendering and ignored a blocked return.
-The branch now uses existing Modal + lazy PdfPreview and a Download control; blob lifetime follows
-the preview instead of expiring after one minute. All 93 register tests pass, including complete
-population, no popup dependency and cleanup on close. Actual local sample PDF rendering reached
-Page 1 of 1 (`/tmp/carres-receiving-list-pdf-local.png`). The list template now wraps oversized tokens using the actual PDF font metrics without inserting
-hyphens or altering identities. Generated-PDF readback proves all 15 column boundaries, complete
-identity characters and all 65 records across page breaks; the original template fails the same
-boundary test. Two rendering tests and three export tests pass; Web typecheck passes. The local
-preview confirms separated references (`/tmp/carres-receiving-list-pdf-fitted-local.png`). Browser
-download observation timed out, so download is not verified. No production change occurred.
 
 Still required before an exact SQL review/release: remaining non-PO downstream lifecycle and
 source-resolution audit, extra-goods custody and authority boundaries, full Warehouse
@@ -2530,17 +2526,18 @@ Staff selects purpose
 
 ### 7.3 Receiving and later defect
 
-**Register list PDF — BUILT ON RELEASE BRANCH / NOT YET DEPLOYED, 2026-10-05.**
-The authenticated Receiving list PDF action opened no preview or error. The shared grid previously
-called `window.open` after asynchronous population loading/rendering and ignored a blocked return.
-It now composes existing Modal + lazy PdfPreview with Download; blob lifetime follows the preview.
-The PDF template wraps oversized tokens using actual font metrics without changing document
-identity characters. Generated-PDF readback verifies 15 column boundaries and all 65 sample records
-exactly once across page breaks; the original template fails the same boundary check. All 93 grid
-tests, two PDF render tests and Web typecheck pass on the originating branch. Local actual preview:
-`/tmp/carres-receiving-list-pdf-fitted-local.png`. Exact release-head CI, production preview and
-browser download acceptance remain required. This release changes no receipt writes, SQL or RLS;
-Warehouse automatic confirmation and extra-goods resolution remain in separate draft PR1910.
+**Register list PDF — PRODUCTION-VERIFIED, 2026-10-05 (#1911).**
+Shared DataGrid now opens the existing Modal + lazy PdfPreview after export rendering and provides
+Download. Oversized tokens wrap within their PDF columns without changing identity characters.
+Exact-head CI and production run `37248636367` passed; both Pages projects, both custom web domains
+and API converged to `5604b06d142221215ae9a64e45926dacf4fe01b4`. Authenticated Receiving export
+rendered all seven current register rows in the preview. Download saved the real 4,325-byte PDF
+(`/Users/chaichiewlim/Downloads/Receiving (1).pdf`, 09:00 MYT); text readback confirms seven records
+and the cancelled marker. Screenshot: `/tmp/carres-receiving-pdf-1911-live.png`. Downloaded bundle
+comparison: preview title 0→1, popup call in Register export 1→0, export-error control 1→1.
+The 15-column and 65-record generated-PDF checks cover overflow and page breaks beyond this live
+seven-row case. This release changes no SQL, receipt authority or Stock writer; Warehouse automatic
+confirmation and extra-goods resolution remain unfinished in draft #1910.
 
 ```text
 PO/CO carries the official Deliver To and original PO Delivery Date

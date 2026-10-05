@@ -57,17 +57,15 @@ and measurements.
 
 # §1 · Overview
 
-**Register list PDF — BUILT ON RELEASE BRANCH / NOT YET DEPLOYED, 2026-10-05.**
-The authenticated Receiving list PDF action opened no preview or error. The shared grid previously
-called `window.open` after asynchronous population loading/rendering and ignored a blocked return.
-It now composes existing Modal + lazy PdfPreview with Download; blob lifetime follows the preview.
-The PDF template wraps oversized tokens using actual font metrics without changing document
-identity characters. Generated-PDF readback verifies 15 column boundaries and all 65 sample records
-exactly once across page breaks; the original template fails the same boundary check. All 93 grid
-tests, two PDF render tests and Web typecheck pass on the originating branch. Local actual preview:
-`/tmp/carres-receiving-list-pdf-fitted-local.png`. Exact release-head CI, production preview and
-browser download acceptance remain required. This release changes no receipt writes, SQL or RLS;
-Warehouse automatic confirmation and extra-goods resolution remain in separate draft PR1910.
+**Register list PDF — PRODUCTION-VERIFIED, 2026-10-05 (#1911).**
+Shared DataGrid uses existing Modal + lazy PdfPreview and Download, with preview-scoped blob
+lifetime. Long tokens wrap by PDF font metrics without changing identity characters. Exact-head CI
+and deploy `37248636367` passed; all five proof endpoints report
+`5604b06d142221215ae9a64e45926dacf4fe01b4`. Authenticated Receiving preview rendered seven rows;
+its downloaded 4,325-byte PDF retains seven records and the cancelled marker. Evidence:
+`/tmp/carres-receiving-pdf-1911-live.png`; Purchasing MASTER §7.3 records the full acceptance boundary.
+The generated-PDF regression additionally proves 15 column boundaries and 65 records across pages.
+This proves shared PDF delivery, not completion of the separate Warehouse confirmation flow.
 
 **Shared document display implementation — 2026-10-04, branch only / NOT PRODUCTION VERIFIED.**
 `packages/shared/src/document-display.ts` provides `documentDisplayNumber` for known Carres-owned

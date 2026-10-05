@@ -1936,6 +1936,7 @@ Operation owns supplier follow-up; Warehouse owns physical evidence and results.
 | Final physical confirmation | `I checked the goods and confirm these receiving results.` | Applies to this exact draft; an edit requires confirmation again. |
 | Unconfirmed draft | `Prefilled results are not confirmed. Check the goods before saving.` | A prefilled outcome is not receipt evidence. |
 | Final save | `Save Receiving` | The engine either creates the GRN or preserves the report with its exact blockers. |
+| Older page submitted a count | `Check the goods and confirm these receiving results.` | Preserve the report unposted; an older submit action is not the new final confirmation. |
 | Confirmation still missing | `Save — confirm receiving results` | Disabled until the individual confirms the displayed report. |
 | Posted successfully | `Receiving saved · {GRN No}` | Only after the engine returns a posted receipt and its actual GRN. |
 | Preserved but unposted report | `Receiving report saved. No GRN created.` | Show the returned blockers; keep the same session for correction. Never describe this as received stock. |

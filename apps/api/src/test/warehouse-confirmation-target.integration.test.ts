@@ -55,8 +55,10 @@ describe.skipIf(!databaseUrl)("authorised Warehouse final receipt (approved targ
     }
   };
   const submit = (source = po, path: string | null = doPath, counts: unknown = lines) => request(
-    "select public.warehouse_submit_receipt($1, $2, $3, 'Physical report', $4::jsonb, null, '[]'::jsonb, '[]'::jsonb, $5::timestamptz) as result",
-    [source, `DO-${hex}`, path, JSON.stringify(counts), arrived],
+    "select public.warehouse_confirm_receipt($1::jsonb,$2::uuid,null,null) as result",
+    [JSON.stringify({ po_id: source, do_number: `DO-${hex}`, do_file_path: path,
+      note: "Physical report", lines: counts, goods_received_time: arrived,
+      arrival_evidence: [], extra_lines: [] }), uid("90")],
   );
   const report = (over: Record<string, unknown> = {}) => ({
     po_id: po, actual_site_id: site, do_number: `DO-${hex}`, do_file_path: doPath,
@@ -520,6 +522,29 @@ describe.skipIf(!databaseUrl)("authorised Warehouse final receipt (approved targ
     const body = await setupArrival();
     const answer = await request("select receiving_arrival_post($1,'{}'::jsonb) as result", [body.arrival_source_id]);
     expect(answer.ok).toBe(false);
+  });
+
+  it("preserves a legacy count without treating an older page as final physical confirmation", async () => {
+    const legacy = () => request(
+      "select public.warehouse_submit_receipt($1,$2,$3,'Physical report',$4::jsonb,null,'[]'::jsonb,'[]'::jsonb,$5::timestamptz) as result",
+      [po, `DO-${hex}`, doPath, JSON.stringify(lines), arrived]);
+    const first = await legacy();
+    if (!first.ok) throw new Error(first.reason);
+    expect(first.result.status).toBe("draft");
+    expect(first.result.grn_no).toBeNull();
+    expect(first.result.blockers).toEqual([expect.objectContaining({ code: "confirmation_required" })]);
+    const again = await legacy();
+    if (!again.ok) throw new Error(again.reason);
+    expect(again.result.id).toBe(first.result.id);
+    const stored = await receipt(first.result.id);
+    expect(stored.raw_report.lines).toEqual(lines);
+    expect((await q("select count(*)::int as n from ops_stock_items where id=any($1::uuid[]) and status<>'incoming'", [unitIds])).rows[0]!.n).toBe(0);
+    expect((await q("select received_qty from purchase_order_lines where id=$1", [line])).rows[0]!.received_qty).toBe(0);
+    await as(person);
+    const completed = await confirm(stored.raw_report, stored.save_key, stored.id, stored.revision);
+    if (!completed.ok) throw new Error(completed.reason);
+    expect(completed.result).toMatchObject({ id: stored.id, status: "posted" });
+    expect(completed.result.grn_no).toMatch(/^GRN-/);
   });
 
   it("final confirmation posts a numbered GRN, accepts only the received Unit and keeps missing goods outstanding", async () => {
