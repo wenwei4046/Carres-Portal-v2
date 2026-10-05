@@ -1,13 +1,13 @@
 # FINANCE — MASTER
 
-> **Status 2026-10-03: PR #1864 DEPLOYED** (merge `030ea3d8c`). Chew chose to test on production (no separate test database) and approved going live: the work below is on production, and its migrations 0635–0648 were applied through the governed path. Chew tests everything once, on production; that walk is owed. §4's menu (one row per report, the Forecast row, the area fold) is built in the PR that follows #1864.
+> **Status 2026-10-03: PR #1864 DEPLOYED** (merge `030ea3d8c`). Chew chose to test on production (no separate test database) and approved going live: the work below is on production, and its migrations 0635–0648 were applied through the governed path. Chew tests everything once, on production; that walk is owed. §4's menu (one row per report, the Forecast row, the area fold) is PR #1865, merged 2026-10-05 (`37405f70`).
 >
 > **Who approves Finance's production changes.** Chew approves Finance's own production database changes and their release; he holds that permission for the Finance module (Chew 2026-10-03). ENGINEERING.md names Jess for migration approval; that was raised with Chew, who confirmed his authority over Finance's own changes. A change outside Finance still goes to Jess.
 >
 > | Delivered in PR #1864 | Migration |
 > |---|---|
 > | One person may check and approve a voucher (§2) | 0635 |
-> | Finance menu modules (§4; regrouped by the PR after it) | none |
+> | Finance menu modules (§4; regrouped by PR #1865) | none |
 > | Suppliers: Finance's own tax and bank details, and `Pay to` on a voucher (§3.2) | 0636 |
 > | Daily Bank (§3.4) | 0637 |
 > | Cash Flow (§3.6) | 0638 |
@@ -297,8 +297,8 @@ All reports only read. Reports → Payment stays Payment's.
 
 ## 4 · Menu
 
-- **Status.** APPROVED by Chew 2026-10-03 (「都可以」), after he sent a picture of the menu he wants and the conflicts below were shown to him. Built in the PR that follows #1864.
-- **Words.** Screen words come from `docs/COPY-STANDARD.md` "Finance (Chew)". A menu word is its page's title, so a page keeps one name.
+- **Status.** APPROVED by Chew 2026-10-03 (「都可以」), after he sent a picture of the menu he wants and the conflicts below were shown to him. Built in PR #1865, merged 2026-10-05.
+- **Words.** Screen words come from `docs/COPY-STANDARD.md` "Finance (Chew)". A menu word is its page's title, so a page keeps one name. One exception stands from before: the row `AP · Payables` opens the page titled `Unpaid by Supplier` (ruling YH 2026-09-14).
 
 ```text
 FINANCE          its title folds the area (§4.1)
@@ -316,6 +316,7 @@ FINANCE          its title folds the area (§4.1)
 
 - **Reports.** One row per report. The Profit and Loss and the Balance Sheet are two pages: `/finance/reports/profit-and-loss` and `/finance/reports/balance-sheet`. The old `/finance/reports` opens the one its address asked for, keeping its dates. The old page's list of doors is gone, because every report is on the menu. Reports → Payment stays Payment's own report, unchanged; it is now also a row.
 - **Forecast.** Its own row after Reports. It becomes a group when a second forecasting page exists.
+- **No page repeats the menu** (Chew 2026-10-05). The switch `Bills | Payment Vouchers | Unpaid by Supplier` at the top of those three pages is retired; the menu is the one way between them. Two page switches stay because they lead to no menu page: Other debtors' `Parties`, and Dealer commission's `Commission rates` and `Renovation quotas`. Dealer commission also waits for its calculation check with Chew (§5).
 - **A page joins the menu when it is built.** No `Coming soon` rows. Not built yet, from Chew's picture: Deposit Invoices, Not Yet Billed, Credit / Debit Notes, Official Invoices Owed, Bank Recon, Month-end, AR Aging, Corrections, Performance P&L, Event costs, Sales Report, a forecasting Dashboard, Item Groups, Currencies. Several of them are not decided yet.
 - **Where the picture met an existing rule, the rule stays** (Chew agreed, 2026-10-03):
   - No `Money in` / `Money out` group names. Customer `Money In` is Payment's word (Payment MASTER §1).

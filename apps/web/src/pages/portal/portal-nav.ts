@@ -634,9 +634,9 @@ export const PORTAL_NAV: PortalNavGroup[] = [
         section: "Receivables",
       },
       // 0477 — a supplier's bill and the voucher that pays it. What is still
-      // unpaid per supplier is the `ap` row above (and the third listing of the
-      // Bills toolbar switch). Payment Vouchers sits above Bills, as in Chew's
-      // menu (2026-10-03).
+      // unpaid per supplier is the `ap` row above. Payment Vouchers sits above
+      // Bills, as in Chew's menu (2026-10-03). The menu is the one way between
+      // these pages; their toolbar switch is retired (Chew, 2026-10-05).
       {
         key: "payment-vouchers",
         label: "Payment Vouchers",

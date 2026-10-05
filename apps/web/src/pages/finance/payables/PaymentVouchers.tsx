@@ -46,7 +46,7 @@ import {
   refusal,
   word,
 } from "./payables-words";
-import { FactRow, Facts, FilesCard, HistoryCard, PayablesSwitch, ReadFailed, ReasonModal } from "./PayablesParts";
+import { FactRow, Facts, FilesCard, HistoryCard, ReadFailed, ReasonModal } from "./PayablesParts";
 import { VoucherAdvanceCard } from "./VoucherAdvance";
 import { paymentVoucherPrint } from "./voucher-print";
 import { paysOut } from "@carres/shared/money-accounts";
@@ -171,7 +171,6 @@ function VoucherRegister() {
                 >
                   + New Payment Voucher
                 </button>
-                <PayablesSwitch current="vouchers" />
               </span>
             }
             emptyMessage="No payment vouchers yet. Every payment to a supplier or creditor starts here."
