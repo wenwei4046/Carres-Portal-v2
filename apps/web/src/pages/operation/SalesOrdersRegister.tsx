@@ -844,6 +844,15 @@ export default function SalesOrdersRegister() {
     [navigate, dealer, deliveryState, deliveryCity, category],
   );
   const requested = view === "list" ? requestedNarrowingOf(urlParams.get("requested")) : null;
+  /* `Select month` lists the span `Starting month` lists (twelve months back,
+     this month, eleven ahead). A linked month outside it is still listed, so
+     the select never hides a filter that is on. */
+  const requestedMonth = requested?.kind === "month" ? requested.month : null;
+  const requestedMonthChoices = useMemo(() => {
+    const months = Array.from({ length: 24 }, (_, i) => shiftMonth(currentMonth, i - 12));
+    if (requestedMonth && !months.includes(requestedMonth)) months.push(requestedMonth);
+    return months.sort().map((month) => ({ value: month, label: fmtMonth(month) }));
+  }, [currentMonth, requestedMonth]);
   const [requestedRange, setRequestedRange] = useState<[string, string]>(["", ""]);
   /* The Order list's rail facts, read only in that view. */
   const listDealer = useMemo(() => monthly ? [] : urlParams.getAll("dealer"), [monthly, urlParams]);
@@ -1189,9 +1198,17 @@ export default function SalesOrdersRegister() {
           <FilterRailGroup title="Customer’s original requested delivery" icon="date" defaultOpen>
             <FilterRailRow testId="requested-all" label="All dates" resets active={!requested} onClick={() => setParam("requested", null)} />
             {requestedPresets().map(option => <FilterRailRow key={option.label} testId={`requested-${option.label}`} label={option.label} active={urlParams.get("requested") === option.value} onClick={() => toggleParam("requested", option.value)} />)}
-            <label className="block px-2 pt-2 text-meta text-kit-slate-11">Select month
-              <input aria-label="Requested delivery month" type="month" className="mt-1 h-8 w-full rounded-md border border-kit-slate-6 bg-white px-2 text-body text-kit-slate-12" value={requested?.kind === "month" ? requested.month : ""} onChange={event => setParam("requested", event.target.value || null)} />
-            </label>
+            {/* The rail's own select, as `Starting month` is: a native month
+                input printed `--------- ----` when empty, and no dash may reach
+                a screen. Its empty option reads the control's label. */}
+            <FilterRailSelect
+              label="Select month"
+              value={requested?.kind === "month" ? requested.month : null}
+              options={requestedMonthChoices}
+              onChange={(next) => setParam("requested", next)}
+              testId="requested-month"
+              allLabel="Select month"
+            />
             <details className="px-2 py-2 text-meta text-kit-slate-11"><summary className="cursor-pointer">Custom range</summary>
               {(["From", "To"] as const).map((label, i) => <label key={label} className="mt-1 block">{label}<input aria-label={`Requested delivery ${label.toLowerCase()}`} type="date" className="mt-1 h-8 w-full rounded-md border border-kit-slate-6 bg-white px-2 text-body text-kit-slate-12" value={requestedRange[i]} onChange={event => { const values: [string, string] = [...requestedRange]; values[i] = event.target.value; setRequestedRange(values); if (values[0] && values[1] && values[0] <= values[1]) setParam("requested", `range:${values[0]}:${values[1]}`); }} /></label>)}
             </details>
