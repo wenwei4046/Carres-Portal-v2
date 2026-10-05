@@ -434,12 +434,12 @@ export function StockStatusWalkPanel() {
     redraw((n) => n + 1);
   };
   return (
-    <div className="fixed bottom-12 right-14 z-50 w-[380px] max-w-[calc(100vw-16px)] rounded-card bg-kit-slate-12 text-label text-white shadow-lg" data-testid="stock-status-walk">
+    <div className="fixed bottom-14 left-2 z-50 w-[360px] max-w-[calc(100vw-16px)] rounded-card bg-kit-slate-12 text-label text-white shadow-lg" data-testid="stock-status-walk">
       <button type="button" className="flex w-full items-center justify-between px-3 py-1.5 text-left font-semibold" onClick={() => setOpen((v) => !v)}>
         <span>Local walk · Stock Status · SIMULATED</span><span aria-hidden>{open ? "▾" : "▸"}</span>
       </button>
       {open && (
-        <div className="max-h-[60vh] space-y-2 overflow-auto px-3 pb-3">
+        <div className="max-h-[45vh] space-y-2 overflow-auto px-3 pb-3">
           <button type="button" className="rounded-control border border-kit-slate-6 px-2" data-testid="walk-go-sales-orders"
             onClick={() => {
               const next = new URLSearchParams(window.location.search);
