@@ -2220,7 +2220,7 @@ function DataGridInner<T>({
    * `visibleColumns`, one `layout.widths`, one `layout.sort`, one resize
    * handle — so every group is the same table, not four tables that agree.
    */
-  const headerCells = (inGroup: boolean) =>
+  const headerCells = (inGroup: boolean, selectionRows: readonly T[] = sortedRows) =>
       visibleColumns.map((col) => {
         const w = layout.widths[col.key] ?? col.width ?? 140;
         const style: CSSProperties = {
@@ -2234,7 +2234,7 @@ function DataGridInner<T>({
           /* Select-all means "every row that CAN be selected". A header
              box that stays indeterminate forever because three rows can
              never be ticked is a control that lies about its own state. */
-          const keys = sortedRows
+          const keys = selectionRows
             .filter((r) => selectable.isSelectable?.(r as never) ?? true)
             .map(rowKey);
           const allSel = keys.length > 0 && keys.every((k) => selectable.selectedKeys.has(k));
@@ -3470,7 +3470,7 @@ function DataGridInner<T>({
                       that had no rows in it. The heading and its count are the
                       whole truth there. */}
                   {!section.group.collapsed && section.rows.length > 0 && (
-                    <tr data-testid={`grid-header-${section.group.path}`}>{headerCells(true)}</tr>
+                    <tr data-testid={`grid-header-${section.group.path}`}>{headerCells(true, section.rows.flatMap(item => item.kind === "row" ? [item.row] : []))}</tr>
                   )}
                 </thead>
                 <tbody className={styles.tbody}>

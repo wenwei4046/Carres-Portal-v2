@@ -15,7 +15,7 @@
  * `<colgroup>`-equivalent width set, one visibility set, one sort, one resize —
  * four headers that could disagree would be four tables.
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { DataGrid, type DataGridColumn } from "./DataGrid";
 
@@ -58,6 +58,20 @@ const widthsOf = (row: HTMLElement) =>
   [...row.querySelectorAll<HTMLElement>("th")].map((th) => th.style.width);
 
 describe("DataGrid · group-local headers", () => {
+  it("selects only the selectable records inside the clicked group", () => {
+    const onToggleAll = vi.fn();
+    render(<DataGrid<Row> appearance="reference" rows={ROWS} columns={COLUMNS}
+      storageKey="k.group-selection" rowKey={row => row.id}
+      fixedGroups={{ groups: [{ key: "waiting", label: "Waiting" }, { key: "completed", label: "Completed" }], groupOf: row => row.group }}
+      selectable={{ selectedKeys: new Set(["c"]), onToggle: vi.fn(), onToggleAll, isSelectable: (row: Row) => row.id !== "b" }} />);
+    const waiting = within(screen.getByTestId("grid-section-waiting")).getByRole("checkbox", { name: "Select all rows" });
+    expect(waiting).not.toBeChecked();
+    fireEvent.click(waiting);
+    expect(onToggleAll).toHaveBeenCalledWith(["a"], false);
+    fireEvent.click(within(screen.getByTestId("grid-section-completed")).getByRole("checkbox", { name: "Select all rows" }));
+    expect(onToggleAll).toHaveBeenLastCalledWith(["c"], true);
+  });
+
   it("draws no header above all groups — every header belongs to a group", () => {
     const { container } = mount();
     expect(screen.queryByTestId("grid-header")).toBeNull();
