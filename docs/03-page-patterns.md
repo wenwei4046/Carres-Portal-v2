@@ -10,9 +10,8 @@
 Page patterns use `01-design-tokens.md` and `02-components.md` only. They never
 define typography, colour, spacing or component styles.
 
-The current shared-template direction and its approval boundaries live in
-[`ui/MASTER.md`, Reuse-first shared page templates](ui/MASTER.md#reuse-first-shared-page-templates--owner-ruling-2026-10-01).
-The owner-approved 2026-10-05 shared module flow is UI MASTER’s **Shared module page flow**: source-owned mission rail, one shared listing with module columns, and the Sales Order-derived right Working Panel with Info and module tabs (including Warehouse). Apply that current target and its exception/acceptance contract; persistence is not proof of app adoption.
+The current shared-template direction and its approval boundaries live in UI MASTER §1.3 (reference
+direction and the five template roles). The owner-approved 2026-10-05 shared module flow is UI MASTER §0.2: source-owned mission rail, one shared listing with module columns, and the Sales Order-derived right Working Panel with Info and module tabs (including Warehouse). Apply that current target and its exception/acceptance contract; persistence is not proof of app adoption. UI MASTER §0.1 is the page-anatomy table of contents; not every module shows every part.
 
 This file describes the common patterns; it is not a second reference selection or an authority
 to redesign each page independently. The current listing contract is UI MASTER §6.0; its detailed
@@ -23,7 +22,7 @@ Register/Object Detail rules govern where an older example below differs.
 **Owner direction2026-10-01:** adapt measured Houzs geometry/hierarchy to Inter and existing
 Carres semantic colours. Do not introduce the withdrawn warm-grey hex proposal or literal Houzs
 palette. Compact search dimensions in01§7.2 and the fixed far-right secondary-tools menu are
-OWNER ACCEPTED TEMPLATE awaiting production verification. Visible SO toolbar content is search, admitted Table/Cards and `⋯`; filtered count and quantity remain in its footer. The accepted 2026-10-01 Sales Orders rail composition and shared adoption boundaries are recorded in UI MASTER, Confirmed shared template. Reference styling does not change business actions.
+OWNER ACCEPTED TEMPLATE awaiting production verification. Visible SO toolbar content is search, admitted Table/Cards and `⋯`; filtered count and quantity remain in its footer. The accepted 2026-10-01 Sales Orders template and rail are recorded in UI MASTER §6.0 and §6.1; numbers in 01 §7.5. Reference styling does not change business actions.
 
 **One purpose per page and one obvious primary next action for the current task.**
 Secondary authorised actions remain discoverable. Existing UI MASTER/module-specific action
@@ -50,8 +49,8 @@ ONE component rendered as the page's first child. A page draws no breadcrumb,
 no title, no global icons of its own — it structurally cannot forget or
 mis-draw the header, because it never draws one.
 
-The current header contract, dimensions and contents live once in
-[`ui/MASTER.md` §6.0](ui/MASTER.md#60--listing-template--every-portal-listing--owner-rulings-2026-09-21-jess).
+The current header contract, dimensions and contents live once in UI MASTER §4
+(the listing's own toolbar in [§6.0](ui/MASTER.md#60--listing-template--every-portal-listing-one-page)).
 Use the shared module header, with page name and global tools. Page actions belong in the
 toolbar; do not reconstruct the header locally or restore an old module-tab header example.
 
@@ -115,36 +114,35 @@ This is not an alternate My Work queue. A task queue and a document register are
 ```text
 Existing portal navigation | Shared module header/global tools | Existing Quick Rail
                           | Governed Site/view tabs when applicable
-                          | Filter rail | Search / page tools
-                          |             | Register header + rows
-                          |             |   Goods-only expansion when opened
-                          |             | Scope-matched footer / pagination
+                          | Mission rail | Search / page tools        | Working Panel
+                          |              | Register header + rows     | (opens on a record:
+                          |              |   Goods expansion when open |  Info + module tab)
+                          |              | Scope-matched footer / pagination
 ```
 
-- Global navigation changes destination. The factual rail narrows the same record population;
-  Site remains a tab where the module has ruled it, including Inbound. Neither creates local Work.
+- Global navigation changes destination. The left mission rail presents source-owned missions and
+  may scope the records (UI MASTER §6.1); ordinary filters narrow the same record population; Site
+  remains a tab where the module has ruled it, including Inbound. The rail never calculates its own
+  work or owners.
 - Apply UI MASTER’s owner-approved2026-10-01 Register toolbar target: visible search, current filter summary and admitted Table/Cards; supported secondary page tools in fixed far-right `⋯`. Use 01 §7.2 dimensions. Existing toolbar height remains;48px is not approved. A selection
   action states the selected scope; no hidden rows silently join a destructive/batch operation.
 - Use DataGrid, content-led column recipes and governed defaults. Main identity, important facts
   and task door must be readable at the measured shell width. Do not shrink type to force columns.
 - Expansion has one admitted purpose: scoped child goods/evidence with real headings and aligned
   quantities. Edit opens the owning surface; only explicitly ruled inline-edit exceptions survive.
-- Number/link opens the exact object; return preserves current filters, sort and position under
-  the existing state contract. Personal saved layouts and temporary filters are different state.
+- Row click opens the right Working Panel (UI MASTER §4.3); the number/link opens the exact object as
+  the module rules; return preserves current filters, sort and position under the existing state contract. Personal saved layouts and temporary filters are different state.
 - Loading/error/denied do not render as empty. Empty filtered results retain criteria and a clear
   way to remove them. Row/quantity summaries and export use the same authorised population.
 - Narrow layouts use the existing filter drawer and contained table scrolling. Full-width shell
   evidence is required; an isolated centre cannot prove default columns fit.
 
-**Scoped SO exception — APPROVED TARGET / NOT BUILT, 2026-10-01:** a compact goods summary
-with remaining GOODS LINE count may open read-only goods details at the side. This is only the
-owner-admitted goods-summary inspection surface, not generic full-order quick view or editing.
-Keep existing expansion/full-order navigation and filter context; same source and compatible goods
-renderer, keyboard entry, named panel, close/focus return and narrow contained scrolling. UI MASTER
-“Sales Order compact goods summary and side inspection” owns the exact scope and evidence status.
+**Scoped SO exception — owner-approved 2026-10-01, BUILT:** a compact goods summary with a remaining
+GOODS LINE count opens read-only goods details in the kit Drawer. It is only the goods-summary
+inspection surface, not a full-order drawer or editing. UI MASTER §4.1 owns its scope.
 
 **Module differences:** admitted filters, source types, columns, quantities and authorised doors.
-No separate card chrome, table engine, date format, selection language or generic local Work rail.
+No separate card chrome, table engine, date format, selection language or page-calculated work rail.
 
 # Detail / Object
 
@@ -162,7 +160,7 @@ Read-only completed objects do not acquire invented work.
 - Current version, proposal, last sent version and historical original/reconstruction are labelled
   accurately. Unknown/unreadable document is not no document; authorised commercial data remains
   protected in the preview and attachment as well as the on-screen fields.
-- A document split follows the explicit object rule (UI MASTER §4.1 and owning MASTER), not a
+- A document split follows the explicit object rule (UI MASTER §4.4 and owning MASTER), not a
   universal “all details split” or “no views split” inference. It is not introduced merely to
   resemble Houzs. Preserve governed SO/PO/GRN arrangements and narrow stacking rules.
 - History preserves actual actor/time/source; business completion, document sending and claim
@@ -457,18 +455,9 @@ because it imports shared components. Do not display an isolated centre as a ver
 
 ### Accepted Sales Orders template — 2026-10-01
 
-The owner-accepted numeric recipe is governed by [UI MASTER, Confirmed shared template](ui/MASTER.md#confirmed-shared-template--owner-acceptance-2026-10-01): search220×32 desktop, rows32 desktop, body12/18, header11/600/36, touch targets40. Reuse the shared kit; runtime delivery proof is recorded by the BUILD controller.
-
-Owner correction2026-10-02: the shared page/object header global utilities are icon-only at all
-widths. Jump to uses kit `jump`/Command16 with tooltip and shortcut; Help/Settings retain names
-and menu contents through accessibility. Bell keeps its count. Register Search stays a magnifier;
-Table/Cards labels and rail words remain visible. Shared quick-view Print is icon-only, while
-full-object Print keeps its word/menu. Reuse the complete kit composition and existing Toast for
-ordinary result feedback; do not add an extra result banner. Existing persistent reports/source
-errors/business blockers and inline validation keep their governed purpose.
-
-SO Order summary recipe (owner2026-10-02): four compact rows, label left/value right;
-Sales orders · Total payable · Paid to date · Balance due all remain visible. Reuse existing
-FilterRailGroup, Money and typography; count uses text-strong, values right/tabular/no-wrap,
-8px row gap. Conditional missing-amount notices span the row. Filtering/calculation ownership
-and loaded-scope tooltip/count stay unchanged; other modules derive aggregates from their own facts.
+Numbers: [01 §7.5](01-design-tokens.md#75-accepted-so-derived-template--measurement-lookup). Law: UI
+MASTER §4 (shell and icon-only global utilities, owner correction 2026-10-02), §6.0 (listing) and
+§2.2 (ordinary result feedback reuses the governed Toast; persistent blockers and inline validation
+keep their purpose). The compact card opens its saved document from the document number; full-object
+Print keeps its word/menu. The SO Order summary in the Sales Orders rail is an SO composition owned
+by Orders MASTER.
