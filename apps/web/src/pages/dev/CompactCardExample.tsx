@@ -10,11 +10,20 @@
  *
  * Info and Delivery facts, editors and items are MODULE content passed into the
  * card; another module passes its own.
+ *
+ * `Purchase Order · Sales Order tab` shows the EMBEDDED presentation (owner
+ * 2026-10-05): a host card ({Supplier} · {PO No}, braces because no real PO links
+ * SO-1368) whose `Sales Order` tab holds two embedded SOs — the SO-1368 sample and
+ * the long-number, long-address layout sample. SO-1368's number opens its real
+ * saved PDF when signed in; the layout sample has no saved document, so its PDF
+ * door shows the real failure state.
  */
 // design-standard: not-a-list-page — a /ui component sample; its tables are the card's item lists.
 import { useState } from "react";
-import CompactModuleCard, { CardChecklist, CardEditorButtons, compactCardStyles as s, type CardFact, type CardTimelineEvent } from "@/components/kit/CompactModuleCard";
+import CompactModuleCard, { CardChecklist, CardEditorButtons, compactCardStyles as s, type CardFact, type CardTimelineEvent, type CompactModuleCardProps } from "@/components/kit/CompactModuleCard";
 import Button from "@/components/kit/Button";
+import SalesOrderCardDocument from "@/pages/operation/components/SalesOrderCardDocument";
+import { SalesOrderItemsTable } from "@/pages/operation/components/EmbeddedSalesOrders";
 
 /** Card widths of the reference page at browser widths 1146 · 480 · 440 · 420 · 390. */
 export const CARD_WIDTHS = [560, 440, 416, 396, 366] as const;
@@ -26,6 +35,7 @@ const PRESETS = {
   infoAll: { label: "Info · all open", module: "info", open: { items: true, communication: true, timeline: true }, warehouseLeg: false },
   deliveryAll: { label: "Delivery · all open", module: "delivery", open: { items: true, communication: true, timeline: true }, warehouseLeg: false },
   warehouseLeg: { label: "Delivery · warehouse leg", module: "delivery", open: {}, warehouseLeg: true },
+  poSalesOrder: { label: "Purchase Order · Sales Order tab", module: "sales", open: {}, warehouseLeg: false },
 } as const;
 type PresetKey = keyof typeof PRESETS;
 
@@ -38,7 +48,35 @@ const PAYMENT: CardTimelineEvent = {
   result: "RC-300926-3735",
 };
 /** The existing Sales Order page for the sample order (the reference page opens the same order). */
-export const SAMPLE_ORDER_PATH = "/operation/orders/so/82cee77c-67df-4515-8b4e-7b81796e1423";
+export const SAMPLE_ORDER_ID = "82cee77c-67df-4515-8b4e-7b81796e1423";
+export const SAMPLE_ORDER_PATH = `/operation/orders/so/${SAMPLE_ORDER_ID}`;
+const LONG_ADDRESS = "Unit A-18-08, Block A, Residensi Example Heights, Jalan Example Utama 12, Taman Example Permai, 68000 Ampang, Selangor, Malaysia";
+/** The SO-1368 handoff sample's saved lines: goods, then the two disposal services. */
+const SAMPLE_ITEMS = {
+  lines: [{ sku: "B1201S", description: "B1201S · King", qty: 1, unit_price: 2499, line_total: 2499, attrs: null }],
+  addons: [
+    { label: "Dispose old bed frame", qty: 1, unit_price: 100, line_total: 100, attrs: { size: "King" } },
+    { label: "Dispose old mattress", qty: 2, unit_price: 80, line_total: 160, attrs: { size: "King ×2" } },
+  ],
+};
+
+/** One embedded SO, as the module adapter passes it (sample facts, real kit and item table). */
+function embeddedSample(reference: string, full: string, door: { orderId: string; path?: string }): CompactModuleCardProps {
+  return {
+    presentation: "embedded", name: "Jimmy", reference, phone: "019-83372393",
+    document: { label: `Sales Order ${reference}`, preview: (onClose) => <SalesOrderCardDocument orderId={door.orderId} reference={reference} onClose={onClose} /> },
+    sales: { orderDate: "30 Sep 2026", proceedDate: "30 Sep 2026", salesLocation: "Carres Kota Damansara", salesperson: "Alvin" },
+    address: { area: "Ampang", hideArea: true, full, facts: [{ kind: "building", label: "Building", value: "Condo · Floor 1" }, { kind: "access", label: "Access", value: "No lift" }] },
+    target: { date: "Sat, 31 Oct", badge: "31d", label: "Customer’s original requested delivery", labelLines: ["Customer’s original", "requested delivery"] },
+    openLabel: "Open full page", onOpen: door.path ? () => window.open(door.path, "_blank", "noopener") : undefined,
+    initialModule: "info",
+    modules: [{ key: "info", label: "Info", summary: [
+      { key: "total", label: "Total payable", value: "RM2,759.00" },
+      { key: "paid", label: "Paid to date", value: "RM1,380.00" },
+      { key: "outstanding", label: "Balance due", value: "RM1,379.00" },
+    ], items: <SalesOrderItemsTable reference={reference} data={SAMPLE_ITEMS} /> }],
+  };
+}
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const RESULTS = ["No Answer", "Asked to Call Again", "Waiting for Customer Reply", "Requested Another Date", "Confirmed"];
 
@@ -172,7 +210,18 @@ export default function CompactCardExample() {
         <Button size="sm" variant={failNext ? "primary" : "neutral"} data-testid="card-fail-next" onClick={() => setFailNext((v) => !v)}>{failNext ? "Preview: next save fails" : "Preview: saves succeed"}</Button>
       </div>
       <div data-testid="compact-card-frame" style={{ width, maxWidth: "100%" }}>
-        {closed ? null : preset === "receiving" ? <CompactModuleCard
+        {closed ? null : preset === "poSalesOrder" ? <CompactModuleCard
+          key={`po-${width}`} name="{Supplier}" reference="{PO No}" modulesLabel="Purchase Order" initialModule="sales"
+          onClose={() => setClosed(true)} modules={[
+            { key: "info", label: "Info", disabled: true },
+            { key: "purchasing", label: "Purchasing", disabled: true },
+            { key: "sales", label: "Sales Order", communication: null, content: (
+              <div className="flex min-w-0 flex-col gap-3" data-testid="embedded-sample">
+                <CompactModuleCard {...embeddedSample("SO-1368", "1888. jalan Pillow, 68000 Ampang, Selangor", { orderId: SAMPLE_ORDER_ID, path: SAMPLE_ORDER_PATH })} />
+                <CompactModuleCard {...embeddedSample("SO2609-4827(1)", LONG_ADDRESS, { orderId: "layout-sample" })} />
+              </div>
+            ) },
+          ]} /> : preset === "receiving" ? <CompactModuleCard
           key={`receipt-${width}`} name="Sample supplier" reference="GRN-261004-1234" referenceStatus="Cancelled"
           modulesLabel="Receiving" initialModule="receipt" openLabel="Receiving"
           onOpen={() => window.open("/operation?tab=receiving", "_blank", "noopener")}
@@ -186,7 +235,7 @@ export default function CompactCardExample() {
           reference={preset === "infoLong" ? "SO2609-4827(1)" : "SO-1368"}
           phone="019-83372393"
           sales={{ orderDate: "30 Sep 2026", proceedDate: "30 Sep 2026", salesLocation: "Carres Kota Damansara", salesperson: "Alvin" }}
-          address={{ area: "Ampang", hideArea: true, full: preset === "infoLong" ? "Unit A-18-08, Block A, Residensi Example Heights, Jalan Example Utama 12, Taman Example Permai, 68000 Ampang, Selangor, Malaysia" : "1888. jalan Pillow, 68000 Ampang, Selangor", facts: [{ kind: "building", label: "Building", value: "Condo · Floor 1" }, { kind: "access", label: "Access", value: "No lift" }] }}
+          address={{ area: "Ampang", hideArea: true, full: preset === "infoLong" ? LONG_ADDRESS : "1888. jalan Pillow, 68000 Ampang, Selangor", facts: [{ kind: "building", label: "Building", value: "Condo · Floor 1" }, { kind: "access", label: "Access", value: "No lift" }] }}
           target={{ date: "Sat, 31 Oct", badge: `${days}d`, label: "Customer’s original requested delivery", labelLines: ["Customer’s original", "requested delivery"] }}
           onOpen={() => window.open(SAMPLE_ORDER_PATH, "_blank", "noopener")}
           onClose={() => setClosed(true)}

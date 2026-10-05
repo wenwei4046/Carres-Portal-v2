@@ -4,7 +4,7 @@
 // list chrome around the same register, contrary to the Sales Orders template.
 import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
 import "./purchase-order-detail.css";
-import EmbeddedSalesOrders from "../components/EmbeddedSalesOrders";
+import EmbeddedSalesOrders, { linkedSalesOrderIds } from "../components/EmbeddedSalesOrders";
 import registerStyles from "./PurchaseOrdersRegister.module.css";
 import type { IconName } from "@/components/kit/Icon";
 import { FilterRail, FilterRailGroup, FilterRailRow, FilterRailSelect, ShowFiltersButton, useFilterRailOpen } from "../components/workspace-rail";
@@ -1479,7 +1479,11 @@ function PurchaseOrderObject({
      to Document, so a hand-typed `?view=nonsense` cannot render a blank tab. */
   const [objectParams, setObjectParams] = useSearchParams();
   const viewParam = objectParams.get("view");
-  const view: ObjectView = (OBJECT_VIEWS as readonly string[]).includes(viewParam ?? "")
+  /* `Sales Order` earns its tab only when this PO links one (UI MASTER "A tab
+     earns its place"; owner 2026-10-05): a stock or MPR PO opens no empty room. */
+  const salesOrderIds = linkedSalesOrderIds(row.sources);
+  const views = salesOrderIds.length ? OBJECT_VIEWS : OBJECT_VIEWS.filter((item) => item !== "Sales Order");
+  const view: ObjectView = (views as readonly string[]).includes(viewParam ?? "")
     ? (viewParam as ObjectView)
     : "Document";
   const setView = (next: ObjectView) => {
@@ -1586,7 +1590,7 @@ function PurchaseOrderObject({
           </div>
         ) : null}
         <nav className="mt-3 flex gap-1 overflow-x-auto whitespace-nowrap" aria-label="Purchase order views">
-          {OBJECT_VIEWS.map((item) => (
+          {views.map((item) => (
             <button
               key={item}
               type="button"
@@ -1695,7 +1699,7 @@ function PurchaseOrderObject({
             onRetryClaims={() => void claimsQ.refetch()}
           />
         ) : view === "Sales Order" ? (
-          <EmbeddedSalesOrders orderIds={row.sources.filter(source => source.kind === "sales_order" && source.orderId).map(source => source.orderId!)} />
+          <EmbeddedSalesOrders orderIds={salesOrderIds} />
         ) : view === "Revisions" ? (
           <RecordList
             title="Revisions"

@@ -1,7 +1,6 @@
 import type { ReactNode } from "react";
 import { LIFT_OPTIONS, type SoBatchOrderRow } from "@carres/shared";
 import CompactModuleCard from "@/components/kit/CompactModuleCard";
-import EmbeddedSalesOrders from "../components/EmbeddedSalesOrders";
 import Button from "@/components/kit/Button";
 import { useOperationOrders } from "@/lib/queries";
 import { appTodayIso, fmtDate, fmtDateShort } from "@/lib/fmt-date";
@@ -38,13 +37,13 @@ export default function SoBatchCompactView({ row, status, supplier, safetyDays, 
       badge: `${Math.round((Date.parse(row.requestedDeliveryDate.slice(0, 10)) - Date.parse(appTodayIso())) / 86400000)}d` } : undefined}
     document={row.so == null ? undefined : { label: `Sales Order SO-${row.so}`, preview: onClose => <SalesOrderCardDocument orderId={row.orderId} reference={`SO-${row.so}`} onClose={onClose} /> }}
     openLabel="Open full page" onOpen={onOpen} onClose={onClose} initialModule="buying"
-    modules={[{ key: "buying", label: "Purchasing", communication: null,
+    modules={[{ key: "buying", label: "SO Batch Purchase", communication: null,
       summary: [
         { key: "status", label: "PO Status", value: `PO ${status}` },
         { key: "supplier", label: "Supplier", value: supplier },
         { key: "proceed", label: "Proceed Date", value: row.proceededAt ? fmtDate(row.proceededAt) : "Not recorded" },
         ...(safetyDays ? [{ key: "safety", label: "PO Safety Days", value: safetyDays }] : []),
       ], items, details: <div className="flex flex-col gap-3">{readFailed && <Button size="sm" onClick={() => void source.refetch()}>Try again</Button>}{details}</div>,
-    }, { key: "sales", label: "Sales Order", content: <EmbeddedSalesOrders orderIds={[row.orderId]} />, communication: null }]} />{actions && <div className="flex flex-wrap items-center justify-end gap-2 p-2">{actions}</div>}
+    }]} />{actions && <div className="flex flex-wrap items-center justify-end gap-2 p-2">{actions}</div>}
   </div>;
 }

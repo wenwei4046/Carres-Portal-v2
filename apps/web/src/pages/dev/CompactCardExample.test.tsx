@@ -7,6 +7,10 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import CompactCardExample, { SAMPLE_ORDER_PATH } from "./CompactCardExample";
 
+vi.mock("@/pages/operation/components/SalesOrderCardDocument", () => ({
+  default: ({ reference, onClose }: { reference: string; onClose: () => void }) => <div>Saved document {reference}<button onClick={onClose}>Close PDF</button></div>,
+}));
+
 function delivery() {
   render(<CompactCardExample />);
   fireEvent.click(screen.getByTestId("card-state-delivery"));
@@ -138,5 +142,45 @@ describe("Delivery Customer cell", () => {
     const c = within(screen.getByTestId("compact-card-frame"));
     expect(c.queryByRole("button", { name: /^Customer/ })).toBeNull();
     expect(c.getByText("{Receiving warehouse}")).toBeTruthy();
+  });
+});
+
+describe("Purchase Order · Sales Order tab (embedded presentation)", () => {
+  function host() {
+    render(<CompactCardExample />);
+    fireEvent.click(screen.getByTestId("card-state-poSalesOrder"));
+    return within(screen.getByTestId("compact-card-frame"));
+  }
+
+  it("the host keeps its own header and tabs; the Sales Order tab holds two embedded SOs", () => {
+    const c = host();
+    expect(c.getByText("{Supplier}")).toBeTruthy();
+    expect(c.getByText("{PO No}")).toBeTruthy();
+    expect(c.getByRole("button", { name: "Sales Order" })).toHaveAttribute("aria-current", "page");
+    /* One Close: the host's. The embedded SOs draw none, and no module tabs. */
+    expect(c.getAllByRole("button", { name: "Close panel" })).toHaveLength(1);
+    expect(c.getAllByRole("navigation")).toHaveLength(1);
+    const embedded = within(c.getByTestId("embedded-sample"));
+    expect(embedded.getByRole("button", { name: "Sales Order SO-1368" })).toBeTruthy();
+    expect(embedded.getByRole("button", { name: "Sales Order SO2609-4827(1)" })).toBeTruthy();
+    expect(embedded.getAllByRole("table")).toHaveLength(2);
+    expect(embedded.getAllByText("Customer’s original")).toHaveLength(2);
+  });
+
+  it("↗ only where a full page exists; the PDF opens and closes without folding the facts", () => {
+    const open = vi.spyOn(window, "open").mockReturnValue(null);
+    const c = host();
+    const embedded = within(c.getByTestId("embedded-sample"));
+    expect(embedded.getAllByRole("button", { name: "Open full page" })).toHaveLength(1);
+    fireEvent.click(embedded.getByRole("button", { name: "Open full page" }));
+    expect(open).toHaveBeenCalledWith(SAMPLE_ORDER_PATH, "_blank", "noopener");
+    open.mockRestore();
+    const number = embedded.getByRole("button", { name: "Sales Order SO2609-4827(1)" });
+    fireEvent.click(number);
+    expect(embedded.getByText("Saved document SO2609-4827(1)")).toBeTruthy();
+    fireEvent.click(embedded.getByRole("button", { name: "Close PDF" }));
+    expect(number).toHaveFocus();
+    expect(embedded.getAllByText("SO Doc Date")).toHaveLength(2);
+    expect(embedded.getByText(/Residensi Example Heights/)).toBeTruthy();
   });
 });
