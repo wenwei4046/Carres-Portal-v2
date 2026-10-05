@@ -674,7 +674,7 @@ incomplete` prints the missing fact on line two; `Scheduled for {date}` · `Good
 {partner}` · `{partner} is delivering to the customer` · `Confirm delivery time` are retired, and
 ONE label function prints every surface (Delivery §8.4). `Confirmed Delivery` / `Confirmed Time`
 are retired as field words. `Delivery failed` is not a second spelling of **`Failed Delivery`**.
-**BUILT 2026-10-05 (Delivery scope 1 · one status ladder; production state in Delivery §16):** the
+**BUILT 2026-10-05, DEPLOYED PR #1935 `f1bb6005` (Delivery scope 1 · one status ladder; production record in Delivery §16; owner walk owed):** the
 register column, the `DELIVERY STATUS` dropdown, the schedule card, the phone card, the Order
 Route DELIVER node and Reports → Delivery print these words from `deliveryWorkStatusLabelOf`
 alone. The dropdown's option words carry the role word where a row carries a real name:
