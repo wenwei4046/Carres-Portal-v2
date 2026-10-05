@@ -653,7 +653,7 @@ may never be inferred from a time, an ETA or a location.
 The schedule boundary is **`Confirmed dates only`**: a date can be confirmed while its time
 still needs agreeing. It applies equally to customer deliveries and transfers.
 
-**Expanded-row words:** **`Driver and vehicle not recorded`** (owner ruling 2026-09-25; `Logistics details incomplete` and `DO not released` retired) ·
+**Expanded-row words:** **`Driver and vehicle not recorded`** (owner ruling 2026-09-25, BUILT 2026-10-05 on the schedule card's readiness line and the Logistics Details panel; `Logistics details incomplete` and `DO not released` retired) ·
 **`Leg {n} of {m}`** · `Access not recorded` (orange, actionable — never a grey absence).
 
 ⛔ **Retired on Monitor, never to return:** `Waiting for customer date` · `Delivery confirmed` ·
@@ -674,6 +674,15 @@ incomplete` prints the missing fact on line two; `Scheduled for {date}` · `Good
 {partner}` · `{partner} is delivering to the customer` · `Confirm delivery time` are retired, and
 ONE label function prints every surface (Delivery §8.4). `Confirmed Delivery` / `Confirmed Time`
 are retired as field words. `Delivery failed` is not a second spelling of **`Failed Delivery`**.
+**BUILT 2026-10-05, DEPLOYED PR #1935 `f1bb6005` (Delivery scope 1 · one status ladder; production record in Delivery §16; owner walk owed):** the
+register column, the `DELIVERY STATUS` dropdown, the schedule card, the phone card, the Order
+Route DELIVER node and Reports → Delivery print these words from `deliveryWorkStatusLabelOf`
+alone. The dropdown's option words carry the role word where a row carries a real name:
+`Get delivery date from logistics` · `Waiting for logistics pickup` · `Collected by logistics` ·
+`In transit to warehouse` · `Arrived at warehouse` (an unnamed transfer stop reads `warehouse`
+on the row too, never the customer's town). Delivery Dates edit fields print `Scheduled date` ·
+`Scheduled time (optional)`. The reason library still carries the catch-all reason label
+`Delivery failed` (`delivery_failed`); it needs a governed replacement word before it can retire.
 
 **Delivery workspace rail and action words — owner ruling 2026-08-24, editor words re-ruled
 2026-09-13.** The rail's overdue queue is **`Overdue delivery`**, never `Date passed`. The two
@@ -779,7 +788,7 @@ One fact, one first line on every surface, a second line written for the party r
 | Party · surface | Line 1 | Line 2 | Doors |
 |---|---|---|---|
 | Operation · Monitor `Payment` column · Order Route gate · Work Logistics card | `Hold delivery` | `RM {amount} unpaid` · `Finance hold · {reason}` | `Open Payments` |
-| Payment · Payment Monitor row · collection workspace · `Ask the customer to pay` | `Hold delivery` | `RM {amount} unpaid · by {date}` · `Finance hold · {reason}` | `Record payment` · `Remove hold` (Finance only) |
+| Payment · Payment Monitor row · collection workspace · `Ask customer to pay` | `Payment due {day}` / `Payment due today` (the Monitor's `Payment timing` fact — owner reconciliation 2026-09-25: the collection desk asks *when must the money be in*, so its first line is the deadline, never `Hold delivery`; `by {date}` is retired) | `RM {amount} unpaid` · `Finance hold · {reason}` | `Record payment` · `Remove hold` (Finance only) |
 | Warehouse · Warehouse Schedule row · Outbound | `Hold delivery` | `Payment incomplete` · `Do not pack` | none; never an amount, never the Finance reason |
 | Logistics · NETS portal · external link | `Hold delivery` | nothing | none; never money, never why |
 | Money settled | `Paid` | | |
@@ -2072,6 +2081,7 @@ dictionary with the approved Receiving build; each is registered here so no chat
 | `Only Operation staff may save a receiving.` | the refused act | The page states the same rule the SQL door holds (0601, owner ruling 2026-09-25): every active Operation staff member and the principal may post. `Only GRN duty may save a receiving.` and `Not your duty today` are RETIRED. Amend and Void keep the GRN Duty authority; their doors are simply not offered to anyone else. |
 | `Operation staff` | the posting label beside `Saved by` | A saver who is neither GRN Duty, its cover nor an Operations Superuser (0601). |
 | `Staff & Duties` | Global Settings destination + page (production verified 2026-09-29, PR #1791) | The ONE company-wide assignment surface (Law F.1). A module names the duty it needs; it never keeps a second assignment list. |
+| `Sales Approver` | Staff & Duties duty name; scoped SO approval responsibility | **OWNER-APPROVED 2026-10-01 / TARGET NOT BUILT.** Required before price decreases, customer refunds and whole-SO cancellation after Proceed take effect. Ordinary amendments do not require this approval. Holder and cover must be active Principal people assigned through Settings → Staff & Duties. Orders MASTER § Staff amendments and Sales Approver owns the gates; the currently resolved eligible Sales Approver may decide their own SO exception with reason, customer evidence and actual-actor records (owner-approved 2026-10-01 / TARGET NOT BUILT); other Duties and refund execution controls are unchanged. Correct system delivery-charge recalculation is not a discretionary product discount; any customer refund still requires this Duty. Replaces the withdrawn all-amendments mandate; catalogue code is not changed by this PLAN. |
 | `GRN Duty` | duty label | The receiving duty's name everywhere — pages, history, work rows. |
 | `Nobody holds GRN Duty.` | Staff & Duties resolution · unassigned states | The honest unassigned answer (owner correction 2026-09-04): no rota recommendation is ever shown as if it were an assignment. Posting is never refused for it (owner ruling 2026-09-25). |
 | Assignment presentation (owner ruling 2026-09-29; NOT BUILT) | `Assigned to {name}`; history records changes, completer remains separate | `{acting} covering for {holder}` · normal/acting/cover badges |
@@ -2648,22 +2658,51 @@ the drawer and the DO document read them from the shared modules (`delivery-paym
 | Route gate, unpriced order | **`No price yet — unknown never holds`** | Money does not hold this delivery |
 | The drawer's absence sentence | **`No delivery order yet. The system issues it when the goods, money and date are ready`** | the 2026-08-16 version without `money` |
 
+### The customer-money words in Payment and Work — owner ruling 2026-09-25
+
+The one fact "what the customer still owes" had five spellings; on every Payment and Work surface
+it now has two words, and each appears once per screen:
+
+| Meaning | Use exactly | Do NOT use |
+|---|---|---|
+| The money, as a fact line | **`RM {amount} unpaid`** (the 2026-09-25 screen-line rule: money says `Paid` or `RM {amount} unpaid`); **`Balance due`** is the label/column header and the Sales Order document word (2026-09-22) | Amount needed · Outstanding (on Payment/Work) · to collect · still needed · still to collect |
+| The date | **`Payment due {day}`** / **`Payment due today`** — the Monitor's own fact, on every Payment and Work surface (owner reconciliation 2026-09-25 of #1635's `by {date}`) | by {date} · to collect by · Due T−2 · Collect by |
+| Work middle card for collection | line 1 `PAYMENT · {customer}` · problem **`RM {amount} unpaid`** · action **`Ask customer to pay`** · footer **`SO-{n}`** | an Invoice number as the object · `Customer balance due` |
+| Work Route exception line | **`Payment due {day}`** — the deadline, once; `Payment · Hold delivery · Finance hold · {reason}` | the amount repeated here · by {date} |
+| Work Customer card, expanded · Monitor row expansion | the ONE `Payment` section: `What to do` with `Ask customer to pay` · `Record the result` · `Record payment` · `Documents` (`Print` · `Send`) · `Communication History`; Monitor door strip `Record payment` · `Ask customer to pay` · `⋯` (`Statement` · `Print` · `Create payment link`) | a money line on the collapsed card · five doors in a row |
+
+`RM {amount} still to collect` stays Delivery's own warning word (Delivery Monitor, Logistics card).
+
+### The Payment page and the History table — owner instruction 2026-09-26
+
+| Meaning | Use exactly | Do NOT use |
+|---|---|---|
+| The page header | `← Monitor` · `SO-{n} · {customer}` · the `Payment timing` status word · `Print` · one blue (`Ask customer to pay` / `Record payment`) · `⋮` (`Record payment` · `Record the result` · `Create payment link` · `Statement`) | a `What to do` block · two blues · buttons inside a block body |
+| The left blocks, in order | **`Money`** · **`Storage`** · **`History`** · **`Customer`** | Details · Summary · Info |
+| Money rows | **`Goods`** · **`Storage`** · **`Total payable`** · **`Paid to date`** · **`Balance due`**; footer line `Payment due {day} · Collection owner {name}` | Amount needed · Outstanding · Owing |
+| Storage block doors | **`Request more free days`** · **`Check stored goods`** | Create Storage Invoice · Check the stored furniture (as a door word) |
+| History columns | **`Date · Event · Amount · By · Document`** | What · Who · Action · Notes |
+| History events | **`Proceed`** · **`Payment recorded`** · **`Payment message sent`** · **`Customer will pay on a date · promised {day}`** · **`Customer did not answer`** · **`Customer needs help`** · **`Customer disputes the amount`** · **`Customer paid`** · **`Receipt and invoice sent`** · **`Invoice issued`** · **`Storage started`** · **`Free storage approved until {day}`** · **`Stored goods checked`** · **`Collection handed over · {from} → {to}`** · **`Payment voided`** · **`Allocation corrected`** | Deposit received · Order proceeded · Reminder · Note |
+| History document words | `{Receipt No}` · `Print` · `Send receipt` · `WhatsApp screenshot` · `{Invoice No}` · `{SO No}` | Send (alone) · Screenshot (alone) · View |
+| Customer block | **`Full name`** · **`Phone`** · **`Reference`** · `No reference` · `No phone recorded` | Name · Contact · Ref |
+| The paper's tabs | **`Sales Order`** · **`Message`** · **`Receipt`** · **`Invoice`** | Preview · Document · PDF |
+
 ### PAYMENTS → Monitor · Payment Records (owner ruling 2026-09-12)
 
 | Meaning | Use exactly | Do NOT use |
 |---|---|---|
 | The module heading and its two destinations | **`Payments`** · **`Monitor`** · **`Payment Records`** | Finance Portal · Invoices · Receipts · Order Payments · Collections desk |
-| Monitor columns, in order (owner ruling 2026-09-16) | **`SO No · Customer · Amount needed · Items & Stock · Storage · Requested Delivery Date · Scheduled delivery · Payment timing`** — on a fixed 72px row, one fact and one supporting line per cell | Goods · Customer delivery (both RETIRED 2026-09-16) · Stock readiness · Stock arrival · Next step · Needed · Expected arrival · Stock status · Logistics ETA · Payment Timing (capital T) |
+| Monitor columns, in order (owner ruling 2026-09-16) | **`SO No · Customer · Balance due · Items & Stock · Storage · Requested Delivery Date · Scheduled delivery · Payment timing · Collection owner`** — on the Sales Orders Register's row density, one fact per cell on one line (owner direction 2026-09-25 — the row height is the SO-derived template's, UI MASTER §6.0; the 72px two-line row is retired; `Balance due` replaces `Amount needed`; `Collection owner` = avatar + name, never a bare `Owner`) | Amount needed (RETIRED 2026-09-25) · Goods · Customer delivery (both RETIRED 2026-09-16) · Stock readiness · Stock arrival · Next step · Needed · Expected arrival · Stock status · Logistics ETA · Payment Timing (capital T) |
 | SO No and Customer cells | line 1 **`SO-{n}`** (opens the Sales Order) over the customer's reference(s) **`TCF0541 · CR1122`**, nothing when none; line 1 the customer name over the phone. A cut value opens whole by click or keyboard | `SO-1217 TCF0541` on one line · a hover-only full value |
 | Items & Stock cell (Delivery's words) | **`Ready`** · **`Not ready`** over **`2 of 2`** · **`1 of 2 · 1 short`** · **`Arriving after the requested date`**; **`Delivered`** for a delivered order still owing; Finance reader **`Stock facts are Operation's.`**; a failed stock read **`Stock facts could not be loaded.`** The cell opens Delivery's **`Items, Services & Stock`** panel (`Item` · `Qty` · `Source` · `Status` · `Location`) | Goods ready · Received (for Ready) · Stock readiness · In stock · ETA |
 | Storage cell | **`No storage charge`** · **`Free until {day}`** · **`{Group} · Day {n} · RM {x} so far`** · **`Free request waiting for approval · Estimated charge RM {x}`** · **`Free storage approved until {day}`** · **`Storage Invoice issued · RM {x} not paid`** — on the 72px row the same words break onto two lines after the state (`Sofa · Day 15` / `RM 200.00 so far` · `Free storage approved` / `until {day}`); Search and Export keep the one sentence | Storage fee · Accrued · Pending waiver |
 | Requested Delivery Date and Scheduled delivery cells | the request in Delivery's words **`{Weekday}, {d} {Mon}`** · **`To be confirmed`** · **`No delivery date`**; the scheduled fact **`Scheduled`** over **`{day}`** or **`{day} · {time}`**, or **`Not scheduled`** alone | Customer delivery · Not confirmed yet (retired 2026-09-16) · Logistics ETA · TBD |
-| Payment timing — the fact (line 1) | **`Payment due today`** · **`Ask customer today`** · **`Customer promised to pay today`** · **`Payment should have been received`** · **`Arrival not confirmed`** · **`Storage Invoice not paid`** · **`No delivery date`** · **`Payment due {day}`** | Overdue · Late · Due T−2 |
-| Payment timing — the action (line 2) | **`Ask customer to pay`** · **`Wait`** · **`Send the invoice and collect payment`** | Ask the customer to pay · Chase · Remind · Collect |
-| The owner on the action | line 2 is the shared Work item's OWN action beside the avatar chip — no Work item, no action and no person (only **`Wait`** stands alone); accessible/readable assignment = **`Assigned to {name}`**; completed work separately names **`Completed by {name}`**; no owner resolved → **`Not assigned`**, named **`Nobody is assigned to this order. Assign it in Sales Orders → Team`**, door the Sales Orders Team; the workspace prints **`Nobody is assigned to this order.`** + **`Assign it in Sales Orders → Team`** (owner instruction 2026-09-16) | a name inside the sentence · `Nobody holds Delivery Duty.` / `Staff & Duties` for a collection owner (retired 2026-09-16) |
-| The rail's follow-up plan (owner ruling 2026-09-16 — replaces the seven filters and the summaries) | the week **`{Mon, 14 Sep} – {Fri, 18 Sep}`** with **`Previous week`** · **`Next week`** · **`This week`** · a day **`{fmtDate}`** with the marker **`Today`** (only on a working today) · **`Public holiday · {name}`** · **`Ask {n} customer(s) to pay`** · **`Check {n} promised payment(s)`** · **`Collect {n} storage payment(s)`** · **`Includes {n} not done since {day}`** · **`{n} not done · counted under Today`** / **`… counted under {day}`** · **`No follow-up planned`** · **`All unpaid orders`** · **`Reading the collection desk…`** · **`The follow-up plan could not be loaded.`** · **`The follow-up plan is Operation's.`** | tabs of any kind · Open · Late · Overdue · Needs attention · `Today` WITHOUT its date |
-| Monitor footer / empty / scoped-empty | **`{n} orders · RM {x} still needed`** · **`No customer money is needed right now.`** · **`No follow-up planned on {day}.`** · **`SO-{n} needs no payment right now. Its money is in Payment Records.`** | — |
-| Opening a Monitor row | the chevron **`Show payment details`**; the row opens below itself; its sections **`Money · Delivery Dates · Items, Services & Stock · Storage · What to do · Collection owner · Invoice · Related Payments · Communication History`**; its doors **`Statement · Print · Create payment link · Record payment`** | Show items · Open workspace · Details |
+| Payment timing — the ONE fact in the cell (owner direction 2026-09-25: one fact per cell) | **`Payment due today`** · **`Ask customer today`** · **`Customer promised to pay today`** · **`Payment should have been received`** · **`Arrival not confirmed`** · **`Storage Invoice not paid`** · **`No delivery date`** · **`Payment due {day}`** · **`Paid`** | Overdue · Late · Due T−2 |
+| The collection action — on the opened order and the Work card, never in the Monitor cell (owner direction 2026-09-25) | **`Ask customer to pay`** · **`Wait`** · **`Send the invoice and collect payment`** | Ask the customer to pay · Chase · Remind · Collect |
+| The `Collection owner` column | the acting person's avatar + name from the shared Work item (owner ruling 2026-09-25; the action is not repeated here) — no Work item, no person (a `Wait` row is empty); accessible/readable assignment = **`Assigned to {name}`**; completed work separately names **`Completed by {name}`**; no owner resolved → **`Not assigned`**, named **`Nobody is assigned to this order. Assign it in Sales Orders → Team`**, door the Sales Orders Team; the opened order prints **`Nobody is assigned to this order.`** + **`Assign it in Sales Orders → Team`** (owner instruction 2026-09-16) | a bare `Owner` · a name inside the sentence · an action word or avatar inside `Payment timing` (retired 2026-09-25) · `Nobody holds Delivery Duty.` / `Staff & Duties` for a collection owner (retired 2026-09-16) |
+| The rail — the STATUS rail (owner ruling 2026-09-25; replaces the 2026-09-16 week plan) | section **`Status`**; groups **`Needs action`** · **`Waiting`** · **`Other owners`** · **`Done`**; rows **`Missed`** · **`Ask customer today`** · **`Payment due today`** · **`Customer promised to pay today`** · **`Storage Invoice not paid`** · **`Payment due later`** · **`No delivery date`** · **`Waiting for goods`** · **`Finance hold`** · **`Needs review`** · **`Paid orders`** · **`All unpaid orders`** — each with its order count, `0` printed; loading **`Reading the collection desk…`** · failed **`The collection desk could not be loaded.`** | the week plan words (`Ask {n} customers to pay` · `Includes {n} not done since {day}` · `No follow-up planned`) · tabs · Open · Late · Overdue · Needs attention |
+| Monitor footer / empty / scoped-empty | **`{n} orders · RM {x} unpaid`** · **`No customer money is needed right now.`** · **`No follow-up planned on {day}.`** · **`SO-{n} needs no payment right now. Its money is in Payment Records.`** | — |
+| Opening a Monitor row | the chevron **`Show payment details`**; the row opens below itself; its sections **`Money · Delivery Dates · Items, Services & Stock · Storage · What to do · Collection owner · Related Payments · Communication History`** (no `Invoice` section — owner approval 2026-09-25); its doors **`Statement · Print · Create payment link · Record payment · Ask customer to pay`**, one blue; Money reads **`RM {x} unpaid`** over **`Total payable RM {t} · Paid RM {p}`** (owner approval 2026-09-26, Payment MASTER §3: the row's `▸` is the read-only History table and `SO No` opens the Payment page; this presentation is under the UI MASTER §0.3 item 11 combined review against the 2026-10-05 shared Working Panel — Payment MASTER §3 REAL GAP) | Show items · Open workspace · Details |
 | Collection assignment and history (owner ruling 2026-09-29; NOT BUILT) | `Assigned to {name}` · `Updated by {name}` · `Completed by {name}` · `History`; retain governed formal-handover action/permission and prior assignment evidence | Normal owner · Today's cover · No cover today · Acting today · competing current names |
 | Communication History entries | sent messages (**`Payment message sent`** …) and recorded results (**`Customer will pay on a date · promised {day}`** · **`Customer did not answer`** …) with **`Next: {sentence}`**; empty **`No messages or results recorded yet.`** | Notes · Log · Activity |
 | Payment Records columns, in order | **`Paid date · Receipt No · Customer · SO No · Amount received · Method`** | Amount · Paid Date · Recorded |
@@ -3476,9 +3515,9 @@ RETIRED — the rail is ONE `WORK TO DO` group):
 | `Calendar view` | the Day · Week · Month control's accessible name only | **RULED 2026-09-07** |
 | `Previous month` · `Next month` | the rail month calendar's arrow labels (the month itself prints locale-aware, e.g. `SEPTEMBER 2026`), and the toolbar arrows while `Month` shows (`Sep 2026` in the one month spelling) | **RULED 2026-09-06** (month-calendar correction) |
 | `No deliveries` | one individually empty calendar day (the long T10 sentence is retired on Monitor) | **RULED 2026-09-06** |
-| `No delivery scheduled this week.` · `No delivery scheduled on {day}.` · `No delivery scheduled this month.` | the ONE spanning state of a fully empty visible range | **RULED 2026-09-25** (replaces `No deliveries are scheduled from {first} to {last}.`) |
-| `{n} orders still need a delivery date.` / `1 order still needs a delivery date.` | under the spanning state, from the REAL count only; the sentence is the link (blue) to the `Get delivery date` queue — no `Open …` button | **RULED 2026-09-25** (replaces `{n} deliveries need a confirmed date.` and `Open No confirmed date`) |
-| `Get delivery date` | Monitor's WORK TO DO queue for scopes with a company but no Scheduled delivery | **RULED 2026-09-25** (replaces `Call customer`) |
+| `No delivery scheduled this week.` · `No delivery scheduled on {day}.` · `No delivery scheduled this month.` | the ONE spanning state of a fully empty visible range | **RULED 2026-09-25** (replaces `No deliveries are scheduled from {first} to {last}.`), **BUILT 2026-10-05** |
+| `{n} orders still need a delivery date.` / `1 order still needs a delivery date.` | under the spanning state, from the REAL count only; the sentence is the link (blue) to the `Get delivery date` queue — no `Open …` button | **RULED 2026-09-25** (replaces `{n} deliveries need a confirmed date.` and `Open No confirmed date`), **BUILT 2026-10-05** |
+| `Get delivery date` | Monitor's WORK TO DO queue for scopes with a company but no Scheduled delivery | **RULED 2026-09-25** (replaces `Call customer`), **BUILT 2026-10-05**; `?view=call_customer`, `?view=no_confirmed_date` and `?view=get_delivery_date` all open it |
 | `Clear filters` | the combined active-filter summary above the work list | **RULED 2026-09-06** |
 | `{N} selected` · `{N} delivery orders selected` | the Monitor and Delivery Orders selection toolbars respectively | **RULED 2026-09-07** |
 | `Print {N} delivery orders` | the register's selection output | **RULED 2026-09-06** |
@@ -3824,7 +3863,7 @@ table freezes the new visible words; §5.9's Logistics vocabulary remains built 
 | Customer current act | normally none: `{company} contacts the customer.`; exceptions only: `Tell the customer the new date` · `Decide the next step for this delivery` · `Correct the phone number` · `The customer asked for {date}` | `Contact customer today` as routine Carres work · `Agree the delivery date, then record the reply` |
 | Customer card sections | `Current action` · `Delivery` · `Partner contact` · `Contact by` · `Latest result` · `Open in Delivery` · `Exception` · `Evidence and communication history` · `Name not recorded` · `WhatsApp reply · 1 photo` · `In person` | Record reply · Accepted date |
 | Customer communication preview | always available on the card (owner ruling 2026-09-26; a governed exception or ERP-ARCHITECTURE §6.5 outstation release supplies its own template): `To {name} · {phone}` · source-owned template · `Copy message` · `Open WhatsApp` · `Open email` · `Was this message sent?` · `Recorded as sent` · `Message copied` · `Email unavailable · No email recorded` | routine `Confirm delivery date` template · Send |
-| Route statuses and payment line | `Unavailable` · `Due` · `Done` · `Not proceeded` · `Offered` · `Accepted` · `Declined` · `Lent out` · `Returned` · `PO not issued` · `Issued` · `From stock` · `In stock` · `Received` · `Due today` · `Due {date}` · `Missed` · `Scheduled` · `Requested` · `No date` · `{n} days left` · `{n} days late` · `Payment · Hold delivery · RM {amount} unpaid · by {date}` · `Payment · Hold delivery · Finance hold · {reason}` | Blocked · a Payment circle · to collect |
+| Route statuses and payment line | `Unavailable` · `Due` · `Done` · `Not proceeded` · `Offered` · `Accepted` · `Declined` · `Lent out` · `Returned` · `PO not issued` · `Issued` · `From stock` · `In stock` · `Received` · `Due today` · `Due {date}` · `Missed` · `Scheduled` · `Requested` · `No date` · `{n} days left` · `{n} days late` · `Payment due {day}` (owner reconciliation 2026-09-25; the amount is said once, in the summary) · `Payment · Hold delivery · Finance hold · {reason}` | Blocked · a Payment circle · to collect · `Payment · Hold delivery · RM {amount} unpaid · by {date}` (retired 2026-09-25) |
 | Route detail row | `{supplier}  {state} · Expected {date}` · `Received {date}` · `Not received yet` · `Customer` · `Logistics` · `Open Supplier card` · `Open Customer card` · `Open Logistics card` · `Open Purchasing` · `Open Sales Order` · `Open in Delivery` · `Logistics not assigned` · `Logistics · Cannot deliver · {reason}` | a second timeline |
 | Customer exception doors | `Open Sales Order` (a known delay · a wrong phone number) · `Open in Delivery` (another date · a refusal) | a Work form |
 | Customer card read failure | `Customer contact unavailable` + `Open Sales Order` | a guessed partner state |
@@ -4742,14 +4781,15 @@ matched payments to add up to the day's Sales total, and no matched payment may 
   before you approve the day.` · `Recorded in Carres is {RM} over the Sales total. Check the
   matches before you approve the day.`
 
-## Monthly demand words — owner ruling 2026-09-26 · APPROVED TARGET / NOT BUILT
+## Monthly demand words — owner ruling 2026-09-26 · composition built; correctness close-out per Orders MASTER
 
 | Meaning | Use exactly | Do NOT use |
 |---|---|---|
 | The rail's view selector | **`Listing`** · **`Monthly demand`** | Register · Report · Forecast · Dashboard |
 | The period controls (owner ruling 2026-09-26: any count 1–6, never only 3 or 6) | **`Starting month`** select · **`Months`** select `1 · 2 · 3 · 4 · 5 · 6` (default 6), resolved window printed as **`Oct 2026 – Mar 2027`** | Range · From/To · Horizon · two fixed period buttons |
-| The month table (owner correction 2026-09-26: dictionary words only, one row per month) | rows **`Before {Mon YYYY}`** · **`{Mon YYYY}`** … · **`After {Mon YYYY}`** · **`No delivery date`** · **`Total`**; columns **`Month`** · the catalog categories `Mattress` · `Bedframe` · `Sofa` · `Accessory` · **`Not delivered`** · **`Reserved`** · **`Pending Delivery Qty`** · **`To buy`** | `Earlier` · `Later` · `No date` · `Product` (all retired 2026-09-26) · Overdue · Backlog · TBD |
+| The month table (owner correction 2026-09-26: dictionary words only, one row per month) | rows **`Before {Mon YYYY}`** · **`{Mon YYYY}`** … · **`After {Mon YYYY}`** · **`No delivery date`** · **`Total`**; columns **`Month`** · the catalog categories `Mattress` · `Bedframe` · `Sofa` · `Accessory` · **`Total Qty`** · **`Delivered`** · **`Not delivered`** · **`To buy`** | `Earlier` · `Later` · `No date` · `Product` (all retired 2026-09-26) · Overdue · Backlog · TBD |
 | A cell whose source could not be read | **`Unavailable`** | `0` · a blank · a dash |
+| `To buy` when the chosen Product category is not bought per order by SO Batch Purchase (`Accessory`: mattress protectors and pillows are warehouse ready stock; Purchasing agreed 2026-10-05), in every month row and `Total`, on screen and in Export | **`Not applicable`** | `0` (reads as "nothing to buy") · `Unavailable` · a blank · a dash |
 | The three this-month numbers (owner correction 2026-09-26, second round: one month, three numbers, no repetition of the table) | heading **`This month · {Mon YYYY}`** · **`Total Qty`** · **`Delivered`** · **`Not delivered`**; the table's last columns **`Total Qty`** · **`Delivered`** · **`Not delivered`** · **`To buy`** (SO Batch Purchase's word); `Reserved` and `Pending Delivery Qty` do not appear on this view | `Still owed` · `Reserved from stock` · `On purchase orders` · `Still to buy` · `Supplier may be late` · `Arrival not known` · `{n} pieces have no delivery date` (all retired 2026-09-26 — words the owner did not understand) · Demand · Allocated · Covered · Shortage |
 | Its door | **`Open SO Batch Purchase →`** | Buy now · Create PO |
 | The rail groups' titles (owner ruling 2026-09-28: no description under a group) | Listing: `Sales Location` · `Customer Delivery Location` · `Delivery` · `Obligations` · `Service Cases` (no `Date` group: a date filters on its own column's ▽, owner ruling 2026-09-28); Monthly demand: `Period` · `Sales Location` · `Customer Delivery Location` · `Product category`; the two views are the tabs `Listing` · `Monthly demand` | a description line under a title · `View` as a group · `Delivery State / City` (the dictionary word is `Customer Delivery Location`) |
@@ -4958,7 +4998,16 @@ Workspace message availability: `Message not available` replaces a placeholder d
 
 ### Accepted Sales Orders shared template — 2026-10-01
 
-Owner-accepted screen vocabulary: `Order summary` · `Stock Status` · `Receipt unconfirmed` · `Not applicable` · `Clear all` · `Open full page` · `Related documents`. These describe the accepted read-only template; receipt uncertainty never asserts a posted receipt.
+Owner-accepted screen vocabulary: `Order summary` · `Stock Status` · `Not applicable` · `Clear all` · `Open full page` · `Related documents`. These describe the accepted read-only template. `Receipt unconfirmed` is retired (owner ruling 2026-10-05): a failed stock read shows its error with `Try again`.
+
+### Sales Order Stock Status — owner ruling 2026-10-05 · APPROVED / NOT BUILT
+
+Goods only (never Delivery release, never a service line); meanings and tones in Orders MASTER "Stock Status".
+
+| Where | Words | Never |
+|---|---|---|
+| Stock Status | `To purchase` · `Awaiting goods` (legend `Waiting for goods from the supplier.`) · `Partially ready` · `Ready` (all required quantity usable and reserved to this order) | `Receipt unconfirmed` · `Awaiting receipt` / `Partially received` / `Fully received` as an SO Stock Status · `Ready` for goods that are not reserved to this order |
+| Manual line action | `Reserve stock` · `{n} in stock. Reserve for this order.` Shown only while the line has an uncovered quantity; reserves at most that quantity | reserving goods that were bought for the line (they are reserved on receipt) · showing it on a line fully covered by POs and reservations · hiding it only because the line has a PO |
 
 ### Purchasing PO monitoring rail — owner-approved 2026-10-01 / TARGET NOT BUILT
 

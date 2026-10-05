@@ -1,5 +1,12 @@
 # DELIVERY — MASTER
 
+**SO blueprint direct dependency — APPROVED TARGET / NOT BUILT, Jess 2026-10-01.**
+Orders MASTER §0.0 requires validation of preceding-leg arrival before next-leg DO release,
+split-trip arrangements and exact Unit/SO-line attribution. Delivery owns these writes and must
+preserve existing money/release gates. SO only reads and links. Acceptance: a route display cannot
+substitute for enforced release conditions; no premature next-leg issue or invented historical
+line attribution. This is a bounded dependency, not full module redesign.
+
 **Shared field-operation UI:** follow [the canonical UI MASTER ruling](../ui/MASTER.md#shared-field-operation-ui--owner-ruling-2026-09-29) (approved direction; implementation and operator validation pending).
 
 **All listing appearance — APPROVED / NOT BUILT (Jess, 2026-09-17):** follow
@@ -201,7 +208,7 @@ result, proof, problems and history.
   Operation   Monitor Payment column · Order Route gate · Work Logistics card
               Hold delivery  /  RM {amount} unpaid            or  Finance hold · {reason}
   Payment     Payment Monitor row · collection workspace · the Ask the customer to pay Work item
-              Hold delivery  /  RM {amount} unpaid · by {date}  or  Finance hold · {reason}
+              Payment due {day}  /  RM {amount} unpaid  or  Finance hold · {reason}   (owner reconciliation 2026-09-25: Payment's own line 1 is its deadline fact, not `Hold delivery`; `by {date}` is retired)
               doors: Record payment · Remove hold (Finance only)
   Warehouse   Warehouse Schedule row · Outbound
               Hold delivery  /  Payment incomplete · Do not pack     (never an amount)
@@ -434,6 +441,32 @@ Within the customer-agreed date/window, routine booking remains Logistics' respo
 proposed delivery outside that agreement is an Operation-owned customer exception: record the
 customer's response and required evidence before treating the changed arrangement as agreed.
 Recording it does not rewrite Sales Orders' Requested Delivery Date.
+
+**SO delivery-charge recalculation — OWNER-CONFIRMED 2026-10-01 / TARGET NOT BUILT.**
+Orders MASTER § System-priced delivery charges governs this amendment path: address changes or
+added delivery services trigger the existing system pricing rules. Operation cannot hand-edit,
+discount or waive the computed delivery charge, so this path has no manual charge-approval step.
+This supersedes the proposed SO Delivery Charge Approver waiver lane; it does not retire that
+Duty or redefine unrelated exceptions. Correct recalculation can lower the charge, but customer
+refunds retain Sales Approver and the owning money workflow. Preserve evidence and before/after.
+
+**Requested Delivery Date boundary — OWNER-APPROVED 2026-10-01 / TARGET NOT BUILT.**
+Orders MASTER § Requested Delivery Date changes is the matching owner rule. A customer-initiated
+earlier SO date applies through an evidenced SO amendment only when the order's required goods
+are already in the warehouse and genuinely ready; otherwise refuse it and tell the customer
+Carres will contact them when the goods arrive. Do not chase a supplier or promise an earlier
+date before stock is ready. A customer-initiated later date also applies through an evidenced
+SO amendment: it is never a silent edit. No PO Duty or supplier confirmation is required for the
+date change itself. Independent goods changes in a mixed request keep their applicable gates.
+
+For Carres-initiated early receipt, after genuine readiness and existing delivery/money/release
+conditions are satisfied, Logistics calls the customer. Acceptance must be recorded with WhatsApp
+evidence before arranging the earlier delivery. This is a Delivery arrangement, not an SO
+amendment; leave the SO Requested Delivery Date unchanged. If declined, retain the original date.
+Declining early receipt while keeping that date/window is not customer delay and must not start
+storage charges by itself. Payment's existing readiness-plus-customer-delay, evidence, free-period
+and waiver rules remain unchanged. Actual delivery always retains its existing release gates.
+This records an approved target, not a built or production-verified date workflow.
 
 **The deadline** is the Logistics card's `2 working days before` check (owner ruling 2026-09-24):
 a Scheduled delivery date must be recorded by then, counted back from the Scheduled date (else the
@@ -856,12 +889,15 @@ SO at x=370–520 and Customer at x=520–690, with the expanded brief still vis
 production entry asset was `index-DFzOMPX6.js`; no browser console errors were observed.
 This was an authenticated Principal read-only walk, not an Operation-role permission test.
 
-Calendar progress now reads the existing shared recorded ladder with data-gap and overdue
-overlays removed, while Work queues retain those overlays. A card can therefore show `Confirmed`
-or `Collected by {partner}` without losing that fact when Sales details are missing. Transfer
-progress uses its own words and actual destination; a missing destination never creates a stop.
-Before collection, its supporting line names the payment, stock, Logistics or DO blocker.
-Unpriced and incomplete Sales facts cannot produce `Ready`. Once collection/result is recorded,
+Calendar progress reads the ONE status function (§8.4) with the data-gap and overdue overlays
+removed, while Work queues retain those overlays. A card can therefore show `Scheduled` or
+`Collected by {partner}` without losing that fact when Sales details are missing. A transfer
+prints the transfer ladder (`Transfer scheduled` · `Collected for transfer` · `In transit to
+{stop}` · `Arrived at {stop}` · `Transfer failed`); an unnamed stop reads the role word
+`warehouse`, never the customer's town. Before collection, its supporting line is the §8.4
+readiness word in its precedence (`Hold delivery` → `Goods not ready` → `Driver and vehicle not
+recorded` → `Ready`); a missing time or ETA never blocks. Unpriced and incomplete Sales facts
+cannot produce `Ready` (they read `Order details incomplete`). Once collection/result is recorded,
 the supporting line keeps the recorded ETA, failure reason or proof owed instead of re-testing
 pre-departure stock against goods that have moved. This display never authorises issue or dispatch.
 The Monitor Payment cell reads `No price yet` for unknown valuation, never `Paid`.
@@ -2119,7 +2155,8 @@ their absence as a design blind spot:
 | Delivery reports exist; convergence with newly approved timing, agreement and proof rules still needs validation | `OperationDeliveryReport.tsx` and §12; this pass is source inspection, not a new production verification |
 | `Hold delivery` on the Payment, Warehouse and Logistics surfaces, and the Operation words `RM {amount} unpaid` · `Finance hold · {reason}` (§3, owner ruling 2026-09-25) | `delivery-work-status.ts`, `logistics-card.ts`, `delivery-warehouse-schedule.ts`, `PaymentMonitor.tsx`, the partner arrange page and `DeliveryLinkPage.tsx` |
 | `View Sales Order` in panel 1 of the brief, replacing `Open Sales Order to change` (§8.5) | `DeliveryBrief.tsx`, the governed SO renderer |
-| **measured 2026-09-25 (Law D):** the Monitor register prints the 2026-09-13 status spellings (`Scheduled for {date}`, `Goods collected by {p}`, `Delivered`) from `deliveryWorkStatusLabelOf` while the schedule card prints the §8.4 words through a second function; a transfer leg on the register wears the customer-leg word; the retired `confirm_time` rung is still a kind; `Order details incomplete` still prints the deadline on line two; a leg's status is derived locally (`legWorkStatusOf`); the Work feed reads "logistics assigned" from `orders` columns while Monitor reads the arrangement; three readers derive the delivery day | `packages/shared/src/delivery-work-status.ts`, `apps/web/src/pages/operation/delivery-work.ts`, `apps/api/src/routes/operation/work.ts`, `components/rail/CalendarPanel.tsx` |
+| **ONE status function and ONE label function — BUILT 2026-10-05, DEPLOYED PR #1935 `f1bb6005` (Delivery scope 1 · one status ladder; production record in §16; owner walk owed).** Measured 2026-09-25: the register printed the 2026-09-13 spellings while the schedule card printed the §8.4 words through a second function. Now `deliveryWorkStatusOf` returns the §8.4 words itself and `deliveryWorkStatusLabelOf(kind, {partner, stop})` is the only label function: the register column, the `DELIVERY STATUS` dropdown (one option per printed word, 17 rungs, role words `logistics` · `warehouse`), the schedule card, the phone card (the same status cell component as the register), the Order Route DELIVER node and Reports → Delivery all read it. The relabeller `deliveryJourneyProgressFromStatus`, the local `legWorkStatusOf` (a leg without a DO now translates its stop record into facts) and the `confirm_time` rung are deleted; a stored `?status=confirm_time` opens `Scheduled`. `Order details incomplete` prints the missing fact on line two and carries the contact deadline as the cell's title, accessible name, Search and Export. One delivery-day reader (`scheduledDeliveryOf` / `customerLegDeliveryOf`: live DO → arrangement → confirmed booking, customer leg) serves Monitor, the Work feed, the rail Calendar and Payment's collection clock; one assignment reader (`assignedLogisticsIdOf`) makes the Work feed name and assign the company from Delivery's arrangement. Consequences stated, not hidden: a carrier's provisional `logistic_eta` no longer puts an order on the rail Calendar (the one reader counts scheduled days only, §10); `Arrived at {stop}` carries the stop on line one, so its line two stays empty rather than printing the stop twice. Tests: §8.4 table test over every row; source scans that fail on a second label path, a journey word spelled outside the ladder file, or a retired word; Work-feed tests that fail on the previous `work.ts`. | `packages/shared/src/delivery-work-status.ts`, `packages/shared/src/delivery-calendar.ts`, `apps/web/src/pages/operation/delivery-work.ts`, `delivery-monitor.ts`, `OperationDelivery.tsx`, `apps/api/src/routes/operation/work.ts`, `components/rail/CalendarPanel.tsx` |
+| Still open after scope 1, named so no build reads them as done: the §2.1 assignment deadline on `Assign logistics` line two (prints nothing until §2.1's configured lead is built); the Monitor `Payment` column still prints `Do not deliver` · `{amount} still to collect` · `Finance is holding this delivery` (the `Hold delivery` row above); the calendar card footer `Open DO` / `Edit Delivery` and the `Show delivery brief` disclosure (§8.2 doors ruling 2026-09-25); `Why is the logistics partner changing?` in Logistics Details (COPY governs no replacement yet); the reason library's catch-all label `Delivery failed` (`delivery_failed`), which can print under `Failed Delivery` (no governed replacement) | `delivery-monitor.ts` (`monitorPaymentOf`, `MONITOR_COPY`), `OperationDelivery.tsx` (`MonitorCard`), `DeliveryBrief.tsx`, `packages/shared/src/delivery-reasons.ts` |
 | the Delivery Orders register's date-first pair `DO Date · DO No` (§8.7, UI §6.7) | `DeliveryOrdersRegister.tsx` (`stickyIdentity` → `leadingColumns`) |
 | the Delivery Order brief inside the register row and the two-column DO object (§8.7, §9, owner ruling 2026-09-26) | `DeliveryOrdersRegister.tsx` (`DoExpansion`), `DeliveryOrderPage.tsx`; the acts reuse `DeliveryResultAction`, `WarehouseHandoverBlock`, `DeliveryEvidencePanel` |
 | the POS required-facts gate for address, state, building type, floor, lift and access | **BUILT 2026-09-13 (Delivery Card 18)** — `createOrderInputSchema`, `rawCreateOrderInputSchema`, the POS wizard and the office create door refuse the facts with one wording; `Order details incomplete` now names legacy rows only |
@@ -2245,6 +2282,26 @@ below as they occur; takeover is not proof of completion.
 
 
 ## 16 · Production closure
+
+**2026-10-05 Delivery scope 1 · ONE STATUS LADDER — DEPLOYED, PR #1935, main `f1bb6005e3b233d28ded3c2945cae886f5c723f8`.**
+Status only; the law is §8.4 and the built record is §15.1. Exact-head PR CI (run `37330397842`,
+head `d75b09a2c`) passed lint, typecheck, 4,105 shared · 4,051 API (352 optional skipped) · 6,463
+web tests and the production build; the deploy run `37332740411` repeated the checks on the merge
+SHA and passed. Re-probed 2026-10-05T15:42Z: carres-portal Pages, carres-pos Pages, the ERP and POS
+canonical sites and the API Worker (both hostnames) all report `f1bb6005`. The deployed ERP bundle
+(`index-COmjRsnq.js` and its chunks, read whole, control strings `Upload delivery proof` 1 ·
+`Logistics not assigned` 16) holds 0 of `Operation must assign logistics` · `must record the result`
+· `Scheduled for` · `Goods collected by` · `is delivering to the customer` · `Confirm delivery time` ·
+`Transfer confirmed` · `Stock risk` · `Logistics details incomplete` · `DO not released` · `Open Call
+customer` · the quoted Monitor word `Call customer` · `Payment blocked` (the pre-merge bundle held
+each of them), and carries `Get delivery date from` · `Transfer scheduled` · `On the way to customer` ·
+`Delivered to customer` · `Collected for transfer` · `In transit to` · `Transfer failed` · `Driver
+and vehicle not recorded` · `orders still need a delivery date` · `No delivery scheduled this week.` ·
+`Scheduled time (optional)`. `Delivery failed` remains once: the reason library's catch-all label
+(§15.1, no governed replacement yet). Unauthenticated `/api/operation/work` and
+`/api/operation/delivery-arrangements` refuse with 401. Local fixture preview (not production) at
+1440 and 390: no retired word on screen, register rows 72px, no horizontal overflow. No migration,
+RLS change or production data write. **The authenticated owner walk is owed (Jess).**
 
 **2026-09-30 routine UI increment — DEPLOYED, PR #1813, main `250781e3f1a0eb6b64922e0f4c62a83eb33176cc`.** The first change
 adds the existing ETA field to Logistics Details (normalising stored SQL clock seconds before

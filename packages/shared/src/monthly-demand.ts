@@ -11,7 +11,10 @@
  *   delivered          Stock's Units sold against the order, by the line the
  *                      Unit names (`reserved_order_line_id`)
  *   To buy             SO Batch Purchase's one arithmetic, handed in per LINE,
- *                      so a Product category narrows it with the lines it counts
+ *                      so a Product category narrows it with the lines it counts.
+ *                      A category SO Batch does not buy per order (Accessory:
+ *                      warehouse ready stock) has no To buy: `not-applicable`,
+ *                      which the page prints as `Not applicable`, never `0`
  * A date is never manufactured: an order with no definite date is counted
  * under `No delivery date`. A source that could not be read is `null`, which
  * the page prints as `Unavailable` — never zero.
@@ -21,6 +24,14 @@ import { normalizeSkuKey } from "./sku-code";
 
 export const MONTHLY_DEMAND_CATEGORIES = ["Mattress", "Bedframe", "Sofa", "Accessory"] as const;
 export type MonthlyDemandCategory = (typeof MONTHLY_DEMAND_CATEGORIES)[number];
+
+/**
+ * The categories SO Batch Purchase buys PER ORDER. Accessories (mattress
+ * protectors, pillows) are warehouse ready stock, fulfilled from stock and
+ * replenished ahead (Purchasing MASTER § MP / PILLOW STOCK PATH; Purchasing
+ * agreed 2026-10-05), so a view narrowed to them has no To buy at all.
+ */
+const BOUGHT_PER_ORDER: ReadonlySet<MonthlyDemandCategory> = new Set(["Mattress", "Bedframe", "Sofa"]);
 
 export interface MonthlyDemandOrder {
   id: string;
@@ -64,8 +75,9 @@ export interface MonthlyDemandRow {
   totalQty: number;
   delivered: number;
   notDelivered: number;
-  /** Null = SO Batch Purchase could not be read. */
-  toBuy: number | null;
+  /** Null = SO Batch Purchase could not be read. `not-applicable` = the chosen
+   *  Product category is not bought per order, so there is nothing to count. */
+  toBuy: number | null | "not-applicable";
 }
 
 export interface MonthlyDemandView {
@@ -94,7 +106,7 @@ export function monthlyDemandWindowOf(startMonth: string, months: number) {
   return { months: list, first: list[0]!, last: list[list.length - 1]! };
 }
 
-const emptyRow = (key: string, kind: MonthlyDemandRow["kind"], month: string | null, toBuy: number | null): MonthlyDemandRow => ({
+const emptyRow = (key: string, kind: MonthlyDemandRow["kind"], month: string | null, toBuy: MonthlyDemandRow["toBuy"]): MonthlyDemandRow => ({
   key,
   kind,
   month,
@@ -153,8 +165,12 @@ export function monthlyDemandOf(input: {
   focusMonth?: string | null;
 }): MonthlyDemandView {
   const window = monthlyDemandWindowOf(input.startMonth, input.months);
-  const unread = input.toBuyByLine === null;
-  const blank = unread ? null : 0;
+  const filters = input.filters ?? {};
+  /* Not applicable outranks an unread source: a category SO Batch never buys
+     per order has no To buy whatever that read returned. */
+  const boughtPerOrder = !filters.category || BOUGHT_PER_ORDER.has(filters.category);
+  const toBuyByLine = boughtPerOrder ? input.toBuyByLine : null;
+  const blank: MonthlyDemandRow["toBuy"] = !boughtPerOrder ? "not-applicable" : toBuyByLine === null ? null : 0;
   const rows = new Map<string, MonthlyDemandRow>();
   rows.set("before", emptyRow("before", "before", window.first, blank));
   for (const month of window.months) rows.set(month, emptyRow(month, "month", month, blank));
@@ -162,7 +178,6 @@ export function monthlyDemandOf(input: {
   rows.set("no-date", emptyRow("no-date", "no-date", null, blank));
   const total = emptyRow("total", "total", null, blank);
 
-  const filters = input.filters ?? {};
   const pick = (value: string | null | undefined) => words(value);
   const salesLocations = new Set<string>();
   const states = new Set<string>();
@@ -205,10 +220,9 @@ export function monthlyDemandOf(input: {
         if (column === "not-in-catalog") target.notInCatalog += owed;
         else target.categories[column] += owed;
       }
-      if (!unread) {
-        const toBuy = count(input.toBuyByLine!.get(line.id) ?? 0);
-        row.toBuy = (row.toBuy ?? 0) + toBuy;
-        total.toBuy = (total.toBuy ?? 0) + toBuy;
+      if (toBuyByLine) {
+        const toBuy = count(toBuyByLine.get(line.id) ?? 0);
+        for (const target of [row, total]) if (typeof target.toBuy === "number") target.toBuy += toBuy;
       }
     }
   }

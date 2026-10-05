@@ -3023,7 +3023,7 @@ export interface opsRemarkEmbed {
    *  column (Jess 2026-06-25); operation fills it from the drawer or the cell. */
   logistic_eta?: string | null;
   /** Payment + storage overlay (C2 Next-action, 2026-07-08) — the Orders list now
-   *  also reads these so the "Collect $" payment-hold + "Call customer" lamps can
+   *  also reads these so the "Collect $" payment-hold + customer-call lamps can
    *  compute. All optional so pre-C2 fixtures keep typechecking. */
   balance?: number | string | null;
   payment_status?: string | null;
@@ -6798,35 +6798,6 @@ export function useSaveSalesOrderRevision(
         qc.invalidateQueries({ queryKey: qk.operation.order(orderId) }),
         qc.invalidateQueries({ queryKey: ["operation", "orders"] }),
       ]);
-      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
-    },
-  });
-}
-
-/** POST / — the office birth door. Returns the new order id + SO number. */
-export function useCreateSalesOrder(
-  opts?: Partial<
-    UseMutationOptions<
-      { id: string; so: number; revision: number },
-      ApiError,
-      { header: Record<string, unknown>; lines: Omit<SaveRevisionLineInput, "id">[] }
-    >
-  >,
-) {
-  const qc = useQueryClient();
-  return useMutation<
-    { id: string; so: number; revision: number },
-    ApiError,
-    { header: Record<string, unknown>; lines: Omit<SaveRevisionLineInput, "id">[] }
-  >({
-    mutationFn: (input) =>
-      apiFetch<{ id: string; so: number; revision: number }>("/api/operation/orders", {
-        method: "POST",
-        body: JSON.stringify(input),
-      }),
-    ...opts,
-    onSuccess: async (...args) => {
-      await qc.invalidateQueries({ queryKey: ["operation", "orders"] });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
   });

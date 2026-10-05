@@ -156,6 +156,16 @@ coverage per module (§4.3, §6.1). Tests or shared-component imports alone do n
     chat proactively offers how to complete that module's Settings: every setting the module needs to
     run, its Settings door, current value or default, which are still empty, and who sets it — before
     calling the module complete. Never wait for the owner to ask.
+11. **One combined review for shared UI — owner ruling 2026-10-05 ("agree, tell every chat to align
+    with you").** A module chat never shows the owner its own variant of a shared part: Working Panel
+    host and tabs, Tasks entries, compact card, row menu or listing kit. It sends them to the chat that
+    controls this MASTER, in one message: per page, route · main object · panel host · tabs in order ·
+    opens on · ↗ destination · row menu; per Tasks item, act wording · card + tab it opens; any kit part
+    that does not exist (named, not drawn); status per item (APPROVED with MASTER § · BUILT with SHA ·
+    PROPOSAL with preview + branch@SHA); known conflicts with another module's card. The UI owner
+    combines every module into one table and one local preview; the owner accepts once; this MASTER is
+    then written and each module writes its own section. Module business rules stay with the module
+    chat.
 
 ## Find it — this index is enough
 
@@ -429,10 +439,12 @@ StatusPill · Tabs · Textarea · Toast · Tooltip · TotalsSummary`, plus `regi
   meaning (a confirmed document is not a completed physical job); state is readable without colour.
 - **Solid status pills — owner confirmed 2026-10-02, PRODUCTION VERIFIED (PR #1842, `68d133c4`).**
   White text on a solid semantic fill, no circular mark or decorative icon; `StatusPill` owns it,
-  neutral `Badge` counts are unaffected. Complete = green (`Fully received` · `Fully delivered` ·
-  `Paid in full`); partial progress = blue (`Partially …`); waiting/not started = neutral grey
-  (`Awaiting receipt` · `Not delivered` · `Unpaid`); issue = amber (`Received with issue`); unknown =
-  neutral grey (`Receipt unconfirmed` · `Amount unconfirmed`). Red needs a proven late/blocking
+  neutral `Badge` counts are unaffected. Complete = green (`Fully delivered` · `Paid in full`);
+  partial progress = blue (`Partially …`); waiting/not started = neutral grey (`Not delivered` ·
+  `Unpaid`); issue = amber; unknown = neutral grey (`Amount unconfirmed`). The Sales Order Stock
+  Status words (`To purchase` · `Awaiting goods` · `Partially ready` · `Ready`) and their tones are
+  Orders MASTER "Stock Status" (owner ruling 2026-10-05, APPROVED / NOT BUILT; production still
+  prints the retired receipt words). Red needs a proven late/blocking
   condition; unpaid alone is not one. Accessible, filter, sort, search and export strings keep the full
   text.
 - **Action grammar (owner amendment 2026-10-01, correction 2026-10-02).** Full-object Print, Export
@@ -855,7 +867,7 @@ Everything you can see · Updated 10:42
 FRI, 25 SEP
 Delivery      2 scheduled deliveries      ›  Delivery Monitor ?date=
 Warehouse     1 arriving                  ›  ?tab=warehouse-arrival-schedule&date=
-Payment       2 promised payments         ›  Payment Monitor ?day=
+Payment       2 promised payments         ›  Payment Monitor ?status=
 ```
 
 **Customer lookup — capability APPROVED 2026-09-24/26; rail door removed 2026-10-05; placement OPEN.**
@@ -905,10 +917,7 @@ Staff & Duties edits assignments.
   second line is supporting evidence, never an instruction. Actions live in My Work, Team Work, the
   Order Route, the Working Panel's module tab and detail panels. **A left mission rail may present
   source-owned missions (§6.1); it never calculates its own work or owners.**
-- **Ruled exceptions (no other register copies them without its own ruling):** the **Payment Monitor**
-  `Payment timing` cell (owner ruling 2026-09-12, re-ruled 2026-09-16; Payment MASTER §3) — a control
-  listing whose last column shows the fact and the shared Work item's own action with its resolved
-  owner avatar; the **Delivery Monitor** `Delivery Status` column (Delivery MASTER §8.4) — one status
+- **Ruled exceptions (no other register copies them without its own ruling):** the **Delivery Monitor** `Delivery Status` column (Delivery MASTER §8.4) — one status
   word set from one function, no avatar and no second action; the **Delivery schedule card** — two
   facts on two lines (journey progress, then readiness/blocker) and a type label, never summed
   (Delivery MASTER §§8.2, 8.4). **Delivery Work sentences** are two structured lines: act with
@@ -973,8 +982,9 @@ seconds, or the record fails.
             round. 8px left/right in every cell · 1px lines between cells · header 36px 11/600 ·
             footer 32px · 8px gaps. Second fact in a cell (where approved): 11px slate-11. One line
             per cell; a long value ends in … and shows whole on hover and focus; dates and numbers
-            never cut; the row never grows. Own approved heights: Delivery Monitor and Payment
-            Monitor 72px; two-line goods rows 51px (§6.8)
+            never cut; the row never grows. Own approved height: Delivery Monitor 72px (§7.1);
+            two-line goods rows 51px (§6.8). Payment Monitor uses this template's 32px row
+            (Payment MASTER §3, owner 2026-09-25, persisted #1934)
 6  HEADER   11px/600 grey band; the filter icon shows on hover, focus or while filtered — never
             on every column at rest; sort = a 12px ArrowUp/ArrowDown icon, spoken to a screen reader
 7  EXPAND   ▸ opens the record's goods and related facts (§6.9) — one job, not a second panel.
@@ -1047,7 +1057,7 @@ redesigns nothing there.
   chosen filters. Use the sidebar's panel-left icon pair, never a chevron or `X`.
 - **No `Clear filters` inside a rail** (Sales Orders, Purchase Orders): click a chosen facet again to
   clear it; selects keep `All`; the shared condition strip keeps its own clear.
-- **Special rails** (Payment Monitor weekly plans, Warehouse schedule day lists) use the same heading,
+- **Special rails** (Warehouse schedule day lists) use the same heading,
   divider and text treatment and keep their content and date meaning.
 
 **Per module (adoption of the mission rule):** Sales Orders — SO instance as above (owns no work).
@@ -1203,10 +1213,11 @@ The local filter/mission rail recipe is §6.1; this section holds the register's
   and arithmetic.
 - **Density — APPROVED / LOCKED.** The readable baseline is a 36px header (`text-label` 11/14) and a
   single-line parent row through frozen tokens; the accepted SO-derived template sets that row at 32px
-  (§6.0 rule 5) and other listings keep the 38px engine default until adopted. Ruled exceptions: the
-  Delivery Monitor work list (owner 2026-09-12) and Payment Monitor listing (owner 2026-09-16) use a
-  fixed 72px row through the shared `MonitorTwoLines` (one fact + one supporting line, never a third;
-  a cut value opens whole). Rows are gained by removing chrome, never by squeezing below the template.
+  (§6.0 rule 5) and other listings keep the 38px engine default until adopted. Ruled exception: the
+  Delivery Monitor work list (owner 2026-09-12) uses a fixed 72px row through the shared
+  `MonitorTwoLines` (one fact + one supporting line, never a third; a cut value opens whole). The
+  Payment Monitor's 72px row was retired by the owner on 2026-09-25 (Payment MASTER §3, #1934): it
+  takes the 32px template row. Rows are gained by removing chrome, never by squeezing below the template.
 - **Listing boundary — owner correction 2026-08-31.** A full DataGrid has **no enclosing outer
   border**; the toolbar keeps its bottom divider, the table its header/row/column lines, the footer its
   top divider. 8px breathing room above and below; available height fills with complete rows (one
@@ -1402,7 +1413,7 @@ never truncate; content may wrap; user resizing stays. **The registry is code:**
 | PO Safety Days | 110 | prototype | |
 | Order By | 112 | **MEASURED** | Manual Purchase |
 | Category (parent) | 112 | prototype | Sales Orders live 2026-10-05 renders Category at 208 — reconcile in the SO round |
-| Stock Status (status pill) | 120 | **MEASURED — too narrow** | Sales Orders live 2026-10-05: cuts every `Receipt unconfirmed` pill; widen after re-measuring (§7.2) |
+| Stock Status (status pill) | 120 | **MEASURED — old words** | Sales Orders live 2026-10-05 cut the retired `Receipt unconfirmed` pill; re-measure against the Orders MASTER Stock Status words when they are built |
 | Qty | 64 | **MEASURED** | header floor 24px + 16 |
 | Item / Items | 208 | **MEASURED** | PO 2026-09-18. **Owed:** Manual Purchase built 180 |
 | Supplier / Ready Stock | 140 | **MEASURED** | longest live supplier 17 characters; PO widened 136 → 140 |
@@ -1448,7 +1459,6 @@ into the section it belongs to, and this list loses it.
 | Delivery Monitor: 72px two-line rows; in-place panel write state in the expansion; `Delivery Status` word set | 2026-09-12 / 09-13 / 09-14 / 09-25 | Delivery MASTER §§8.3–8.5 |
 | Delivery Orders: DO brief recorded in place (two columns ≥1024px) | 2026-09-26 | Delivery MASTER §8.7 |
 | Delivery schedule card: two facts on two lines + type label | 2026-09-14 / 09-25 | Delivery MASTER §§8.2, 8.4 |
-| Payment Monitor: 72px rows; `Payment timing` fact + Work action + avatar cell | 2026-09-12 / 09-16 | Payment MASTER §3 |
 | SO Batch Purchase and Manual Purchase: their own approved listing designs (§6.8); the PO Duty owner chip only beside the selected `Issue PO` (`YJ`), Export at the far right | 2026-09-18 | Purchasing MASTER §§9.1–9.2 |
 | SO Batch `PO No` cell: every linked PO on one line, comma-separated, each its own link, 170px, no wrap (DEPLOYED #1924; signed-in check owed). Sales Orders keeps its own PO No cell; unifying them is NOT approved | 2026-10-05 | Purchasing MASTER §9.1 |
 | Supplier Claims leading order `☐ · ▸ · Claim status · Supplier Claim No · Claim Reported · …` (status leads; date never pinned; `pinnedPrefix`, BUILT on branch 2026-09-29) | 2026-09-18 | Purchasing MASTER §9.5 |
@@ -1476,7 +1486,6 @@ into the section it belongs to, and this list loses it.
 | WarehouseIncoming modal close | focus lands on the page, not the Count trigger (research file §9) | Adopt `DialogFrame` focus return |
 | Picker inside a dialog renders UNDER it | a real P1 defect, approved, not built | Kit fix |
 | **Customer lookup placement** | The caller-lookup capability (name/phone/order number across all a customer's orders and recorded history) is approved 2026-09-24/26; its rail door was removed 2026-10-05. Tasks → `Sales Order` tab shows only the linked SO's customer | Owner decision on where the cross-order lookup lives (PROPOSAL in §5) |
-| Stock Status column truncates its pill | Live SO register 2026-10-05: the 120px Stock Status width cuts every `Receipt unconfirmed` pill (natural width >103px of content) — content must decide width (Constitution §2) | GAP: re-measure and widen the registry role in the SO round |
 
 ## §7.3 · KIT GAPs — admit once, never draw locally
 

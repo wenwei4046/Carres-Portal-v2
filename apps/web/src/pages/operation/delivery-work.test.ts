@@ -19,7 +19,7 @@ import type { DeliveryOrderRow, operationOrderListRow } from "@/lib/queries";
 import {
   buildDeliveryScopeRows,
   confirmedDeliveryOf,
-  legWorkStatusOf,
+  legStopFactsOf,
   entersDeliveryWork,
   isOpenDeliveryScope,
   requiredSalesFactsMissing,
@@ -169,44 +169,54 @@ describe("delivery scopes and journey legs", () => {
     });
     expect(rows.map((r) => r.doNumber)).toEqual(["DO-250826-0001", null]);
     expect(rows[0]!.deliveryOrderId).toBe("do-leg-1");
-    /* The document's own handover facts speak: the partner collected. */
-    expect(rows[0]!.status.kind).toBe("collected");
+    /* The document's own handover facts speak: the partner collected. Leg 1
+       of 2 is a TRANSFER, so it speaks the transfer ladder's word. */
+    expect(rows[0]!.status.kind).toBe("collected_for_transfer");
+    expect(rows[0]!.status.label).toBe("Collected for transfer");
     expect(rows[0]!.receivedAt).toBe("2026-08-25T03:00:00Z");
     /* Leg 2, no document yet: its day is scheduled, and a scheduled date
        alone completes the arrangement (owner ruling 2026-09-24). */
     expect(rows[1]!.status.kind).toBe("confirmed");
-    expect(rows[1]!.status.label).toMatch(/^Scheduled for /);
+    expect(rows[1]!.status.label).toBe("Scheduled");
   });
 
-  it("speaks a leg's status in the shared ACTOR-FIRST words (§8.4), never `Pending`", () => {
-    // One vocabulary across the workspace: a leg and a whole-order scope must
-    // not be readable on two different scales.
-    expect(legWorkStatusOf({ status: "pending" }, null).label).toBe("Operation must assign logistics");
-    /* The ACT, never the actor (owner ruling 2026-09-14): the party is the
-       row's Logistics field, and a leg speaks the same words as a scope. */
-    expect(legWorkStatusOf({ status: "pending" }, null, "TEOW").label).toBe("Call customer");
-    /* A scheduled day alone completes the leg — the time is optional. */
-    expect(legWorkStatusOf({ status: "pending" }, "2026-08-25", "TEOW").label).toBe("Scheduled for Tue, 25 Aug");
-    const booked = legWorkStatusOf({ status: "pending" }, "2026-08-25", "TEOW", "9am–12pm");
-    expect(booked.label).toBe("Scheduled for Tue, 25 Aug");
-    expect(booked.second).toBe("9am–12pm");
-    expect(legWorkStatusOf({ status: "picked_up" }, null, "TEOW").label).toBe("Goods collected by TEOW");
-    /* Leg 1 handing over at the named JB warehouse is that leg's ARRIVAL —
-       the goods reached the stop, never the customer (Card 20). */
-    const arrived = legWorkStatusOf({ status: "handed_off", to_loc: "JB transit warehouse" }, null);
+  it("a leg without a document TRANSLATES its stop record — it speaks no words of its own (owner ruling 2026-09-25)", () => {
+    expect(legStopFactsOf({ status: "pending" }, false)).toEqual({ attempts: [], handoverEvents: [] });
+    expect(legStopFactsOf({ status: "picked_up", picked_up_at: "2026-08-25T03:00:00Z" }, true).handoverEvents).toEqual([
+      { kind: "received_by_logistics", recordedAt: "2026-08-25T03:00:00Z" },
+    ]);
+    /* Handed off at the stop is an arrival ONLY on an intermediate leg; the
+       last leg has no next leg and never claims a customer result from it. */
+    expect(legStopFactsOf({ status: "handed_off" }, true).attempts[0]?.result).toBe("delivered");
+    expect(legStopFactsOf({ status: "handed_off" }, false).attempts).toEqual([]);
+    expect(legStopFactsOf({ status: "delivered" }, false).attempts[0]?.result).toBe("delivered");
+    expect(legStopFactsOf({ status: "issue" }, false).attempts[0]?.result).toBe("failed");
+  });
+
+  it("speaks a leg's status through the ONE status function — the same words as a scope (§8.4)", () => {
+    const stops = (status: string, partner: string | null, scheduled: string | null) => [
+      { leg: 1, partner_id: "p-teow", partner_name: partner, from_loc: "Klang WH", to_loc: "JB transit warehouse", scheduled_at: scheduled, status },
+      { leg: 2, partner_id: "p-al", partner_name: "AL", from_loc: "JB transit warehouse", to_loc: "Customer (Singapore)", scheduled_at: null, status: "pending" },
+    ] as never;
+    const leg = (status: string, partner: string | null = "TEOW", scheduled: string | null = null) =>
+      build([order({ id: "j", so: 1390, delivery_stops: stops(status, partner, scheduled) })]);
+    expect(leg("pending", null)[0]!.status.label).toBe("Assign logistics");
+    expect(leg("pending")[0]!.status.label).toBe("Get delivery date from TEOW");
+    expect(leg("pending", "TEOW", "2026-08-25T02:00:00.000Z")[0]!.status.label).toBe("Transfer scheduled");
+    expect(leg("picked_up")[0]!.status.label).toBe("Collected for transfer");
+    const arrived = leg("handed_off")[0]!.status;
     expect(arrived.kind).toBe("arrived");
-    expect(arrived.label).toBe("Arrived");
-    expect(arrived.second).toBe("JB transit warehouse");
+    expect(arrived.label).toBe("Arrived at JB transit warehouse");
     expect(arrived.tone).toBe("green");
-    expect(legWorkStatusOf({ status: "handed_off" }, null).label).toBe("Arrived");
-    expect(legWorkStatusOf({ status: "delivered" }, null).label).toBe("Delivered");
-    expect(legWorkStatusOf({ status: "issue" }, null).label).toBe("Failed Delivery");
+    expect(leg("issue")[0]!.status.label).toBe("Transfer failed");
+    /* The customer leg of the same journey speaks the customer ladder. */
+    expect(leg("pending")[1]!.status.label).toBe("Get delivery date from AL");
   });
 
   it("⭐ never prints the DOCUMENT's `Created` on a leg or a scope", () => {
     const rows = build([order({ id: "a", so: 1301 })]);
     expect(rows[0]!.status.label).not.toBe("Created");
-    expect(rows[0]!.status.label).toBe("Operation must assign logistics");
+    expect(rows[0]!.status.label).toBe("Assign logistics");
   });
 
   it("leaves a delivered order out — that is history, not planning", () => {
@@ -463,7 +473,7 @@ describe("the arrangement is what Delivery wrote", () => {
     });
     expect(rows[0]!.confirmedIso).toBe("2026-08-28");
     expect(rows[0]!.confirmedTime).toBe("9am–12pm");
-    expect(rows[0]!.status.label).toBe("Scheduled for Fri, 28 Aug");
+    expect(rows[0]!.status.label).toBe("Scheduled");
     expect(rows[0]!.status.second).toBe("9am–12pm");
     expect(rows[0]!.status.tone).toBe("green");
   });
@@ -702,8 +712,9 @@ describe("an intermediate leg's arrival reads Arrived on Monitor (Card 20)", () 
       partnerNameById: NO_PARTNERS,
     });
     expect(rows[0]!.status.kind).toBe("arrived");
-    expect(rows[0]!.status.label).toBe("Arrived");
-    expect(rows[0]!.status.second).toBe("JB transit warehouse");
+    /* The stop is on line one (`Arrived at {stop}`); line two does not repeat it. */
+    expect(rows[0]!.status.label).toBe("Arrived at JB transit warehouse");
+    expect(rows[0]!.status.second).toBeNull();
     expect(rows[0]!.status.tone).toBe("green");
     expect(rows[0]!.missingProof).toEqual({ photo: false, signedDo: false });
     expect(rows[0]!.proofReview.state).toBe("none");
@@ -714,6 +725,8 @@ describe("an intermediate leg's arrival reads Arrived on Monitor (Card 20)", () 
   it("without a document, a chain stop already handed off reads Arrived over its stop too", () => {
     const rows = build([order({ id: "sg", so: 1362, delivery_stops: stops })]);
     expect(rows[0]!.status.kind).toBe("arrived");
-    expect(rows[0]!.status.second).toBe("JB transit warehouse");
+    expect(rows[0]!.status.label).toBe("Arrived at JB transit warehouse");
+    /* The customer leg never borrows a transfer word. */
+    expect(rows[1]!.status.label).not.toMatch(/^Arrived|transfer/i);
   });
 });

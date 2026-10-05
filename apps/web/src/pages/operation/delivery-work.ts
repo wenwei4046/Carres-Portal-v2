@@ -32,31 +32,29 @@
  */
 
 import {
+  assignedLogisticsIdOf,
   deliveryOrderStatusOf,
   signedDeliveryDocumentOf,
   deliveryStepDueIso,
-  deliveryWorkStatusLabelOf,
   deliveryWorkStatusOf,
   deliveryJourneyProgressOf,
-  deliveryJourneyProgressFromStatus,
-  DELIVERY_WORK_STATUS_TONE,
   lineKind,
   myHolidaySet,
   latestDeliveryContactOf,
+  scheduledDeliveryOf,
   type DeliveryArrangementRow,
   type DeliveryContactRow,
   type DeliveryQueueLeads,
   type DeliveryStatusSpell,
   type DeliveryWorkStatus,
   type DeliveryWorkStatusInput,
-  type DeliveryWorkStatusKind,
   type DeliveryHandoverKind,
   type DeliveryOrderStatus,
   type DeliveryStop,
 } from "@carres/shared";
 import { displayCustomerName } from "@/lib/customer-name";
 import { fmtDate } from "@/lib/fmt-date";
-import { orderBookingDay } from "@/lib/order-booking";
+import { orderBookingRead } from "@/lib/order-booking";
 import { resolveDeliveryLocality } from "@/lib/locality";
 import { detectState } from "@/lib/region";
 import type {
@@ -262,64 +260,43 @@ export interface DeliveryScopeRow {
   o: operationOrderListRow;
 }
 
-/**
- * A leg's own status, spoken in the DOCUMENT's five words rather than in a
- * second vocabulary.
- *
- * `orders.delivery_stops` stores `pending | picked_up | handed_off | delivered
- * | issue`, and two of those may never reach a screen as written: `Pending` is
- * a banned word, and `Issue` names a mood rather than what happened. Mapping
- * them onto the governed document statuses is what keeps ONE status vocabulary
- * across Delivery Work, the Delivery Orders register and the DO object.
- *
- * A leg speaks the SAME seven operational words as a whole-order scope (owner
- * ruling 2026-08-24) — one vocabulary across the workspace, so two rows of one
- * order cannot be read on two different scales.
- */
 function statusAndProgressOf(input: DeliveryWorkStatusInput, spell: DeliveryStatusSpell) {
   return { status: deliveryWorkStatusOf(input, spell), progress: deliveryJourneyProgressOf(input, spell) };
 }
 
-export function legWorkStatusOf(
-  stop: Pick<DeliveryStop, "status"> & Partial<Pick<DeliveryStop, "to_loc">>,
-  confirmedIso: string | null,
-  partnerName: string | null = null,
-  confirmedTime: string | null = null,
-  intermediateLeg = false,
-): DeliveryWorkStatus {
-  const say = (kind: DeliveryWorkStatusKind, second: string | null = null): DeliveryWorkStatus => ({
-    kind,
-    label: deliveryWorkStatusLabelOf(
-      kind,
-      partnerName,
-      kind === "confirmed" && confirmedIso ? DELIVERY_STATUS_SPELL.date(confirmedIso) : null,
-    ),
-    tone: DELIVERY_WORK_STATUS_TONE[kind],
-    second,
-    secondTone: null,
-    reasonLabel: null,
+/**
+ * A Journey leg with no document yet keeps its movement on `orders.
+ * delivery_stops` (0156): `pending | picked_up | handed_off | delivered |
+ * issue`. This only TRANSLATES that record into the facts the one status
+ * function reads — it decides no word and no rung (Law D; the local leg
+ * ladder that spoke its own words is retired, owner ruling 2026-09-25). `handed_off` is a hand-off to the NEXT leg at this leg's stop,
+ * so it is an arrival only on an intermediate leg; the last leg has no next
+ * leg and never claims a customer result from it.
+ */
+export function legStopFactsOf(
+  stop: Pick<DeliveryStop, "status"> &
+    Partial<Pick<DeliveryStop, "picked_up_at" | "handed_off_at" | "delivered_at">>,
+  intermediateLeg: boolean,
+): Pick<DeliveryWorkStatusInput, "attempts" | "handoverEvents"> {
+  const collected = {
+    attempts: [],
+    handoverEvents: [{ kind: "received_by_logistics" as const, recordedAt: stop.picked_up_at ?? null }],
+  };
+  const result = (outcome: "delivered" | "failed", at: string | null | undefined) => ({
+    attempts: [{ result: outcome, reasonKey: null, recordedAt: at ?? "" }],
+    handoverEvents: [],
   });
   switch (stop.status) {
     case "delivered":
-      return intermediateLeg ? say("arrived", stop.to_loc?.trim() || null) : say("delivered");
+      return result("delivered", stop.delivered_at);
     case "handed_off":
-      /* A leg handed off at the named partner warehouse has ARRIVED there —
-         the goods reached the stop, never the customer (Delivery MASTER
-         §14.1; Card 20). The customer leg is its own row with its own word. */
-      return say("arrived", stop.to_loc?.trim() || null);
+      return intermediateLeg ? result("delivered", stop.handed_off_at) : collected;
     case "picked_up":
-      return say("collected");
+      return collected;
     case "issue":
-      return say("failed");
+      return result("failed", stop.handed_off_at ?? stop.picked_up_at);
     default:
-      /* A leg nobody has moved yet is exactly the rungs the whole-order scope
-         uses: a day and a window agreed, a partner still to contact the
-         customer, or no partner at all. */
-      /* A scheduled date completes the leg's arrangement; the time is
-         optional (owner ruling 2026-09-24). */
-      if (confirmedIso) return say("confirmed", confirmedTime);
-      if (!partnerName) return say("assign_logistics");
-      return say("partner_must_contact");
+      return { attempts: [], handoverEvents: [] };
   }
 }
 
@@ -358,25 +335,21 @@ export function logisticsOf(
  * otherwise books a truck twice.
  */
 export function confirmedDeliveryOf(
-  o: operationOrderListRow,
-  doc: DeliveryOrderRow | null,
-  arrangement?: DeliveryArrangementRow | null,
+  o: Pick<operationOrderListRow, "ops_order_control">,
+  doc: Pick<DeliveryOrderRow, "delivery_date" | "time_slot"> | null,
+  arrangement?: Pick<DeliveryArrangementRow, "confirmed_date" | "confirmed_time"> | null,
 ): { iso: string | null; time: string | null } {
-  if (doc?.delivery_date) {
-    return { iso: doc.delivery_date.slice(0, 10), time: doc.time_slot ?? null };
-  }
-  /* Delivery's own arrangement outranks the booking overlay: it is the record
-     Delivery wrote deliberately, where the overlay is a field Sales' door also
-     touches. The DOCUMENT still outranks both — it is the snapshot the
-     warehouse and the partner are actually working to. */
-  if (arrangement?.confirmed_date) {
-    return { iso: arrangement.confirmed_date.slice(0, 10), time: arrangement.confirmed_time ?? null };
-  }
-  const booking = orderBookingDay(o);
-  if (booking.kind === "confirmed" && booking.date) {
-    return { iso: booking.date, time: booking.slot ?? null };
-  }
-  return { iso: null, time: null };
+  /* The ONE delivery-day reader (shared `scheduledDeliveryOf`): the DOCUMENT,
+     then Delivery's own arrangement, then a CONFIRMED legacy booking — the
+     same answer the Work feed and the rail Calendar read. */
+  const day = scheduledDeliveryOf({
+    document: doc ? { deliveryDate: doc.delivery_date, timeSlot: doc.time_slot } : null,
+    arrangement: arrangement
+      ? { confirmedDate: arrangement.confirmed_date, confirmedTime: arrangement.confirmed_time }
+      : null,
+    booking: orderBookingRead(o),
+  });
+  return { iso: day.iso, time: day.time };
 }
 
 /** `Klang WH → JB transit`, from the leg's own recorded places. */
@@ -757,7 +730,12 @@ export function buildDeliveryScopeRows({
         leg: null,
         intermediateLeg: false,
         legRoute: null,
-        logisticsId: arrangement?.partner_id ?? fallbackPartner.id,
+        /* The ONE assignment reader — the Work feed asks the same question. */
+        logisticsId: assignedLogisticsIdOf({
+          arrangementPartnerId: arrangement?.partner_id,
+          orderPartnerId: o.delivery_partners?.id ?? o.delivery_partner_id,
+          triagePartnerId: o.ops_assigned_logistic,
+        }),
         logisticsName,
         confirmedIso: confirmed.iso,
         confirmedTime: confirmed.time,
@@ -810,20 +788,25 @@ export function buildDeliveryScopeRows({
          That is the whole reason the arrangement is keyed by (order, leg). */
       const arrangement = arrangements?.get(`${o.id}#${stop.leg}`) ?? null;
       const intermediateLeg = stop.leg > 0 && stop.leg < lastLeg;
-      const confirmedIso =
-        arrangement?.confirmed_date ??
-        (stop.scheduled_at ? stop.scheduled_at.slice(0, 10) : null);
-      const legPartner = arrangement?.partner_name ?? stop.partner_name ?? null;
-      const legTime = arrangement?.confirmed_time ?? null;
-      /* 0491 — since a leg carries its OWN document, its handover facts, its
-         own attempts and its own proof ride the same ladder as a whole-order
-         scope (Law D); a leg still without a document keeps the chain's own
-         status words. */
+      /* 0491 — a leg carries its OWN document, so its handover facts, its own
+         attempts and its own proof ride the same ladder as a whole-order scope
+         (Law D). */
       const legDoc = legDocOf(o.id, stop.leg);
+      /* The ONE delivery-day reader, leg by leg: the leg's document, then its
+         arrangement, then the day pencilled on the recorded stop. */
+      const legDay = scheduledDeliveryOf({
+        document: legDoc ? { deliveryDate: legDoc.delivery_date, timeSlot: legDoc.time_slot } : null,
+        arrangement: arrangement
+          ? { confirmedDate: arrangement.confirmed_date, confirmedTime: arrangement.confirmed_time }
+          : null,
+        booking: stop.scheduled_at ? { stage: "confirmed", confirmedDate: stop.scheduled_at } : null,
+      });
+      const confirmedIso = legDay.iso;
+      const legTime = legDay.source === "booking" ? null : legDay.time;
+      const legPartner = arrangement?.partner_name ?? stop.partner_name ?? null;
       const legFacts = factsOf(legDoc);
       const legMissingProof = proofOf(legDoc, o, intermediateLeg);
       const legReview = reviewOf(legDoc, o, intermediateLeg);
-      const stopStatus = legWorkStatusOf(stop, confirmedIso, legPartner, legTime, intermediateLeg);
       rows.push({
         ...base,
         key: `${o.id}#leg${stop.leg}`,
@@ -847,32 +830,34 @@ export function buildDeliveryScopeRows({
         deliveryOrderId: legDoc?.id ?? null,
         doIssuedAt: legDoc?.issued_at ?? null,
         contacts: contactsByScope.get(`${o.id}#${stop.leg}`) ?? [],
-        ...(legDoc
-          ? statusAndProgressOf(
-              {
-                partnerName: legPartner,
-                latestContact: latestContactOf(`${o.id}#${stop.leg}`),
-                confirmedDate: confirmedIso,
-                confirmedTime: legTime,
-                hasDeliveryOrder: true,
-                expectedArrival: arrangement?.expected_arrival ?? null,
-                missingFacts: base.missingFacts,
-                todayIso: todayIso ?? null,
-                proof: {
+        /* ONE status function for every leg (owner ruling 2026-09-25): a leg
+           with its own document reads that document's facts; a leg without
+           one reads its recorded stop, translated — never a second ladder. A
+           transfer leg therefore prints transfer words. */
+        ...statusAndProgressOf(
+          {
+            partnerName: legPartner,
+            latestContact: latestContactOf(`${o.id}#${stop.leg}`),
+            confirmedDate: confirmedIso,
+            confirmedTime: legTime,
+            hasDeliveryOrder: Boolean(legDoc),
+            expectedArrival: arrangement?.expected_arrival ?? null,
+            missingFacts: base.missingFacts,
+            todayIso: todayIso ?? null,
+            proof: legDoc
+              ? {
                   photoUploaded: legMissingProof.photo ? false : null,
                   signedDoUploaded: legMissingProof.signedDo ? false : null,
                   acceptedOn: legReview.state === "accepted" ? legReview.reviewedAt : null,
                   review: { state: legReview.state, reason: legReview.reason },
-                },
-                intermediateLeg,
-                legStop: stop.to_loc ?? null,
-                ...legFacts,
-              },
-              DELIVERY_STATUS_SPELL,
-            )
-          : { status: stopStatus, progress: deliveryJourneyProgressFromStatus(stopStatus, {
-              partnerName: legPartner, intermediateLeg, legStop: stop.to_loc,
-            }) }),
+                }
+              : null,
+            intermediateLeg,
+            legStop: stop.to_loc ?? null,
+            ...(legDoc ? legFacts : legStopFactsOf(stop, intermediateLeg)),
+          },
+          DELIVERY_STATUS_SPELL,
+        ),
       });
     }
   }

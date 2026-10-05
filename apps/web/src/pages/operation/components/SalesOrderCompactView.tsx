@@ -6,7 +6,7 @@ import { apiFetch } from "@/lib/api";
 import { renderPaymentTemplate, type PaymentTemplateRow } from "@carres/shared/payment-templates";
 import { useAuth } from "@/lib/auth";
 import { useDeliveryPartners, useDeliverySettings, useOrderTimeline } from "@/lib/queries";
-import { fmtDate } from "@/lib/fmt-date";
+import { fmtDate, fmtDateShort } from "@/lib/fmt-date";
 import { useDeliveryScopeCard } from "../delivery-scope-card";
 import { describeActivity } from "./activity-display";
 import { DeliveryDatesEdit, LogisticsDetailsEdit } from "./DeliveryBrief";
@@ -39,7 +39,8 @@ export default function SalesOrderCompactView({ row, salesLocation, items, onOpe
   const unavailable = delivery.failed ? "Unavailable" : delivery.loading ? "Loading…" : "Not recorded";
   const goods = card ? [...card.items, ...card.extras.filter(item => item.kind === "accessory")].reduce((sum, item) => sum + item.qty, 0) : 0;
   const stock: CardFact = { key: "stock", label: "Stock", value: card && goods ? `${Math.max(0, goods - card.readiness.shortQty)}/${goods}` : unavailable, status: card && goods && card.readiness.ready ? "Ready" : undefined, opensItems: true };
-  const customer: CardFact = { key: "customer", label: "Customer", value: card ? card.confirmedDate ? `${new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", timeZone: "UTC" }).format(new Date(`${card.confirmedDate.slice(0, 10)}T00:00:00Z`))}${card.confirmedTime ? ` · ${card.confirmedTime}` : ""}` : "Date not confirmed" : unavailable, status: card?.confirmedDate ? "Date confirmed" : undefined, editable: mayEdit, editor: mayEdit && card ? close => <DeliveryDatesEdit card={card} compact layout="grid" onDone={close} /> : undefined };
+  // `30 Sep`, from the portal's fixed month names: the browser's en-GB short month prints `30 Sept`.
+  const customer: CardFact = { key: "customer", label: "Customer", value: card ? card.confirmedDate ? `${fmtDateShort(card.confirmedDate.slice(0, 10))}${card.confirmedTime ? ` · ${card.confirmedTime}` : ""}` : "Date not confirmed" : unavailable, status: card?.confirmedDate ? "Date confirmed" : undefined, editable: mayEdit, editor: mayEdit && card ? close => <DeliveryDatesEdit card={card} compact layout="grid" onDone={close} /> : undefined };
   const logistics: CardFact = { key: "logistics", label: "Logistics", value: card ? card.logisticsPartnerName ?? "Not assigned" : unavailable, editable: mayEdit, editor: mayEdit && card ? close => <LogisticsDetailsEdit card={card} compact onDone={close} /> : undefined };
   const doFact: CardFact = { key: "do", label: "DO", value: card ? card.doNumber ?? "No DO yet" : unavailable, editor: () => card ? <CardChecklist label="Delivery Order" items={[
     { text: "Stock ready", done: card.readiness.ready },

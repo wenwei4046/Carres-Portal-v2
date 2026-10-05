@@ -302,6 +302,48 @@ may not assign), so 0533 assigned Jess once from 2026-09-18 with `assigned_by` N
 runs only when the Duty has no assignment history; it created no cover. Until a second Principal
 person exists, Jess has no eligible cover: her approvals wait while she is away.
 
+**Sales Approver — OWNER-APPROVED 2026-10-01 / TARGET NOT BUILT.** Orders MASTER
+§ “Staff amendments and Sales Approver” replaces the earlier all-amendments approval ruling and
+withdrawn matrix. Ordinary SO amendments need no owner approval. Sales Approver is required before
+price decreases, customer refunds and whole-SO cancellation after Proceed take effect. Holder and
+any cover must be active Principal people, assigned only through Settings → Staff & Duties and
+resolved through the shared mechanism; no hard-coded person, local roster or expanded role rights.
+A required approval cannot pass when its eligible assignment is unresolved. The catalogue and
+live assignments are unchanged by this PLAN. This Duty is NOT BUILT.
+
+For an ordinary amendment whose changed line is covered by an issued PO, PO Duty records the
+supplier's confirmation that the change can be made before it takes effect. No supplier answer or
+an unknown supplier date means waiting, not automatic effectiveness. This does not make PO Duty
+a general commercial approver. Purchasing still owns the PO change. No issued PO covering that
+line means ordinary application on submission with the required customer evidence. The accepted
+trade-off is no second-person check on ordinary product changes; retain the actual submitter and
+confirmation actors. Linked changes remain one effective outcome.
+
+**SO submission — owner-approved A, 2026-10-01; PIC notification TARGET NOT BUILT.** Any
+Operation staff member with existing order access may submit; it is not PIC-only. Principal
+submission remains permitted, while Salespeople/Dealers continue to request changes through
+Operation. Automatically notify the order PIC via the shared notification/activity mechanism,
+retaining the actual submitter and Before/After evidence. Notification does not transfer PIC
+ownership, misattribute the act, grant approval rights or add a PIC approval gate. A waiting
+amendment must not be presented as already effective. See Orders MASTER for the full ruling.
+Do not infer notification delivery from the existing submission door; it remains unverified.
+
+Requested Delivery Date routing is settled in Orders/Delivery MASTER: evidenced customer
+earlier-date amendments require ready stock, otherwise refuse; evidenced later-date amendments
+apply; neither date change needs PO Duty or supplier confirmation. Carres-initiated early
+arrangements leave the SO date unchanged. This adds no new staff or approval assignment.
+System-priced delivery-charge changes have no manual approval lane: staff cannot override the
+computed price (Orders MASTER, owner-confirmed 2026-10-01 / TARGET NOT BUILT). Do not assign a
+new SO charge-waiver task to Delivery Charge Approver; that Duty remains for its other governed
+uses. Customer refunds still route to Sales Approver. Non-delivery service exceptions, 0329
+attribution changes/consolidation remain undecided. **Sales Approver self-approval — owner-approved
+2026-10-01 / TARGET NOT BUILT:** the currently resolved eligible Principal holder or dated cover
+may decide their own SO exception request, retaining reason, customer evidence, actual submitter,
+approver and times. This does not allow another Principal to bypass duty resolution or change
+Finance/refund execution controls or other Duties' own-request rules. Do not copy Purchasing
+Approver's own-request prohibition or bootstrap into this Duty as an assumed decision.
+The existing PIC-first ordinary Delivery ownership remains unchanged.
+
 **`Finance Approver` (`finance_approver`) takes Finance users only.** Its holder and cover pickers
 list active Finance users. The API reads them through the definer function `workspace_duty_staff`,
 because an operation login cannot read Finance accounts under RLS. The database refuses a
@@ -2134,8 +2176,16 @@ separate governed outstation-release rule.
 #### Payment, Warehouse, loan and after-sales boundaries
 
 Payment is a Route/party exception only when it materially affects delivery; it is not another
-calendar card. Use the Payment MASTER's governed collection/approval action and do not invent
-`Blocked`. A permitted post-delivery clock starts from Delivered. PO/supplier delay belongs to
+calendar card. **Owner ruling 2026-09-25 (APPROVED / NOT BUILT; `../payment/MASTER.md` "Payment
+inside Work"):** a collection Work item's object is the **Sales Order** (never an Invoice, so the
+Route and party cards always draw); the middle card prints `Balance due RM {x}` over `Ask customer
+to pay`; the Summary carries the money and the one blue `Ask customer to pay`; the Route exception
+line is `Payment due {day}` (`to collect by` is retired); the Customer card keeps Delivery's collapsed
+line and gains an expanded **Payment** section whose doors (`Ask customer to pay` · `Record the
+result` · `Record payment`) open Payment's own compositions in place. That section is ONE shared
+component with the Payment Monitor's row expansion (owner approval 2026-09-25: same function, two
+frames). One fact, one place. Do not
+invent `Blocked`. A permitted post-delivery clock starts from Delivered. PO/supplier delay belongs to
 Purchasing; GRN/received quantity belongs to Warehouse. Loan is its optional independent point.
 After-sales starts a separate mission after delivery unless its own MASTER explicitly connects it.
 
@@ -2176,7 +2226,7 @@ These close the questions §5.10 leaves to the owning modules; they change no ap
   record (0487). Each act opens its owner's door and writes nothing in Work. `Waiting` is not
   derived for the customer; the Waiting tab lists only a source-recorded waiting state (§5.2.1
   `communication.replyState`) and is empty until a module records one.
-- **Payment exception line** beneath the Route: `Payment · Hold delivery · RM {amount} unpaid · by {date}` (amber
+- **Payment exception line** beneath the Route: `Payment due {day}` (owner reconciliation 2026-09-25; amber
   once the deadline is reached) or `Payment · Hold delivery · Finance hold · {reason}`; the deadline is
   `paymentDeadlineOf` — the one the Logistics day-before check reads (2 working days before the
   delivery date, 3 outstation; the effective-dated Payment rule row is not readable by Operation —

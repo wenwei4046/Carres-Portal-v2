@@ -11,7 +11,7 @@
  *                        queue — SO No · Customer · State · Requested Delivery
  *                        Date · Items · Accessories & services · Expected
  *                        arrival · Stock · Actions · Edit Delivery
- * Confirmed deliveries   Day · Week · Month — only rows a customer has agreed
+ * Delivery schedule      Day · Week · Month — only rows a customer has agreed
  *                        a day for; NO checkboxes, no writes
  * ```
  *
@@ -27,7 +27,7 @@
  * three-day half-week, a phone is only ever the `Day` list. A rail date or a
  * Month-view date opens that date's `Day` and KEEPS the active narrowings.
  *
- * ⭐ THE CONTACT WEEK. Under `Call customer` — the T−3 contact queue — a
+ * ⭐ THE CONTACT WEEK. Under `Get delivery date` — the T−3 contact queue — a
  * Monday-to-Saturday strip counts the calls DUE on each operating day, with an
  * always-visible `Overdue` chip so late work cannot hide behind a quiet
  * Thursday. These dates are contact deadlines and the strip says so.
@@ -65,7 +65,6 @@ import {
   HelpCircle,
   PanelLeftOpen,
 } from "lucide-react";
-import { DELIVERY_WORK_STATUS_KINDS } from "@carres/shared";
 import {
   ARRIVAL_COPY,
   arrivalNoteOf,
@@ -134,12 +133,14 @@ import {
   matchesMonitorSearch,
   missingProofLabels,
   monitorCardHref,
-  monitorRowAction,
+  contactDeadlinePlacementOf,
+  contactDeadlineSentenceOf,
+  monitorStatusParamOf,
   monitorScheduleStatusOf,
   monthDayCounts,
   monthDaysOf,
   monthStepStart,
-  needConfirmedDateSentence,
+  ordersNeedDateSentence,
   nextOperatingWindowStart,
   operatingDaysFrom,
   operatingWeekOf,
@@ -347,22 +348,12 @@ function ArrivalCell({ card }: { card: DeliveryMonitorCard }) {
  * so: a step with no anchor can never be late (`delivery-queue.ts`).
  */
 function ContactDeadline({ card }: { card: DeliveryMonitorCard }) {
-  /* The deadline answers the CHASE and nothing else — a delivery with BOTH a
-     day and a window agreed has no call left to be late for. A day without a
-     window is not a booking, so its conversation is still open (owner ruling
-     2026-09-11). */
-  /* ⭐ AND A TRIP THAT HAS ALREADY RUN HAS NO CALL LEFT EITHER (owner
-     correction 2026-09-11). A delivered row used to print `No contact
-     deadline` under an upload action — a grey line about a conversation
-     nobody owes, beside work somebody does. */
-  if (card.booked || card.settled) return null;
-  if (!card.contactDueIso) {
-    return (
-      <span className="block truncate text-label">
-        <Absent>{MONITOR_COPY.noContactDeadline}</Absent>
-      </span>
-    );
-  }
+  /* The deadline answers the CHASE and nothing else: it is drawn under the two
+     `Get delivery date …` rungs only (`contactDeadlinePlacementOf`). A
+     scheduled day completes the arrangement (owner ruling 2026-09-24), a trip
+     that has already run has no call left, and a row whose customer named no
+     day owes no deadline at all. */
+  if (contactDeadlinePlacementOf(card) !== "line2" || !card.contactDueIso) return null;
   const date = fmtDate(card.contactDueIso);
   /* ⭐ THE COMPACT CELL IS A GLYPH AND A DATE (owner ruling 2026-09-11,
      re-ruled 2026-09-14). The full sentence — including that the deadline is
@@ -533,9 +524,12 @@ function MonitorCard({ card }: { card: DeliveryMonitorCard }) {
  * agreed a day, who carries it, and the one thing to do next. Those four
  * facts are the card; everything else the sheet offers is a desk job.
  *
- * The words, the absences and the act are the SAME ones the DataGrid prints —
- * `monitorRowAction` and the governed absence strings — so the two viewports
- * can never tell an operator two different things.
+ * The words and the absences are the SAME ones the DataGrid prints — the
+ * one `Delivery Status` cell and the governed absence strings — so the two
+ * viewports can never tell an operator two different things (owner ruling
+ * 2026-09-25: a card never prints a queue word such as `No confirmed date`
+ * where the register prints `Not scheduled`, and never a bare date without
+ * its act).
  */
 function MonitorWorkCard({
   card,
@@ -544,13 +538,12 @@ function MonitorWorkCard({
   card: DeliveryMonitorCard;
   onOpenOrder: (card: DeliveryMonitorCard) => void;
 }) {
-  const action = monitorRowAction(card);
   /* The phone has no ▸ column: the card itself unfolds the brief (§8.5), and
      every Delivery-owned write lives inside it (§8.6). */
   const [briefOpen, setBriefOpen] = useState(false);
   /* The SAME words the sheet prints — the phone never spells a date twice. */
   const requested = requestedText(card);
-  const confirmed = card.confirmedDate ? fmtDate(card.confirmedDate) : DW.noConfirmedDate;
+  const confirmed = card.confirmedDate ? fmtDate(card.confirmedDate) : MONITOR_COPY.notConfirmed;
   const row = (label: string, value: string, muted: boolean) => (
     <div className="flex items-baseline justify-between gap-3">
       <span className="shrink-0 text-label text-kit-slate-11">{label}</span>
@@ -589,20 +582,12 @@ function MonitorWorkCard({
         )}
       </div>
       <div className="flex flex-col gap-1 border-t border-kit-slate-4 px-2.5 py-2">
-        {action.kind === "confirm_date" ? (
-          <span className="text-body text-kit-slate-12">
-            <span className="block">{action.call}</span>
-            <span className="block text-kit-slate-11">{action.result}</span>
-          </span>
-        ) : action.kind === "upload_proof" || action.kind === "check_proof" ? (
-          /* The EXACT missing evidence, or the review owed — the act, then
-             the door below it. */
-          <span className="text-body text-kit-slate-12">{action.label}</span>
-        ) : null}
-        {/* The contact deadline is one of the facts a chase needs, so it is on
-            the card rather than behind a Columns chooser the phone has not
-            got. Same words, same arithmetic as the sheet. */}
-        <ContactDeadline card={card} />
+        {/* The register's `Delivery Status` cell, the same component: the act
+            or the fact on line one, its supporting fact (or the contact
+            deadline glyph and day) on line two. */}
+        <div className="text-body" data-testid={`delivery-monitor-work-card-status-${card.scopeId}`}>
+          <MonitorStatusCell card={card} />
+        </div>
         <button
           type="button"
           className="min-h-11 rounded-control border border-kit-slate-6 bg-white px-3 text-body font-medium text-kit-slate-12"
@@ -622,27 +607,44 @@ function MonitorWorkCard({
    shared with the Payment Monitor so both 72px listings print one cell. ── */
 
 /**
- * ⭐ WHICH ROWS OWE A CONTACT DEADLINE — the ONE predicate, asked in one place.
- *
- * Exactly `ContactDeadline`'s own guard: a row that is booked (a day AND a
- * window) or settled (a result recorded) has no call left to be late for, and
- * a row whose customer named no day has nothing to measure from. Asking it
- * here as well as inside the component is deliberate — the cell must know
- * whether the component will draw anything BEFORE it chooses a layout, or an
- * ordinary status would lose its supporting line to an empty deadline.
+ * ⭐ THE `Delivery Status` CELL — ONE component for the register's column and
+ * the phone's card (owner ruling 2026-09-25: the card carries the same two
+ * status lines from the same arithmetic). Line one is the one label
+ * function's word in its colour; line two is the status's supporting fact, or
+ * — under a `Get delivery date …` rung — the contact deadline as the kit glyph
+ * and a day. On `Order details incomplete` line two keeps the MISSING FACT and
+ * the deadline is the cell's title and accessible name.
  */
-function contactDeadlineApplies(r: DeliveryMonitorCard): boolean {
-  return !r.booked && !r.settled && r.contactDueIso !== null;
+function MonitorStatusCell({ card }: { card: DeliveryMonitorCard }) {
+  const placement = contactDeadlinePlacementOf(card);
+  if (placement === "line2") {
+    return (
+      <span className="block min-w-0">
+        <span className={`block truncate ${STATUS_TONE_TEXT[card.statusTone]}`} title={card.statusLabel}>
+          {card.statusLabel}
+        </span>
+        <ContactDeadline card={card} />
+      </span>
+    );
+  }
+  return (
+    <TwoLines
+      line1={card.statusLabel}
+      tone={card.statusTone}
+      line2={card.statusSecond}
+      line2Tone={card.statusSecondTone ?? "none"}
+      line2TestId={missingProofLabels(card).length ? "delivery-monitor-missing-proof" : undefined}
+      cellTitle={placement === "title" ? contactDeadlineSentenceOf(card, fmtDate) ?? undefined : undefined}
+    />
+  );
 }
 
 /** The same cell as WORDS — what Search reads and what Excel prints, so the
  *  sheet and the screen never say two different things (§8.3). */
 function statusSecondText(r: DeliveryMonitorCard): string | null {
-  if (!contactDeadlineApplies(r)) return r.statusSecond;
-  const date = fmtDate(r.contactDueIso!);
-  return r.contactOverdue
-    ? MONITOR_COPY.contactLateSentence(date)
-    : MONITOR_COPY.contactDueSentence(date);
+  const sentence = contactDeadlineSentenceOf(r, fmtDate);
+  if (sentence === null) return r.statusSecond;
+  return contactDeadlinePlacementOf(r) === "line2" ? sentence : joinLines(r.statusSecond ?? "", sentence);
 }
 
 /**
@@ -766,7 +768,7 @@ export default function OperationDelivery() {
   /* ⭐ `?view=` STILL CARRIES THE WHOLE VIEW (owner ruling 2026-09-10) — one
      param, so refresh, share and Back restore exactly one state. It holds
      EITHER a calendar view (`day` · `week` · `month`), which opens the
-     **Confirmed deliveries** tab, OR a WORK TO DO queue, which opens
+     **Delivery schedule** tab, OR a WORK TO DO queue, which opens
      **Work to do**. Absent = the DEFAULT LANDING: Work to do, `All delivery
      work`.
 
@@ -776,7 +778,8 @@ export default function OperationDelivery() {
      filter · `?schedule=`/`?checking=` → their queue · `?start=`/`?day=` only
      ever named the calendar, so they open its week. `call_customer` is the
      contact queue's new spelling and `no_confirmed_date` is its old one; both
-     open the same rows. */
+     open the same rows, and so does `get_delivery_date` — the queue's word
+     since 2026-09-25. `details_incomplete` opens its own queue. */
   const viewParam =
     searchParams.get("view") ??
     searchParams.get("schedule") ??
@@ -796,9 +799,10 @@ export default function OperationDelivery() {
     viewParam === "overdue" ||
     viewParam === "failed" ||
     viewParam === "upload_proof" ||
-    viewParam === "check_proof"
+    viewParam === "check_proof" ||
+    viewParam === "details_incomplete"
       ? viewParam
-      : viewParam === "call_customer"
+      : viewParam === "call_customer" || viewParam === "get_delivery_date"
         ? "no_confirmed_date"
         : viewParam === "delivered_proof_required"
           ? "upload_proof"
@@ -826,11 +830,8 @@ export default function OperationDelivery() {
      the rung that replaced it — the partner's pickup wait (§8.4). */
   const statusParam =
     searchParams.get("status") ?? (viewParam === "waiting_warehouse" ? "waiting_pickup" : null);
-  const status: MonitorDeliveryStatus | null = (DELIVERY_WORK_STATUS_KINDS as readonly string[]).includes(
-    statusParam ?? "",
-  )
-    ? (statusParam as MonitorDeliveryStatus)
-    : null;
+  /* A retired rung in a stored link still resolves (the time-only rung → `Scheduled`). */
+  const status: MonitorDeliveryStatus | null = monitorStatusParamOf(statusParam);
 
   /* THE RESOLVED VIEW, as ONE word. A URL that arrived in a retired spelling
      (`?day=`, `?start=`, `?view=calendar`, `?schedule=`) is normalised to it on
@@ -890,7 +891,7 @@ export default function OperationDelivery() {
       next.delete("due");
       next.delete("late");
     });
-  /* Day / Week / Month belong to the Confirmed deliveries calendar and open
+  /* Day / Week / Month belong to the Delivery schedule calendar and open
      it. `Week` is the default and is spelled `week` rather than by absence,
      because absence now means the Work to do landing. */
   const pickCalendarView = (value: MonitorCalendarView) =>
@@ -915,7 +916,7 @@ export default function OperationDelivery() {
       next.delete("start");
     });
   /* A rail-calendar or Month-view date click OPENS that date's Day view on the
-     Confirmed deliveries tab. The STATE / LOGISTICS / STATUS narrowings SURVIVE
+     Delivery schedule tab. The STATE / LOGISTICS / STATUS narrowings SURVIVE
      it now: they apply to both views, and silently dropping them would answer a
      question the operator did not ask. */
   const pickCalendarDate = (iso: string) =>
@@ -927,7 +928,7 @@ export default function OperationDelivery() {
       next.delete("due");
       next.delete("late");
     });
-  /* ── THE CONTACT-WEEK PICK — the `Call customer` queue's own narrowing ─── */
+  /* ── THE CONTACT-WEEK PICK — the `Get delivery date` queue's own narrowing ─── */
   const contactDue = searchParams.get("due");
   const contactOverdueOnly = searchParams.get("late") === "1";
   const pickContactDue = (iso: string | null) =>
@@ -1160,27 +1161,12 @@ export default function OperationDelivery() {
         filterType: "enum",
         chooserGroup: "Delivery",
         /* ⭐ LINE TWO IS THE DEADLINE ITSELF WHEN ONE IS OWED (owner ruling
-           2026-09-14). A chase row reads `Call customer` over the kit's
-           phone glyph and the day — no `Call by`, because line one has
-           already said what to do and the verb printed twice is the noise the
-           ruling names. Every other status keeps its supporting sentence. */
-        accessor: (r) =>
-          contactDeadlineApplies(r) ? (
-            <span className="block min-w-0">
-              <span className={`block truncate ${STATUS_TONE_TEXT[r.statusTone]}`} title={r.statusLabel}>
-                {r.statusLabel}
-              </span>
-              <ContactDeadline card={r} />
-            </span>
-          ) : (
-            <TwoLines
-              line1={r.statusLabel}
-              tone={r.statusTone}
-              line2={r.statusSecond}
-              line2Tone={r.statusSecondTone ?? "none"}
-              line2TestId={missingProofLabels(r).length ? "delivery-monitor-missing-proof" : undefined}
-            />
-          ),
+           2026-09-14). A chase row reads the contact rung's act over
+           the kit's phone glyph and the day — no `Call by`, because line one
+           has already said what to do. Every other status keeps its
+           supporting fact; `Order details incomplete` keeps the missing fact
+           and carries the deadline as its title (owner ruling 2026-09-25). */
+        accessor: (r) => <MonitorStatusCell card={r} />,
         /* Search and Export keep the WORDS: the sheet a manager opens in Excel
            must still say what the deadline is, and a search for the word
            `deadline` must still find the rows that owe one. */
@@ -1639,7 +1625,7 @@ export default function OperationDelivery() {
   );
 
   /* ── THE CONTACT WEEK — Monday to Saturday, counted by CONTACT DEADLINE ───
-     It appears under `Call customer` and nowhere else, because it answers only
+     It appears under `Get delivery date` and nowhere else, because it answers only
      that queue's question. The `Overdue` chip stays visible WITH ITS COUNT at
      every date, so navigating to a quiet Thursday can never hide calls that
      are already late. */
@@ -1763,7 +1749,7 @@ export default function OperationDelivery() {
       }
     >
       {/* WORK TO DO belongs to the Work to do tab — a queue pick from the
-          Confirmed deliveries calendar would silently change the tab, which is
+          Delivery schedule calendar would silently change the tab, which is
           exactly the side effect the two tabs replaced. Clicking one there is
           still possible from the tab itself, one click away. */}
       {calendarMode ? null : (
@@ -1854,31 +1840,27 @@ export default function OperationDelivery() {
     );
   };
 
-  /* ── THE SPANNING EMPTY RANGE (owner correction 2026-09-06) — one state,
-     never the same sentence repeated in six columns. The confirmed-date count
-     it offers is the REAL rail count, never an invented number. ──────────── */
+  /* ── THE SPANNING EMPTY RANGE (owner ruling 2026-09-25) — one state in two
+     lines, never the same sentence repeated in six columns. The count beneath
+     is the REAL `Get delivery date` queue count, and the sentence itself is
+     the door into that queue: no `Open …` button, no second verb. ────────── */
   const emptyRange = (
     <div
       className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 px-4 text-center"
       data-testid="delivery-monitor-empty-range"
     >
       <p className="text-body text-kit-slate-12">
-        {emptyRangeSentence(visibleDays, fmtDate)}
+        {emptyRangeSentence(calendarView, calendarView === "day" ? fmtDate(selectedDate) : null)}
       </p>
       {rails.work.no_confirmed_date > 0 ? (
-        <>
-          <p className="text-body text-kit-slate-11">
-            {needConfirmedDateSentence(rails.work.no_confirmed_date)}
-          </p>
-          <button
-            type="button"
-            className="rounded-control border border-kit-slate-6 bg-white px-3 py-1.5 text-meta font-medium text-kit-slate-12 hover:bg-kit-slate-3"
-            onClick={() => pickView("no_confirmed_date")}
-            data-testid="delivery-monitor-open-no-confirmed-date"
-          >
-            {MONITOR_COPY.openNoConfirmedDate}
-          </button>
-        </>
+        <button
+          type="button"
+          className="text-body text-blue-700 underline-offset-2 hover:underline"
+          onClick={() => pickView("no_confirmed_date")}
+          data-testid="delivery-monitor-open-no-confirmed-date"
+        >
+          {ordersNeedDateSentence(rails.work.no_confirmed_date)}
+        </button>
       ) : null}
     </div>
   );
