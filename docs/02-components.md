@@ -445,8 +445,8 @@ keeps arrival evidence at receipt scope; no Unit attribution is inferred.
 
 **Purpose.** The owner-confirmed compact module card (UI MASTER §4.3): one shared customer header
 (sales facts behind ▾, address, target date), module tabs, the module's own summary cells, inline
-editors, items, Communication and Timeline. Live on `/ui#compact-card` with Info and Delivery; no
-production page uses it yet.
+editors, items, Communication and Timeline. Live on `/ui#compact-card` with Info and Delivery; Sales Orders and SO Batch use the shared component.
+The current owner-confirmed arrangement is UI MASTER §4.3 (5 Oct2026): Header, wrapping address left/access right, then SO Doc Date / Proceed date / Sales Location / Salesperson, tabs and module-owned summary. Info has no duplicate details/status/document panel.
 
 **Contract.** The card takes the header facts once and a list of modules; each module passes its own
 summary facts (`label`, `value`, optional `editor` or `opensItems`), items and whether it opens the
@@ -456,9 +456,9 @@ interaction: it never writes a record or marks a message sent, keeps saved templ
 and uploads no file. Editors close only when the module reports a successful save.
 `CardEditorButtons`, `CardChecklist` and `compactCardStyles` style module content inside it.
 
-**Proof.** `scripts/compact-card-states.mjs` against `docs/ui-reference/module-card-reference.html`:
-18 states × 5 widths, no unexplained difference; deviations are listed in
-`docs/ui-reference/MODULE-CARD-TEMPLATE.md`. Palette, font, radius and glyphs await the owner's token
+**Proof.** Current release and actual-component width evidence are recorded in UI MASTER §4.3 and
+`docs/ui-reference/MODULE-CARD-TEMPLATE.md`. The earlier18-state reference comparison is historical
+fidelity evidence, not proof of the re-ruled5Oct2026 layout. Palette, font, radius and glyphs await the owner's token
 decision and live in one block of `compact-card.module.css`.
 
 ---
