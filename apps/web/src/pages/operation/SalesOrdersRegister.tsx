@@ -792,9 +792,11 @@ function SalesOrderItemsTable({ row, lines, addons, miniLines }: {
       const lineFact = goodsLine ? row.stockFact?.lines.find((fact) => fact.lineId === goodsLine.id) : undefined;
       const lineId = goodsLine?.id ?? null;
       /* Owner ruling 2026-10-05: the action follows the line's UNCOVERED
-         quantity (the door's own remainder). Fully covered by PO lineage and
-         reservations → no action; having a PO never hides it by itself. */
-      const uncovered = lineId && lineFact && lineFact.status !== "ready" ? readyStock.remainingFor(lineId) : null;
+         quantity — the SAME fact `To purchase` reads and SO Batch prints
+         (`uncoveredQty`, Purchasing's `soBatchOrderLineOutstandingQty`).
+         Fully covered by PO lineage and reservations → no action; having a
+         PO never hides it by itself. The door rechecks on the locked row. */
+      const uncovered = lineFact && lineFact.status !== "ready" ? lineFact.uncoveredQty ?? null : null;
       const inStock = lineId && uncovered != null && uncovered > 0 ? readyStock.availableFor(lineId) : null;
       const open = lineId ? readyStock.isOpen(lineId) : false;
       const stockCell = service

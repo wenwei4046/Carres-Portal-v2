@@ -99,6 +99,15 @@ export const STOCK_ISSUE_LEGEND = "Damaged or wrong goods are not usable and do 
 export interface StockReadinessCounts {
   requiredQty: number;
   usableQty: number;
+  /**
+   * ⭐ THE ONE COVERAGE FACT (Law D, owner ruling 2026-10-05): what is still
+   * uncovered — `soBatchOrderLineOutstandingQty`, the SAME function SO Batch
+   * prints *to buy* with (TS twin of `so_line_remaining_requirement`): ordered
+   * less non-cancelled PO lineage less bound Units, a Unit on its own lineage
+   * PO line once. `To purchase` and the `Reserve stock` gate read THIS number.
+   */
+  uncoveredQty: number;
+  /** `requiredQty − uncoveredQty`, carried for reading only. */
   purchasedQty: number;
   /** Damaged or wrong goods in this line's share of a receipt, plus reserved
    *  Units Stock controls (damaged, waiting for repair). */
@@ -127,7 +136,7 @@ export function stockStatusOfCounts(c: StockReadinessCounts): SalesOrderStockVer
   if (c.requiredQty <= 0) return null;
   if (c.usableQty >= c.requiredQty) return "ready";
   if (c.usableQty > 0) return "partially_ready";
-  if (c.purchasedQty < c.requiredQty) return "to_purchase";
+  if (c.uncoveredQty > 0) return "to_purchase";
   /* ⚠ THE ONE ISOLATED RULE — owner decision pending (2026-10-05). Fully
      purchased, nothing usable, and goods bought for this order have ARRIVED
      but no Unit is reserved to it. `Awaiting goods` is true only while the
@@ -145,10 +154,12 @@ export function stockFactOfGoodsLines(goods: readonly RouteGoodsLine[]): SalesOr
   const lines: SalesOrderStockLine[] = [];
   for (const line of goods) {
     if (line.qty <= 0) continue;
+    const uncoveredQty = Math.min(line.qty, line.remainingRequirementQty);
     const counts: StockReadinessCounts = {
       requiredQty: line.qty,
       usableQty: Math.min(line.qty, line.usableQty),
-      purchasedQty: Math.min(line.qty, Math.max(line.purchasedQty, line.usableQty)),
+      uncoveredQty,
+      purchasedQty: line.qty - uncoveredQty,
       issueQty: issueOf(line),
       arrivedUnallocatedQty: line.arrivedUnallocatedQty,
     };
@@ -158,6 +169,7 @@ export function stockFactOfGoodsLines(goods: readonly RouteGoodsLine[]): SalesOr
   const counts: StockReadinessCounts = {
     requiredQty: sum("requiredQty"),
     usableQty: sum("usableQty"),
+    uncoveredQty: sum("uncoveredQty"),
     purchasedQty: sum("purchasedQty"),
     issueQty: sum("issueQty"),
     arrivedUnallocatedQty: sum("arrivedUnallocatedQty"),

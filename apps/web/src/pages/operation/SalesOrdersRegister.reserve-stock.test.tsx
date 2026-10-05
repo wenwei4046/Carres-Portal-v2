@@ -2,8 +2,8 @@
  * ⭐ `Reserve stock` on the quick view's Items — owner rulings 2026-10-05.
  *
  * A MANUAL line action, never a status. It follows the line's UNCOVERED
- * quantity — the existing door's own remainder (`so_line_remaining_requirement`)
- * — and opens the EXISTING Ready Stock door under the line. Having a PO never
+ * quantity — the server's `uncoveredQty`, the same fact `To purchase` reads
+ * and SO Batch prints — and opens the EXISTING Ready Stock door under the line. Having a PO never
  * hides it by itself; a fully covered line gets no action; viewing reserves
  * nothing; only a confirmed save, through the existing door, writes.
  */
@@ -24,7 +24,7 @@ const ORDER = "00000000-0000-0000-0000-00000000cafe";
 const L1 = "11111111-1111-4111-8111-111111111111";
 const L2 = "22222222-2222-4222-8222-222222222222";
 const L3 = "33333333-3333-4333-8333-333333333333";
-const lineFact = (lineId: string, status: string) => ({ lineId, sku: "B1201S-K", status, requiredQty: 3, usableQty: 0, purchasedQty: 0, issueQty: 0, arrivedUnallocatedQty: 0 });
+const lineFact = (lineId: string, status: string, uncoveredQty: number) => ({ lineId, sku: "B1201S-K", status, requiredQty: 3, usableQty: 0, uncoveredQty, purchasedQty: 3 - uncoveredQty, issueQty: 0, arrivedUnallocatedQty: 0 });
 const order = {
   id: ORDER, so: 1303, status: "proceed_order", operation_stage: "confirmed", warehouse_id: null, customer_name: "Kimmy",
   customer_phone: "019-3478913", placed_at: "2026-08-09T02:00:00Z", proceeded_at: "2026-08-10T02:00:00Z",
@@ -47,7 +47,7 @@ vi.mock("@/lib/queries", async () => {
     useOperationOrders: () => ({ data: { orders: [order], salesOrderTotal: 1 }, isLoading: false, isError: false, error: null, refetch: vi.fn() }),
     useSalesOrderRegisterFacts: () => ({
       data: {
-        facts: { [ORDER]: { obligations: null, cases: null, stock: { status: "to_purchase", requiredQty: 7, usableQty: 0, purchasedQty: 3, issueQty: 0, arrivedUnallocatedQty: 0, lines: [lineFact(L1, "to_purchase"), lineFact(L2, "to_purchase"), lineFact(L3, "awaiting_goods")] } } },
+        facts: { [ORDER]: { obligations: null, cases: null, stock: { status: "to_purchase", requiredQty: 7, usableQty: 0, purchasedQty: 3, issueQty: 0, arrivedUnallocatedQty: 0, lines: [lineFact(L1, "to_purchase", 3), lineFact(L2, "to_purchase", 1), lineFact(L3, "awaiting_goods", 0)] } } },
         failed: { obligations: false, cases: false, stock: false },
       },
     }),
