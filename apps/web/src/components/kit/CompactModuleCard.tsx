@@ -168,6 +168,8 @@ export interface CardFact {
 export interface CardModule {
   key: string;
   label: string;
+  /** Complete module-owned read-only composition, using shared kit exports. */
+  content?: ReactNode;
   disabled?: boolean;
   /** The module's own summary facts — as many cells as it has facts. */
   summary?: CardFact[];
@@ -202,6 +204,8 @@ export interface CardCommunication {
   namePlaceholder?: string;
 }
 export interface CompactModuleCardProps {
+  /** Embedded SO content keeps the outer module Header/tabs and shows its table directly. */
+  presentation?: "standalone" | "embedded";
   name: string;
   reference: string;
   /** Exceptional document state only; normal records need no badge. */
@@ -229,6 +233,7 @@ export interface CompactModuleCardProps {
 }
 
 export default function CompactModuleCard(p: CompactModuleCardProps) {
+  const embedded = p.presentation === "embedded";
   const first = p.modules.find((m) => m.key === p.initialModule) ?? p.modules[0];
   const [documentOpen, setDocumentOpen] = useState(false);
   const documentEntry = useRef<HTMLButtonElement>(null);
@@ -238,8 +243,8 @@ export default function CompactModuleCard(p: CompactModuleCardProps) {
     documentEntry.current?.focus();
   }
   const [moduleKey, setModuleKey] = useState(first.key);
-  const [sales, setSales] = useState(!!first.opensHeaderDetails);
-  const [address, setAddress] = useState(!!first.opensHeaderDetails);
+  const [sales, setSales] = useState(embedded || !!first.opensHeaderDetails);
+  const [address, setAddress] = useState(embedded || !!first.opensHeaderDetails);
   const [details, setDetails] = useState(false);
   const [items, setItems] = useState(!!p.initiallyOpen?.items);
   const [comm, setComm] = useState(!!p.initiallyOpen?.communication);
@@ -274,13 +279,13 @@ export default function CompactModuleCard(p: CompactModuleCardProps) {
 
   return (
     <div className={s.cq}>
-      <section className={s.panel}>
+      <section className={`${s.panel} ${embedded ? s.embedded : ""}`}>
         <header className={s.header} data-layout={!p.address && !p.target ? "identity" : p.address?.hideArea ? "no-area" : undefined}>
           <div className={s.identity}>
             <div className={s.identityTitle}><strong>{p.name}</strong></div>
             <small className={s.contactLine}><>{p.document ? <button ref={documentEntry} type="button" className={s.documentNumber} title={p.document.label} aria-label={p.document.label} aria-expanded={documentOpen} aria-controls={`${ids}-document`} onClick={() => setDocumentOpen((v) => !v)}>{p.reference}</button> : <span>{p.reference}</span>}</>{p.phone ? <span className={s.phonePair}><Glyph name="phone" />{p.phone}</span> : null}</small>
             {p.referenceStatus ? <small className={s.referenceStatus}>{p.referenceStatus}</small> : null}
-            {p.sales ? (
+            {p.sales && !embedded ? (
               <button type="button" className={s.salesToggle} title={CARD_WORDS.orderDetails} aria-label={CARD_WORDS.orderDetails} aria-controls={`${ids}-sales`} aria-expanded={sales} onClick={() => { if (p.address?.hideArea) setAddress(!sales); setSales(v => !v); }}>
                 <span className={s.chevron}>{sales ? "▴" : "▾"}</span>
               </button>
@@ -298,7 +303,7 @@ export default function CompactModuleCard(p: CompactModuleCardProps) {
           </div>
           <div className={s.actions}>
             <button type="button" aria-label={p.openLabel ?? "Open order"} title={p.openLabel ?? "Open order"} onClick={p.onOpen}>↗</button>
-            <button type="button" aria-label={p.closeLabel ?? "Close panel"} title={p.closeLabel ?? "Close panel"} onClick={p.onClose}>×</button>
+            {!embedded && <button type="button" aria-label={p.closeLabel ?? "Close panel"} title={p.closeLabel ?? "Close panel"} onClick={p.onClose}>×</button>}
           </div>
         </header>
         {p.address && address ? (
@@ -321,7 +326,7 @@ export default function CompactModuleCard(p: CompactModuleCardProps) {
             <div className={s.salesFact}><span className={s.salesLabel}>{CARD_WORDS.salesperson}</span><strong>{p.sales.salesperson}</strong></div>
           </div>
         ) : null}
-        <nav className={s.moduleNav} aria-label={p.modulesLabel ?? CARD_WORDS.modules}>
+        {!embedded && <nav className={s.moduleNav} aria-label={p.modulesLabel ?? CARD_WORDS.modules}>
           {p.modules.map((m) => (
             <button key={m.key} type="button" disabled={m.disabled} className={m.key === mod.key ? s.selected : undefined} aria-current={m.key === mod.key ? "page" : undefined} onClick={() => selectModule(m)}>{m.label}</button>
           ))}
@@ -336,7 +341,7 @@ export default function CompactModuleCard(p: CompactModuleCardProps) {
           {p.timeline ? (
             <button type="button" className={`${s.toggle} ${s.toggleTimeline} ${communication || mod.items ? "" : s.toggleFirst}`} title={CARD_WORDS.timeline} aria-label={timeline ? CARD_WORDS.hideTimeline : CARD_WORDS.showTimeline} aria-expanded={timeline} onClick={() => setTimeline((v) => !v)}><Glyph name="history" /></button>
           ) : null}
-        </nav>
+        </nav>}
         {p.document && documentOpen ? <div id={`${ids}-document`} className={s.body} role="region" aria-label={p.document.label}>
           {p.document.preview(closeDocument)}
         </div> : null}
@@ -356,7 +361,8 @@ export default function CompactModuleCard(p: CompactModuleCardProps) {
             ) : null}
             {editingFact?.editor ? <div className={s.editor}>{editingFact.editor(close)}</div> : null}
             {mod.details && details ? <div id={`${ids}-details`}>{mod.details}</div> : null}
-            {mod.items && items ? <div id={`${ids}-items`}>{mod.items}</div> : null}
+            {mod.content}
+            {mod.items && (embedded || items) ? <div id={`${ids}-items`}>{mod.items}</div> : null}
           </div>
         </article>
         {communication && comm ? <CardCommunicationPanel key={mod.key} id={`${ids}-comm`} config={communication} onClose={() => setComm(false)} /> : null}

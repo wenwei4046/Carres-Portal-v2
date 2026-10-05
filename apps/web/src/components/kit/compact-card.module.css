@@ -434,3 +434,14 @@ aside.section { background: var(--cc-surface); }
 .targetLabel:empty { display: none; }
 .target b small { font-size: 11px; font-weight: 500; }
 @container (max-width: 440px) { .header[data-layout="no-area"] { grid-template-columns: minmax(0, 1fr) 142px 60px; } .targetLabel { font-size: 9px; } }
+
+/* Embedded SO: same measured content, no second black Header or module navigation. */
+.embedded { border: 0; border-radius: 0; }
+.embedded .header { background: var(--cc-soft); color: var(--cc-ink); grid-template-columns: minmax(0, 1fr) 156px 32px; }
+.embedded .header .contactLine { color: var(--cc-ink); }
+.embedded .header .identity, .embedded .header .target { border-color: var(--cc-line); }
+.embedded .header .targetLabel { color: var(--cc-muted); }
+.embedded .header .target small { color: var(--cc-ink); }
+.embedded .header button:hover { background: var(--cc-toggle-hover); color: var(--cc-brand); }
+.embedded .header button:focus-visible { outline-color: var(--cc-brand); }
+@container (max-width: 440px) { .embedded .header[data-layout="no-area"] { grid-template-columns: minmax(0, 1fr) 142px 32px; } }

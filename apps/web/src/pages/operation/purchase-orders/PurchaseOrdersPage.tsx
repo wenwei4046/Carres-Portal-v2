@@ -4,6 +4,7 @@
 // list chrome around the same register, contrary to the Sales Orders template.
 import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
 import "./purchase-order-detail.css";
+import EmbeddedSalesOrders from "../components/EmbeddedSalesOrders";
 import registerStyles from "./PurchaseOrdersRegister.module.css";
 import type { IconName } from "@/components/kit/Icon";
 import { FilterRail, FilterRailGroup, FilterRailRow, FilterRailSelect, ShowFiltersButton, useFilterRailOpen } from "../components/workspace-rail";
@@ -1447,7 +1448,7 @@ async function downloadOfficialPdf(poId: string): Promise<void> {
   setTimeout(() => URL.revokeObjectURL(url), 30_000);
 }
 
-const OBJECT_VIEWS = ["Document", "Revisions", "History", "Order Route"] as const;
+const OBJECT_VIEWS = ["Document", "Revisions", "History", "Order Route", "Sales Order"] as const;
 type ObjectView = (typeof OBJECT_VIEWS)[number];
 type DocumentMode = "read" | "issue" | "revise" | "deliverTo";
 
@@ -1693,6 +1694,8 @@ function PurchaseOrderObject({
             onRetryReceiving={() => void receivingQ.refetch()}
             onRetryClaims={() => void claimsQ.refetch()}
           />
+        ) : view === "Sales Order" ? (
+          <EmbeddedSalesOrders orderIds={row.sources.filter(source => source.kind === "sales_order" && source.orderId).map(source => source.orderId!)} />
         ) : view === "Revisions" ? (
           <RecordList
             title="Revisions"
