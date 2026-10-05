@@ -2232,7 +2232,11 @@ over-received quantities are never auto-reserved. If the original SO is cancelle
 fallen, or the source is unclear, nothing is forced: the exception is kept and shown for handling.
 Ordinary warehouse stock is still reserved only when staff choose `Reserve stock`; Match Ready Stock
 stays an optional, user-started mode. Receiving posts the receipt; the reservation is written through
-Stock's existing reservation door (Stock MASTER §4). Open for the build: today `Amend Receiving`
+Stock's existing reservation door (Stock MASTER §4). Manual `Reserve stock` reserves only a line's
+uncovered quantity and never releases or replaces a PO; using stock instead of a PO means changing or
+cancelling the PO through Purchasing's existing route first (owner ruling 2026-10-05). SO Batch demand
+and the SO list read one coverage fact (`so_line_remaining_requirement`), so received-and-reserved
+goods are never bought again. Open for the build: today `Amend Receiving`
 refuses an outcome change on a reserved Unit — how it treats a reservation this posting made must be
 settled with this rule, as `Use this PO` arrivals already are (§9.4).
 
