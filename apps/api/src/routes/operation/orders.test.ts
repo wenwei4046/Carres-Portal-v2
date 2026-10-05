@@ -246,6 +246,123 @@ describe("GET /api/operation/orders", () => {
     });
   });
 
+  /* ⭐ FIND AN ORDER BY PHONE (Orders MASTER §0 Charter). The Sales Order
+     page's `Existing customer · {n} orders ›` opens this list searched by the
+     phone; before this read the server matched no phone, so the answer
+     replaced the rows with nothing. */
+  describe("phone search — the digits find the order however they were written", () => {
+    type Call = { table: string; cols: string; head: boolean; method: string; args: unknown[] };
+    const PHONE_COLS = "id, customer_phone";
+    function mockPhoneRead(opts: { phones?: Array<{ id: string; customer_phone: string | null }>; phoneError?: unknown }) {
+      const calls: Call[] = [];
+      const from = vi.fn((table: string) => {
+        let cols = "";
+        let head = false;
+        const chain: Record<string, unknown> = {};
+        chain.select = vi.fn((c: string, o?: { head?: boolean }) => {
+          cols = c;
+          head = Boolean(o?.head);
+          calls.push({ table, cols, head, method: "select", args: [c, o] });
+          return chain;
+        });
+        for (const m of ["in", "eq", "neq", "ilike", "or", "not", "is", "order", "limit", "range"])
+          chain[m] = vi.fn((...args: unknown[]) => { calls.push({ table, cols, head, method: m, args }); return chain; });
+        chain.then = (resolve: (v: unknown) => unknown) =>
+          resolve(
+            head
+              ? { count: 1, error: null, data: null }
+              : cols === PHONE_COLS
+                ? opts.phoneError
+                  ? { data: null, error: opts.phoneError }
+                  : { data: opts.phones ?? [], error: null }
+                : { data: [ORDER_ROW], error: null },
+          );
+        return chain;
+      });
+      vi.mocked(userClient).mockReturnValue({ from } as never);
+      return calls;
+    }
+    const search = async (term: string, stage = "proceeded") => {
+      const jwt = await makeJwt("operation");
+      return app.fetch(
+        new Request(`http://t/api/operation/orders?stage=${stage}&search=${encodeURIComponent(term)}`, { headers: { Authorization: `Bearer ${jwt}` } }),
+        env,
+      );
+    };
+    const listOr = (calls: Call[]) =>
+      calls.filter((c) => c.table === "orders" && !c.head && c.cols !== PHONE_COLS && c.method === "or").map((c) => String(c.args[0]));
+    const searchClause = (calls: Call[]) => listOr(calls).find((v) => v.includes("customer_name")) ?? "";
+
+    it.each([
+      ["019-83372393", "019-83372393"],
+      ["01983372393", "019-83372393"],
+      ["019 8337 2393", "019-83372393"],
+      ["(019) 8337-2393", "019-83372393"],
+      ["+60198337 2393", "019-83372393"],
+      ["+60 19-8337 2393", "019-83372393"],
+      ["0123456789", "+60123456789"],
+      ["012-345 6789", "+60 12-345 6789"],
+      ["+60123456789", "0123456789"],
+      ["0123456789", "123456789"],
+    ])("typed %s finds the order stored as %s", async (typed, stored) => {
+      const calls = mockPhoneRead({
+        phones: [
+          { id: "hit-order", customer_phone: stored },
+          { id: "other-order", customer_phone: "011-1111 2222" },
+        ],
+      });
+      const res = await search(typed);
+      expect(res.status).toBe(200);
+      const clause = searchClause(calls);
+      expect(clause).toContain("id.in.(hit-order)");
+      expect(clause).not.toContain("other-order");
+    });
+
+    it("reads the phones of the list's OWN population, through the caller's RLS client", async () => {
+      const calls = mockPhoneRead({ phones: [] });
+      await search("019-8337 2393");
+      const phoneCalls = calls.filter((c) => c.cols === PHONE_COLS).map((c) => ({ method: c.method, args: c.args }));
+      expect(phoneCalls).toContainEqual({ method: "not", args: ["status", "in", "(place,cancelled)"] });
+      expect(phoneCalls).toContainEqual({ method: "or", args: ["source_system.is.null,source_system.neq.rental"] });
+      expect(phoneCalls).toContainEqual({ method: "ilike", args: ["customer_phone", "%1%9%8%3%3%7%2%3%9%3%"] });
+      expect(phoneCalls).toContainEqual({ method: "range", args: [0, 999] });
+      /* No phone matched: no id clause, and the rest of the search is unchanged. */
+      expect(searchClause(calls)).not.toContain("id.in.");
+    });
+
+    it("leaves a NAME search exactly as it was — no phone read", async () => {
+      const calls = mockPhoneRead({ phones: [{ id: "hit-order", customer_phone: "0123456789" }] });
+      const res = await search("Tan");
+      expect(res.status).toBe(200);
+      expect(calls.some((c) => c.cols === PHONE_COLS)).toBe(false);
+      expect(searchClause(calls)).toBe("customer_name.ilike.%Tan%,source_ref.cs.{TAN},invoice_no.ilike.%TAN%,do_number.ilike.%TAN%");
+    });
+
+    it("leaves an SO-number search as it was — four digits are not a phone", async () => {
+      const calls = mockPhoneRead({ phones: [{ id: "hit-order", customer_phone: "0123454001" }] });
+      await search("4001");
+      expect(calls.some((c) => c.cols === PHONE_COLS)).toBe(false);
+      expect(searchClause(calls)).toContain("so.eq.4001");
+    });
+
+    it("fails the search when the phones cannot be read — never a silent `no order`", async () => {
+      const calls = mockPhoneRead({ phoneError: { code: "42501", message: "permission denied for table orders" } });
+      const res = await search("019-8337 2393");
+      expect(res.status).toBe(403);
+      /* The list itself was never answered with a phone-less search. */
+      expect(listOr(calls).some((v) => v.includes("customer_name"))).toBe(false);
+    });
+
+    it("keeps a bracketed phone from breaking the or() grammar", async () => {
+      const calls = mockPhoneRead({ phones: [{ id: "hit-order", customer_phone: "03-1234 5678" }] });
+      const res = await search("(03) 1234 5678");
+      expect(res.status).toBe(200);
+      const clause = searchClause(calls);
+      expect(clause.startsWith('customer_name.ilike."%(03) 1234 5678%",')).toBe(true);
+      expect(clause).toContain("id.in.(hit-order)");
+    });
+  });
+
   it.each(["4001", "SO-4001", "so-4001", "SO 4001"])("finds the order number entered as %s", async (search) => {
     const { or } = mockOrdersList([]);
     const jwt = await makeJwt("operation");

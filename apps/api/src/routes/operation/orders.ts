@@ -39,6 +39,7 @@ import {
   stockMatchKey,
 } from "@carres/shared";
 import { findSalesOrderDocuments } from "../../lib/sales-order-document-search";
+import { findOrdersByPhone, phoneSearchDigits } from "../../lib/sales-order-phone-search";
 import { readFreeStock } from "../../lib/purchase-demand-read";
 // renderDoPdf moved to apps/web/src/lib/pdf/render.ts (Workers WASM ban).
 import type { DoTemplateData } from "../../lib/pdf/types";
@@ -322,29 +323,38 @@ operationOrdersRouter.get("/", requireOperation, async (c) => {
     )
     .eq("original_request.revision", 1);
 
-  if (stage === "proceeded") {
-    // The Sales Orders Register's population — the ONE predicate its total
-    // below is counted with (salesOrderRegisterPopulation).
-    q = salesOrderRegisterPopulation(q);
-  } else {
-    // Pipeline v2 (C3): include `status='place'` rows so the FE kanban can
-    // render the "Placed" column. proceed_order + delivered preserved as
-    // before; existing M2 tests still pass.
-    q = q.in("status", ["place", "proceed_order", "delivered"]);
-    if (stage === "placed") {
-      // 'placed' is a synthetic stage derived from `status='place'` (pre-push
-      // orders may have NULL operation_stage or 'placed' depending on whether
-      // they were seeded post-0024). Filter on status, not stage.
-      q = q.eq("status", "place");
-    } else if (stage !== "all") {
-      q = q.eq("operation_stage", stage);
+  /* The list's scope — stage, the one order, channel — applied by ONE
+     function, so the phone read below asks exactly the population the rows
+     come from and can never drift from it. */
+  const listScope = <Q,>(query: Q): Q => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let s = query as any;
+    if (stage === "proceeded") {
+      // The Sales Orders Register's population — the ONE predicate its total
+      // below is counted with (salesOrderRegisterPopulation).
+      s = salesOrderRegisterPopulation(s);
+    } else {
+      // Pipeline v2 (C3): include `status='place'` rows so the FE kanban can
+      // render the "Placed" column. proceed_order + delivered preserved as
+      // before; existing M2 tests still pass.
+      s = s.in("status", ["place", "proceed_order", "delivered"]);
+      if (stage === "placed") {
+        // 'placed' is a synthetic stage derived from `status='place'` (pre-push
+        // orders may have NULL operation_stage or 'placed' depending on whether
+        // they were seeded post-0024). Filter on status, not stage.
+        s = s.eq("status", "place");
+      } else if (stage !== "all") {
+        s = s.eq("operation_stage", stage);
+      }
     }
-  }
-  // Public 'channel' enum kept as 'dealers'|'showrooms' per spec §18.3 (Loo-facing wording).
-  // Internally maps to outlet_id IS [NOT] NULL — schema column is outlet_id, not showroom_id.
-  if (onlyOrderId) q = q.eq("id", onlyOrderId);
-  if (channel === "dealers") q = q.is("outlet_id", null);
-  if (channel === "showrooms") q = q.not("outlet_id", "is", null);
+    // Public 'channel' enum kept as 'dealers'|'showrooms' per spec §18.3 (Loo-facing wording).
+    // Internally maps to outlet_id IS [NOT] NULL — schema column is outlet_id, not showroom_id.
+    if (onlyOrderId) s = s.eq("id", onlyOrderId);
+    if (channel === "dealers") s = s.is("outlet_id", null);
+    if (channel === "showrooms") s = s.not("outlet_id", "is", null);
+    return s as Q;
+  };
+  q = listScope(q);
   if (search) {
     // Match customer name (ILIKE), the SO number (digits or displayed SO- prefix), AND
     // each imported invoice number. A combined Ref is tokenised into
@@ -352,7 +362,15 @@ operationOrdersRouter.get("/", requireOperation, async (c) => {
     // any single invoice — e.g. "CR0854" — find the combined order too (alias).
     // The ref term is sanitised to invoice chars [A-Z0-9/-] so it can't break
     // the PostgREST or()/cs.{} grammar.
-    const clauses = [`customer_name.ilike.%${search}%`];
+    //
+    // The name term is the operator's own text. A `,` `(` `)` `"` or `\` in it
+    // would end the or() value early — `(03) 1234 5678` failed the whole search
+    // — so such a term is double-quoted (PostgREST's reserved-character rule);
+    // a plain name rides exactly as before.
+    const nameTerm = /[,()"\\]/.test(search)
+      ? `"%${search.replace(/[\\"]/g, (ch) => `\\${ch}`)}%"`
+      : `%${search}%`;
+    const clauses = [`customer_name.ilike.${nameTerm}`];
     const refTerm = search.toUpperCase().replace(/[^A-Z0-9/-]/g, "");
     if (refTerm) clauses.push(`source_ref.cs.{${refTerm}}`);
     if (refTerm) {
@@ -363,6 +381,29 @@ operationOrdersRouter.get("/", requireOperation, async (c) => {
         if (linked.soNumbers.length) clauses.push(`so.in.(${linked.soNumbers.join(",")})`);
       } catch (documentError) {
         const mapped = mapPgError(documentError as { code?: string; message?: string });
+        return c.json(mapped.body, mapped.status);
+      }
+    }
+    /* A PHONE typed any way — `019-8337 2393`, `(019) 83372393`,
+       `+6019 83372393` — finds the orders whose phone carries those digits.
+       The read is the caller's RLS over the list's own scope; the Worker
+       decides the match on digits (sales-order-phone-search.ts). A failed
+       read fails the search, exactly like the document read above: an
+       unread phone is not "no order". */
+    const phoneDigits = phoneSearchDigits(search);
+    if (phoneDigits) {
+      try {
+        const phoneOrderIds = await findOrdersByPhone(
+          (pattern, from, to) =>
+            listScope(sb.from("orders").select("id, customer_phone"))
+              .ilike("customer_phone", pattern)
+              .order("id", { ascending: true })
+              .range(from, to),
+          phoneDigits,
+        );
+        if (phoneOrderIds.length) clauses.push(`id.in.(${phoneOrderIds.join(",")})`);
+      } catch (phoneError) {
+        const mapped = mapPgError(phoneError as { code?: string; message?: string });
         return c.json(mapped.body, mapped.status);
       }
     }
