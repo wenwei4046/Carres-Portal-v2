@@ -1626,7 +1626,7 @@ describe("approved solid SO status presentation", () => {
     const drawer = screen.getByRole("dialog", { name: "SO-1303 · Kimmy" });
     fireEvent.click(within(drawer).getByRole("button", { name: "Items" }));
     expect(within(drawer).queryByRole("button", { name: "Info · Order details" })).toBeNull();
-    expect(within(drawer).queryByText("Stock Status")).toBeNull();
+    expect(within(drawer).getByRole("columnheader", { name: "Stock Status" })).toBeVisible();
     expect(within(drawer).queryByText("Payment Status")).toBeNull();
     expect(within(drawer).queryByText("Delivery Status")).toBeNull();
     expect(within(drawer).getByText("Total payable")).toBeVisible();
