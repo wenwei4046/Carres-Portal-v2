@@ -127,7 +127,7 @@ Dealer commission rules:
   4. 「我是根据收到的钱给佣金，如果取消单没有退也要扣，但要做能toggle 决定」. Commission follows money received. A cancelled order's commission is taken back even when its money is not refunded, behind a switch Finance can turn.
   5. 「收到的钱的%」, then 「1是a」 (2026-10-05): confirmed. The renovation rebate is money Carres pays the dealer on top of commission: the rebate rate times the money collected since its start date, until the total is reached; the total left runs down by itself.
   6. 「每个月重新数，根据订单」, then 「暂时每个月算还是每年算我再决定」 (2026-10-05). The 15-year guarantee KPI counts from orders; whether the count restarts each month or each year is Chew's to decide later, so the period is a setting.
-  7. 「这个确定，是根据订单的mattress 决定的」, then 「是a」 (2026-10-05): commission is worked on the price after the bundle discount, so Carres and the dealer share it. Chew recalls the bundle discount belongs to the whole bundle, not to one product; how it spreads over lines at different rates is open (recommended: by each line's value).
+  7. 「这个确定，是根据订单的mattress 决定的」, then 「是a」 (2026-10-05): commission is worked on the price after the bundle discount, so Carres and the dealer share it. The bundle discount belongs to the whole bundle and is shared equally by the order's mattresses, piece by piece: 「3张就500 除3， 4张就500 除4」 (Chew 2026-10-05). Each mattress's commission is its rate on its price less its share.
 - **Noted for later (Chew 2026-10-05).** A list's search box opens already typed-into, not behind a click. To change together with other UI items; first check whether it is the shared kit search.
 
 **Supplier credit notes approach — PROPOSAL / NOT LAW, built for Chew's test (0642).**
