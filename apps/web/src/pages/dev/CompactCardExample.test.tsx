@@ -154,8 +154,11 @@ describe("Purchase Order · Sales Order tab (embedded presentation)", () => {
 
   it("the host keeps its own header and tabs; the Sales Order tab holds two embedded SOs", () => {
     const c = host();
-    expect(c.getByText("{Supplier}")).toBeTruthy();
-    expect(c.getByText("{PO No}")).toBeTruthy();
+    expect(c.getAllByText("{Supplier}").length).toBeGreaterThan(0);
+    expect(c.getByRole("button", { name: "Purchase Order" })).toHaveAttribute("aria-current", "page");
+    expect(c.getByRole("button", { name: "Info" })).toBeTruthy();
+    expect(c.queryByTestId("embedded-sample")).toBeNull();
+    fireEvent.click(c.getByRole("button", { name: "Sales Order" }));
     expect(c.getByRole("button", { name: "Sales Order" })).toHaveAttribute("aria-current", "page");
     /* One Close: the host's. The embedded SOs draw none, and no module tabs. */
     expect(c.getAllByRole("button", { name: "Close panel" })).toHaveLength(1);
@@ -170,6 +173,7 @@ describe("Purchase Order · Sales Order tab (embedded presentation)", () => {
   it("↗ only where a full page exists; the PDF opens and closes without folding the facts", () => {
     const open = vi.spyOn(window, "open").mockReturnValue(null);
     const c = host();
+    fireEvent.click(c.getByRole("button", { name: "Sales Order" }));
     const embedded = within(c.getByTestId("embedded-sample"));
     expect(embedded.getAllByRole("button", { name: "Open full page" })).toHaveLength(1);
     fireEvent.click(embedded.getByRole("button", { name: "Open full page" }));

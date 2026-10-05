@@ -13,8 +13,9 @@
  *
  * `Purchase Order · Sales Order tab` shows the EMBEDDED presentation (owner
  * 2026-10-05): a host card ({Supplier} · {PO No}, braces because no real PO links
- * SO-1368) whose `Sales Order` tab holds two embedded SOs — the SO-1368 sample and
- * the long-number, long-address layout sample. SO-1368's number opens its real
+ * SO-1368) opening on its own `Purchase Order` tab, whose `Sales Order` tab holds
+ * two embedded SOs — the SO-1368 sample and the long-number, long-address layout
+ * sample. The host's tabs are its own; this example only shows where they sit. SO-1368's number opens its real
  * saved PDF when signed in; the layout sample has no saved document, so its PDF
  * door shows the real failure state.
  */
@@ -35,7 +36,7 @@ const PRESETS = {
   infoAll: { label: "Info · all open", module: "info", open: { items: true, communication: true, timeline: true }, warehouseLeg: false },
   deliveryAll: { label: "Delivery · all open", module: "delivery", open: { items: true, communication: true, timeline: true }, warehouseLeg: false },
   warehouseLeg: { label: "Delivery · warehouse leg", module: "delivery", open: {}, warehouseLeg: true },
-  poSalesOrder: { label: "Purchase Order · Sales Order tab", module: "sales", open: {}, warehouseLeg: false },
+  poSalesOrder: { label: "Purchase Order · Sales Order tab", module: "purchaseOrder", open: {}, warehouseLeg: false },
 } as const;
 type PresetKey = keyof typeof PRESETS;
 
@@ -211,10 +212,15 @@ export default function CompactCardExample() {
       </div>
       <div data-testid="compact-card-frame" style={{ width, maxWidth: "100%" }}>
         {closed ? null : preset === "poSalesOrder" ? <CompactModuleCard
-          key={`po-${width}`} name="{Supplier}" reference="{PO No}" modulesLabel="Purchase Order" initialModule="sales"
+          key={`po-${width}`} name="{Supplier}" reference="{PO No}" modulesLabel="Purchase Order" initialModule="purchaseOrder"
           onClose={() => setClosed(true)} modules={[
-            { key: "info", label: "Info", disabled: true },
-            { key: "purchasing", label: "Purchasing", disabled: true },
+            { key: "info", label: "Info", communication: null, summary: [
+              { key: "supplier", label: "Supplier", value: "{Supplier}" }, { key: "po", label: "PO No", value: "{PO No}" },
+              { key: "date", label: "PO Doc Date", value: "{PO Doc Date}" }, { key: "source", label: "SO No / MPR No", value: "{SO No}" },
+            ] },
+            { key: "purchaseOrder", label: "Purchase Order", communication: null, summary: [
+              { key: "delivery", label: "PO Delivery Date", value: "{PO Delivery Date}" }, { key: "deliverTo", label: "Supplier Deliver To", value: "{Supplier Deliver To}" },
+            ] },
             { key: "sales", label: "Sales Order", communication: null, content: (
               <div className="flex min-w-0 flex-col gap-3" data-testid="embedded-sample">
                 <CompactModuleCard {...embeddedSample("SO-1368", "1888. jalan Pillow, 68000 Ampang, Selangor", { orderId: SAMPLE_ORDER_ID, path: SAMPLE_ORDER_PATH })} />
