@@ -127,7 +127,7 @@ function orderRow(over: Partial<SoBatchOrderRow> & { orderId: string }): SoBatch
     customer: null,
     status: "blank",
     proceededAt: null,
-    requestedDeliveryDate: null,
+    requestedDeliveryDate: null, originalRequestedDeliveryDate: null,
     deliveryCity: null,
     deliveryState: null,
     pos: [],
@@ -144,7 +144,7 @@ const ORDER_O1 = orderRow({
   so: 1318,
   customer: "Kimmy",
   proceededAt: "2026-08-20T08:15:00+08:00",
-  requestedDeliveryDate: "2026-08-28",
+  requestedDeliveryDate: "2026-08-28", originalRequestedDeliveryDate: "2026-08-28",
   deliveryCity: "Petaling Jaya",
   deliveryState: "Selangor",
   lines: [
@@ -173,7 +173,7 @@ const ORDER_O3 = orderRow({
   deliveryCity: "Johor Bahru",
   deliveryState: "Johor",
   status: "partial",
-  requestedDeliveryDate: "2026-09-20",
+  requestedDeliveryDate: "2026-09-20", originalRequestedDeliveryDate: "2026-09-20",
   pos: [
     { poId: "PO-20260820-4827", status: "open", supplierId: "s-hooka",
       supplierName: "Hooka", destinationId: KLANG, officialDeliveryDate: "2026-09-18",
@@ -324,6 +324,12 @@ function renderRegister(over: Partial<SoBatchPurchaseResponse> = {}, expandHisto
   return rendered;
 }
 
+it("shows the original request while keeping purchasing planning facts separate", () => {
+  renderRegister({ registerRows: [{ ...ORDER_O1, requestedDeliveryDate: "2026-12-01", originalRequestedDeliveryDate: "2026-08-01" }] });
+  expect(screen.getByTestId("so-batch-requested-o1")).toHaveTextContent("Sat, 1 Aug");
+  expect(screen.getByTestId("so-batch-requested-o1")).not.toHaveTextContent("Dec");
+});
+
 it("refuses manual whole-round matching when the persisted priority source is unavailable", () => {
   renderRegister({ readyStockPriority: null });
   expect(screen.getByRole("button", { name: "Match Ready Stock" })).toBeDisabled();
@@ -456,7 +462,7 @@ describe("the approved columns, in the approved reading order", () => {
     "Proceed Date",
     "SO No",
     "PO Safety Days",
-    "Customer Requested Delivery Date",
+    "Customer’s original requested delivery",
     "Customer Delivery Location",
     "Customer",
     "Items",
@@ -2673,7 +2679,7 @@ describe("the two-line Status rule", () => {
       ...base,
       registerRows: [{ ...order, lines: [{ ...order.lines[0]!, poOffer: { poId: "PO260924-4827", qty: 2 } }] }],
     });
-    expect(screen.getByTestId("so-batch-select-ob")).not.toBeDisabled();
+    expect(screen.getByTestId("so-batch-select-ob")).toBeEnabled();
     expect(rowOf("ob")).toHaveAttribute("data-row-highlight", "info");
     expect(rowOf("ob").getAttribute("title")).toBe("PO260924-4827 has 2 Booqit King available.");
   });
