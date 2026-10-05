@@ -1053,7 +1053,8 @@ phone read fails the search; it is never answered as no order. Name and SO-numbe
 typed text against the row's phone and its digits. On screen, a phone shows when it is typed as stored or
 as the stored digits without punctuation, and the Sales Order page's `Existing customer · {n} orders ›`
 link (it carries the stored phone) lands on the orders; a different punctuation or the other country-code
-form (`+60…` against a stored `0…`) is found by the server and then hidden by that re-filter.
+form (`+60…` against a stored `0…`) is found by the server and then hidden by that re-filter — and is
+still counted in `{n}`, which counts the server's answer, until that re-filter is fixed.
 **Several PO numbers print like Items — OWNER RULING 2026-09-27 (Jess: "show all PO No like +"):** the
 first document number as its own link, then `+ {n} more` (`PO-20260902-8370 + 1 more`), the `+ {n} more`
 being the door to the popover that lists every number as a link; the count-only entry (`2 Purchase
@@ -1134,6 +1135,9 @@ CUSTOMER                name · phone · email · demographics
   │                     Existing customer carries `· {n} orders ›` (owner ruling 2026-09-21, BUILT 2026-09-23):
   │                     n = this phone's Sales Orders the reader may see; the link opens the Sales Orders
   │                     Register searched by that phone. No new customer page, no new writer.
+  │                     n is what the door opens — the Register's own population and server phone search,
+  │                     counted for the same phone and caller (`count=only`); 0 or a failed count shows
+  │                     no `· {n} orders ›` (BUILT 2026-10-06, SO BUILD-1c).
   ├ Emergency contact   name · phone · relationship      (own heading, own divider)
   └ Billing             billing relationship · billing address  (moved from Delivery 2026-09-21)
 DELIVERY                ONE group, no in-card headings (owner ruling 2026-09-21): the MY address cascade
