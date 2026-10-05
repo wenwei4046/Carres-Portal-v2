@@ -83,11 +83,13 @@ describe("GET /api/operation/orders", () => {
   }
 
   it("reads invoice, receipt allocation and amendment lineage from their source ledgers", async () => {
-    const { select } = mockOrdersList([ORDER_ROW]);
+    const { select, eq } = mockOrdersList([ORDER_ROW]);
     const jwt = await makeJwt("operation");
     const res = await app.fetch(new Request("http://t/api/operation/orders", { headers: { Authorization: `Bearer ${jwt}` } }), env);
     expect(res.status).toBe(200);
     const fields = String(select.mock.calls[0]?.[0]);
+    expect(fields).toContain("original_request:sales_order_revisions(revision,snapshot)");
+    expect(eq).toHaveBeenCalledWith("original_request.revision", 1);
     expect(fields).toContain("invoice_documents:invoices(id,invoice_no)");
     expect(fields).toContain("receipt_documents:order_payments(id,receipt_no)");
     expect(fields).toContain("allocated_receipts:payment_allocations(order_payments(id,receipt_no))");

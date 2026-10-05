@@ -210,8 +210,8 @@ export interface CompactModuleCardProps {
   document?: { label: string; preview: (onClose: () => void) => ReactNode };
   phone?: string;
   sales?: { orderDate: string; proceedDate?: string; salesLocation: string; salesperson: string };
-  address?: { area: string; full: string; facts?: { kind: "building" | "access"; label: string; value: string }[] };
-  target?: { date: string; badge?: string };
+  address?: { area: string; full: string; hideArea?: boolean; facts?: { kind: "building" | "access"; label: string; value: string }[] };
+  target?: { date: string; badge?: string; label?: string; labelLines?: string[] };
   openLabel?: string;
   onOpen?: () => void;
   closeLabel?: string;
@@ -275,18 +275,18 @@ export default function CompactModuleCard(p: CompactModuleCardProps) {
   return (
     <div className={s.cq}>
       <section className={s.panel}>
-        <header className={s.header} data-layout={!p.address && !p.target ? "identity" : undefined}>
+        <header className={s.header} data-layout={!p.address && !p.target ? "identity" : p.address?.hideArea ? "no-area" : undefined}>
           <div className={s.identity}>
             <div className={s.identityTitle}><strong>{p.name}</strong></div>
             <small className={s.contactLine}><>{p.document ? <button ref={documentEntry} type="button" className={s.documentNumber} title={p.document.label} aria-label={p.document.label} aria-expanded={documentOpen} aria-controls={`${ids}-document`} onClick={() => setDocumentOpen((v) => !v)}>{p.reference}</button> : <span>{p.reference}</span>}</>{p.phone ? <span className={s.phonePair}><Glyph name="phone" />{p.phone}</span> : null}</small>
             {p.referenceStatus ? <small className={s.referenceStatus}>{p.referenceStatus}</small> : null}
             {p.sales ? (
-              <button type="button" className={s.salesToggle} title={CARD_WORDS.orderDetails} aria-label={CARD_WORDS.orderDetails} aria-controls={`${ids}-sales`} aria-expanded={sales} onClick={() => setSales((v) => !v)}>
+              <button type="button" className={s.salesToggle} title={CARD_WORDS.orderDetails} aria-label={CARD_WORDS.orderDetails} aria-controls={`${ids}-sales`} aria-expanded={sales} onClick={() => { if (p.address?.hideArea) setAddress(!sales); setSales(v => !v); }}>
                 <span className={s.chevron}>{sales ? "▴" : "▾"}</span>
               </button>
             ) : null}
           </div>
-          <div className={s.addressBox}>
+          <div className={s.addressBox} hidden={p.address?.hideArea}>
             {p.address ? (
               <button type="button" className={s.addressButton} aria-label={CARD_WORDS.address} title={p.address.full} aria-expanded={address} onClick={() => setAddress((v) => !v)}>
                 <Glyph name="pin" /><span>{p.address.area}</span><span className={s.chevron} aria-hidden="true">{address ? "▴" : "▾"}</span>
@@ -294,7 +294,7 @@ export default function CompactModuleCard(p: CompactModuleCardProps) {
             ) : null}
           </div>
           <div className={s.target}>
-            {p.target ? <><b><Glyph name="calendar" />{p.target.date}</b>{p.target.badge ? <small className={s.badge}>{p.target.badge}</small> : null}</> : null}
+            {p.target ? <><span className={s.targetLabel} title={p.target.label}>{p.target.labelLines?.map(line => <span key={line}>{line}</span>)}</span><b>{p.target.label && p.target.badge ? <><small title="Calendar days from Proceed date to customer’s original requested delivery">{p.target.badge}</small><span aria-hidden="true">·</span></> : null}<Glyph name="calendar" />{p.target.date}</b>{!p.target.label && p.target.badge ? <small className={s.badge}>{p.target.badge}</small> : null}</> : null}
           </div>
           <div className={s.actions}>
             <button type="button" aria-label={p.openLabel ?? "Open order"} title={p.openLabel ?? "Open order"} onClick={p.onOpen}>↗</button>
@@ -306,7 +306,7 @@ export default function CompactModuleCard(p: CompactModuleCardProps) {
             <div className={s.fullAddress}><Glyph name="addressPin" /><span>{p.address.full}</span></div>
             {p.address.facts?.length ? (
               <div className={s.locationFacts}>
-                {p.address.facts.map((f) => (
+                {(["building", "access"] as const).flatMap(kind => { const group = p.address!.facts!.filter(f => f.kind === kind); return group.length ? [{ kind, label: group.map(f => f.label).join(" · "), value: group.map(f => f.value).join(" · ") }] : []; }).map((f) => (
                   <div key={f.label} className={s.factBox}><div aria-label={f.label}><Glyph name={f.kind} /></div><strong>{f.value}</strong></div>
                 ))}
               </div>

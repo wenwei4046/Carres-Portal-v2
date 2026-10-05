@@ -128,6 +128,12 @@ export function requestedDeliveryOf(o: {
   return { iso: tbd ? null : o.delivery_date ?? null, tbd };
 }
 
+/** Original request only: current delivery_date can change after issue. */
+export function originalRequestedDeliveryOf(o: Pick<operationOrderListRow, "original_request">): string | null {
+  const first = o.original_request?.find(r => r.revision === 1)?.snapshot.header;
+  return first ? requestedDeliveryOf(first).iso : null;
+}
+
 /**
  * ⭐ AND ONE SPELLING OF ITS CELL. Three different things can be true of a
  * requested date — a day, `To be confirmed`, or nothing asked for — and the
@@ -225,7 +231,7 @@ export function buildRegisterRow(
     items: registerItemsSummary(o, itemNameOf),
     proceeded: o.proceeded_at ?? null,
     ordered: o.placed_at,
-    customerDelivery: requestedDeliveryOf(o).iso,
+    customerDelivery: originalRequestedDeliveryOf(o),
     /* A required fact (2026-09-21): an empty locality prints nothing, never
        the locality helper's `Not recorded`. */
     deliveryLocation:
@@ -332,7 +338,7 @@ export const REGISTER_FIELDS: readonly RegisterField[] = [
   { key: "salesperson", label: "Salesperson", width: W.salesperson, group: "Sales ownership", on: true,
     text: (r) => r.o.salespersons?.name ?? "" },
   /* A required fact: a date, never `To be confirmed` / `No delivery date`. */
-  { key: "customer_delivery", label: "Customer Requested Delivery Date", width: W.customerRequestedDeliveryDate,
+  { key: "customer_delivery", label: "Customer’s original requested delivery", width: W.customerRequestedDeliveryDate,
     group: "Dates", on: true,
     text: (r) => (r.customerDelivery ? fmtDate(r.customerDelivery) : ""),
     sortBy: (r) => r.customerDelivery ?? "",

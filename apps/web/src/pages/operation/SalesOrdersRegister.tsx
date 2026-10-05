@@ -121,7 +121,7 @@ import {
  * the column's accessible, filter and export name.
  */
 const HEADER_LINES: Partial<Record<string, readonly [string, string]>> = {
-  customer_delivery: ["Customer Requested", "Delivery Date"],
+  customer_delivery: ["Customer’s original", "requested delivery"],
   delivery_location: ["Customer Delivery", "Location"],
 };
 
@@ -1010,7 +1010,7 @@ export default function SalesOrdersRegister() {
       listPayment && { key: "payment", label: `Payment Status: ${PAYMENT_STATUSES.find(p => p.key === listPayment)!.label}`, onClear: () => setParam("payment", null) },
       requested && {
         key: "requested",
-        label: `Customer Requested Delivery Date: ${requestedNarrowingWord(requested)}`,
+        label: `Customer’s original requested delivery: ${requestedNarrowingWord(requested)}`,
         onClear: () => setParam("requested", null),
       },
       listDealer.length > 0 && { key: "dealer", label: `Sales Location: ${listDealer.join(", ")}`, onClear: () => setParam("dealer", null) },
@@ -1208,7 +1208,7 @@ export default function SalesOrdersRegister() {
               })}
             </dl>
           </FilterRailGroup>
-          <FilterRailGroup title="Customer Requested Delivery Date" icon="date" defaultOpen>
+          <FilterRailGroup title="Customer’s original requested delivery" icon="date" defaultOpen>
             <FilterRailRow testId="requested-all" label="All dates" resets active={!requested} onClick={() => setParam("requested", null)} />
             {requestedPresets().map(option => <FilterRailRow key={option.label} testId={`requested-${option.label}`} label={option.label} active={urlParams.get("requested") === option.value} onClick={() => toggleParam("requested", option.value)} />)}
             <label className="block px-2 pt-2 text-meta text-kit-slate-11">Select month
@@ -1303,7 +1303,7 @@ export default function SalesOrdersRegister() {
                     </div>}>
                       <dl className="grid min-w-0 grid-cols-2 gap-3 text-body">
                         <div className="col-span-2"><dt className="text-label text-kit-slate-11">Customer</dt><dd className="break-words">{row.customer}</dd></div>
-                        <div><dt className="text-label text-kit-slate-11">Customer Requested Delivery Date</dt><dd>{row.customerDelivery ? fmtDate(row.customerDelivery) : ""}</dd></div>
+                        <div><dt className="text-label text-kit-slate-11">Customer’s original requested delivery</dt><dd>{row.customerDelivery ? fmtDate(row.customerDelivery) : ""}</dd></div>
                         <div className="col-span-2 order-last"><dt className="text-label text-kit-slate-11">Items</dt><dd className="min-w-0"><GoodsSummary row={row} onOpen={setGoodsTarget} /></dd></div>
                         <div><dt className="text-label text-kit-slate-11">Delivery</dt><dd>{REGISTER_DELIVERY_CONDITIONS.find(condition => condition.key === registerDeliveryConditionOf(row.o.order_lines ?? [], row.o.allocated_units ?? []))?.label ?? "Not recorded"}</dd></div>
                         <div><dt className="text-label text-kit-slate-11">Total payable</dt><dd>{moneyCell(row.total)}</dd></div>
