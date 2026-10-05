@@ -238,9 +238,10 @@ execution. Missing implementation does not reopen these decisions.
   scope. Do not substitute a supplier summary or PDF Modal for the complete PO object.
 - **Supplier sending.** The issued result remains available in the right-side task panel by
   supplier, numbered PO and version. Its complete approved document/channel rules are in §8.2.
-  Sending is separate from issuing and receiving; preparation never records sending. Real Email
-  remains unavailable until actual sender/provider configuration and dispatch capability are
-  verified. WhatsApp sends remain an external human action with source/version-bound confirmation.
+  Sending is separate from issuing and receiving; preparation never records sending. Ohana currently can send POs by Email (owner-confirmed 2026-10-05); preserve this existing
+  operating capability. Portal provider dispatch is a separate verification boundary and must not
+  be described as an absence of supplier Email sending. WhatsApp sends remain an external human
+  action with source/version-bound confirmation.
 - **Delivery acceptance.** Verify actual authenticated production rail, retained Register,
   Table/Cards/grouping, whole-round and individual stock choice, Quick View issue/partial retry,
   formal PO information/PDF view and supplier preparation/evidence recovery. Preserve the exact
@@ -432,7 +433,8 @@ separately; selecting only `PO-20260903-7907` produced
 `PO-20260903-7907-V1.pdf` (31,165 bytes). Its timestamp, archive CRC, PDF header and EOF passed.
 Evidence: `/tmp/so-batch-live-supplier-address-refusal.png`. No destination address, issuance,
 reservation or supplier transmission was changed for this verification. Missing source addresses
-and actual sender/provider verification remain operational gaps, not successful transmissions.
+remain operational gaps for these measured sources. This verification did not test provider
+dispatch; it does not negate Ohana’s owner-confirmed existing Email sending capability.
 
 **Supplier preparation return and Batch document display — PRODUCTION-VERIFIED bounded scope,
 2026-10-05.** PR1900 exact head `81ea80c66766bf415dfbf697637ff5a290f5c48e` passed complete
@@ -451,7 +453,8 @@ after current PO/version/context evidence completed. Closing the panel retained 
 Table, Supplier grouping, `time=11:00`, and the same 12-of-32 population. Evidence:
 `/tmp/so-batch-live-return-retained-draft.png`, `/tmp/so-batch-live-return-email-draft.png` and
 `/tmp/so-batch-live-return-formal-po.png`. No live issue, reservation or supplier transmission was
-performed. Send Email remained disabled because actual provider/sender availability is unverified.
+performed. This Nice Future acceptance did not verify provider dispatch and does not establish
+that Ohana cannot send PO Email; Ohana’s existing Email sending is owner-confirmed.
 
 Returned presentation state supplies no issue/send authority. Today refreshes current membership
 and drops removed selections without replacement. A restored undated Round refreshes each exact
@@ -2330,8 +2333,8 @@ SO Batch gives immediate access without requiring a second trip to that register
 
 Every supplier supports both Email and WhatsApp in the approved communication target. The panel
 provides a channel selector, initially using the supplier's saved preferred channel, and permits
-switching without restricting either channel by supplier identity. Ohana currently preferring Email
-is an operating example, not an Email-only rule; other suppliers may also use Email. Contact details
+switching without restricting either channel by supplier identity. Ohana currently can send POs by Email and prefers Email (owner-confirmed 2026-10-05).
+This is an existing operating capability, not an Email-only rule; other suppliers may also use Email. Contact details
 for each channel come from supplier authority. This ruling does not silently overwrite production
 supplier settings. Email panel shows saved recipient, editable prepared subject/message listing
 selected PO numbers/versions, and each independent selected PDF as an attachment. Send Email is
@@ -2387,7 +2390,7 @@ It does not approve legacy PR #1859 or completion of the Workspace Working Panel
 - **Implementation and readback, 2026-09-24 — DEPLOYED #1573 (`913ef00897e5da27bd4aa7be819a7e1f871dad3a`).** Shared review paints actual PDF pages with the Sales Order renderer, zoom/fit and decode retry; issuance waits for painting, and the final action names the whole batch. Both lanes carry server-projected provisional dates and supplier/destination facts. SO split draft quantities reuse the allocated-part quantity helper used by `composeDocumentLines`: an 11-item 10/1 allocation previews 10/1 rather than 11/11. Loading no longer asserts missing destinations; selection names Sales Orders, items, units and POs. Full CI `35961742802` passed on `d97ab18f3` (12,596 tests passed, 100 existing skips), as did deployment `35962708358`; all five canonical SHA endpoints converged. Negative controls caught a dropped PDF page and the old split quantities. Bundle fingerprints prove the old draft iframe disappeared, provisional-date copy appeared and preview/Back controls survived.
 - **Authenticated SO read-only proof.** Operation selected SO-1365 + SO-1363: 2 Sales Orders, 3 items, 3 units, 3 POs. All three draft selections changed their document facts and actual paper. At 1074px the two panes were 481px each; 150% paper measured 674px inside a 449px independently scrolling pane. At 390px the page stayed 390px wide and stacked 278px panes; Back retained both selections and the summary plus all actions remained visible. Server destination addresses and supplier-specific delivery dates were shown; missing supplier addresses linked to Suppliers, never invented. The temporary selection was cleared afterward. No final Issue, sending, upload, receiving or stock write occurred.
 - **DELIVERY FACT — 2026-10-05; VERIFIED BOUNDED PRODUCTION FLOWS, COMPLETE TARGET STILL OPEN.** The current deployment and authenticated acceptance proofs in §2 replace earlier local-only status: two configured cutoff aggregates; retained Listing/Table/Cards/Supplier grouping; own-source Quick View/PDF/issue preparation; supplier-selected current-version PDF ZIP; exact full-PO return preserving supplier, subset, channel and editable draft; and the mandatory-rollback Ready Stock save probe. The complete acceptance boundary remains §2. No live PO issue or supplier transmission was performed merely for testing. Issue retry/concurrency and permissions have controlled API/component/SQL evidence in §9.1; this is distinct from an authenticated production final-issue act.
-  Supplier composition preserves individual PO/version selection, same-set message and independent PDFs, current-round Work projection and Malaysia-date Today scope. Real Email is unavailable until actual sender/provider configuration and dispatch capability are verified. The implemented route validates authority, saved recipient, supplier/current-version membership and previous sending. Migration 0649 is applied (tracker `20261004110741`); its server-only attempt RPC reserves the exact document/version set and payload digest before dispatch, retains unknown outcomes and recovers known provider success without resending. Both tables have RLS; browser INSERT/RPC execution is denied and service-role execution allowed. Applied bodies match committed MD5s `da24f4aeda80e18fc6bb9061f7005352` / `77747b78bd6c05605b00d885796e1dee`, with seven isolated PostgreSQL cases. Per-PO evidence failure retries the evidence write only. Unknown transport outcome blocks silent resend; explicit Send again is deliberate for known dispatch. No PDF bytes or credentials enter browser attempt storage. Actual configured sender and external production email dispatch remain unverified, and are not represented as completed by the delivered preparation flow.
+  Supplier composition preserves individual PO/version selection, same-set message and independent PDFs, current-round Work projection and Malaysia-date Today scope. Ohana’s existing PO Email sending is owner-confirmed (2026-10-05). This bounded portal-provider verification does not negate that operating capability. The implemented route validates authority, saved recipient, supplier/current-version membership and previous sending. Migration 0649 is applied (tracker `20261004110741`); its server-only attempt RPC reserves the exact document/version set and payload digest before dispatch, retains unknown outcomes and recovers known provider success without resending. Both tables have RLS; browser INSERT/RPC execution is denied and service-role execution allowed. Applied bodies match committed MD5s `da24f4aeda80e18fc6bb9061f7005352` / `77747b78bd6c05605b00d885796e1dee`, with seven isolated PostgreSQL cases. Per-PO evidence failure retries the evidence write only. Unknown transport outcome blocks silent resend; explicit Send again is deliberate for known dispatch. No PDF bytes or credentials enter browser attempt storage. Actual configured sender and external production email dispatch remain unverified, and are not represented as completed by the delivered preparation flow.
 - **Verification boundary.** The authenticated MPR register has `Need PO 0`, so its issue walk was not manufactured; 189 full-page SO/MPR journey tests cover selection, refusals and preview readiness. No test or read-only view proves real issuance/receiving/sending. The exact-source versus generic PO-pool coverage discrepancy, remaining MPR composition/requester check, database-dependent work and the rest of the module remain open.
 
 - **ONE COMMUNICATION AREA PER DOCUMENT.** The doors out of the Portal (`Copy message`,
@@ -7842,6 +7845,9 @@ No Purchasing object has one universal owner. Each action resolves owner and cov
 Hookka Industries and Ohana receive PO email at **hookka.manufacturing@gmail.com**.
 Keep their separate Supplier identities; sharing a recipient never merges their POs or history.
 Default both to the existing `Open email` action. Hookka currently receives all POs by email.
+**OWNER CORRECTION 2026-10-05 — APPROVED / LOCKED:** Ohana currently can send POs by
+Email. Preserve the existing capability; do not re-plan it as missing or ask the owner to confirm
+it again. This ruling confirms the operating capability, not an unmeasured portal-provider test.
 Nice Future's confirmed contact email is **farithazelam@gmail.com**; retain its current channel
 and access arrangements. A possible end to Nice Future supply after Subscription launches is
 future context, not a present cutover instruction. Historical recipients remain as recorded.
