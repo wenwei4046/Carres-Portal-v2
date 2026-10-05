@@ -445,8 +445,8 @@ keeps arrival evidence at receipt scope; no Unit attribution is inferred.
 
 **Purpose.** The owner-confirmed compact module card (UI MASTER §4.3): one shared customer header
 (sales facts behind ▾, address, target date), module tabs, the module's own summary cells, inline
-editors, items, Communication and Timeline. Live on `/ui#compact-card` with Info and Delivery; Sales Orders and SO Batch use the shared component.
-The current owner-confirmed arrangement is UI MASTER §4.3 (5 Oct2026): Header, wrapping address left/access right, then SO Doc Date / Proceed date / Sales Location / Salesperson, tabs and module-owned summary. Info has no duplicate details/status/document panel.
+editors, items, Communication and Timeline. Live on `/ui#compact-card` with Info and Delivery; Sales Orders, SO Batch and Receiving use the shared component.
+It is the right Working Panel of the shared module page flow (UI MASTER §0.2, §4.3). The current owner-confirmed arrangement (5 Oct 2026: Header, wrapping address left/access right, then SO Doc Date / Proceed date / Sales Location / Salesperson, tabs and module-owned summary; Info has no duplicate details/status/document panel) lives once in `docs/ui-reference/MODULE-CARD-TEMPLATE.md`.
 
 **Contract.** The card takes the header facts once and a list of modules; each module passes its own
 summary facts (`label`, `value`, optional `editor` or `opensItems`), items and whether it opens the
@@ -456,8 +456,8 @@ interaction: it never writes a record or marks a message sent, keeps saved templ
 and uploads no file. Editors close only when the module reports a successful save.
 `CardEditorButtons`, `CardChecklist` and `compactCardStyles` style module content inside it.
 
-**Proof.** Current release and actual-component width evidence are recorded in UI MASTER §4.3 and
-`docs/ui-reference/MODULE-CARD-TEMPLATE.md`. The earlier18-state reference comparison is historical
+**Proof.** Adoption status per module is UI MASTER §4.3.3; rules are in
+`docs/ui-reference/MODULE-CARD-TEMPLATE.md`; measurements are in 01 §7.6. The earlier18-state reference comparison is historical
 fidelity evidence, not proof of the re-ruled5Oct2026 layout. Palette, font, radius and glyphs await the owner's token
 decision and live in one block of `compact-card.module.css`.
 
@@ -518,36 +518,33 @@ governed review. A component missing from this inventory is not automatically mi
 
 ### Accepted Sales Orders template — 2026-10-01
 
-The owner-accepted numeric recipe is governed by [UI MASTER, Confirmed shared template](ui/MASTER.md#confirmed-shared-template--owner-acceptance-2026-10-01): search220×32 desktop, rows32 desktop, body12/18, header11/600/36, touch targets40. Reuse the shared kit; runtime delivery proof is recorded by the BUILD controller.
+Numbers: [01 §7.5](01-design-tokens.md#75-accepted-so-derived-template--measurement-lookup). Law: UI MASTER §6.0 (listing) and §4 (shell). Reuse the shared kit; runtime delivery proof is recorded by the BUILD controller.
 
 ### Accepted template composition — 2026-10-01
 
-Use existing DataGrid, FilterRail, Block, Drawer/DialogFrame, Button, Icon, Tooltip and Badge components under [UI MASTER, Confirmed shared template](ui/MASTER.md#confirmed-shared-template--owner-acceptance-2026-10-01). This acceptance creates no second kit. Square return controls use canonical back icon and kit neutral-control geometry; pills remain status badges. Shared /ui examples and adoption tests are required by the authorised BUILD controller before claiming kit convergence.
+Use existing DataGrid, FilterRail, Block, Drawer/DialogFrame, Button, Icon, Tooltip and Badge components under UI MASTER §0 and §6.0. This acceptance creates no second kit. Square return controls use canonical back icon and kit neutral-control geometry; pills remain status badges. Shared /ui examples and adoption tests are required by the authorised BUILD controller before claiming kit convergence.
 
-Accepted quick-view composition: existing Drawer `variant="quick-view"` owns the dark header and header actions; Block `tone="muted"` supplies the quiet identity section. `/ui` renders these same primitives. Close uses the canonical 32px desktop / 40px touch target. No page-local replacement drawer or card is admitted.
+Record-to-panel opening (the right Working Panel) uses `CompactModuleCard` inside the shared `Drawer variant="compact-card"` (UI MASTER §4.3). `/ui` renders these same primitives. Close uses the canonical 32px desktop / 40px touch target. No page-local replacement drawer or card is admitted.
 
 The shared Tabs segmented presentation example uses canonical Table/Cards icons with visible words,16px inheriting colour; accessible names remain Table/Cards. This is the owner-approved2026-10-01 presentation amendment.
 
 Owner correction2026-10-02: shared global Jump to/Help/Settings triggers are icon-only on every
-width, retaining tooltip/accessibility/key shortcuts; bell keeps count. Quick-view Print is
-icon-only with tooltip/accessibility; full-object Print retains its visible word/menu.
+width, retaining tooltip/accessibility/key shortcuts; bell keeps count. The compact card opens its
+saved document from the document number (UI MASTER §4.4); full-object Print retains its visible word/menu.
 Use the complete existing component recipes, including focus/touch/state behavior. Ordinary
 result feedback reuses the governed Toast; do not add a duplicate result banner or new feedback
 component. Persistent source failures, business blockers and field errors retain their existing
 owned presentation.
 
-SO Order summary recipe (owner2026-10-02): four compact rows, label left/value right;
-Sales orders · Total payable · Paid to date · Balance due all remain visible. Reuse existing
-FilterRailGroup, Money and typography; count uses text-strong, values right/tabular/no-wrap,
-8px row gap. Conditional missing-amount notices span the row. Filtering/calculation ownership
-and loaded-scope tooltip/count stay unchanged; other modules derive aggregates from their own facts.
+The SO Order summary in the Sales Orders rail is an SO composition owned by Orders MASTER (UI MASTER
+§6.1 calls it the SO instance, not the mission rule).
 
 ### Solid status pills — owner confirmed 2026-10-02
 
 StatusPill renders white status text on solid semantic-colour fill, without circular/decorative
-icons. See UI MASTER “Solid status pills” for meanings and rollout scope. Reuse shared tokens;
+icons. See UI MASTER §3 (solid status pills) for meanings and scope. Reuse shared tokens;
 neutral Badge counts and action-tone surfaces keep their existing recipes.
 
 ### Accepted Register composition
 
-DataGrid `pageToolsItems` composes module-owned presentation commands into the existing Page tools menu. It does not create another toolbar or filtering engine. Governed `fixedGroups` retain one width/sort/filter/selection/export state and group-local headers; None restores the flat grid. The confirmed geometry, adoption checks and bounded production evidence live in [UI MASTER’s Complete-template adoption contract](ui/MASTER.md#complete-template-adoption-contract--clarified-2026-10-02).
+DataGrid `pageToolsItems` composes module-owned presentation commands into the existing Page tools menu. It does not create another toolbar or filtering engine. Governed `fixedGroups` retain one width/sort/filter/selection/export state and group-local headers; None restores the flat grid. Every DataGrid capability and its prop is listed in UI MASTER §6.2; the adoption checklist is UI MASTER §2.2; numbers are in 01 §7.5.

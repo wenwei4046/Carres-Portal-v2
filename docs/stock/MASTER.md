@@ -1,7 +1,7 @@
 # STOCK / WAREHOUSE — MASTER
 
 **Shared-template adoption — owner acceptance2026-10-01 / Warehouse adoption not verified:**
-follow UI MASTER **“Confirmed shared template — owner acceptance2026-10-01”**, integrated by
+follow UI MASTER **§6.0 (the accepted SO-derived listing template, owner acceptance 2026-10-01)**, integrated by
 [PR1838](https://github.com/wenwei4046/Carres-Portal-v2/pull/1838), main `c926e3f76`. Read the current
 canonical UI MASTER; its accepted composition is resolved owner truth. The one canonical UI MASTER owns the visual
 contract; this module does not duplicate its dimensions or create another kit.
