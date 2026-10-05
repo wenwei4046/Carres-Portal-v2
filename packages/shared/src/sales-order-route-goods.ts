@@ -13,19 +13,33 @@
  *   the day-before check          `tomorrowDeliveryCallOf`   (Purchasing)
  *   what is still owed            `receivingSummaryOf`       (Receiving)
  * and the only lineage is `po_line_sources` — never a SKU match.
+ *
+ * ⭐ THE SAME ARRANGEMENT ANSWERS THE REGISTER'S `Stock Status` (owner scope
+ * 2026-10-05, `sales-order-stock-status.ts`): the Route and the Sales Orders
+ * list read ONE binding of Units to lines, ONE lineage and ONE receipt
+ * allocation, so the two can never tell one order's goods two ways (Law D).
  */
 import { poExpectedArrivalsOf, type EffectiveArrivalPromise } from "./po-windows";
 import { tomorrowDeliveryCallOf } from "./purchasing-supplier-calls";
 import { normalizeSkuKey } from "./sku-code";
+import { isReservedUnitAtRisk } from "./unit-availability";
 import { receivingSummaryOf } from "./warehouse-receipt";
 
 export interface RouteGoodsFacts {
   todayIso: string;
   holidays?: ReadonlySet<string>;
+  /** The order these lines belong to. Needed only when `sources` also carries
+   *  OTHER orders' shares of the same PO lines (see `sources`). */
+  orderId?: string;
   /** `order_lines` of the CURRENT effective Revision, goods only. */
   lines: ReadonlyArray<{ id: string; sku: string; label: string; qty: number }>;
-  /** `po_line_sources`, this order's rows. */
+  /** `po_line_sources` in LINEAGE ORDER (`created_at`, oldest first): this
+   *  order's rows and, when the reader brings them, every other order's share
+   *  of the same PO lines (`order_id` names whose). A PO line's receipts fill
+   *  the shares in the order they were written, whoever wrote them, so goods
+   *  shared by two orders are never counted for both. */
   sources: ReadonlyArray<{
+    order_id?: string | null;
     order_line_id: string | null;
     po_id: string;
     po_line_id: string | null;
@@ -70,12 +84,21 @@ export interface RouteGoodsFacts {
     /** `lines[].id` — the PO lines this receipt counted. */
     line_ids: ReadonlyArray<string>;
   }>;
-  /** `ops_stock_items` reserved to or sold against this order. */
+  /** `ops_stock_items` reserved to or sold against this order — and, when the
+   *  reader brings them, the `incoming` Units `Use this PO` bound to one of its
+   *  lines (0600: bound before receipt, status stays `incoming`). An incoming
+   *  Unit is purchased cover, never ready goods. */
   units: ReadonlyArray<{
     unit_code: string | null;
     status: string;
     reserved_order_line_id: string | null;
     sku: string;
+    /** Stock's control facts (0589). Absent = not read, never at risk. */
+    condition?: string | null;
+    needs_repair?: boolean | null;
+    sale_cleared_at?: string | null;
+    /** The PO line the Unit was born on (0443): one PO line covers once. */
+    po_line_id?: string | null;
   }>;
   /** Eligible Ready Stock per SKU — Stock's own count, by its own match. */
   readyStock: Readonly<Record<string, number>>;
@@ -112,6 +135,21 @@ export interface RouteGoodsLine {
   onOrderQty: number;
   /** Bound Units — reserved to, or sold against, this line. */
   readyQty: number;
+  /** Of `readyQty`, reserved Units Stock controls — damaged and not cleared for
+   *  sale, or waiting for repair (`isReservedUnitAtRisk`). Not usable goods. */
+  atRiskQty: number;
+  /** `readyQty` less `atRiskQty`: goods held for this line in a condition that
+   *  can be delivered, or already delivered. */
+  usableQty: number;
+  /** What Carres has bought or bound for the line — Purchasing's
+   *  `so_line_remaining_requirement` read the other way round: per PO line the
+   *  greater of the Units bound and the non-cancelled lineage share, plus Units
+   *  bound from no PO line (Ready Stock). Never more than `qty`. */
+  purchasedQty: number;
+  /** Goods RECEIVED on this line's own lineage that no Unit binding gives to
+   *  it yet: they landed `free` (Receiving verifies, it never allocates; the
+   *  Sales Order binds — Stock MASTER §4). Never more than `qty − readyQty`. */
+  arrivedUnallocatedQty: number;
   unitCodes: string[];
   /** What neither a Unit nor a Purchase Order covers. */
   uncoveredQty: number;
@@ -130,25 +168,12 @@ export function routeGoodsLinesOf(facts: RouteGoodsFacts): RouteGoodsLine[] {
   );
   const linesOfSku = (sku: string) => facts.lines.filter((line) => skuOf(line.sku) === skuOf(sku));
 
-  /* ── lineage: the line a source names, in the order it was written ────── */
-  const sourcesByLine = new Map<string, Array<RouteGoodsFacts["sources"][number]>>();
-  for (const source of facts.sources) {
-    const po = poById.get(source.po_id);
-    if (!po) continue;
-    let lineId = source.order_line_id;
-    if (!lineId) {
-      /* Lineage written before the line was recorded. It may join by SKU only
-         when that cannot be wrong: exactly one line carries the SKU. */
-      const poLine = po.lines.find((row) => row.id === source.po_line_id);
-      const candidates = poLine ? linesOfSku(poLine.sku) : [];
-      lineId = candidates.length === 1 ? candidates[0]!.id : null;
-    }
-    if (!lineId) continue;
-    sourcesByLine.set(lineId, [...(sourcesByLine.get(lineId) ?? []), source]);
-  }
-
   /* A PO line shared by several Sales Order lines is received in lineage
-     order: what arrived fills the first share before the next. */
+     order: what arrived fills the first share before the next. The walk is
+     over `sources` in the order the reader wrote them (`created_at`) and over
+     every order's share it brought — never over this order's lines, whose
+     order says nothing about which share was written first (defect found
+     2026-10-05: one PO line shared by two orders was received for both). */
   const receivedLeft = new Map<string, number>();
   const troubleLeft = new Map<string, number>();
   for (const po of poById.values()) {
@@ -159,37 +184,70 @@ export function routeGoodsLinesOf(facts: RouteGoodsFacts): RouteGoodsLine[] {
     }
   }
 
+  /* ── lineage: the line a source names, in the order it was written ────── */
+  type Share = { source: RouteGoodsFacts["sources"][number]; taken: number; trouble: number };
+  const sourcesByLine = new Map<string, Share[]>();
+  for (const source of facts.sources) {
+    const po = poById.get(source.po_id);
+    if (!po) continue;
+    const poLine = po.lines.find((row) => row.id === source.po_line_id) ?? null;
+    const share = count(source.qty);
+    const taken = poLine ? Math.min(share, receivedLeft.get(poLine.id) ?? 0) : 0;
+    /* Damaged or wrong pieces arrived INSTEAD of good ones, so they fall on a
+       share the good pieces left short — never on a share already whole (one
+       share of 1 cannot have received a good piece and a damaged one). */
+    const trouble = poLine ? Math.min(share - taken, troubleLeft.get(poLine.id) ?? 0) : 0;
+    if (poLine) {
+      receivedLeft.set(poLine.id, (receivedLeft.get(poLine.id) ?? 0) - taken);
+      troubleLeft.set(poLine.id, (troubleLeft.get(poLine.id) ?? 0) - trouble);
+    }
+    /* Another order's share takes its goods and joins none of these lines. */
+    if (facts.orderId && source.order_id && source.order_id !== facts.orderId) continue;
+    let lineId = source.order_line_id;
+    if (!lineId) {
+      /* Lineage written before the line was recorded. It may join by SKU only
+         when that cannot be wrong: exactly one line carries the SKU. */
+      const candidates = poLine ? linesOfSku(poLine.sku) : [];
+      lineId = candidates.length === 1 ? candidates[0]!.id : null;
+    }
+    if (!lineId) continue;
+    sourcesByLine.set(lineId, [...(sourcesByLine.get(lineId) ?? []), { source, taken, trouble }]);
+  }
+
   /* ── Units: the line a Unit names; one that names none takes the first
      line of its SKU that still has room ─────────────────────────────────── */
-  const unitsByLine = new Map<string, string[]>();
+  type BoundUnit = RouteGoodsFacts["units"][number];
+  const unitsByLine = new Map<string, BoundUnit[]>();
   const room = new Map(facts.lines.map((line) => [line.id, count(line.qty)]));
-  const bind = (lineId: string, code: string | null) => {
-    unitsByLine.set(lineId, [...(unitsByLine.get(lineId) ?? []), code ?? ""]);
+  const bind = (lineId: string, unit: BoundUnit) => {
+    unitsByLine.set(lineId, [...(unitsByLine.get(lineId) ?? []), unit]);
     room.set(lineId, (room.get(lineId) ?? 0) - 1);
   };
-  const named = facts.units.filter((unit) => unit.reserved_order_line_id && room.has(unit.reserved_order_line_id));
-  for (const unit of named) bind(unit.reserved_order_line_id!, unit.unit_code);
+  /* An `incoming` Unit bound by `Use this PO` always names its line (0600).
+     It is purchased cover only: it takes no room and is never ready. */
+  const incomingByLine = new Map<string, BoundUnit[]>();
   for (const unit of facts.units) {
+    const lineId = unit.reserved_order_line_id;
+    if (unit.status !== "incoming" || !lineId || !room.has(lineId)) continue;
+    incomingByLine.set(lineId, [...(incomingByLine.get(lineId) ?? []), unit]);
+  }
+  const held = facts.units.filter((unit) => unit.status !== "incoming");
+  const named = held.filter((unit) => unit.reserved_order_line_id && room.has(unit.reserved_order_line_id));
+  for (const unit of named) bind(unit.reserved_order_line_id!, unit);
+  for (const unit of held) {
     if (named.includes(unit)) continue;
     const home = linesOfSku(unit.sku).find((line) => (room.get(line.id) ?? 0) > 0);
-    if (home) bind(home.id, unit.unit_code);
+    if (home) bind(home.id, unit);
   }
 
   return facts.lines.map((line) => {
     const qty = count(line.qty);
     const sources: RouteGoodsSource[] = [];
-    for (const source of sourcesByLine.get(line.id) ?? []) {
+    for (const { source, taken, trouble } of sourcesByLine.get(line.id) ?? []) {
       const po = poById.get(source.po_id)!;
       const poLine = po.lines.find((row) => row.id === source.po_line_id) ?? null;
       const share = count(source.qty);
       const version = po.version ?? 1;
-
-      const taken = poLine ? Math.min(share, receivedLeft.get(poLine.id) ?? 0) : 0;
-      const trouble = poLine ? Math.min(share, troubleLeft.get(poLine.id) ?? 0) : 0;
-      if (poLine) {
-        receivedLeft.set(poLine.id, (receivedLeft.get(poLine.id) ?? 0) - taken);
-        troubleLeft.set(poLine.id, (troubleLeft.get(poLine.id) ?? 0) - trouble);
-      }
 
       const original = day(po.official_delivery_date);
       const arrivals = poLine
@@ -274,8 +332,42 @@ export function routeGoodsLinesOf(facts: RouteGoodsFacts): RouteGoodsLine[] {
       });
     }
 
-    const unitCodes = (unitsByLine.get(line.id) ?? []).filter(Boolean);
-    const readyQty = Math.min(qty, (unitsByLine.get(line.id) ?? []).length);
+    const bound = unitsByLine.get(line.id) ?? [];
+    const unitCodes = bound.map((unit) => unit.unit_code ?? "").filter(Boolean);
+    const readyQty = Math.min(qty, bound.length);
+    const atRisk = bound.filter((unit) =>
+      isReservedUnitAtRisk({
+        status: unit.status,
+        needsRepair: unit.needs_repair,
+        condition: unit.condition,
+        saleClearedAt: unit.sale_cleared_at,
+      }),
+    ).length;
+    const usableQty = Math.max(0, Math.min(qty, bound.length - atRisk));
+    /* Purchasing's cover (`so_line_remaining_requirement`, 0600/0631): a Unit
+       born on a PO line and that line's lineage share cover ONCE — the greater
+       of the two — and a Unit from no PO line covers by itself. */
+    const lineage = sourcesByLine.get(line.id) ?? [];
+    const cover = new Map<string, { units: number; lineage: number; arrived: number }>();
+    const add = (key: string, units: number, share: number, arrived: number) => {
+      const was = cover.get(key) ?? { units: 0, lineage: 0, arrived: 0 };
+      cover.set(key, { units: was.units + units, lineage: was.lineage + share, arrived: was.arrived + arrived });
+    };
+    [...bound, ...(incomingByLine.get(line.id) ?? [])].forEach((unit, index) =>
+      add(unit.po_line_id ? `line:${unit.po_line_id}` : `unit:${index}`, 1, 0, 0),
+    );
+    for (const { source, taken } of lineage) {
+      add(source.po_line_id ? `line:${source.po_line_id}` : `legacy:${source.po_id}`, 0, count(source.qty), taken);
+    }
+    const rows = [...cover.values()];
+    const purchasedQty = Math.min(qty, rows.reduce((sum, row) => sum + Math.max(row.units, row.lineage), 0));
+    /* What this line's own lineage RECEIVED that no Unit of that PO line binds
+       to it. The received good Units are counted by Receiving; the binding by
+       Stock. Their difference landed `free`. */
+    const arrivedUnallocatedQty = Math.min(
+      Math.max(0, qty - readyQty),
+      rows.reduce((sum, row) => sum + Math.max(0, row.arrived - row.units), 0),
+    );
     /* Units that arrived through a Purchase Order are already counted as
        received; what is still ON ORDER is what has not arrived. */
     const onOrderQty = sources.reduce((sum, source) => sum + source.pendingQty, 0);
@@ -289,6 +381,10 @@ export function routeGoodsLinesOf(facts: RouteGoodsFacts): RouteGoodsLine[] {
       sources,
       onOrderQty,
       readyQty,
+      atRiskQty: Math.min(readyQty, atRisk),
+      usableQty,
+      purchasedQty,
+      arrivedUnallocatedQty,
       unitCodes,
       uncoveredQty,
       shortBecause: !short ? null : uncoveredQty > 0 ? "not-ordered" : "not-received",

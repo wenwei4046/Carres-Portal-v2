@@ -63,6 +63,19 @@ export {
 } from "./monthly-demand";
 export { readFailureWords, type ReadFailureSurface, type ReadFailureWords } from "./read-failure";
 export { routeGoodsLinesOf, type RouteGoodsFacts, type RouteGoodsLine, type RouteGoodsSource } from "./sales-order-route-goods";
+export {
+  SALES_ORDER_STOCK_STATUSES,
+  STOCK_ISSUE_LEGEND,
+  salesOrderStockOf,
+  stockFactOfGoodsLines,
+  stockStatusOfCounts,
+  stockStatusWord,
+  stockIssueWord,
+  type SalesOrderStockStatus,
+  type SalesOrderStockFact,
+  type SalesOrderStockLine,
+  type StockReadinessCounts,
+} from "./sales-order-stock-status";
 export { routeDeliveryScopesOf, type RouteScopeFacts } from "./sales-order-route-scopes";
 
 export {
@@ -1279,6 +1292,7 @@ export {
   unitAvailability,
   isUnitAvailable,
   isUnitBindable,
+  isReservedUnitAtRisk,
   unitLifecycleOutcome,
   type UnitAvailability,
   type UnitLifecycleOutcome,
