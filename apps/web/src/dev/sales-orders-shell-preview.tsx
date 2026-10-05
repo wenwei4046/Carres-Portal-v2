@@ -156,9 +156,9 @@ window.fetch = async (input, init) => {
   /* The Order list's server facts: a spread so every rail value has rows. */
   if (/\/api\/operation\/orders\/register-facts/.test(url)) {
     /* Stock Status: every state, the issue indicator (up to two digits, the
-       widest content the column holds) and a goods-free order. `?stock=fail`
-       answers the failed read. */
-    if (new URLSearchParams(window.location.search).get("stock") === "fail") {
+       widest content the column holds) and a goods-free order. The page
+       answers the failed read with `?stockRead=fail`. */
+    if (new URLSearchParams(window.location.search).get("stockRead") === "fail") {
       const facts = Object.fromEntries(orders.map((o) => [o.id, { obligations: "outstanding", cases: "none", stock: null }]));
       return new Response(JSON.stringify({ facts, failed: { obligations: false, cases: false, stock: true } }), { status: 200, headers: { "content-type": "application/json" } });
     }
