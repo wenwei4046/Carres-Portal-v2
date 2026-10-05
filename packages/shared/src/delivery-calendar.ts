@@ -122,6 +122,48 @@ export function scheduledDeliveryOf(read: ScheduledDeliveryRead): ScheduledDeliv
   return { iso: null, time: null, source: null };
 }
 
+/** One live Delivery Order, as an order-level reader sees it. */
+export interface CustomerLegDocumentRead {
+  leg?: number | null;
+  deliveryDate?: string | null;
+  timeSlot?: string | null;
+  issuedAt?: string | null;
+}
+
+/** One `ops_delivery_arrangements` row, as an order-level reader sees it. */
+export interface CustomerLegArrangementRead {
+  leg?: number | null;
+  confirmedDate?: string | null;
+  confirmedTime?: string | null;
+  partnerId?: string | null;
+}
+
+/**
+ * ⭐ THE CUSTOMER LEG'S SCHEDULED DAY — for a reader that sees a whole ORDER
+ * (the Work feed, the rail Calendar, Payment's collection clock) rather than
+ * one Monitor row. The customer leg is the highest leg Delivery recorded (0 on
+ * an ordinary order); its newest live document, then its arrangement, then a
+ * confirmed legacy booking — `scheduledDeliveryOf`'s one precedence. The
+ * caller hands in LIVE documents only.
+ */
+export function customerLegDeliveryOf(input: {
+  documents: ReadonlyArray<CustomerLegDocumentRead>;
+  arrangements: ReadonlyArray<CustomerLegArrangementRead>;
+  booking?: BookingRead | null;
+}): ScheduledDelivery & { leg: number; arrangement: CustomerLegArrangementRead | null } {
+  const leg = Math.max(
+    0,
+    ...input.documents.map((d) => Number(d.leg ?? 0) || 0),
+    ...input.arrangements.map((a) => Number(a.leg ?? 0) || 0),
+  );
+  const document =
+    input.documents
+      .filter((d) => (Number(d.leg ?? 0) || 0) === leg && asDate(d.deliveryDate))
+      .sort((a, b) => (b.issuedAt ?? "").localeCompare(a.issuedAt ?? ""))[0] ?? null;
+  const arrangement = input.arrangements.find((a) => (Number(a.leg ?? 0) || 0) === leg) ?? null;
+  return { ...scheduledDeliveryOf({ document, arrangement, booking: input.booking }), leg, arrangement };
+}
+
 /**
  * ⭐ WHICH LOGISTICS COMPANY CARRIES THIS DELIVERY — asked ONCE.
  *

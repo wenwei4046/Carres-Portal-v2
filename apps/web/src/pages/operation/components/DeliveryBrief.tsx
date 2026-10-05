@@ -973,8 +973,11 @@ export default function DeliveryBrief({
         <LogisticsDetailsEdit card={card} onDone={() => setEditingLogistics(false)} />
       ) : (
         <div data-testid="delivery-brief-logistics">
-          {card.confirmedDate && (!trim(arrangement?.driver_name) || !trim(arrangement?.vehicle) || !pickup.length || !trim(arrangement?.expected_arrival)) ?
-            <p className="mb-2 text-body text-kit-amber-11">{MONITOR_COPY.logisticsIncomplete}</p> : null}
+          {/* `Driver and vehicle not recorded` names the missing facts (owner
+              ruling 2026-09-25, retiring `Logistics details incomplete`). The
+              ETA and the time are optional and never make this line. */}
+          {card.confirmedDate && partner && (!trim(arrangement?.driver_name) || !trim(arrangement?.vehicle)) ?
+            <p className="mb-2 text-body text-kit-amber-11">{MONITOR_COPY.driverVehicleMissing}</p> : null}
           <Fact
             label={MONITOR_COPY.partner}
             value={partner ?? <span className="text-kit-amber-11">{MONITOR_COPY.noLogistics}</span>}

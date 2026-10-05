@@ -3,6 +3,8 @@ import { Link, useSearchParams } from "react-router-dom";
 import Select from "@/components/kit/Select";
 import MonthCalendar from "@/components/kit/MonthCalendar";
 import {
+  assignedLogisticsIdOf,
+  customerLegDeliveryOf,
   documentDisplayNumber,
   type WarehouseCalendarArrival,
   carrierDayLoads,
@@ -17,12 +19,13 @@ import {
   type PartnerDeliveryRules,
 } from "@carres/shared";
 import {
+  useDeliveryArrangements,
+  useDeliveryOrdersRegister,
   useOperationOrders,
   useWarehouseCalendar,
   useDeliveryPartners,
-  type operationOrderListRow,
 } from "@/lib/queries";
-import { orderBookingDay } from "@/lib/order-booking";
+import { orderBookingRead } from "@/lib/order-booking";
 import { cjkClassName } from "@/lib/cjk";
 import { locationForAddress } from "@/lib/region";
 import { appTodayIso, fmtDate, fmtDateShort } from "@/lib/fmt-date";
@@ -50,6 +53,11 @@ export default function CalendarPanel({ onOpenRecord }: { onOpenRecord?: () => v
   const deliveryQuery = useOperationOrders();
   const data = deliveryQuery.data;
   const orders = useMemo(() => data?.orders ?? [], [data]);
+  /* Delivery's own records — the document and the arrangement outrank the
+     legacy booking in the ONE delivery-day reader. A failed read leaves the
+     next owner's answer standing; it never invents a day. */
+  const arrangementsQuery = useDeliveryArrangements();
+  const documentsQuery = useDeliveryOrdersRegister();
   const warehouseQuery = useWarehouseCalendar();
   const { data: partnersData } = useDeliveryPartners();
   const [params, setParams] = useSearchParams();
@@ -93,41 +101,65 @@ export default function CalendarPanel({ onOpenRecord }: { onOpenRecord?: () => v
   }, [partnersData]);
 
 
-  const carrierOf = (o: operationOrderListRow): { id: string | null; name: string | null } => ({
-    id: o.delivery_partner_id ?? o.ops_assigned_logistic ?? null,
-    name: o.delivery_partners?.name ?? null,
-  });
-
-  // Bucket deliveries by the BOOKING day (T10) — confirmed date when the
-  // customer said yes, otherwise the logistics company's provisional date. An order with
-  // neither is not on any day; it is a queue item (Assign / confirm the date).
+  // Bucket deliveries by the SCHEDULED day — the ONE delivery-day reader
+  // Monitor and the Work feed read (`customerLegDeliveryOf`: the customer
+  // leg's live document, then Delivery's arrangement, then a CONFIRMED legacy
+  // booking; Delivery MASTER §15.1, Workspace §5.9). A carrier's provisional
+  // date is not a scheduled day and puts nothing on the calendar; an order
+  // with no scheduled day is a queue item (Assign / get the delivery date).
   const deliveriesByDay = useMemo(() => {
+    const docsByOrder = new Map<string, Array<{ leg: number | null; deliveryDate: string | null; timeSlot: string | null; issuedAt: string | null }>>();
+    for (const d of documentsQuery.data?.deliveryOrders ?? []) {
+      if (d.voided_at || !d.order_id) continue;
+      const list = docsByOrder.get(d.order_id) ?? [];
+      list.push({ leg: d.leg ?? 0, deliveryDate: d.delivery_date, timeSlot: d.time_slot ?? null, issuedAt: d.issued_at ?? null });
+      docsByOrder.set(d.order_id, list);
+    }
+    const arrangementsByOrder = new Map<string, Array<{ leg: number; confirmedDate: string | null; confirmedTime: string | null; partnerId: string | null; partnerName: string | null }>>();
+    for (const a of arrangementsQuery.data?.arrangements ?? []) {
+      const list = arrangementsByOrder.get(a.order_id) ?? [];
+      list.push({ leg: a.leg, confirmedDate: a.confirmed_date, confirmedTime: a.confirmed_time, partnerId: a.partner_id, partnerName: a.partner_name });
+      arrangementsByOrder.set(a.order_id, list);
+    }
+    const partnerNameById = new Map((partnersData?.partners ?? []).map((p) => [p.id, p.name] as const));
     const m = new Map<string, DayDelivery[]>();
     for (const o of orders) {
-      const booking = orderBookingDay(o);
-      if (booking.kind === "none" || !booking.date) continue;
-      const carrier = carrierOf(o);
+      const arrangements = arrangementsByOrder.get(o.id) ?? [];
+      const day = customerLegDeliveryOf({
+        documents: docsByOrder.get(o.id) ?? [],
+        arrangements,
+        booking: orderBookingRead(o),
+      });
+      if (!day.iso) continue;
+      const legArrangement = arrangements.find((a) => a.leg === day.leg) ?? null;
+      const partnerId = assignedLogisticsIdOf({
+        arrangementPartnerId: legArrangement?.partnerId,
+        orderPartnerId: o.delivery_partners?.id ?? o.delivery_partner_id,
+        triagePartnerId: o.ops_assigned_logistic,
+      });
       const entry: DayDelivery = {
         orderId: o.id,
         so: o.so,
         customer: displayCustomerName(o.customer_name),
-        partnerId: carrier.id,
-        partnerName: carrier.name,
-        kind: booking.kind,
-        date: booking.date,
-        slot: booking.slot,
+        partnerId,
+        partnerName:
+          (legArrangement?.partnerId && legArrangement.partnerId === partnerId ? legArrangement.partnerName : null) ??
+          (partnerId ? partnerNameById.get(partnerId) ?? (o.delivery_partners?.id === partnerId ? o.delivery_partners.name : null) : null),
+        kind: "confirmed",
+        date: day.iso,
+        slot: day.time,
         address: o.customer_address ?? null,
         // No `cancelled` flag to set: the list endpoint filters status IN
         // (place, proceed_order, delivered), so a cancelled order never
         // reaches this panel. `DayBooking.cancelled` exists for callers that
         // read a wider status set.
       };
-      const arr = m.get(booking.date) ?? [];
+      const arr = m.get(day.iso) ?? [];
       arr.push(entry);
-      m.set(booking.date, arr);
+      m.set(day.iso, arr);
     }
     return m;
-  }, [orders]);
+  }, [orders, documentsQuery.data, arrangementsQuery.data, partnersData]);
 
   // One Warehouse-owned read, with expected arrangements and physical receipt
   // events kept distinct. No second arrival is published by Receiving.
@@ -143,7 +175,7 @@ export default function CalendarPanel({ onOpenRecord }: { onOpenRecord?: () => v
   }, [warehouseQuery.data, module, location]);
   const activeCount = (key: string): number =>
     (receiveByDay.get(key)?.length ?? 0) + (module === "warehouse" ? 0 : deliveriesByDay.get(key)?.length ?? 0);
-  const loading = (module !== "delivery" && warehouseQuery.isPending) || (module !== "warehouse" && deliveryQuery.isPending);
+  const loading = (module !== "delivery" && warehouseQuery.isPending) || (module !== "warehouse" && (deliveryQuery.isPending || arrangementsQuery.isPending));
   const failed = (module !== "delivery" && warehouseQuery.error) || (module !== "warehouse" && deliveryQuery.error);
 
   const todayKey = appTodayIso();
@@ -298,29 +330,23 @@ export default function CalendarPanel({ onOpenRecord }: { onOpenRecord?: () => v
   );
 }
 
-/** One booked delivery. Confirmed is the ONLY green (T1): the customer said
- *  yes. The carrier's own date is amber — a date nobody has agreed to. */
+/** One scheduled delivery. Only a scheduled day reaches the calendar, so the
+ *  row is always the settled green; its face is the time when one was
+ *  recorded, else `Scheduled` (time is optional, owner ruling 2026-09-24). */
 function DeliveryRow({ d, href, onOpenRecord }: { d: DayDelivery; href: string; onOpenRecord?: () => void }) {
-  const confirmed = d.kind === "confirmed";
   const loc = locationForAddress(d.address);
   const carrier = d.partnerName?.trim() || "Logistics not assigned";
   return (
     <Link to={href} onClick={onOpenRecord}
       className="flex gap-2 rounded bg-base-50 hover:bg-base-100 px-2 py-1.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9"
-      title={
-        confirmed
-          ? "The customer confirmed this date."
-          : "Only logistics have given this date. Not confirmed with the customer yet."
-      }
+      title="The customer confirmed this date."
     >
-      <span className={`w-1 rounded-full shrink-0 ${confirmed ? "bg-success" : "bg-warning"}`} />
+      <span className="w-1 rounded-full shrink-0 bg-success" />
       <div className="min-w-0 flex-1">
         <div className="flex items-center justify-between gap-2">
           <span className="font-mono text-meta font-semibold text-base-900">SO-{d.so}</span>
-          <span
-            className={`text-label font-semibold shrink-0 ${confirmed ? "text-success" : "text-warning"}`}
-          >
-            {confirmed ? (d.slot ? shortSlot(d.slot) : "Confirmed") : "Logistics' date"}
+          <span className="text-label font-semibold shrink-0 text-success">
+            {d.slot ? shortSlot(d.slot) : "Scheduled"}
           </span>
         </div>
         <div className={`text-meta text-base-700 truncate ${cjkClassName(d.customer)}`}>

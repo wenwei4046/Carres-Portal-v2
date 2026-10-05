@@ -1429,7 +1429,10 @@ export {
 export {
   bookingDayOf,
   scheduledDeliveryOf,
+  customerLegDeliveryOf,
   assignedLogisticsIdOf,
+  type CustomerLegArrangementRead,
+  type CustomerLegDocumentRead,
   type ScheduledDelivery,
   type ScheduledDeliveryRead,
   carrierDayLoads,
