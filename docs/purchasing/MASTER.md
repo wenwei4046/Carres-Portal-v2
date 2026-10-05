@@ -217,14 +217,44 @@ execution. Missing implementation does not reopen these decisions.
 - **Optional whole-round Ready Stock.** Customer demand defaults to purchasing. A manual action
   computes non-overlapping suggestions for the selected buying scope in the same Listing.
   Location is selectable, defaults to Carres Klang, and changes candidate stock scope only.
-  Default allocation priority is earliest Customer Requested Delivery Date, then earliest Proceed
-  Date, with undated demand after dated demand; priority is configurable in Purchasing Settings.
+  Owner-confirmed 2026-10-05: this is an optional, manually invoked old-stock consumption
+  mode, never a mandatory step in every PO round. On invocation, show matching Sales Orders
+  ordered by earliest Customer’s original requested delivery, then earliest Proceed Date;
+  undated original requests follow dated requests. Do not substitute a later planned Delivery
+  date. The original-request priority is the owner-approved behaviour; existing configurable
+  priority is implementation evidence, not permission to override this ruling.
   FIFO selects otherwise eligible exact Units. Matching preserves goods compatibility, ownership,
   availability and existing reservations. Suggestions show quantity/location and appear first;
   browsing, matching and ticking reserve nothing. Bulk selection and Proceed accept chosen offers
   through the existing Sales Order-owned reservation door, with fresh eligibility/remainder checks.
   Only successfully saved exact reservations reduce purchase quantity; unmatched quantity continues
   to purchase. Keep the individual customer/item Unit chooser, including location choice, available.
+**Ready Stock placement — RECOMMENDED DESIGN / PROPOSAL, NOT LAW (2026-10-05).**
+Use the existing actionable `FilterRailRow` at the top of the rail for `Match Ready Stock`,
+with its governed active styling and `aria-pressed`, rather than a newly styled toggle/pill.
+The control is an action rendered with the rail grammar, not a passive status badge. Show the
+existing Stock Location Select below it only while matching; use one existing Cancel action
+for exit. Do not duplicate exit in an invented close-icon composite. A compact applied-mode
+summary above the grid names the source buying scope, location, matching SO count and original
+requested-delivery sort. Current round filters are preserved: matching does not silently widen
+into other dated rounds. Exiting restores prior listing state. Suggestions are manually selected;
+only confirmed saved reservations change purchase remainder. Mission counts remain sourced from
+procurement/send facts and are never recalculated from matching-only results.
+
+Current-source finding: the allocation helper already sorts original requested date then Proceed,
+but `SoBatchRegister` currently puts offers first without excluding unmatched records and uses
+its normal comparator for displayed SO order. The recommended presentation must align displayed
+order with the approved matching priority and clearly distinguish no matches from unreadable stock.
+Use existing loading, error/Try again, Select, rail and selection/save components. If source scope
+or stock location changes with unsaved choices, preserve no hidden selections: discard draft picks
+and recompute, without releasing confirmed reservations. Narrow layout uses the existing rail
+show/hide mechanism; the applied-mode summary remains visible when the rail is hidden.
+
+Falsifier: local acceptance fails if staff cannot identify matching mode, its scope/location,
+priority, selected exact Units and whether reservation has actually saved, or if normal round
+navigation silently carries stale matching picks. Placement remains unapproved until the owner
+reviews the actual local page; this paragraph authorises no application build or deployment.
+
 - **Inspection and placement.** Listing selection opens the governed right-side Quick View for
   source facts, evidence and authorised source-bound actions. Ordinary SO Batch introduces no
   extra information-review gate or Jess approval round. Issue the prepared eligible scope through
