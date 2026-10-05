@@ -53,7 +53,7 @@ and an acceptance boundary, and no owner decision blocks it. The BUILD/DELIVERY 
 | **A · Order Route reads its owners** | §0.2 THE DELIVERY GROUP READS DELIVERY'S OWN RECORDS · THE GOODS CHAIN READS PURCHASING, RECEIVING AND STOCK · THE PAYMENT NODE … TWO LINES · `⚠ unreadable` · `PROPOSED CHANGE` banner · lanes per scope | SO-1362 (two legs, delivered) draws two DELIVERY lanes, two issued DOs, `Delivered to customer`, `Paid`; SO-1319 draws `PO Delivery Date`, `0 of 1 received`, `Hold delivery` / `RM 1,249.00 unpaid · by {date}`; a thrown Purchasing read yellows one line only; a `submitted` amendment shows the banner; route facts load only with `?route=1`; the four orphaned components deleted |
 | **B · Identity and History** | §0.1 WHO ACTED IS DECIDED ONCE … · HISTORY TRANSLATES AT THE READ BOUNDARY · BELOW 768px THE HEADER IS TWO ROWS | `principal@carres.com` events print `Staff identity not recorded · Principal`; `awaiting logistics triage` never prints; `Not recorded → No`; at 375px `SO-1365` and `Print` never overlap |
 | **C · SO page locked state** | §0.1 THE LOCKED STATE (five rules) | View and Rev 1 render zero row writers, `RM 1,399.00` text, `RM 0.00` discount, no `*`, no TBD checkbox in Edit |
-| **D · Register close-out + no dash (portal-wide)** | §0.1 REGISTER CLOSE-OUT · COPY NO DASH ANYWHERE ON A SCREEN · UI §6.0 empty-cell line · `Not applicable` on Service rows | menu `Edit · View · Print · ─ Cancel SO`; one population predicate; the 154-file dash sweep leaves no `—`/`–` printed as a value anywhere in `apps/web` (PDFs and WhatsApp templates included) |
+| **D · Register close-out + no dash (portal-wide)** | §0.1 REGISTER CLOSE-OUT · COPY NO DASH ANYWHERE ON A SCREEN · UI §6.0 empty-cell line · `Not applicable` on Service rows | menu `View · Print · ─ Cancel SO` (owner 2026-10-05; Edit is reached through View); one population predicate; the 154-file dash sweep leaves no `—`/`–` printed as a value anywhere in `apps/web` (PDFs and WhatsApp templates included) |
 | **E · Read-failure faces** | § A READ FAILURE HAS THREE FACES | a 403 on each of the five surfaces prints the permission words with no retry; no `error.message` on screen; kit `EmptyState` + `Button` only |
 | **F · Monthly demand + rail** | §0.1 Monthly demand (2026-09-22 model + 2026-09-26 UI, KIT AND SOURCES) · UI §6.7 rail note · COPY Monthly demand words | `FilterRailMultiSelect` admitted through the kit with a `/ui` example; the matrix reconciles with its drill-down at one scope; the strip reads SO Batch's and Stock's arithmetic and buys nothing; measured at 1440/1180/820/743/390 |
 
@@ -152,7 +152,9 @@ boxes print as text. A chosen value a `Select` no longer offers prints as itself
 2026-09-28), never an empty box.
 
 **Scope D, first half · Register close-out — BUILT 2026-09-28, production walk owed.** The row menu
-reads `Edit · View · Print · ─ Cancel SO`, and carries nothing of Delivery's. The engine draws
+reads `View · Print · ─ Cancel SO` (ONE ROW MENU, owner ruling 2026-10-05 — it overwrites
+`Edit · View · Print`: Edit is reached through View, where it is a button pressed on purpose), built
+on the shared `documentRowMenu` helper, and carries nothing of Delivery's. The engine draws
 NOTHING for a blank cell (`DataGrid`, every listing alike); `0` still prints `0`. The Register's
 rows and its total call ONE predicate (`salesOrderRegisterPopulation`: status not in `place`,
 `cancelled`; rentals excluded on the server), riding only `?stage=proceeded`, so what Delivery, Work,
@@ -831,14 +833,19 @@ a door to its owner: SO → SO, PO → PO, DO → DO.
 **REGISTER CLOSE-OUT — OWNER RULING 2026-09-26 (Jess) · APPROVED TARGET / NOT BUILT.** Measured on
 production 2026-09-25 (`6ed021fac`):
 
-1. **The context menu reads `Edit · View · Print · ─ Cancel SO` — and NOTHING of Delivery's.**
+1. **The context menu reads `View · Print · ─ Cancel SO` — and NOTHING of Delivery's.**
+   ONE ROW MENU — OWNER RULING 2026-10-05 (Jess): every register starts `View · Print` from the
+   shared `documentRowMenu` helper; `View` opens the full read-first Sales Order page (Edit is a
+   button there, never started automatically), `Print` is the same governed SO paper, and `Cancel SO`
+   alone below the divider opens the one `CancelSalesOrderDialog`. Row click (quick card),
+   double-click (full page) and the SO No link are unchanged. This overwrites the 2026-09-26
+   `Edit · View · Print` order; the `#1838` interim with no menu is closed.
    OWNER RULING 2026-09-26 (Jess: *"sales order request delivery order?"* — no): `Request Delivery
    Order` is Delivery's door (the Monitor row, the DO page; server door `POST
    /:id/delivery-order/request`, `order-control.ts:767`) and a Sales Order surface offering it is a
    second entrance to another module's act (Law C) and a work control on a truth register (§0
    CHARTER). This overwrites the Loo 2026-08-11 fourth row and its 2026-08-16/19 re-wording in §11.
-   Shipped: `View · Edit · Print PDF · ─ Cancel SO` (`SalesOrdersRegister.tsx:652-675`); the order
-   becomes `Edit · View · Print` and the word is `Print` (the Export menu already says it). The only
+   The word is `Print` (the Export menu already says it). The only
    Delivery door a Sales Order carries is Order Route's `Open Delivery →`.
 2. **An empty cell is empty.** The engine prints `—` for a blank value (`DataGrid.tsx:2580, :2592`),
    the banned absent-value glyph (SO-1312 / SO-1313 `Proceed Date`, SO-1312 `Customer Delivery
@@ -875,7 +882,7 @@ FOOTER     `{n} sales orders` unfiltered; `{n} of {m}` only when search, a heade
 1440       identity + main decision columns fully visible; the rest scrolls inside the grid;
            no auto-hidden default column, no squeezed text
 COLUMNS    resize · reorder · hide · visible `Reset columns` · personal, browser storage for now
-ACTIONS    every act reachable from the order detail (View/Edit = open · Print · Cancel SO);
+ACTIONS    every act reachable from the order detail (View = open · Print · Cancel SO; Edit on the page);
            right-click and Menu key / Shift+F10 are shortcuts only · no row buttons
 VISUAL     one shared register grammar · NO create button (owner 2026-09-27: orders are born in the Sales Portal)
 STATES     skeleton · `Sales orders could not be loaded` + `Try again` · `No sales orders yet` ·

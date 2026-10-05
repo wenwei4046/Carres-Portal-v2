@@ -26,9 +26,10 @@ import StatusPill from "@/components/kit/StatusPill";
  *             orders), the column catalog, the scope, and where a row opens.
  * ▸ EXPAND    ships (2990's register expands; SO-1's "never expands" came
  *             from a docs-only commit). ONE job: the order's own lines.
- * ROW OPENS   double-click → the WORKSPACE ROUTE, a full page — the panel is
- *             superseded (closed ruling). Right-click: Edit · View ·
- *             Print · ─ Cancel SO — nothing else, and nothing of Delivery's.
+ * ROW OPENS   click → the quick card; double-click → the WORKSPACE ROUTE, a
+ *             full page. Right-click (one row menu, owner 2026-10-05):
+ *             View · Print · ─ Cancel SO — Edit is reached through View,
+ *             and nothing of Delivery's.
  * ROLES       Operations opens with money hidden (openable); Finance /
  *             Principal open with money visible. defaultHidden is NOT
  *             permission — a restricted fact is removed from the API
@@ -63,7 +64,9 @@ import { useQueryClient, type QueryClient } from "@tanstack/react-query";
 import {
   DataGrid,
   type DataGridColumn,
+  type DataGridContextMenuItem,
 } from "@/components/register/DataGrid";
+import { documentRowMenu } from "@/components/register/row-menu";
 import Drawer from "@/components/kit/Drawer";
 import Block from "@/components/kit/Block";
 import Checkbox from "@/components/kit/Checkbox";
@@ -72,11 +75,10 @@ import Money from "@/components/Money";
 import Button from "@/components/kit/Button";
 import Tabs from "@/components/kit/Tabs";
 import SalesOrderReadFailure from "./SalesOrderReadFailure";
+import CancelSalesOrderDialog from "./CancelSalesOrderDialog";
+import { printSalesOrdersOrSay } from "./record-print";
 import Popover from "@/components/kit/Popover";
-import { apiFetch, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { renderCombinedSalesOrderPdf } from "@/lib/pdf/render";
-import type { SalesOrderTemplateData } from "@/lib/pdf/types";
 import { appTodayIso, fmtMonth } from "@/lib/fmt-date";
 import {
   useCatalog,
@@ -701,41 +703,6 @@ function ExpandedLines({ row, inspection = false, compact = false }: { row: Regi
   );
 }
 
-/**
- * Print PDF — the SAME renderer output as the workspace's right pane
- * (`renderSalesOrderPdf`, DONE-WHEN's own clause). Data is assembled
- * server-side (`/sales-order-data`, RLS-scoped); the browser renders and
- * opens the blob. READ-ONLY: nothing is written anywhere.
- */
-/**
- * The batch behind `Print N sales orders` — the 2990 shape, in Carres terms:
- * the operator ticks rows and gets the REAL documents, not a picture of the
- * list. Each order's data is assembled server-side under RLS exactly as the
- * single-order print does, so a row the user may not read cannot enter the
- * file; the browser then renders one PDF carrying one governed page per order.
- * READ-ONLY.
- */
-async function printSalesOrders(rows: Array<{ id: string; so: number }>): Promise<void> {
-  if (rows.length === 0) return;
-  try {
-    const bundles: SalesOrderTemplateData[] = [];
-    for (const r of rows) {
-      bundles.push(
-        await apiFetch<SalesOrderTemplateData>(`/api/orders/${r.id}/sales-order-data`),
-      );
-    }
-    const blob = await renderCombinedSalesOrderPdf(bundles);
-    const url = URL.createObjectURL(blob);
-    window.open(url, "_blank");
-    setTimeout(() => URL.revokeObjectURL(url), 60_000);
-  } catch (error) {
-    const message = error instanceof ApiError ? error.message : String(error);
-    toast.error(`Printing ${rows.length} sales orders failed: ${message}`);
-  }
-}
-
-
-
 function GoodsSummary({ row, onOpen, compact = false }: { row: RegisterRow; onOpen: (row: RegisterRow) => void; compact?: boolean }) {
   const extra = Math.max(0, (row.o.order_lines?.length ?? 0) - 1);
   const suffix = extra ? ` + ${extra} more` : "";
@@ -926,6 +893,7 @@ export default function SalesOrdersRegister() {
   /* The register still writes nothing itself. `Cancel SO` opens the ONE
      governed cancellation door and that door owns the act — the row is only
      naming which Sales Order the dialog is about. */
+  const [cancelTarget, setCancelTarget] = useState<{ id: string; so: number } | null>(null);
 
 
   /* ⭐ POPULATION — owner ruling 2026-09-21: only orders Sales has handed to
@@ -1098,9 +1066,19 @@ export default function SalesOrdersRegister() {
     [navigate],
   );
   const onRowDoubleClick = useCallback((r: RegisterRow) => openWorkspace(r), [openWorkspace]);
+  /* ONE ROW MENU (owner ruling 2026-10-05): `View · Print · ─ Cancel SO`.
+     View opens the full read-first Sales Order page — Edit is a button there,
+     pressed on purpose; Print is the same governed SO paper the page prints. */
+  const contextMenu = useCallback(
+    (r: RegisterRow): DataGridContextMenuItem[] =>
+      documentRowMenu({
+        view: () => openWorkspace(r),
+        print: () => void printSalesOrdersOrSay([r]),
+        more: [{ label: "Cancel SO", danger: true, onClick: () => setCancelTarget({ id: r.id, so: r.so }) }],
+      }),
+    [openWorkspace],
+  );
 
-  /* Right-click document actions. Copy opens the authoritative create form as
-     a draft; the register still writes nothing. */
 
   const expandable = useMemo(
     () => ({
@@ -1232,6 +1210,15 @@ export default function SalesOrdersRegister() {
       {quickOrder && <Drawer variant="compact-card" open onOpenChange={(open) => { if (!open) setQuickOrder(null); }} title={`SO-${quickOrder.so} · ${quickOrder.customer}`}>
         <SalesOrderCompactView row={quickOrder} salesLocation={salesLocationOf(quickOrder.o)} items={<div className="min-w-0 overflow-x-auto"><ExpandedLines row={quickOrder} compact /></div>} onOpen={() => openWorkspace(quickOrder)} onClose={() => setQuickOrder(null)} />
       </Drawer>}
+      {cancelTarget && (
+        <CancelSalesOrderDialog
+          orderId={cancelTarget.id}
+          so={cancelTarget.so}
+          open
+          onOpenChange={(open) => { if (!open) setCancelTarget(null); }}
+          onCancelled={() => void refetch()}
+        />
+      )}
       {goodsTarget && <Drawer open onOpenChange={(open) => { if (!open) setGoodsTarget(null); }} title={`SO-${goodsTarget.so} · Items`}>
         <div className="min-w-0 max-w-full overflow-x-auto"><ExpandedLines row={goodsTarget} inspection /></div>
       </Drawer>}
@@ -1381,19 +1368,19 @@ export default function SalesOrdersRegister() {
             onRowClick={setQuickOrder}
             onRowDoubleClick={onRowDoubleClick}
             onSearchChange={searchChanged}
-            contextMenu={undefined}
+            contextMenu={contextMenu}
             expandable={expandable}
             selectable={{
               selectedKeys: selected,
               onToggle: toggleRow,
               onToggleAll: toggleAll,
             }}
-            outputActions={[{ label: "Print sales orders", onClick: () => { const picked = rows.filter(row => selected.has(row.id)); if (!picked.length) { toast.error("Select sales orders to print"); return; } void printSalesOrders(picked); } }]}
+            outputActions={[{ label: "Print sales orders", onClick: () => { const picked = rows.filter(row => selected.has(row.id)); if (!picked.length) { toast.error("Select sales orders to print"); return; } void printSalesOrdersOrSay(picked); } }]}
             selectionActions={[
               {
                 label: (n) => `Print ${n} sales order${n === 1 ? "" : "s"}`,
                 onClick: (picked) => {
-                  void printSalesOrders(picked as unknown as RegisterRow[]);
+                  void printSalesOrdersOrSay(picked as unknown as RegisterRow[]);
                 },
               },
             ]}

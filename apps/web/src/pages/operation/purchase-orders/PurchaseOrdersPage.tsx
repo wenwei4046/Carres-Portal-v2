@@ -39,6 +39,8 @@ import {
   type DataGridContextMenuItem,
   type DataGridPersonalLayouts,
 } from "@/components/register/DataGrid";
+import { documentRowMenu } from "@/components/register/row-menu";
+import { printPurchaseOrder } from "../record-print";
 import SupplierReplySection, { batchWord } from "./SupplierReplySection";
 import { Modal } from "../components/Modal";
 import { apiFetch } from "@/lib/api";
@@ -1045,18 +1047,22 @@ export default function PurchaseOrdersPage() {
     }
   }
 
-  const contextMenu = (row: RegisterRow): DataGridContextMenuItem[] => [
-    { label: "View", onClick: () => openObject(row) },
-    {
-      label: "Download official PDF",
-      onClick: () => {
-        setPdfProblem(null);
-        void downloadOfficialPdf(row.id).catch(() => {
-          setPdfProblem("The official PDF could not be downloaded");
-        });
-      },
-    },
-  ];
+  /* ONE ROW MENU (owner ruling 2026-10-05): `View · Print`. View opens the
+     PO's read-first document page (Edit stays a button there); Print opens the
+     same official bytes `Download PDF` saves, and records no send. A cancelled
+     PO has no paper by design (`po_not_printable`, 0402), so it has no Print. */
+  const contextMenu = (row: RegisterRow): DataGridContextMenuItem[] =>
+    documentRowMenu({
+      view: () => openObject(row),
+      print: row.po.status === "cancelled"
+        ? undefined
+        : () => {
+            setPdfProblem(null);
+            void printPurchaseOrder(row.id).catch(() => {
+              setPdfProblem("The official PDF could not be opened");
+            });
+          },
+    });
 
   return (
     <div ref={canvasRef} className={`${registerStyles.page} flex h-full min-h-0 flex-col`} data-testid="purchase-orders-register">
