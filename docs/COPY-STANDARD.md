@@ -4971,16 +4971,16 @@ predicates stay with Purchasing MASTER §9.3 and their source owners. A missing 
 
 Use `Amendment No`, not `Amendment status`. Genuine absence is `No amendment`, without a link; unnumbered recorded amendments use `Not recorded`, unread source `Unavailable`. Never print an internal UUID as a document number. Related columns: `PO No`, `DO No`, `Invoice No`, `Receipt No`; genuine receipt absence `Receipt not recorded`. Page tools: `Group by: None`, `Group by: Delivery Status`, `Group by: Stock Status`, `Group by: Payment Status`.
 
-## Compact module card words — owner confirmed 2026-10-03 / 2026-10-04 · kit component built on branch
+## Compact module card words — owner confirmed 2026-10-03 / 2026-10-04 / 2026-10-05
 
 The words of UI MASTER §4.3's card, as confirmed on the owner's reference pages. They live once in
 `CARD_WORDS` (`components/kit/CompactModuleCard.tsx`); a module adds only its own facts and editors.
 
 | Where | Words |
 |---|---|
-| Header | accessible names `Order details` (the ▾/▴, no visible words) · `Delivery address` · `Open order` · `Close panel`; sales facts `Order date` · `Sales Location` · `Salesperson` |
+| Header | accessible names `Order details` (the ▾/▴, no visible words) · `Delivery address` · `Open order` · `Close panel`; sales facts `SO Doc Date` · `Proceed date` · `Sales Location` · `Salesperson` |
 | Module bar | `Order modules` · icon names `Communication` · `Items` · `Show timeline` / `Hide timeline` |
-| Info summary | `Total` · `Paid` · `Outstanding`; order items `Item` · `Qty` · `Unit price` · `Amount` |
+| Info summary | `Total payable` · `Paid to date` · `Balance due`; order items `Item` · `Qty` · `Unit price` · `Amount` |
 | Delivery summary | `Stock` (value `{ready}/{goods}`, status `Ready`; service lines are not goods and read `Service` in the item list) · `Logistics ▾` (empty `Not assigned`) · `Customer ▾` (before agreement `Date not confirmed`; after agreement `{d Mon}` · `{d Mon} · Morning` · `{d Mon} · Afternoon` · `{d Mon} · {h:mm AM/PM}` with status `Date confirmed`; final customer leg only — a warehouse leg names its receiver) · `DO`, empty `Data not loaded`; editors `Assign logistics` · `Choose company` · `Record delivery arrangement` · `Customer Requested Delivery Date` · `Contact result` · `Choose result` · `Next follow-up` · `Confirmed Delivery` · `Confirmed Time · optional` · `Not specified` · `Morning` · `Afternoon` · `Specific time` · `Choose time` · `Delivery Order` · `Stock ready` · `Payment cleared` · `Customer confirmed date`; buttons `Cancel` · `Save`; refusals `Choose the contact result.` · `Choose the confirmed date.` · `Choose the time.` · `Choose the company.`; save failed `Customer date not recorded · Try again` (the input stays) |
 | Communication | `Communication` · `Communication channel` · `WhatsApp` · `Email` · `To` · `Subject` · `Message` · `Message options` · `Find template…` · `Save as template…` · `Manage templates…` · `Find template` · `Search templates` · `Choose template` · `Save template` · `Name` · `Saved templates` · `No saved templates yet.` · `Attach evidence` · `Evidence · none attached` · `Evidence · {n} attached (preview only)` · `Copy message` · `Open WhatsApp` · `Open email` |
 | Communication placeholders | `Choose contact or enter phone (+country code)` · `Enter email address` · `Enter email subject` · `Draft a message` |
