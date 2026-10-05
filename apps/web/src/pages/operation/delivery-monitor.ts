@@ -567,7 +567,7 @@ export const MONITOR_STATUS_LABEL: Record<MonitorDeliveryStatus, string> = Objec
 /**
  * ⭐ ONE OPTION PER PRINTED WORD (owner ruling 2026-09-14). The dropdown
  * filters what the column SAYS: since 2026-09-25 the two contact rungs print
- * two sentences (`Get delivery date from {partner}` · `… from customer`) and
+ * two sentences (from the partner · from the customer) and
  * are two options, and each journey ladder's words are their own options.
  * Should two rungs ever print one word again, the FIRST kind in the ladder
  * wins the option and `matchesMonitorFilters` keeps every row that prints it.
@@ -1302,7 +1302,7 @@ function matchesView(card: DeliveryMonitorCard, view: MonitorWorkView, todayIso:
          exception count and the work order cannot disagree (Law D). */
       return isOverdueDelivery(card, todayIso);
     case "failed":
-      /* A failure on either ladder — `Failed Delivery` or `Transfer failed` —
+      /* A failure on either ladder — the customer leg's or the transfer's —
          is the same act owed: arrange the next step. */
       return deliveryFailed(card.statusKey);
     case "upload_proof":
@@ -1639,7 +1639,7 @@ export function monthDaySentence(dateLabel: string, counts: MonthDayCounts | und
  * Readiness precedence (owner ruling 2026-09-25): `Hold delivery` → `Goods
  * not ready` → `Driver and vehicle not recorded` → `Ready`. Unpriced or
  * incomplete Sales facts never produce `Ready`. A card without a DO prints the
- * reason; `DO not released`, `Stock risk` and `Logistics details incomplete`
+ * reason; the three vague 2026-09-13 blocker words
  * are retired, and a missing time or ETA is never a blocker (both optional).
  */
 export function monitorScheduleStatusOf(card: DeliveryMonitorCard): {

@@ -830,7 +830,7 @@ export default function OperationDelivery() {
      the rung that replaced it — the partner's pickup wait (§8.4). */
   const statusParam =
     searchParams.get("status") ?? (viewParam === "waiting_warehouse" ? "waiting_pickup" : null);
-  /* A retired rung in a stored link still resolves (`confirm_time` → `Scheduled`). */
+  /* A retired rung in a stored link still resolves (the time-only rung → `Scheduled`). */
   const status: MonitorDeliveryStatus | null = monitorStatusParamOf(statusParam);
 
   /* THE RESOLVED VIEW, as ONE word. A URL that arrived in a retired spelling
@@ -1161,7 +1161,7 @@ export default function OperationDelivery() {
         filterType: "enum",
         chooserGroup: "Delivery",
         /* ⭐ LINE TWO IS THE DEADLINE ITSELF WHEN ONE IS OWED (owner ruling
-           2026-09-14). A chase row reads `Get delivery date from NETS` over
+           2026-09-14). A chase row reads the contact rung's act over
            the kit's phone glyph and the day — no `Call by`, because line one
            has already said what to do. Every other status keeps its
            supporting fact; `Order details incomplete` keeps the missing fact

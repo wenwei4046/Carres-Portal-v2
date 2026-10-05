@@ -3023,7 +3023,7 @@ export interface opsRemarkEmbed {
    *  column (Jess 2026-06-25); operation fills it from the drawer or the cell. */
   logistic_eta?: string | null;
   /** Payment + storage overlay (C2 Next-action, 2026-07-08) — the Orders list now
-   *  also reads these so the "Collect $" payment-hold + "Call customer" lamps can
+   *  also reads these so the "Collect $" payment-hold + customer-call lamps can
    *  compute. All optional so pre-C2 fixtures keep typechecking. */
   balance?: number | string | null;
   payment_status?: string | null;

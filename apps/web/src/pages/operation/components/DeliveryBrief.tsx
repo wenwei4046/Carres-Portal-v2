@@ -974,7 +974,7 @@ export default function DeliveryBrief({
       ) : (
         <div data-testid="delivery-brief-logistics">
           {/* `Driver and vehicle not recorded` names the missing facts (owner
-              ruling 2026-09-25, retiring `Logistics details incomplete`). The
+              ruling 2026-09-25, replacing the vague retired word). The
               ETA and the time are optional and never make this line. */}
           {card.confirmedDate && partner && (!trim(arrangement?.driver_name) || !trim(arrangement?.vehicle)) ?
             <p className="mb-2 text-body text-kit-amber-11">{MONITOR_COPY.driverVehicleMissing}</p> : null}

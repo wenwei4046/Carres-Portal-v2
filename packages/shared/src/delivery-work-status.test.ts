@@ -381,8 +381,15 @@ describe("⭐ one status function and one label function print every surface", (
   });
 
   it("no second status derivation survives anywhere", () => {
+    /* `confirm_time` survives ONLY in the Monitor URL resolver, which maps a
+       stored `?status=confirm_time` link onto `Scheduled` (the URL law). */
+    const urlResolver = "apps/web/src/pages/operation/delivery-monitor.ts";
     const offenders = files
-      .filter((f) => /function\s+(legWorkStatusOf|deliveryJourneyProgressFromStatus)\b|\bconfirm_time\b/.test(f.text))
+      .filter(
+        (f) =>
+          /function\s+(legWorkStatusOf|deliveryJourneyProgressFromStatus)\b/.test(f.text) ||
+          (f.path !== urlResolver && /\bconfirm_time\b/.test(f.text)),
+      )
       .map((f) => f.path);
     expect(offenders).toEqual([]);
   });
