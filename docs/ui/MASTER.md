@@ -23,6 +23,23 @@
 
 # §0 · Current kit index — read this first
 
+**ONE PAGE PATTERN — owner ruling, Jess 2026-10-05 · APPROVED / LOCKED.** Every operational
+listing page in every module is the same three parts, with the same UI and UX:
+
+1. **Left rail + table listing** — the accepted Sales Orders recipe (Confirmed shared template
+   below): rail views, the module's own summary and date shortcuts, active chips, toolbar, DataGrid,
+   footer. Status and other column filters live in the table header.
+2. **Right Working Panel** — the shared `CompactModuleCard` in its Drawer (§4.3). Its first tab is
+   the Info of the record the row belongs to; when the row belongs to one Sales Order, it is that
+   Sales Order's card (Info · Delivery …). Each module adds its own tab after it (Warehouse adds
+   `GRN`, owner direction 2026-10-05).
+3. **The job is completed on the page** — the ▾ expand on a fact opens its editor inside the
+   panel; the document number opens the saved document preview; a physical job (`Receive`,
+   `Loading`) opens its existing full-width workspace on the same page and returns to the same list.
+
+A listing page built any other way is a defect. Exceptions already named in §6.0 row 5 stay until
+each is reviewed against this pattern; no new exception without the owner's approval.
+
 **One row per thing on screen; one current source per row.** If something is not in this table it is
 not a current pattern: do not copy it from a neighbouring page. Live examples are on `/ui`. "Files" is
 the count of app files importing it, measured on `fe53daeec` (tests and `/ui` excluded) — re-measure

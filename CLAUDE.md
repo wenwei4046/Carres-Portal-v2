@@ -65,6 +65,10 @@ On a conflict, Business wins.
   the retired `Btn`, `Field` and `PageHeader`. Portal-wide standards ruled the same day: **no dash anywhere on a screen** ·
   **card titles are black bold `text-strong`, never blue** · **column separators by column
   count** · **rail = icon + title only; every group closed until clicked, its chosen value on the header; two views are a tab bar (owner ruling 2026-09-28; SO representative pilot owner correction 2026-10-01 stacks the two views and opens Delivery first, see Orders MASTER)** · **header filter icons on hover only**.
+- **ONE PAGE PATTERN — owner ruling, Jess 2026-10-05.** Every listing page = the Sales Orders
+  left rail + table listing, the right Working Panel (`CompactModuleCard`: tab 1 is the owning
+  record's Info, each module adds its own tab), and the job completed on that page (▾ to edit,
+  document number to preview). Full text: [UI MASTER §0](docs/ui/MASTER.md).
 - **Content decides column width**, never the table width. **Expand has exactly one job.**
   **An inline second line is the only exception.**
 - **Copy the POWER of the tools the team already uses, never their ASSUMPTIONS.** AutoCount's

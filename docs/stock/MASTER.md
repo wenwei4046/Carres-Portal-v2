@@ -59,6 +59,16 @@ never transfers write ownership.
 
 ## 2 · Navigation and words
 
+**ONE PAGE PATTERN — owner ruling, Jess 2026-10-05 · APPROVED / NOT BUILT.** Inbound, Inventory
+and Outbound follow [UI MASTER §0](../ui/MASTER.md): the Sales Orders left rail + table listing,
+the right Working Panel and the job completed on the page. The owner's 2026-09-25 column orders
+stay. Clicking a row opens the shared card: when the row belongs to one Sales Order it is that
+Sales Order's card (Info · Delivery) with Warehouse's `GRN` tab after it (owner direction
+2026-10-05); otherwise the card's header is the owning PO/supplier, Unit or Transfer and its first
+tab is that record's Info. `Receive` and `Loading` open their existing full-width workspaces on the
+same page. A PO Delivery Date that passes with no supplier answer is late (Purchasing §§2.4, 5.7);
+`Not confirmed` describes only the missing supplier answer.
+
 Warehouse has five operator destinations: **Arrival Schedule · Pickup Schedule · Inbound · Inventory · Outbound**.
 The two schedules are separate read-only projections. They use large working-day dates, white cards,
 quiet Expected/Scheduled badges and warning colour only for actual overdue work. They keep distinct
@@ -551,11 +561,12 @@ PO, never one row per Unit. A formal split makes its own arrangement counting on
 a part-received arrangement keeps its remainder; a formal date change preserves history and overdue
 work stays under its original date.
 
-**SITE IS A TAB.** Inbound answers *what is arriving HERE*, so the place is the first question and
-not a rail row. The strip is built from the governed Sites the operator may see and opens on
+**SITE IS THE FIRST RAIL VIEW — ONE PAGE PATTERN, owner ruling 2026-10-05 (overwrites the
+2026-09-15 tab strip); NOT BUILT.** Inbound answers *what is arriving HERE*, so the place is the first
+question: the Sites are the rail's top views, where Sales Orders keeps its views. The views are built from the governed Sites the operator may see and open on
 `Carres Klang Warehouse`; a partner Site appears because it is a governed Site with receiving
 access, never because its name was written into the page. Where a purchasing destination has goods
-coming and NO governed Site linked, those arrangements get their own final tab, named and counted,
+coming and NO governed Site linked, those arrangements get their own final view, named and counted,
 carrying the destinations' own recorded names — **an unlinked destination is a MAPPING GAP and may
 never be rendered as "no incoming goods"**. Those rows carry NO receiving door: goods that never
 reach a Carres Site must not mint a warehouse receipt.
