@@ -207,13 +207,14 @@ describe("the Work feed — one delivery-day reader and one assignment reader", 
     expect(words(confirmOf(items))).toContain("AL");
   });
 
-  it("a live Delivery Order's day is a scheduled day — no `Get the scheduled delivery date` is owed", () => {
+  it("a live Delivery Order's day is THE scheduled day — the feed owes the delivery on it", () => {
     const items = feed({
       row: { delivery_partner_id: "partner-nets", do_number: "DO-0001" },
       arrangements: new Map([["order-yj", [{ leg: 0, confirmedDate: null, partnerId: "partner-nets" }]]]),
-      deliveryOrders: new Map([["order-yj", [{ leg: 0, deliveryDate: "2026-09-25", timeSlot: null, issuedAt: "2026-09-16T02:00:00Z" }]]]),
+      deliveryOrders: new Map([["order-yj", [{ leg: 0, deliveryDate: TODAY, timeSlot: null, issuedAt: "2026-09-16T02:00:00Z" }]]]),
     });
     expect(confirmOf(items)).toBeUndefined();
+    expect(items.map((i) => i.ruleKey)).toContain("deliver_today");
   });
 
   it("a CONFIRMED legacy booking is a scheduled day too — the reader Monitor runs", () => {
