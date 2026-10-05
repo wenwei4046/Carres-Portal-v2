@@ -190,6 +190,45 @@ describe("FIX 1 · the register asks the SERVER", () => {
     expect(screen.queryByText("No sales orders yet")).not.toBeInTheDocument();
   });
 
+  /* The rail narrows the rows BEFORE the grid sees them, so the grid alone
+     cannot tell "nothing exists" from "nothing matches this choice". */
+  it.each([
+    ["the server's total", 1],
+    ["the unsearched load when the total is unknown", undefined],
+  ])("a rail choice that leaves nothing says the filters do, judged by %s", (_by, total) => {
+    listHookState.data = { orders: [order({ customer_address_state: "Selangor" })], ...(total === undefined ? {} : { salesOrderTotal: total }) };
+    mount("/operation/orders?state=Johor");
+    expect(screen.getByText("No sales orders match these filters")).toBeInTheDocument();
+    expect(screen.queryByText("No sales orders yet")).not.toBeInTheDocument();
+  });
+
+  it("says No sales orders yet only when the permitted population itself is empty", () => {
+    listHookState.data = { orders: [], salesOrderTotal: 0 };
+    mount("/operation/orders?state=Johor");
+    expect(screen.getByText("No sales orders yet")).toBeInTheDocument();
+    expect(screen.queryByText("No sales orders match these filters")).not.toBeInTheDocument();
+  });
+
+  it("a search answered with nothing, over a population that exists, says the filters do", async () => {
+    listHookState.data = { orders: [], salesOrderTotal: 24 };
+    mount("/operation/orders?search=0123456789");
+    await waitFor(() => expect(screen.getByText("No sales orders match these filters")).toBeInTheDocument());
+    expect(screen.queryByText("No sales orders yet")).not.toBeInTheDocument();
+  });
+
+  it("names phone in what the search box covers — the server now matches it", () => {
+    mount();
+    const box = screen.getByRole("searchbox");
+    const scope = "Search sales orders by SO number, customer, phone, imported reference or linked document number";
+    expect(box).toHaveAttribute("title", scope);
+    expect(box).toHaveAttribute("aria-description", scope);
+  });
+
+  it("asks the server with the phone exactly as the Existing customer link carries it", () => {
+    mount(`/operation/orders?search=${encodeURIComponent("019-83372393")}`);
+    expect(useOperationOrdersSpy).toHaveBeenCalledWith({ stage: "proceeded", search: "019-83372393" });
+  });
+
   it.each(["loading", "error"])("never calls %s expansion data Not allocated", (state) => {
     expansionHookState = { data: undefined, isLoading: state === "loading", isError: state === "error", refetch: vi.fn() };
     mount();
@@ -1647,6 +1686,9 @@ describe("the Order list rail: Obligations and Service Cases are the server's fa
 
 describe("the isolated shared-template pilot", () => {
   it("keeps active filters before tools in both Table and Cards", () => {
+    /* The order is IN the chosen state: a rail choice that left nothing would
+       show the empty state's own `Clear filters` instead of `Clear all`. */
+    listHookState.data = { orders: [order({ customer_address_state: "Selangor" })] };
     mount("/operation/orders?state=Selangor");
     const conditions=screen.getByTestId("active-conditions");
     const tools=screen.getByTestId("work-toolbar");

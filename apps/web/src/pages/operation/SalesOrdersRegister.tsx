@@ -1017,6 +1017,11 @@ export default function SalesOrdersRegister() {
      so a search answered before any unsearched load still has it and a created
      or cancelled order moves it on the next read. Unknown → `null` → no `of`. */
   const population = typeof data?.salesOrderTotal === "number" ? data.salesOrderTotal : null;
+  /* `No sales orders yet` is a claim about the POPULATION, never about what a
+     rail choice or a search left on screen: the rail narrows `rows` before
+     the grid sees them, so an empty `rows` alone cannot tell the two apart.
+     The server's count says it; unknown, the unsearched load does. */
+  const populationEmpty = population !== null ? population === 0 : all.length === 0 && !serverSearch;
 
   /* Role decides the FIRST PAINT only (money hidden for Operations, visible
      for Finance/Principal); the chooser opens every column either way.
@@ -1287,7 +1292,7 @@ export default function SalesOrdersRegister() {
             } : urlParams.get("group") === "payment" ? {
               groups: PAYMENT_STATUSES.map(c => ({ key: c.key, label: c.label })), groupOf: paymentStatusOf,
             } : undefined}
-            searchScope="Search sales orders by SO number, customer, imported reference or linked document number"
+            searchScope="Search sales orders by SO number, customer, phone, imported reference or linked document number"
             presentationKey={cards ? "cards" : "table"}
             toolbarEnd={<Tabs variant="segmented" label="Sales Orders view" value={cards ? "cards" : "table"}
               onValueChange={(next) => setParam("view", next === "cards" ? "cards" : null)}
@@ -1356,7 +1361,7 @@ export default function SalesOrdersRegister() {
             initialSearch={seededSearch}
             searchPlaceholder="Search orders…"
             isLoading={isLoading}
-            emptyMessage={rows.length === 0 && !serverSearch ? "No sales orders yet" : "No sales orders match these filters"}
+            emptyMessage={populationEmpty ? "No sales orders yet" : "No sales orders match these filters"}
             noMatchMessage="No sales orders match these filters"
             groupBanner={false}
             /* Accepted shared template:32px desktop row,12/18 text; generic defaults stay scoped. */
