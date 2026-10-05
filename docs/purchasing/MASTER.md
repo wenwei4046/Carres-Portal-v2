@@ -229,6 +229,13 @@ execution. Missing implementation does not reopen these decisions.
   through the existing Sales Order-owned reservation door, with fresh eligibility/remainder checks.
   Only successfully saved exact reservations reduce purchase quantity; unmatched quantity continues
   to purchase. Keep the individual customer/item Unit chooser, including location choice, available.
+**OWNER RULING — 2026-10-05, APPROVED / LOCKED: no parent Ready Stock column.**
+Remove the `Ready Stock` column from the SO Batch parent Register, including the dynamically
+added matching-mode column. Repeated `0 available` on completed or non-matching SOs creates
+confusion without an action. Preserve optional Match Ready Stock, its applied-mode summary and
+matching-only results; exact availability, Units, selection and save remain at expanded item level.
+This removes parent presentation only, not stock eligibility, reservation or matching capability.
+
 **Ready Stock placement — RECOMMENDED DESIGN / PROPOSAL, NOT LAW (2026-10-05).**
 Use the existing actionable `FilterRailRow` at the top of the rail for `Match Ready Stock`,
 with its governed active styling and `aria-pressed`, rather than a newly styled toggle/pill.
