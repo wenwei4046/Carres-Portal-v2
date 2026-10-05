@@ -111,6 +111,7 @@ import type { SalesOrderTemplateData } from "@/lib/pdf/types";
 import {
   useCatalog,
   useCustomerTypeProbe,
+  useSalesOrderRegisterSearchCount,
   useOperationDealersRef,
   useOperationOrder,
   useWorkspaceDuties,
@@ -2256,6 +2257,17 @@ function SalesOrderWorkspaceBody() {
         : typeProbe.data?.existing
           ? "Existing customer"
           : "New customer";
+  /* ⭐ `{n}` COUNTS WHAT THE DOOR OPENS (SO BUILD-1c, 2026-10-06 · Law D).
+     The probe above answers New/Existing from an EXACT phone over every
+     status; the door opens the Sales Orders Register, whose population is
+     handed-over, non-cancelled, non-rental orders and whose server search
+     matches the phone by digits. So `n` is the Register's own read for the
+     SAME phone the door carries, counted on the server — never the probe's
+     `matches`. Read only for an existing customer; a failed read, or one that
+     answers no number, shows no count and no door. */
+  const ordersDoorQ = useSalesOrderRegisterSearchCount(probedPhone, customerTypeWord === "Existing customer");
+  const ordersDoorCount =
+    ordersDoorQ.isSuccess && typeof ordersDoorQ.data?.count === "number" ? ordersDoorQ.data.count : 0;
 
   const liveBlocksCommercial =
     Boolean(liveAmendment && !liveAmendment.stale) && changeClass?.action === "submit" && !replaceAmendmentId;
@@ -2902,20 +2914,20 @@ function SalesOrderWorkspaceBody() {
               {customerTypeWord}
               {/* ⭐ AN EXISTING CUSTOMER CARRIES HOW MANY ORDERS, AND A DOOR TO
                   THEM — OWNER RULING (Jess, 2026-09-21). `n` is this phone's
-                  Sales Orders the reader may see: the SAME `matches` the
-                  customer-type probe already answers with, so no second read
-                  and no new arithmetic. The link opens the Sales Orders
-                  Register searched by that phone — no new customer page and no
-                  new writer (Law C: a door, never a duplicate). */}
-              {customerTypeWord === "Existing customer" && (typeProbe.data?.matches ?? 0) > 0 && (
+                  Sales Orders the reader may see, counted by the Register's
+                  own read (`ordersDoorCount` above), and the link opens that
+                  Register searched by the SAME phone — no new customer page
+                  and no new writer (Law C: a door, never a duplicate). Zero,
+                  or no number, prints no `0 orders` and no door. */}
+              {customerTypeWord === "Existing customer" && ordersDoorCount > 0 && (
                 <>
                   {" · "}
                   <Link
-                    to={`/operation/orders?search=${encodeURIComponent(draft.customer_phone.trim())}`}
+                    to={`/operation/orders?search=${encodeURIComponent(probedPhone)}`}
                     className="font-medium text-kit-blue-11 underline-offset-2 hover:underline"
                     data-testid="customer-orders-door"
                   >
-                    {typeProbe.data?.matches === 1 ? "1 order" : `${typeProbe.data?.matches} orders`} ›
+                    {ordersDoorCount === 1 ? "1 order" : `${ordersDoorCount} orders`} ›
                   </Link>
                 </>
               )}
