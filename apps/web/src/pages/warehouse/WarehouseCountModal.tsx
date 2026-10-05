@@ -41,7 +41,7 @@ const GRID = "1fr 76px 78px 72px 76px";
  *  the ops Session records (ERP-ARCHITECTURE §3.4). */
 type UnitState = {
   outcome: ReceivingUnitOutcome | null;
-  issueKind: "damaged" | "wrong_item";
+  issueKind: "damaged" | "wrong_item" | null;
 };
 
 type ExpectedUnit = NonNullable<WarehouseIncomingPo["expected_units"]>[number];
@@ -108,7 +108,7 @@ export default function WarehouseCountModal({ po, onClose, saved }: Props) {
         const previous = storedLines.find((line) => line.id === l.id)?.units?.find((item) => item.unitCode === u.unit_code);
         o[u.id] = {
           outcome: previous?.outcome ?? (saved ? null : i < cap ? "received" : "not_received"),
-          issueKind: previous?.issueKind ?? "damaged",
+          issueKind: previous?.issueKind ?? (saved && previous?.outcome === "received_with_issue" ? null : "damaged"),
         };
       });
     }
@@ -142,7 +142,7 @@ export default function WarehouseCountModal({ po, onClose, saved }: Props) {
             if (!st?.outcome || st.outcome === "not_received") continue;
             if (st.outcome === "received") receivedNow += 1;
             else if (st.issueKind === "wrong_item") wrongItemQty += 1;
-            else damagedQty += 1;
+            else if (st.issueKind === "damaged") damagedQty += 1;
           }
         }
         return {
@@ -181,7 +181,10 @@ export default function WarehouseCountModal({ po, onClose, saved }: Props) {
   const [savedReport, setSavedReport] = useState<WarehouseConfirmationResult | null>(saved?.result ?? null);
   const [confirmed, setConfirmed] = useState(false);
   const saving = useRef(false);
-  const unitResultsKnown = (lineId: string) => (unitsByLine.get(lineId) ?? []).every((unit) => Boolean(unitStates[unit.id]?.outcome));
+  const unitResultsKnown = (lineId: string) => (unitsByLine.get(lineId) ?? []).every((unit) => {
+    const state = unitStates[unit.id];
+    return Boolean(state?.outcome && (state.outcome !== "received_with_issue" || state.issueKind));
+  });
   const report: WarehouseConfirmationReportInput = {
     ...saved?.report,
     poId: po.po_id, doNumber: doNumber.trim(), doFilePath,
@@ -202,7 +205,7 @@ export default function WarehouseCountModal({ po, onClose, saved }: Props) {
         const state = unitStates[unit.id];
         if (!state?.outcome) return [];
         return [{ unitCode: unit.unit_code, note: storedLines.find((item) => item.id === line.id)?.units?.find((item) => item.unitCode === unit.unit_code)?.note, outcome: state.outcome,
-          ...(state.outcome === "received_with_issue" ? { issueKind: state.issueKind } : {}) }];
+          ...(state.outcome === "received_with_issue" && state.issueKind ? { issueKind: state.issueKind } : {}) }];
       }),
     })),
   };
@@ -454,7 +457,7 @@ export default function WarehouseCountModal({ po, onClose, saved }: Props) {
                     </select>
                     {st.outcome === "received_with_issue" && (
                       <select
-                        value={st.issueKind}
+                        value={st.issueKind ?? ""}
                         onChange={(e) =>
                           setUnit(u.id, {
                             issueKind: e.target.value as
@@ -466,6 +469,7 @@ export default function WarehouseCountModal({ po, onClose, saved }: Props) {
                         data-testid={`warehouse-unit-issue-${u.unit_code}`}
                         className="px-2 py-1.5 border border-base-300 rounded-[4px] text-meta bg-white outline-none focus:border-base-500"
                       >
+                        <option value="" disabled>Not recorded</option>
                         <option value="damaged">Damaged</option>
                         <option value="wrong_item">Wrong item</option>
                       </select>

@@ -552,3 +552,28 @@ describe("saved exact-Unit reports keep unanswered results unknown", () => {
       units: [{ unitCode: "U-260904-0001", outcome: "received" }, { unitCode: "U-260904-0002", outcome: "received" }] });
   });
 });
+
+
+describe("saved issue classification", () => {
+  it("preserves Received with issue without inventing Damaged when its kind is absent", async () => {
+    const id = "11111111-1111-4111-8111-111111111199";
+    apiFetchMock.mockResolvedValue({ id, revision: 3, status: "draft", grn_no: null, blockers: [] });
+    wrap(<WarehouseCountModal po={UNIT_PO} onClose={vi.fn()} saved={{
+      saveKey: "11111111-1111-4111-8111-111111111198",
+      result: { id, receipt_id: id, revision: 2, status: "draft", grn_no: null, blockers: [], already_saved: true },
+      report: { poId: UNIT_PO.po_id, lines: [{ id: UNIT_PO.lines[0]!.id,
+        units: [{ unitCode: "U-260904-0001", outcome: "received_with_issue" },
+          { unitCode: "U-260904-0002", outcome: "received" }],
+      }] },
+    }} />);
+    expect(screen.getByTestId("warehouse-unit-issue-U-260904-0001")).toHaveValue("");
+    expect(screen.getByTestId(`warehouse-derived-${UNIT_PO.lines[0]!.sku}`)).toHaveTextContent("Not recorded");
+    fireEvent.click(screen.getByRole("checkbox", { name: "I checked the goods and confirm these receiving results." }));
+    fireEvent.click(screen.getByRole("button", { name: "Save Receiving" }));
+    await waitFor(() => expect(apiFetchMock).toHaveBeenCalledWith("/api/warehouse/receipts/confirm", expect.anything()));
+    const call = apiFetchMock.mock.calls.find((call) => call[0] === "/api/warehouse/receipts/confirm")!;
+    const line = JSON.parse(call[1].body).report.lines[0];
+    expect(line).toMatchObject({ receivedNow: null, damagedQty: null, wrongItemQty: null });
+    expect(line.units[0]).toEqual({ unitCode: "U-260904-0001", outcome: "received_with_issue" });
+  });
+});
