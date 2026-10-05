@@ -1055,7 +1055,7 @@ a failed history read fails explicitly. Saving a note changes no custody quantit
 acceptance or return result. No supplier message is sent. The shared Modal/Textarea editor now opens from the exact extra-goods row. It preserves text and
 save key across uncertain save, close/reopen and retry; only a matching confirmed response clears
 the draft. History shows the actual recorder/time and wrapped note, with unknown names explicit.
-The 82 Receiving UI/component tests and 95 API receipt-route tests pass. Missing or blank
+The 82 Receiving UI/component tests and 95 API receipt-route tests pass. Full CI at `3a689f64f` found one unpublished note-metadata colour token; it is corrected to the governed slate-11 secondary text. The palette guard and six custody component regressions pass locally; full CI remains required. Missing or blank
 recorder/Site names are omitted from label maps so the existing Not recorded fallback preserves
 the custody and note history; three API regressions cover null, empty and whitespace labels. The 390×844 illustrative
 preview saved a note and displayed its recorder/history; the initial horizontally scrolling history

@@ -56,7 +56,7 @@ export default function ReceivingExtraCustody({ receiptId }: { receiptId: string
     {current && draft && <Modal open title={`Extra goods · ${current.reported_sku}`} onOpenChange={open => { if (!open) setSelected(null); }}>
       <ul aria-label="History" className="space-y-3 mb-3">
         {query.data.notes.filter(note => note.custody_id === current.id).map(note => <li key={note.id}>
-          <p className="text-meta text-kit-slate-10">{query.data.actorNames[note.actor_id] || "Not recorded"} · {fmtDate(note.recorded_at, { time: true })}</p>
+          <p className="text-meta text-kit-slate-11">{query.data.actorNames[note.actor_id] || "Not recorded"} · {fmtDate(note.recorded_at, { time: true })}</p>
           <p className="text-body whitespace-pre-wrap break-words">{note.note}</p>
         </li>)}
       </ul>
