@@ -457,7 +457,7 @@ own width (`narrowCanvas` below 768) · `available canvas` = content width after
 | Footer | 32 high; 12/18; padding 0 12 | any |
 | Goods expansion header | 26.5 high; 11/14/600; padding 6 8 | any |
 | Goods rows | 51 high; 13/18; padding 8 | any |
-| Column widths | SO No 90 · dates 120 · Stock Status 120 · Sales Location 168 · Salesperson 120 · Customer’s original requested delivery 180 · Customer 150 · Items 208 · PO No 170 · DO No 170 · Category 208 | registry (UI MASTER §6.11); Stock Status 120 truncates every `Receipt unconfirmed` pill (GAP, UI MASTER §7.2); Category renders 208 while the registry `category` role is 112 — reconcile in the SO round |
+| Column widths | SO No 90 · dates 120 · Stock Status 120 · Sales Location 168 · Salesperson 120 · Customer’s original requested delivery 180 · Customer 150 · Items 208 · PO No 170 · DO No 170 · Category 208 | registry (UI MASTER §6.11); Stock Status 120 cut the retired `Receipt unconfirmed` pill — re-measure against the Orders MASTER Stock Status words when built; Category renders 208 while the registry `category` role is 112 — reconcile in the SO round |
 
 ### 7.6 Compact module card — CompactModuleCard
 

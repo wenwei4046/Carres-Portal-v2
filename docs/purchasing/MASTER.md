@@ -2215,11 +2215,26 @@ PO/CO carries the official Deliver To and original PO Delivery Date
   on a quantity line count the pieces — Receiving verifies, it never creates an ID
 → finish physical receiving; Carres creates the numbered GRN
 ├─ valid received goods → Stock receives custody/location
+│    → accepted usable goods bought for an explicit SO line (`po_line_sources`) are reserved to
+│      that original line automatically, through Stock's reservation door (rule below)
 ├─ damaged/wrong/extra → no available stock and no reduction of Pending Delivery Qty
 │    → record affected lines/Units, quantity, condition and proof
 │    → report source-linked Supplier Claim to Purchasing; no Service Case required
 └─ problem found later → Stock/receipt source → Purchasing Supplier Claim
 ```
+
+**Receipt reserves goods bought for a Sales Order line — owner ruling (Jess) 2026-10-05 · APPROVED /
+NOT BUILT.** Goods bought for an explicit Sales Order goods line (`po_line_sources` lineage) are
+reserved automatically to that original SO line when Receiving posts them; staff do not allocate them
+again. Only the accepted, usable received quantity is reserved. When several SOs share one PO line,
+allocation follows the existing source rows (lineage), never a guess. Damaged, wrong-item and
+over-received quantities are never auto-reserved. If the original SO is cancelled, its requirement has
+fallen, or the source is unclear, nothing is forced: the exception is kept and shown for handling.
+Ordinary warehouse stock is still reserved only when staff choose `Reserve stock`; Match Ready Stock
+stays an optional, user-started mode. Receiving posts the receipt; the reservation is written through
+Stock's existing reservation door (Stock MASTER §4). Open for the build: today `Amend Receiving`
+refuses an outcome change on a reserved Unit — how it treats a reservation this posting made must be
+settled with this rule, as `Use this PO` arrivals already are (§9.4).
 
 **Receiving claim boundary — OWNER-CONFIRMED 2026-09-14.** Receiving records what actually
 arrived and reports supplier-goods problems to Purchasing from that receipt. Reporting the Claim
@@ -2587,7 +2602,9 @@ PO Status remains governed by the actual remaining quantity, not this optional o
   returns the quantity to the PO's free balance. The operator may ignore it and tick the row to
   issue a new PO instead; the second line never blocks buying.
 - When that PO's goods are received, the reserved quantity belongs to this order without a
-  second choice.
+  second choice. Goods bought for an explicit SO line need no `Use this PO`: they are reserved to
+  their original line on receipt (§7.3, owner ruling 2026-10-05, APPROVED / NOT BUILT). `Use this
+  PO` remains for goods on a PO that no order holds.
 - Every `{PO No}` and quantity is read from the real PO; nothing is guessed. A PO whose free
   quantity cannot be read prints the existing `Coverage not checked` instead of a number.
 - Law A: the reservation is the SAME exact-Unit reservation Ready Stock uses, owned by Stock.
@@ -4804,7 +4821,7 @@ Invalid scope → preserve report and show blocker; no false GRN or Inventory po
   its received pieces as bulk register rows (`identity_scope = quantity`, 0218's model) that carry
   a technical register key and are never shown as Unit IDs. Missing, foreign, duplicated,
   wrong-line (a Unit of another line of the same SKU) and already-received Units refuse by name;
-  a Unit is looked up by its line binding, never by `(PO, SKU)`. Receiving never allocates: the
+  a Unit is looked up by its line binding, never by `(PO, SKU)`. Receiving never allocates a Unit ID: the
   0426/0427 shortfall mint (`gen_unit_code()` at receipt or amendment) is gone, and the allocators
   are unreachable from every client role. The external Warehouse count uses the same outcomes:
   `warehouse_incoming_pos()` lists each line's mode and the expected Units with their line, the
@@ -4815,8 +4832,10 @@ Invalid scope → preserve report and show blocker; no false GRN or Inventory po
 - **Stock posts by the register only (0366 unit authority).** The receive engine flips the
   named Units of an exact-unit line and posts a quantity line's count as bulk register rows — it
   mints no identity; `stock_balances` is DERIVED by the rollup triggers and is never written
-  directly, and the pre-0366 aggregate-reserve write is gone — reservation is the Sales Order's
-  exact-Unit binding, owned by the Stock reserve door.
+  directly, and the pre-0366 aggregate-reserve write is gone — reservation is the exact-Unit binding
+  written only through the Stock reserve door: by the Sales Order's choice, on a `Use this PO`
+  arrival, or automatically on posting for accepted usable goods bought for an explicit SO line
+  (§7.3, owner ruling 2026-10-05, APPROVED / NOT BUILT).
 - **CO / consignment receiving runs through the SAME engine.** `purchase_orders.is_consignment`
   marks the source; received Units enter Inventory as `supplier_consignment` with the supplier
   named, and the posting creates no AP consequence — supplier ownership is preserved, never
