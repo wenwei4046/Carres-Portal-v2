@@ -165,7 +165,7 @@ coverage per module (§4.3, §6.1). Tests or shared-component imports alone do n
 | The right Working Panel | §4.3 (rules in `MODULE-CARD-TEMPLATE.md`, numbers in 01 §7.6) |
 | Which tab the panel opens on (page-owned main work tab) | §4.3.1 |
 | Default page work, `Tasks` and the one right area | §4.3.5 · §5 |
-| Row right-click (`View` · `Print`) and click behaviour per register | §6.5 |
+| Row right-click (ONE ROW MENU `View` · `Print`) and click behaviour per register | §6.7 rule 5 · §6.5 |
 | Standalone versus embedded Sales Order card | §4.3.3 |
 | Columns and other modules' facts on my list | §6.3 |
 | Row expansion | §6.9 (goods tables §6.8) |
@@ -1055,7 +1055,7 @@ actions. **A component existing is not whole-page adoption** — each page prove
 | Grouping | SUPPORTED | `fixedGroups` (governed, §6.10) · `initialGroupBy` · `allowColumnGrouping` · `countsInGroup`; optional `Group by` via `pageToolsItems` | Sales Orders optional grouping released (PR #1850); the choice rides the route parameters — browser/account persistence beyond the URL is not built; one grouping at a time, never duplicating a record across groups |
 | Expansion | SUPPORTED | `expandable` (`renderExpansion` · `flush` · `alignToColumn` · `fitExpansionToViewport` · `trigger` · `defaultExpandedKeys` · `revealExpandedKey`) + `GoodsMiniTable` + connector | §6.9 |
 | Identity link | SUPPORTED (page-rendered cell) | `leadingColumns.identity` + the page's link cell · `onRowClick` · `onRowDoubleClick` | No generic identity-link prop; Enter = double-click |
-| Row right-click menu | engine SUPPORTED · shared `View · Print` set APPROVED TARGET / NOT BUILT | `contextMenu` (Shift+F10 / Menu key) | Per-register menus today in §6.5; SO menu missing in code (§7.2) |
+| Row right-click menu | engine SUPPORTED · ONE ROW MENU `View · Print` APPROVED / BUILD IN PROGRESS (§6.7 rule 5) | `contextMenu` (Shift+F10 / Menu key) + the shared `documentRowMenu` helper (in the build) | Per-register menus today in §6.5; production SO has none since #1838 (§7.2) |
 | Export (current view) | SUPPORTED | Excel and list PDF from one derivation: column `exportValue` · `exportLabel` · `exportName`; selection exports the ticked rows | List PDF in-page preview PRODUCTION VERIFIED (#1911) |
 | Paged full-population export | SUPPORTED | `loadExportRows` | Receiving first; PRODUCTION VERIFIED for Excel (#1905, `a087fec9`); live PDF-list download of a paged register not claimed |
 | Server-side column filter/sort | SUPPORTED | `serverColumns { values, onChange }` + shared `register-column-query` | PRODUCTION VERIFIED on Receiving (#1899/#1901, `5c04b662`) |
@@ -1142,24 +1142,23 @@ The local filter/mission rail recipe is §6.1; this section holds the register's
   (`Export Excel ({n})`). A one-record action disappears on multi-select. With rows ticked, Export can
   also produce the documents those rows own (`Print {n} sales orders`, one governed page per order,
   assembled server-side) — never confused with the list output.
-- **Row actions — owner-approved 2026-10-05, APPROVED TARGET / NOT BUILT unless the table below says
-  a register has it.** The shared row right-click menu (also Shift+F10 / the Menu key) offers
-  **`View`** — opens the full document's 50/50 read-first view page, which carries an `Edit` button;
-  editing starts only when `Edit` is pressed — and **`Print`**, which enters the existing print flow.
-  Right-click stays a shortcut, never the only door. The identity-number click, row single-click and
-  double-click keep each register's CURRENT approved behaviour (below). The embedded Sales Order is
-  unchanged: SO No → saved PDF, ↗ → full SO page. Sales Orders' approved row menu is Orders law:
-  `Edit · View · Print · ─ Cancel SO` (Orders MASTER, register close-out 2026-09-26).
+- **Row actions — the ONE ROW MENU is §6.7 rule 5 (owner 2026-10-05, APPROVED / BUILD IN PROGRESS).**
+  The menu also opens by Shift+F10 / the Menu key. `View` opens the full document's read-first page
+  (the 50/50 page where the object rule splits, §4.4), whose `Edit` must be pressed; `Print` enters
+  the existing print flow. The identity-number click, row single-click and double-click keep each
+  register's CURRENT approved behaviour (below). The embedded Sales Order is unchanged: SO No → saved
+  PDF, ↗ → full SO page. Manual Purchase Request has no print flow (no `Print`); Delivery Monitor rows
+  are delivery jobs, not documents (no `View` / `Print`).
 
   | Register (measured in code 2026-10-05) | Single click | Double click | Right-click menu today |
   |---|---|---|---|
-  | Sales Orders | compact SO card (Working Panel) | full SO page | none in code since #1838 (`contextMenu={undefined}`), although Orders law approves `Edit · View · Print · ─ Cancel SO` — REAL GAP (§7.2) |
+  | Sales Orders | compact SO card (Working Panel) | full SO page | none in production since #1838 (`contextMenu={undefined}`); the shared row-menu build restores it as `View · Print · ─ Cancel SO` (§7.2) |
   | SO Batch Purchase | none (selection and expansion) | compact SO Batch card | `View` (compact card) · `Open {PO}` when exactly one PO |
   | Purchase Orders | none | PO object | `View` (PO object) · `Download official PDF` |
-  | Manual Purchase Request | none | request detail | `View` (request detail) · `Open {PO}` when exactly one PO |
+  | Manual Purchase Request | none | request detail | `View` (request detail) · `Open {PO}` when exactly one PO; no print flow, so no `Print` |
   | Receiving | compact GRN card | none | none |
   | Delivery Orders | none (▸ opens the DO brief in place) | the DO | `View` · `Open SO-{n}` · `Open Order Route` |
-  | Delivery Monitor | none (▸ opens the delivery brief) | none | `Assign logistics` (unassigned only) · `Open SO-{n}` · `Open Order Route` · `Open {DO}` |
+  | Delivery Monitor | none (▸ opens the delivery brief) | none | `Assign logistics` (unassigned only) · `Open SO-{n}` · `Open Order Route` · `Open {DO}`; rows are delivery jobs, so no `View` / `Print` |
   | Supplier Claims | none | the claim | none |
   | Warehouse stock register | none | the Unit | none |
   | Finance listings | none | the record (per Finance MASTER) | page-specific; not reviewed here |
@@ -1222,8 +1221,13 @@ recorded in §6.0; the compact card in §4.3.4.
    A layout saves order, widths, visibility and sort ONLY — never search, filters or group state;
    `Reset columns` restores the company layout (and clears sort). Browser-remembered layout per page key
    applies everywhere. Rollout beyond Purchase Orders waits for owner acceptance of the pilot.
-5. **Actions.** Essential actions stay discoverable on the record opened via identity; right-click is a
-   shortcut, never the only door; read-only registers get no invented batch actions.
+5. **ONE ROW MENU (owner 2026-10-05) — APPROVED / BUILD IN PROGRESS.** Every register's right-click
+   menu starts `View · Print` from the shared `documentRowMenu` helper — View opens the record's full
+   read-first document page (Edit only when pressed), Print runs that record's existing print flow; an
+   item is omitted where the record has no full page or paper. Module MASTER-approved items follow
+   after one divider (Sales Orders: Cancel SO). Click, double-click and number links are unchanged.
+   Essential actions stay discoverable on the record opened via identity; right-click is a shortcut,
+   never the only door; read-only registers get no invented batch actions.
 6. **Presentation.** Shared header, typography, palette, icons, row treatment and width registry; no
    separate page theme.
 7. **Expansion and states.** Reuse the governed expansion; loading, failure, empty and filtered-empty
@@ -1439,7 +1443,7 @@ into the section it belongs to, and this list loses it.
 | Shared Select long option at 390px | measured right edge 420.72px beyond the viewport (research file §9) | Kit fix |
 | WarehouseIncoming modal close | focus lands on the page, not the Count trigger (research file §9) | Adopt `DialogFrame` focus return |
 | Picker inside a dialog renders UNDER it | a real P1 defect, approved, not built | Kit fix |
-| Sales Orders row menu missing in code | Orders law (register close-out 2026-09-26, BUILT 2026-09-28) approves `Edit · View · Print · ─ Cancel SO`; the accepted-template build #1838 set `contextMenu={undefined}`, so production has no row menu | Orders lane restores it, aligned with the shared `View` (50/50 read-first) and `Print` rule |
+| Production Sales Orders register has no row menu | Since #1838 (accepted-template build, `c926e3f7`) set `contextMenu={undefined}`, production has no row menu | APPROVED TARGET / NOT BUILT — the shared row-menu build restores it as `View · Print · ─ Cancel SO` (§6.7 rule 5) |
 | Stock Status column truncates its pill | Live SO register 2026-10-05: the 120px Stock Status width cuts every `Receipt unconfirmed` pill (natural width >103px of content) — content must decide width (Constitution §2) | GAP: re-measure and widen the registry role in the SO round |
 
 ## §7.3 · KIT GAPs — admit once, never draw locally

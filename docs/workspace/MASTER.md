@@ -1850,7 +1850,7 @@ checklist. Revisions 2 to 5 carry her corrections of the same day, made on the d
     never closes it.
   - *Status:* Delivery does not raise this act today — build after this page, in Delivery.
 
-**C · Not in this build.** The right-rail Calendar/Customers/Activity; `{n} of {m} done` and
+**C · Not in this build.** The right-rail Calendar/Tasks/Activity; `{n} of {m} done` and
 auto-advance (need closure receipts, §5.2.1); the `3 new actions` banner; B4 and B5.
 
 **Acceptance (the builder checks, Jess only confirms).** 1440 / 1180 / 820 / 390; one difficult
@@ -2051,9 +2051,9 @@ WhatsApp never completes anything. Facts remain owned by Sales Orders (customer/
 delay planning and phone), Delivery (partner contact result, scheduled/delivered and arrangement
 decision), and their source communication evidence.
 
-**Relation to the right rail's Customers door (owner-confirmed 2026-09-26, UI MASTER §5):** this card is
-one mission's customer-facing exception; the rail door starts from the customer and lists all their orders
-and recorded history. Both read the same Sales Orders / Delivery / Payment records; neither stores a copy.
+**Relation to customer information in the right rail (UI MASTER §5):** this card is one mission's
+customer-facing exception; customer information is reached through the `Sales Order` tab inside Tasks
+(owner ruling 2026-10-05). Both read the same Sales Orders / Delivery / Payment records; neither stores a copy.
 
 #### Supplier card
 
@@ -2371,10 +2371,11 @@ Batch's `?window=` scope read that stamp. Workspace decides the composition (han
 
 ## 7 · Right Rail and Notifications
 
-**OWNER-APPROVED TARGET / NOT BUILT — 2026-09-24.** Remove the Right Rail My Work slot
-and replace it with the customer-search/record door governed by UI MASTER §5. Formal Work,
+**OWNER-APPROVED TARGET / NOT BUILT — 2026-09-24.** The Right Rail My Work slot
+becomes `Tasks` (UI MASTER §5); customer information is reached through the `Sales Order` tab inside
+Tasks (owner ruling 2026-10-05). Formal Work,
 My Work and Team Work retain their current scope, counts, action projection and existing navigation.
-The customer door has no Work badge or task-completion control. The existing My Work rail code is
+The existing My Work rail code is
 implementation awaiting replacement, not a second current target. No mobile mini-queue is added.
 
 Notifications are event receipts—assigned, cover activated, became missed, unblocked, source failed
@@ -2391,7 +2392,8 @@ remains legacy debt and may not be presented as this contract.
 
 ### 7.1 · Right Rail and notification acceptance contract
 
-- The right rail follows UI MASTER §5's Calendar/customer/Activity target; it does not duplicate Work.
+- The right rail follows UI MASTER §5's Calendar/Tasks/Activity target (customer information is reached
+  through the `Sales Order` tab inside Tasks, owner ruling 2026-10-05); it does not duplicate Work.
 - Formal Work remains directly reachable from existing Workspace navigation on desktop and narrow widths.
 - Removal of the rail shortcut changes no Work identity, count, owner, deadline or completion fact.
 - No rail or Bell control assigns, covers, completes or dismisses Work or records a module result.
@@ -2525,7 +2527,7 @@ unreviewed annotation · `Upcoming` · `Take it` · `Release`.
   health, recent changes. No horizontal pipeline, compressed five-column board or sideways KPI strip.
 - Counts and amounts never truncate. Long measure explanations wrap; object doors remain keyboard and
   touch accessible. Hover-only source/threshold evidence also opens by focus/tap.
-- The right rail (Calendar · Customers · Activity, UI MASTER §5) stays beside Dashboard on supported
+- The right rail (Calendar · Tasks · Activity, UI MASTER §5) stays beside Dashboard on supported
   desktop widths; it is not folded into Dashboard. Work is reached from its own navigation door.
 
 ### 8.5 · Current → proposed gap audit — 2026-09-07
