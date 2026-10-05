@@ -156,6 +156,16 @@ coverage per module (§4.3, §6.1). Tests or shared-component imports alone do n
     chat proactively offers how to complete that module's Settings: every setting the module needs to
     run, its Settings door, current value or default, which are still empty, and who sets it — before
     calling the module complete. Never wait for the owner to ask.
+11. **One combined review for shared UI — owner ruling 2026-10-05 ("agree, tell every chat to align
+    with you").** A module chat never shows the owner its own variant of a shared part: Working Panel
+    host and tabs, Tasks entries, compact card, row menu or listing kit. It sends them to the chat that
+    controls this MASTER, in one message: per page, route · main object · panel host · tabs in order ·
+    opens on · ↗ destination · row menu; per Tasks item, act wording · card + tab it opens; any kit part
+    that does not exist (named, not drawn); status per item (APPROVED with MASTER § · BUILT with SHA ·
+    PROPOSAL with preview + branch@SHA); known conflicts with another module's card. The UI owner
+    combines every module into one table and one local preview; the owner accepts once; this MASTER is
+    then written and each module writes its own section. Module business rules stay with the module
+    chat.
 
 ## Find it — this index is enough
 
