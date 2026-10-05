@@ -13,6 +13,9 @@
  *   ?at=<path>         the page on the left (kept while walking)
  */
 import { SCENARIO, SCENARIOS, TODAY, type Scenario } from "./tasks-fixtures";
+/* The Sales Orders Stock Status walk rides the SAME link (owner, 2026-10-05):
+   imported right after the Tasks fixtures so it wraps the fetch they own. */
+import { StockStatusWalkPanel } from "./so-stock-status-scenario";
 import { StrictMode, useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
@@ -113,6 +116,7 @@ createRoot(document.getElementById("root")!).render(
         </Routes>
       </MemoryRouter>
       <Banner />
+      <StockStatusWalkPanel />
     </QueryClientProvider>
   </StrictMode>,
 );
