@@ -419,7 +419,9 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
 /* ── the walk panel ────────────────────────────────────────────────────── */
 export function StockStatusWalkPanel() {
   const qc = useQueryClient();
-  const [open, setOpen] = useState(true);
+  /* Inside the Tasks walk it starts folded so it never covers the Working
+     Panel; `?walk=stock` (the button below) opens it on Sales Orders. */
+  const [open, setOpen] = useState(() => new URLSearchParams(window.location.search).get("walk") === "stock");
   const [, redraw] = useState(0);
   useEffect(() => {
     const fn = () => redraw((n) => n + 1);
@@ -432,12 +434,21 @@ export function StockStatusWalkPanel() {
     redraw((n) => n + 1);
   };
   return (
-    <div className="fixed bottom-2 right-2 z-50 w-[380px] max-w-[calc(100vw-16px)] rounded-card bg-kit-slate-12 text-label text-white shadow-lg" data-testid="stock-status-walk">
+    <div className="fixed bottom-12 right-14 z-50 w-[380px] max-w-[calc(100vw-16px)] rounded-card bg-kit-slate-12 text-label text-white shadow-lg" data-testid="stock-status-walk">
       <button type="button" className="flex w-full items-center justify-between px-3 py-1.5 text-left font-semibold" onClick={() => setOpen((v) => !v)}>
         <span>Local walk · Stock Status · SIMULATED</span><span aria-hidden>{open ? "▾" : "▸"}</span>
       </button>
       {open && (
         <div className="max-h-[60vh] space-y-2 overflow-auto px-3 pb-3">
+          <button type="button" className="rounded-control border border-kit-slate-6 px-2" data-testid="walk-go-sales-orders"
+            onClick={() => {
+              const next = new URLSearchParams(window.location.search);
+              next.set("at", "/operation/orders");
+              next.set("walk", "stock");
+              window.location.search = next.toString();
+            }}>
+            Open Sales Orders
+          </button>
           <p className="text-kit-slate-6">Sales Orders → find the SO → click its number → Items. Every receipt and reservation here is simulated; nothing is saved anywhere. Receipt auto-reserve is approved, not built.</p>
           <ol className="space-y-1.5">
             {STOCK_STATUS_WALK.map((s) => (
