@@ -12,6 +12,8 @@ define typography, colour, spacing or component styles.
 
 The current shared-template direction and its approval boundaries live in
 [`ui/MASTER.md`, Reuse-first shared page templates](ui/MASTER.md#reuse-first-shared-page-templates--owner-ruling-2026-10-01).
+The owner-approved 2026-10-05 shared module flow is UI MASTER’s **Shared module page flow**: source-owned mission rail, one shared listing with module columns, and the Sales Order-derived right Working Panel with Info and module tabs (including Warehouse). Apply that current target and its exception/acceptance contract; persistence is not proof of app adoption.
+
 This file describes the common patterns; it is not a second reference selection or an authority
 to redesign each page independently. The current listing contract is UI MASTER §6.0; its detailed
 Register/Object Detail rules govern where an older example below differs.
