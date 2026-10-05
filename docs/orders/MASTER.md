@@ -1,6 +1,6 @@
 # ORDERS — MASTER
 
-**All listing appearance — APPROVED / NOT BUILT (Jess, 2026-09-17):** follow
+**All listing appearance — the shared listing template (UI MASTER §6.0):** follow
 [UI MASTER §6.7 Portal-wide listing readability](../ui/MASTER.md#portal-wide-listing-readability--built-2026-09-17-slice-1--authenticated-walk-owed).
 This is the shared default, not a PO visual pilot. Preserve this module's filter content,
 control types, special schedules and business behavior; no page-local appearance specification.
@@ -40,10 +40,79 @@ control types, special schedules and business behavior; no page-local appearance
 
 ---
 
-# §0.0 · SALES ORDER BLUEPRINT 2026-09-26 — PLAN MISSION COMPLETE · READY SCOPES
+# §0.0 · SALES ORDER COMPLETE BLUEPRINT — owner-approved 2026-10-01 · PLAN COMPLETE
+
+Jess approved the consolidated whole-domain recommendation after the scoped amendment rulings.
+This closes PLAN review; it does not certify whole-module implementation or authorise deployment.
+Keep the current navigation, flat register, the accepted shared listing rows (UI MASTER §6.0) and 51px goods rows, order detail and PDF split,
+revision/history, one amendment entry and owning-module boundaries. Apply the existing One Kit;
+no full-page replacement or alternative design system is approved.
+
+**Evidence boundary.** Complete audit: Carres `74b4981b62a50cb159d677e07429f8fc03fcf519`,
+Houzs `ecce2e9676acc555efa8b2c30e78052b2ab54749`, local 2990 committed source
+`a600b8d7417120d25bbd021820fc6b3ec4f92081` (not verified against its latest remote).
+301 scoped unit/mock/source tests passed; desktop 1440px and phone 390px real Carres components
+were observed with isolated fixture data. These are not production, full keyboard or live-data
+acceptance. **Persisted to main 2026-10-06** (the rulings had stayed on unmerged docs PR #1826,
+`9153f309f`; the owner confirmed on 2026-10-06 that they need no re-approval). Build PR #1834
+(head `768fd8db9`) implements the scoped amendment slice for review only: it is OPEN, not merged,
+not deployed, and its migrations `0629`/`0630`/`0632` must take new numbers after main's migration
+tail before it can merge. Other rows below remain APPROVED TARGET / NOT BUILT unless separately
+evidenced.
+
+## Approved handoff scopes and business acceptance
+
+| Capability / scope | Keep or exact improvement | Acceptance boundary / owning dependency |
+|---|---|---|
+| Register, filters, reports and exports | KEEP shared DataGrid; IMPROVE the complete permission-scoped population, stable sort, totals and export rather than filtering a truncated 500-order sample | More than 500 matching orders do not disappear; list, totals and all-matching export reconcile; selected-row export is explicitly distinct; pagination changes loading only |
+| Monthly demand | KEEP two blocks, one month-row table, one-select Sales Location and existing rail; preserve active location/region/category through month, Before, After and no-date drill-down and return | The opened orders are the exact same population, no silent filter loss; no pivot, chart, multi-select or second coverage table |
+| Unknown facts and line attribution | IMPROVE unreadable versus genuine zero, missing catalogue versus source failure, and exact SO-line/Unit attribution | Unsupported purchase calculations are not zero; repeated SKUs do not establish line identity; uncertain legacy allocation stays visibly uncertain; Purchasing/Stock/Delivery own facts and calculations |
+| Staff amendments | KEEP the single whole-page draft and evidence gate; implement the current Staff amendments and Sales Approver, date and system-charge rulings in this MASTER | One request, one effective result after applicable gates; mixed changes never partially apply; ordinary changes do not wait for owner approval; actual submitter/confirmers and PIC notification preserved |
+| Concurrent editing | IMPROVE save/submit with the editor's original baseline, in addition to approval-time stale checks | Two editors cannot silently overwrite one another; conflict keeps the draft and exposes what changed; same amendment entry, no new draft engine |
+| Documents, history and failures | KEEP issued originals, immutable revisions, labelled reconstruction and real actor history; make failed original capture visible and retryable, with governed actionable write errors | File failure does not undo an effective revision, impersonate an actor, fabricate a signature or pass reconstruction off as the issued original; retry cannot duplicate the business change |
+| Existing approved document details | IMPROVE multiple-PO cell to first reference plus more, and deliver already-approved numbering with compatibility | Old references remain searchable/linked, historical documents are never renumbered, no unrelated Subscription redesign |
+| Direct Purchasing / Delivery dependencies | IMPROVE PO revision/source-share consistency and prove preceding-leg arrival, split-trip and Unit/line consequences in owning modules | No understated procurement demand or premature next-leg release; SO reads and links rather than writing PO, stock, delivery or money facts |
+| Work, Quick Rail and Calendar | KEEP shared Work/duty/history engines; integrate approved shared destinations and exact object/date deep-links | No duplicate personnel list, customer centre or SO-private task engine; shared customer identity/portal scope remains Workspace/UI-owned |
+
+**Staff journey.** Find the order with the existing register, check current promise and issued
+file, edit once, review Before/After and evidence, then see whether the request took effect or
+which supplier/eligible approver is awaited. The original effective order stays authoritative
+while waiting. Work points the responsible person to the owning confirmation/action. Operation
+helpers retain their own identity; the PIC receives the outcome. Purchasing manages the supplier
+commitment, Delivery manages arrangements and issued DOs, and Payment manages refunds and actual
+money. History and saved documents explain what happened without inventing missing evidence.
+
+**UI reuse decision.** Existing Carres table, rail, Tabs, Modal/DialogFrame, EmptyState, buttons,
+detail/PDF and Work components are READY. Houzs shared list/export predicates and save/confirmation
+interactions are REUSE CANDIDATES as patterns. Reference source-code rights/dependencies and Carres
+schema/security compatibility are not cleared; no source copy is designated COPY REQUIRED and no
+unmeasured saving is promised. Reject its independent partial amendment lanes or logistics control
+over the SO customer promise. A real missing shared interaction follows UI MASTER admission and
+its /ui example, not a page-local replacement. Every delivered slice must specify visible fields,
+actions, permission/loading/empty/error/waiting/success states and measured desktop/phone journeys.
+
+**Intentional exclusions.** Preserve 0329's separate attribution request and eligibility; do not
+expand post-Proceed ordinary-address restrictions, arbitrary non-delivery service pricing,
+copy/scan/bulk amendment or approval, Subscription scope, or full Purchasing/Delivery redesign.
+Previously approved future targets are not cancelled. Sales Approver's post-Proceed cancellation
+gate is approved but not a complete stock/PO/refund consequence policy: approval alone never means
+all obligations are settled. Unsupported consequences must not execute automatically. Genuine
+blocking contradictions are reported together with the smallest recommendation; missing code is
+not a new owner decision.
+
+**Delivery control.** This document is the one plan authority, not a second implementation queue.
+BUILD owns Cards only under its explicit commission. #1834 remains a partial commissioned slice;
+plan approval does not expand it silently. Release requires exact-head checks, migration upgrade
+proof, duty configuration readiness, real staff journeys and recovery steps. A passing CI or
+rendered fixture is not live acceptance. Merge to main currently triggers deployment; no main
+merge, production write or live duty assignment is authorised by this PLAN ruling.
+
+## Preserved approved scopes from the 2026-09-26 blueprint
+
 
 **Eight segments were reviewed and approved by Jess on 2026-09-25/26 and are persisted in this
-MASTER, COPY-STANDARD and UI MASTER as APPROVED TARGET / NOT BUILT.** The Order Route Blueprint of
+MASTER, COPY-STANDARD and UI MASTER.** Implementation is partial and evidenced per scope below;
+no blanket NOT BUILT or whole-module production claim applies. The Order Route Blueprint of
 2026-09-24 is folded in and its file deleted (Law 5). Every scope below is a dependency-ordered,
 unnumbered BUILD handoff boundary: it has approved business truth, approved UI/word truth, one owner
 and an acceptance boundary, and no owner decision blocks it. The BUILD/DELIVERY lane authors Cards.
@@ -55,7 +124,7 @@ and an acceptance boundary, and no owner decision blocks it. The BUILD/DELIVERY 
 | **C · SO page locked state** | §0.1 THE LOCKED STATE (five rules) | View and Rev 1 render zero row writers, `RM 1,399.00` text, `RM 0.00` discount, no `*`, no TBD checkbox in Edit |
 | **D · Register close-out + no dash (portal-wide)** | §0.1 REGISTER CLOSE-OUT · COPY NO DASH ANYWHERE ON A SCREEN · UI §6.0 empty-cell line · `Not applicable` on Service rows | menu `View · Print · ─ Cancel SO` (owner 2026-10-05; Edit is reached through View); one population predicate; the 154-file dash sweep leaves no `—`/`–` printed as a value anywhere in `apps/web` (PDFs and WhatsApp templates included) |
 | **E · Read-failure faces** | § A READ FAILURE HAS THREE FACES | a 403 on each of the five surfaces prints the permission words with no retry; no `error.message` on screen; kit `EmptyState` + `Button` only |
-| **F · Monthly demand + rail** | §0.1 Monthly demand (2026-09-22 model + 2026-09-26 UI, KIT AND SOURCES) · UI §6.7 rail note · COPY Monthly demand words | `FilterRailMultiSelect` admitted through the kit with a `/ui` example; the matrix reconciles with its drill-down at one scope; the strip reads SO Batch's and Stock's arithmetic and buys nothing; measured at 1440/1180/820/743/390 |
+| **F · Monthly demand + rail** | §0.1 Monthly demand (2026-09-22 model + 2026-09-26 UI, KIT AND SOURCES) · UI §6.7 rail note · COPY Monthly demand words | Existing single-select shared rail and two-block month table reconcile with same-scope drill-down; quantities read owning calculations and buy nothing; measured at 1440/1180/820/743/390 |
 
 **Scope A is delivered in three dependency-ordered slices (BUILD lane, 2026-09-27).**
 
@@ -580,7 +649,7 @@ prints `Not recorded → No` / `Not recorded → Yes`. A line-3 note longer than
 and opens whole on hover, focus and click through the engine's `OverflowText` — the Register's
 rule, not a second one. The stored event is never rewritten.
 
-## Monthly demand — owner approved 2026-09-22 · APPROVED TARGET / NOT BUILT
+## Monthly demand — approved model · composition BUILT 2026-09-28; correctness close-out approved 2026-10-01
 
 **Purpose and placement.** Jess approved a six-month view of the quantities still owed on
 accepted Sales Orders, for Operation to plan stock, purchasing and supplier capacity. Sales Orders
@@ -603,7 +672,7 @@ rail belongs to this monthly view and filters Sales Location, customer delivery 
 and product category. Dealer location and customer delivery destination remain different facts.
 Both views use the shared rail shell under the following owner ruling.
 
-**Left rail — owner approved 2026-09-22 · APPROVED TARGET / NOT BUILT.**
+**Left rail — approved shared composition; built evidence in Scope F above.**
 Use the existing `FilterRail` family in `workspace-rail.tsx`, with governed 240px width,
 wrapping labels and collapse behaviour. One view selector chooses Order list or Monthly demand;
 each view exposes only its own controls. Do not add a second handmade rail.
@@ -626,24 +695,13 @@ each view exposes only its own controls. Do not add a second handmade rail.
 - Source classifications are catalog-owned; never print Other goods. Missing classifications are
   traceable data errors, not silently omitted physical demand. Services are separate from Qty.
 
-**Quantity matrix.** Columns are calendar months with years; rows are product categories.
-Every number means physical goods still owed to the customer, not order lines or original sold
-quantity: use the effective commitment and authoritative actual fulfilment. Partial delivery
-reduces only the quantity actually fulfilled. Gifts count in their actual product category;
-services do not count as physical pieces. Applied cancellations/amendments change the effective
-demand; pending requests do not. Preserve quantity unit and product/configuration identity.
-Expand a category into model, size and purchasing-relevant configuration. Clicking a month/product
-quantity exposes the contributing SOs and dealers under exactly the same filters and permissions.
-An empty result is not evidence of zero demand when its underlying facts failed to load.
-
-**Selected-month coverage.** Below the matrix, expose remaining customer demand, allocated stock
-coverage, valid PO coverage and remaining purchase requirement. Read the owning Stock and
-Purchasing calculations; do not create a second demand engine or allocate/purchase from this
-report. Stock and PO coverage must not double-count the same quantity, including after PO receipt.
-Available but unallocated stock is not represented as stock already arranged for these orders.
-PO coverage is not proof of timely delivery: separately expose supplier timing risks or unknown
-arrival evidence against the customer's requested date, without inventing a new promised date.
-Counts and drill-downs must reconcile at the same scope; unavailable coverage is unknown, not zero.
+**Quantity and coverage.** Use the two-block month-row composition in UI, KIT AND SOURCES below.
+Effective committed quantities and authoritative actual fulfilment determine the figures; pending
+amendments do not. Gifts count in their real category, services are not physical pieces. Coverage
+and To buy read the owning Purchasing/Stock calculations without double-counting receipts or
+creating an allocation writer. Exact line identity matters; uncertain legacy attribution and
+unavailable or unsupported calculations are not known zero. Every month/boundary/no-date door
+preserves the same scope and permissions. No category/configuration expansion or coverage strip.
 
 **Forecast boundary.** Confirmed demand is the approved planning baseline. Future sales targets
 or predicted new dealer orders would be a separately identified input; no target-entry engine,
@@ -685,9 +743,7 @@ operating model above is unchanged; this fixes how it is drawn and where every n
   `Sales Location` is one select (a search box waits for a kit admission); there is NO multi-select
   and NO `FilterRailMultiSelect`; the 2026-09-22 multi-selection line is withdrawn and no kit
   component is admitted. Several sales locations together = `All sales locations`.
-- **One page, three blocks, dictionary words only — OWNER CORRECTION 2026-09-26 (Jess: the pivot
-  "Excel listing" was confusing; reference shape = summary numbers · month chart · period table).**
-  **Corrected again the same day (Jess: "4 KPI is what? repeated?"): two blocks, not three.**
+- **One page, two blocks, dictionary words only — owner ruling 2026-09-26.**
   ① `This month · {Mon YYYY}` — THREE numbers for the current month (or the month the operator
   chose): `Total Qty` · `Delivered` · `Not delivered`. They never repeat the table's `Total` row —
   they are one month, the table is every month. No unit line; `Qty` is in the word. ② One table,
@@ -709,18 +765,18 @@ operating model above is unchanged; this fixes how it is drawn and where every n
   `ops_stock_items` reserved to these lines; `Pending Delivery Qty` = the PO word, `po_line_sources`
   on non-cancelled POs less received (Rental §5.6's evidenced Diglant supply counted once); `To buy`
   = `soBatchOrderLineOutstandingQty`, SO Batch's one arithmetic. Nothing is bought or reserved here.
-- **States:** skeleton = rail groups + a 10-column, 3-row matrix + the strip; filtered empty `No
+- **States:** skeleton = rail groups, the three this-month figures and the 9-column month table; filtered empty `No
   Sales Orders in these months` (the `No delivery date` row still shows); whole failure `Monthly
   demand could not be loaded` + `Try again`; a single failed source prints `Unavailable` in its
   numbers only; permission follows the Register's scope.
-- **Responsive:** 1440 / 1180 rail beside the three blocks (the month table is ~900px and never
-  scrolls sideways; the bars share one row); below 896px
-  (`FILTER_RAIL_FLOAT_BELOW_PX`) the rail floats behind `Show filters`; at 743 the four numbers become two rows of two and the bars wrap under them; at 390 `Period` moves under the toolbar and every target is
-  40px; the page never scrolls sideways.
+- **Responsive:** desktop rail beside the two approved blocks; below the shared rail breakpoint,
+  use its existing floating filter control. Preserve all table facts, readable type and keyboard
+  access through the shared grid's own scrolling viewport; do not make the whole page scroll
+  sideways. Verify 1440 / 1180 / 820 / 743 / 390 with long names and realistic quantities.
 - **Flat data-table treatment — owner ruling 2026-09-27:** the month table (9 columns, numbers under
   distinct words) draws NO column separators (tokens §5.1 column-count rule); the Register (11 columns,
   look-alike neighbours) keeps its 1px lines; header filter icons appear on hover, focus or an active
-  filter only (UI §6.0 rule 6); each rail group carries its 11px supporting line (UI §6.7).
+  filter only (UI §6.0 rule 6); rail groups follow the current UI §6.7 rule: title and chosen value, no supporting description.
 - Words registered in COPY-STANDARD § Monthly demand words with this ruling.
 
 **Acceptance boundary and remaining design work.** Review must demonstrate a month/year boundary,
@@ -1227,11 +1283,15 @@ opens Your changes → review Before/After and impact, enter Reason for change �
 takes effect where required → each owning module handles its part`. The review uses the shared Modal
 at submission, not a panel inserted above SO info during typing. Cancel closes the review and preserves
 the draft; reason and customer-agreement gates remain unchanged.
-1. **Submitting changes nothing.** While editing, a removed line is struck through and can be restored.
-   After `Submit amendment request` the current order and its official PDF stay exactly as they were;
-   the new version takes effect only on `Approve and apply`. `Reject` leaves the order unchanged.
-2. **Approval does not "reduce the PO".** Cancelling an SO item after approval hands the supplier
-   commitment to Purchasing, which settles it with the supplier; goods already made, shipped or received
+1. **Effectiveness follows the 2026-10-01 staff-amendment ruling below.** While editing, a removed
+   line is struck through and can be restored. An ordinary change with no issued PO covering the
+   changed line takes effect on submission with evidence. Where supplier confirmation or Sales
+   Approver is required, the effective order/PDF remains unchanged until those gates pass. Reject
+   leaves it unchanged. The former universal `Approve and apply` target is superseded; it remains
+   a description of the current built 0564 gate only.
+2. **An effective amendment does not "reduce the PO".** Where an issued PO covers the changed
+   line, PO Duty first records supplier feasibility under the 2026-10-01 ruling. Purchasing then
+   settles the separate PO change with the supplier; goods already made, shipped or received
    are never cancelled as if never ordered. The original PO, Unit IDs and history are never rewritten
    automatically.
 3. **The reason, the before/after and the impact are shown before submitting** — which item, what
@@ -1315,7 +1375,9 @@ the draft; reason and customer-agreement gates remain unchanged.
 - The approved SO draft/revision words are registered in COPY-STANDARD: `Add item`, `Remove` /
   `Restore`, `Before` / `After`, `View version` / `Return to current`, `Print this version`,
   `Qty:` with category quantities and `Services:` with service names. `Waiting for management` and
-  `Before approval` remain the governed waiting state and impact heading.
+  `Before approval` describe the built 0564 gate. The waiting words for the two 2026-10-01 gates (a
+  supplier answer recorded by PO Duty; a Sales Approver decision) are not in COPY yet: they are
+  proposed with the staff-amendment build's localhost preview, never invented in code.
 
 ### Sales Order amendment — DELIVERED 2026-09-23, production `abbea07a2`
 
@@ -1382,7 +1444,9 @@ being the Staff-correction case, whose reference must name a revision of this or
 API or the screen**, which is how "a manager's statement or checkbox … is not sufficient" is made
 structural rather than a matter of discipline.
 
-SUBMIT is unchanged — the request is still written while the evidence is incomplete. REJECT is
+**Built 0564 behaviour (not the new ordinary-amendment target):** SUBMIT writes the request
+while evidence is incomplete. The 2026-10-01 staff-amendment target requires evidence before
+effectiveness, including ordinary application on submission. REJECT is
 unchanged — refusing a change needs no customer agreement. APPROVE is refused
 (`customer_agreement_required`) until a basis is recorded, and refused again
 (`customer_agreement_stale`) when the recorded basis no longer fingerprints the terms being applied,
@@ -2645,12 +2709,15 @@ whole-page submission or the rule against silently saving part of a draft.
 - Staff submit one amendment with the reason and Before/After. The system shows its review
   destinations before submission and resolves the responsible people through the governed
   Staff & Duties mechanism. Never hard-code a name, let the requester arbitrarily choose the
-  approver, or treat a department label as a person's identity. Existing approval rights remain
-  required; this ruling grants no new permission or self-approval right.
-- A product-only amendment routes to the applicable approval Duty. A customer-requested-date-only
-  amendment stays in the Sales Order governed change path and routes to the applicable approval
-  Duty; it does not wait for an unrelated Purchasing review. This ruling does not assign all
-  commercial or price decisions to Purchasing.
+  approver, or treat a department label as a person's identity. Where approval is required under
+  the later staff-amendment ruling, its role qualification remains required. Submission follows
+  the any-Operation ruling below; Sales Approver self-approval follows its scoped ruling below.
+  An assignment alone grants no additional approval permission.
+- Product amendments follow the later **Staff amendments and Sales Approver** ruling below:
+  ordinary changes do not require owner approval; issued-PO coverage requires supplier confirmation.
+  Requested Delivery Date changes follow the approved date ruling below, with no PO Duty or
+  supplier-confirmation step for the date itself. No blanket Purchasing commercial approval is
+  granted.
 - Where a submission contains dependent changes, the relevant reviews may proceed in parallel,
   but the linked changes take effect together only after all required approvals. Example:
   “change the bed only if it can arrive on Friday” must never become an approved bed change
@@ -2676,6 +2743,148 @@ and Logistics self-approval of Carres customer promises are not adopted.
 production operation, Card, complete field-to-Duty matrix, or production-verification claim is
 created by this entry. Existing implementation still classifies mixed drafts as a whole;
 scoped multi-review routing remains target work, not a shipped capability.
+
+#### Staff amendments and Sales Approver — OWNER-APPROVED 2026-10-01 / TARGET NOT BUILT
+
+**This ruling REPLACES both earlier pastes:** the approval matrix and the “Sales Approver
+approves every amendment” ruling. Neither remains a ruling or proposal of record. There is one
+Duty, **Sales Approver**; the earlier name SO Approver is retired.
+
+**OWNER-REPORTED OPERATING REALITY (Jess, 2026-10-01):** staff decide and make ordinary order
+changes themselves; Jess does not approve those changes. This is the owner's account of actual
+operations, not a newly observed production-system test. The built Principal-only gate in
+`0564_the_amendment_carries_the_whole_change_and_the_customers_agreement.sql` does not match
+that operating model. The code remains unchanged; the following is the approved target.
+
+1. **Ordinary SO amendments do not need owner approval.** Staff submit once: one amendment
+   request and one final decision/outcome. Preserve the existing 0564 customer-agreement evidence
+   gate (signed document, customer confirmation reference or original agreement, with its governed
+   evidence/reference rules). No evidence-free application is authorised.
+2. **Route from the changed line's actual PO coverage**, not another line's PO:
+   - No issued PO covers the changed line: an ordinary amendment takes effect on submission
+     with the required evidence, subject to the expressly undecided scopes below.
+   - An issued PO covers the changed line: **PO Duty must first record the supplier's answer
+     that the change can be made**. Only then may it take effect. If the supplier has not answered
+     or the supplier date is unknown, it waits; it never takes effect by default.
+   - This is supplier-feasibility confirmation, not blanket commercial approval for PO Duty.
+     The original PO is never rewritten automatically. Purchasing settles the PO change with
+     the supplier and retains its own documents and actual-actor evidence.
+3. **Only these exceptions require Sales Approver before effectiveness:** a price decrease
+   (Carres collects less from the customer); a refund to the customer; cancelling a whole SO
+   after Proceed. Required supplier confirmation and customer evidence are not bypassed by this
+   approval. Refund execution remains with the owning money workflow; this is not a second
+   refund writer or automatic payout. The cancellation approval requirement is now decided;
+   this entry is not evidence that a complete post-Proceed cancellation implementation exists.
+4. **Sales Approver** is a new target Duty in
+   `packages/shared/src/workspace-duties-catalogue.ts`, with the existing qualification pattern
+   `roles: ["principal"]`. Holder and any cover must be active Principal people, assigned only
+   through **Settings → Staff & Duties**. Resolve people through the shared mechanism, never a
+   hard-coded name or a module roster. An unresolved required approval cannot silently pass.
+   This PLAN adds the word to COPY-STANDARD but does not modify catalogue code or live assignments.
+5. Keep who submitted, Before/After, reason, customer evidence, who confirmed and when. Linked
+   changes take effect together only when all applicable confirmations/approvals and evidence
+   gates are satisfied, never as independently effective department fragments. Delivery
+   arrangements never overwrite the customer's Requested Delivery Date.
+
+**Accepted trade-off:** no second person checks an ordinary product change before it applies;
+its audit record identifies who changed what. Supplier confirmation remains necessary where an
+issued PO covers the affected line. Submission eligibility is now settled by the scoped ruling below.
+
+**NOT DECIDED — each requires its own owner decision:** service-price exceptions beyond the
+system-priced delivery-charge scope settled below;
+salesperson/dealer/sales-location changes and whether the 0329 lane folds into the amendment.
+Ordinary-address amendment restrictions after Proceed were not
+resolved by this ruling either; do not infer them from the floor/lift/stairs rule.
+
+**Sales Approver self-approval — OWNER-APPROVED 2026-10-01 / TARGET NOT BUILT.**
+The person currently resolved as Sales Approver through Staff & Duties (eligible holder or dated
+Principal cover) may decide their own submitted SO exception request. This is a specific SO
+approval rule, not permission for every Principal to bypass the resolved Duty or for Operation
+to approve commercial exceptions. Retain the decision reason, required customer evidence,
+actual submitter, actual approver and their timestamps; show the real same-person record rather
+than inventing a second reviewer. Required supplier confirmation and linked-effectiveness gates
+remain. The owner accepts the absence of a second-person review for this SO decision.
+
+Actual refund/payment execution retains its existing owning-module controls; this decision does
+not override Finance controls, Purchasing Approver's own-request prohibition, or other Duties'
+self-approval rules. No live approval, assignment, code or production verification is performed
+by this PLAN entry.
+
+**System-priced delivery charges — OWNER-CONFIRMED 2026-10-01 / TARGET NOT BUILT.**
+Operation does not decide the delivery price or collect the customer's money personally; the
+customer pays the company through the existing governed money workflow. At order entry the
+system calculates the delivery charge. During an amendment, changed address or added delivery
+services are inputs to the same governed pricing rules: the system recalculates, not the employee.
+Staff cannot manually set, discount or waive this charge. Accordingly there is no separate manual
+delivery-charge approval step on this SO amendment path. Do not build the withdrawn proposal's
+Delivery Charge Approver discount/waiver lane here. The existing Duty is not deleted or repurposed
+for unrelated governed actions.
+
+Preserve customer-agreement evidence, Before/After, reason, actual actor and PIC notification.
+A correct system recalculation, including a lower calculated delivery charge, is not a discretionary
+product-price reduction. The Sales Approver gate for a customer refund remains, and refund execution
+stays with its owning money workflow; lower recalculation never automatically pays money out.
+Product-price reductions and the other previously approved exception gates remain unchanged.
+This does not authorise editing price rules through the SO, removing ordinary goods/PO checks, or
+setting arbitrary non-delivery service prices. No new live payment, application change or Duty
+assignment is made by this PLAN. Current code is not certified to enforce this target.
+
+**Requested Delivery Date changes — OWNER-APPROVED 2026-10-01 / TARGET NOT BUILT.**
+This resolves the formerly open date-change decision. Preserve the earlier readiness and
+storage-witness clarification; this is not a claim of implementation or production verification.
+
+1. **Customer asks for an earlier date:** the order's required goods must already be in the
+   warehouse and genuinely ready under the existing readiness definition, not merely located
+   there or forecast to arrive. When ready, staff submit the SO amendment with the required
+   customer evidence and it takes effect. If not ready, refuse the amendment; staff tell the
+   customer Carres will contact them when the goods arrive. Do not chase a supplier to pull the
+   customer date forward or promise an earlier date before stock is ready. Actual delivery still
+   requires the existing delivery, money and release conditions; changing the SO date is not a DO
+   or goods-release authorisation.
+2. **Goods ready early; Carres initiates:** once the previously approved readiness and existing
+   delivery/money/release conditions are satisfied, Logistics calls to offer earlier delivery.
+   If the customer accepts, record their reply with **WhatsApp evidence** and arrange it. This is
+   a Delivery arrangement, **not an SO amendment**; the SO Requested Delivery Date stays unchanged.
+   If they decline, keep the original date. Declining early receipt while retaining the original
+   agreed date/window is not customer delay and cannot itself start storage charges.
+3. **Customer asks for a later date:** staff submit the SO amendment with customer evidence and
+   it takes effect. A later date is never a silent edit. Payment's existing written-request /
+   storage evidence, actual Storage Start, free periods and waiver-authority rules remain
+   unchanged; a changed date alone does not prove the storage trigger or grant free storage.
+4. **No PO Duty or supplier confirmation forms part of a date change.** This date-only rule does
+   not remove the separately approved supplier-feasibility gate when the same submission also
+   changes goods/specifications/quantity covered by an issued PO. Linked changes still take effect
+   together after their applicable gates pass; do not apply a dependent date half on its own.
+
+Use the existing single SO amendment and evidence path, actual submitter/Before/After/reason/time
+records and PIC notification target. Delivery arrangements never overwrite the SO promise.
+No storage rates, waiver rights, live charges, code or implementation Cards change in this PLAN.
+
+**Who may submit — OWNER-APPROVED A, 2026-10-01 / TARGET NOT BUILT (PIC notification).**
+Any Operation staff member with the existing order access may submit an SO amendment; submission
+is not restricted to that order's PIC. Principal submission remains permitted. Salespeople and
+Dealers remain unable to submit through this Operations amendment door and ask Operation to make
+the change. This changes no other record-access or approval right.
+
+The system automatically notifies **that order's PIC** about the amendment, using the governed
+shared notification/activity mechanism rather than a module-specific task engine. Keep the actual
+submitter, Before/After, reason, customer evidence and times; the PIC is not falsely recorded as
+the actor when a colleague helped. Helping does not transfer the order's PIC responsibility. The
+notification must make clear whether the amendment is still waiting or effective; notifying the
+PIC is not another approval gate. Existing supplier-confirmation, customer-evidence, exception
+approval and linked-effectiveness rules still apply.
+
+This preserves coverage when the PIC is away or busy. Repeated incidents where PICs are unaware
+are grounds to review notification delivery and this policy with the owner, not permission to
+automatically switch to PIC-only submission. Existing broad submission capability does not prove
+that automatic PIC notification is built or verified. No code, live notification or permission
+change is performed by this PLAN entry.
+
+This is a scoped PLAN ruling, not approval of the whole module blueprint, implementation Cards,
+BUILD, a migration or production changes. Workspace owns assignment/cover; Orders owns amendment
+policy. Current implementation notes elsewhere describe the built 0564 behaviour, not a competing
+approved target. Neither the earlier all-Principal target nor the withdrawn matrix may be used
+as implementation authority.
 
 - **Delivery-date changes belong to the whole-page draft**, not a competing date-only form.
   Preserve customer-request date, reason, Before/After, actor/time and historical document truth.
