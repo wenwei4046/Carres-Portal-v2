@@ -1203,7 +1203,7 @@ export default function SalesOrdersRegister() {
                 a screen. Its empty option reads the control's label. */}
             <FilterRailSelect
               label="Select month"
-              value={requested?.kind === "month" ? requested.month : null}
+              value={requestedMonth}
               options={requestedMonthChoices}
               onChange={(next) => setParam("requested", next)}
               testId="requested-month"
