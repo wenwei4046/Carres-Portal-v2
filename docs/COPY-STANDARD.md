@@ -653,7 +653,7 @@ may never be inferred from a time, an ETA or a location.
 The schedule boundary is **`Confirmed dates only`**: a date can be confirmed while its time
 still needs agreeing. It applies equally to customer deliveries and transfers.
 
-**Expanded-row words:** **`Driver and vehicle not recorded`** (owner ruling 2026-09-25; `Logistics details incomplete` and `DO not released` retired) ·
+**Expanded-row words:** **`Driver and vehicle not recorded`** (owner ruling 2026-09-25, BUILT 2026-10-05 on the schedule card's readiness line and the Logistics Details panel; `Logistics details incomplete` and `DO not released` retired) ·
 **`Leg {n} of {m}`** · `Access not recorded` (orange, actionable — never a grey absence).
 
 ⛔ **Retired on Monitor, never to return:** `Waiting for customer date` · `Delivery confirmed` ·
@@ -674,6 +674,15 @@ incomplete` prints the missing fact on line two; `Scheduled for {date}` · `Good
 {partner}` · `{partner} is delivering to the customer` · `Confirm delivery time` are retired, and
 ONE label function prints every surface (Delivery §8.4). `Confirmed Delivery` / `Confirmed Time`
 are retired as field words. `Delivery failed` is not a second spelling of **`Failed Delivery`**.
+**BUILT 2026-10-05 (Delivery scope 1 · one status ladder; production state in Delivery §16):** the
+register column, the `DELIVERY STATUS` dropdown, the schedule card, the phone card, the Order
+Route DELIVER node and Reports → Delivery print these words from `deliveryWorkStatusLabelOf`
+alone. The dropdown's option words carry the role word where a row carries a real name:
+`Get delivery date from logistics` · `Waiting for logistics pickup` · `Collected by logistics` ·
+`In transit to warehouse` · `Arrived at warehouse` (an unnamed transfer stop reads `warehouse`
+on the row too, never the customer's town). Delivery Dates edit fields print `Scheduled date` ·
+`Scheduled time (optional)`. The reason library still carries the catch-all reason label
+`Delivery failed` (`delivery_failed`); it needs a governed replacement word before it can retire.
 
 **Delivery workspace rail and action words — owner ruling 2026-08-24, editor words re-ruled
 2026-09-13.** The rail's overdue queue is **`Overdue delivery`**, never `Date passed`. The two
@@ -3476,9 +3485,9 @@ RETIRED — the rail is ONE `WORK TO DO` group):
 | `Calendar view` | the Day · Week · Month control's accessible name only | **RULED 2026-09-07** |
 | `Previous month` · `Next month` | the rail month calendar's arrow labels (the month itself prints locale-aware, e.g. `SEPTEMBER 2026`), and the toolbar arrows while `Month` shows (`Sep 2026` in the one month spelling) | **RULED 2026-09-06** (month-calendar correction) |
 | `No deliveries` | one individually empty calendar day (the long T10 sentence is retired on Monitor) | **RULED 2026-09-06** |
-| `No delivery scheduled this week.` · `No delivery scheduled on {day}.` · `No delivery scheduled this month.` | the ONE spanning state of a fully empty visible range | **RULED 2026-09-25** (replaces `No deliveries are scheduled from {first} to {last}.`) |
-| `{n} orders still need a delivery date.` / `1 order still needs a delivery date.` | under the spanning state, from the REAL count only; the sentence is the link (blue) to the `Get delivery date` queue — no `Open …` button | **RULED 2026-09-25** (replaces `{n} deliveries need a confirmed date.` and `Open No confirmed date`) |
-| `Get delivery date` | Monitor's WORK TO DO queue for scopes with a company but no Scheduled delivery | **RULED 2026-09-25** (replaces `Call customer`) |
+| `No delivery scheduled this week.` · `No delivery scheduled on {day}.` · `No delivery scheduled this month.` | the ONE spanning state of a fully empty visible range | **RULED 2026-09-25** (replaces `No deliveries are scheduled from {first} to {last}.`), **BUILT 2026-10-05** |
+| `{n} orders still need a delivery date.` / `1 order still needs a delivery date.` | under the spanning state, from the REAL count only; the sentence is the link (blue) to the `Get delivery date` queue — no `Open …` button | **RULED 2026-09-25** (replaces `{n} deliveries need a confirmed date.` and `Open No confirmed date`), **BUILT 2026-10-05** |
+| `Get delivery date` | Monitor's WORK TO DO queue for scopes with a company but no Scheduled delivery | **RULED 2026-09-25** (replaces `Call customer`), **BUILT 2026-10-05**; `?view=call_customer`, `?view=no_confirmed_date` and `?view=get_delivery_date` all open it |
 | `Clear filters` | the combined active-filter summary above the work list | **RULED 2026-09-06** |
 | `{N} selected` · `{N} delivery orders selected` | the Monitor and Delivery Orders selection toolbars respectively | **RULED 2026-09-07** |
 | `Print {N} delivery orders` | the register's selection output | **RULED 2026-09-06** |
