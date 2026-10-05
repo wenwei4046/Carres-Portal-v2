@@ -13,7 +13,7 @@ vi.mock("../delivery-scope-card", () => ({ useDeliveryScopeCard: (_id: string, l
 vi.mock("@/lib/queries", () => ({ useSalesOrderRevisions: () => ({ data: { revisions: [{ revision: 1, snapshot: { header: { delivery_date: "2026-10-31" } } }] } }), useCatalog: () => ({ data: { models: [], skus: [] } }), useDeliverySettings: () => ({ data: { templates: state.templates } }), useDeliveryPartners: () => ({ data: { partners: [] } }), useOrderTimeline: () => ({ data: [{ id: "event", actor_name: "Recorder", kind: "annotation", content: "Saved note", occurred_at: "2026-09-30T08:08:32Z" }] }) }));
 vi.mock("./SalesOrderCardDocument", () => ({ default: () => <div>Saved document</div> }));
 vi.mock("./DeliveryBrief", () => ({ DeliveryDatesEdit: ({ onDone }: { onDone: () => void }) => <button onClick={onDone}>Date editor</button>, LogisticsDetailsEdit: ({ onDone }: { onDone: () => void }) => <button onClick={onDone}>Logistics editor</button> }));
-const row = buildRegisterRow({ id: "o", so: 1303, customer_name: "Kimmy", customer_phone: "0191234567", customer_email: "a@example.com", customer_address: "Recorded address", placed_at: "2026-09-30T08:00:00Z", delivery_date: "2026-10-31", proceeded_at: "2026-10-01T08:00:00Z", proceed_date: "2026-10-02", dealers: { name: "Recorded dealer" }, order_lines: [{ sku: "M", qty: 1, unit_price: 2499 }], paid: 1250 } as operationOrderListRow);
+const row = buildRegisterRow({ id: "o", so: 1303, customer_name: "Kimmy", customer_phone: "0191234567", customer_email: "a@example.com", customer_address: "Recorded address", placed_at: "2026-09-30T08:00:00Z", delivery_date: "2026-10-31", original_request: [{ revision: 1, snapshot: { header: { delivery_date: "2026-10-31" } } }], proceeded_at: "2026-10-01T08:00:00Z", proceed_date: "2026-10-02", dealers: { name: "Recorded dealer" }, order_lines: [{ sku: "M", qty: 1, unit_price: 2499 }], paid: 1250 } as operationOrderListRow);
 function mount(source = row) { return render(<SalesOrderCompactView row={source} salesLocation="Recorded location" items={<div>Actual Items</div>} onOpen={vi.fn()} onClose={vi.fn()} />); }
 beforeEach(() => { state.templates = []; state.paymentTemplates = []; state.role = "operation"; state.failed = false; state.loading = false; state.card = { leg: 0, items: [{ qty: 1 }], extras: [{ kind: "service", qty: 4 }], readiness: { shortQty: 0, ready: true }, confirmedDate: "2026-10-31", confirmedTime: null, logisticsPartnerId: "nets", logisticsPartnerName: "NETS", payment: { line1: "Paid" }, settled: false, doNumber: null } as unknown as DeliveryMonitorCard; });
 afterEach(cleanup);
@@ -39,7 +39,7 @@ describe("real SO card", () => {
     expect(screen.queryByText("Delivery Status")).toBeNull();
   });
   it("uses real goods only, date-only precision, one formal editor and read-only DO", () => {
-    mount(); fireEvent.click(screen.getByRole("button", { name: "Delivery" })); expect(screen.queryByText("Recorded address")).toBeNull(); expect(screen.getByText("1/1")).toBeVisible(); expect(screen.getAllByText("31 Oct")).toHaveLength(2); expect(screen.getByText("Date confirmed")).toBeVisible();
+    mount(); fireEvent.click(screen.getByRole("button", { name: "Delivery" })); expect(screen.queryByText("Recorded address")).toBeNull(); expect(screen.getByText("1/1")).toBeVisible(); expect(screen.getByText("Sat, 31 Oct")).toBeVisible(); expect(screen.getByText("31 Oct")).toBeVisible(); expect(screen.getByText("Date confirmed")).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: /Logistics/ })); expect(screen.getByText("Logistics editor")).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: /Customer/ })); expect(screen.queryByText("Logistics editor")).toBeNull(); expect(screen.getByText("Date editor")).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: /^DO/ })); expect(screen.queryByText("Date editor")).toBeNull(); expect(screen.getByLabelText("Delivery Order")).toBeVisible(); expect(screen.queryByRole("checkbox")).toBeNull();
@@ -63,8 +63,8 @@ describe("real SO card", () => {
     try { mount(); expect(screen.getByText("29d")).toBeVisible(); const phone = screen.getByText("0191234567"); expect(phone.querySelector("svg")).not.toBeNull(); } finally { vi.useRealTimers(); }
   });
   it("preserves the original date despite a changed current request and omits empty stair carry", () => {
-    mount({ ...row, customerDelivery: "2026-12-31", o: { ...row.o, delivery_stair_items: 0 } });
-    expect(screen.getByText("31 Oct")).toBeVisible(); expect(screen.getByText("29d")).toBeVisible();
+    mount(buildRegisterRow({ ...row.o, delivery_date: "2026-12-31", delivery_stair_items: 0 }));
+    expect(screen.getByText("Sat, 31 Oct")).toBeVisible(); expect(screen.getByText("29d")).toBeVisible();
     expect(screen.queryByText(/Stair carry:/)).toBeNull(); expect(screen.queryByRole("button", { name: "Delivery address" })).toBeNull();
   });
   it("groups four populated access facts into two lines", () => {

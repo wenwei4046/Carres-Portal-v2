@@ -206,7 +206,7 @@ Order list. The page is two blocks: `This month · {Mon YYYY}` (`Total Qty` · `
 delivered`, ONE month) and one table, one row per month (`Before` · six months · `After` · `No
 delivery date` · `Total`), columns `Month` · the four categories · `Not in catalog` (only when a
 line has no catalog row) · `Total Qty` · `Delivered` · `Not delivered` · `To buy`. A month is a door:
-the Order list narrowed on the Customer Requested Delivery Date (`?requested=`), shown as an active
+the Order list narrowed on the Customer’s original requested delivery (`?requested=`), shown as an active
 condition. `Open SO Batch Purchase →` sits under the table.
 **Sources, and the arithmetic's one home:** `GET /api/operation/orders/monthly-demand` reads the
 Register's ONE population past the list's 500-row cap (it pages), with Stock's Units sold against
@@ -222,7 +222,7 @@ production walk owed.** Each is a read-only fact filter: Delivery asks the one g
 committed unit sold; a service-only order is under All only); a row clicked again is deselected;
 nothing carries between the two views. **No Date group — owner ruling 2026-09-28 (Jess: "why date
 got proceed date? ... today? this week, this month? i dont get it"; approved "yes").** A date is
-narrowed on its OWN column's ▽ (`Proceed Date` · `SO Doc Date` · `Customer Requested Delivery Date`,
+narrowed on its OWN column's ▽ (`Proceed Date` · `SO Doc Date` · `Customer’s original requested delivery`,
 each with `Today` · `This week` · `This month` · `From` / `To`), the way Shopify and Linear filter a
 date: on the field itself, never a rail field picker plus a range. An old `?date=` / `?range=` link
 narrows nothing, so no filter the rail cannot show.
@@ -338,7 +338,7 @@ The implementation record that follows is evidence, not a competing target.
 
 **SO Header composition correction — owner approved 2026-10-05:** remove the separate Ampang/area cell; retain the full address below Header. Requested-date label has two small lines, date and day count together beneath. The day-count tooltip states `Calendar days from Proceed date to customer’s original requested date`. This changes no SO numbering or existing issued documents.
 
-**Customer original requested date and day count — owner correction 2026-10-05 / BUILT ON RELEASE BRANCH; production verification pending.** Header label uses two small lines: `Customer’s original` / `requested date`. `{n}d` means **calendar days from Proceed date (`proceed_date`) to the customer’s original requested delivery date**, calculated as original requested date minus Proceed date using calendar dates in Asia/Kuala_Lumpur. It is not days remaining from today, order age, days since SO Doc Date, actual delivery duration, a confirmed delivery date or Logistics ETA. Example: Proceed date `30 Sep 2026` and original requested date `31 Oct 2026` show `31 Oct · 31d`; the number does not change each day. Same date shows `0d`. Missing either date: omit the day count; never invent a date or show a placeholder count. An original requested date before Proceed date requires a data check; omit the count rather than present a negative delivery duration. Changing a later requested/confirmed date must not overwrite the original date used here. The SO Header reads revision 1’s immutable `snapshot.header.delivery_date` (respecting its `delivery_date_tbd`), not the mutable order `delivery_date`. Missing revision 1 displays `Not recorded`; failed reads display `Unavailable`. Never silently substitute the current date. Other chats must not reuse the retired today-based countdown for this SO Header. Delivery’s Customer confirmation and Logistics ETA remain separate facts. Acceptance must include changing today without changing either stored date: the day count stays unchanged.
+**Customer original requested date and day count — owner correction 2026-10-05 / BUILT ON RELEASE BRANCH; production verification pending.** Header label uses two small lines: `Customer’s original` / `requested delivery`. `{n}d` means **calendar days from Proceed date (`proceed_date`) to the customer’s original requested delivery date**, calculated as original requested date minus Proceed date using calendar dates in Asia/Kuala_Lumpur. It is not days remaining from today, order age, days since SO Doc Date, actual delivery duration, a confirmed delivery date or Logistics ETA. Example: Proceed date `30 Sep 2026` and original requested date `31 Oct 2026` show `31d · Sat, 31 Oct`; the number does not change each day. Same date shows `0d`. Missing either date: omit the day count; never invent a date or show a placeholder count. An original requested date before Proceed date requires a data check; omit the count rather than present a negative delivery duration. Changing a later requested/confirmed date must not overwrite the original date used here. The SO table, card, requested-delivery filter and export read the same revision 1’s immutable `snapshot.header.delivery_date` (respecting its `delivery_date_tbd`), not the mutable order `delivery_date`. The list embeds only revision 1 via its existing user-authorized read; missing revision 1 has no original date (Header `Not recorded`, required table cell blank). A failed list read remains a failed list. Never silently substitute the current date. Other chats must not reuse the retired today-based countdown for this SO Header. Delivery’s Customer confirmation and Logistics ETA remain separate facts. Acceptance must include changing today without changing either stored date: the day count stays unchanged.
 
 ## External numbering privacy — owner requirements 2026-09-23
 
@@ -743,7 +743,7 @@ Population, permission, export and business-write ownership remain governed by t
 (`SO Date · SO No`), and the 2026-09-18 default order.
 
 ```
-Proceed Date | SO Doc Date | SO No | Sales Location | Salesperson | Customer Requested Delivery Date | Customer Delivery Location | Customer | Items | PO No | DO No
+Proceed Date | SO Doc Date | SO No | Sales Location | Salesperson | Customer’s original requested delivery | Customer Delivery Location | Customer | Items | PO No | DO No
 ```
 
 - **Population.** Only orders Sales has handed to Operation. A `Placed` order is not on this Register,
@@ -760,7 +760,7 @@ Proceed Date | SO Doc Date | SO No | Sales Location | Salesperson | Customer Req
   2026-09-21). After-sales service can happen at any point, so a Service Case is never a group and never
   a Register column; the order's Service Cases stay on the order and on Order Route `Linked problems`.
 - **No absence word for a required fact.** Proceed Date, SO Doc Date, SO No, Sales Location, Salesperson,
-  Customer Requested Delivery Date, Customer Delivery Location, Customer and Items are required when Sales
+  Customer’s original requested delivery, Customer Delivery Location, Customer and Items are required when Sales
   submits the order (Sales Portal entry gate), so every row has them. `Not recorded`, `To be confirmed`
   and `No delivery date` never print in these columns: an empty one would be a system error, not a state
   of the order, and is fixed at its source rather than dressed as data. Only a document that genuinely
@@ -799,7 +799,7 @@ Proceed Date | SO Doc Date | SO No | Sales Location | Salesperson | Customer Req
   40px (`rowHeight={40}`, this page only); no page-level sideways scroll at 1440 / 1180 / 820 / 390 or 200% zoom.
 - **Sales Location** is `salesLocationOf` — the outlet, else the dealer, trimmed, in full; the same
   rule as the SO PDF (`sales-order-template.tsx`). Production 2026-09-22: 0 of 27 proceeded orders
-  lack it, 0 lack a Salesperson, 0 lack a Customer Requested Delivery Date.
+  lack it, 0 lack a Salesperson, 0 lack a Customer’s original requested delivery.
 - **Engine behaviours it reads, shipped once for every listing by [PR #1492](https://github.com/wenwei4046/Carres-Portal-v2/pull/1492)**
   (merged before this page): a cut value shows whole on hover and keyboard focus, and click/Enter opens
   it to read and select; the §6.9 line starts under the SO row's caret and runs to the goods frame.
@@ -949,7 +949,7 @@ prints `—`, the glyph the owner banned portal-wide on 2026-09-26).
 The child follows the Purchasing reference (UI MASTER §6.8–§6.9, owner ruling 2026-09-21): it hangs
 flush under its row inside the shared `ConnectedSections` stack, whose 1px line runs to the goods
 table's own four-sided bordered frame and ends there. Sales Orders never selects child items.
-`Customer Requested Delivery Date` and `Customer Delivery Location` render on the shared two-line
+`Customer’s original requested delivery` and `Customer Delivery Location` render on the shared two-line
 header (`Customer Requested` / `Delivery Date`, `Customer Delivery` / `Location`), with accessible
 sort and filter controls named by the full label. Dates and SO numbers stay
 on one line; Customer and Delivery Location receive usable content widths. Narrow screens use
@@ -1049,7 +1049,7 @@ amounts never borrow the heading size: every amount is 13px, and `Total payable`
 are weight 600 (owner card "KEEP Existing UI Kit Sizes", 2026-09-23 — overwrites "only the balance line").
 
 ```
-SO info                 SO Doc Date · Proceed Date · Customer Requested Delivery Date · Sales Location · Salesperson ·
+SO info                 SO Doc Date · Proceed Date · Customer’s original requested delivery · Sales Location · Salesperson ·
                         Dealer (+ the approval lane) — no `Sales ownership` heading. `Customer reference` is
                         REMOVED from the page (owner ruling 2026-09-21)
   └ Change delivery date  the governed three fields · creates a Revision · needs approval
@@ -6780,7 +6780,7 @@ Creation stays in the Sales Portal; Operation does not regain a New Sales Order 
 The acceptance matrix records current implementation and proof, not a new Blueprint or new business law.
 
 - Order list rail: Order summary (Sales orders, Total payable, Paid to date, Balance due), then
-  Customer Requested Delivery Date shortcuts. Both start open. Summary labels sit left and values
+  Customer’s original requested delivery shortcuts. Both start open. Summary labels sit left and values
   right; count uses text-strong, money has tabular digits and never wraps. Missing-amount notices
   remain visible only when needed. Summary and Table/Cards use the same filtered loaded result;
   incomplete scope remains in the summary tooltip/register count. Payment, Delivery and Stock

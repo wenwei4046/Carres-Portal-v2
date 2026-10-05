@@ -294,7 +294,7 @@ export default function CompactModuleCard(p: CompactModuleCardProps) {
             ) : null}
           </div>
           <div className={s.target}>
-            {p.target ? <><span className={s.targetLabel} title={p.target.label}>{p.target.labelLines?.map(line => <span key={line}>{line}</span>)}</span><b><Glyph name="calendar" />{p.target.date}{p.target.label ? p.target.badge ? <small title="Calendar days from Proceed date to customer’s original requested date">{p.target.badge}</small> : null : null}</b>{!p.target.label && p.target.badge ? <small className={s.badge}>{p.target.badge}</small> : null}</> : null}
+            {p.target ? <><span className={s.targetLabel} title={p.target.label}>{p.target.labelLines?.map(line => <span key={line}>{line}</span>)}</span><b>{p.target.label && p.target.badge ? <><small title="Calendar days from Proceed date to customer’s original requested delivery">{p.target.badge}</small><span aria-hidden="true">·</span></> : null}<Glyph name="calendar" />{p.target.date}</b>{!p.target.label && p.target.badge ? <small className={s.badge}>{p.target.badge}</small> : null}</> : null}
           </div>
           <div className={s.actions}>
             <button type="button" aria-label={p.openLabel ?? "Open order"} title={p.openLabel ?? "Open order"} onClick={p.onOpen}>↗</button>

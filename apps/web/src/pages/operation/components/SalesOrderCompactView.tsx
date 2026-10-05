@@ -6,8 +6,8 @@ import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
 import { renderPaymentTemplate, type PaymentTemplateRow } from "@carres/shared/payment-templates";
 import { useAuth } from "@/lib/auth";
-import { useDeliveryPartners, useDeliverySettings, useOrderTimeline, useSalesOrderRevisions } from "@/lib/queries";
-import { fmtDate, fmtDateShort } from "@/lib/fmt-date";
+import { useDeliveryPartners, useDeliverySettings, useOrderTimeline } from "@/lib/queries";
+import { fmtDate } from "@/lib/fmt-date";
 import { useDeliveryScopeCard } from "../delivery-scope-card";
 import { describeActivity } from "./activity-display";
 import { DeliveryDatesEdit, LogisticsDetailsEdit } from "./DeliveryBrief";
@@ -31,9 +31,7 @@ export default function SalesOrderCompactView({ row, salesLocation, items, onOpe
   const leg = Math.max(0, ...(row.o.delivery_stops ?? []).map(stop => stop.leg));
   const delivery = useDeliveryScopeCard(row.id, leg, row.o);
   const timeline = useOrderTimeline(row.id);
-  const revisions = useSalesOrderRevisions(row.id);
-  const original = revisions.data?.revisions.find(r => r.revision === 1)?.snapshot.header;
-  const requested = original && !original.delivery_date_tbd && typeof original.delivery_date === "string" ? original.delivery_date : null;
+  const requested = row.customerDelivery;
   const days = originalRequestDays(row.o.proceed_date, requested);
   const settings = useDeliverySettings();
   const partners = useDeliveryPartners();
@@ -84,7 +82,7 @@ export default function SalesOrderCompactView({ row, salesLocation, items, onOpe
       { kind: "access", label: "Lift", value: row.o.delivery_has_lift == null ? "Lift: Not recorded" : LIFT_OPTIONS[row.o.delivery_has_lift ? 1 : 0] },
       ...(row.o.delivery_stair_items && row.o.delivery_stair_items > 0 ? [{ kind: "access" as const, label: "Stair carry", value: `Stair carry: ${row.o.delivery_stair_items} items` }] : []),
     ] }}
-    target={{ date: requested ? fmtDateShort(requested) : revisions.isLoading ? "Loading…" : revisions.isError ? "Unavailable" : "Not recorded", badge: days === null ? undefined : `${days}d`, label: "Customer’s original requested delivery date", labelLines: ["Customer’s original", "requested date"] }}
+    target={{ date: requested ? fmtDate(requested) : "Not recorded", badge: days === null ? undefined : `${days}d`, label: "Customer’s original requested delivery", labelLines: ["Customer’s original", "requested delivery"] }}
     closeLabel="Close order" openLabel="Open full page" onOpen={onOpen} onClose={onClose}
     initialModule="info" modules={[
       { key: "info", label: "Info", opensHeaderDetails: true, summary: [{ key: "total", label: "Total payable", value: money(row.total) }, { key: "paid", label: "Paid to date", value: money(row.paid) }, { key: "outstanding", label: "Balance due", value: money(row.balance) }], items },

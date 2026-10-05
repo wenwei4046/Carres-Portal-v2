@@ -130,6 +130,7 @@ const order = (over: Partial<operationOrderListRow>): operationOrderListRow =>
     paid: 1250,
     order_lines: [{ sku: "B1201S-K", qty: 1, unit_price: 2499, label: "B1201S · King" }],
     order_addons: [],
+    original_request: [{ revision: 1, snapshot: { header: { delivery_date: "delivery_date" in over ? over.delivery_date : "2026-08-30", delivery_date_tbd: over.delivery_date_tbd ?? false } } }],
     ...over,
   }) as operationOrderListRow;
 
@@ -339,7 +340,7 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
      Requested Delivery Date is mandatory at order entry, so an empty one is a
      system error fixed at its source: no `To be confirmed`, no amber
      `No delivery date`, no action sentence and no hover guidance. */
-  it("prints no absence word, warning or guidance for a missing Customer Requested Delivery Date", () => {
+  it("prints no absence word, warning or guidance for a missing Customer’s original requested delivery", () => {
     listHookState.data = { orders: [
       order({ id: "a", so: 1, delivery_date: null, delivery_date_tbd: true, salespersons: { name: "Shasha" } }),
       order({ id: "b", so: 2, delivery_date: null, delivery_date_tbd: false, salespersons: { name: "Shasha" }, outlets: null }),
@@ -678,7 +679,7 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
       "Stock Status",
       "Sales Location",
       "Salesperson",
-      "Customer Requested Delivery Date",
+      "Customer’s original requested delivery",
       "Customer",
       "Items",
       "PO No",
@@ -1086,11 +1087,11 @@ describe("order view before editing", () => {
 describe("Sales Orders table correction", () => {
   it("keeps the full date label on its sort and filter doors", () => {
     mount();
-    const sort = within(screen.getByTestId("register-column")).getByRole("button", { name: "Customer Requested Delivery Date" });
+    const sort = within(screen.getByTestId("register-column")).getByRole("button", { name: "Customer’s original requested delivery" });
     expect(sort.querySelector("br")).not.toBeNull();
     fireEvent.click(sort);
-    expect(within(screen.getByTestId("register-column")).getByRole("button", { name: "Customer Requested Delivery Date" })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Filter Customer Requested Delivery Date" }));
+    expect(within(screen.getByTestId("register-column")).getByRole("button", { name: "Customer’s original requested delivery" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Filter Customer’s original requested delivery" }));
     expect(outsideRail("Today")).toHaveLength(1);
   });
 
@@ -1109,7 +1110,7 @@ describe("Sales Orders table correction", () => {
     const business = [...screen.getByTestId("grid-header").querySelectorAll("th")].map((th) => th.getAttribute("title")).filter(Boolean);
     expect(business.slice(0, 4)).toEqual(["Proceed Date", "SO Doc Date", "SO No", "Customer"]);
     expect(screen.getByRole("button", { name: "Customer" }).closest("th")).toHaveStyle({width: "288px"});
-    expect(within(screen.getByTestId("register-column")).getByRole("button", { name: "Customer Requested Delivery Date" }).closest("th")).toHaveStyle({width: "240px"});
+    expect(within(screen.getByTestId("register-column")).getByRole("button", { name: "Customer’s original requested delivery" }).closest("th")).toHaveStyle({width: "240px"});
     expect(screen.getByRole("button", { name: "Filter Phone" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Expand row" }));
     expect(screen.getAllByTestId(/^grid-expansion-gutter-/).map((e) => e.dataset.testid)).toEqual([
@@ -1325,7 +1326,7 @@ describe("the Sales Orders rail and its two views", () => {
     expect(within(grid).getByText("SO-1401")).toBeInTheDocument();
     expect(within(grid).queryByText("SO-1402")).not.toBeInTheDocument();
     expect(within(grid).queryByText("SO-1403")).not.toBeInTheDocument();
-    expect(grid).toHaveTextContent("Customer Requested Delivery Date: Oct 2026");
+    expect(grid).toHaveTextContent("Customer’s original requested delivery: Oct 2026");
   });
 
   it("a Before door narrows to everything owed before the window", () => {
@@ -1418,7 +1419,7 @@ describe("the Order list rail: read-only fact filters (owner approved 2026-09-22
   it("the Order list carries Sales Location, Customer Delivery Location and Delivery, no Date group and no Clear filters", () => {
     mount();
     const rail = screen.getByTestId("sales-orders-rail");
-    for (const group of ["Customer Requested Delivery Date", "Order summary"]) {
+    for (const group of ["Customer’s original requested delivery", "Order summary"]) {
       expect(within(rail).getByText(group)).toBeInTheDocument();
     }
     /* A date is narrowed on its own column's ▽ (Jess, 2026-09-28). */

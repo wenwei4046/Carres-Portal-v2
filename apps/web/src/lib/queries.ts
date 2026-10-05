@@ -2695,6 +2695,8 @@ export interface operationOrderThreadRow {
  *  compat (print-DO and other legacy callers) — but the kanban now reads from
  *  threads to honor multi-supplier scenarios. */
 export interface operationOrderListRow {
+  /** Immutable first request, embedded from revision 1; missing is not current-date fallback. */
+  original_request?: Array<{ revision: number; snapshot: { header: { delivery_date?: string | null; delivery_date_tbd?: boolean | null } } }>;
   id: string;
   so: number;
   /**

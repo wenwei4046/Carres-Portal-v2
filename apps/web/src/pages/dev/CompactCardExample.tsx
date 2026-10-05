@@ -37,7 +37,6 @@ const PAYMENT: CardTimelineEvent = {
   at: "2026-09-30T08:08:32.181911Z",
   result: "RC-300926-3735",
 };
-const TARGET = "2026-10-31";
 /** The existing Sales Order page for the sample order (the reference page opens the same order). */
 export const SAMPLE_ORDER_PATH = "/operation/orders/so/82cee77c-67df-4515-8b4e-7b81796e1423";
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -184,11 +183,11 @@ export default function CompactCardExample() {
           }]} /> : <CompactModuleCard
           key={`${preset}-${width}`}
           name="Jimmy"
-          reference="SO-1368"
+          reference={preset === "infoLong" ? "SO2609-4827(1)" : "SO-1368"}
           phone="019-83372393"
           sales={{ orderDate: "30 Sep 2026", proceedDate: "30 Sep 2026", salesLocation: "Carres Kota Damansara", salesperson: "Alvin" }}
           address={{ area: "Ampang", hideArea: true, full: preset === "infoLong" ? "Unit A-18-08, Block A, Residensi Example Heights, Jalan Example Utama 12, Taman Example Permai, 68000 Ampang, Selangor, Malaysia" : "1888. jalan Pillow, 68000 Ampang, Selangor", facts: [{ kind: "building", label: "Building", value: "Condo · Floor 1" }, { kind: "access", label: "Access", value: "No lift" }] }}
-          target={{ date: "31 Oct", badge: `${days}d`, label: "Customer’s original requested delivery date", labelLines: ["Customer’s original", "requested date"] }}
+          target={{ date: "Sat, 31 Oct", badge: `${days}d`, label: "Customer’s original requested delivery", labelLines: ["Customer’s original", "requested delivery"] }}
           onOpen={() => window.open(SAMPLE_ORDER_PATH, "_blank", "noopener")}
           onClose={() => setClosed(true)}
           initialModule={p.module}
