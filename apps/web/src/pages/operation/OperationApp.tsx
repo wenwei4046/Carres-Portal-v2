@@ -4,6 +4,7 @@ import Button from "@/components/kit/Button";
 import Drawer from "@/components/kit/Drawer";
 import CalendarPanel from "./components/rail/CalendarPanel";
 import PhoneTasksDoor from "./components/rail/PhoneTasksDoor";
+import PendingWorkReminder from "./tasks/PendingWorkReminder";
 import {
   Navigate,
   Route,
@@ -727,6 +728,8 @@ export default function OperationApp() {
           supersedes SO-1's "rail not mounted" ruling — later owner statement
           wins (BUILD-QUEUE governance). */}
       {phone ? null : <OperationRightRail />}
+      {/* LOCAL PROPOSAL: the first-entry `Pending work` reminder. */}
+      <PendingWorkReminder />
     </div>
   );
 }

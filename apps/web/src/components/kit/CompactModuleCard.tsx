@@ -239,6 +239,9 @@ export interface CompactModuleCardProps {
   /** Domain label for accessibility; customer orders keep their default. */
   modulesLabel?: string;
   initialModule: string;
+  /** A fact of the initial module whose editor is open on arrival — a task that
+   *  IS that edit (Tasks, LOCAL PROPOSAL 2026-10-05). Ignored without an editor. */
+  initialEditor?: string;
   communication?: CardCommunication;
   timeline?: CardTimelineEvent[];
   timelineStatus?: string;
@@ -268,8 +271,9 @@ export default function CompactModuleCard(p: CompactModuleCardProps) {
   const [items, setItems] = useState(!!p.initiallyOpen?.items);
   const [comm, setComm] = useState(!!p.initiallyOpen?.communication);
   const [timeline, setTimeline] = useState(!!p.initiallyOpen?.timeline);
-  const [editing, setEditing] = useState<string | null>(null);
-  const [marked, setMarked] = useState<string | null>(null);
+  const openOnArrival = p.initialEditor && first.summary?.some((f) => f.key === p.initialEditor && f.editor) ? p.initialEditor : null;
+  const [editing, setEditing] = useState<string | null>(openOnArrival);
+  const [marked, setMarked] = useState<string | null>(openOnArrival);
   const ids = useId();
   const mod = p.modules.find((m) => m.key === moduleKey) ?? first;
 
@@ -396,12 +400,14 @@ export default function CompactModuleCard(p: CompactModuleCardProps) {
 
 /* ---------- editor building blocks for module-supplied editors ---------- */
 /** Cancel then Save, at the right. Save closes the editor only when the module reports success. */
-export function CardEditorButtons({ onSave, onCancel, error, disabled }: { onSave: () => void; onCancel: () => void; error?: string | null; disabled?: boolean }) {
+export function CardEditorButtons({ onSave, onCancel, error, disabled, saveLabel }: { onSave: () => void; onCancel: () => void; error?: string | null; disabled?: boolean;
+  /** The owning act's own save word (`Save scheduled delivery`); `Save` otherwise. */
+  saveLabel?: string }) {
   return (
     <>
     {error ? <p className={s.editorError} role="alert">{error}</p> : null}
     <div className={`${s.buttons} ${s.editorButtons}`}>
-      <button type="button" className={s.btn} disabled={disabled} onClick={onSave}>{CARD_WORDS.save}</button>
+      <button type="button" className={s.btn} disabled={disabled} onClick={onSave}>{saveLabel ?? CARD_WORDS.save}</button>
       <button type="button" className={s.btn} onClick={onCancel}>{CARD_WORDS.cancel}</button>
     </div>
     </>

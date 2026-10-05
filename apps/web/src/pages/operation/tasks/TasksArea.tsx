@@ -4,13 +4,13 @@
  * `tasks-complete-ux.html`, layout B). Never deployed until the owner walks it.
  *
  * The list:
- *   Module [All modules ▾]                   ‹ 5–10 Oct ›   (week arrows: PROPOSAL)
+ *   Module [All modules ▾]                               ‹ ›   (week arrows: PROPOSAL)
  *   ✓ {result line}                                          (after a finished act)
  *   ▾ (!) Missed                                        (7)  red, first, open
  *   ▾ MON (5) Oct                                       (2)  today: blue circle, open
  *   ▸ TUE 6 Oct  ⌂▭ Receive goods from Ohana · Call AL · +1 (3)  closed: one-line preview
  *     THU 8 Oct                                 Nothing due  empty: no arrow, no number
- *   ▸ No due date                                       (1)  only while n > 0
+ *   ▸ No date                                           (1)  only while n > 0
  *
  * Each section header is one 52px tap target; its leading arrow only shows the
  * state. A row opens THAT module's own panel in the same area with `‹ Tasks`;
@@ -27,7 +27,6 @@ import {
   poWindowWorkFromSoBatch,
   soBatchPurchaseResponseSchema,
   type OperationWorkModule,
-  type PoWindowWork,
   type SoBatchPurchaseResponse,
 } from "@carres/shared";
 import Icon from "@/components/kit/Icon";
@@ -50,13 +49,14 @@ import {
   sectionModules,
   taskList,
   taskRowWords,
+  type PoWindowFacts,
 } from "./tasks-model";
 import { isSimulatedWalk, useTasksHost, type WorkPanelHost } from "./tasks-host";
 import { panelFor } from "./work-panels";
 
 /** The purchase batches' facts for their row words, from the same SO Batch
  *  read the Work items were projected from. Read only while a batch is listed. */
-function usePoWindowFacts(enabled: boolean): Map<string, PoWindowWork> {
+function usePoWindowFacts(enabled: boolean): Map<string, PoWindowFacts> {
   const demands = useQuery<SoBatchPurchaseResponse>({
     queryKey: ["so-batch-purchase", null],
     queryFn: async () =>
@@ -66,10 +66,15 @@ function usePoWindowFacts(enabled: boolean): Map<string, PoWindowWork> {
   });
   const suppliers = useOperationSuppliers();
   return useMemo(() => {
-    const map = new Map<string, PoWindowWork>();
+    const map = new Map<string, PoWindowFacts>();
     if (!demands.data || !suppliers.data) return map;
     try {
-      for (const w of poWindowWorkFromSoBatch(demands.data, suppliers.data.suppliers as never, { keepClosed: true })) map.set(w.key, w);
+      for (const window of poWindowWorkFromSoBatch(demands.data, suppliers.data.suppliers as never, { keepClosed: true })) {
+        const demandSos = [...new Set(demands.data.rows
+          .filter((r) => r.poWindow === window.key && window.demand.rowIds.includes(r.id) && r.so != null)
+          .map((r) => r.so as number))];
+        map.set(window.key, { window, demandSos });
+      }
     } catch {
       /* Settings unavailable: rows keep the Work item's own sentence. */
     }
@@ -85,7 +90,7 @@ function SimulatedTag() {
   );
 }
 
-type Result = { text: string; taskId: string };
+type Result = { text: string; taskId: string; stay: boolean };
 
 export default function TasksArea({ onClose, fill = false }: { onClose: () => void; fill?: boolean }) {
   const work = useOpenWorkSet();
@@ -126,8 +131,11 @@ export default function TasksArea({ onClose, fill = false }: { onClose: () => vo
 
   /* The source closed the act (it left the feed): back to the list. */
   useEffect(() => {
-    if (taskId && hasData && !items.some((r) => r.id === taskId)) closeTask();
-  }, [taskId, hasData, items, closeTask]);
+    /* …unless its own result asked to stay: the panel keeps showing what was
+       just saved (a partial receipt) until the operator goes back. */
+    const kept = result?.taskId === taskId && result.stay;
+    if (taskId && hasData && !kept && !items.some((r) => r.id === taskId)) closeTask();
+  }, [taskId, hasData, items, closeTask, result]);
 
   const openTask = (row: WorkRow) => {
     guard(() => {
@@ -144,7 +152,7 @@ export default function TasksArea({ onClose, fill = false }: { onClose: () => vo
     result: (text, opts) => {
       if (!taskId) return;
       setDirty(false);
-      setResult({ text, taskId });
+      setResult({ text, taskId, stay: Boolean(opts?.stay) });
       if (!opts?.stay) closeTask();
     },
     openReview: (render) => setReview(() => render),
@@ -317,8 +325,6 @@ export default function TasksArea({ onClose, fill = false }: { onClose: () => vo
       <span className="min-w-0 flex-1">
         <span className="font-semibold">{result.text.split(" · ")[0]}</span>
         {result.text.includes(" · ") ? ` · ${result.text.split(" · ").slice(1).join(" · ")}` : ""}
-        {/* A receipt that left goods owed keeps its task (owner 2026-10-05). */}
-        {!taskId && items.some((r) => r.id === result.taskId && r.module === "receiving") ? " · some items still to receive" : ""}
       </span>
       {simulated ? <SimulatedTag /> : null}
     </div>
@@ -340,7 +346,6 @@ export default function TasksArea({ onClose, fill = false }: { onClose: () => vo
             className="grid h-7 w-7 place-items-center rounded-control border border-kit-slate-5 bg-white text-kit-slate-11 hover:bg-kit-slate-3 disabled:opacity-40">
             <ChevronLeft size={14} />
           </button>
-          <span className="min-w-[64px] text-center text-meta tabular-nums text-kit-slate-12" data-testid="tasks-week-label">{list?.weekLabel ?? ""}</span>
           <button type="button" aria-label={T.nextWeek} title={T.nextWeek} disabled={!list} onClick={() => list && setWeek(list.nextWeek)}
             className="grid h-7 w-7 place-items-center rounded-control border border-kit-slate-5 bg-white text-kit-slate-11 hover:bg-kit-slate-3 disabled:opacity-40">
             <ChevronRight size={14} />
@@ -374,9 +379,9 @@ export default function TasksArea({ onClose, fill = false }: { onClose: () => vo
               ),
             }))}
             {list.noDate.length > 0 ? section({
-              key: "no-date", tone: "nodate", rows: list.noDate, defaultOpen: false, aria: T.noDueDate,
+              key: "no-date", tone: "nodate", rows: list.noDate, defaultOpen: false, aria: T.noDate,
               leading: <Icon name="noDate" size={16} />,
-              label: <span className="text-body font-semibold text-kit-slate-12">{T.noDueDate}</span>,
+              label: <span className="text-body font-semibold text-kit-slate-12">{T.noDate}</span>,
             }) : null}
           </div>
         ) : null}

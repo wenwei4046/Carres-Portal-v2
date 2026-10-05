@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ListTodo } from "lucide-react";
 import Button from "@/components/kit/Button";
 import Drawer from "@/components/kit/Drawer";
@@ -15,6 +15,11 @@ import { useTasksHost } from "../../tasks/tasks-host";
 export default function PhoneTasksDoor() {
   const [open, setOpen] = useState(false);
   const guard = useTasksHost((s) => s.guard);
+  /* `View tasks` (the first-entry reminder) opens the same list here. */
+  const tasksRequest = useTasksHost((s) => s.tasksRequest);
+  useEffect(() => {
+    if (tasksRequest > 0) setOpen(true);
+  }, [tasksRequest]);
   return (
     <>
       <Button variant="ghost" onClick={() => setOpen(true)} aria-expanded={open} data-testid="phone-tasks-door">

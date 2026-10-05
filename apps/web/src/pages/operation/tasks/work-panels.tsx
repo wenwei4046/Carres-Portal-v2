@@ -16,12 +16,13 @@
  */
 import { useMemo, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
+import { Route, Routes, useNavigate } from "react-router-dom";
 import {
   defaultAllocations,
   groupSelectionsIntoDocuments,
   isSelectableForBuying,
   parsePoWindowKey,
+  poLineReportable,
   poWindowTimeWord,
   soBatchPurchaseResponseSchema,
   type PoWindowWork,
@@ -29,6 +30,8 @@ import {
 } from "@carres/shared";
 import CompactModuleCard, { type CardFact } from "@/components/kit/CompactModuleCard";
 import Button from "@/components/kit/Button";
+import DocumentTable from "@/components/kit/DocumentTable";
+import Icon from "@/components/kit/Icon";
 import { apiFetch, ApiError } from "@/lib/api";
 import { fmtDate } from "@/lib/fmt-date";
 import { useOperationSuppliers, type operationOrdersListResponse, type operationPosListResponse, type SupplierRow } from "@/lib/queries";
@@ -37,8 +40,9 @@ import type { WorkRow } from "../use-open-work";
 import { buildRegisterRow, salesLocationOf } from "../sales-order-columns";
 import SalesOrderCompactView from "../components/SalesOrderCompactView";
 import EmbeddedSalesOrders, { SalesOrderItemsTable, linkedSalesOrderIds } from "../components/EmbeddedSalesOrders";
-import { DeliveryDatesEdit } from "../components/DeliveryBrief";
-import ReceivingWorkspace from "../components/ReceivingWorkspace";
+import ReceivingRecord from "../components/ReceivingRecord";
+import DeliveryOrderPage from "../DeliveryOrderPage";
+import { SupplierAnswerForm } from "../work/WorkActForms";
 import WorkActionPanel from "../work/WorkActionPanel";
 import PoWindowPanel, { usePoWindow } from "../work/PoWindowPanel";
 import SoBatchIssueWorkspace from "../so-batch/SoBatchIssueWorkspace";
@@ -52,17 +56,22 @@ export type WorkPanelRenderer = (item: WorkRow, host: WorkPanelHost) => ReactNod
  *  `po_window` with its BatchPanel; the defaults below stand until then. */
 export const WORK_PANELS: Partial<Record<string, WorkPanelRenderer>> = {
   po_window: (item, host) => <DefaultBatchPanel key={item.id} item={item} host={host} />,
-  delivery_scope: (item, host) => <DeliveryTaskPanel key={item.id} item={item} host={host} />,
-  delivery_order: (item, host) => <DeliveryTaskPanel key={item.id} item={item} host={host} />,
+  /* The Warehouse lane's `warehouse-task-panel.tsx` replaces this default. */
+  receiving: (item, host) => <ReceiveTaskPanel key={item.id} item={item} host={host} />,
 };
 
-/** The panel a task opens: the registry by object kind, Warehouse receiving
- *  for a PO the Warehouse must receive, else the act card. */
+/** The panel a task opens: the registry by object kind, then the module's
+ *  own door, else the act card. */
 export function panelFor(item: WorkRow, host: WorkPanelHost): ReactNode {
   const byKind = WORK_PANELS[item.source.object.kind];
   if (byKind) return byKind(item, host);
-  if (item.module === "receiving" && item.source.object.kind === "purchase_order") {
-    return <WarehouseTaskPanel key={item.id} item={item} host={host} />;
+  if (item.module === "delivery") {
+    return DO_PAGE_RULES.has(item.ruleKey)
+      ? <DeliveryOrderTaskPanel key={item.id} item={item} host={host} />
+      : <DeliveryTaskPanel key={item.id} item={item} host={host} />;
+  }
+  if (item.module === "purchasing" && item.source.object.kind === "purchase_order") {
+    return <PoDutyTaskPanel key={item.id} item={item} host={host} />;
   }
   return <GenericTaskPanel key={item.id} item={item} host={host} />;
 }
@@ -108,50 +117,113 @@ const missedWord = (item: WorkRow) => (item.timingBucket === "overdue" ? "Missed
 
 /* ── Delivery — the Sales Order card on its Delivery tab, then the act ───── */
 
+/** ONE door (Delivery, verified 2026-10-05): the standalone Sales Order card,
+ *  `Info · Delivery` only, with the act's OWN existing editor open and empty —
+ *  `Assign logistics` → the Logistics editor, every scheduling act → the
+ *  Customer (scheduled delivery) editor. The only line above it is the act
+ *  and its due date. No second act form. */
+const DELIVERY_EDITOR: Record<string, "customer" | "logistics"> = {
+  assign_logistics: "logistics",
+};
+
 function DeliveryTaskPanel({ item, host }: { item: WorkRow; host: WorkPanelHost }) {
   const navigate = useNavigate();
   const orderId = item.source.object.kind === "delivery_scope" ? item.source.object.id : item.orderId ?? null;
   const order = useOrderRow(orderId);
   const known = order.data?.source;
   const scope = useDeliveryScopeCard(orderId, 0, known);
-  if (order.isPending) return <PanelState text="Loading…" />;
+  if (order.isPending || scope.loading) return <PanelState text="Loading…" />;
   if (order.isError || !order.data) return <PanelState text="This Sales Order could not be opened" alert />;
+  if (scope.failed || !scope.card) return <PanelState text="The delivery could not be loaded" alert />;
   const { row } = order.data;
-  const card = scope.card && !scope.failed ? scope.card : null;
   return (
-    <div className="flex flex-col gap-3 p-3" data-testid="task-panel-delivery">
+    <div className="flex flex-col gap-2 p-3" data-testid="task-panel-delivery">
+      <p className="flex flex-wrap items-baseline gap-x-2 text-body" data-testid="task-delivery-act">
+        <span className="font-semibold text-kit-slate-12">{item.line}</span>
+        {item.dueIso ? (
+          <span className={item.timingBucket === "overdue" ? "font-semibold text-danger" : "text-kit-slate-11"}>due {fmtDate(item.dueIso)}</span>
+        ) : null}
+      </p>
       <SalesOrderCompactView
         row={row}
         salesLocation={salesLocationOf(row.o)}
         initialModule="delivery"
+        initialEditor={DELIVERY_EDITOR[item.ruleKey] ?? "customer"}
+        onSaved={(sentence) => host.result(`${sentence} · SO-${row.so}`)}
         items={<OrderItems orderId={row.id} reference={`SO-${row.so}`} />}
         onOpen={() => navigate(`/operation/orders/so/${row.id}`)}
         onClose={host.close}
-      />
-      <WorkActionPanel
-        item={item.source}
-        onOpen={() => navigate(item.destination)}
-        embedded={card ? (
-          <>
-            <DeliveryDatesEdit
-              card={card}
-              layout="stack"
-              onSaved={(sentence) => host.result(`${sentence} · SO-${row.so}`)}
-              onDone={() => undefined}
-            />
-            <p className="text-meta text-kit-slate-11">Saving finishes this task.</p>
-          </>
-        ) : (
-          <PanelState text={scope.loading ? "Loading…" : "The delivery could not be loaded"} />
-        )}
       />
     </div>
   );
 }
 
-/* ── Warehouse — receive the PO's goods (never gated by the send record) ─── */
+/** Delivery result and proof acts open the EXISTING Delivery Order page full
+ *  width (the DO panel is still a PROPOSAL) and return to the same task. */
+const DO_PAGE_RULES = new Set(["ask_delivery_result", "upload_signed_do", "check_delivery_proof", "upload_delivery_photo"]);
 
-function WarehouseTaskPanel({ item, host }: { item: WorkRow; host: WorkPanelHost }) {
+function DeliveryOrderTaskPanel({ item, host }: { item: WorkRow; host: WorkPanelHost }) {
+  const doNumber = item.source.object.kind === "delivery_order" ? item.source.object.id : item.source.object.label;
+  const open = () => host.openReview((close) => (
+    <div className="flex h-full min-h-0 flex-col" data-testid="task-do-page">
+      <div className="flex h-10 shrink-0 items-center border-b border-kit-slate-4 px-3">
+        <button type="button" onClick={close} className="text-meta font-semibold text-kit-blue-11 hover:underline" data-testid="task-do-back">‹ Tasks</button>
+      </div>
+      <div className="min-h-0 flex-1 overflow-auto">
+        <Routes location={`/operation/delivery-orders/${encodeURIComponent(doNumber)}`}>
+          <Route path="/operation/delivery-orders/:doId" element={<DeliveryOrderPage />} />
+        </Routes>
+      </div>
+    </div>
+  ));
+  return (
+    <div className="flex flex-col gap-3 p-3" data-testid="task-panel-do">
+      <WorkActionPanel item={item.source} onOpen={open} />
+    </div>
+  );
+}
+
+/* ── Warehouse — LOCAL DEFAULT until the Warehouse chat's panel lands ───────
+   The Warehouse lane delivers `warehouse-task-panel.tsx` (read-only lines,
+   one `Receive`). Until then this default only proves the host plumbing: the
+   act card, and `Receive` opening the submitted report's OWN session in the
+   existing full-width Receiving record (never a new blank receipt, never
+   inside the side panel). */
+
+function ReceiveTaskPanel({ item, host }: { item: WorkRow; host: WorkPanelHost }) {
+  const navigate = useNavigate();
+  const sessionId = item.source.object.kind === "receiving" ? item.source.object.id : null;
+  return (
+    <div className="flex flex-col gap-3 p-3" data-testid="task-panel-receive">
+      <WorkActionPanel item={item.source} onOpen={() => navigate(item.destination)} />
+      {sessionId ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant="primary"
+            size="sm"
+            icon="warehouse"
+            data-testid="task-receive"
+            onClick={() => host.openReview((close) => (
+              <div className="flex h-full min-h-0 flex-col" data-testid="task-receiving-workspace">
+                <ReceivingRecord sessionId={sessionId} onBack={close} />
+              </div>
+            ))}
+          >
+            Receive
+          </Button>
+          <span className="text-meta text-kit-slate-11">Opens this arrival report's own receiving record, full width.</span>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/* ── PO Duty — a missed supplier date, or a partial receipt's balance ─────
+   `Ask {supplier} when the goods will arrive` / `Ask {supplier} for the
+   balance delivery date` open the exact PO with the existing `Record
+   supplier answer` (Purchasing §2.4). Receiving is never asked to chase. */
+
+function PoDutyTaskPanel({ item, host }: { item: WorkRow; host: WorkPanelHost }) {
   const navigate = useNavigate();
   const poId = item.source.object.id;
   const poQ = useQuery({
@@ -160,54 +232,75 @@ function WarehouseTaskPanel({ item, host }: { item: WorkRow; host: WorkPanelHost
     staleTime: 10_000,
   });
   const suppliersQ = useOperationSuppliers();
-  const [receiving, setReceiving] = useState(true);
+  const [recording, setRecording] = useState(false);
   const po = poQ.data?.pos.find((p) => p.id === poId) ?? null;
   if (poQ.isPending) return <PanelState text="Loading…" />;
   if (poQ.isError || !po) return <PanelState text="This purchase order could not be opened" alert />;
-  const supplier = (suppliersQ.data?.suppliers ?? []).find((s) => s.id === po.supplier_id) as SupplierRow | undefined;
-  const destinations = [...(poQ.data?.destinations ?? []), ...(poQ.data?.referencedDestinations ?? [])];
-  const deliverTo = destinations.find((d) => d.id === (po.destination_id ?? po.warehouse_id))?.name ?? "";
-  const poDate = po.official_delivery_date ?? po.eta_date;
-  const sentForCurrent = (po.sends ?? []).some((s) => s.kind === "confirmed_sent" && s.po_version === (po.version ?? 1));
+  const supplier = (suppliersQ.data?.suppliers ?? []).find((s) => s.id === po.supplier_id) as
+    | (SupplierRow & { whatsapp_group_url?: string | null })
+    | undefined;
+  const supplierName = supplier?.name ?? "the supplier";
+  const lines = po.purchase_order_lines ?? [];
   const orderIds = linkedSalesOrderIds((po.sources ?? []).map((s) => ({ kind: s.kind, orderId: s.order_id ?? null })));
-  const info: CardFact[] = [
-    { key: "deliver", label: "Supplier Deliver To", value: deliverTo || "Not recorded" },
-    { key: "date", label: "PO Delivery Date", value: poDate ? fmtDate(poDate) : "Not recorded" },
-  ];
+  const poDate = po.official_delivery_date ?? po.eta_date;
   return (
-    <div className="p-3" data-testid="task-panel-warehouse">
+    <div className="p-3" data-testid="task-panel-po-duty">
       <CompactModuleCard
-        name={supplier?.name ?? "Supplier"}
-        reference={[po.id, poDate ? `PO Delivery Date ${fmtDate(poDate)}` : null].filter(Boolean).join(" · ")}
+        name={supplierName}
+        reference={`${item.source.object.label} · ${item.problem}`}
         referenceStatus={missedWord(item)}
         openLabel={`Open ${po.id}`}
         onOpen={() => navigate(`/operation/procurement?po=${encodeURIComponent(po.id)}`)}
         closeLabel="Close panel"
         onClose={host.close}
-        modulesLabel="Receiving"
-        initialModule="receiving"
+        modulesLabel="Purchase Order"
+        initialModule="po"
         modules={[
-          { key: "info", label: "Info", summary: info, communication: null },
           {
-            key: "receiving", label: "Receiving", communication: null,
+            key: "info", label: "Info", communication: null,
+            summary: [{ key: "date", label: "PO Delivery Date", value: poDate ? fmtDate(poDate) : "Not recorded" }],
+          },
+          {
+            key: "po", label: "Purchase Order", communication: null,
             content: (
-              <div data-testid="task-receiving">
-                {/* Receiving never depends on the PO's send record: goods that
-                    arrive can always be received (owner 2026-10-05). */}
-                {!sentForCurrent ? (
-                  <p className="px-3 pt-3 text-meta text-kit-slate-11" data-testid="task-receiving-not-sent">
-                    This PO is not recorded as sent, and it can still be received.
-                  </p>
-                ) : null}
-                <ReceivingWorkspace
-                  po={po}
-                  supplier={supplier}
-                  warehouseName={deliverTo}
-                  warehouses={destinations.map((d) => ({ id: d.id, name: d.name }))}
-                  receiving={receiving}
-                  onReceiving={setReceiving}
-                  onPosted={() => host.result(`Receipt saved · ${po.id}`)}
+              <div className="flex flex-col gap-3 p-3" data-testid="task-po-duty">
+                <p className="text-body font-semibold text-kit-slate-12">{item.line}</p>
+                <DocumentTable
+                  label={`Goods · ${item.source.object.label}`}
+                  columns={[
+                    { key: "item", label: "Item" },
+                    { key: "order", label: "Order Qty", numeric: true },
+                    { key: "received", label: "Received Qty", numeric: true },
+                    { key: "pending", label: "Pending Delivery Qty", numeric: true },
+                  ]}
+                  rows={lines.map((l) => ({
+                    key: l.id,
+                    cells: {
+                      item: <div className="whitespace-normal">{[l.model_name, l.size].filter(Boolean).join(" ") || l.sku}<div className="text-meta text-kit-slate-11">{l.sku}</div></div>,
+                      order: Number(l.qty ?? 0),
+                      received: Number(l.received_qty ?? 0),
+                      pending: poLineReportable(l),
+                    },
+                  }))}
                 />
+                {recording ? (
+                  <SupplierAnswerForm
+                    poId={po.id}
+                    supplierName={supplierName}
+                    onCancel={() => setRecording(false)}
+                    onDone={() => host.result(`Supplier answer recorded · ${item.source.object.label}`)}
+                  />
+                ) : (
+                  <div className="flex flex-wrap items-center gap-2">
+                    {supplier?.whatsapp_group_url ? (
+                      <a href={supplier.whatsapp_group_url} target="_blank" rel="noreferrer"
+                        className="inline-flex h-8 items-center gap-1.5 rounded-control border border-kit-slate-5 bg-white px-3 text-body text-kit-slate-12 hover:bg-kit-slate-3">
+                        <Icon name="message" size={14} />Open WhatsApp group
+                      </a>
+                    ) : null}
+                    <Button variant="primary" size="sm" onClick={() => setRecording(true)} data-testid="task-record-supplier-answer">Record supplier answer</Button>
+                  </div>
+                )}
               </div>
             ),
           },

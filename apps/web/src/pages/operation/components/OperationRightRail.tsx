@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { CalendarDays, ListTodo, ScrollText, X, type LucideIcon } from "lucide-react";
 import { useActiveOrder } from "@/lib/active-order";
 import CalendarPanel from "./rail/CalendarPanel";
@@ -51,6 +51,12 @@ export default function OperationRightRail() {
   };
   /* Leaving Tasks with an unsaved task asks first; Tasks itself never does. */
   const go = (next: Door | null) => (active === "tasks" && next !== "tasks" ? guard(() => show(next)) : show(next));
+  /* `View tasks` (the first-entry reminder) opens the same Tasks list. */
+  const tasksRequest = useTasksHost((s) => s.tasksRequest);
+  useEffect(() => {
+    if (tasksRequest > 0) show("tasks");
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- a request, not a dependency
+  }, [tasksRequest]);
 
   const { items, myUserId, myFocus, hasData, error } = useOpenWorkSet();
   // ONE count (Workspace MASTER §7.1): the same Missed + today number the list

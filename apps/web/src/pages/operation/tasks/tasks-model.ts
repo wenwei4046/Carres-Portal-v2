@@ -7,13 +7,13 @@
  * the week is `workRailDates` with Saturday always drawn. This file only
  * groups, counts and words what the engine already decided.
  *
- *   Missed        every overdue act, earliest first, counted once
- *   Mon … Sat     the shown week; a day's number counts only that day
- *   No due date   only while something has no working date
+ *   Missed      every overdue act, earliest first, counted once
+ *   Mon … Sat   the shown week; a day's number counts only that day
+ *   No date     only while something has no working date
  *
  * The Module filter narrows rows and counts only — never a fact, a date or an
- * owner — and its counts (Missed + this week + No due date) add up exactly to
- * the list.
+ * owner — and its counts (Missed + this week + No date) add up exactly to the
+ * list.
  */
 import { parsePoWindowKey, poWindowTimeWord, type OperationWorkModule, type PoWindowWork } from "@carres/shared";
 import { fmtDate } from "@/lib/fmt-date";
@@ -41,15 +41,15 @@ export const TASK_MODULE_ICON: Record<OperationWorkModule, IconName> = {
   issue_tracker: "flag",
 };
 
-/** Words on the list. `Nothing due`, `No due date`, `set by {module}`,
- *  `{n} item(s) to buy` are FOR REVIEW until COPY admits them (storyboard §8). */
+/** Words on the list. `Nothing due`, `set by {module}`, `{n} item(s) to buy`
+ *  are FOR REVIEW until COPY admits them (storyboard §8); `No date` is COPY. */
 export const TASKS_WORDS = {
   title: "Tasks",
   module: "Module",
   allModules: "All modules",
   missed: "Missed",
   nothingDue: "Nothing due",
-  noDueDate: "No due date",
+  noDate: "No date",
   setBy: (module: string) => `set by ${module}`,
   nothingAssigned: "Nothing assigned to you",
   thisWeek: "this week",
@@ -71,7 +71,7 @@ export interface TaskRowWords {
   detail: string;
   /** The original due date, printed red on a missed row. */
   missedDate: string | null;
-  /** `No due date · set by {module}` on a row with no working date. */
+  /** `No date · set by {module}` on a row with no working date. */
   noDate: string | null;
 }
 
@@ -85,16 +85,25 @@ export function partiesWord(names: readonly string[]): string {
   return `${unique[0]} and ${unique.length - 1} more`;
 }
 
+/** What a purchase batch's row needs beyond the window: the Sales Orders
+ *  of its demand still to buy (from the same SO Batch read). */
+export interface PoWindowFacts {
+  window: PoWindowWork;
+  demandSos: readonly number[];
+}
+
 /**
  * A purchase batch row is never called "round" or "PO window": line 1 is the
- * act (`Send 2 POs to Ohana` · `Issue PO to Ohana`), line 2 the batch time or
- * the one document. Read from the SAME window arithmetic the Work item was
- * projected from (`poWindowWorkFromSoBatch`), so the row and Work agree.
+ * act (`Send 2 POs to Nice Future` · `Issue PO to Nice Future`), line 2 the
+ * batch time or the one document. Read from the SAME window arithmetic the
+ * Work item was projected from (`poWindowWorkFromSoBatch`), so the row and
+ * Work agree.
  */
-export function poWindowWords(row: WorkRow, window: PoWindowWork | null): { act: string; detail: string } {
+export function poWindowWords(row: WorkRow, facts: PoWindowFacts | null): { act: string; detail: string } {
   const parts = parsePoWindowKey(row.source.object.id);
   const time = parts ? poWindowTimeWord(parts.time) : row.source.object.label;
-  if (!window) return { act: row.line, detail: time };
+  if (!facts) return { act: row.line, detail: time };
+  const { window, demandSos } = facts;
   const unsent = window.pos.filter((po) => !po.sent);
   if (unsent.length > 0) {
     const parties = partiesWord(unsent.map((po) => po.supplierName));
@@ -104,21 +113,29 @@ export function poWindowWords(row: WorkRow, window: PoWindowWork | null): { act:
   }
   if (window.demand.items > 0) {
     const parties = partiesWord(window.demand.suppliers.map((s) => s.supplier));
-    return { act: `Issue PO to ${parties}`, detail: `${time} · ${TASKS_WORDS.itemsToBuy(window.demand.items)}` };
+    const where = demandSos.length === 1 ? `SO-${demandSos[0]}` : time;
+    return { act: `Issue PO to ${parties}`, detail: `${where} · ${TASKS_WORDS.itemsToBuy(window.demand.items)}` };
   }
   return { act: row.line, detail: time };
 }
 
-export function taskRowWords(row: WorkRow, window: PoWindowWork | null = null): TaskRowWords {
+/** Rules whose row names what is still owed after the document (the PO Duty
+ *  balance follow-up: `{PO No} · 1 item still due`). */
+const DETAIL_CARRIES_PROBLEM = new Set(["purchasing.balance_date", "confirm_delivery_date", "assign_logistics"]);
+
+export function taskRowWords(row: WorkRow, facts: PoWindowFacts | null = null): TaskRowWords {
   const base = row.source.object.kind === "po_window"
-    ? poWindowWords(row, window)
-    : { act: row.line, detail: row.source.object.label };
+    ? poWindowWords(row, facts)
+    : {
+        act: row.line,
+        detail: DETAIL_CARRIES_PROBLEM.has(row.ruleKey) ? `${row.source.object.label} · ${row.problem}` : row.source.object.label,
+      };
   const covered = row.ownerState === "covered" && row.normalOwner?.name ? TASKS_WORDS.forOwner(row.normalOwner.name) : null;
   return {
     act: base.act,
     detail: [base.detail, covered].filter(Boolean).join(" · "),
     missedDate: row.timingBucket === "overdue" && row.dueIso ? fmtDate(row.dueIso) : null,
-    noDate: row.dueIso === null ? `${TASKS_WORDS.noDueDate} · ${TASKS_WORDS.setBy(TASK_MODULE_WORD[row.module])}` : null,
+    noDate: row.dueIso === null ? `${TASKS_WORDS.noDate} · ${TASKS_WORDS.setBy(TASK_MODULE_WORD[row.module])}` : null,
   };
 }
 
@@ -139,11 +156,9 @@ export interface TaskList {
   missed: WorkRow[];
   days: TaskDay[];
   noDate: WorkRow[];
-  /** Per module, before the module choice: Missed + this week + No due date. */
+  /** Per module, before the module choice: Missed + this week + No date. */
   moduleCounts: Record<OperationWorkModule, number>;
   total: number;
-  /** `5–10 Oct` — the shown week. */
-  weekLabel: string;
   previousWeek: string;
   nextWeek: string;
 }
@@ -166,7 +181,7 @@ export function taskList(
   const rail = workRailDates(mine, today, week, { saturday: "always" });
   const weekIsos = new Set(rail.days.map((d) => d.iso));
   const inScope = (item: WorkRow) =>
-    item.timingBucket === "overdue" || item.dueIso === null || (item.dueIso !== null && weekIsos.has(item.dueIso));
+    item.timingBucket === "overdue" || item.dueIso === null || weekIsos.has(item.dueIso);
   const moduleCounts = Object.fromEntries(WORK_MODULES.map((m) => [m, 0])) as Record<OperationWorkModule, number>;
   for (const item of mine) if (inScope(item)) moduleCounts[item.module] += 1;
   const shown = module ? mine.filter((item) => item.module === module) : [...mine];
@@ -181,20 +196,12 @@ export function taskList(
     today: day.today,
     rows: shown.filter((item) => item.dueIso === day.iso && item.timingBucket !== "overdue").sort(byDue),
   }));
-  const first = rail.days[0]?.label ?? "";
-  const last = rail.days.at(-1)?.label ?? "";
-  const [, firstRest = ""] = first.split(", ");
-  const [, lastRest = ""] = last.split(", ");
-  const firstDay = firstRest.split(" ")[0] ?? "";
-  const firstMonth = firstRest.split(" ")[1] ?? "";
-  const weekLabel = firstMonth && lastRest.endsWith(firstMonth) ? `${firstDay}–${lastRest}` : `${firstRest}–${lastRest}`;
   return {
     missed,
     days,
     noDate,
     moduleCounts,
     total: Object.values(moduleCounts).reduce((sum, n) => sum + n, 0),
-    weekLabel,
     previousWeek: rail.previousWeek,
     nextWeek: rail.nextWeek,
   };

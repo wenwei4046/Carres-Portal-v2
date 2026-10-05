@@ -12,13 +12,14 @@
  *   ?scenario=default | loading | failed | failed-no-data | nothing
  *   ?at=<path>         the page on the left (kept while walking)
  */
-import { SCENARIO, SCENARIOS, type Scenario } from "./tasks-fixtures";
+import { SCENARIO, SCENARIOS, TODAY, type Scenario } from "./tasks-fixtures";
 import { StrictMode, useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
 import OperationApp from "@/pages/operation/OperationApp";
+import { useTasksHost } from "@/pages/operation/tasks/tasks-host";
 import "@/index.css";
 
 const ME = "00000000-0000-4000-8000-0000000000aa";
@@ -42,19 +43,32 @@ function LocationInAddressBar() {
 }
 
 const SCENARIO_WORDS: Record<Scenario, string> = {
-  default: "Full week (Missed, today, later days, no due date)",
+  default: "Full week (storyboard: 6 · 2 · 7 · 1 · 1 = 17)",
   loading: "Loading",
   failed: "Failed read (last numbers kept, Delivery named)",
   "failed-no-data": "Failed read, nothing held yet",
   nothing: "Nothing assigned",
+  "reminder-first-entry": "First entry today (3 missed · 5 due today)",
+  "reminder-zero": "Zero tasks (no reminder)",
+  "reminder-acknowledged": "Already acknowledged today (no reminder, badge still red)",
+  "reminder-draft": "Draft open at entry (no reminder)",
 };
+
+/* The first-entry reminder: only its own scenarios start as a first entry of
+   the day; every other walk starts as already shown today. */
+const SHOWN_KEY = `carres.pendingWork.shownOn.${ME}`;
+try {
+  if (["reminder-first-entry", "reminder-zero", "reminder-draft"].includes(SCENARIO)) window.localStorage.removeItem(SHOWN_KEY);
+  else window.localStorage.setItem(SHOWN_KEY, TODAY);
+} catch { /* blocked storage */ }
+if (SCENARIO === "reminder-draft") useTasksHost.setState({ dirty: true, subject: "SO-1368" });
 
 function Banner() {
   return (
     /* Floating, so the real shell keeps its own full-height layout. */
     <div className="fixed bottom-2 left-2 z-50 flex max-w-[min(720px,calc(100vw-16px))] flex-wrap items-center gap-x-3 gap-y-1 rounded-card bg-kit-slate-12 px-3 py-1.5 text-label text-white shadow-lg" data-testid="walk-banner">
       <span className="font-semibold">Local walk · Tasks · SIMULATED</span>
-      <span className="text-kit-slate-6">Invented data. Every save is simulated here; nothing is issued, sent, saved or messaged.</span>
+      <span className="text-kit-slate-6">Invented data. Every save is simulated here; nothing is issued, sent, saved or messaged. PROPOSAL words: Pending work · View tasks · Got it · Nothing due.</span>
       <label className="ml-auto flex items-center gap-1.5">
         <span>Scenario</span>
         <select

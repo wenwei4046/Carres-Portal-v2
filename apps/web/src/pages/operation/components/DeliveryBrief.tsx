@@ -275,7 +275,7 @@ export function DeliveryDatesEdit({
       <div data-compact-fields={compact || undefined} className={layout === "grid" && !compact ? "grid grid-cols-3 gap-3" : "flex flex-col gap-3"}>
       <DatePicker
         id={`delivery-brief-date-${card.scopeId}`}
-        label={MONITOR_COPY.confirmedDateField}
+        label={MONITOR_COPY.confirmedDate}
         value={date}
         onChange={setDate}
         error={dayRefused}
@@ -283,7 +283,7 @@ export function DeliveryDatesEdit({
       />
       <Select
         id={`delivery-brief-time-${card.scopeId}`}
-        label={MONITOR_COPY.confirmedTimeField}
+        label={MONITOR_COPY.confirmedTime}
         value={time}
         onValueChange={setTime}
         options={DELIVERY_TIME_SLOTS.map((slot) => ({ value: slot, label: slot }))}
@@ -309,7 +309,7 @@ export function DeliveryDatesEdit({
         }}
       />
       </div>
-      {compact ? <CardEditorButtons onSave={() => void submit()} onCancel={onDone} error={saveError} disabled={!canSave} /> : <div className="flex items-center gap-2">
+      {compact ? <CardEditorButtons saveLabel={needsReply ? MONITOR_COPY.saveConfirmedDeliveryNeedsReply : MONITOR_COPY.saveConfirmedDelivery} onSave={() => void submit()} onCancel={onDone} error={saveError} disabled={!canSave} /> : <div className="flex items-center gap-2">
         <Button
           variant="primary"
           size={layout === "grid" ? "touch" : "sm"}
@@ -333,11 +333,15 @@ export function DeliveryDatesEdit({
 export function LogisticsDetailsEdit({
   card,
   onDone,
+  onSaved,
   linkUrl = null,
   compact = false,
 }: {
   card: DeliveryMonitorCard;
   onDone: () => void;
+  /** Called once with the saved sentence after a successful assignment — the
+   *  Tasks host's result line (LOCAL PROPOSAL 2026-10-05). */
+  onSaved?: (sentence: string) => void;
   linkUrl?: string | null;
   compact?: boolean;
 }) {
@@ -441,7 +445,9 @@ export function LogisticsDetailsEdit({
         condoRegistration: trim(condo) || null,
         reason: changing ? (reason as never) : null,
       });
-      toast.success(`${chosen?.name ?? MONITOR_COPY.partner} assigned`);
+      const assigned = `${chosen?.name ?? MONITOR_COPY.partner} assigned`;
+      toast.success(assigned);
+      onSaved?.(assigned);
       onDone();
     } catch (err) {
       const message = err instanceof Error ? err.message : MONITOR_COPY.uploadFailed;

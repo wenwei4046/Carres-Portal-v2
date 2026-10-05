@@ -17,10 +17,14 @@ import { useGoodsName } from "../work/goods-name";
 import type { RegisterRow } from "../sales-order-columns";
 
 export { originalRequestDays } from "./sales-order-card";
-export default function SalesOrderCompactView({ row, salesLocation, items, onOpen, onClose, initialModule = "info" }: {
+export default function SalesOrderCompactView({ row, salesLocation, items, onOpen, onClose, initialModule = "info", initialEditor, onSaved }: {
   row: RegisterRow; salesLocation: string; items: ReactNode; onOpen: () => void; onClose: () => void;
   /** The module tab that opens first: `delivery` when a Delivery task opens the card (Tasks, LOCAL PROPOSAL). */
   initialModule?: "info" | "delivery";
+  /** The Delivery editor a task opens on arrival (Tasks, LOCAL PROPOSAL). */
+  initialEditor?: "customer" | "logistics";
+  /** The saved sentence of a Delivery editor, for the Tasks result line. */
+  onSaved?: (sentence: string) => void;
 }) {
   // Customer is only the final receiver, never an intermediate warehouse.
   const leg = Math.max(0, ...(row.o.delivery_stops ?? []).map(stop => stop.leg));
@@ -41,8 +45,8 @@ export default function SalesOrderCompactView({ row, salesLocation, items, onOpe
   const unavailable = delivery.failed ? "Unavailable" : delivery.loading ? "Loading…" : "Not recorded";
   const goods = card ? [...card.items, ...card.extras.filter(item => item.kind === "accessory")].reduce((sum, item) => sum + item.qty, 0) : 0;
   const stock: CardFact = { key: "stock", label: "Stock", value: card && goods ? `${Math.max(0, goods - card.readiness.shortQty)}/${goods}` : unavailable, status: card && goods && card.readiness.ready ? "Ready" : undefined, opensItems: true };
-  const customer: CardFact = { key: "customer", label: "Customer", value: card ? card.confirmedDate ? `${new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", timeZone: "UTC" }).format(new Date(`${card.confirmedDate.slice(0, 10)}T00:00:00Z`))}${card.confirmedTime ? ` · ${card.confirmedTime}` : ""}` : "Date not confirmed" : unavailable, status: card?.confirmedDate ? "Date confirmed" : undefined, editable: mayEdit, editor: mayEdit && card ? close => <DeliveryDatesEdit card={card} compact layout="grid" onDone={close} /> : undefined };
-  const logistics: CardFact = { key: "logistics", label: "Logistics", value: card ? card.logisticsPartnerName ?? "Not assigned" : unavailable, editable: mayEdit, editor: mayEdit && card ? close => <LogisticsDetailsEdit card={card} compact onDone={close} /> : undefined };
+  const customer: CardFact = { key: "customer", label: "Customer", value: card ? card.confirmedDate ? `${new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", timeZone: "UTC" }).format(new Date(`${card.confirmedDate.slice(0, 10)}T00:00:00Z`))}${card.confirmedTime ? ` · ${card.confirmedTime}` : ""}` : "Date not confirmed" : unavailable, status: card?.confirmedDate ? "Date confirmed" : undefined, editable: mayEdit, editor: mayEdit && card ? close => <DeliveryDatesEdit card={card} compact layout="grid" onDone={close} onSaved={onSaved} /> : undefined };
+  const logistics: CardFact = { key: "logistics", label: "Logistics", value: card ? card.logisticsPartnerName ?? "Not assigned" : unavailable, editable: mayEdit, editor: mayEdit && card ? close => <LogisticsDetailsEdit card={card} compact onDone={close} onSaved={onSaved} /> : undefined };
   const doFact: CardFact = { key: "do", label: "DO", value: card ? card.doNumber ?? "No DO yet" : unavailable, editor: () => card ? <CardChecklist label="Delivery Order" items={[
     { text: "Stock ready", done: card.readiness.ready },
     { text: "Payment cleared", done: card.payment.line1 === "Paid" },
@@ -67,7 +71,7 @@ export default function SalesOrderCompactView({ row, salesLocation, items, onOpe
   return <div data-testid="sales-order-quick-view"><CompactModuleCard
     key={row.id} {...salesOrderCardHeader(row, salesLocation)}
     closeLabel="Close order" openLabel="Open full page" onOpen={onOpen} onClose={onClose}
-    initialModule={initialModule} modules={[
+    initialModule={initialModule} initialEditor={initialEditor} modules={[
       { key: "info", label: "Info", opensHeaderDetails: true, summary: salesOrderMoneySummary(row), items },
       { key: "delivery", label: "Delivery", summary: [stock, logistics, customer, doFact], items, communication: deliveryCommunication },
     ]}

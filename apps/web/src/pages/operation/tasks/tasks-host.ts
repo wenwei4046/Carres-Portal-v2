@@ -10,6 +10,9 @@ import type { ReactNode } from "react";
 import { create } from "zustand";
 
 interface TasksHostState {
+  /** Bumped by `View tasks`: the rail (or the phone door) opens Tasks. */
+  tasksRequest: number;
+  requestTasks: () => void;
   dirty: boolean;
   /** What the open task is about, for the guard's sentence (`SO-1368`). */
   subject: string | null;
@@ -21,6 +24,8 @@ interface TasksHostState {
 }
 
 export const useTasksHost = create<TasksHostState>((set, get) => ({
+  tasksRequest: 0,
+  requestTasks: () => set((s) => ({ tasksRequest: s.tasksRequest + 1 })),
   dirty: false,
   subject: null,
   pending: null,
