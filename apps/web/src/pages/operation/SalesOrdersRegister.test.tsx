@@ -1625,10 +1625,12 @@ describe("approved solid SO status presentation", () => {
     fireEvent.click(screen.getByRole("button", { name: "SO-1303" }));
     const drawer = screen.getByRole("dialog", { name: "SO-1303 · Kimmy" });
     fireEvent.click(within(drawer).getByRole("button", { name: "Items" }));
-    fireEvent.click(within(drawer).getByRole("button", { name: "Info · Order details" }));
-    check(drawer, String(stockLabel), String(stockTone));
-    check(drawer, String(paymentLabel), String(paymentTone));
-    check(drawer, String(deliveryLabel), String(deliveryTone));
+    expect(within(drawer).queryByRole("button", { name: "Info · Order details" })).toBeNull();
+    expect(within(drawer).queryByText("Stock Status")).toBeNull();
+    expect(within(drawer).queryByText("Payment Status")).toBeNull();
+    expect(within(drawer).queryByText("Delivery Status")).toBeNull();
+    expect(within(drawer).getByText("Total payable")).toBeVisible();
+    expect(within(drawer).getByText("Paid to date")).toBeVisible();
   });
 });
 
