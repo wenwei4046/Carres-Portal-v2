@@ -14,11 +14,19 @@ import { soBatchAction, purchaseDemandStateWords } from "@carres/shared";
 import type { SalesOrderExpansionResponse } from "@/lib/queries";
 
 const navigate = vi.fn();
+const printSalesOrdersSpy = vi.hoisted(() => vi.fn(async (_rows: ReadonlyArray<{ id: string }>) => {}));
+vi.mock("../record-print", async () => {
+  const actual = await vi.importActual<typeof import("../record-print")>("../record-print");
+  return { ...actual, printSalesOrdersOrSay: printSalesOrdersSpy };
+});
 vi.mock("react-router-dom", async () => {
   const actual = await vi.importActual<typeof import("react-router-dom")>("react-router-dom");
   return { ...actual, useNavigate: () => navigate };
 });
 vi.mock("../components/GlobalTopBar", () => ({ TopBarIcons: () => null }));
+/* Export is read from the sheet the grid hands the workbook writer. */
+const xlsx = vi.hoisted(() => ({ sheet: vi.fn((_data: unknown, _options?: unknown) => ({})) }));
+vi.mock("xlsx", () => ({ utils: { json_to_sheet: xlsx.sheet, book_new: () => ({}), book_append_sheet: vi.fn() }, writeFile: vi.fn() }));
 /* The expansion's Unit IDs come through the Sales Order expansion endpoint —
    the same door the Sales Orders register asks. The suite answers it empty
    unless a test overrides. */
@@ -127,7 +135,7 @@ function orderRow(over: Partial<SoBatchOrderRow> & { orderId: string }): SoBatch
     customer: null,
     status: "blank",
     proceededAt: null,
-    requestedDeliveryDate: null,
+    requestedDeliveryDate: null, originalRequestedDeliveryDate: null,
     deliveryCity: null,
     deliveryState: null,
     pos: [],
@@ -144,7 +152,7 @@ const ORDER_O1 = orderRow({
   so: 1318,
   customer: "Kimmy",
   proceededAt: "2026-08-20T08:15:00+08:00",
-  requestedDeliveryDate: "2026-08-28",
+  requestedDeliveryDate: "2026-08-28", originalRequestedDeliveryDate: "2026-08-28",
   deliveryCity: "Petaling Jaya",
   deliveryState: "Selangor",
   lines: [
@@ -173,7 +181,7 @@ const ORDER_O3 = orderRow({
   deliveryCity: "Johor Bahru",
   deliveryState: "Johor",
   status: "partial",
-  requestedDeliveryDate: "2026-09-20",
+  requestedDeliveryDate: "2026-09-20", originalRequestedDeliveryDate: "2026-09-20",
   pos: [
     { poId: "PO-20260820-4827", status: "open", supplierId: "s-hooka",
       supplierName: "Hooka", destinationId: KLANG, officialDeliveryDate: "2026-09-18",
@@ -324,6 +332,18 @@ function renderRegister(over: Partial<SoBatchPurchaseResponse> = {}, expandHisto
   return rendered;
 }
 
+it("shows the original request while keeping purchasing planning facts separate", () => {
+  renderRegister({ registerRows: [{ ...ORDER_O1, requestedDeliveryDate: "2026-12-01", originalRequestedDeliveryDate: "2026-08-01" }] });
+  expect(screen.getByTestId("so-batch-requested-o1")).toHaveTextContent("Sat, 1 Aug");
+  expect(screen.getByTestId("so-batch-requested-o1")).not.toHaveTextContent("Dec");
+});
+
+it("never substitutes the current request when original-date evidence is missing", () => {
+  renderRegister({ registerRows: [{ ...ORDER_O1, requestedDeliveryDate: "2026-12-01", originalRequestedDeliveryDate: null }] });
+  expect(screen.getByTestId("so-batch-requested-o1")).toHaveTextContent("Not recorded");
+  expect(screen.getByTestId("so-batch-requested-o1")).not.toHaveTextContent("Dec");
+});
+
 it("refuses manual whole-round matching when the persisted priority source is unavailable", () => {
   renderRegister({ readyStockPriority: null });
   expect(screen.getByRole("button", { name: "Match Ready Stock" })).toBeDisabled();
@@ -412,6 +432,7 @@ it("matches through actual Listing controls and ticking exposes Proceed without 
 
 beforeEach(() => {
   navigate.mockClear();
+  xlsx.sheet.mockClear();
   onIssue.mockClear();
   onOpenPurchaseOrders.mockClear();
   apiFetch.mockClear();
@@ -456,7 +477,7 @@ describe("the approved columns, in the approved reading order", () => {
     "Proceed Date",
     "SO No",
     "PO Safety Days",
-    "Customer Requested Delivery Date",
+    "Customer’s original requested delivery",
     "Customer Delivery Location",
     "Customer",
     "Items",
@@ -626,16 +647,13 @@ describe("one permanent row per proceeded Sales Order", () => {
    * These cells used to measure their own text against their own width and
    * print `AL Sungai Buloh +1 more`, so the visible text, the exported text
    * and the accessible name were three different answers, and a narrower
-   * window silently changed what the screen said. One value prints itself;
-   * several say how many there are and send the reader to the expansion.
+   * window silently changed what the screen said. Supplier, destination and
+   * date summaries keep that rule. `PO No` is overwritten by the owner's
+   * 2026-10-05 ruling: every number, on one line (see its own block below).
    */
   it("many POs, suppliers, destinations and dates summarise deterministically", () => {
     renderRegister();
-    const many = screen.getByTestId("so-batch-po-many-o5");
-    expect(many).toHaveTextContent("2 POs");
-    expect(many).not.toHaveTextContent("more");
-    fireEvent.click(many);
-    expect(screen.getByTestId("so-batch-expand-o5")).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByTestId("so-batch-po-o5").textContent).toBe("PO-260820-1111, PO-260821-2222");
     expect(screen.getByTestId("so-batch-supplier-o5").textContent).toBe("2 suppliers");
     expect(screen.getByTestId("so-batch-deliver-to-o5").textContent).toBe("Multiple");
     expect(screen.getByTestId("so-batch-po-date-o5").textContent).toBe("Multiple");
@@ -647,6 +665,163 @@ describe("one permanent row per proceeded Sales Order", () => {
        2026-09-09). It read "" until then, which is what a row with NO purchase
        order prints — one cell, two different answers. */
     expect(screen.getByTestId("so-batch-po-date-o7").textContent).toBe("Not recorded");
+  });
+});
+
+/**
+ * ⭐ PO No LISTS EVERY LINKED PO NUMBER — owner ruling 2026-10-05 (Purchasing
+ * §9.1). One line, every real number from the row's `po_line_sources` lineage,
+ * each once, by stored PO number ascending, in the shared display form with
+ * its actual version, separated by `, `. Each number is its own door to that
+ * exact PO. Default width, the standard 32px row, no count, no popover; search,
+ * the column filter and Export carry the complete list.
+ */
+describe("PO No lists every linked PO number (owner ruling 2026-10-05)", () => {
+  const SO1205_POS = ["PO-20260903-4316", "PO-20260903-4585", "PO-20260903-7907", "PO-20260903-9389"];
+  const poFact = (poId: string, over: Partial<SoBatchOrderRow["pos"][number]> = {}): SoBatchOrderRow["pos"][number] => ({
+    poId, status: "open", supplierId: "s-hooka", supplierName: "Hooka", destinationId: KLANG,
+    officialDeliveryDate: "2026-09-20", sentCurrentVersion: true, version: 1, ...over,
+  });
+  /* Out of order and with a repeated document, as an older payload could send
+     it; two item lines link to the same PO. The cell must still print each
+     document once, in stored PO-number order. */
+  const MANY = orderRow({
+    orderId: "o1205",
+    so: 1205,
+    customer: "FOUR DOCUMENTS",
+    status: "ordered",
+    pos: [poFact(SO1205_POS[2]!), poFact(SO1205_POS[0]!), poFact(SO1205_POS[3]!), poFact(SO1205_POS[1]!), poFact(SO1205_POS[2]!)],
+    lines: [
+      { orderLineId: "l1205a", sku: "B1201S-K", qty: 1, stockTaken: 0, item: "Booqit", variant: "King", category: "mattress",
+        pos: [{ poId: SO1205_POS[2]!, qty: 1 }, { poId: SO1205_POS[0]!, qty: 1 }] },
+      { orderLineId: "l1205b", sku: "B1201S-Q", qty: 1, stockTaken: 0, item: "Booqit", variant: "Queen", category: "mattress",
+        pos: [{ poId: SO1205_POS[2]!, qty: 1 }, { poId: SO1205_POS[1]!, qty: 1 }, { poId: SO1205_POS[3]!, qty: 1 }] },
+    ],
+  });
+  const FOURTEEN = Array.from({ length: 14 }, (_, i) => `PO-20260904-${String(1001 + i)}`);
+  const LONG = orderRow({
+    orderId: "o1340",
+    so: 1340,
+    customer: "FOURTEEN DOCUMENTS",
+    status: "ordered",
+    pos: [...FOURTEEN].reverse().map((id, i) => poFact(id, { version: i === 0 ? 3 : 1 })),
+    lines: [{ orderLineId: "l1340", sku: "S9-2A", qty: 14, stockTaken: 0, item: "Booqit Sofa", variant: null, category: "sofa",
+      pos: FOURTEEN.map((poId) => ({ poId, qty: 1 })) }],
+  });
+  const render1205 = () => renderRegister({ registerRows: [ORDER_O1, ORDER_O3, MANY, LONG] }, false);
+
+  it("prints every linked PO once, by stored number, comma-separated on one line, each with its actual version", () => {
+    render1205();
+    const cell = screen.getByTestId("so-batch-po-o1205");
+    expect(cell.textContent).toBe("PO-260903-4316-V1, PO-260903-4585-V1, PO-260903-7907-V1, PO-260903-9389-V1");
+    const links = within(cell).getAllByRole("button");
+    expect(links.map((b) => b.textContent)).toEqual([
+      "PO-260903-4316-V1", "PO-260903-4585-V1", "PO-260903-7907-V1", "PO-260903-9389-V1",
+    ]);
+    /* The commas are plain text, never part of a door. */
+    for (const link of links) expect(link.textContent).not.toContain(",");
+    /* The shared document-link recipe the Sales Orders register uses. */
+    for (const link of links) {
+      expect(link.className).toBe("font-medium text-kit-blue-11 underline-offset-2 hover:underline");
+    }
+  });
+
+  it("each number opens its own exact PO and never toggles, selects or expands the row", () => {
+    render1205();
+    const links = within(screen.getByTestId("so-batch-po-o1205")).getAllByRole("button");
+    links.forEach((link, i) => {
+      fireEvent.click(link);
+      expect(navigate).toHaveBeenLastCalledWith(`/operation/procurement?po=${encodeURIComponent(SO1205_POS[i]!)}`);
+    });
+    expect(navigate).toHaveBeenCalledTimes(4);
+    expect(screen.queryByTestId("selection-bar")).not.toBeInTheDocument();
+    expect(screen.getByTestId("so-batch-expand-o1205")).toHaveAttribute("aria-expanded", "false");
+    fireEvent.doubleClick(links[0]!);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("no PO count and no popover remain; one PO stays a direct door; no PO keeps `Not ordered yet`", () => {
+    render1205();
+    const page = screen.getByTestId("so-batch-page");
+    expect(page.textContent).not.toMatch(/\d+ POs\b/);
+    expect(page.querySelector('[data-testid^="so-batch-po-many-"]')).toBeNull();
+    for (const id of ["o1205", "o1340", "o3"]) {
+      expect(screen.getByTestId(`so-batch-po-${id}`).querySelector("[aria-haspopup]")).toBeNull();
+    }
+    const single = within(screen.getByTestId("so-batch-po-o3")).getAllByRole("button");
+    expect(single).toHaveLength(1);
+    fireEvent.click(single[0]!);
+    expect(navigate).toHaveBeenLastCalledWith("/operation/procurement?po=PO-20260820-4827");
+    expect(screen.getByTestId("so-batch-po-o1").textContent).toBe("Not ordered yet");
+    expect(within(screen.getByTestId("so-batch-po-o1")).queryByRole("button")).toBeNull();
+  });
+
+  it("a long list stays one clipped line in the standard 32px row, at the registry width", () => {
+    render1205();
+    const cell = screen.getByTestId("so-batch-po-o1340");
+    expect(within(cell).getAllByRole("button")).toHaveLength(14);
+    expect(cell.textContent).toBe(
+      FOURTEEN.map((id) => `${id.replace("PO-2026", "PO-26")}-V${id === FOURTEEN[13] ? 3 : 1}`).join(", "),
+    );
+    /* One line: the cell never wraps, never breaks, never stacks its doors. */
+    expect(cell.className.split(" ")).toEqual(expect.arrayContaining(["block", "truncate"]));
+    expect(cell.querySelector("br, div, p, ul, li")).toBeNull();
+    for (const link of within(cell).getAllByRole("button")) expect(link.className).not.toMatch(/\bblock\b|\bflex\b/);
+    /* The row recipe is the standard one, and this column does not wrap. */
+    expect(document.querySelector('[data-row-height="32"]')).not.toBeNull();
+    const td = cell.closest("td")!;
+    expect(td.className).not.toMatch(/wrap/i);
+    const header = screen.getAllByRole("columnheader").find((th) => th.getAttribute("title") === "PO No")!;
+    expect(header.style.width).toBe("170px");
+  });
+
+  it.each([
+    ["PO-20260903-7907", "stored"],
+    ["PO-260903-7907-V1", "display"],
+    ["PO-260903-9389", "display without version"],
+  ])("search finds the order by any of its numbers: %s (%s)", async (query) => {
+    render1205();
+    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search" }), { target: { value: query } });
+    await waitFor(() => expect(screen.queryByTestId("so-batch-row-o3")).not.toBeInTheDocument());
+    expect(screen.getByTestId("so-batch-row-o1205")).toBeInTheDocument();
+    expect(screen.queryByTestId("so-batch-row-o1340")).not.toBeInTheDocument();
+  });
+
+  it("the column filter lists the complete list, never a count", () => {
+    render1205();
+    fireEvent.click(screen.getAllByRole("button", { name: "Filter PO No" })[0]!);
+    expect(
+      screen.getByText("PO-260903-4316-V1, PO-260903-4585-V1, PO-260903-7907-V1, PO-260903-9389-V1"),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/^\d+ POs$/)).toBeNull();
+  });
+
+  it("Export writes every number, comma-separated, in the same display form", async () => {
+    render1205();
+    fireEvent.keyDown(screen.getByRole("button", { name: "Page tools" }), { key: "Enter" });
+    fireEvent.click(screen.getByRole("menuitem", { name: "Export" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Excel" }));
+    await waitFor(() => expect(xlsx.sheet).toHaveBeenCalledTimes(1));
+    const sheet = xlsx.sheet.mock.calls[0]![0] as Array<Record<string, string>>;
+    const row = (so: string) => sheet.find((r) => r["SO No"] === so)!;
+    expect(row("SO-1205")["PO No"]).toBe("PO-260903-4316-V1, PO-260903-4585-V1, PO-260903-7907-V1, PO-260903-9389-V1");
+    expect(row("SO-1340")["PO No"].split(", ")).toHaveLength(14);
+    expect(row("SO-1330")["PO No"]).toBe("PO-260820-4827");
+    expect(row("SO-1318")["PO No"]).toBe("");
+  });
+
+  it("the row expansion is unchanged: the item-to-PO mapping keeps one record per item line and PO", async () => {
+    render1205();
+    fireEvent.click(screen.getByTestId("so-batch-expand-o1205"));
+    const box = await screen.findByTestId("so-batch-inspector-o1205");
+    const details = within(box).getByTestId("po-details-table");
+    /* Five mappings: line a → 7907 + 4316, line b → 7907 + 4585 + 9389. The
+       parent cell de-duplicates; the expansion does not, because each record
+       is a different item line. */
+    expect(within(details).getAllByTestId(/^po-detail-link-/)).toHaveLength(5);
+    expect(within(details).getAllByTestId(`po-detail-link-${SO1205_POS[2]}`)).toHaveLength(2);
+    expect(within(screen.getByTestId("so-batch-po-o1205")).getAllByRole("button")).toHaveLength(4);
   });
 });
 
@@ -2673,7 +2848,7 @@ describe("the two-line Status rule", () => {
       ...base,
       registerRows: [{ ...order, lines: [{ ...order.lines[0]!, poOffer: { poId: "PO260924-4827", qty: 2 } }] }],
     });
-    expect(screen.getByTestId("so-batch-select-ob")).not.toBeDisabled();
+    expect(screen.getByTestId("so-batch-select-ob")).toBeEnabled();
     expect(rowOf("ob")).toHaveAttribute("data-row-highlight", "info");
     expect(rowOf("ob").getAttribute("title")).toBe("PO260924-4827 has 2 Booqit King available.");
   });
@@ -2745,5 +2920,40 @@ describe("Order time contains configured cutoffs, not dated occurrence records",
     expect(screen.queryByText("Tue, 1 Sep")).not.toBeInTheDocument();
     fireEvent.click(screen.getByText("11:00 AM"));
     expect(onSelect).toHaveBeenCalledWith("11:00");
+  });
+});
+
+/* ONE ROW MENU — owner ruling 2026-10-05: `View · Print`, then this register's
+   own `Open {PO}` after one divider. Double-click keeps the quick card. */
+describe("one row menu: View · Print", () => {
+  it("reads View · Print · ─ Open {PO} on a one-PO order", () => {
+    renderRegister({ registerRows: [ORDER_O3] }, false);
+    fireEvent.contextMenu(screen.getByTestId("so-batch-row-o3"));
+    const menu = screen.getByRole("menu", { name: "Row actions" });
+    expect(within(menu).getAllByRole("menuitem").map((i) => i.textContent)).toEqual([
+      "View", "Print", "Open PO-260820-4827",
+    ]);
+    expect(within(menu).getAllByRole("separator")).toHaveLength(1);
+  });
+
+  it("View opens the Sales Order's full read-first page; Print prints that SO", () => {
+    printSalesOrdersSpy.mockClear();
+    navigate.mockClear();
+    renderRegister({ registerRows: [ORDER_O3] }, false);
+    fireEvent.contextMenu(screen.getByTestId("so-batch-row-o3"));
+    fireEvent.click(screen.getByRole("menuitem", { name: "View" }));
+    expect(navigate).toHaveBeenLastCalledWith("/operation/orders/so/o3");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    fireEvent.contextMenu(screen.getByTestId("so-batch-row-o3"));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Print" }));
+    expect(printSalesOrdersSpy).toHaveBeenCalledWith([{ id: "o3" }]);
+  });
+
+  it("double-click still opens the quick card, unchanged", () => {
+    navigate.mockClear();
+    renderRegister({ registerRows: [ORDER_O3] }, false);
+    fireEvent.doubleClick(screen.getByTestId("so-batch-row-o3"));
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(navigate).not.toHaveBeenCalled();
   });
 });

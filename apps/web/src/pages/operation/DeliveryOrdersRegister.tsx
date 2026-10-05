@@ -50,6 +50,8 @@ import {
   type DataGridColumn,
   type DataGridContextMenuItem,
 } from "@/components/register/DataGrid";
+import { documentRowMenu } from "@/components/register/row-menu";
+import { printDeliveryOrder } from "./record-print";
 import Select from "@/components/kit/Select";
 import ModuleHeader from "./components/ModuleHeader";
 import DeliveryResultAction from "./components/DeliveryResultAction";
@@ -910,19 +912,31 @@ export default function DeliveryOrdersRegister() {
     [navigate, openDeliveryOrder, openSalesOrder, filters.queue],
   );
 
+  /* ONE ROW MENU (owner ruling 2026-10-05): `View · Print`, then this
+     register's own doors after the divider. Print is the DO page's own flow —
+     a reprint carries the same number and records no delivery result. */
   const contextMenu = useCallback(
-    (r: DoRegisterRow): DataGridContextMenuItem[] => [
-      { label: "View", onClick: () => openDeliveryOrder(r) },
-      {
-        label: "Open SO-" + r.so,
-        onClick: () => navigate(`/operation/orders/so/${encodeURIComponent(r.orderId)}`),
-      },
-      {
-        label: "Open Order Route",
-        onClick: () =>
-          navigate(`/operation/orders/so/${encodeURIComponent(r.orderId)}?route=1`),
-      },
-    ],
+    (r: DoRegisterRow): DataGridContextMenuItem[] =>
+      documentRowMenu({
+        view: () => openDeliveryOrder(r),
+        print: () =>
+          void printDeliveryOrder(r.orderId, r.doNumber).catch((e: unknown) => {
+            toast.error(
+              e instanceof ApiError ? e.message : `Delivery Order ${r.doNumber} PDF failed`,
+            );
+          }),
+        more: [
+          {
+            label: "Open SO-" + r.so,
+            onClick: () => navigate(`/operation/orders/so/${encodeURIComponent(r.orderId)}`),
+          },
+          {
+            label: "Open Order Route",
+            onClick: () =>
+              navigate(`/operation/orders/so/${encodeURIComponent(r.orderId)}?route=1`),
+          },
+        ],
+      }),
     [navigate, openDeliveryOrder],
   );
 

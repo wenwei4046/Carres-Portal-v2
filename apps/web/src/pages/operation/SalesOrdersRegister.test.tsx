@@ -88,6 +88,12 @@ const useDeliveryOrdersRegisterSpy = vi.fn((..._args: unknown[]) => ({
   refetch: vi.fn(),
 }));
 
+const printSalesOrdersSpy = vi.hoisted(() => vi.fn(async (_rows: ReadonlyArray<{ id: string }>) => {}));
+vi.mock("./record-print", async () => {
+  const actual = await vi.importActual<typeof import("./record-print")>("./record-print");
+  return { ...actual, printSalesOrdersOrSay: printSalesOrdersSpy };
+});
+
 vi.mock("@/lib/queries", async () => {
   const actual = await vi.importActual<typeof import("@/lib/queries")>("@/lib/queries");
   return {
@@ -1065,10 +1071,43 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
  * a new test — not the quiet return of this one.
  */
 describe("order view before editing", () => {
-  it("does not open a row actions menu", () => {
+  /* ONE ROW MENU — owner ruling 2026-10-05: `View · Print · ─ Cancel SO`.
+   * Edit is reached through View (a button on the read-first page). */
+  it("opens the one row menu: View · Print · ─ Cancel SO", () => {
     mount();
     fireEvent.contextMenu(screen.getByTestId("grid-parent-row"));
-    expect(screen.queryByRole("menu", {name:"Row actions"})).not.toBeInTheDocument();
+    const menu = screen.getByRole("menu", { name: "Row actions" });
+    expect(within(menu).getAllByRole("menuitem").map((i) => i.textContent)).toEqual(["View", "Print", "Cancel SO"]);
+    expect(within(menu).getAllByRole("separator")).toHaveLength(1);
+    expect(within(menu).queryByRole("menuitem", { name: "Edit" })).not.toBeInTheDocument();
+  });
+  it("View opens the full read-first page, never the quick card", () => {
+    mount();
+    fireEvent.contextMenu(screen.getByTestId("grid-parent-row"));
+    fireEvent.click(screen.getByRole("menuitem", { name: "View" }));
+    expect(screen.getByTestId("location")).toHaveTextContent("/operation/orders/so/00000000-0000-0000-0000-00000000cafe");
+    expect(screen.queryByTestId("sales-order-quick-view")).not.toBeInTheDocument();
+  });
+  it("Print runs the governed SO paper for that one order", () => {
+    printSalesOrdersSpy.mockClear();
+    mount();
+    fireEvent.contextMenu(screen.getByTestId("grid-parent-row"));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Print" }));
+    expect(printSalesOrdersSpy).toHaveBeenCalledTimes(1);
+    expect(printSalesOrdersSpy.mock.calls[0]?.[0]).toEqual([expect.objectContaining({ id: "00000000-0000-0000-0000-00000000cafe" })]);
+    expect(screen.getByTestId("location")).toHaveTextContent(/^\/operation\/orders$/);
+  });
+  it("Cancel SO opens the one governed cancellation door", () => {
+    mount();
+    fireEvent.contextMenu(screen.getByTestId("grid-parent-row"));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Cancel SO" }));
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(screen.getByTestId("location")).toHaveTextContent(/^\/operation\/orders$/);
+  });
+  it("the Menu key opens the same menu from the keyboard", () => {
+    mount();
+    fireEvent.keyDown(screen.getByTestId("grid-parent-row"), { key: "F10", shiftKey: true });
+    expect(screen.getByRole("menu", { name: "Row actions" })).toBeInTheDocument();
   });
   it("opens a read-only summary from the order number, then offers the full page", () => {
     mount();

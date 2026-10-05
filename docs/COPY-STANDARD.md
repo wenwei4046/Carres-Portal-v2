@@ -249,9 +249,10 @@ Workspace-owned Staff & Duties page under global Settings (placement production 
 | Work calendar not configured | `Working hours not configured · {Site or owner}` · `Open {owning settings}` | assuming Sunday or Saturday is closed · showing `0` |
 | Work calendar read failure | `Working days could not be loaded. Dates may be missing.` · `Try again` | using a default calendar silently · showing invented missed age |
 | Work day has no eligible actor | `Nobody works {weekday, date} for {Duty}.` · `Set cover in Settings → Staff & Duties` | Nobody holds {Duty}. · Saturday Duty · moving a physical Saturday action to Friday |
-| Rail Customers door (owner-confirmed 2026-09-26, UI MASTER §5) | `Customers` · `Customers you can see` · `Name, phone or order number` · `Back to results` · `Matched by phone` · `Possible match` · `Orders` · `History` | Customer 360 · CRM · Contacts · merging a name-only match into one customer |
+| Customer lookup (capability approved 2026-09-26; its rail door removed 2026-10-05; placement open, UI MASTER §5) | `Customers` (the lookup's title, never a rail door) · `Customers you can see` · `Name, phone or order number` · `Back to results` · `Matched by phone` · `Possible match` · `Orders` · `History` | Customer 360 · CRM · Contacts · merging a name-only match into one customer |
+| Rail doors (owner ruling 2026-10-05, UI MASTER §5) | `Calendar` · `Tasks` · `Activity` — icon only; each word is the door's tooltip and accessible name. `Tasks` replaces `My Work`; customer information is reached through the `Sales Order` tab inside Tasks | a `Customers` door · visible words under the rail icons · `My Work` on the rail |
 | Rail Calendar day rows (owner-confirmed 2026-09-25, UI MASTER §5) | `{n} scheduled deliveries` · `{n} {company} contact deadline(s)` · `{n} arriving` · `{n} pickups` · `Pickup By {company}` · `{n} return pickup(s)` · `{n} promised payment(s)` · `{n} free storage ends` · `{n} service visit(s)`; zero prints nothing; a failed source says it could not be loaded | `supplier arrival` · `pickups by logistics` · `{n} jobs` · `0` for a failed source |
-| Right Rail healthy clear — **retires with the rail My Work slot (UI MASTER §5, owner 2026-09-24)** | `No work due now` · `Open My Work` | All done! · `0` while loading/failed |
+| Right Rail healthy clear — **retires with the rail My Work slot (`Tasks` replaces it, UI MASTER §5, owner 2026-10-05)** | `No work due now` · `Open My Work` | All done! · `0` while loading/failed |
 | Right Rail refresh failure — **retires with the rail My Work slot** | `My Work could not be refreshed` | No work due now · No open work |
 | Duty destination (production verified 2026-09-29, PR #1791) | `Settings → Staff & Duties` · page `Staff & Duties`, reached via `All System Settings`; contextual links open the exact Duty | Workspace main-menu Duty row · Duty roster |
 | Staff departure presentation (owner-approved 2026-09-29; NOT BUILT; HR §3) | `Last working day`; one review-and-confirm departure flow; default lists contain current staff only, former-profile lookup is personnel-manager-only | `Delete account` for departure · a second removal step · historical names removed · scheduled or partial effects described as complete |
@@ -1302,14 +1303,15 @@ sidebar page. Existing implementation constants do not override these approved p
 | Search | `Search Sales Order, customer, SKU or supplier…` |
 | Rail headings | `ORDER TIMING` · `PRODUCT` · `SUPPLIER` · `REGION` · `SETUP TO FIX` |
 | Empty state | `No proceeded Sales Orders.` |
-| Register columns (owner ruling 2026-09-18 — exactly, in this order; overwrites R3 2026-09-16) | `Proceed Date` · `SO No` · `PO Safety Days` · `Customer Requested Delivery Date` · `Customer Delivery Location` · `Customer` · `Items` · `Supplier` · `Supplier Deliver To` · `PO No` · `PO Delivery Date` |
+| Register columns (owner ruling 2026-09-18 — exactly, in this order; overwrites R3 2026-09-16) | `Proceed Date` · `SO No` · `PO Safety Days` · `Customer’s original requested delivery` · `Customer Delivery Location` · `Customer` · `Items` · `Supplier` · `Supplier Deliver To` · `PO No` · `PO Delivery Date` |
 | Table group headings (ruling R1 2026-09-16) | `To buy` (heading, count beside it) · `No purchase needed` (disclosure button, count beside it) |
 | Order By absence (ruling R2, split by S1 — BUILT 2026-09-17) | Three facts, three words, blank when nothing is left to buy: `Not planned` — ONLY missing setup blocks the date · `Already on a PO` — another open PO covers the remaining demand · `Coverage not checked` — whether an open PO covers it could not be verified. Never one word for all three. |
 | Footer (ruling R6) | `27 Sales Orders` · `5 of 27 Sales Orders` · `1 Sales Order` — one total, nothing else |
 | Search clear control (ruling R4) | `Clear search` |
 | `Proceed Date` on SO Batch Purchase | The actual date Sales handed the complete order to Operations (`orders.proceeded_at`). Never the planned production-start field (`orders.proceed_date`) |
 | Parent Status column | Retired. Do not restore `Partial` / `Ordered` as status pills or footer tallies. `To buy` / `No purchase needed` are the separately approved table group headings, not stored statuses. |
-| A parent cell over several values | one value prints itself; several print `2 POs` · `2 suppliers` · `Multiple` — the exact mapping lives in the expansion |
+| A parent cell over several values | one value prints itself; several print `2 suppliers` · `Multiple` — the exact mapping lives in the expansion |
+| `PO No` on SO Batch Purchase (owner ruling 2026-10-05) | every linked PO number on one line, separated by `, ` (`PO-260903-4316-V1, PO-260903-4585-V1`), each its own link; no `{n} POs` count; none: `Not ordered yet` |
 | Open local filter-rail control | `Hide filters` |
 | Hidden local filter-rail control | `Show filters` |
 | Selected Issue action | `1 selected · 1 unit · Issue 1 PO  [Clear]  [YJ]  [Issue PO]          [Export Excel (1)]` |
@@ -2732,8 +2734,8 @@ new Sales Order always carries a real `Requested Delivery Date`.
 The object page is ONE page in ONE state, so the words that named a MODE are retired with it.
 **`Edit`, `Edit operational details`, `Order context` and `Save changes` no longer appear on the
 object page** — nothing announces permission to type into a field that is already typeable. The
-Register's context menu keeps the word `Edit` only because it names a destination, and that
-destination is the same one `View` opens.
+Register's context menu no longer carries `Edit` (owner ruling 2026-10-05): `View` opens the page,
+and Edit is a button there.
 
 #### Its section names — owner ruling 2026-08-26 (Jess), re-paired 2026-09-11
 
@@ -2793,7 +2795,7 @@ words and puts the reason after a `·`, exactly as stair carry already qualifies
 | The management-only door on Sales ownership | **`Change salesperson`** | Request ownership change (that stays the FORM's title) · Reassign · Change owner · **`Change salesperson — needs approval`** (the previous ruling; retired 2026-08-26). The suffix was one of THREE statements of the same fact stacked around an unpressed button — a line above it, the suffix, and a line below. The rule now lives once, on the modal the button opens, where it is read at the moment it is acted on. The verb alone is the door |
 | Report a problem, now inside the `⋮` menu (icon only; its accessible name is `More actions` — owner ruling 2026-09-21) | **`Report a problem`** | Raise an issue · Log a complaint · New Service Case |
 | The delivery address the customer has not given yet | **`Address not given yet`** | Unknown · Fill in later · TBC |
-| The Sales Orders row context menu (owner ruling 2026-09-26) | **`Edit` · `View` · `Print` · `Cancel SO`** | `Print PDF` (retired as a menu word 2026-09-26) · `Preview` · `Copy to new Sales Order` · `Request Delivery Order` (Delivery's door, never a Sales Order row — Jess 2026-09-26) |
+| The Sales Orders row context menu (ONE ROW MENU, owner ruling 2026-10-05) | **`View` · `Print` · `Cancel SO`** — `View · Print` are the shared row-menu words every register starts with (`documentRowMenu`); `Cancel SO` alone after the divider | `Edit` in the row menu (reached through View since 2026-10-05) · `Print PDF` (retired as a menu word 2026-09-26) · `Download official PDF` (the PO row's word until 2026-10-05) · `Preview` · `Copy to new Sales Order` · `Request Delivery Order` (Delivery's door, never a Sales Order row — Jess 2026-09-26) |
 | A cell with no value, anywhere in a register | **`Not recorded`** | `Not given` · Not provided · None · N/A · — · a blank cell. **ONE word, YH 2026-08-29.** The Sales Orders register printed TWO — `Not given` for a fact the customer never told us, `Not recorded` for one Carres never wrote down — 20 cells against 18 on the same table. The distinction is real and invisible: an operator sees two spellings of empty and must work out whether they differ. `Not recorded` survives because it is honest about EVERY column; nobody *gives* us an invoice number or a showroom. Neither word had ever been registered here, while `lib/locality.ts` claimed `Not given` was governed by this file |
 | Sales Orders register `PO No` / `DO No` cell with several documents (owner ruling 2026-09-27) | **`{first No} + {n} more`** — `PO-20260902-8370 + 1 more` · `DO-130926-0842 + 1 more`; the `+ {n} more` opens the list of every number; the same grammar as `Items` (`Trion + 2 more`) | `2 Purchase Orders` · `14 Purchase Orders` · `2 Delivery Orders` (count-only, retired 2026-09-27) |
 | Sales Orders register `PO No` / `DO No` cell when no PO or DO exists for the order yet — OWNER RULING 2026-09-21 (Jess) · BUILT (Sales Orders Card 12) | **`No PO yet`** · **`No DO yet`**, muted, one line (owner preference 2026-09-21; also the SO goods expansion's `Deliver To` before any PO line). 🟡 SO Batch Purchase prints `Not ordered yet` for the same fact — converging it is Purchasing's own round | `Not recorded` (says Carres failed to write a number down; the document simply does not exist yet) · `No delivery order yet` (too long for the cell, and a second grammar beside `PO No`) · a blank cell |
@@ -4981,6 +4983,7 @@ The words of UI MASTER §4.3's card, as confirmed on the owner's reference pages
 |---|---|
 | Header | accessible names `Order details` (the ▾/▴, no visible words) · `Delivery address` · `Open order` · `Close panel`; sales facts `SO Doc Date` · `Proceed date` · `Sales Location` · `Salesperson` |
 | SO table and filters | `Customer’s original requested delivery` means version 1’s preserved request; its table, card, filtering and export use the same original source. The mutable requested date in other module-owned forms remains separate. Customer-confirmed date and Logistics ETA remain separate. |
+| SO Batch listing date | `Customer’s original requested delivery`, with two header lines `Customer’s original` / `requested delivery`. Table display, date filtering, sorting and export read the preserved revision 1 request; missing/TBD original evidence reads `Not recorded`, never the later current request. Purchasing planning and stock-priority inputs remain separate. |
 | SO access facts | Group building and floor on one line, lift and positive `Stair carry: {n} items` on the next; omit missing or zero stair carry. |
 | SO requested-date header | `Customer’s original` / `requested delivery` (two small lines); `{n}d` = original requested date minus Proceed date in calendar days, never a today-based countdown. Example `30 Sep` → `31 Oct` = `31d`; missing either date omits the count. Tooltip: `Customer’s original requested delivery` |
 | Module bar | `Order modules` · icon names `Communication` · `Items` · `Show timeline` / `Hide timeline` |

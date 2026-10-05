@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -65,6 +65,8 @@ import {
   type DataGridColumn,
   type DataGridContextMenuItem,
 } from "@/components/register/DataGrid";
+import { documentRowMenu } from "@/components/register/row-menu";
+import { printSalesOrdersOrSay } from "../record-print";
 import { fmtDate } from "@/lib/fmt-date";
 import { conciseLocality, NOT_RECORDED } from "@/lib/locality";
 import { useSalesOrderExpansion } from "@/lib/queries";
@@ -147,20 +149,6 @@ const STORAGE_KEY = "carres.soBatchPurchase.register.v7";
 const FILTER_RAIL_STORAGE_KEY = "carres.soBatchPurchase.filters.open";
 
 /**
- * ⭐ ONE PO IS A DOOR; SEVERAL ARE A COUNT — owner correction 2026-09-11.
- *
- * This cell measured its own text against its own width and printed as many
- * numbers as happened to fit, plus `+2 more`. Three readers got three answers:
- * the eye saw one-and-a-half numbers, `Export` saw the full list, and a
- * narrower window silently changed what the screen said without anything
- * having changed about the order.
- *
- * A summary now says exactly one thing. One purchase order prints in full and
- * opens Purchase Orders; several print how many there are and open the row's
- * own expansion, where every number is its own door beside the item line it
- * actually covers. No measurement, no truncation, no resize behaviour.
- */
-/**
  * `{first item} + {n} more` — the `Items` summary. ONE statement, whatever the
  * width: it never measures itself, so the screen, the export and the accessible
  * name are the same answer.
@@ -199,47 +187,64 @@ function safetyDaysWord(cell: SoBatchSafetyDaysCell | undefined): string {
   return cell.days < 0 ? "Production late" : String(cell.days);
 }
 
+/**
+ * ⭐ EVERY LINKED PO, ON ONE LINE — OWNER RULING 2026-10-05 (Purchasing §9.1).
+ *
+ * Replaces the 2026-09-11 `2 POs` count, which sent the operator into the
+ * row's expansion to find a number the cell already knew. The cell now prints
+ * every real PO linked to the order (`order.pos`, the server's
+ * `po_line_sources` lineage) once each, by stored PO number ascending, in the
+ * shared display form with its actual version (`PO-260903-7907-V1`),
+ * separated by `, `. Each number is its own door to that exact PO; the commas
+ * are plain text. One line, default width, the standard 32px row: a longer
+ * list is clipped inside the cell and the operator drags the column wider.
+ * No count, no popover. Search, the column filter and Export carry the same
+ * complete list, so the screen, the funnel and the sheet never disagree.
+ */
+function soBatchPoNumbers(order: Pick<SoBatchOrderRow, "pos">): Array<{ poId: string; display: string }> {
+  const versions = new Map<string, number | undefined>();
+  for (const po of order.pos) if (!versions.has(po.poId)) versions.set(po.poId, po.version);
+  return [...versions]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([poId, version]) => ({
+      poId,
+      display: documentDisplayNumber(version == null ? poId : `${poId}-V${version}`),
+    }));
+}
+
+/** The same list as ONE string — the column filter and every export. */
+function soBatchPoNumbersText(order: Pick<SoBatchOrderRow, "pos">): string {
+  return soBatchPoNumbers(order).map((po) => po.display).join(", ");
+}
+
+/** The shared document-link recipe (the Sales Orders register's PO link). */
+const DOCUMENT_LINK_CLASS = "font-medium text-kit-blue-11 underline-offset-2 hover:underline";
+
 function PoNumbersCell({ order }: { order: SoBatchOrderRow }) {
   const navigate = useNavigate();
-  const numbers = useMemo(() => [...new Set(order.pos.map((po) => po.poId))], [order.pos]);
+  const numbers = useMemo(() => soBatchPoNumbers(order), [order]);
   if (numbers.length === 0) return null;
-  if (numbers.length === 1) {
-    const number = numbers[0]!;
-    const version = order.pos.find(po => po.poId === number)?.version;
-    return (
-      <button
-        type="button"
-        className="truncate text-kit-blue-11 underline-offset-2 hover:underline"
-        data-testid={`so-batch-po-link-${order.orderId}`}
-        onClick={(event) => {
-          event.stopPropagation();
-          navigate(`/operation/procurement?po=${encodeURIComponent(number)}`);
-        }}
-      >
-        {documentDisplayNumber(`${number}${version == null ? "" : `-V${version}`}`)}
-      </button>
-    );
-  }
   return (
-    <button
-      type="button"
-      className="truncate text-kit-blue-11 underline-offset-2 hover:underline"
-      data-testid={`so-batch-po-many-${order.orderId}`}
-      title="Open the row to see every purchase order"
-      onClick={(event) => {
-        event.stopPropagation();
-        const row = event.currentTarget.closest("tr");
-        const arrow = row?.querySelector<HTMLButtonElement>("button[aria-expanded]");
-        if (arrow?.getAttribute("aria-expanded") === "false") arrow.click();
-        requestAnimationFrame(() => {
-          row?.nextElementSibling
-            ?.querySelector('[data-testid="grid-expansion-cell"]')
-            ?.scrollIntoView?.({ behavior: "smooth", block: "nearest" });
-        });
-      }}
-    >
-      {`${numbers.length} POs`}
-    </button>
+    <>
+      {numbers.map((po, index) => (
+        <Fragment key={po.poId}>
+          {index > 0 ? ", " : null}
+          <button
+            type="button"
+            className={DOCUMENT_LINK_CLASS}
+            data-testid={`so-batch-po-link-${order.orderId}`}
+            data-po-id={po.poId}
+            onClick={(event) => {
+              event.stopPropagation();
+              navigate(`/operation/procurement?po=${encodeURIComponent(po.poId)}`);
+            }}
+            onDoubleClick={(event) => event.stopPropagation()}
+          >
+            {po.display}
+          </button>
+        </Fragment>
+      ))}
+    </>
   );
 }
 
@@ -445,29 +450,35 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
    * ⛔ THE MENU CARRIES ONLY DOORS THAT EXIST. The sibling Sales Orders menu
    * ends in `Cancel SO`; a buying register must not offer that — it records
    * what was bought, it does not amend the sale. `Open <PO>` appears only when
-   * the order has exactly one, which is the same test the PO No cell makes;
-   * the exact numbers for a multi-PO order live in the expansion. */
+   * the order has exactly one; for a multi-PO order every number is already
+   * its own door in the PO No cell and beside its item line in the expansion. */
   const openOrder = useCallback(
     (o: SoBatchOrderRow) => setQuickOrderId(o.orderId),
     [],
   );
+  /* ONE ROW MENU (owner ruling 2026-10-05): `View · Print`, then this
+     register's own `Open {PO}` after the divider. The row's record is the
+     Sales Order, so View opens its full read-first page (double-click keeps
+     the quick card) and Print is the same governed SO paper. */
   const rowMenu = useCallback(
     (o: SoBatchOrderRow): DataGridContextMenuItem[] => {
       const po = soBatchCellSummary(o.pos.map((p) => p.poId));
-      return [
-        { label: "View", onClick: () => openOrder(o) },
-        ...(po.kind === "one"
-          ? [
-              {
-                label: `Open ${documentDisplayNumber(po.value)}`,
-                onClick: () =>
-                  navigate(`/operation/procurement?po=${encodeURIComponent(po.value)}`),
-              },
-            ]
-          : []),
-      ];
+      return documentRowMenu({
+        view: () => navigate(`/operation/orders/so/${o.orderId}`),
+        print: () => void printSalesOrdersOrSay([{ id: o.orderId }]),
+        more:
+          po.kind === "one"
+            ? [
+                {
+                  label: `Open ${documentDisplayNumber(po.value)}`,
+                  onClick: () =>
+                    navigate(`/operation/procurement?po=${encodeURIComponent(po.value)}`),
+                },
+              ]
+            : [],
+      });
     },
-    [navigate, openOrder],
+    [navigate],
   );
   const leafs = data.rows;
   const orders = data.registerRows;
@@ -858,7 +869,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
            actual hand-off to Operations, `orders.proceeded_at`. */
         key: "proceededAt",
         label: W.colProceedDate,
-        width: 120, minWidth: 118,
+        width: REGISTER_FIELD_WIDTH.date, minWidth: 118,
         sortable: true,
         chooserGroup: "Order",
         accessor: (o) => (
@@ -876,7 +887,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
            loses WHICH record a row is (Card §9). */
         key: "soNo",
         label: W.colSoNo,
-        width: 90, minWidth: 80,
+        width: REGISTER_FIELD_WIDTH.soNo, minWidth: 80,
         sortable: true,
         chooserGroup: "Order",
         accessor: (o) => (
@@ -931,7 +942,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
         key: "poSafetyDays",
         label: W.colPoSafetyDays,
         headerLines: ["PO Safety", "Days"],
-        width: 120, minWidth: 104,
+        width: REGISTER_FIELD_WIDTH.poSafetyDays, minWidth: 104,
         sortable: true,
         chooserGroup: "Buying",
         accessor: (o) => {
@@ -979,24 +990,24 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
       {
         key: "requestedDelivery",
         label: W.colRequestedDelivery,
-        headerLines: ["Customer Requested", "Delivery Date"],
-        width: 144, minWidth: 118,
+        headerLines: ["Customer’s original", "requested delivery"],
+        width: REGISTER_FIELD_WIDTH.customerRequestedDeliveryDate, minWidth: 118,
         sortable: true,
         chooserGroup: "Order",
         accessor: (o) => (
           <span data-testid={`so-batch-requested-${o.orderId}`}>
-            {o.requestedDeliveryDate ? (
-              fmtDate(o.requestedDeliveryDate)
+            {o.originalRequestedDeliveryDate ? (
+              fmtDate(o.originalRequestedDeliveryDate)
             ) : (
-              <Absent>No delivery date yet</Absent>
+              <Absent>{NOT_RECORDED}</Absent>
             )}
           </span>
         ),
-        dateValue: (o) => o.requestedDeliveryDate,
+        dateValue: (o) => o.originalRequestedDeliveryDate,
         filterType: "date",
         sortFn: (a, b) =>
-          (a.requestedDeliveryDate ?? "").localeCompare(b.requestedDeliveryDate ?? ""),
-        exportValue: (o) => o.requestedDeliveryDate ?? "",
+          (a.originalRequestedDeliveryDate ?? "").localeCompare(b.originalRequestedDeliveryDate ?? ""),
+        exportValue: (o) => o.originalRequestedDeliveryDate ?? "",
       },
       {
         /* The CUSTOMER's locality — never the supplier's destination. The one
@@ -1007,7 +1018,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
         wrap: true,
         label: W.colDeliveryLocation,
         headerLines: ["Customer Delivery", "Location"],
-        width: 140, minWidth: 92,
+        width: REGISTER_FIELD_WIDTH.customerDeliveryLocation, minWidth: 92,
         sortable: true,
         chooserGroup: "Order",
         accessor: (o) => {
@@ -1027,7 +1038,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
         /* R7: the complete value is always on screen — a long value takes an inline second line, never an ellipsis behind a hover title. */
         wrap: true,
         label: W.colCustomer,
-        width: 136, minWidth: 100,
+        width: REGISTER_FIELD_WIDTH.customer, minWidth: 100,
         sortable: true,
         chooserGroup: "Order",
         accessor: (o) => (
@@ -1054,7 +1065,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
         key: "items",
         wrap: true,
         label: W.colItems,
-        width: 180, minWidth: 92,
+        width: REGISTER_FIELD_WIDTH.items, minWidth: 92,
         sortable: true,
         chooserGroup: "Order",
         accessor: (o) => (
@@ -1070,7 +1081,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
         /* R7: the complete value is always on screen — a long value takes an inline second line, never an ellipsis behind a hover title. */
         wrap: true,
         label: W.colSupplier,
-        width: 136, minWidth: 92,
+        width: REGISTER_FIELD_WIDTH.supplier, minWidth: 92,
         sortable: true,
         chooserGroup: "Buying",
         /* ⭐ A SUMMARY SAYS ONE THING (owner correction 2026-09-11). It used
@@ -1119,7 +1130,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
         /* R7: the complete value is always on screen — a long value takes an inline second line, never an ellipsis behind a hover title. */
         wrap: true,
         label: W.deliverTo,
-        width: 120, minWidth: 100,
+        width: REGISTER_FIELD_WIDTH.supplierDeliverTo, minWidth: 100,
         chooserGroup: "Buying",
         accessor: (o) => {
           const issued = soBatchCellSummary(
@@ -1144,22 +1155,29 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
       {
         key: "poNo",
         label: W.colPoNo,
-        width: 144, minWidth: 80,
+        width: REGISTER_FIELD_WIDTH.documentNo, minWidth: 80,
         sortable: true,
         chooserGroup: "Documents",
         /* ⭐ THE DOCUMENT COLUMN SAYS THERE IS NO DOCUMENT — once, and here.
            `Deliver To` and `PO Delivery Date` describe a purchase order, so on
            a row that has none they stay blank rather than repeating the same
            sentence three times across one row. */
+        /* One line, never wrapped: a list longer than the cell is clipped
+           inside it, and the column is dragged wider (owner ruling
+           2026-10-05). The row keeps the standard 32px recipe. */
         accessor: (o) => (
           <span className="block truncate" data-testid={`so-batch-po-${o.orderId}`}>
             {o.pos.length ? <PoNumbersCell order={o} /> : <Absent>Not ordered yet</Absent>}
           </span>
         ),
-        searchValue: (o) => o.pos.map((p) => `${p.poId} ${documentDisplayNumber(p.poId)}`).join(" "),
-        filterValue: (o) =>
-          summaryText(soBatchCellSummary(o.pos.map((p) => documentDisplayNumber(`${p.poId}${p.version == null ? "" : `-V${p.version}`}`))), (n) => `${n} POs`) ?? "",
-        exportValue: (o) => o.pos.map((p) => p.poId).join(" · "),
+        /* Both forms of every number: the stored `PO-20260903-7907`, the
+           display `PO-260903-7907` and the versioned `PO-260903-7907-V1`. */
+        searchValue: (o) =>
+          soBatchPoNumbers(o)
+            .map((p) => `${p.poId} ${documentDisplayNumber(p.poId)} ${p.display}`)
+            .join(" "),
+        filterValue: (o) => soBatchPoNumbersText(o),
+        exportValue: (o) => soBatchPoNumbersText(o),
       },
       {
         /* `purchase_orders.official_delivery_date` — the ORIGINAL
@@ -1172,7 +1190,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
         key: "poDeliveryDate",
         label: W.colPoDeliveryDate,
         headerLines: ["PO", "Delivery Date"],
-        width: 120, minWidth: 110,
+        width: REGISTER_FIELD_WIDTH.poDefaultDeliveryDate, minWidth: 110,
         sortable: true,
         chooserGroup: "Documents",
         accessor: (o) => {
@@ -1545,20 +1563,21 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
               renderResults={presentation === "cards" ? visible => <div className="grid grid-cols-1 gap-3 p-3 xl:grid-cols-2" data-testid="so-batch-cards">
                 {visible.map(o => <div key={o.orderId} data-row-key={o.orderId}>{compactView(o)}</div>)}
               </div> : undefined}
-              toolbarEnd={<span className="flex min-w-0 flex-wrap items-center gap-2">
+              toolbarEnd={<div className={`${styles.toolbarTools} flex min-w-0 flex-wrap items-center gap-2`}>
                 {viewSwitch}
                 {stock.active ? <><Select id="round-stock-location" toolbar label="Stock Location" value={stock.location}
                   onValueChange={stock.setLocation} disabled={stock.busy} options={stock.locations} />
-                  <Button size="sm" disabled={stock.busy} onClick={stock.clear}>Cancel</Button></>
-                  : <Button size="sm" loading={stock.busy} disabled={isLoading || data.readyStockPriority == null} title={data.readyStockPriority == null ? "Not available" : undefined} onClick={() => {
+                  <Button disabled={stock.busy} onClick={stock.clear}>Cancel</Button></>
+                  : <Button loading={stock.busy} disabled={isLoading || data.readyStockPriority == null} title={data.readyStockPriority == null ? "Not available" : undefined} onClick={() => {
                     void stock.match(visibleOrders.current.filter(order => shown.some(row => row.orderId === order.orderId) && purchaseStatus(order) !== "Done"));
                   }}>Match Ready Stock</Button>}
-                {onOpenPurchaseOrders ? <Button size="sm" loading={purchaseOrdersLoading} disabled={isLoading} onClick={() => {
+                {onOpenPurchaseOrders ? <Button loading={purchaseOrdersLoading} disabled={isLoading} onClick={() => {
                 const visibleIds = new Set(shown.map(order => order.orderId));
                 onOpenPurchaseOrders([...new Set(visibleOrders.current.filter(order => visibleIds.has(order.orderId))
                   .flatMap(order => order.pos.map(po => po.poId)))]);
               }}>Purchase Orders</Button> : null}
-              </span>}
+              </div>}
+              rowHeight={32}
               appearance="reference"
               wrapToolbar
               palette="slate"
@@ -1873,9 +1892,8 @@ function SoBatchOrderExpansion({
   const poById = useMemo(() => new Map(order.pos.map((p) => [p.poId, p])), [order.pos]);
 
   /**
-   * The details section opens with the row, because the parent's `2 POs`
-   * summary is a door and a door that opens onto a closed box has not answered
-   * anything.
+   * The details section opens with the row: the item-to-PO mapping is what the
+   * operator opened the row for, and a closed box answers nothing.
    *
    * ⭐ NOTHING SCROLLS TO IT ANY MORE. `Ordered Qty` was the door that did, and
    * the owner's 2026-09-18 goods table has no such column: the section is

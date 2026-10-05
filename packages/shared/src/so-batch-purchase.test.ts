@@ -191,7 +191,7 @@ describe("the rail — latest Owner ruling 2026-08-30", () => {
       "Proceed Date",
       "SO No",
       "PO Safety Days",
-      "Customer Requested Delivery Date",
+      "Customer’s original requested delivery",
       "Customer Delivery Location",
       "Customer",
       "Items",

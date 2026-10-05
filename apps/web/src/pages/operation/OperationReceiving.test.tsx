@@ -81,6 +81,12 @@ const h = vi.hoisted(() => ({
   receiver: null as null | { kind: "company" | "staff"; name: string | null },
 }));
 
+const printGrnSpy = vi.hoisted(() => vi.fn(async (_id: string) => {}));
+vi.mock("./record-print", async () => {
+  const actual = await vi.importActual<typeof import("./record-print")>("./record-print");
+  return { ...actual, printGrn: printGrnSpy };
+});
+
 vi.mock("@/lib/queries", async () => {
   const actual =
     await vi.importActual<typeof import("@/lib/queries")>("@/lib/queries");
@@ -907,6 +913,24 @@ describe("OperationReceiving — the formal GRN Register", () => {
     fireEvent.click(screen.getByTestId("start-receiving-door"));
     const empty = await screen.findByTestId("receiving-find-empty");
     expect(empty).toHaveTextContent("No supplier delivery is ready to receive.");
+  });
+
+  /* ONE ROW MENU — owner ruling 2026-10-05: `View · Print`. Click keeps the
+     quick card; View opens the full read-first receipt page. */
+  it("the row menu reads View · Print; View opens the full page, Print the GRN", async () => {
+    h.sessionDetail = postedDetail({ receipt: { po_id: "PO-20260901-4827" } });
+    printGrnSpy.mockClear();
+    renderPage();
+    const row = screen.getAllByText("GRN-260901-1234")[0]!.closest("tr")!;
+    fireEvent.contextMenu(row);
+    const menu = screen.getByRole("menu", { name: "Row actions" });
+    expect(within(menu).getAllByRole("menuitem").map((i) => i.textContent)).toEqual(["View", "Print"]);
+    fireEvent.click(within(menu).getByRole("menuitem", { name: "Print" }));
+    expect(printGrnSpy).toHaveBeenCalledTimes(1);
+    fireEvent.contextMenu(row);
+    fireEvent.click(screen.getByRole("menuitem", { name: "View" }));
+    await screen.findByTestId("receiving-record");
+    expect(screen.queryByTestId("receiving-quick-view")).not.toBeInTheDocument();
   });
 
   it("a row opens the shared panel, then Open full page keeps the register mounted", async () => {
