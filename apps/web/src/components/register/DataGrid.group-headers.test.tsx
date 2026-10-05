@@ -63,7 +63,7 @@ describe("DataGrid · group-local headers", () => {
     render(<DataGrid<Row> appearance="reference" rows={ROWS} columns={COLUMNS}
       storageKey="k.group-selection" rowKey={row => row.id}
       fixedGroups={{ groups: [{ key: "waiting", label: "Waiting" }, { key: "completed", label: "Completed" }], groupOf: row => row.group }}
-      selectable={{ selectedKeys: new Set(["c"]), onToggle: vi.fn(), onToggleAll, isSelectable: row => row.id !== "b" }} />);
+      selectable={{ selectedKeys: new Set(["c"]), onToggle: vi.fn(), onToggleAll, isSelectable: (row: Row) => row.id !== "b" }} />);
     const waiting = within(screen.getByTestId("grid-section-waiting")).getByRole("checkbox", { name: "Select all rows" });
     expect(waiting).not.toBeChecked();
     fireEvent.click(waiting);
