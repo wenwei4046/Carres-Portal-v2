@@ -222,6 +222,17 @@ operationOrdersRouter.get("/", requireOperation, async (c) => {
   if (onlyOrderId !== null && !/^[0-9a-f-]{36}$/i.test(onlyOrderId)) {
     return c.json({ error: "invalid_query", code: "invalid_param", message: "orderId must be an order id" }, 422);
   }
+  /* ⭐ `count=only` — HOW MANY ROWS THIS LIST WOULD ANSWER, AND NOTHING ELSE
+     (SO BUILD-1c, 2026-10-06). The Sales Order page's `Existing customer ·
+     {n} orders ›` opens this list searched by the phone, so `n` is counted
+     HERE: the same `listScope`, the same search clauses, the same caller's
+     RLS — one head-only exact count instead of the rows (Law D: the number
+     and the door can never count two different sets). */
+  const countParam = c.req.query("count") ?? null;
+  if (countParam !== null && countParam !== "only") {
+    return c.json({ error: "invalid_query", code: "invalid_param", message: "count must be only" }, 422);
+  }
+  const countOnly = countParam === "only";
 
   const sb = userClient(c.env, c.var.auth.jwt);
   // Phase 4.5 Chunk 2 (T9): customer-leg LP fields now live on
@@ -355,6 +366,9 @@ operationOrdersRouter.get("/", requireOperation, async (c) => {
     return s as Q;
   };
   q = listScope(q);
+  /* The search's one or() filter — built once, applied to the rows below and,
+     for `count=only`, to the count. */
+  let searchFilter: string | null = null;
   if (search) {
     // Match customer name (ILIKE), the SO number (digits or displayed SO- prefix), AND
     // each imported invoice number. A combined Ref is tokenised into
@@ -411,7 +425,23 @@ operationOrdersRouter.get("/", requireOperation, async (c) => {
     const soTerm = /^(?:SO[-\s]?)?(\d+)$/i.exec(search.trim());
     const asInt = soTerm ? Number(soTerm[1]) : NaN;
     if (Number.isSafeInteger(asInt)) clauses.push(`so.eq.${asInt}`);
-    q = q.or(clauses.join(","));
+    searchFilter = clauses.join(",");
+    q = q.or(searchFilter);
+  }
+
+  if (countOnly) {
+    let countQ = listScope(sb.from("orders").select("id", { count: "exact", head: true }));
+    if (searchFilter) countQ = countQ.or(searchFilter);
+    const { count, error: countError } = await countQ;
+    if (countError) {
+      const m = mapPgError(countError);
+      return c.json(m.body, m.status);
+    }
+    /* No number is never answered as zero — the page then shows no count. */
+    if (typeof count !== "number") {
+      return c.json({ error: "count_unavailable", code: "count_unavailable", message: "Sales orders could not be counted." }, 500);
+    }
+    return c.json({ count });
   }
 
   // STAGE 1 FIX 1 — the 200-row trap removed; the agreed cap is 500. Server

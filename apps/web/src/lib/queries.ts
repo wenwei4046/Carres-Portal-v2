@@ -5836,6 +5836,28 @@ export function useOperationOrders(
   });
 }
 
+/**
+ * How many Sales Orders the Sales Orders Register answers for this search —
+ * the Register's own read (`stage=proceeded` + `search`), counted on the
+ * server (`count=only`) through the same population, the same search and the
+ * same caller. The Sales Order page's `· {n} orders ›` reads this, so the
+ * number is what its door opens (Law D). Keyed under `["operation","orders"]`
+ * so an order write's blunt invalidation refreshes it with the Register.
+ */
+export function useSalesOrderRegisterSearchCount(search: string, enabled = true) {
+  const trimmed = search.trim();
+  const filters: operationOrderFilters = { stage: "proceeded", search: trimmed };
+  return useQuery<{ count: number }>({
+    queryKey: [...qk.operation.orders(filters), "count"],
+    queryFn: () =>
+      apiFetch<{ count: number }>(
+        "/api/operation/orders" + operationOrdersSearch(filters) + "&count=only",
+      ),
+    enabled: enabled && trimmed !== "",
+    staleTime: 30_000,
+  });
+}
+
 /** Drawer detail. `null` id disables the query (mirror of usePrincipalDealer). */
 /**
  * 【DELIVERY】 CARD 19 — the operator's document word (`SO-1362`) resolved to
