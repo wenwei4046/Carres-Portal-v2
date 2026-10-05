@@ -4967,7 +4967,7 @@ Goods only (never Delivery release, never a service line); meanings and tones in
 | Where | Words | Never |
 |---|---|---|
 | Stock Status | `To purchase` · `Awaiting goods` (legend `Waiting for goods from the supplier.`) · `Partially ready` · `Ready` (all required quantity usable and reserved to this order) | `Receipt unconfirmed` · `Awaiting receipt` / `Partially received` / `Fully received` as an SO Stock Status · `Ready` for goods that are not reserved to this order |
-| Manual line action | `Reserve stock` · `{n} in stock. Reserve for this order.` | reserving goods that were bought for the line (they are reserved on receipt) |
+| Manual line action | `Reserve stock` · `{n} in stock. Reserve for this order.` Shown only while the line has an uncovered quantity; reserves at most that quantity | reserving goods that were bought for the line (they are reserved on receipt) · showing it on a line fully covered by POs and reservations · hiding it only because the line has a PO |
 
 ### Purchasing PO monitoring rail — owner-approved 2026-10-01 / TARGET NOT BUILT
 

@@ -239,7 +239,11 @@ returns as something to buy. Both register views expose it.
 locked row: the line belongs to that Sales Order, the goods match by `stock_match_key`, the Unit is
 an exact Unit and never a counted row (§3 · 0368), it is `available` by `unit_availability`, and the
 line still has a remaining requirement of ordered quantity less bound Ready Stock less
-non-cancelled purchase-order lineage. There is no override. A caller that names no line has one
+non-cancelled purchase-order lineage. There is no override. That remaining requirement is the
+line's uncovered quantity and the limit of the manual `Reserve stock` action (owner ruling 2026-10-05:
+partly covered lines may reserve the rest; fully covered lines show no action; reserving never releases
+or replaces a PO, which changes only through Purchasing's change or cancel route; Orders MASTER
+"Stock Status"). A caller that names no line has one
 RESOLVED — a single candidate, or a refusal by name; the door never picks out of several.
 
 **RECEIPT RESERVES GOODS BOUGHT FOR A SALES ORDER LINE — owner ruling (Jess) 2026-10-05 · APPROVED /

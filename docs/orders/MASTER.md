@@ -6939,8 +6939,18 @@ lineage; it calculates no second stock truth.
 - **Manual line action `Reserve stock`** — sentence `{n} in stock. Reserve for this order.` — reserves
   ordinary warehouse stock through Stock's reservation door. Goods bought for the line need no action:
   they are reserved on receipt (Ready Stock law above).
-- **REAL GAP — owner decision pending:** `Reserve stock` on a line already covered by a PO. The
-  existing door refuses it (`line_already_covered`; Stock MASTER §4 "There is no override").
+- **`Reserve stock` follows the line's uncovered quantity — owner ruling (Jess) 2026-10-05 · APPROVED
+  / NOT BUILT.** Uncovered = ordered quantity less non-cancelled PO lineage less Units already bound to
+  the line (Stock MASTER §4). Need 3, nothing covered: reserve up to 3. A PO covers 2: reserve the
+  remaining 1. PO lineage and reservations cover all of it: the action does not show. Never simplify
+  this to "a line with a PO hides the action". The door rechecks the uncovered quantity on the locked
+  row before every reservation. Reserving never releases or replaces a PO automatically; to use stock
+  instead of a PO, staff change or cancel the PO through Purchasing's existing route first.
+- **One coverage fact (Law D):** the SO list's Stock Status, the `Reserve stock` quantity and SO Batch
+  demand read the same coverage (`so_line_remaining_requirement`), so goods received and reserved for
+  a line are never shown as to buy or bought again. A difference between them is an engineering
+  defect fixed in the shared arithmetic, never with a page-only patch; only a needed business-rule
+  change is reported to the owner.
 - **PROPOSAL / NOT LAW (shown in the local preview):** which word an order or line shows when its
   quantities mix states, e.g. part bought, part not.
 
