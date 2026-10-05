@@ -3,6 +3,7 @@ import { lineKind } from "./line-category";
 import type { RouteGoodsFacts } from "./sales-order-route-goods";
 import {
   SALES_ORDER_STOCK_STATUSES,
+  STOCK_OPEN_DECISION,
   salesOrderStockOf,
   stockIssueWord,
   stockStatusOfCounts,
@@ -56,6 +57,7 @@ describe("the approved words and tones", () => {
     expect(SALES_ORDER_STOCK_STATUSES.find((s) => s.key === "ready")!.legend).toBe(
       "All required goods are usable and allocated to this order. Delivery may still need other conditions.",
     );
+    expect(SALES_ORDER_STOCK_STATUSES.find((s) => s.key === "awaiting_goods")!.legend).toBe("Waiting for goods from the supplier.");
     expect(stockIssueWord(2)).toBe("2 damaged or wrong");
     expect(stockStatusWord("awaiting_goods")).toBe("Awaiting goods");
   });
@@ -84,10 +86,23 @@ describe("one order's Stock Status from the owners' records", () => {
     expect(fact).toMatchObject({ status: "partially_ready", usableQty: 1, purchasedQty: 2, arrivedUnallocatedQty: 0 });
   });
 
-  it("⚠ REAL GAP carried apart: goods received on the lineage but bound to nobody are counted, not yet mapped", () => {
+  it("⚠ OPEN DECISION held apart: bought goods ARRIVED but bound to nobody are never `Awaiting goods`", () => {
     const fact = salesOrderStockOf(facts(onPo(2, 1)));
-    expect(fact).toMatchObject({ status: "awaiting_goods", usableQty: 0, arrivedUnallocatedQty: 1 });
-    expect(fact.lines[0]).toMatchObject({ arrivedUnallocatedQty: 1, status: "awaiting_goods" });
+    expect(fact).toMatchObject({ status: "open_decision", usableQty: 0, purchasedQty: 2, arrivedUnallocatedQty: 1 });
+    expect(fact.lines[0]).toMatchObject({ arrivedUnallocatedQty: 1, status: "open_decision" });
+    /* Not a status: the four approved states stay four. */
+    expect(SALES_ORDER_STOCK_STATUSES.map((s) => s.key)).not.toContain(STOCK_OPEN_DECISION);
+    /* Some still unbought: To purchase stays true. */
+    expect(salesOrderStockOf(facts({ ...onPo(1, 1) })).status).toBe("to_purchase");
+    /* Something usable: Partially ready stays true. */
+    expect(salesOrderStockOf(facts({ ...onPo(2, 1), units: [reserved("U9")] })).status).toBe("partially_ready");
+  });
+
+  it("available stock alone changes nothing: Ready only after a reservation binds the Units", () => {
+    const shelf = { ...onPo(2, 0), readyStock: { B1201S: 5 } };
+    expect(salesOrderStockOf(facts(shelf)).status).toBe("awaiting_goods");
+    expect(salesOrderStockOf(facts({ readyStock: { B1201S: 5 } })).status).toBe("to_purchase");
+    expect(salesOrderStockOf(facts({ readyStock: { B1201S: 5 }, units: [reserved("U1"), reserved("U2")] })).status).toBe("ready");
   });
 
   it("damaged or wrong goods in the receipt are never usable and show as the issue count, not a status", () => {
@@ -173,6 +188,8 @@ describe("the ONE summary rule reads a line and an order alike", () => {
     [counts(3, 1, 1), "partially_ready"],
     [counts(3, 1, 3), "partially_ready"],
     [counts(3, 0, 3), "awaiting_goods"],
+    [{ ...counts(3, 0, 3), arrivedUnallocatedQty: 1 }, "open_decision"],
+    [{ ...counts(3, 0, 2), arrivedUnallocatedQty: 1 }, "to_purchase"],
     [counts(3, 0, 2), "to_purchase"],
     [counts(0, 0, 0), null],
   ])("%j → %s", (c, expected) => {

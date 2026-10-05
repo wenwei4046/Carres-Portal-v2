@@ -106,6 +106,16 @@ export interface SoBatchReadyStock {
   detail: (orderLineId: string) => React.ReactNode;
   /** Any line with an unsaved edit — `Issue PO` waits for a decision on it. */
   pending: boolean;
+  /**
+   * ⭐ THE SAME DOOR FROM ANOTHER SURFACE (owner ruling 2026-10-05: the Sales
+   * Order's `Reserve stock` line action). The count the cell prints as
+   * `{n} available` — free, exact, Carres-owned Units of this line's goods —
+   * or `null` while the read has not answered or failed (never a zero).
+   */
+  availableFor: (orderLineId: string) => number | null;
+  /** Whether the picker under this item line is open, and the one toggle. */
+  isOpen: (orderLineId: string) => boolean;
+  toggle: (orderLineId: string) => void;
 }
 
 /**
@@ -403,6 +413,14 @@ export function useSoBatchReadyStock({
     );
   };
 
+  const toggle = (orderLineId: string) =>
+    setOpenLines((prev) => {
+      const next = new Set(prev);
+      if (next.has(orderLineId)) next.delete(orderLineId);
+      else next.add(orderLineId);
+      return next;
+    });
+
   const detail = (orderLineId: string) => {
     if (!openLines.has(orderLineId)) return null;
     const rows = unitsForLine(orderLineId);
@@ -481,7 +499,14 @@ export function useSoBatchReadyStock({
     );
   };
 
-  return { cell, detail, pending };
+  return {
+    cell,
+    detail,
+    pending,
+    availableFor: (orderLineId) => (q.isPending || q.isError ? null : availableForLine(orderLineId).length),
+    isOpen: (orderLineId) => openLines.has(orderLineId),
+    toggle,
+  };
 }
 
 /**

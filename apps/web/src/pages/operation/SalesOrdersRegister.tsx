@@ -44,7 +44,7 @@ import StatusPill from "@/components/kit/StatusPill";
 // ruling), full-bleed as SO-4 shipped it. The engine owns the toolbar, search,
 // filters, chooser and footer; ListPageShell would wrap a second chrome
 // around the one the engine already draws.
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   GOODS_CATEGORY_WORDS,
   MONTHLY_DEMAND_CATEGORIES,
@@ -59,9 +59,10 @@ import {
   type MonthlyDemandRow,
   SALES_ORDER_STOCK_STATUSES,
   STOCK_ISSUE_LEGEND,
+  STOCK_OPEN_DECISION,
   lineKind,
   stockIssueWord,
-  type SalesOrderStockStatus,
+  type SalesOrderStockVerdict,
 } from "@carres/shared";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
@@ -107,6 +108,7 @@ import {
   useFilterRailOpen,
 } from "./components/workspace-rail";
 import SalesOrderMonthlyDemand from "./SalesOrderMonthlyDemand";
+import { useSoBatchReadyStock } from "./so-batch/ReadyStockCell";
 import { lineConfigBits } from "../dealer/new-order/special-addons-picker";
 import { isRental, lineName, type MoneyState } from "./sales-order-facts";
 import {
@@ -443,9 +445,15 @@ function salesOrderStatusTone(label: string): "success" | "info" | "warning" | "
 const STOCK_NOT_APPLICABLE = "Not applicable";
 const STOCK_UNREAD = "Unavailable";
 const STOCK_LOADING = "Loading…";
-type StockKey = SalesOrderStockStatus | "not_applicable";
+/* ⚠ LOCAL ONLY — the one case the owner has not ruled (goods bought for the
+   order ARRIVED, nothing reserved, nothing usable). It is NOT a status and is
+   never printed as `Awaiting goods`; the owner's ruling replaces this marker
+   with one of the four before the branch ships (shared `stockStatusOfCounts`). */
+const STOCK_OPEN_DECISION_LABEL = "OPEN DECISION";
+type StockKey = SalesOrderStockVerdict | "not_applicable";
 const STOCK_STATUSES: ReadonlyArray<{ key: StockKey; label: string }> = [
   ...SALES_ORDER_STOCK_STATUSES.map(({ key, label }) => ({ key, label })),
+  { key: STOCK_OPEN_DECISION, label: STOCK_OPEN_DECISION_LABEL },
   { key: "not_applicable", label: STOCK_NOT_APPLICABLE },
 ];
 function stockStatusOf(row: RegisterRow): StockKey | null {
@@ -470,12 +478,18 @@ function StockStatusView({ status, issueQty, absence }: { status: StockKey | nul
   if (!status || status === "not_applicable") {
     return <span className="text-kit-slate-11" data-absence="true">{status ? STOCK_NOT_APPLICABLE : absence}</span>;
   }
-  const word = SALES_ORDER_STOCK_STATUSES.find((row) => row.key === status)!;
+  const word = SALES_ORDER_STOCK_STATUSES.find((row) => row.key === status);
   return (
     <span className="inline-flex max-w-full items-center gap-1 whitespace-nowrap" data-testid="stock-status">
-      <Tooltip content={word.legend}>
-        <span className="inline-flex min-w-0"><StatusPill tone={word.tone}>{word.label}</StatusPill></span>
-      </Tooltip>
+      {word ? (
+        <Tooltip content={word.legend}>
+          <span className="inline-flex min-w-0"><StatusPill tone={word.tone}>{word.label}</StatusPill></span>
+        </Tooltip>
+      ) : (
+        <span className="rounded-full border border-dashed border-kit-slate-9 px-2 py-0.5 text-label text-kit-slate-12" data-open-decision="true">
+          {STOCK_OPEN_DECISION_LABEL}
+        </span>
+      )}
       {issueQty > 0 && (
         <Tooltip content={STOCK_ISSUE_LEGEND}>
           <span className="inline-flex min-w-0"><StatusPill tone="warning">{stockIssueWord(issueQty)}</StatusPill></span>
@@ -704,25 +718,7 @@ function ExpandedLines({ row, inspection = false, compact = false }: { row: Regi
       selectable: false,
     })),
   ];
-  if (compact) return <div className="max-h-64 overflow-auto"><table className="w-full text-body" aria-label={`Items on SO-${row.so}`}>
-    <thead className="sticky top-0 bg-kit-slate-3 text-label text-kit-slate-11"><tr><th className="p-2 text-left">Item</th><th className="p-2 text-right">Qty</th><th className="p-2 text-right">Unit price</th><th className="p-2 text-right">Amount</th><th className="p-2 text-left">Stock Status</th></tr></thead>
-    <tbody>{miniLines.map((line, index) => {
-      const source = index < lines.length ? lines[index] : addons[index - lines.length];
-      /* The SAME fact, per line: the server's line status by the order line's
-         own id. A service is not goods; it reads `Service`. */
-      const goodsLine = index < lines.length ? lines[index] : null;
-      const service = line.selectable === false || (goodsLine != null && lineKind(goodsLine.sku) === "service");
-      const lineFact = goodsLine ? row.stockFact?.lines.find((fact) => fact.lineId === goodsLine.id) : undefined;
-      const stockCell = service
-        ? <StatusPill tone="neutral">Service</StatusPill>
-        : <StockStatusView
-            status={row.stockFact ? lineFact?.status ?? "not_applicable" : null}
-            issueQty={lineFact?.issueQty ?? 0}
-            absence={row.stockFact === undefined ? STOCK_LOADING : STOCK_UNREAD}
-          />;
-      return <tr key={line.key} className="border-b border-kit-slate-5"><td className="p-2">{line.item}{line.itemDetail && <div className="text-meta text-kit-slate-11">{line.itemDetail}</div>}</td><td className="p-2 text-right">{line.qty}</td><td className="p-2 text-right whitespace-nowrap">{source.unit_price == null ? "Not recorded" : Number(source.unit_price).toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td><td className="p-2 text-right whitespace-nowrap">{source.unit_price == null ? "Not recorded" : (Number(source.unit_price) * line.qty).toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td><td className="p-2">{stockCell}</td></tr>;
-    })}</tbody>
-  </table></div>;
+  if (compact) return <SalesOrderItemsTable row={row} lines={lines} addons={addons} miniLines={miniLines} />;
   if (inspection) return <div className="space-y-3" data-testid="goods-side-inspection">
     {expansion.isError && <Button variant="ghost" size="sm" onClick={() => void expansion.refetch()}>Retry</Button>}
     {miniLines.map((line) => <Block key={line.key} title={line.item} note={`Qty ${line.qty}`}>
@@ -755,6 +751,75 @@ function ExpandedLines({ row, inspection = false, compact = false }: { row: Regi
     </div>
   );
 }
+
+/**
+ * THE QUICK VIEW'S ITEMS — goods and services with their money and the line's
+ * own `Stock Status` (the server's one fact, by order line id).
+ *
+ * ⭐ `Reserve stock` — owner ruling 2026-10-05. A MANUAL line action, never a
+ * status: where the line is not yet Ready and free exact Units of its goods
+ * are on the shelf, the line says `{n} in stock. Reserve for this order.` and
+ * `Reserve stock` opens the EXISTING reservation door under the line (the SO
+ * Batch Ready Stock picker: `Choose Ready Unit` → `so_batch_save_ready_units`
+ * → `ops_stock_pool_draw`, its eligibility checks and refusals unchanged).
+ * Nothing is reserved by opening it; only a confirmed save binds Units, and
+ * the Stock Status then recomputes from the server. The same table — no new
+ * mini table.
+ */
+function SalesOrderItemsTable({ row, lines, addons, miniLines }: {
+  row: RegisterRow;
+  lines: NonNullable<RegisterRow["o"]["order_lines"]>;
+  addons: NonNullable<RegisterRow["o"]["order_addons"]>;
+  miniLines: GoodsMiniLine[];
+}) {
+  const queryClient = useQueryClient();
+  const readyStock = useSoBatchReadyStock({
+    orderId: row.o.id,
+    so: row.so,
+    onSaved: () => void queryClient.invalidateQueries({ queryKey: ["operation", "orders", "register-facts"] }),
+  });
+  const money = (value: number | string | null | undefined, times = 1) =>
+    value == null ? "Not recorded" : (Number(value) * times).toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return <div className="max-h-96 overflow-auto"><table className="w-full text-body" aria-label={`Items on SO-${row.so}`}>
+    <thead className="sticky top-0 bg-kit-slate-3 text-label text-kit-slate-11"><tr><th className="p-2 text-left">Item</th><th className="p-2 text-right">Qty</th><th className="p-2 text-right">Unit price</th><th className="p-2 text-right">Amount</th><th className="p-2 text-left">Stock Status</th></tr></thead>
+    <tbody>{miniLines.map((line, index) => {
+      const source = index < lines.length ? lines[index] : addons[index - lines.length];
+      /* The SAME fact, per line: the server's line status by the order line's
+         own id. A service is not goods; it reads `Service`. */
+      const goodsLine = index < lines.length ? lines[index] : null;
+      const service = line.selectable === false || (goodsLine != null && lineKind(goodsLine.sku) === "service");
+      const lineFact = goodsLine ? row.stockFact?.lines.find((fact) => fact.lineId === goodsLine.id) : undefined;
+      const lineId = goodsLine?.id ?? null;
+      const inStock = lineId && lineFact && lineFact.status !== "ready" ? readyStock.availableFor(lineId) : null;
+      const open = lineId ? readyStock.isOpen(lineId) : false;
+      const stockCell = service
+        ? <StatusPill tone="neutral">Service</StatusPill>
+        : <div className="flex min-w-0 flex-col items-start gap-1">
+            <StockStatusView
+              status={row.stockFact ? lineFact?.status ?? "not_applicable" : null}
+              issueQty={lineFact?.issueQty ?? 0}
+              absence={row.stockFact === undefined ? STOCK_LOADING : STOCK_UNREAD}
+            />
+            {lineId && inStock != null && inStock > 0 && (
+              <div className="flex flex-wrap items-center gap-2" data-testid={`reserve-stock-offer-${lineId}`}>
+                <span className="text-meta text-kit-slate-11">{reserveStockSentence(inStock)}</span>
+                <Button variant="neutral" size="sm" aria-expanded={open} onClick={() => readyStock.toggle(lineId)}>
+                  {RESERVE_STOCK}
+                </Button>
+              </div>
+            )}
+          </div>;
+      return <Fragment key={line.key}>
+        <tr className="border-b border-kit-slate-5"><td className="p-2 align-top">{line.item}{line.itemDetail && <div className="text-meta text-kit-slate-11">{line.itemDetail}</div>}</td><td className="p-2 text-right align-top">{line.qty}</td><td className="p-2 text-right align-top whitespace-nowrap">{money(source.unit_price)}</td><td className="p-2 text-right align-top whitespace-nowrap">{money(source.unit_price, line.qty)}</td><td className="p-2 align-top">{stockCell}</td></tr>
+        {lineId && open && <tr className="border-b border-kit-slate-5" data-testid={`reserve-stock-door-${lineId}`}><td colSpan={5} className="px-2 pt-2">{readyStock.detail(lineId)}</td></tr>}
+      </Fragment>;
+    })}</tbody>
+  </table></div>;
+}
+
+/** Owner-approved line action words (2026-10-05). */
+const RESERVE_STOCK = "Reserve stock";
+const reserveStockSentence = (n: number) => `${n} in stock. Reserve for this order.`;
 
 function GoodsSummary({ row, onOpen, compact = false }: { row: RegisterRow; onOpen: (row: RegisterRow) => void; compact?: boolean }) {
   const extra = Math.max(0, (row.o.order_lines?.length ?? 0) - 1);

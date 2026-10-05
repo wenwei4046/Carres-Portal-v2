@@ -136,7 +136,8 @@ describe("Stock Status on the Sales Orders list", () => {
     const reads = database(world());
     const body = await listFacts();
     expect(body.failed).toEqual({ obligations: false, cases: false, stock: false });
-    expect(body.facts[A].stock).toMatchObject({ status: "awaiting_goods", arrivedUnallocatedQty: 1, issueQty: 0 });
+    /* A's good piece arrived and nobody reserved it: the owner's open decision, never `Awaiting goods`. */
+    expect(body.facts[A].stock).toMatchObject({ status: "open_decision", arrivedUnallocatedQty: 1, issueQty: 0 });
     expect(body.facts[B].stock).toMatchObject({ status: "awaiting_goods", arrivedUnallocatedQty: 0, issueQty: 1 });
     expect(body.facts[C].stock).toMatchObject({ status: "partially_ready", usableQty: 1, issueQty: 1 });
     expect(body.facts[C].stock.lines).toEqual([expect.objectContaining({ lineId: "c1", status: "partially_ready" })]);

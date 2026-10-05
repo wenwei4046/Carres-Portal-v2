@@ -16,7 +16,7 @@
  *   To purchase      no usable goods yet, and some required quantity is not
  *                    fully purchased
  *   Awaiting goods   no usable goods yet, the required quantity is fully
- *                    purchased, waiting for arrival
+ *                    purchased and the purchased goods have NOT arrived
  *   Partially ready  part of the required quantity is usable, a gap remains
  *   Ready            the whole required quantity is usable AND allocated to
  *                    this order — goods only; it never claims any other
@@ -28,11 +28,27 @@
  * issue indicator `{k} damaged or wrong`, which is not a fifth status. A
  * failed read is not a status either — the reader returns no fact at all.
  * Service lines and lines with no quantity are not goods and are excluded.
+ *
+ * Owner rulings 2026-10-05: exactly FOUR states, no fifth. Available stock
+ * never changes a status by itself — `Reserve stock` is a manual act through
+ * the existing reservation door, and only a confirmed reservation moves the
+ * line toward Ready. ⚠ ONE case fits no state truthfully and is held apart as
+ * `open_decision` until the owner rules (see `stockStatusOfCounts`).
  */
 import { lineKind } from "./line-category";
 import { routeGoodsLinesOf, type RouteGoodsFacts, type RouteGoodsLine } from "./sales-order-route-goods";
 
 export type SalesOrderStockStatus = "to_purchase" | "awaiting_goods" | "partially_ready" | "ready";
+/**
+ * ⚠ NOT A STATUS — the one isolated case the owner has not ruled (2026-10-05):
+ * goods bought for this order ARRIVED but no Unit is reserved to it, and no
+ * part of it is usable. `Awaiting goods` would send staff to chase a supplier
+ * for goods already in the warehouse, so it is never printed as that. The
+ * owner's ruling replaces this value with one of the four, in ONE place
+ * (`stockStatusOfCounts`), before this ships.
+ */
+export const STOCK_OPEN_DECISION = "open_decision" as const;
+export type SalesOrderStockVerdict = SalesOrderStockStatus | typeof STOCK_OPEN_DECISION;
 
 /** The four approved states, in reading order, with their solid-pill tone
  *  (UI MASTER §3: complete green · partial blue · waiting/not started grey;
@@ -48,7 +64,7 @@ export const SALES_ORDER_STOCK_STATUSES = [
     key: "awaiting_goods",
     label: "Awaiting goods",
     tone: "neutral",
-    legend: "No goods are usable for this order yet. The required quantity is purchased and waiting to arrive.",
+    legend: "Waiting for goods from the supplier.",
   },
   {
     key: "partially_ready",
@@ -95,29 +111,30 @@ export interface StockReadinessCounts {
 export interface SalesOrderStockLine extends StockReadinessCounts {
   lineId: string;
   sku: string;
-  status: SalesOrderStockStatus;
+  status: SalesOrderStockVerdict;
 }
 
 export interface SalesOrderStockFact extends StockReadinessCounts {
   /** `null` — the order carries no goods (services only): `Not applicable`. */
-  status: SalesOrderStockStatus | null;
+  status: SalesOrderStockVerdict | null;
   lines: SalesOrderStockLine[];
 }
 
 /** THE ONE SUMMARY RULE. A line and an order are read by the same function;
  *  the order's counts are its lines' counts, each already capped at the
  *  line's own quantity, so one line's surplus never fills another's gap. */
-export function stockStatusOfCounts(c: StockReadinessCounts): SalesOrderStockStatus | null {
+export function stockStatusOfCounts(c: StockReadinessCounts): SalesOrderStockVerdict | null {
   if (c.requiredQty <= 0) return null;
   if (c.usableQty >= c.requiredQty) return "ready";
   if (c.usableQty > 0) return "partially_ready";
-  /* ⚠ REAL GAP — owner decision pending (relayed to the owner 2026-10-05;
-     Orders MASTER § Stock Status). Goods that ARRIVED on this order's own
-     lineage but that no Unit binding gives to it (`arrivedUnallocatedQty`)
-     fit none of the four approved states. Until ruled they read as purchased
-     and not usable; the ruling changes THIS branch and nothing else. */
-  if (c.purchasedQty >= c.requiredQty) return "awaiting_goods";
-  return "to_purchase";
+  if (c.purchasedQty < c.requiredQty) return "to_purchase";
+  /* ⚠ THE ONE ISOLATED RULE — owner decision pending (2026-10-05). Fully
+     purchased, nothing usable, and goods bought for this order have ARRIVED
+     but no Unit is reserved to it. `Awaiting goods` is true only while the
+     purchased goods have NOT arrived, so this case is held apart. The ruling
+     changes THIS line and nothing else. */
+  if (c.arrivedUnallocatedQty > 0) return STOCK_OPEN_DECISION;
+  return "awaiting_goods";
 }
 
 const issueOf = (line: RouteGoodsLine) =>
