@@ -6800,35 +6800,6 @@ export function useSaveSalesOrderRevision(
   });
 }
 
-/** POST / — the office birth door. Returns the new order id + SO number. */
-export function useCreateSalesOrder(
-  opts?: Partial<
-    UseMutationOptions<
-      { id: string; so: number; revision: number },
-      ApiError,
-      { header: Record<string, unknown>; lines: Omit<SaveRevisionLineInput, "id">[] }
-    >
-  >,
-) {
-  const qc = useQueryClient();
-  return useMutation<
-    { id: string; so: number; revision: number },
-    ApiError,
-    { header: Record<string, unknown>; lines: Omit<SaveRevisionLineInput, "id">[] }
-  >({
-    mutationFn: (input) =>
-      apiFetch<{ id: string; so: number; revision: number }>("/api/operation/orders", {
-        method: "POST",
-        body: JSON.stringify(input),
-      }),
-    ...opts,
-    onSuccess: async (...args) => {
-      await qc.invalidateQueries({ queryKey: ["operation", "orders"] });
-      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
-    },
-  });
-}
-
 /** GET /reference/dealers — the create form's dealer picker. */
 export function useOperationDealersRef(
   opts?: Partial<UseQueryOptions<{ dealers: Array<{ id: string; name: string }> }>>,

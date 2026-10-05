@@ -44,6 +44,13 @@ describe("real SO card", () => {
     fireEvent.click(screen.getByRole("button", { name: /Customer/ })); expect(screen.queryByText("Logistics editor")).toBeNull(); expect(screen.getByText("Date editor")).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: /^DO/ })); expect(screen.queryByText("Date editor")).toBeNull(); expect(screen.getByLabelText("Delivery Order")).toBeVisible(); expect(screen.queryByRole("checkbox")).toBeNull();
   });
+  it("prints the confirmed Customer date with the fixed month name, `30 Sep`, never the browser's `30 Sept`", () => {
+    vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(new Date("2026-10-06T04:00:00Z"));
+    try {
+      state.card!.confirmedDate = "2026-09-30"; mount(); fireEvent.click(screen.getByRole("button", { name: "Delivery" }));
+      expect(screen.getByText("30 Sep")).toBeVisible(); expect(screen.queryByText(/Sept/)).toBeNull();
+    } finally { vi.useRealTimers(); }
+  });
   it("never turns failed reads into stock readiness or absence, and hides writers for other roles", () => {
     state.failed = true; mount(); fireEvent.click(screen.getByRole("button", { name: "Delivery" })); expect(screen.queryByText("1/1")).toBeNull(); expect(screen.queryByText("Date not confirmed")).toBeNull(); expect(screen.getAllByText("Unavailable").length).toBe(4); expect(screen.queryByRole("button", { name: /^Customer/ })).toBeNull();
     cleanup(); state.failed = false; state.role = "finance"; mount(); fireEvent.click(screen.getByRole("button", { name: "Delivery" })); expect(screen.queryByRole("button", { name: /^Customer/ })).toBeNull();

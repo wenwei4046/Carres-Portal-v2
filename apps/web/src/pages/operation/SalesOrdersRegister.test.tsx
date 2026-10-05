@@ -1491,11 +1491,63 @@ describe("the Order list rail: read-only fact filters (owner approved 2026-09-22
       order({ id: "b", so: 1502, delivery_date: "2026-11-10" }),
       order({ id: "c", so: 1503, delivery_date: "2026-12-10" }),
     ];
-    mount();
-    fireEvent.change(screen.getByLabelText("Requested delivery month"), { target: { value: "2026-11" } });
-    expect(shown()).toEqual([1502]);
-    fireEvent.click(screen.getByTestId("requested-all"));
-    expect(shown()).toEqual([1501, 1502, 1503]);
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-06T04:00:00Z"));
+    try {
+      mount();
+      fireEvent.change(screen.getByRole("combobox", { name: "Select month" }), { target: { value: "2026-11" } });
+      expect(shown()).toEqual([1502]);
+      fireEvent.click(screen.getByTestId("requested-all"));
+      expect(shown()).toEqual([1501, 1502, 1503]);
+      fireEvent.change(screen.getByRole("combobox", { name: "Select month" }), { target: { value: "2026-12" } });
+      expect(shown()).toEqual([1503]);
+      /* The empty option clears the month, exactly as `All dates` does. */
+      fireEvent.change(screen.getByRole("combobox", { name: "Select month" }), { target: { value: "" } });
+      expect(shown()).toEqual([1501, 1502, 1503]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("Select month is the rail's own select: no month input, its empty option reads its label, never a dash", () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-06T04:00:00Z"));
+    try {
+      mount();
+      const rail = screen.getByTestId("sales-orders-rail");
+      /* A native month input printed `--------- ----` when empty. */
+      expect(rail.querySelector('input[type="month"]')).toBeNull();
+      const select = within(rail).getByRole("combobox", { name: "Select month" }) as HTMLSelectElement;
+      expect(select.tagName).toBe("SELECT");
+      expect(select.value).toBe("");
+      expect(select.options[0]!.textContent).toBe("Select month");
+      const labels = [...select.options].map((option) => option.textContent ?? "");
+      /* The span `Starting month` lists: twelve back, this month, eleven ahead. */
+      expect(labels.slice(1, 2)).toEqual(["Oct 2025"]);
+      expect(labels).toContain("Oct 2026");
+      expect(labels.at(-1)).toBe("Sep 2027");
+      for (const label of labels) expect(label).not.toMatch(/[-–—]/);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("a linked month outside the listed span stays chosen in Select month", () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-06T04:00:00Z"));
+    try {
+      listHookState.data!.orders = [
+        order({ id: "a", so: 1501, delivery_date: "2024-02-10" }),
+        order({ id: "b", so: 1502, delivery_date: "2026-11-10" }),
+      ];
+      mount("/operation/orders?requested=2024-02");
+      expect(shown()).toEqual([1501]);
+      const select = screen.getByRole("combobox", { name: "Select month" }) as HTMLSelectElement;
+      expect(select.value).toBe("2024-02");
+      expect(select.selectedOptions[0]!.textContent).toBe("Feb 2024");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("requested range includes both ends and excludes adjacent dates", () => {
