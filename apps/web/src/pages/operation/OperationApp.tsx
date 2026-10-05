@@ -3,7 +3,6 @@ import { Menu } from "lucide-react";
 import Button from "@/components/kit/Button";
 import Drawer from "@/components/kit/Drawer";
 import CalendarPanel from "./components/rail/CalendarPanel";
-import { PageWorkProvider } from "@/components/working-panel/page-work";
 import PhoneTasksDoor from "./components/rail/PhoneTasksDoor";
 import {
   Navigate,
@@ -336,7 +335,6 @@ export default function OperationApp() {
   }
 
   return (
-    <PageWorkProvider>
     <div
       className="h-screen text-base-900 grid"
       style={{
@@ -730,7 +728,6 @@ export default function OperationApp() {
           wins (BUILD-QUEUE governance). */}
       {phone ? null : <OperationRightRail />}
     </div>
-    </PageWorkProvider>
   );
 }
 

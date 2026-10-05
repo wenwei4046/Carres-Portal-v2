@@ -17,8 +17,10 @@ import { useGoodsName } from "../work/goods-name";
 import type { RegisterRow } from "../sales-order-columns";
 
 export { originalRequestDays } from "./sales-order-card";
-export default function SalesOrderCompactView({ row, salesLocation, items, onOpen, onClose }: {
+export default function SalesOrderCompactView({ row, salesLocation, items, onOpen, onClose, initialModule = "info" }: {
   row: RegisterRow; salesLocation: string; items: ReactNode; onOpen: () => void; onClose: () => void;
+  /** The module tab that opens first: `delivery` when a Delivery task opens the card (Tasks, LOCAL PROPOSAL). */
+  initialModule?: "info" | "delivery";
 }) {
   // Customer is only the final receiver, never an intermediate warehouse.
   const leg = Math.max(0, ...(row.o.delivery_stops ?? []).map(stop => stop.leg));
@@ -65,7 +67,7 @@ export default function SalesOrderCompactView({ row, salesLocation, items, onOpe
   return <div data-testid="sales-order-quick-view"><CompactModuleCard
     key={row.id} {...salesOrderCardHeader(row, salesLocation)}
     closeLabel="Close order" openLabel="Open full page" onOpen={onOpen} onClose={onClose}
-    initialModule="info" modules={[
+    initialModule={initialModule} modules={[
       { key: "info", label: "Info", opensHeaderDetails: true, summary: salesOrderMoneySummary(row), items },
       { key: "delivery", label: "Delivery", summary: [stock, logistics, customer, doFact], items, communication: deliveryCommunication },
     ]}

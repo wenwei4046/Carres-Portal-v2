@@ -141,7 +141,7 @@ function PoSendCard({
   );
 }
 
-export default function PoWindowPanel({ item }: { item: OperationWorkItem }) {
+export default function PoWindowPanel({ item, onSent }: { item: OperationWorkItem; /** The Tasks host's result line, after `PO sent to supplier` is recorded (LOCAL PROPOSAL). */ onSent?: (po: PoWindowPo) => void }) {
   const queryClient = useQueryClient();
   const { window, loading, failed } = usePoWindow(item);
   const demandLeft = (window?.demand.rowIds.length ?? 0) > 0;
@@ -194,7 +194,7 @@ export default function PoWindowPanel({ item }: { item: OperationWorkItem }) {
               po={po}
               open={openPo === po.poId}
               onToggle={(next) => setOpenPo(next ? po.poId : null)}
-              onSent={refresh}
+              onSent={() => { refresh(); onSent?.(po); }}
             />
           ))}
         </section>

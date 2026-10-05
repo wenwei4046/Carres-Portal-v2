@@ -189,11 +189,16 @@ function ReplyProofField({
 export function DeliveryDatesEdit({
   card,
   onDone,
+  onSaved,
   layout = "stack",
   compact = false,
 }: {
   card: DeliveryMonitorCard;
   onDone: () => void;
+  /** Called once with the saved sentence, only after a successful save — the
+   *  Tasks host's result line (LOCAL PROPOSAL 2026-10-05). `onDone` still
+   *  follows, as on every other host. */
+  onSaved?: (sentence: string) => void;
   /** `grid` — the Work route card (Workspace MASTER §5.10 BUILD SHEET): the
    *  same fields and the same save, three per row, 36px buttons. The
    *  Requested date is on the Route already, so the card repeats no fact. */
@@ -242,7 +247,9 @@ export function DeliveryDatesEdit({
         condoRegistration: arrangement?.condo_registration ?? null,
         informationReceivedFrom: from ?? null,
       });
-      toast.success(MONITOR_COPY.deliveryConfirmedDone(fmtDate(date), time ?? null));
+      const sentence = MONITOR_COPY.deliveryConfirmedDone(fmtDate(date), time ?? null);
+      toast.success(sentence);
+      onSaved?.(sentence);
       onDone();
     } catch (err) {
       const message = err instanceof Error ? err.message : MONITOR_COPY.uploadFailed;

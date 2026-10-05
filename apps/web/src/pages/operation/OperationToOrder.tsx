@@ -18,8 +18,6 @@ import SoBatchIssueWorkspace from "./so-batch/SoBatchIssueWorkspace";
 import PoSupplierResultPanel, { useVisiblePoResults } from "./so-batch/PoSupplierResultPanel";
 import { readPoSupplierPreparation } from "./so-batch/PoSupplierBundle";
 import type { IssuedPo } from "./components/PoIssueEvidence";
-import { usePageWork } from "@/components/working-panel/page-work";
-import { useSoBatchPageWork } from "./working-panel-sources";
 
 /**
  * SO BATCH PURCHASE — the orchestrator, and nothing else
@@ -91,10 +89,6 @@ export default function OperationToOrder() {
   // Every scoped response retains the complete rail projection from the same server read.
   const railData = q.data ?? queryClient.getQueryData<SoBatchPurchaseResponse>([...QUERY_KEY, null]);
   const data = q.data;
-  /* LOCALHOST PROPOSAL (owner flow 2026-10-05): the right Working Panel opens
-     on this page's highest-priority PO window — earliest Missed, then today's
-     due round, then the next round. Work engine items only; nothing ticks. */
-  usePageWork(useSoBatchPageWork(data));
 
   const documents = useMemo(() => {
     if (!selections || !data) return [];
