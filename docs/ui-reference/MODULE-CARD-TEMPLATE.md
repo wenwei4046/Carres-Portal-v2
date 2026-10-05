@@ -114,13 +114,13 @@ start closed.
   number; the dark Header `Close order` × closes the whole Register Drawer and returns to its opener.
   Neither control saves business facts or changes current or historical issued documents.
 
-## Embedded presentation — owner confirmed 2026-10-05 · BUILT (PO full page `Sales Order` view, PR #1926, `dc631e1a`); owner acceptance owed
+## Embedded presentation — owner confirmed 2026-10-05 · MERGED (PR #1926, `dc631e1a`; PO full page `Sales Order` view), deployment not verified — not live; owner acceptance owed
 
 `<CompactModuleCard presentation="embedded" …>` draws one record inside a host module's tab. The host owns
 the outer Header, its tabs and every business action; the host's own tabs and which one opens first follow
 UI MASTER's shared module page flow (§0.2, §4.3.1), not this component. A host shows a `Sales Order` tab
 only when at least one Sales Order is linked; an empty list draws nothing. Hosts: the Purchase Order full
-page (`Sales Order` view, built) and the Purchase Order working panel and round panel (approved; their
+page (`Sales Order` view, merged, deployment not verified) and the Purchase Order working panel and round panel (approved; their
 work-content layouts are localhost-first in the Purchasing lane). Standalone and embedded rules are
 separate; nothing below changes a standalone card. Numbers for both presentations: 01 §7.6.
 

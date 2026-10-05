@@ -50,7 +50,7 @@ not a current pattern: do not copy it from a neighbouring page. Live examples ar
 | Register / listing | `register/DataGrid` | `components/register/DataGrid.tsx` | §6.0 · §6.2 · SO-derived template owner accepted 2026-10-01 · built; adoption per page |
 | Goods expansion | `GoodsMiniTable` + connector | `pages/operation/components/GoodsMiniTable.tsx` · `ConnectedSections.tsx` | §6.9 · built |
 | Simple and document tables | `DataTable` · `DocumentTable` · `TotalsSummary` · `TableScroller` | `components/kit/*` · `components/TableScroller.tsx` | §3 · built |
-| **Compact module card** (the right Working Panel: identity header, Info and module tabs, module summary, editors, Items, Communication, Timeline) | **`CompactModuleCard`** in kit `Drawer variant="compact-card"` — pass the header facts once and each module's own facts, editors and items | `components/kit/CompactModuleCard.tsx` · `/ui#compact-card` · contract `docs/ui-reference/MODULE-CARD-TEMPLATE.md` | §4.3 · shared component built · Sales Orders adoption PRODUCTION VERIFIED 2026-10-05 (PR #1893/#1896/#1897, `2ce91e2d`) · other modules per §4.3 table |
+| **Compact module card** (the right Working Panel: identity header, Info and module tabs, module summary, editors, Items, Communication, Timeline) | **`CompactModuleCard`** in kit `Drawer variant="compact-card"` — pass the header facts once and each module's own facts, editors and items | `components/kit/CompactModuleCard.tsx` · `/ui#compact-card` · contract `docs/ui-reference/MODULE-CARD-TEMPLATE.md` | §4.3 · shared component built · Sales Orders adoption PRODUCTION VERIFIED 2026-10-05 (PR #1893/#1896/#1897, `2ce91e2d`) · embedded presentation MERGED (PR #1926), deployment not verified · other modules per §4.3.4 table |
 | Object header + tabs | `SalesOrderTabs` recipe | `pages/operation/SalesOrderTabs.tsx` | §4.1 · accepted; page-owned — no generic ObjectHeader/ObjectPage kit API (KIT GAP) |
 | Object facts | `Block` — the one card · `Panel` · `StatusPill` · `EmptyState` · `Loading` | `components/kit/*` | LOCKED · built |
 | Forms | `Input` · `Textarea` · `Select` · `SearchInput` · `Checkbox` · `DatePicker` · `FieldFrame` | `components/kit/*`, `field-recipe.ts` | LOCKED · built |
@@ -148,7 +148,8 @@ coverage per module (§4.3, §6.1). Tests or shared-component imports alone do n
    older generic example. If two current explicit rulings still conflict, record the exact
    consequence as a REAL GAP (§7.2); never pick whichever gives the preferred layout, and never
    rewrite locked values or approved action placement to make a document shorter.
-9. **Every number states its trigger** — viewport width, grid canvas width, available content canvas
+9. **Every number states its trigger** (a documentation convention the owner requested 2026-10-05, not a
+   UI rule) — viewport width, grid canvas width, available content canvas
    (after shell rails), card width or pointer type. A number without its trigger is how chats end up
    copying different things; 01 §7 carries the trigger beside each measurement.
 10. **Module Settings completion — owner ruling 2026-10-05.** When a module's build is complete, the
@@ -717,7 +718,7 @@ pending review from completed stock, payment, delivery or approval. No new panel
 | Component | `CompactModuleCard` | the same component in its embedded presentation |
 
 A single-SO card whose Header is already that SO does not embed the same SO again. A host shows its
-`Sales Order` tab only when a Sales Order is linked. **BUILT** — PR #1926 (`dc631e1a`): the PO full page
+`Sales Order` tab only when a Sales Order is linked. **MERGED (PR #1926, `dc631e1a`), deployment not verified (production reported `9418faa6a` at check time; deploy run in progress) — not live**: the PO full page
 `Sales Order` view, one SO builder (`sales-order-card.tsx`) feeding the standalone and embedded cards, and
 the host entry `EmbeddedSalesOrders({ orderIds })`; owner acceptance owed. The PO working panel and round
 panel adopt it as approved hosts (their work-content layouts are localhost-first). Complete defaults,
@@ -731,10 +732,11 @@ hidden parts, states and entry points: the contract's "Embedded presentation"; n
 | Delivery tab (inside the SO card) | `DeliveryBrief` summary + Delivery-owned editors | DEPLOYED with the SO card; editors reuse Delivery's governed doors | Delivery MASTER |
 | SO Batch Purchase quick view / Cards | `SoBatchCompactView`; opens on main tab `SO Batch Purchase` (§4.3.1, target) | DEPLOYED (#1891); its header still shows the current request with a today-based countdown — the original-date fix is LOCAL ONLY in the Purchasing lane | Purchasing MASTER §9.1 |
 | Receiving (GRN) | `ReceivingCompactView`: supplier/source + GRN No, `referenceStatus` `Cancelled` | DEPLOYED (#1894); wrapped summary labels PRODUCTION VERIFIED (#1906, `d4cca587`) | Purchasing MASTER §9.4 |
-| Purchase Orders full page | `Sales Order` view = `EmbeddedSalesOrders` (embedded presentation) | BUILT (PR #1926, `dc631e1a`); owner acceptance owed | Purchasing MASTER §9.3 |
-| Purchase Orders (PO working panel) | supplier · PO No + PO state; Info · `Purchase Order` (default) · `Sales Order` (embedded, §4.3.3) | tabs owner-approved 2026-10-05; the layout of the work content is PROPOSAL, localhost first; a `GRN` tab is pending owner decision; PO quick panel NOT BUILT (stale PR #1859 not authorised) | Purchasing MASTER §9.3 |
-| SO Batch Purchase purchasing round | round time/date + `Missed` / `Done`; Info · `SO Batch Purchase` (default) · `Sales Order` (embedded) | tabs owner-approved 2026-10-05; the layout of the work content is PROPOSAL, localhost only; NOT BUILT | Purchasing MASTER §5.6.1 |
-| Manual Purchase Request | Info · `Manual Purchase Request` (default) · related `Sales Order` (embedded) per its approved capability | APPROVED TARGET / NOT BUILT (owner 2026-10-05) | Purchasing MASTER §9.2 |
+| Shared embedded SO component (kit `CompactModuleCard presentation="embedded"`, `EmbeddedSalesOrders`, `sales-order-card`) | one SO builder for standalone and embedded cards | MERGED (PR #1926, `dc631e1a`), deployment not verified (production reported `9418faa6a` at check time; deploy run in progress) — not live | UI MASTER §4.3.3 · card contract |
+| Purchase Orders full page | `Sales Order` view = `EmbeddedSalesOrders` (embedded presentation) | MERGED (PR #1926, `dc631e1a`), deployment not verified (production reported `9418faa6a` at check time; deploy run in progress) — not live; owner acceptance owed | Purchasing MASTER §9.3 |
+| Purchase Orders (PO working panel) | supplier · PO No + PO state; Info · `Purchase Order` (default) · `Sales Order` (embedded, §4.3.3) | APPROVED TARGET / NOT BUILT — tabs owner-approved 2026-10-05; the layout of the work content is PROPOSAL, localhost first; a `GRN` tab is pending owner decision (stale PR #1859 not authorised) | Purchasing MASTER §9.3 |
+| SO Batch Purchase purchasing round | round time/date + `Missed` / `Done`; Info · `SO Batch Purchase` (default) · `Sales Order` (embedded) | APPROVED TARGET / NOT BUILT — tabs owner-approved 2026-10-05; the layout of the work content is PROPOSAL, localhost only | Purchasing MASTER §5.6.1 |
+| Manual Purchase Request | Info · `Manual Purchase Request` (default) · related `Sales Order` (embedded) per its approved capability | APPROVED TARGET / NOT BUILT — tabs owner-approved 2026-10-05; the layout of the work content is PROPOSAL | Purchasing MASTER §9.2 |
 | Warehouse | a `Warehouse` tab in the shared panel | APPROVED TARGET / NOT BUILT (§0.2) | Stock MASTER |
 | Workspace Work right panel | Workspace §5.10 composition | Governed by `docs/workspace/MASTER.md` §5.10 (deployed §5.9 Logistics; rest NOT BUILT); not yet aligned to this card | Workspace MASTER |
 
@@ -758,7 +760,7 @@ hidden parts, states and entry points: the contract's "Embedded presentation"; n
 **Open items on the card** are in §7: the compact-card token decision, 40px phone tabs, the editable
 `To` versus Work's recorded channels, the native Input/Textarea cascade, the preview-versus-kit
 differences, the link-style button inside the card and "several SOs → list first". (↗ renders only when
-the page passes `onOpen` — BUILT in PR #1926.)
+the page passes `onOpen` — MERGED in PR #1926, deployment not verified.)
 
 ## §4.4 · Document preview — the document the other party receives
 
@@ -1069,7 +1071,7 @@ actions. **A component existing is not whole-page adoption** — each page prove
 | Search | SUPPORTED | built-in box; `searchPlaceholder` · `searchScope` · `initialSearch` · `onSearchChange` · `searchPresentation="responsive"` (`Search: {query}` chip) | 220×32 desktop under the template; the accessible hint names only fields actually searched; server search is the page's reader |
 | Table / Cards | SUPPORTED | `presentationTools` + `renderResults` (Cards consume the grid's exact sorted/filtered result) · `presentationKey` | Adopted: Sales Orders, SO Batch, Purchase Orders, Receiving. Kit `Tabs` segmented with `Table2` / `LayoutGrid` icons and visible words |
 | Page tools `⋯` | SUPPORTED | `presentationTools` menu: Export · `outputActions` · `pageToolsItems` · Columns | Entries icon + text; page tools never write business records |
-| Columns (show/hide, grouped chooser) | SUPPORTED — parent columns only; default-hidden columns stay hidden (PR #1927 `a78e527c4`, MERGED, deploy verification pending) | column `defaultHidden` · `chooserGroup` · `chooserGroupOrder` | Expansion columns are not listed (§6.3, KIT GAP) |
+| Columns (show/hide, grouped chooser) | SUPPORTED — parent columns only; default-hidden columns stay hidden (PR #1927 `a78e527c4`, MERGED, deployment not verified) | column `defaultHidden` · `chooserGroup` · `chooserGroupOrder` | Expansion columns are not listed (§6.3, KIT GAP) |
 | Sort | SUPPORTED | column `sortable` · `sortFn` · `onSortChange` | 12px arrow; grouped listings sort the whole register once |
 | Per-column filter | SUPPORTED | column `filterable` · `filterType` · `filterValue` · `dateValue` · `numberValue` | Every filter matches its column type (dates get presets and Between…); paged registers use `serverColumns` |
 | Active conditions | SUPPORTED | `activeConditions` · `onClearConditions` · `reserveConditionRow` | One removable strip for rail + column + search conditions; neutral `Clear all` |
@@ -1247,7 +1249,7 @@ recorded in §6.0; the compact card in §4.3.4.
    A layout saves order, widths, visibility and sort ONLY — never search, filters or group state;
    `Reset columns` restores the company layout (and clears sort). Browser-remembered layout per page key
    applies everywhere. Rollout beyond Purchase Orders waits for owner acceptance of the pilot.
-   **One layout rule (MERGED, deploy verification pending):** `register/DataGrid`: every layout writer
+   **One layout rule (MERGED, deployment not verified):** `register/DataGrid`: every layout writer
    passes through one rule (`settleLayout`) — on a pristine layout pin, drag, hide or show changes only
    that column and default-hidden columns stay hidden until shown; an arranged layout keeps an empty
    hidden literal; `Reset columns` alone returns to pristine (PR #1927, `a78e527c4`).

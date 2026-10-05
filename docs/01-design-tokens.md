@@ -311,9 +311,11 @@ obsolete generic sizing/layout tables. It records the current shared recipes and
 rulings; it does not approve every implementation difference. Values are CSS pixels unless noted.
 `KEEP` below means retain the stated admitted recipe in its scope, not production verification.
 A proposed value is **PROPOSAL / NOT LAW** until reviewed. Source inspection does not prove that a
-font loaded, a control is accessible, or a page rendered correctly. **Every measurement names its
-trigger** (owner-required 2026-10-05): viewport width, grid canvas, available content canvas, container,
-card width or pointer — §7.5 carries the key. A number without its trigger is not usable.
+font loaded, a control is accessible, or a page rendered correctly. **Trigger column — a documentation
+convention, not a new UI rule:** the owner asked on 2026-10-05 to "write down from top to toe … every chat
+knows the measurement", so each measurement names what switches it (viewport width, grid canvas, available
+content canvas, container, card width or pointer); §7.5 carries the key. A number without its trigger is
+not usable.
 
 **Source basis:** application files in the inspected checkout, compared with main
 `36e2840dd8dcce6eeb77252417ab57febbd6848d` for the previously recorded shared-source scope.
@@ -394,7 +396,7 @@ touch targets 40px. Table/Cards uses the shared segmented `Tabs` with canonical 
 words: outer 32px, border 1 / padding 2 / option 26, radius 6; option 13/18, horizontal padding 10,
 selected blue-3 / blue-11 / 600; outer 40px touch.
 
-**Trigger key** (owner-required 2026-10-05: every measurement names what switches it):
+**Trigger key** (documentation convention, owner request 2026-10-05; it records what switches each value):
 `viewport` = browser width (`@media`, ≥768 desktop / <768 phone-touch) · `grid canvas` = the DataGrid's
 own width (`narrowCanvas` below 768) · `available canvas` = content width after the shell rails ·
 `container` = the host region's available width · `card` = the card's own width (container queries) ·
@@ -463,7 +465,7 @@ own width (`narrowCanvas` below 768) · `available canvas` = content width after
 below: the card's own width (CSS container queries), never the viewport — except where a row names
 the viewport (the PDF Close button).** The card's rules live in
 [`ui-reference/MODULE-CARD-TEMPLATE.md`](ui-reference/MODULE-CARD-TEMPLATE.md); its law in UI MASTER §4.3.
-The embedded `Sales Order` presentation's numbers joined on 2026-10-05 (PR #1926, `dc631e1a`).
+The embedded `Sales Order` presentation's numbers joined on 2026-10-05 (PR #1926, `dc631e1a`; merged, deployment not verified).
 
 **Scope and authority:** this table describes the existing shared compact card, not every full-page table or the whole kit. CSS px throughout; padding is vertical × horizontal unless otherwise stated. Source is `apps/web/src/components/kit/compact-card.module.css`, plus `DeliveryBrief.tsx`, `field-recipe.ts`, `PdfPreview.tsx` and `DialogFrame.tsx`. These are implementation measurements, not new independently editable token definitions. Canonical tokens remain in01; update source and this lookup together. Do not copy these values into a page-local stylesheet.
 
