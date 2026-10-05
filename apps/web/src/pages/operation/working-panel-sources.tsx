@@ -22,6 +22,7 @@ import {
 import CompactModuleCard, { type CardFact, type CardModule } from "@/components/kit/CompactModuleCard";
 import DocumentTable from "@/components/kit/DocumentTable";
 import { fmtDate } from "@/lib/fmt-date";
+import EmbeddedSalesOrders, { linkedSalesOrderIds } from "./components/EmbeddedSalesOrders";
 import type { PageWorkBucket, PageWorkItem, PageWorkSource } from "@/components/working-panel/page-work";
 import { useOpenWorkSet, type WorkRow } from "./use-open-work";
 
@@ -95,6 +96,11 @@ export function useSoBatchPageWork(data: SoBatchPurchaseResponse | undefined): P
         const key = row.source.object.id;
         const bucket = bucketOfPoWindow(row, now);
         const window = windows.get(key) ?? null;
+        /* The round's Sales Orders: its demand lines and the POs issued from it. */
+        const orderIds = [...new Set([
+          ...(data?.rows ?? []).filter((line) => line.poWindow === key).map((line) => line.orderId),
+          ...(window?.pos ?? []).flatMap((po) => po.orderIds),
+        ])];
         return {
           key: row.id,
           bucket,
@@ -102,17 +108,17 @@ export function useSoBatchPageWork(data: SoBatchPurchaseResponse | undefined): P
           label: row.source.object.label,
           action: row.line,
           render: (onClose) => (
-            <PoWindowCard row={row} window={window} missed={bucket === "missed"} onClose={onClose}
+            <PoWindowCard row={row} window={window} orderIds={orderIds} missed={bucket === "missed"} onClose={onClose}
               onOpen={() => navigate(row.destination)} />
           ),
         };
       });
     return { pageKey: "so-batch", pageName: "SO Batch Purchase", state: work.state, items, retry: work.retry };
-  }, [work.items, work.state, work.retry, windows, navigate]);
+  }, [work.items, work.state, work.retry, windows, data, navigate]);
 }
 
-function PoWindowCard({ row, window, missed, onClose, onOpen }: {
-  row: WorkRow; window: PoWindowWork | null; missed: boolean; onClose: () => void; onOpen: () => void;
+function PoWindowCard({ row, window, orderIds, missed, onClose, onOpen }: {
+  row: WorkRow; window: PoWindowWork | null; orderIds: readonly string[]; missed: boolean; onClose: () => void; onOpen: () => void;
 }) {
   const parts = parsePoWindowKey(row.source.object.id);
   const W = PO_WINDOW_WORK_COPY;
@@ -136,9 +142,9 @@ function PoWindowCard({ row, window, missed, onClose, onOpen }: {
         ]} rows={suppliers.map((s, i) => ({ key: `${s.supplierId ?? "none"}-${i}`, cells: { supplier: s.supplier, items: s.items, orders: s.orders } }))} />
       ) : undefined,
     },
-    /* The shared embedded `Sales Order` tab lands with #1926; until then the
-       tab is shown unavailable — no SO content of our own. */
-    { key: "sales-order", label: "Sales Order", disabled: true, communication: null },
+    /* The shared embedded `Sales Order` tab (#1926): read-only, one embedded
+       card per linked Sales Order; shown only when one is linked. */
+    ...salesOrderModule(orderIds),
   ];
   return (
     <CompactModuleCard
@@ -154,6 +160,14 @@ function PoWindowCard({ row, window, missed, onClose, onOpen }: {
       modules={modules}
     />
   );
+}
+
+/** The host's `Sales Order` tab: the shared embedded component, only when a
+ *  Sales Order is linked (UI MASTER §4.3 embedded presentation). */
+function salesOrderModule(orderIds: readonly string[]): CardModule[] {
+  return orderIds.length
+    ? [{ key: "sales-order", label: "Sales Order", communication: null, content: <EmbeddedSalesOrders orderIds={orderIds} /> }]
+    : [];
 }
 
 /* ── Sales Orders — the order's own card ─────────────────────────────────── */
@@ -194,7 +208,7 @@ export function useSalesOrdersPageWork<Row extends { id: string }>(
 /* ── Purchase Orders — one PO per card ───────────────────────────────────── */
 
 export function usePurchaseOrdersPageWork(
-  rows: ReadonlyArray<{ id: string; supplierName: string }>,
+  rows: ReadonlyArray<{ id: string; supplierName: string; sources: ReadonlyArray<{ kind: string; orderId: string | null }> }>,
   openPo: (poId: string) => void,
 ): PageWorkSource {
   const work = useStableWork();
@@ -212,6 +226,7 @@ export function usePurchaseOrdersPageWork(
           action: row.line,
           render: (onClose) => (
             <GenericWorkCard row={row} mainTab="Purchase Order" reference={po?.supplierName ?? row.recipient ?? ""}
+              salesOrderIds={po ? linkedSalesOrderIds(po.sources) : []}
               onClose={onClose} onOpen={() => openPo(row.source.object.id)} />
           ),
         };
@@ -225,8 +240,8 @@ export function usePurchaseOrdersPageWork(
  * its record: the record in the header, the source's own sentences in the
  * page's tab, `Sales Order` unavailable until the shared embedded tab lands.
  */
-function GenericWorkCard({ row, mainTab, reference, onClose, onOpen }: {
-  row: WorkRow; mainTab: string; reference?: string; onClose: () => void; onOpen: () => void;
+function GenericWorkCard({ row, mainTab, reference, salesOrderIds = [], onClose, onOpen }: {
+  row: WorkRow; mainTab: string; reference?: string; salesOrderIds?: readonly string[]; onClose: () => void; onOpen: () => void;
 }) {
   return (
     <CompactModuleCard
@@ -243,7 +258,7 @@ function GenericWorkCard({ row, mainTab, reference, onClose, onOpen }: {
         { key: "info", label: "Info", communication: null,
           summary: row.dueIso ? [{ key: "due", label: "Working day", value: fmtDate(row.dueIso) }] : [] },
         { key: "main", label: mainTab, communication: null, summary: [workFact(row)] },
-        ...(mainTab === "Sales Order" ? [] : [{ key: "sales-order", label: "Sales Order", disabled: true, communication: null }]),
+        ...(mainTab === "Sales Order" ? [] : salesOrderModule(salesOrderIds)),
       ]}
     />
   );

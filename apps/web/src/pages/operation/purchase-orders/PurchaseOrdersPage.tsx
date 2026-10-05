@@ -544,6 +544,16 @@ export default function PurchaseOrdersPage() {
      `OwnerBadge` already degrades to "PO Duty not assigned" on a null holder,
      which is the right thing to show. */
   const requiredReadError = posQ.isError || suppliersQ.isError || warehouseQ.isError;
+  /* LOCALHOST PROPOSAL (owner flow 2026-10-05): the right Working Panel opens
+     on this page's highest-priority PO work — Work engine items for a PO.
+     Registered BEFORE any early return (Rules of Hooks); `openObject` is
+     declared further down and reached through a ref. */
+  const openObjectRef = useRef<(row: RegisterRow) => void>(() => {});
+  const openPoById = useCallback((poId: string) => {
+    const row = allRows.find((candidate) => candidate.id === poId);
+    if (row) openObjectRef.current(row);
+  }, [allRows]);
+  usePageWork(usePurchaseOrdersPageWork(allRows, openPoById));
   if (requiredReadError) {
     return (
       <div ref={canvasRef} className="flex h-full min-h-0 flex-col bg-kit-canvas">
@@ -675,15 +685,7 @@ export default function PurchaseOrdersPage() {
       return next;
     });
   };
-  /* LOCALHOST PROPOSAL (owner flow 2026-10-05): the right Working Panel opens
-     on this page's highest-priority PO work — Work engine items for a PO. */
-  const openObjectRef = useRef(openObject);
   openObjectRef.current = openObject;
-  const openPoById = useCallback((poId: string) => {
-    const row = allRows.find((candidate) => candidate.id === poId);
-    if (row) openObjectRef.current(row);
-  }, [allRows]);
-  usePageWork(usePurchaseOrdersPageWork(allRows, openPoById));
   /** The actual receipt, in Receiving, which owns it. */
   const openReceipt = (receiptId: string) =>
     navigate(`/operation?tab=receiving&session=${encodeURIComponent(receiptId)}`);
