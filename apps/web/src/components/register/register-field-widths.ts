@@ -141,6 +141,15 @@ export const REGISTER_FIELD_WIDTH = {
   shortFact: 96,
   /** A small count with a two-line header: Stair carry items, Instalment months. */
   smallCount: 120,
+  /**
+   * `Stock Status` — the Sales Order's goods readiness pill and, beside it,
+   * the amber issue indicator `{k} damaged or wrong`. MEASURED 2026-10-05 in
+   * the real shell (Inter 11/500 pills): the widest status pill alone is
+   * `Awaiting goods` 96.9px; the widest cell is `Awaiting goods` +
+   * `12 damaged or wrong` 230.3px (4px gap included) + 16px padding = 246.3;
+   * at 248 Chrome still shrank one pill by its sub-pixel remainder, so 256.
+   */
+  stockStatus: 256,
 } as const;
 
 export type RegisterFieldWidth = keyof typeof REGISTER_FIELD_WIDTH;

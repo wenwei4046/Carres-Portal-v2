@@ -252,6 +252,43 @@ describe("RECEIVING counts this line's share, and keeps counting after a receipt
     );
     expect(lines.map((l) => l.sources[0]!.receivedQty)).toEqual([2, 1]);
   });
+
+  it("lineage order is the order the shares were WRITTEN, not the order the lines are listed", () => {
+    const lines = routeGoodsLinesOf(
+      facts({
+        lines: [
+          { id: "L1", sku: "B1201S", label: "a", qty: 2 },
+          { id: "L2", sku: "B1201S", label: "b", qty: 2 },
+        ],
+        /* L2's share was written first. */
+        sources: [
+          { order_line_id: "L2", po_id: "PO-1", po_line_id: "pl1", qty: 2 },
+          { order_line_id: "L1", po_id: "PO-1", po_line_id: "pl1", qty: 2 },
+        ],
+        purchaseOrders: [po({ id: "PO-1", lines: [{ id: "pl1", sku: "B1201S", qty: 4, received_qty: 3, damaged_qty: 1 }] })],
+      }),
+    );
+    expect(lines.map((l) => l.sources[0]!.receivedQty)).toEqual([1, 2]);
+    /* The damaged piece came instead of a good one: it falls on the share the
+       good pieces left short (L1), never on L2, which is already whole. */
+    expect(lines.map((l) => l.sources[0]!.damagedOrWrongQty)).toEqual([1, 0]);
+  });
+
+  it("⭐ a PO line shared by TWO Sales Orders is never received for both: the earlier share fills first", () => {
+    const shared = {
+      sources: [
+        { order_id: "SO-A", order_line_id: "A1", po_id: "PO-1", po_line_id: "pl1", qty: 1 },
+        { order_id: "SO-B", order_line_id: "B1", po_id: "PO-1", po_line_id: "pl1", qty: 1 },
+      ],
+      purchaseOrders: [po({ id: "PO-1", lines: [{ id: "pl1", sku: "B1201S", qty: 2, received_qty: 1 }] })],
+    };
+    const a = routeGoodsLinesOf(facts({ ...shared, orderId: "SO-A", lines: [{ id: "A1", sku: "B1201S", label: "a", qty: 1 }] }));
+    const b = routeGoodsLinesOf(facts({ ...shared, orderId: "SO-B", lines: [{ id: "B1", sku: "B1201S", label: "b", qty: 1 }] }));
+    expect(a[0]!.sources).toHaveLength(1);
+    expect(b[0]!.sources).toHaveLength(1);
+    expect([a[0]!.sources[0]!.receivedQty, b[0]!.sources[0]!.receivedQty]).toEqual([1, 0]);
+    expect(b[0]!.onOrderQty).toBe(1);
+  });
 });
 
 describe("STOCK reads the Units bound to the line", () => {
@@ -290,6 +327,39 @@ describe("STOCK reads the Units bound to the line", () => {
       }),
     );
     expect(lines.map((l) => l.unitCodes)).toEqual([["U1"], ["U2"]]);
+  });
+
+  it("a reserved Unit Stock controls is bound but not usable; one cleared for sale is usable", () => {
+    const [line] = routeGoodsLinesOf(
+      facts({
+        lines: [{ id: "L1", sku: "B1201S", label: "a", qty: 3 }],
+        units: [
+          { unit_code: "U1", status: "reserved", reserved_order_line_id: "L1", sku: "B1201S", condition: "damaged" },
+          { unit_code: "U2", status: "reserved", reserved_order_line_id: "L1", sku: "B1201S", needs_repair: true },
+          { unit_code: "U3", status: "reserved", reserved_order_line_id: "L1", sku: "B1201S", condition: "damaged", sale_cleared_at: "2026-09-30T00:00:00Z" },
+        ],
+      }),
+    );
+    expect(line).toMatchObject({ readyQty: 3, atRiskQty: 2, usableQty: 1, purchasedQty: 3 });
+  });
+
+  it("an incoming Unit bound by `Use this PO` is purchased cover, never ready", () => {
+    const [line] = routeGoodsLinesOf(
+      facts({ units: [{ unit_code: "U9", status: "incoming", reserved_order_line_id: "L1", sku: "B1201S", po_line_id: "free-pl" }] }),
+    );
+    expect(line).toMatchObject({ readyQty: 0, usableQty: 0, purchasedQty: 1, unitCodes: [] });
+  });
+
+  it("a Unit born on the lineage PO line and that line's share cover ONCE (Purchasing's arithmetic)", () => {
+    const [line] = routeGoodsLinesOf(
+      facts({
+        lines: [{ id: "L1", sku: "B1201S", label: "a", qty: 2 }],
+        sources: [{ order_line_id: "L1", po_id: "PO-1", po_line_id: "pl1", qty: 2 }],
+        purchaseOrders: [po({ id: "PO-1", lines: [{ id: "pl1", sku: "B1201S", qty: 2, received_qty: 2 }] })],
+        units: [{ unit_code: "U1", status: "reserved", reserved_order_line_id: "L1", sku: "B1201S", po_line_id: "pl1" }],
+      }),
+    );
+    expect(line).toMatchObject({ usableQty: 1, purchasedQty: 2, arrivedUnallocatedQty: 1 });
   });
 });
 

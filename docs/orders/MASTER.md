@@ -737,7 +737,7 @@ or approval of the whole SO Blueprint is implied by this local approval.
 ### Accepted register template — authorised BUILD/DELIVERY
 
 The current owner-approved register, quick view and object composition is defined in
-“Sales Order accepted shared UI template” below and UI MASTER “Confirmed shared template”.
+“Sales Order accepted shared UI template” below and UI MASTER §6.0 (accepted listing template).
 The dedicated controller is authorised through merge, deployment and authenticated verification.
 Population, permission, export and business-write ownership remain governed by this MASTER.
 
@@ -6939,7 +6939,7 @@ This delivery does not resume unrelated Route/Customer/Monthly preview work.
 Default None; existing ⋯ tools offers None / Delivery Status / Stock Status / Payment Status.
 Use one grouping at a time, section title + filtered SO count + collapse, shared column headers
 and one toolbar/search/selection/export engine. Row status pills remain. Reuse UI MASTER
-“Optional register grouping”. Built and merged in PR #1850; the former 72-order local pilot
+§6.2 grouping (optional `Group by`). Built and merged in PR #1850; the former 72-order local pilot
 is historical acceptance evidence, not the authenticated production dataset.
 Document discovery stays governed by the earlier related-document section; Amendment No, not
 Amendment status. Existing unnumbered amendments are Not recorded, confirmed none No amendment,

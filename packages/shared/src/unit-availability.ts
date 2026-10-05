@@ -84,6 +84,29 @@ export function unitAvailability(unit: {
   return "not_available";
 }
 
+/**
+ * Is a Unit the Sales Order already holds AT RISK? (Stock MASTER §4 / §6,
+ * 0589 `stock_unit_report_problem`: "an existing SO reservation stays linked
+ * but is shown at risk".)
+ *
+ * RESERVED OUTRANKS CONTROL above, so availability alone can never say it: a
+ * reserved Unit stays `reserved` while it is damaged or waiting for repair.
+ * This reads the SAME control facts the availability arithmetic reads for a
+ * pool Unit — repair, and damage not cleared for sale (0589's fifth fact) —
+ * applied to a Unit an order holds. A delivered (`sold`) Unit is history,
+ * never at risk.
+ */
+export function isReservedUnitAtRisk(unit: {
+  status: string | null | undefined;
+  needsRepair?: boolean | null;
+  condition?: string | null;
+  saleClearedAt?: string | null;
+}): boolean {
+  if (unit.status !== "reserved") return false;
+  if (unit.needsRepair) return true;
+  return CONTROLLED_CONDITIONS.has(unit.condition ?? "") && !unit.saleClearedAt;
+}
+
 /** Can these goods be promised to a new customer? The one question. */
 export function isUnitAvailable(unit: {
   status: string | null | undefined;

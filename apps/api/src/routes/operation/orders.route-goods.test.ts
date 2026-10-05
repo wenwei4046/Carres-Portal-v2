@@ -60,7 +60,7 @@ const rows = {
     { id: "L1", sku: "B1201S", qty: 1 },
     { id: "L2", sku: "DELIVERY", qty: 1 },
   ],
-  po_line_sources: [{ order_line_id: "L1", po_id: "PO-1", po_line_id: "pl1", qty: 1 }],
+  po_line_sources: [{ id: "s1", order_id: ORDER, order_line_id: "L1", po_id: "PO-1", po_line_id: "pl1", qty: 1, created_at: "2026-09-03T03:00:00Z" }],
   purchase_orders: [
     { id: "PO-1", status: "open", supplier_id: "s1", destination_id: "d1", placed_at: "2026-09-03T03:00:00Z", official_delivery_date: "2026-09-18", eta_date: "2026-09-18", version: 2, suppliers: { name: "Ohana" } },
   ],
@@ -74,7 +74,7 @@ const rows = {
     { po_id: "PO-1", po_version: 1, kind: "confirmed_sent" },
     { po_id: "PO-1", po_version: 2, kind: "external_open" },
   ],
-  ops_stock_items: [{ unit_code: "U1-000-231", status: "reserved", reserved_order_line_id: "L1", sku: "B1201S" }],
+  ops_stock_items: [{ unit_code: "U1-000-231", status: "reserved", reserved_order_line_id: "L1", sku: "B1201S", condition: "new", needs_repair: false, sale_cleared_at: null, po_line_id: "pl1" }],
 };
 
 beforeEach(() => {
@@ -142,10 +142,14 @@ describe("GET /api/operation/orders/:id/route-goods", () => {
     const { calls } = mockSb(rows);
     await read();
     expect(calls).toContainEqual({ table: "po_line_sources", method: "eq", args: ["order_id", ORDER] });
+    /* The other orders' shares of the same PO lines, so a shared line is never received twice. */
+    expect(calls).toContainEqual({ table: "po_line_sources", method: "in", args: ["po_line_id", ["pl1"]] });
     expect(calls).toContainEqual({ table: "order_lines", method: "eq", args: ["order_id", ORDER] });
     const units = calls.find((c) => c.table === "ops_stock_items" && c.method === "or")!;
     expect(String(units.args[0])).toContain("reserved_ref.eq.SO-1319");
     expect(String(units.args[0])).toContain(`sold_order_id.eq.${ORDER}`);
+    /* 0600: a Unit `Use this PO` bound while still incoming is this order's too. */
+    expect(String(units.args[0])).toContain("and(status.eq.incoming,reserved_ref.eq.SO-1319)");
   });
 
   it("⭐ a failed Purchasing read still answers: the lines and their Units stand, Purchasing is marked failed", async () => {

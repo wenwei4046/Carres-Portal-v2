@@ -37,6 +37,9 @@ import {
   SALES_ORDER_EDIT_HEADER_KEYS,
   type SalesOrderChangeSide,
   stockMatchKey,
+  salesOrderStockOf,
+  type RouteGoodsFacts,
+  type SalesOrderStockFact,
 } from "@carres/shared";
 import { findSalesOrderDocuments } from "../../lib/sales-order-document-search";
 import { readFreeStock } from "../../lib/purchase-demand-read";
@@ -823,20 +826,31 @@ const MONTHLY_DEMAND_PAGE = 1000;
  *   cases        `open` | `closed` | `none` — Service's own truth
  *                (`service_case_statuses.is_closed`); an unreadable read is
  *                `null`, never `none`.
+ *   stock        ⭐ `Stock Status` (owner-approved scope 2026-10-05, Orders
+ *                MASTER § Stock Status) — `salesOrderStockOf`, the Order
+ *                Route's own goods arrangement (`routeGoodsLinesOf`) fed the
+ *                same owners' records the Route reads, batched for the whole
+ *                list: lineage, its sibling shares on the same PO lines (so a
+ *                shared PO line is never received for two orders), PO lines,
+ *                and the Units reserved, sold or `Use this PO`-bound. A failed
+ *                read leaves every order's `stock` null and `failed.stock`
+ *                true — a failure is never a status.
  *
  * Same population as the Register (`salesOrderRegisterPopulation`). Read-only;
  * a fact this reader could not establish is left out, never guessed.
  */
 operationOrdersRouter.get("/register-facts", requireOperation, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
-  type OrderRow = CompletionOrderRow;
+  type OrderRow = Omit<CompletionOrderRow, "order_lines"> & {
+    order_lines?: Array<{ id?: string; sku: string; qty: number; unit_price: number | string | null }> | null;
+  };
   const orders: OrderRow[] = [];
   for (let from = 0; ; from += MONTHLY_DEMAND_PAGE) {
     const { data, error } = await salesOrderRegisterPopulation(
       sb
         .from("orders")
         .select(
-          "id, so, status, paid, delivery_date, order_lines(sku, qty, unit_price), order_addons(qty, unit_price), ops_order_control(balance, storage_from, storage_fee_override, storage_fee_msbf, storage_fee_sof, storage_collected_at, storage_waiver_status, extension_original_date)",
+          "id, so, status, paid, delivery_date, order_lines(id, sku, qty, unit_price), order_addons(qty, unit_price), ops_order_control(balance, storage_from, storage_fee_override, storage_fee_msbf, storage_fee_sof, storage_collected_at, storage_waiver_status, extension_original_date)",
         ),
     )
       .order("id", { ascending: true })
@@ -865,8 +879,15 @@ operationOrdersRouter.get("/register-facts", requireOperation, async (c) => {
     }
     return out;
   };
-  const UNIT_FIELDS = "id, unit_code, sku, status, condition, warehouse_id, po_no, qty, date_in, sold_at, reserved_ref, sold_order_id";
-  type UnitRow = CompletionUnitRow & { reserved_ref: string | null; sold_order_id: string | null };
+  const UNIT_FIELDS = "id, unit_code, sku, status, condition, warehouse_id, po_no, qty, date_in, sold_at, reserved_ref, sold_order_id, reserved_order_line_id, needs_repair, sale_cleared_at, po_line_id";
+  type UnitRow = CompletionUnitRow & {
+    reserved_ref: string | null;
+    sold_order_id: string | null;
+    reserved_order_line_id: string | null;
+    needs_repair: boolean | null;
+    sale_cleared_at: string | null;
+    po_line_id: string | null;
+  };
   const [reserved, sold, refunds, loans, invoices, cases] = await Promise.all([
     readAll<UnitRow>((b) => sb.from("ops_stock_items").select(UNIT_FIELDS).eq("status", "reserved").in("reserved_ref", b), [...idBySoRef.keys()]),
     readAll<UnitRow>((b) => sb.from("ops_stock_items").select(UNIT_FIELDS).eq("status", "sold").in("sold_order_id", b), ids),
@@ -903,7 +924,86 @@ operationOrdersRouter.get("/register-facts", requireOperation, async (c) => {
     : new Map<string, string>();
   const asOf = todayIsoMYT();
 
-  const facts: Record<string, { obligations: "outstanding" | "none" | null; cases: "open" | "closed" | "none" | null; stock?: Record<string, string> }> = {};
+  /* ── STOCK STATUS: the Route's goods records, batched — soft as ONE owner ── */
+  type SourceRow = RouteGoodsFacts["sources"][number] & { id: string; created_at: string | null };
+  type PoLineRow = RouteGoodsFacts["purchaseOrders"][number]["lines"][number] & { po_id: string };
+  const SOURCE_FIELDS = "id, order_id, order_line_id, po_id, po_line_id, qty, created_at";
+  const stockReads = await (async () => {
+    if (!reserved || !sold) return null;
+    const [incoming, own] = await Promise.all([
+      /* 0600 — `Use this PO` binds an incoming Unit to a line before receipt. */
+      readAll<UnitRow>((b) => sb.from("ops_stock_items").select(UNIT_FIELDS).eq("status", "incoming").in("reserved_ref", b), [...idBySoRef.keys()]),
+      readAll<SourceRow>((b) => sb.from("po_line_sources").select(SOURCE_FIELDS).in("order_id", b), ids),
+    ]);
+    if (!incoming || !own) return null;
+    /* Every other order's share of the same PO lines: what arrived fills the
+       shares in the order they were written, whoever wrote them. */
+    const poLineIds = [...new Set(own.map((row) => row.po_line_id).filter((v): v is string => Boolean(v)))];
+    const siblings = await readAll<SourceRow>((b) => sb.from("po_line_sources").select(SOURCE_FIELDS).in("po_line_id", b), poLineIds);
+    if (!siblings) return null;
+    const sources = [...new Map([...own, ...siblings].map((row) => [row.id, row])).values()].sort(
+      (a, b) => (a.created_at ?? "").localeCompare(b.created_at ?? "") || a.id.localeCompare(b.id),
+    );
+    const poIds = [...new Set(sources.map((row) => row.po_id).filter(Boolean))];
+    const [pos, poLines] = await Promise.all([
+      readAll<{ id: string; status: string }>((b) => sb.from("purchase_orders").select("id, status").in("id", b), poIds),
+      readAll<PoLineRow>(
+        (b) => sb.from("purchase_order_lines").select("id, po_id, sku, qty, received_qty, damaged_qty, wrong_item_qty").in("po_id", b),
+        poIds,
+      ),
+    ]);
+    if (!pos || !poLines) return null;
+    return { incoming, sources, pos, poLines };
+  })();
+  const stockOf = (() => {
+    if (!stockReads) return () => null;
+    const sourcesByOrder = byOrder(stockReads.sources, (row) => row.order_id);
+    const sourcesByPoLine = byOrder(stockReads.sources, (row) => row.po_line_id);
+    const incomingBy = byOrder(stockReads.incoming, (u) => idBySoRef.get(u.reserved_ref ?? ""));
+    const poLinesByPo = byOrder(stockReads.poLines, (line) => line.po_id);
+    const poById = new Map(
+      stockReads.pos.map((po) => [
+        po.id,
+        {
+          id: po.id,
+          status: po.status,
+          placed_at: null,
+          official_delivery_date: null,
+          eta_date: null,
+          lines: (poLinesByPo.get(po.id) ?? []).map(({ po_id: _po, ...line }) => line),
+          promises: [],
+          arrival_confirmations: [],
+        },
+      ]),
+    );
+    const rank = new Map(stockReads.sources.map((row, index) => [row.id, index]));
+    return (o: OrderRow): SalesOrderStockFact => {
+      const own = sourcesByOrder.get(o.id) ?? [];
+      const shared = new Map(own.map((row) => [row.id, row]));
+      for (const row of own) {
+        for (const sibling of row.po_line_id ? sourcesByPoLine.get(row.po_line_id) ?? [] : []) shared.set(sibling.id, sibling);
+      }
+      /* Lineage order is the one order the whole batch was sorted in. */
+      const relevant = [...shared.values()].sort((a, b) => (rank.get(a.id) ?? 0) - (rank.get(b.id) ?? 0));
+      const purchaseOrders = [...new Set(relevant.map((row) => row.po_id))]
+        .map((poId) => poById.get(poId))
+        .filter((po): po is NonNullable<typeof po> => Boolean(po));
+      return salesOrderStockOf({
+        todayIso: asOf,
+        orderId: o.id,
+        lines: (o.order_lines ?? [])
+          .filter((line): line is typeof line & { id: string } => Boolean(line.id))
+          .map((line) => ({ id: line.id, sku: line.sku, label: line.sku, qty: Number(line.qty) || 0 })),
+        sources: relevant,
+        purchaseOrders,
+        receipts: [],
+        units: [...(unitsBy.get(o.id) ?? []), ...(incomingBy.get(o.id) ?? [])],
+        readyStock: {},
+      });
+    };
+  })();
+
+  const facts: Record<string, { obligations: "outstanding" | "none" | null; cases: "open" | "closed" | "none" | null; stock: SalesOrderStockFact | null }> = {};
   for (const o of orders) {
     const obligations = completionReadable
       ? completionOfOrder({
@@ -932,17 +1032,9 @@ operationOrdersRouter.get("/register-facts", requireOperation, async (c) => {
               ? "closed"
               : null;
     }
-    const stock: Record<string, string> = {};
-    const required = new Map<string, number>();
-    for (const line of o.order_lines ?? []) required.set(line.sku, (required.get(line.sku) ?? 0) + Number(line.qty));
-    for (const sku of required.keys()) {
-      // Associated Units alone cannot prove this exact line's latest posted receipt.
-      // Keep the display unknown until Stock supplies that source-linked projection.
-      stock[sku] = "unknown";
-    }
-    facts[o.id] = { obligations, cases: caseFact, stock };
+    facts[o.id] = { obligations, cases: caseFact, stock: stockOf(o) };
   }
-  return c.json({ facts, failed: { obligations: !completionReadable, cases: cases === null } });
+  return c.json({ facts, failed: { obligations: !completionReadable, cases: cases === null, stock: stockReads === null } });
 });
 
 operationOrdersRouter.get("/monthly-demand", requireOperation, async (c) => {
@@ -1634,18 +1726,35 @@ operationOrdersRouter.get("/:id/route-goods", requireOperation, async (c) => {
   if (ownError) { const m = mapPgError(ownError); return c.json(m.body, m.status); }
   if (!order) return c.json({ error: "Order not found" }, 404);
 
+  /* Units reserved to, sold against, or (0600 `Use this PO`) bound while still
+     incoming to this order — with Stock's control facts, so the register's
+     `Stock Status` and this Route read one binding (Law D). */
+  const soRef = `SO-${(order as { so: number }).so}`;
   const { data: units, error: unitsErr } = await sb
     .from("ops_stock_items")
-    .select("unit_code, status, reserved_order_line_id, sku")
-    .or(`and(status.eq.reserved,reserved_ref.eq.SO-${(order as { so: number }).so}),and(status.eq.sold,sold_order_id.eq.${id})`);
+    .select("unit_code, status, reserved_order_line_id, sku, condition, needs_repair, sale_cleared_at, po_line_id")
+    .or(`and(status.eq.reserved,reserved_ref.eq.${soRef}),and(status.eq.sold,sold_order_id.eq.${id}),and(status.eq.incoming,reserved_ref.eq.${soRef})`);
   if (unitsErr) { const m = mapPgError(unitsErr); return c.json(m.body, m.status); }
 
   /* ── Purchasing and Receiving: soft as ONE owner ───────────────────────── */
   const purchasing = await (async () => {
-    const sources = await sb.from("po_line_sources")
-      .select("order_line_id, po_id, po_line_id, qty").eq("order_id", id).order("created_at", { ascending: true });
-    if (sources.error) return null;
-    const sourceRows = (sources.data ?? []) as Array<{ po_id: string }>;
+    const SOURCE_FIELDS = "id, order_id, order_line_id, po_id, po_line_id, qty, created_at";
+    const own = await sb.from("po_line_sources")
+      .select(SOURCE_FIELDS).eq("order_id", id).order("created_at", { ascending: true }).order("id", { ascending: true });
+    if (own.error) return null;
+    type SourceRow = { id: string; po_id: string; po_line_id: string | null; created_at: string | null };
+    const ownRows = (own.data ?? []) as SourceRow[];
+    /* Every other order's share of the same PO lines, so a PO line shared by
+       two orders is received in the order the shares were written and never
+       for both (`routeGoodsLinesOf`). */
+    const poLineIds = [...new Set(ownRows.map((row) => row.po_line_id).filter((v): v is string => Boolean(v)))];
+    const siblings = poLineIds.length
+      ? await sb.from("po_line_sources").select(SOURCE_FIELDS).in("po_line_id", poLineIds)
+          .order("created_at", { ascending: true }).order("id", { ascending: true })
+      : { data: [], error: null };
+    if (siblings.error) return null;
+    const sourceRows = [...new Map([...ownRows, ...((siblings.data ?? []) as SourceRow[])].map((row) => [row.id, row])).values()]
+      .sort((a, b) => (a.created_at ?? "").localeCompare(b.created_at ?? "") || a.id.localeCompare(b.id));
     const poIds = [...new Set(sourceRows.map((row) => row.po_id).filter(Boolean))];
     if (poIds.length === 0) return { sources: [], purchaseOrders: [], receipts: [] };
     const [pos, poLines, promises, confirmations, receipts, sends] = await Promise.all([
@@ -1667,7 +1776,7 @@ operationOrdersRouter.get("/:id/route-goods", requireOperation, async (c) => {
     const ofPo = <T extends { po_id?: unknown }>(list: T[] | null, poId: string) =>
       (list ?? []).filter((row) => row.po_id === poId);
     return {
-      sources: sources.data ?? [],
+      sources: sourceRows,
       purchaseOrders: ((pos.data ?? []) as Array<Record<string, unknown> & { id: string; suppliers?: unknown }>).map(({ suppliers, ...po }) => ({
         ...po,
         supplier_name: (Array.isArray(suppliers) ? suppliers[0] : suppliers as { name?: string } | null)?.name ?? null,

@@ -27,7 +27,7 @@ const order = (n: number, over: Record<string, unknown> = {}) => ({
   status: "proceed_order",
   paid: 100,
   delivery_date: "2099-01-01",
-  order_lines: [{ sku: "MS12", qty: 1, unit_price: 100 }],
+  order_lines: [{ id: "line-1", sku: "MS12", qty: 1, unit_price: 100 }],
   order_addons: [],
   ops_order_control: null,
   ...over,
@@ -93,18 +93,27 @@ describe("GET /api/operation/orders/register-facts", () => {
     const res = await read();
     expect(res.status).toBe(200);
     const body = (await res.json()) as { facts: Record<string, unknown>; failed: unknown };
-    expect(body.facts[id(1)]).toEqual({ obligations: "none", cases: "none", stock: { MS12: "unknown" } });
-    expect(body.facts[id(2)]).toEqual({ obligations: "outstanding", cases: "open", stock: { MS12: "unknown" } });
-    expect(body.facts[id(3)]).toEqual({ obligations: "outstanding", cases: "closed", stock: { MS12: "unknown" } });
-    expect(body.failed).toEqual({ obligations: false, cases: false });
+    /* Stock Status reads the same Units: delivered and reserved goods are Ready. */
+    const ready = expect.objectContaining({ status: "ready", requiredQty: 1, usableQty: 1 });
+    expect(body.facts[id(1)]).toEqual({ obligations: "none", cases: "none", stock: ready });
+    expect(body.facts[id(2)]).toEqual({ obligations: "outstanding", cases: "open", stock: ready });
+    expect(body.facts[id(3)]).toEqual({ obligations: "outstanding", cases: "closed", stock: ready });
+    expect(body.failed).toEqual({ obligations: false, cases: false, stock: false });
   });
 
   it("an unreadable read leaves its fact unknown, never 'none'", async () => {
     mockSb({ orders: [order(1)], ops_stock_items: [unit(1, "sold", 1)] }, ["service_cases", "order_refunds"]);
     const res = await read();
     const body = (await res.json()) as { facts: Record<string, unknown>; failed: unknown };
-    expect(body.facts[id(1)]).toEqual({ obligations: null, cases: null, stock: { MS12: "unknown" } });
-    expect(body.failed).toEqual({ obligations: true, cases: true });
+    expect(body.facts[id(1)]).toEqual({ obligations: null, cases: null, stock: expect.objectContaining({ status: "ready" }) });
+    expect(body.failed).toEqual({ obligations: true, cases: true, stock: false });
+  });
+
+  it("a failed Unit read leaves Stock Status unknown for every order, never a status", async () => {
+    mockSb({ orders: [order(1)] }, ["ops_stock_items"]);
+    const body = (await (await read()).json()) as { facts: Record<string, { stock: unknown }>; failed: unknown };
+    expect(body.facts[id(1)]!.stock).toBeNull();
+    expect(body.failed).toEqual({ obligations: true, cases: false, stock: true });
   });
 
   it("is refused to a role that may not read the Register", async () => {

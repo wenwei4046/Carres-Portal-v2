@@ -470,6 +470,55 @@ export function soBatchOrderLineOutstandingQty(
 }
 
 /**
+ * The INPUT `soBatchOrderLineOutstandingQty` reads, from one item line's raw
+ * records — so another surface (the Sales Order's `Stock Status`) asks the SAME
+ * coverage question with the SAME function (Law D, owner ruling 2026-10-05).
+ *
+ * One rule only, the SQL twin's (`so_line_remaining_requirement`, 0631): a Unit
+ * born on a PO line this item line's lineage names, and that lineage share,
+ * cover ONCE. So a bound Unit first uses up its own PO line's lineage budget
+ * and only the rest counts as independent `stockTaken` (Ready Stock, `sold` or
+ * `reserved`) or `poReserved` (`Use this PO`, still `incoming`). A Unit with no
+ * PO line, or on a PO line the lineage does not name, is independent cover.
+ *
+ * ⚠ Purchasing's own readers still build this input inline
+ * (`apps/api/src/lib/purchase-demand-read.ts` `independentUnits`,
+ * `apps/api/src/routes/operation/so-batch-ready-stock.ts` `sourceBudget`):
+ * converging them onto this helper is Purchasing's round, not this one.
+ */
+export function soBatchLineCoverageInput(line: {
+  qty: number;
+  /** Non-cancelled `po_line_sources` rows naming this item line. */
+  lineage: ReadonlyArray<{ poId: string; poLineId: string | null; qty: number }>;
+  /** Units bound to this item line (`reserved_order_line_id`). */
+  units: ReadonlyArray<{ status: string; poLineId: string | null; poId?: string | null }>;
+}): Pick<SoBatchOrderLineFact, "qty" | "stockTaken" | "pos" | "poReserved"> {
+  const budget = new Map<string, number>();
+  for (const share of line.lineage) {
+    if (share.poLineId) budget.set(share.poLineId, (budget.get(share.poLineId) ?? 0) + Math.max(0, share.qty));
+  }
+  let stockTaken = 0;
+  const poReserved = new Map<string, number>();
+  for (const unit of line.units) {
+    const left = unit.poLineId ? budget.get(unit.poLineId) ?? 0 : 0;
+    if (left > 0) {
+      budget.set(unit.poLineId!, left - 1);
+      continue;
+    }
+    if (unit.status === "incoming") {
+      const key = unit.poId ?? unit.poLineId ?? "";
+      poReserved.set(key, (poReserved.get(key) ?? 0) + 1);
+    } else stockTaken += 1;
+  }
+  return {
+    qty: Math.max(0, line.qty),
+    stockTaken,
+    pos: line.lineage.map((share) => ({ poId: share.poId, poLineId: share.poLineId, qty: Math.max(0, share.qty) })),
+    poReserved: [...poReserved].map(([poId, qty]) => ({ poId, qty })),
+  };
+}
+
+/**
  * One Sales Order's rail-relevant facts, derived once from the server's own
  * rows — the leaf states the engine computed, the Catalog categories on the
  * order's lines (never SKU-text inference), and the Register's own supplier

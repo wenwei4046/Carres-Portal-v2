@@ -24,10 +24,10 @@ number, the party and the date already worked out, and one obvious button.
 
 **Mandatory UI cold-start:** before any listing/UI proposal or build, read `docs/ui/MASTER.md`
 **§0 Current kit index first** (one current source per thing on screen; anything not listed is not a
-pattern to copy), then §6.0, §6.7–6.10 and Complete-template adoption contract, the canonical
-token/component/pattern files, the owning module listing section and COPY entries. Module cards use the
-kit `CompactModuleCard` (§4.3), never a copy of its reference HTML. Reuse the kit and complete the
-contract’s full-page checks before delivery.
+pattern to copy), then §0.1–§0.3 (page anatomy, shared module page flow, every-new-chat procedure),
+§6.0 and the section for the part being built, the canonical token/component/pattern files, the owning
+module listing section and COPY entries. Module cards use the kit `CompactModuleCard` (§4.3), never a
+copy of its reference HTML. Reuse the kit and complete the §2.2 full-page checks before delivery.
 Approved goods/Ready Stock flows: Purchasing §9.1 SO Batch and §9.2 Manual Purchase (Jess
 2026-09-18, both BUILT 2026-09-18 — the authenticated production walk is owed for both, and
 Manual Purchase's migrations 0545–0547 + 0549 are APPLIED 2026-09-20 and only the authenticated walk
@@ -510,7 +510,10 @@ production data must be modified irreversibly · long-term architecture must cha
 **BUILD/DELIVERY DEFAULT AUTONOMY.** A BUILD takeover of an approved `READY FOR CARD` scope owns the
 full vertical slice: inspect current `origin/main` and authority → implement → run targeted tests
 during development → pass the authoritative release gate → push/PR/merge → deploy → authenticated
-production verification → close the owning MASTER. If the mission says continuous build, continue
+production verification → close the owning MASTER. Before calling a module complete, proactively offer
+how to complete its Settings — every setting it needs to run, its Settings door, current value or
+default, which are still empty, and who sets it (owner ruling 2026-10-05); never wait for the owner to ask.
+If the mission says continuous build, continue
 to the next approved READY scope without asking *“what next?”* or saying *“waiting for your next
 instruction.”* Never ask Jess to choose subagent-driven vs inline execution, technical-layer order,
 test batching, branch/worktree strategy, migration numbering, PR sequence, CI strategy, deployment

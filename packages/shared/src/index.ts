@@ -63,6 +63,21 @@ export {
 } from "./monthly-demand";
 export { readFailureWords, type ReadFailureSurface, type ReadFailureWords } from "./read-failure";
 export { routeGoodsLinesOf, type RouteGoodsFacts, type RouteGoodsLine, type RouteGoodsSource } from "./sales-order-route-goods";
+export {
+  SALES_ORDER_STOCK_STATUSES,
+  STOCK_ISSUE_LEGEND,
+  STOCK_OPEN_DECISION,
+  salesOrderStockOf,
+  stockFactOfGoodsLines,
+  stockStatusOfCounts,
+  stockStatusWord,
+  stockIssueWord,
+  type SalesOrderStockStatus,
+  type SalesOrderStockVerdict,
+  type SalesOrderStockFact,
+  type SalesOrderStockLine,
+  type StockReadinessCounts,
+} from "./sales-order-stock-status";
 export { routeDeliveryScopesOf, type RouteScopeFacts } from "./sales-order-route-scopes";
 
 export {
@@ -1279,6 +1294,7 @@ export {
   unitAvailability,
   isUnitAvailable,
   isUnitBindable,
+  isReservedUnitAtRisk,
   unitLifecycleOutcome,
   type UnitAvailability,
   type UnitLifecycleOutcome,
@@ -2457,6 +2473,7 @@ export {
   SO_BATCH_RAIL_CLEAR,
   soBatchOrderSupplierNames,
   soBatchOrderLineOutstandingQty,
+  soBatchLineCoverageInput,
   soBatchPoDocumentState,
   soBatchToBuyState,
   type SoBatchToBuyState,
