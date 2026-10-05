@@ -142,10 +142,12 @@ export interface RouteGoodsLine {
   /** `readyQty` less `atRiskQty`: goods held for this line in a condition that
    *  can be delivered, or already delivered. */
   usableQty: number;
-  /** What is covered for the line: `qty` less Purchasing's own
-   *  `soBatchOrderLineOutstandingQty` (TS twin of `so_line_remaining_requirement`)
-   *  — non-cancelled lineage and bound Units, a Unit on its own lineage PO
-   *  line counted once. Never more than `qty`. */
+  /** What is still UNCOVERED for the line — Purchasing's own
+   *  `soBatchOrderLineOutstandingQty` (TS twin of `so_line_remaining_requirement`,
+   *  the number SO Batch prints to buy): ordered less non-cancelled lineage
+   *  less bound Units, a Unit on its own lineage PO line counted once. */
+  remainingRequirementQty: number;
+  /** `qty − remainingRequirementQty`. */
   purchasedQty: number;
   /** Goods RECEIVED on this line's own lineage that no Unit binding gives to
    *  it yet: they landed `free` (Receiving verifies, it never allocates; the
@@ -389,6 +391,7 @@ export function routeGoodsLinesOf(facts: RouteGoodsFacts): RouteGoodsLine[] {
       readyQty,
       atRiskQty: Math.min(readyQty, atRisk),
       usableQty,
+      remainingRequirementQty: outstanding,
       purchasedQty,
       arrivedUnallocatedQty,
       unitCodes,

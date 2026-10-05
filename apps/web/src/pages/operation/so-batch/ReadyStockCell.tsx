@@ -113,10 +113,6 @@ export interface SoBatchReadyStock {
    * or `null` while the read has not answered or failed (never a zero).
    */
   availableFor: (orderLineId: string) => number | null;
-  /** The line's UNCOVERED quantity — the read's canonical SQL remainder
-   *  (`so_line_remaining_requirement`, the door's own number), or `null`
-   *  while the read has not answered or failed. */
-  remainingFor: (orderLineId: string) => number | null;
   /** Whether the picker under this item line is open, and the one toggle. */
   isOpen: (orderLineId: string) => boolean;
   toggle: (orderLineId: string) => void;
@@ -508,8 +504,6 @@ export function useSoBatchReadyStock({
     detail,
     pending,
     availableFor: (orderLineId) => (q.isPending || q.isError ? null : availableForLine(orderLineId).length),
-    remainingFor: (orderLineId) =>
-      q.isPending || q.isError ? null : q.data?.lines.find((line) => line.orderLineId === orderLineId)?.remainingQty ?? null,
     isOpen: (orderLineId) => openLines.has(orderLineId),
     toggle,
   };

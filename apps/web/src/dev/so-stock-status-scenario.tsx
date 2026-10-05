@@ -434,7 +434,7 @@ export function StockStatusWalkPanel() {
     redraw((n) => n + 1);
   };
   return (
-    <div className="fixed bottom-14 left-2 z-50 w-[360px] max-w-[calc(100vw-16px)] rounded-card bg-kit-slate-12 text-label text-white shadow-lg" data-testid="stock-status-walk">
+    <div className="fixed bottom-24 left-2 z-50 w-[360px] max-w-[calc(100vw-16px)] rounded-card bg-kit-slate-12 text-label text-white shadow-lg" data-testid="stock-status-walk">
       <button type="button" className="flex w-full items-center justify-between px-3 py-1.5 text-left font-semibold" onClick={() => setOpen((v) => !v)}>
         <span>Local walk · Stock Status · SIMULATED</span><span aria-hidden>{open ? "▾" : "▸"}</span>
       </button>

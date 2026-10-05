@@ -200,6 +200,7 @@ describe("⭐ Law D — Stock Status and SO Batch read ONE coverage fact", () =>
           units: f.units.map((u) => ({ status: u.status, poLineId: u.po_line_id ?? null })),
         }),
       );
+      expect(fact.lines[0]!.uncoveredQty, name).toBe(outstanding);
       expect(fact.lines[0]!.requiredQty - fact.lines[0]!.purchasedQty, name).toBe(outstanding);
     }
   });
@@ -219,7 +220,7 @@ describe("⭐ Law D — Stock Status and SO Batch read ONE coverage fact", () =>
 
 describe("the ONE summary rule reads a line and an order alike", () => {
   const counts = (requiredQty: number, usableQty: number, purchasedQty: number) =>
-    ({ requiredQty, usableQty, purchasedQty, issueQty: 0, arrivedUnallocatedQty: 0 });
+    ({ requiredQty, usableQty, purchasedQty, uncoveredQty: requiredQty - purchasedQty, issueQty: 0, arrivedUnallocatedQty: 0 });
   it.each([
     [counts(3, 3, 3), "ready"],
     [counts(3, 1, 1), "partially_ready"],

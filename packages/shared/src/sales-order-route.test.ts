@@ -1456,6 +1456,7 @@ const goodsLine = (over: Partial<RouteGoodsLine> & { lineId: string }): RouteGoo
   readyQty: 0,
   atRiskQty: 0,
   usableQty: 0,
+  remainingRequirementQty: 1,
   purchasedQty: 0,
   arrivedUnallocatedQty: 0,
   unitCodes: [],
