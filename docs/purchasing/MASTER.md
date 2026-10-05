@@ -2616,7 +2616,7 @@ Fixture-walked in the real portal shell; the authenticated production walk is re
   Customer, Supplier, Delivery Location and Deliver To never ellipsise: a long value takes an inline
   second line, so the full value is readable by keyboard and touch with no hover title.
   **Width convergence — owner-approved 2026-10-05; DEPLOYED #1914,
-  authenticated post-release verification pending.** SO Batch parent definitions now reference the existing
+  bounded authenticated width verification complete.** SO Batch parent definitions now reference the existing
   `REGISTER_FIELD_WIDTH` entries for Proceed Date, SO No, PO Safety Days, Customer Requested
   Delivery Date, Customer Delivery Location, Customer, Items, Supplier, Supplier Deliver To,
   PO No and PO Delivery Date. Existing header minimums, wrapping, facts, export readers and
@@ -2625,11 +2625,22 @@ Fixture-walked in the real portal shell; the authenticated production walk is re
   PR head `4647cb3c8a142eb49a79e7ea581b60c8dffabb86` passed complete CI
   `37255018325` (including 141 SO Batch tests and 10 group-header tests), merged as
   `7d0fa709cfb4a03b7d970d00792f89b5eb3bdc68`; deployment `37266274278` completed
-  successfully with exact-SHA convergence. Authenticated pre-release 825×694 measurement
-  confirmed independent old widths and no page-level overflow, but is not acceptance of this
-  release. Post-release 825×694/390 widths, scrolling, identity/header readability and saved
-  layout/reset verification remain owed: browser input/CDP timed out, then the desktop browser
-  service became unavailable. No production PO, stock or communication write was performed.
+  successfully with exact-SHA convergence, rechecked from the host on all five canonical
+  endpoints. Authenticated post-release 825×694 and 390×694 DOM measurements both found
+  Proceed Date / SO No / PO Safety Days / requested date / delivery location / Customer /
+  Items / Supplier / Deliver To / PO No / PO date at 120 / 90 / 110 / 180 / 176 / 150 /
+  208 / 140 / 150 / 170 / 150px. Header buttons had equal client/scroll widths at 825;
+  full `PO-260903-8059-V1` and `PO-260903-7907-V1` were readable in the right-scrolled view.
+  Page scroll width equalled viewport width at both sizes; table overflow stayed inside
+  its own 1812px scroll region (685px canvas at 825, 374px at 390). SO-1203 was fully visible
+  on the phone first screen and held at x88 after horizontal scrolling (x148 at 825).
+  An existing 96px PO Status personal width and SO ascending sort survived reload; neither
+  was reset. Width-only diff preserves all export readers, wrapping and facts. Actual export
+  file readback was not completed, and no new export acceptance is claimed. Whole-page toolbar
+  wrapping/clipping at 825/390 remains a separate listing-correction lane, not closed here.
+  Screenshots: `/tmp/so-batch-width-live-825.jpg`, `/tmp/so-batch-width-live-825-right.jpg`,
+  `/tmp/so-batch-width-live-390.jpg`. Browser control was temporarily unavailable; the checks
+  above ran after it recovered. No production PO, stock or communication write was performed.
   This closes only width-reference drift; destination and Safety Days drafts remain unreleased.
 - **R8 · Issue workspace.** `Back to buying` returns to the SAME Register — it stays mounted and
   hidden behind the workspace, keeping search, rail filters, open groups, ticks and scroll offset,
