@@ -107,11 +107,81 @@ for (const po of POS) {
       ? [line(po.id, 1, "L1201S-K", 1, "Mattress L1201S", "183X190CM")]
       : po.id === "PO-260910-3301"
         ? [{ ...line(po.id, 1, "M1401F-K", 2, "Mattress M1401F", "183X190CM", 1), damaged_qty: 0 }]
+        : po.id === "PO-260915-2205"
+          ? [line(po.id, 1, "B1201S-K", 2, "Mattress B1201S", "183X190CM"), line(po.id, 2, "B1201S-Q", 1, "Mattress B1201S", "152X190CM")]
         : po.id === "PO-260903-7907"
           ? Array.from({ length: 10 }, (_, i) => line(po.id, i + 1, i % 2 ? "B1201S-Q" : "B1201S-K", 1, "Mattress B1201S", i % 2 ? "152X190CM" : "183X190CM"))
           : [line(po.id, 1, "B1201S-K", 1, "Mattress B1201S", "183X190CM")];
   po.lines.forEach((l, i) => { l.id = uuidFor(po.id, i + 1); });
 }
+/* ── Warehouse (local walk): the Units each receiving PO expects ─────────
+   Mattresses are exact-unit goods: one Unit ID per piece, born with the PO.
+   LINEAGE is the SO line each PO line was bought for, in order — a received
+   good Unit is reserved to it (owner rule 2026-10-05, APPROVED / NOT BUILT,
+   SIMULATED here); damaged, wrong-item and unlinked goods never are. */
+type FxUnit = { unit_code: string; sku: string; status: string; po_line_id: string; reserved_ref: string | null };
+const LINEAGE: Record<string, Array<{ so: number; qty: number }>> = {};
+export const UNITS: Record<string, FxUnit[]> = {};
+let nextUnit = 401;
+for (const poId of ["PO-260903-6426", "PO-261001-1201", "PO-260915-2205", "PO-260910-3301"]) {
+  const po = POS.find((p) => p.id === poId)!;
+  const list: FxUnit[] = [];
+  for (const l of po.lines) {
+    LINEAGE[l.id] = po.id === "PO-261001-1201" ? [{ so: 1368, qty: 1 }, { so: 1205, qty: 1 }] : [{ so: po.orderIds[0]!, qty: l.qty }];
+    for (let k = 0; k < l.qty; k++) {
+      const received = k < l.received_qty;
+      list.push({ unit_code: `U1-000-${nextUnit++}`, sku: l.sku, status: received ? "reserved" : "incoming", po_line_id: l.id, reserved_ref: received ? `SO-${LINEAGE[l.id]![0]!.so}` : null });
+    }
+  }
+  UNITS[poId] = list;
+}
+/** A received good Unit goes to the first lineage SO line still short; else it is free stock. */
+function reserveOnReceipt(poId: string, unit: FxUnit) {
+  const sameLine = (UNITS[poId] ?? []).filter((u) => u.po_line_id === unit.po_line_id);
+  for (const src of LINEAGE[unit.po_line_id] ?? []) {
+    const held = sameLine.filter((u) => u.status === "reserved" && u.reserved_ref === `SO-${src.so}`).length;
+    if (held < src.qty) { unit.status = "reserved"; unit.reserved_ref = `SO-${src.so}`; return; }
+  }
+  unit.status = "available";
+  unit.reserved_ref = null;
+}
+/** One Unit's physical result, as both receiving doors record it. */
+function applyUnitResult(poId: string, code: string, outcome: string) {
+  const unit = (UNITS[poId] ?? []).find((u) => u.unit_code === code);
+  if (!unit || unit.status !== "incoming") return;
+  if (outcome === "received") reserveOnReceipt(poId, unit);
+  else if (outcome === "received_with_issue") { unit.status = "cannot_sell"; unit.reserved_ref = null; }
+}
+
+/* The Warehouse's arrival report for the Ohana PO, waiting for Carres: one
+   Queen and one of the two Kings arrived. `Receive` must open THIS session. */
+const SUBMITTED_ID = "55555555-5555-4555-8555-555555552205";
+type FxSession = Record<string, unknown> & { id: string; po_id: string; status: string; lines: Array<Record<string, unknown>>; unit_results: Array<Record<string, unknown>> };
+const SESSIONS: FxSession[] = [];
+const RECEIPT_EVENTS: Array<Record<string, unknown>> = [];
+{
+  const po = POS.find((p) => p.id === "PO-260915-2205")!;
+  const [king, queen] = po.lines;
+  const units = UNITS[po.id]!;
+  const kingUnits = units.filter((u) => u.po_line_id === king!.id);
+  const queenUnits = units.filter((u) => u.po_line_id === queen!.id);
+  const result = (u: FxUnit, outcome: string) => ({ stock_item_id: u.unit_code, po_line_id: u.po_line_id, unit_code: u.unit_code, outcome, issue_kind: null, note: null });
+  const unitResults = [result(kingUnits[0]!, "received"), result(kingUnits[1]!, "not_received"), result(queenUnits[0]!, "received")];
+  SESSIONS.push({
+    id: SUBMITTED_ID, po_id: po.id, source_no: po.id, warehouse_id: KLANG, warehouse_name: "Carres Klang", supplier_name: "Ohana",
+    do_number: "OH-DO-5512", do_file_path: "simulated/oh-do-5512.pdf", note: null, status: "submitted", submitted_from: "warehouse",
+    goods_received_at: TODAY, goods_received_time: `${TODAY}T02:30:00Z`, submitted_at: `${TODAY}T03:05:00Z`, submitted_by_name: "Carres Klang",
+    reviewed_by_name: null, reviewed_at: null, posted_at: null, posted_by_name: null, return_reason: null, grn_no: null,
+    actual_site_id: KLANG, actual_site_name: "Carres Klang", summary: "2 good", opens_claims: false,
+    lines: [
+      { id: king!.id, sku: king!.sku, received_now: 1, damaged_qty: 0, wrong_item_qty: 0, wrong_item_claim_type: null, units: unitResults.slice(0, 2) },
+      { id: queen!.id, sku: queen!.sku, received_now: 1, damaged_qty: 0, wrong_item_qty: 0, wrong_item_claim_type: null, units: unitResults.slice(2) },
+    ],
+    unit_results: unitResults,
+  });
+  RECEIPT_EVENTS.push({ id: "ev-2205-submitted", receipt_id: SUBMITTED_ID, event: "submitted", event_at: `${TODAY}T03:05:00Z`, actor_name: "Carres Klang", payload: {} });
+}
+
 const supplierName = (id: string) => SUPPLIERS.find((s) => s.id === id)?.name ?? "Supplier";
 const docNo = (po: Po) => `${po.id}-V${po.version}`;
 
@@ -197,9 +267,14 @@ const windowTime = (key: string) => {
 export const DELIVERY_OPEN = new Map<number, string | null>([
   [1313, past(3)], [1368, TODAY], [1369, day(1)], [1371, day(2)], [1372, day(4)], [1373, day(5)], [1206, null],
 ]);
-/** Which receipts are still owed (a full receipt closes one). */
+/** Which receipts are still owed (a full receipt closes one). Warehouse work
+ *  only while goods are due today or later, or an arrival report waits: a
+ *  passed PO Delivery Date with nothing arrived is PO Duty's `Ask {supplier}
+ *  when the goods will arrive`, and a short delivery's rest is PO Duty's
+ *  `Ask {supplier} for the balance delivery date` (Purchasing §2.4) — so
+ *  PO-260903-6426 and PO-260910-3301 are Purchasing rows, never Warehouse's. */
 const RECEIVE_DUE: Record<string, string> = {
-  "PO-260903-6426": past(20), "PO-261001-1201": TODAY, "PO-260915-2205": day(1), "PO-260910-3301": past(12),
+  "PO-261001-1201": TODAY, "PO-260915-2205": TODAY,
 };
 const CLAIMED: Record<string, string> = { "PO-260910-3301": "SC-260920-0003" };
 
@@ -227,6 +302,9 @@ export function workFeed(): OperationWorkResponse {
     const ordered = po.lines.reduce((n, l) => n + l.qty, 0);
     if (received >= ordered) continue;
     const some = received > 0;
+    /* After a short delivery the rest is PO Duty's balance call (storyboard
+       25e) — unless the Warehouse has already reported another arrival. */
+    if (some && !SESSIONS.some((x) => x.po_id === poId && x.status === "submitted")) continue;
     seeds.push({
       id: `receiving:${poId}:warehouse.receive`, module: "receiving", ruleKey: "warehouse.receive (SIMULATED rule)", kind: "purchase_order",
       objectId: poId, label: `${poId}-V1`,
@@ -246,7 +324,7 @@ export function workFeed(): OperationWorkResponse {
   /* Payment (covering a colleague today) and the Issue Tracker. */
   seeds.push({
     id: "payment:SO-1340:collect", module: "payment", ruleKey: "collect", kind: "sales_order", objectId: orderId(1340), label: "SO-1340",
-    problem: "Customer payment should have been received", action: "Ask customer to pay · Kimmy", recipient: "Kimmy",
+    problem: "Customer payment should have been received", action: "Ask Kimmy to pay", recipient: "Kimmy",
     due: past(3), destination: `/operation/orders/so/${orderId(1340)}`, covered: true,
   });
   seeds.push({
@@ -285,7 +363,7 @@ function poRow(po: Po) {
     grns: [], promises: [],
     sends: [...(po.sent ? [{ channel: "whatsapp", note: null, sent_at: `${po.placed_at.slice(0, 10)}T06:00:00Z`, kind: "confirmed_sent", recipient: "group", po_version: po.version, sent_by_name: "Yu Jun", duty_name: "Yu Jun", acting_name: null, po_revisions: null }] : []), ...(SENDS[po.id] ?? [])],
     purchase_order_lines: po.lines.map((l) => ({
-      ...l, destination_id: KLANG, identity_mode: "quantity", attrs: { category: "Mattress" }, governed_sources: [],
+      ...l, destination_id: KLANG, identity_mode: UNITS[po.id] ? "exact_unit" : "quantity", attrs: { category: "Mattress" }, governed_sources: [],
       sources: po.orderIds.map((so) => ({ so, qty: 1 })),
     })),
   };
@@ -386,9 +464,38 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
         pl.received_qty += l.receivedNow;
         pl.damaged_qty += l.damagedQty ?? 0;
         pl.wrong_item_qty += l.wrongItemQty ?? 0;
+        for (const u of (l as { units?: Array<{ unitCode: string; outcome: string }> }).units ?? []) applyUnitResult(po!.id, u.unitCode, u.outcome);
       }
+      const receiptId = `99999999-9999-4999-8999-${String(Date.now()).slice(-12)}`;
+      RECEIPT_EVENTS.push({ id: `ev-${receiptId}`, receipt_id: receiptId, event: "posted", event_at: new Date().toISOString(), actor_name: "Shasha", payload: { grn_no: "GRN-SIMULATED" } });
       SIMULATED_LOG.push(`receipt saved ${po?.id}`);
-      return json({ receiptId: "99999999-9999-4999-8999-999999999999", grnNo: "GRN-SIMULATED", simulated: true });
+      return json({ receipt_id: receiptId, receiptId, grnNo: "GRN-SIMULATED", simulated: true });
+    }
+    /* The Carres half of the two-step flow: save or return the Warehouse's count. */
+    const review = /^\/api\/operation\/warehouse-receipts\/([^/]+)\/(check-in|send-back)$/.exec(path);
+    if (review) {
+      const session = SESSIONS.find((x) => x.id === decodeURIComponent(review[1]!));
+      if (!session || session.status !== "submitted") return json({ code: "receipt_not_submitted", message: "This count is no longer waiting for Carres." }, 409);
+      const at = new Date().toISOString();
+      if (review[2] === "send-back") {
+        Object.assign(session, { status: "returned", return_reason: String(body.reason ?? ""), reviewed_at: at, reviewed_by_name: "Shasha" });
+        RECEIPT_EVENTS.push({ id: `ev-${session.id}-returned`, receipt_id: session.id, event: "returned", event_at: at, actor_name: "Shasha", payload: { reason: body.reason } });
+        SIMULATED_LOG.push(`count returned ${session.po_id}`);
+        return json({ ok: true, simulated: true });
+      }
+      const po = POS.find((p) => p.id === session.po_id)!;
+      for (const l of session.lines) {
+        const pl = po.lines.find((x) => x.id === l.id);
+        if (!pl) continue;
+        pl.received_qty += Number(l.received_now ?? 0);
+        pl.damaged_qty += Number(l.damaged_qty ?? 0);
+        pl.wrong_item_qty += Number(l.wrong_item_qty ?? 0);
+      }
+      for (const u of session.unit_results) applyUnitResult(po.id, String(u.unit_code), String(u.outcome));
+      Object.assign(session, { status: "posted", grn_no: "GRN-SIMULATED", posted_at: at, posted_by_name: "Shasha", reviewed_at: at, reviewed_by_name: "Shasha" });
+      RECEIPT_EVENTS.push({ id: `ev-${session.id}-posted`, receipt_id: session.id, event: "posted", event_at: at, actor_name: "Shasha", payload: { grn_no: "GRN-SIMULATED" } });
+      SIMULATED_LOG.push(`count saved ${session.po_id}`);
+      return json({ ok: true, simulated: true });
     }
     if (path === "/api/storage/dos/sign-upload") return json({ token: "simulated", path: `simulated/${Date.now()}.pdf` });
     return json({ code: "simulated_refused", message: "This local walk does not save that." }, 405);
@@ -408,6 +515,22 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   if (path === "/api/operation/supplier-claims") return json({ claims: [], counts: { open: 0, closed: 0, all: 0 } });
   if (path === "/api/operation/warehouse") return json({ warehouses: [{ id: KLANG, name: "Carres Klang", address: "Klang" }] });
   if (path === "/api/operation/warehouse-receipts/receiver") return json({ receiver: { kind: "staff", name: "Shasha" } });
+  if (path === "/api/operation/warehouse-receipts/duty") {
+    return json({ duty_key: "grn_duty", normal_user_id: ME, normal_user_name: "Shasha", acting_user_id: null, acting_user_name: null, actor_user_id: ME, is_cover: false, is_superuser: false, allowed: true, may_amend: true, source: "assignment" });
+  }
+  const receipt = /^\/api\/operation\/warehouse-receipts\/([^/]+)$/.exec(path);
+  if (receipt) {
+    const session = SESSIONS.find((x) => x.id === decodeURIComponent(receipt[1]!));
+    if (!session) return json({ message: "not found" }, 404);
+    const po = POS.find((p) => p.id === session.po_id)!;
+    return json({
+      receipt: session,
+      po: { id: po.id, supplier_id: po.supplier_id, warehouse_id: KLANG, purchase_order_lines: po.lines.map((l) => ({ id: l.id, sku: l.sku, qty: l.qty, received_qty: l.received_qty, damaged_qty: l.damaged_qty, wrong_item_qty: l.wrong_item_qty })) },
+      line_info: Object.fromEntries(po.lines.map((l) => [l.sku, { description: `${l.model_name} · ${l.size}`, category: "Mattress" }])),
+      events: RECEIPT_EVENTS.filter((e) => e.receipt_id === session.id),
+      related_records: { claims: [], returns: [] },
+    });
+  }
   if (path === "/api/catalog") return json({ models: [{ id: "m1", modelKey: "B1201S", name: "B1201S", category: "mattress", blurb: null, colors: null, gaps: null, sofaMode: null }], skus: [{ id: "s1", modelId: "m1", sku: "B1201S-K", variant: "King", variantKind: "size", price: 2499, cost: null }], sofaFabrics: [], addons: [{ key: "SVC-DISPOSE", name: "Dispose old bed frame", price: 100 }], floorConfig: {} });
   const timeline = /^\/api\/operation\/orders\/([^/]+)\/timeline$/.exec(path);
   if (timeline) return json([]);
@@ -435,8 +558,13 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     if (poPath[2] === "print-data") return json(printData(po));
     if (poPath[2] === "sends") return json({ sends: poRow(po).sends });
     if (poPath[2] === "issue-context") return json(issued(po));
-    if (poPath[2] === "units") return json({ units: [] });
-    return json({ events: [], expected_units: [] });
+    if (poPath[2] === "units") return json({ units: UNITS[po.id] ?? [] });
+    const sessions = SESSIONS.filter((x) => x.po_id === po.id);
+    return json({
+      sessions,
+      events: RECEIPT_EVENTS.filter((e) => sessions.some((x) => x.id === e.receipt_id)),
+      expected_units: (UNITS[po.id] ?? []).map((u) => ({ id: u.unit_code, unit_code: u.unit_code, sku: u.sku, status: u.status, po_line_id: u.po_line_id })),
+    });
   }
   return json({ message: "not seeded in the local walk" }, 404);
 };

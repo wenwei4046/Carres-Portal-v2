@@ -317,8 +317,9 @@ export default function TasksArea({ onClose, fill = false }: { onClose: () => vo
       <span className="min-w-0 flex-1">
         <span className="font-semibold">{result.text.split(" · ")[0]}</span>
         {result.text.includes(" · ") ? ` · ${result.text.split(" · ").slice(1).join(" · ")}` : ""}
-        {/* A receipt that left goods owed keeps its task (owner 2026-10-05). */}
-        {!taskId && items.some((r) => r.id === result.taskId && r.module === "receiving") ? " · some items still to receive" : ""}
+        {/* The Warehouse panel's own result already says what is still owed
+            (`{n} items still to receive`, storyboard 25d); a short delivery's
+            rest becomes PO Duty's balance row, so the host adds nothing. */}
       </span>
       {simulated ? <SimulatedTag /> : null}
     </div>

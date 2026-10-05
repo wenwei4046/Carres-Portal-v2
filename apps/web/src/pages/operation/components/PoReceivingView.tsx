@@ -28,6 +28,7 @@ export default function PoReceivingView({
   onBack,
   onOpenSession,
   onPosted,
+  initialReceiving = false,
   testId = "receiving-po-view",
 }: {
   poId: string;
@@ -44,9 +45,12 @@ export default function PoReceivingView({
   onOpenSession?: (id: string) => void;
   /** Fired after a successful post, so the host can refresh its own list. */
   onPosted?: (id: string) => void;
+  /** Open straight in Receiving Mode — the host's own button already said
+   *  `Receive`, so a second `Start Receiving` click would be a wasted step. */
+  initialReceiving?: boolean;
   testId?: string;
 }) {
-  const [receiving, setReceiving] = useState(false);
+  const [receiving, setReceiving] = useState(initialReceiving);
   const po = pos.find((p) => p.id === poId) ?? null;
   if (!po) {
     return (

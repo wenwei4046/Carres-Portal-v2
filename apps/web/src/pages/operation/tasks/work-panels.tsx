@@ -3,10 +3,11 @@
  *
  * LOCAL PROPOSAL (owner direction 2026-10-05, storyboard screens 9–25c). The
  * host never draws a module's work itself: a row opens that module's panel
- * (Purchasing → the batch panel, Warehouse → Receiving, Delivery → the Sales
+ * (Purchasing → the batch panel, Warehouse → its read-only Warehouse tab whose
+ * `Receive` opens the full-width Receiving engine, Delivery → the Sales
  * Order's Delivery tab plus the act). Every panel reuses the shared parts —
  * `CompactModuleCard`, `SalesOrderCompactView`, `EmbeddedSalesOrders`,
- * `WorkActionPanel`, `DeliveryDatesEdit`, `ReceivingWorkspace`,
+ * `WorkActionPanel`, `DeliveryDatesEdit`, `PoReceivingView` / `ReceivingRecord`,
  * `PoWindowPanel` / `PoIssueEvidence`, `SoBatchIssueWorkspace` — and their
  * real doors. In the local walk those doors are answered by fixtures
  * (SIMULATED); nothing here writes anywhere else.
@@ -14,7 +15,7 @@
  * `WORK_PANELS` is the seam Purchasing A plugs its batch panel into:
  * `WORK_PANELS.po_window = (item, host) => <BatchPanel … />`.
  */
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import {
@@ -31,20 +32,20 @@ import CompactModuleCard, { type CardFact } from "@/components/kit/CompactModule
 import Button from "@/components/kit/Button";
 import { apiFetch, ApiError } from "@/lib/api";
 import { fmtDate } from "@/lib/fmt-date";
-import { useOperationSuppliers, type operationOrdersListResponse, type operationPosListResponse, type SupplierRow } from "@/lib/queries";
+import type { operationOrdersListResponse } from "@/lib/queries";
 import type { SalesOrderTemplateData } from "@/lib/pdf/types";
 import type { WorkRow } from "../use-open-work";
 import { buildRegisterRow, salesLocationOf } from "../sales-order-columns";
 import SalesOrderCompactView from "../components/SalesOrderCompactView";
-import EmbeddedSalesOrders, { SalesOrderItemsTable, linkedSalesOrderIds } from "../components/EmbeddedSalesOrders";
+import EmbeddedSalesOrders, { SalesOrderItemsTable } from "../components/EmbeddedSalesOrders";
 import { DeliveryDatesEdit } from "../components/DeliveryBrief";
-import ReceivingWorkspace from "../components/ReceivingWorkspace";
 import WorkActionPanel from "../work/WorkActionPanel";
 import PoWindowPanel, { usePoWindow } from "../work/PoWindowPanel";
 import SoBatchIssueWorkspace from "../so-batch/SoBatchIssueWorkspace";
 import { useDeliveryScopeCard } from "../delivery-scope-card";
 import { partiesWord } from "./tasks-model";
 import type { WorkPanelHost } from "./tasks-host";
+import WarehouseReceivePanel from "./warehouse-task-panel";
 
 export type WorkPanelRenderer = (item: WorkRow, host: WorkPanelHost) => ReactNode;
 
@@ -62,7 +63,7 @@ export function panelFor(item: WorkRow, host: WorkPanelHost): ReactNode {
   const byKind = WORK_PANELS[item.source.object.kind];
   if (byKind) return byKind(item, host);
   if (item.module === "receiving" && item.source.object.kind === "purchase_order") {
-    return <WarehouseTaskPanel key={item.id} item={item} host={host} />;
+    return <WarehouseReceivePanel key={item.id} item={item} host={host} />;
   }
   return <GenericTaskPanel key={item.id} item={item} host={host} />;
 }
@@ -144,75 +145,6 @@ function DeliveryTaskPanel({ item, host }: { item: WorkRow; host: WorkPanelHost 
         ) : (
           <PanelState text={scope.loading ? "Loading…" : "The delivery could not be loaded"} />
         )}
-      />
-    </div>
-  );
-}
-
-/* ── Warehouse — receive the PO's goods (never gated by the send record) ─── */
-
-function WarehouseTaskPanel({ item, host }: { item: WorkRow; host: WorkPanelHost }) {
-  const navigate = useNavigate();
-  const poId = item.source.object.id;
-  const poQ = useQuery({
-    queryKey: ["operation", "pos", "one", poId],
-    queryFn: () => apiFetch<operationPosListResponse>(`/api/operation/pos?status=all&poId=${encodeURIComponent(poId)}`),
-    staleTime: 10_000,
-  });
-  const suppliersQ = useOperationSuppliers();
-  const [receiving, setReceiving] = useState(true);
-  const po = poQ.data?.pos.find((p) => p.id === poId) ?? null;
-  if (poQ.isPending) return <PanelState text="Loading…" />;
-  if (poQ.isError || !po) return <PanelState text="This purchase order could not be opened" alert />;
-  const supplier = (suppliersQ.data?.suppliers ?? []).find((s) => s.id === po.supplier_id) as SupplierRow | undefined;
-  const destinations = [...(poQ.data?.destinations ?? []), ...(poQ.data?.referencedDestinations ?? [])];
-  const deliverTo = destinations.find((d) => d.id === (po.destination_id ?? po.warehouse_id))?.name ?? "";
-  const poDate = po.official_delivery_date ?? po.eta_date;
-  const sentForCurrent = (po.sends ?? []).some((s) => s.kind === "confirmed_sent" && s.po_version === (po.version ?? 1));
-  const orderIds = linkedSalesOrderIds((po.sources ?? []).map((s) => ({ kind: s.kind, orderId: s.order_id ?? null })));
-  const info: CardFact[] = [
-    { key: "deliver", label: "Supplier Deliver To", value: deliverTo || "Not recorded" },
-    { key: "date", label: "PO Delivery Date", value: poDate ? fmtDate(poDate) : "Not recorded" },
-  ];
-  return (
-    <div className="p-3" data-testid="task-panel-warehouse">
-      <CompactModuleCard
-        name={supplier?.name ?? "Supplier"}
-        reference={[po.id, poDate ? `PO Delivery Date ${fmtDate(poDate)}` : null].filter(Boolean).join(" · ")}
-        referenceStatus={missedWord(item)}
-        openLabel={`Open ${po.id}`}
-        onOpen={() => navigate(`/operation/procurement?po=${encodeURIComponent(po.id)}`)}
-        closeLabel="Close panel"
-        onClose={host.close}
-        modulesLabel="Receiving"
-        initialModule="receiving"
-        modules={[
-          { key: "info", label: "Info", summary: info, communication: null },
-          {
-            key: "receiving", label: "Receiving", communication: null,
-            content: (
-              <div data-testid="task-receiving">
-                {/* Receiving never depends on the PO's send record: goods that
-                    arrive can always be received (owner 2026-10-05). */}
-                {!sentForCurrent ? (
-                  <p className="px-3 pt-3 text-meta text-kit-slate-11" data-testid="task-receiving-not-sent">
-                    This PO is not recorded as sent, and it can still be received.
-                  </p>
-                ) : null}
-                <ReceivingWorkspace
-                  po={po}
-                  supplier={supplier}
-                  warehouseName={deliverTo}
-                  warehouses={destinations.map((d) => ({ id: d.id, name: d.name }))}
-                  receiving={receiving}
-                  onReceiving={setReceiving}
-                  onPosted={() => host.result(`Receipt saved · ${po.id}`)}
-                />
-              </div>
-            ),
-          },
-          ...(orderIds.length ? [{ key: "sales", label: "Sales Order", communication: null, content: <EmbeddedSalesOrders orderIds={orderIds} /> }] : []),
-        ]}
       />
     </div>
   );

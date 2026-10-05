@@ -68,9 +68,12 @@ import { receivingEventLabel } from "./receiving-event-label";
 export default function ReceivingRecord({
   sessionId,
   onBack,
+  backLabel = "Receiving",
 }: {
   sessionId: string;
   onBack: () => void;
+  /** Where `‹ {backLabel}` returns to — the page that opened this record. */
+  backLabel?: string;
 }) {
   const q = useReceivingSessionDetail(sessionId);
   const dutyQ = useReceivingDuty();
@@ -146,7 +149,7 @@ export default function ReceivingRecord({
           onClick={onBack}
           className="text-body text-kit-blue-11 hover:underline"
         >
-          ‹ Receiving
+          ‹ {backLabel}
         </button>
       </div>
     );
@@ -215,7 +218,7 @@ export default function ReceivingRecord({
         data-testid="receiving-record-back"
         className="text-body text-kit-blue-11 hover:underline"
       >
-        ‹ Receiving
+        ‹ {backLabel}
       </button>
       <div className="mt-1 flex items-start gap-3">
         <div className="min-w-0 flex-1">
