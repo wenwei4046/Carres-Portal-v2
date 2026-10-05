@@ -14,6 +14,11 @@ import { soBatchAction, purchaseDemandStateWords } from "@carres/shared";
 import type { SalesOrderExpansionResponse } from "@/lib/queries";
 
 const navigate = vi.fn();
+const printSalesOrdersSpy = vi.hoisted(() => vi.fn(async (_rows: ReadonlyArray<{ id: string }>) => {}));
+vi.mock("../record-print", async () => {
+  const actual = await vi.importActual<typeof import("../record-print")>("../record-print");
+  return { ...actual, printSalesOrdersOrSay: printSalesOrdersSpy };
+});
 vi.mock("react-router-dom", async () => {
   const actual = await vi.importActual<typeof import("react-router-dom")>("react-router-dom");
   return { ...actual, useNavigate: () => navigate };
@@ -2915,5 +2920,40 @@ describe("Order time contains configured cutoffs, not dated occurrence records",
     expect(screen.queryByText("Tue, 1 Sep")).not.toBeInTheDocument();
     fireEvent.click(screen.getByText("11:00 AM"));
     expect(onSelect).toHaveBeenCalledWith("11:00");
+  });
+});
+
+/* ONE ROW MENU — owner ruling 2026-10-05: `View · Print`, then this register's
+   own `Open {PO}` after one divider. Double-click keeps the quick card. */
+describe("one row menu: View · Print", () => {
+  it("reads View · Print · ─ Open {PO} on a one-PO order", () => {
+    renderRegister({ registerRows: [ORDER_O3] }, false);
+    fireEvent.contextMenu(screen.getByTestId("so-batch-row-o3"));
+    const menu = screen.getByRole("menu", { name: "Row actions" });
+    expect(within(menu).getAllByRole("menuitem").map((i) => i.textContent)).toEqual([
+      "View", "Print", "Open PO-260820-4827",
+    ]);
+    expect(within(menu).getAllByRole("separator")).toHaveLength(1);
+  });
+
+  it("View opens the Sales Order's full read-first page; Print prints that SO", () => {
+    printSalesOrdersSpy.mockClear();
+    navigate.mockClear();
+    renderRegister({ registerRows: [ORDER_O3] }, false);
+    fireEvent.contextMenu(screen.getByTestId("so-batch-row-o3"));
+    fireEvent.click(screen.getByRole("menuitem", { name: "View" }));
+    expect(navigate).toHaveBeenLastCalledWith("/operation/orders/so/o3");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    fireEvent.contextMenu(screen.getByTestId("so-batch-row-o3"));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Print" }));
+    expect(printSalesOrdersSpy).toHaveBeenCalledWith([{ id: "o3" }]);
+  });
+
+  it("double-click still opens the quick card, unchanged", () => {
+    navigate.mockClear();
+    renderRegister({ registerRows: [ORDER_O3] }, false);
+    fireEvent.doubleClick(screen.getByTestId("so-batch-row-o3"));
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(navigate).not.toHaveBeenCalled();
   });
 });

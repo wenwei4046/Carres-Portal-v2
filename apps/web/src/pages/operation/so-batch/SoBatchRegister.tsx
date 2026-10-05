@@ -65,6 +65,8 @@ import {
   type DataGridColumn,
   type DataGridContextMenuItem,
 } from "@/components/register/DataGrid";
+import { documentRowMenu } from "@/components/register/row-menu";
+import { printSalesOrdersOrSay } from "../record-print";
 import { fmtDate } from "@/lib/fmt-date";
 import { conciseLocality, NOT_RECORDED } from "@/lib/locality";
 import { useSalesOrderExpansion } from "@/lib/queries";
@@ -454,23 +456,29 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
     (o: SoBatchOrderRow) => setQuickOrderId(o.orderId),
     [],
   );
+  /* ONE ROW MENU (owner ruling 2026-10-05): `View · Print`, then this
+     register's own `Open {PO}` after the divider. The row's record is the
+     Sales Order, so View opens its full read-first page (double-click keeps
+     the quick card) and Print is the same governed SO paper. */
   const rowMenu = useCallback(
     (o: SoBatchOrderRow): DataGridContextMenuItem[] => {
       const po = soBatchCellSummary(o.pos.map((p) => p.poId));
-      return [
-        { label: "View", onClick: () => openOrder(o) },
-        ...(po.kind === "one"
-          ? [
-              {
-                label: `Open ${documentDisplayNumber(po.value)}`,
-                onClick: () =>
-                  navigate(`/operation/procurement?po=${encodeURIComponent(po.value)}`),
-              },
-            ]
-          : []),
-      ];
+      return documentRowMenu({
+        view: () => navigate(`/operation/orders/so/${o.orderId}`),
+        print: () => void printSalesOrdersOrSay([{ id: o.orderId }]),
+        more:
+          po.kind === "one"
+            ? [
+                {
+                  label: `Open ${documentDisplayNumber(po.value)}`,
+                  onClick: () =>
+                    navigate(`/operation/procurement?po=${encodeURIComponent(po.value)}`),
+                },
+              ]
+            : [],
+      });
     },
-    [navigate, openOrder],
+    [navigate],
   );
   const leafs = data.rows;
   const orders = data.registerRows;

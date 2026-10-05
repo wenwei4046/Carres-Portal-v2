@@ -94,6 +94,7 @@ import {
   type DataGridColumn,
   type DataGridContextMenuItem,
 } from "@/components/register/DataGrid";
+import { documentRowMenu } from "@/components/register/row-menu";
 import { apiFetch } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { addDaysIso } from "@/lib/excel-date-filter";
@@ -972,19 +973,25 @@ export default function OperationManualPurchase() {
   }
 
   const openRequest = useCallback((r: RequestRegisterRow) => setMode({ detail: r.id }), []);
+  /* ONE ROW MENU (owner ruling 2026-10-05): `View`, then this register's own
+     `Open {PO}` after the divider. A Manual Purchase Request is internal and
+     has no paper of its own, so the row offers no `Print` — nothing is
+     invented to fill the slot. */
   const rowMenu = useCallback(
-    (r: RequestRegisterRow): DataGridContextMenuItem[] => [
-      { label: "View", onClick: () => openRequest(r) },
-      ...(r.poNos.length === 1
-        ? [
-            {
-              label: `Open ${r.poNos[0]}`,
-              onClick: () =>
-                navigate(`/operation/procurement?po=${encodeURIComponent(r.poNos[0]!)}`),
-            },
-          ]
-        : []),
-    ],
+    (r: RequestRegisterRow): DataGridContextMenuItem[] =>
+      documentRowMenu({
+        view: () => openRequest(r),
+        more:
+          r.poNos.length === 1
+            ? [
+                {
+                  label: `Open ${r.poNos[0]}`,
+                  onClick: () =>
+                    navigate(`/operation/procurement?po=${encodeURIComponent(r.poNos[0]!)}`),
+                },
+              ]
+            : [],
+      }),
     [navigate, openRequest],
   );
 
