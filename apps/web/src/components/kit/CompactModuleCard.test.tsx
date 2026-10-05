@@ -247,3 +247,72 @@ describe("CompactModuleCard — document entry", () => {
     expect(screen.getByText("Saved document")).toBeInTheDocument();
   });
 });
+
+describe("CompactModuleCard — a record with no full page", () => {
+  it("draws no ↗ when no onOpen is given, and keeps the shared close", () => {
+    card({ onOpen: undefined, onClose: () => {} });
+    expect(screen.queryByRole("button", { name: "Open order" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Close panel" })).toBeInTheDocument();
+  });
+  it("still draws ↗ for every record that has one", () => {
+    card({ onOpen: () => {} });
+    expect(screen.getByRole("button", { name: "Open order" })).toBeInTheDocument();
+  });
+});
+
+describe("CompactModuleCard — embedded presentation (owner 2026-10-05)", () => {
+  const document = { label: "View Sales Order", preview: (onClose: () => void) => <div>Saved document<button onClick={onClose}>Close PDF</button></div> };
+  const embedded = (extra: Partial<Parameters<typeof CompactModuleCard>[0]> = {}) =>
+    card({ presentation: "embedded", initialModule: "delivery", document, onOpen: () => {}, ...extra });
+
+  it("draws no Close, no module tabs and no disclosure toggles; the ↗ door stays", () => {
+    const { container } = embedded();
+    expect(screen.queryByRole("button", { name: "Close panel" })).toBeNull();
+    expect(screen.queryByRole("navigation")).toBeNull();
+    expect(screen.queryByRole("button", { name: CARD_WORDS.orderDetails })).toBeNull();
+    expect(screen.queryByRole("button", { name: CARD_WORDS.address })).toBeNull();
+    expect(screen.queryByRole("button", { name: CARD_WORDS.items })).toBeNull();
+    expect(screen.getByRole("button", { name: "Open order" })).toBeInTheDocument();
+    expect(container.querySelector("[data-presentation='embedded']")).not.toBeNull();
+  });
+
+  it("address, sales facts and items are open by default, whatever the module's own default", () => {
+    embedded();
+    expect(screen.getByText("{full address}")).toBeTruthy();
+    expect(screen.getByText("{location}")).toBeTruthy();
+    expect(screen.getByText("{delivery items}")).toBeTruthy();
+  });
+
+  it("closing the PDF keeps address and sales facts open and returns focus to the SO No", () => {
+    embedded();
+    fireEvent.click(screen.getByRole("button", { name: "View Sales Order" }));
+    fireEvent.click(within(screen.getByRole("region", { name: "View Sales Order" })).getByRole("button", { name: "Close PDF" }));
+    expect(screen.getByRole("button", { name: "View Sales Order" })).toHaveFocus();
+    expect(screen.queryByText("Saved document")).toBeNull();
+    expect(screen.getByText("{full address}")).toBeTruthy();
+    expect(screen.getByText("{location}")).toBeTruthy();
+    expect(screen.getByText("{delivery items}")).toBeTruthy();
+  });
+
+  it("standalone is unchanged: items stay closed and Close is drawn", () => {
+    card({ initialModule: "delivery", onOpen: () => {} });
+    expect(screen.queryByText("{delivery items}")).toBeNull();
+    expect(screen.getByRole("button", { name: "Close panel" })).toBeInTheDocument();
+    expect(screen.getByRole("navigation")).toBeInTheDocument();
+  });
+});
+
+describe("CompactModuleCard — module content", () => {
+  it("a module that is only content draws its composition with no body inset of its own", () => {
+    const { container } = card({ modules: [{ key: "so", label: "Sales Order", content: <div data-testid="host-content">{"{embedded}"}</div> }], initialModule: "so" });
+    const content = screen.getByTestId("host-content");
+    expect(content.parentElement?.tagName).toBe("ARTICLE");
+    expect(container.querySelector("article")?.children).toHaveLength(1);
+  });
+  it("content follows the module's own facts when it has them", () => {
+    card({ modules: [{ ...MODULES[0], content: <div data-testid="after">{"{after}"}</div> }] });
+    const article = screen.getByTestId("after").parentElement as HTMLElement;
+    expect(article.tagName).toBe("ARTICLE");
+    expect(within(article).getByText("{total}")).toBeTruthy();
+  });
+});

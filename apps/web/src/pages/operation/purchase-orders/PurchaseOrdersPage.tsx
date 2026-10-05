@@ -7,6 +7,7 @@ import "./purchase-order-detail.css";
 import registerStyles from "./PurchaseOrdersRegister.module.css";
 import type { IconName } from "@/components/kit/Icon";
 import { FilterRail, FilterRailGroup, FilterRailRow, FilterRailSelect, ShowFiltersButton, useFilterRailOpen } from "../components/workspace-rail";
+import EmbeddedSalesOrders, { linkedSalesOrderIds } from "../components/EmbeddedSalesOrders";
 import { ArrowLeft, ChevronDown, Download, FileCheck2, X } from "lucide-react";
 import {
   monthlyDemandOf,
@@ -1464,7 +1465,7 @@ async function downloadOfficialPdf(poId: string): Promise<void> {
   setTimeout(() => URL.revokeObjectURL(url), 30_000);
 }
 
-const OBJECT_VIEWS = ["Document", "Revisions", "History", "Order Route"] as const;
+const OBJECT_VIEWS = ["Document", "Revisions", "History", "Order Route", "Sales Order"] as const;
 type ObjectView = (typeof OBJECT_VIEWS)[number];
 type DocumentMode = "read" | "issue" | "revise" | "deliverTo";
 
@@ -1495,7 +1496,11 @@ function PurchaseOrderObject({
      to Document, so a hand-typed `?view=nonsense` cannot render a blank tab. */
   const [objectParams, setObjectParams] = useSearchParams();
   const viewParam = objectParams.get("view");
-  const view: ObjectView = (OBJECT_VIEWS as readonly string[]).includes(viewParam ?? "")
+  /* `Sales Order` earns its tab only when this PO links one (UI MASTER "A tab
+     earns its place"; owner 2026-10-05): a stock or MPR PO opens no empty room. */
+  const salesOrderIds = linkedSalesOrderIds(row.sources);
+  const views = salesOrderIds.length ? OBJECT_VIEWS : OBJECT_VIEWS.filter((item) => item !== "Sales Order");
+  const view: ObjectView = (views as readonly string[]).includes(viewParam ?? "")
     ? (viewParam as ObjectView)
     : "Document";
   const setView = (next: ObjectView) => {
@@ -1602,7 +1607,7 @@ function PurchaseOrderObject({
           </div>
         ) : null}
         <nav className="mt-3 flex gap-1 overflow-x-auto whitespace-nowrap" aria-label="Purchase order views">
-          {OBJECT_VIEWS.map((item) => (
+          {views.map((item) => (
             <button
               key={item}
               type="button"
@@ -1710,6 +1715,8 @@ function PurchaseOrderObject({
             onRetryReceiving={() => void receivingQ.refetch()}
             onRetryClaims={() => void claimsQ.refetch()}
           />
+        ) : view === "Sales Order" ? (
+          <EmbeddedSalesOrders orderIds={salesOrderIds} />
         ) : view === "Revisions" ? (
           <RecordList
             title="Revisions"
