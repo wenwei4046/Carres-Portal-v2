@@ -917,10 +917,7 @@ Staff & Duties edits assignments.
   second line is supporting evidence, never an instruction. Actions live in My Work, Team Work, the
   Order Route, the Working Panel's module tab and detail panels. **A left mission rail may present
   source-owned missions (§6.1); it never calculates its own work or owners.**
-- **Ruled exceptions (no other register copies them without its own ruling):** the **Payment Monitor**
-  `Payment timing` cell (owner ruling 2026-09-12, re-ruled 2026-09-16; Payment MASTER §3) — a control
-  listing whose last column shows the fact and the shared Work item's own action with its resolved
-  owner avatar; the **Delivery Monitor** `Delivery Status` column (Delivery MASTER §8.4) — one status
+- **Ruled exceptions (no other register copies them without its own ruling):** the **Delivery Monitor** `Delivery Status` column (Delivery MASTER §8.4) — one status
   word set from one function, no avatar and no second action; the **Delivery schedule card** — two
   facts on two lines (journey progress, then readiness/blocker) and a type label, never summed
   (Delivery MASTER §§8.2, 8.4). **Delivery Work sentences** are two structured lines: act with
@@ -1462,7 +1459,6 @@ into the section it belongs to, and this list loses it.
 | Delivery Monitor: 72px two-line rows; in-place panel write state in the expansion; `Delivery Status` word set | 2026-09-12 / 09-13 / 09-14 / 09-25 | Delivery MASTER §§8.3–8.5 |
 | Delivery Orders: DO brief recorded in place (two columns ≥1024px) | 2026-09-26 | Delivery MASTER §8.7 |
 | Delivery schedule card: two facts on two lines + type label | 2026-09-14 / 09-25 | Delivery MASTER §§8.2, 8.4 |
-| Payment Monitor: `Payment timing` fact + Work action + avatar cell (the 72px row was retired 2026-09-25, #1934; this cell exception stays until Payment MASTER §3 and COPY are rewritten) | 2026-09-12 / 09-16 | Payment MASTER §3 |
 | SO Batch Purchase and Manual Purchase: their own approved listing designs (§6.8); the PO Duty owner chip only beside the selected `Issue PO` (`YJ`), Export at the far right | 2026-09-18 | Purchasing MASTER §§9.1–9.2 |
 | SO Batch `PO No` cell: every linked PO on one line, comma-separated, each its own link, 170px, no wrap (DEPLOYED #1924; signed-in check owed). Sales Orders keeps its own PO No cell; unifying them is NOT approved | 2026-10-05 | Purchasing MASTER §9.1 |
 | Supplier Claims leading order `☐ · ▸ · Claim status · Supplier Claim No · Claim Reported · …` (status leads; date never pinned; `pinnedPrefix`, BUILT on branch 2026-09-29) | 2026-09-18 | Purchasing MASTER §9.5 |
