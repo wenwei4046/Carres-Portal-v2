@@ -158,10 +158,12 @@ export type DataGridColumn<T> = {
       column also sorts by it (blanks last) unless it has a `sortFn`. */
   numberValue?: (row: T) => number | null | undefined;
   /**
-   * HOUZS port (so-list-houzs-port) — when true and the user hasn't manually
-   * hidden/shown anything yet (no persisted `layout.hidden` for this key),
-   * the column is hidden by default. User can show it via right-click "Show
-   * column" menu; the choice persists in localStorage from then on.
+   * HOUZS port (so-list-houzs-port) — when true and the person has not
+   * arranged the columns yet (a pristine layout for this key), the column is
+   * hidden by default. It stays hidden through pin, drag or hiding another
+   * column, until the person shows it (Columns, or the header menu's "Show");
+   * the choice persists in localStorage from then on, and `Reset columns`
+   * returns to these defaults.
    * Used to match Houzs "19 of 25 columns visible by default" semantics.
    */
   defaultHidden?: boolean;
@@ -663,6 +665,10 @@ type Layout = {
   groupBy: string[];
   pinned: string[];
   sort: { key: string; dir: "asc" | "desc" } | null;
+  /** The person has arranged the columns (pin · drag · hide · show · load),
+   *  so `hidden` is literal even when it is empty. Only `Reset columns`
+   *  clears it. Absent on a layout saved before 2026-10-05. */
+  arranged?: boolean;
 };
 
 const DEFAULT_LAYOUT: Layout = {
@@ -673,6 +679,35 @@ const DEFAULT_LAYOUT: Layout = {
   pinned: [],
   sort: null,
 };
+
+/**
+ * ⭐ PRISTINE = THE COLUMN SPEC'S OWN DEFAULTS. A layout nobody has arranged
+ * shows `defaultHidden: true` columns hidden; once arranged, `hidden` is the
+ * person's literal choice.
+ */
+function isPristineLayout(l: Layout): boolean {
+  return !l.arranged && l.order.length === 0 && l.hidden.length === 0;
+}
+
+/**
+ * ⭐ ONE RULE FOR EVERY LAYOUT WRITER (2026-10-05). The writer is handed the
+ * layout AS SEEN — on a pristine layout the default-hidden keys are written
+ * out first — so pin, drag, hide or show changes only the column acted on and
+ * never releases every default-hidden column at once. A writer that leaves the
+ * arrangement alone (sort · group · widths) keeps a pristine layout pristine.
+ * `Reset columns` is the one act that returns to pristine and does not pass
+ * through here.
+ */
+function settleLayout(prev: Layout, updater: (l: Layout) => Layout, defaultHidden: readonly string[]): Layout {
+  const pristine = isPristineLayout(prev);
+  const seen = pristine && defaultHidden.length ? { ...prev, hidden: [...defaultHidden] } : prev;
+  const next = updater(seen);
+  if (next === seen) return prev;
+  if (next.order === seen.order && next.hidden === seen.hidden) {
+    return seen === prev ? next : { ...next, hidden: prev.hidden };
+  }
+  return { ...next, arranged: true };
+}
 
 function readLayout(key: string): Layout {
   if (typeof window === "undefined") return DEFAULT_LAYOUT;
@@ -823,7 +858,12 @@ function DataGridInner<T>({
       ? { ...DEFAULT_LAYOUT, groupBy: [...initialGroupBy] }
       : saved;
   });
-  const setLayout = useCallback(
+  /* The keys a pristine layout hides. Keyed by value so a page that rebuilds
+     its column array every render does not churn every layout writer. */
+  const defaultHiddenSignature = JSON.stringify(columns.filter((c) => c.defaultHidden).map((c) => c.key));
+  const defaultHiddenKeys = useMemo(() => JSON.parse(defaultHiddenSignature) as string[], [defaultHiddenSignature]);
+  /** Writes the layout exactly as given — `Reset columns` only. */
+  const commitLayout = useCallback(
     (updater: (l: Layout) => Layout) => {
       setLayoutRaw((prev) => {
         const next = updater(prev);
@@ -832,6 +872,11 @@ function DataGridInner<T>({
       });
     },
     [storageKey],
+  );
+  /** Every other layout writer: the one pristine rule in `settleLayout`. */
+  const setLayout = useCallback(
+    (updater: (l: Layout) => Layout) => commitLayout((prev) => settleLayout(prev, updater, defaultHiddenKeys)),
+    [commitLayout, defaultHiddenKeys],
   );
 
   const [search, setSearch] = useState(initialSearch ?? remembered?.search ?? "");
@@ -1126,10 +1171,11 @@ function DataGridInner<T>({
      state survives). toggleColumn flips a column's presence in `hidden`. */
   const resetColumns = useCallback(() => {
     /* With personal layouts, `Reset columns` returns to the COMPANY layout,
-       which includes its default order of rows (no header sort). */
-    setLayout((l) => ({ ...l, hidden: [], order: [], widths: {}, ...(personalLayouts ? { sort: null } : {}) }));
+       which includes its default order of rows (no header sort). Back to
+       pristine: the column spec's defaults show again. */
+    commitLayout((l) => ({ ...l, hidden: [], order: [], widths: {}, arranged: false, ...(personalLayouts ? { sort: null } : {}) }));
     setColumnsMenuOpen(false);
-  }, [setLayout, personalLayouts]);
+  }, [commitLayout, personalLayouts]);
   /**
    * The columns a `leadingColumns` listing may never lose or reorder: the
    * owner's own leading columns, then the record date, then the identity. A key
@@ -1155,22 +1201,13 @@ function DataGridInner<T>({
   const toggleColumn = useCallback(
     (colKey: string) => {
       if (leadingKeys.includes(colKey)) return;
-      setLayout((l) => {
-        /* If we're still on the pristine-defaults overlay (no explicit
-         choices yet) materialize the current set of hidden keys before
-         toggling, so the first interaction doesn't silently un-hide every
-         defaultHidden column. */
-        const pristine = l.order.length === 0 && l.hidden.length === 0;
-        const baseHidden = pristine
-          ? columns.filter((c) => c.defaultHidden).map((c) => c.key)
-          : l.hidden;
-        const hidden = baseHidden.includes(colKey)
-          ? baseHidden.filter((k) => k !== colKey)
-          : [...baseHidden, colKey];
-        return { ...l, hidden };
-      });
+      // `setLayout` hands a pristine layout over with its defaults written out.
+      setLayout((l) => ({
+        ...l,
+        hidden: l.hidden.includes(colKey) ? l.hidden.filter((k) => k !== colKey) : [...l.hidden, colKey],
+      }));
     },
-    [columns, setLayout, leadingKeys],
+    [setLayout, leadingKeys],
   );
 
   // ── Resolve visible/ordered columns ───────────────────────────────
@@ -1178,22 +1215,20 @@ function DataGridInner<T>({
   // can't be reordered/hidden via the layout (filtered out of order /
   // hidden persistence on read). The accessor is built per-row inside
   // the tbody render so it can read expandedRows + call toggleExpand.
-  /* HOUZS port — when the persisted layout is pristine (no order +
-     no hidden customisations yet) apply `defaultHidden: true` from the
-     column spec so the grid starts with Houzs's 19-of-25 / 34-of-44
-     visible-by-default semantics. Once the user shows/hides anything,
-     the persisted `hidden` array takes precedence and we stop overlaying
-     defaults (their explicit choice wins). Lifted out of the visibleColumns
-     memo so the Columns popover can read the same set without recomputing. */
+  /* HOUZS port — when the persisted layout is pristine (`isPristineLayout`)
+     apply `defaultHidden: true` from the column spec so the grid starts with
+     Houzs's 19-of-25 / 34-of-44 visible-by-default semantics. Once the person
+     arranges anything, `settleLayout` has written those defaults into
+     `hidden` and the persisted array is their explicit choice. Lifted out of
+     the visibleColumns memo so the Columns popover can read the same set
+     without recomputing. */
+  const layoutPristine = isPristineLayout(layout);
   const effectiveHidden = useMemo(() => {
-    const pristineLayout = layout.order.length === 0 && layout.hidden.length === 0;
-    const hidden = pristineLayout
-      ? new Set(columns.filter((c) => c.defaultHidden).map((c) => c.key))
-      : new Set(layout.hidden);
+    const hidden = new Set(layoutPristine ? defaultHiddenKeys : layout.hidden);
     // A saved `hidden` from before the ruling cannot take the date or identity away.
     for (const k of leadingKeys) hidden.delete(k);
     return hidden;
-  }, [columns, layout.order, layout.hidden, leadingKeys]);
+  }, [layoutPristine, layout.hidden, defaultHiddenKeys, leadingKeys]);
 
   const visibleColumns = useMemo(() => {
     const byKey = new Map(columns.map((c) => [c.key, c]));
@@ -3578,7 +3613,7 @@ function DataGridInner<T>({
       {ctx &&
         (() => {
           const col = columns.find((c) => c.key === ctx.colKey);
-          const hidden = layout.hidden.includes(ctx.colKey);
+          const hidden = effectiveHidden.has(ctx.colKey);
           const grouped = layout.groupBy.includes(ctx.colKey);
           return (
             <div className={styles.ctxMenu} style={{ top: ctx.y, left: ctx.x }} onClick={(e) => e.stopPropagation()}>
@@ -3630,10 +3665,7 @@ function DataGridInner<T>({
                 /* HOUZS port — surface BOTH explicitly hidden columns and
                  the pristine-default-hidden set so the user can reveal
                  the optional columns shipped hidden by default. */
-                const pristine = layout.order.length === 0 && layout.hidden.length === 0;
-                const hiddenKeys = pristine
-                  ? columns.filter((c) => c.defaultHidden).map((c) => c.key)
-                  : layout.hidden;
+                const hiddenKeys = layoutPristine ? defaultHiddenKeys : layout.hidden;
                 if (hiddenKeys.length === 0) return null;
                 return (
                   <>
