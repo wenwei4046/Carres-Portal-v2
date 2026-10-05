@@ -311,7 +311,9 @@ obsolete generic sizing/layout tables. It records the current shared recipes and
 rulings; it does not approve every implementation difference. Values are CSS pixels unless noted.
 `KEEP` below means retain the stated admitted recipe in its scope, not production verification.
 A proposed value is **PROPOSAL / NOT LAW** until reviewed. Source inspection does not prove that a
-font loaded, a control is accessible, or a page rendered correctly.
+font loaded, a control is accessible, or a page rendered correctly. **Every measurement names its
+trigger** (owner-required 2026-10-05): viewport width, grid canvas, available content canvas, container,
+card width or pointer — §7.5 carries the key. A number without its trigger is not usable.
 
 **Source basis:** application files in the inspected checkout, compared with main
 `36e2840dd8dcce6eeb77252417ab57febbd6848d` for the previously recorded shared-source scope.
@@ -392,50 +394,74 @@ touch targets 40px. Table/Cards uses the shared segmented `Tabs` with canonical 
 words: outer 32px, border 1 / padding 2 / option 26, radius 6; option 13/18, horizontal padding 10,
 selected blue-3 / blue-11 / 600; outer 40px touch.
 
-| Element | Accepted measurement / behavior |
-|---|---|
-| Register search | Desktop 220px wide × 32px high; responsive width follows shared DataGrid |
-| Desktop results | Row32px; body12px /18px line height; header11px, weight600, height36px; horizontal cell padding8px |
-| Register toolbar | Desktop40px; responsive wrapping may increase height |
-| Active filters | Minimum36px row; chips24px; padding6px vertical /12px horizontal; gap8px before toolbar; omitted when empty |
-| Canonical action/control icons |16px; use kit Icon registry and supported sizes, not independently drawn glyphs |
-| Back/Close controls |32px desktop /40px touch; canonical neutral control geometry |
-| Local rail breakpoint |896px available content canvas, after shell rails; not viewport width |
-| Collapsed local rail |44px Show filters control; full open composition uses source `.so-template-rail` |
-| SO summary |Four visible rows;8px row gap; label left, value right, tabular/no-wrap; conditional source notices |
-| Object tab selection/divider |Weight600 black, blue underline;1px slate-5 divider; white identity row /slate-2 tab row |
-| Quick-view facts |Labels12px; values weight600; use Drawer/Block source for width, padding and responsive stacking |
-| Carres official mark |Expanded36px, collapsed28px; preserve original asset proportions |
+**Trigger key** (owner-required 2026-10-05: every measurement names what switches it):
+`viewport` = browser width (`@media`, ≥768 desktop / <768 phone-touch) · `grid canvas` = the DataGrid's
+own width (`narrowCanvas` below 768) · `available canvas` = content width after the shell rails ·
+`container` = the host region's available width · `card` = the card's own width (container queries) ·
+`any` = no switch.
+
+| Element | Accepted measurement / behavior | Trigger |
+|---|---|---|
+| Register search | 220 × 32 desktop; 220 × 40 phone; responsive width follows shared DataGrid | viewport ≥768 / <768 |
+| Results | Row 32; body 12/18; header 11/600, height 36; horizontal cell padding 8 | grid canvas ≥768 (below it the 40×40 checkbox target grows rows to 39 — UI MASTER §7.2) |
+| Register toolbar | 40 desktop; phone wraps, minimum 49 | viewport ≥768 / <768 |
+| Active filters | Minimum 36 row; chips 24; padding 6 vertical / 12 horizontal; gap 8 before toolbar; omitted when empty | any |
+| Canonical action/control icons | 16; kit Icon registry and supported sizes only | any |
+| Back/Close controls | 32 desktop / 40 touch; canonical neutral control geometry | viewport ≥768 / <768 |
+| Local rail breakpoint | 896 | available canvas (after shell rails), never the viewport |
+| Collapsed local rail | 44 `Show filters` control; open composition from `.so-template-rail` | available canvas <896, or the operator hid it |
+| SO summary | Four rows; 8 row gap; label left, value right, tabular/no-wrap; conditional source notices | any |
+| Object tab selection/divider | Weight 600 black, blue underline; 1px slate-5 divider; white identity row / slate-2 tab row | any |
+| Carres official mark | Expanded 36, collapsed 28; original proportions | sidebar expanded / collapsed |
 
 **Detailed composition — source recipes (2026-10-02).** Shared token radii: control 6px, card 10px. `text-strong` is 15px/22px, weight 600.
 
-| Surface / element | Exact source recipe | Design and responsive rule |
+| Surface / element | Exact source recipe | Design and responsive rule | Trigger |
+|---|---|---|---|
+| Block card | `kit/Block.tsx`: horizontal padding16px, vertical12px; border1px; radius10px | White default, slate-3 muted identity; black15/22/600 heading; slate-5 border/divider | any |
+| Block heading | Bottom padding8px; header horizontal gap12px /vertical4px; body margin-top12px | Header wraps; read-only navigation may use headerSlot; writing actions stay with their facts | any |
+| Drawer | `kit/DialogFrame.tsx` + Tailwind `max-w-drawer`: width100%, maximum560px, full height | At desktop right offset64px preserves the right rail; below uses side-frame right0 | viewport ≥768 / <768 |
+| Drawer header/body (generic) | Header padding16px horizontal /12px vertical; title/actions gap16px; actions gap8px; body padding16px | Title truncates with full tooltip; below768 header wraps into identity/actions rows with8px gap. The `compact-card` variant draws no container header (§7.6) | viewport ≥768 / <768 |
+| Button default | `kit/Button.tsx`: height32px desktop; phone40px; horizontal padding12px; gap8px; icon16px | Shared primary/secondary/ghost variants; no local className/style overrides | viewport ≥768 / <768 |
+| Icon-only button | Desktop32×32px; phone40×40px; padding0 | Tooltip and accessible name required; icon alone never removes keyboard access | viewport ≥768 / <768 |
+| Button specialised sizes | `sm`: height24px, padding8px, gap4px; `touch`: desktop36px/phone40px, padding12px, gap6px; sm/touch icon14px | Supported API variants only; small size is not the default for phone actions | viewport ≥768 / <768 |
+| FieldFrame | Label/control vertical gap4px | Shared label, required/error/hint semantics; do not hand-roll field wrappers | any |
+| Single-line field | `kit/field-recipe.ts`: height32px, horizontal padding8px, border1px, radius6px | White/rest slate-5; focus blue-9 ring2px; disabled slate-3/slate-9; error border red-9 | any |
+| Read-only framed fact | Workspace FullFact: minimum32px, padding8px horizontal /4px vertical, natural wrapping | Read-only is not disabled editing; automatic fact may use slate-3; preserve module ownership | any |
+| Multi-line field | Padding8px horizontal /4px vertical; natural content height | Same control skin; do not force all multiline facts to32px | any |
+| Toolbar field | Height36px desktop,40px phone; padding12px; text14/20 | Use supported toolbar shape, distinct from compact register search | viewport ≥768 / <768 |
+| Object identity/actions row | `SalesOrderTabs.tsx`: desktop44px; horizontal padding24px desktop /16px phone; gap12px | Fixed outside content scroll; wraps into two rows; wrapped row height is natural, not a fixed44px | padding: viewport 768; wrap: container ≤1023 (incl. shell rails) |
+| Object tab row | Height36px, horizontal padding24px desktop /16px phone; top divider1px slate-5 | Slate-2 surface; horizontal overflow belongs to tab row; selected600 black with blue underline | viewport ≥768 / <768 |
+| Object panes (SO reference) | Workspace form minimum660px, PDF minimum320px | ≥1320: equal halves; 980–1319: 660px form plus remainder PDF; below 980: stack form then PDF; SO source values, not universal module pane minimums | container (available host width) |
+| Object pane padding/gaps | Each pane16px padding; card fact gaps12px | Side-by-side panes scroll independently; stacked view uses outer natural scroll; Items has no nested vertical scroll | any |
+| Rail fixed navigation | `index.css`: padding8px vertical /12px horizontal; stacked tabs gap4px; tabs height36px, horizontal padding8px, radius6px | SO accepted stacked views; selected blue-3/blue-11/600; phone minimum40px targets | viewport <768 for the 40px targets |
+| Rail filter group | Margin4px vertical; border1px slate-6; radius6px; white body | Slate-3 header, slate-4 hover; expanded header bottom divider1px; header minimum36px/phone40px | viewport ≥768 / <768 |
+| Rail group body/rows | Body padding4px top/bottom,8px right,16px left; rows minimum32px, padding7px vertical; text12/18 | Phone minimum40px; chosen rows blue-3/blue-11; long text may increase height rather than clip | viewport ≥768 / <768 |
+| Table/Cards segmented switch | Shared CSS: outer padding2px/gap2px/border1px/radius6px; tab height26px desktop /34px phone, padding10px horizontal, radius4px, text13/18 | Selected600 blue-11 on blue-3; both labels and16px icons remain visible; surrounding hit targets must retain accepted touch behavior | viewport ≥768 / <768 |
+
+**Live production — Sales Orders register, 2026-10-05.** Measured in the owner's window: viewport
+1058×804, register column 694px, rail open (so: viewport = desktop, grid canvas = narrow).
+
+| Element | Live value | Trigger in effect |
 |---|---|---|
-| Block card | `kit/Block.tsx`: horizontal padding16px, vertical12px; border1px; radius10px | White default, slate-3 muted identity; black15/22/600 heading; slate-5 border/divider |
-| Block heading | Bottom padding8px; header horizontal gap12px /vertical4px; body margin-top12px | Header wraps; read-only navigation may use headerSlot; writing actions stay with their facts |
-| Quick-view drawer | `kit/DialogFrame.tsx` + Tailwind `max-w-drawer`: width100%, maximum560px, full height | At desktop>=768 right offset64px preserves right rail; below768 uses side-frame right0 |
-| Drawer header/body | Header padding16px horizontal /12px vertical; title/actions gap16px; actions gap8px; body padding16px | Quick view dark slate-12/white; title truncates with full tooltip; below768 header wraps into identity/actions rows with8px gap |
-| Quick-view content | Register composition: cards gap12px; fact grid2columns, gap12px; labels12px, value600, value margin-top4px | Contact facts first; no duplicate customer card; no footer; body owns vertical scrolling |
-| Button default | `kit/Button.tsx`: desktop>=768 height32px; phone40px; horizontal padding12px; gap8px; icon16px | Shared primary/secondary/ghost variants; no local className/style overrides |
-| Icon-only button | Desktop32×32px; below76840×40px; padding0 | Tooltip and accessible name required; icon alone never removes keyboard access |
-| Button specialised sizes | `sm`: height24px, padding8px, gap4px; `touch`: desktop36px/phone40px, padding12px, gap6px; sm/touch icon14px | Supported API variants only; small size is not the default for phone actions |
-| FieldFrame | Label/control vertical gap4px | Shared label, required/error/hint semantics; do not hand-roll field wrappers |
-| Single-line field | `kit/field-recipe.ts`: height32px, horizontal padding8px, border1px, radius6px | White/rest slate-5; focus blue-9 ring2px; disabled slate-3/slate-9; error border red-9 |
-| Read-only framed fact | Workspace FullFact: minimum32px, padding8px horizontal /4px vertical, natural wrapping | Read-only is not disabled editing; automatic fact may use slate-3; preserve module ownership |
-| Multi-line field | Padding8px horizontal /4px vertical; natural content height | Same control skin; do not force all multiline facts to32px |
-| Toolbar field | Height36px at>=768,40px below; padding12px; text14/20 | Use supported toolbar shape, distinct from compact register search |
-| Object identity/actions row | `SalesOrderTabs.tsx`: desktop44px; horizontal padding24px at>=768 /16px below; gap12px | Fixed outside content scroll; shared CSS wraps at available container<=1023px; wrapped row height is natural, not a fixed44px |
-| Object tab row | Height36px, horizontal padding24px desktop /16px below768; top divider1px slate-5 | Slate-2 surface; horizontal overflow belongs to tab row; selected600 black with blue underline |
-| Object panes (SO reference) | Workspace form minimum660px, PDF minimum320px | Available host>=1320: equal halves;980–1319:660px form plus remainder PDF; below980: stack form then PDF; these are SO source values, not universal module pane minimums |
-| Object pane padding/gaps | Each pane16px padding; quick-view/card fact gaps12px | Side-by-side panes scroll independently; stacked view uses outer natural scroll; Items has no nested vertical scroll |
-| Rail fixed navigation | `index.css`: padding8px vertical /12px horizontal; stacked tabs gap4px; tabs height36px, horizontal padding8px, radius6px | SO accepted stacked views; selected blue-3/blue-11/600; below768 minimum40px targets |
-| Rail filter group | Margin4px vertical; border1px slate-6; radius6px; white body | Slate-3 header, slate-4 hover; expanded header bottom divider1px; header minimum36px/phone40px |
-| Rail group body/rows | Body padding4px top/bottom,8px right,16px left; rows minimum32px, padding7px vertical; text12/18 | Phone minimum40px; chosen rows blue-3/blue-11; long text may increase height rather than clip |
-| Table/Cards segmented switch | Shared CSS: outer padding2px/gap2px/border1px/radius6px; tab height26px desktop /34px phone, padding10px horizontal, radius4px, text13/18 | Selected600 blue-11 on blue-3; both labels and16px icons remain visible; surrounding hit targets must retain accepted touch behavior |
+| Toolbar | 40 high, padding 4 / 12 | viewport ≥768 → desktop |
+| Search | 220 × 32, radius 6; input 12/18 | viewport ≥768 → desktop |
+| Table/Cards segmented | 167 × 32, padding 2, radius 6; option 26 high, 13/18/600, selected blue-3 background / blue-11 text | viewport ≥768 → desktop |
+| Page tools | 32 × 32, radius 6 | viewport ≥768 → desktop |
+| Table header | 36 high; 11/14/600; slate-3; padding 0 8 | any |
+| Cells | 12/18; padding 0 8 | any |
+| Main row | **39 high, not 32** — the 40×40 checkbox hit area (`checkHitNarrow`) is on | grid canvas 694 <768 → narrow (REAL GAP, UI MASTER §7.2) |
+| Status pill | 22 high; 11/14/500; padding 4 8; full radius | any |
+| Footer | 32 high; 12/18; padding 0 12 | any |
+| Goods expansion header | 26.5 high; 11/14/600; padding 6 8 | any |
+| Goods rows | 51 high; 13/18; padding 8 | any |
+| Column widths | SO No 90 · dates 120 · Stock Status 120 · Sales Location 168 · Salesperson 120 · Customer’s original requested delivery 180 · Customer 150 · Items 208 · PO No 170 · DO No 170 · Category 208 | registry (UI MASTER §6.11); Stock Status 120 truncates every `Receipt unconfirmed` pill (GAP, UI MASTER §7.2); Category renders 208 while the registry `category` role is 112 — reconcile in the SO round |
 
 ### 7.6 Compact module card — CompactModuleCard
 
-**Moved here from UI MASTER §4.3 on 2026-10-05 so numbers have one home.** The card's rules live in
+**Moved here from UI MASTER §4.3 on 2026-10-05 so numbers have one home.** **Trigger for every row
+below: the card's own width (CSS container queries), never the viewport — except where a row names
+the viewport (the PDF Close button).** The card's rules live in
 [`ui-reference/MODULE-CARD-TEMPLATE.md`](ui-reference/MODULE-CARD-TEMPLATE.md); its law in UI MASTER §4.3.
 The embedded `Sales Order` tab presentation's measured numbers join this section when its build merges.
 

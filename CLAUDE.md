@@ -510,7 +510,10 @@ production data must be modified irreversibly · long-term architecture must cha
 **BUILD/DELIVERY DEFAULT AUTONOMY.** A BUILD takeover of an approved `READY FOR CARD` scope owns the
 full vertical slice: inspect current `origin/main` and authority → implement → run targeted tests
 during development → pass the authoritative release gate → push/PR/merge → deploy → authenticated
-production verification → close the owning MASTER. If the mission says continuous build, continue
+production verification → close the owning MASTER. Before calling a module complete, proactively offer
+how to complete its Settings — every setting it needs to run, its Settings door, current value or
+default, which are still empty, and who sets it (owner ruling 2026-10-05); never wait for the owner to ask.
+If the mission says continuous build, continue
 to the next approved READY scope without asking *“what next?”* or saying *“waiting for your next
 instruction.”* Never ask Jess to choose subagent-driven vs inline execution, technical-layer order,
 test batching, branch/worktree strategy, migration numbering, PR sequence, CI strategy, deployment
