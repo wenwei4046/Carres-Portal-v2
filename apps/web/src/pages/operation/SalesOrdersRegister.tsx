@@ -77,6 +77,8 @@ import Tabs from "@/components/kit/Tabs";
 import SalesOrderReadFailure from "./SalesOrderReadFailure";
 import CancelSalesOrderDialog from "./CancelSalesOrderDialog";
 import { printSalesOrdersOrSay } from "./record-print";
+import { usePageWork } from "@/components/working-panel/page-work";
+import { useSalesOrdersPageWork } from "./working-panel-sources";
 import Popover from "@/components/kit/Popover";
 import { useAuth } from "@/lib/auth";
 import { appTodayIso, fmtMonth } from "@/lib/fmt-date";
@@ -1078,6 +1080,19 @@ export default function SalesOrdersRegister() {
       }),
     [openWorkspace],
   );
+  /* LOCALHOST PROPOSAL (owner flow 2026-10-05): the right Working Panel opens
+     on this page's highest-priority order work — Work engine items for
+     `orders`, drawn in the order's own card. The lookup reads the whole
+     population (`all`), never the table's current filter. */
+  const renderWorkOrder = useCallback(
+    (row: RegisterRow, close: () => void) => (
+      <SalesOrderCompactView row={row} salesLocation={salesLocationOf(row.o)}
+        items={<div className="min-w-0 overflow-x-auto"><ExpandedLines row={row} compact /></div>}
+        onOpen={() => openWorkspace(row)} onClose={close} />
+    ),
+    [openWorkspace],
+  );
+  usePageWork(useSalesOrdersPageWork(all, renderWorkOrder));
 
 
   const expandable = useMemo(

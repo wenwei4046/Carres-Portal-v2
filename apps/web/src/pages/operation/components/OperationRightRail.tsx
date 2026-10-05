@@ -1,43 +1,85 @@
-import { useState } from "react";
-import { CalendarDays, ListTodo, ScrollText, X, type LucideIcon } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { ArrowLeft, CalendarDays, ListTodo, ScrollText, X, type LucideIcon } from "lucide-react";
 import { useActiveOrder } from "@/lib/active-order";
+import { useCurrentPageWork } from "@/components/working-panel/page-work";
 import CalendarPanel from "./rail/CalendarPanel";
 import TasksPanel from "./rail/TasksPanel";
 import AnnotationTimeline from "./AnnotationTimeline";
 import GlobalActivity from "./GlobalActivity";
+import PageWorkPanel, { WORKING_PANEL_WORDS } from "./rail/PageWorkPanel";
 import { useOpenWorkSet } from "../use-open-work";
 import { myMissedAndToday } from "../work/work-model";
 
 /**
- * OperationRightRail — Gmail-style collapsible right rail (Jess COO ask).
- * A 52px icon strip (Calendar / Keep notes / Follow-ups) that expands a 320px panel.
- * The Follow-ups icon carries a red badge = count of overdue tasks (open past the
- * 60-min SLA) so the team is nudged to take action within the hour. Follow-ups is
- * the same ops_tasks data the Orders list flag column drives.
+ * OperationRightRail — the Quick Rail and the ONE right area beside the page.
+ *
+ * ── LOCALHOST PROPOSAL (owner flow 2026-10-05) — NOT DEPLOYED ──────────────
+ *
+ * Three ICON-ONLY doors, `Calendar · Tasks · Activity` (owner-approved names;
+ * the visible 10px words are gone, each door keeps its tooltip and accessible
+ * name, its icon, its 60×44 hit area and its selected style). `Tasks`
+ * replaces `My Work` with the same icon, badge and count.
+ *
+ * The right area shows ONE view at a time — never two stacked panels:
+ *
+ *   page      the current module page's own work (the shared Working Panel,
+ *             page-supplied source). Opens by itself when a page with a work
+ *             source is entered.
+ *   calendar · tasks · activity   the three doors.
+ *
+ * HOW TASKS COEXISTS WITH CALENDAR AND ACTIVITY IS STILL UNDER OWNER RESEARCH,
+ * so this is the most reversible arrangement, not a decision: every view that
+ * was opened STAYS MOUNTED (hidden, never unmounted), so glancing at Calendar
+ * or Tasks never loses the open task or an editor's draft, and `Back to
+ * {page}` returns to exactly where the operator was. Pressing the selected
+ * door again also returns to the page's work (or closes the area when the
+ * page has none). Closing the area hides it and keeps the same state.
  */
-type Panel = "calendar" | "tasks" | "activity";
-// Calendar (blue) · Team (green — the duty board) · Follow-ups — the
-// Follow-ups rail is the SAME flag system as the Orders list flag column
-// (both ops_tasks), so it uses the Flag icon + amber (Jess 2026-06-29).
-// Team REPLACED Notes (Jess 2026-07-19): Keep notes shipped 6/12 and held
-// exactly ONE note ever — dead slot, repurposed as the DUTY & ROLES board.
-const TABS: { key: Panel; label: string; icon: LucideIcon; active: string }[] = [
+type Door = "calendar" | "tasks" | "activity";
+type View = Door | "page";
+
+/* Calendar (blue) · Tasks · Activity. Tasks wears the SAME icon as the left
+   navigation's `Work` destination (`portal-nav.ts`, ListTodo — owner ruling
+   2026-08-15): the door previews that destination, so it keeps its face. */
+const TABS: { key: Door; label: string; icon: LucideIcon; active: string }[] = [
   { key: "calendar", label: "Calendar", icon: CalendarDays, active: "bg-info-soft text-info" },
-  // My Work wears the SAME icon as the left navigation's `Work` destination
-  // (`portal-nav.ts`, ListTodo) — owner ruling 2026-08-15. The rail is that
-  // destination's peek (ui/MASTER.md §5), and a peek that wears a different
-  // face than the door it previews reads as a different feature. The Flag it
-  // replaced was borrowed from the Orders follow-up column, which is a
-  // different system entirely.
-  { key: "tasks", label: "My Work", icon: ListTodo, active: "bg-warning-soft text-warning" },
-  // Activity = the open order's history timeline (Jess 2026-06-30: moved off the
-  // page into the rail, after the flag). Shows only when an order is open.
+  { key: "tasks", label: "Tasks", icon: ListTodo, active: "bg-warning-soft text-warning" },
+  // Activity = the open order's history timeline when an order is open,
+  // otherwise recent business changes the signed-in person may see.
   { key: "activity", label: "Activity", icon: ScrollText, active: "bg-base-100 text-base-700" },
 ];
 
 export default function OperationRightRail() {
-  const [active, setActive] = useState<Panel | null>(null);
+  const [view, setView] = useState<View | null>(null);
+  /* Views opened at least once stay mounted (hidden) — the draft guard. */
+  const [mounted, setMounted] = useState<ReadonlySet<View>>(() => new Set());
   const activeOrderId = useActiveOrder((s) => s.orderId);
+  const page = useCurrentPageWork();
+  const pageKey = page?.pageKey ?? null;
+
+  const show = (next: View | null) => {
+    setView(next);
+    if (next) setMounted((current) => (current.has(next) ? current : new Set([...current, next])));
+  };
+
+  /* Entering a page that offers work opens the area on that work. Leaving it
+     returns a page view to closed; a door view the operator chose stays. */
+  const lastPage = useRef<string | null>(null);
+  useEffect(() => {
+    if (pageKey === lastPage.current) return;
+    lastPage.current = pageKey;
+    if (pageKey) {
+      show("page");
+      return;
+    }
+    setView((current) => (current === "page" ? null : current));
+    setMounted((current) => {
+      if (!current.has("page")) return current;
+      const next = new Set(current);
+      next.delete("page");
+      return next;
+    });
+  }, [pageKey]);
 
   const { items, myUserId, myFocus, hasData } = useOpenWorkSet();
   // ONE count (Workspace MASTER §7.1): the same Missed + focus-day number the
@@ -45,68 +87,103 @@ export default function OperationRightRail() {
   // no response yet means no number — never `0`.
   const { missed, today } = myMissedAndToday(items, myUserId, myFocus);
 
-  const badgeFor = (key: Panel): { n: number; tone: string } | null => {
+  const badgeFor = (key: Door): { n: number; tone: string } | null => {
     if (key === "tasks" && hasData && missed + today > 0)
       return { n: missed + today, tone: missed > 0 ? "bg-danger" : "bg-base-700" };
     return null;
   };
   const nameFor = (tab: (typeof TABS)[number]): string =>
-    tab.key === "tasks" && hasData ? `My Work · ${missed} missed · ${today} today` : tab.label;
+    tab.key === "tasks" && hasData ? `Tasks · ${missed} missed · ${today} today` : tab.label;
+
+  const pressDoor = (door: Door) => {
+    if (view !== door) return show(door);
+    show(page ? "page" : null);
+  };
+
+  const doorTab = view && view !== "page" ? TABS.find((t) => t.key === view) : undefined;
 
   return (
     <div className="flex h-screen sticky top-0">
-      {/* Active panel */}
-      {active && (
-        <div className="w-[340px] flex flex-col border-l border-base-200 bg-white">
-          <div className="flex items-center justify-between px-3.5 h-12 border-b border-base-100 shrink-0">
-            <div className="text-strong text-base-900 flex items-center gap-2">
-              {(() => {
-                const Icon = TABS.find((t) => t.key === active)?.icon;
-                return Icon ? <Icon size={18} className="text-base-500" /> : null;
-              })()}
-              {TABS.find((t) => t.key === active)?.label}
+      {/* The ONE right area. Hidden — never unmounted — while closed. */}
+      {mounted.size > 0 && (
+        <div
+          className="flex w-[clamp(366px,32vw,560px)] max-w-drawer flex-col border-l border-base-200 bg-white"
+          hidden={view === null}
+          data-testid="right-area"
+          data-view={view ?? "closed"}
+        >
+          {doorTab ? (
+            <div className="flex h-12 shrink-0 items-center justify-between gap-2 border-b border-base-100 px-3.5">
+              <div className="flex min-w-0 items-center gap-2 text-strong text-base-900">
+                <doorTab.icon size={18} className="shrink-0 text-base-500" />
+                <span className="truncate">{doorTab.label}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => show(null)}
+                className="rounded p-1 text-base-500 hover:bg-hovertint"
+                aria-label="Close panel"
+              >
+                <X size={16} />
+              </button>
             </div>
+          ) : null}
+          {page && view && view !== "page" ? (
+            /* The obvious way back to the page's own work (PROPOSAL word). */
             <button
               type="button"
-              onClick={() => setActive(null)}
-              className="p-1 rounded text-base-500 hover:bg-hovertint"
-              aria-label="Close panel"
+              onClick={() => show("page")}
+              data-testid="back-to-page-work"
+              className="flex h-9 shrink-0 items-center gap-1.5 border-b border-base-100 px-3.5 text-left text-meta font-medium text-kit-blue-11 hover:bg-hovertint"
             >
-              <X size={16} />
+              <ArrowLeft size={14} aria-hidden />
+              {WORKING_PANEL_WORDS.backTo(page.pageName)}
             </button>
-          </div>
-          <div className="flex-1 overflow-auto p-3.5 min-h-0">
-            {active === "calendar" && <CalendarPanel />}
-            {active === "tasks" && <TasksPanel />}
-            {active === "activity" &&
-              (activeOrderId ? (
-                <AnnotationTimeline orderId={activeOrderId} />
-              ) : (
-                <GlobalActivity />
-              ))}
+          ) : null}
+          <div className="min-h-0 flex-1 overflow-auto">
+            {mounted.has("page") && page ? (
+              <div hidden={view !== "page"} className="h-full" data-testid="right-area-page">
+                <PageWorkPanel key={page.pageKey} source={page} onClose={() => show(null)} />
+              </div>
+            ) : null}
+            {mounted.has("calendar") && (
+              <div hidden={view !== "calendar"} className="p-3.5">
+                <CalendarPanel />
+              </div>
+            )}
+            {mounted.has("tasks") && (
+              <div hidden={view !== "tasks"} className="p-3.5">
+                <TasksPanel />
+              </div>
+            )}
+            {mounted.has("activity") && (
+              <div hidden={view !== "activity"} className="p-3.5">
+                {activeOrderId ? <AnnotationTimeline orderId={activeOrderId} /> : <GlobalActivity />}
+              </div>
+            )}
           </div>
         </div>
       )}
 
-      {/* Icon strip */}
-      {/* Each icon carries its name (owner review 2026-09-25 item 14). */}
+      {/* Icon strip — ICON ONLY; the name is the tooltip and the accessible name. */}
       <div className="w-[64px] flex flex-col items-center py-3 gap-2 border-l border-base-200 bg-white">
         {TABS.map((t) => {
-          const isActive = active === t.key;
+          const isActive = view === t.key;
           const badge = badgeFor(t.key);
           return (
             <button
               key={t.key}
               type="button"
-              onClick={() => setActive(isActive ? null : t.key)}
+              onClick={() => pressDoor(t.key)}
               title={t.label}
               aria-label={nameFor(t)}
-              className={`relative w-[60px] rounded-md flex flex-col items-center gap-0.5 py-1.5 transition-colors ${
+              aria-pressed={isActive}
+              data-testid={`rail-door-${t.key}`}
+              className={`relative flex h-11 w-[60px] items-center justify-center rounded-md transition-colors ${
                 isActive ? t.active : "text-base-500 hover:bg-hovertint"
               }`}
             >
-              <t.icon size={18} strokeWidth={2} />
-              <span className="text-[10px] font-medium leading-3">{t.label}</span>
+              <t.icon size={18} strokeWidth={2} aria-hidden />
               {badge && (
                 <span
                   data-rail-badge

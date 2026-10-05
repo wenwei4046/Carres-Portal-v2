@@ -41,6 +41,8 @@ import {
 } from "@/components/register/DataGrid";
 import { documentRowMenu } from "@/components/register/row-menu";
 import { printPurchaseOrder } from "../record-print";
+import { usePageWork } from "@/components/working-panel/page-work";
+import { usePurchaseOrdersPageWork } from "../working-panel-sources";
 import SupplierReplySection, { batchWord } from "./SupplierReplySection";
 import { Modal } from "../components/Modal";
 import { apiFetch } from "@/lib/api";
@@ -672,6 +674,15 @@ export default function PurchaseOrdersPage() {
       return next;
     });
   };
+  /* LOCALHOST PROPOSAL (owner flow 2026-10-05): the right Working Panel opens
+     on this page's highest-priority PO work — Work engine items for a PO. */
+  const openObjectRef = useRef(openObject);
+  openObjectRef.current = openObject;
+  const openPoById = useCallback((poId: string) => {
+    const row = allRows.find((candidate) => candidate.id === poId);
+    if (row) openObjectRef.current(row);
+  }, [allRows]);
+  usePageWork(usePurchaseOrdersPageWork(allRows, openPoById));
   /** The actual receipt, in Receiving, which owns it. */
   const openReceipt = (receiptId: string) =>
     navigate(`/operation?tab=receiving&session=${encodeURIComponent(receiptId)}`);

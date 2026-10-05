@@ -3,6 +3,8 @@ import { Menu } from "lucide-react";
 import Button from "@/components/kit/Button";
 import Drawer from "@/components/kit/Drawer";
 import CalendarPanel from "./components/rail/CalendarPanel";
+import { PageWorkProvider } from "@/components/working-panel/page-work";
+import PhoneTasksDoor from "./components/rail/PhoneTasksDoor";
 import {
   Navigate,
   Route,
@@ -334,6 +336,7 @@ export default function OperationApp() {
   }
 
   return (
+    <PageWorkProvider>
     <div
       className="h-screen text-base-900 grid"
       style={{
@@ -379,8 +382,12 @@ export default function OperationApp() {
               <Menu size={18} />
               Menu
             </button>
-            <div className="ml-auto">
+            <div className="ml-auto flex items-center gap-1">
               <Button variant="ghost" icon="date" onClick={() => setCalendarOpen(true)} aria-expanded={calendarOpen}>Calendar</Button>
+              {/* LOCALHOST PROPOSAL (owner flow 2026-10-05): the phone shell has
+                  no Quick Rail, so `Tasks` sits beside `Calendar` in the same
+                  form and opens the same Working Panel in a Drawer. */}
+              <PhoneTasksDoor />
             </div>
             <Drawer open={calendarOpen} onOpenChange={setCalendarOpen} title="Calendar">
               {calendarOpen && <CalendarPanel onOpenRecord={() => setCalendarOpen(false)} />}
@@ -723,6 +730,7 @@ export default function OperationApp() {
           wins (BUILD-QUEUE governance). */}
       {phone ? null : <OperationRightRail />}
     </div>
+    </PageWorkProvider>
   );
 }
 
