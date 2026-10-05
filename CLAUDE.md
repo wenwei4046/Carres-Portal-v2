@@ -65,6 +65,18 @@ On a conflict, Business wins.
   the retired `Btn`, `Field` and `PageHeader`. Portal-wide standards ruled the same day: **no dash anywhere on a screen** ·
   **card titles are black bold `text-strong`, never blue** · **column separators by column
   count** · **rail = icon + title only; every group closed until clicked, its chosen value on the header; two views are a tab bar (owner ruling 2026-09-28; SO representative pilot owner correction 2026-10-01 stacks the two views and opens Delivery first, see Orders MASTER)** · **header filter icons on hover only**.
+- **SHARED HABITS, TEMPLATE BY WORK — owner ruling, Jess 2026-10-05.** Pages need not look
+  identical. The operating habits (find, filter, select, open, edit, preview, complete, return) are
+  the same everywhere; the layout follows the job, from the smallest template set that covers the
+  whole product (UI MASTER "Five shared template roles": list work → Register; document work →
+  detail and preview; physical work → task workspace; plus Calendar for time). Never force a
+  template, never invent one. **The planning chat chooses the template, finds gaps, explains
+  exceptions and checks quality; Jess judges whether the business and the proposal are right.**
+  At the start of every module, unasked, state per page: which template fits and why · what is
+  reused directly · where it does not fit and exactly how that would slow staff · the adjustment,
+  pages affected and trade-off. No reason to differ → reuse correctly. A real reason → show the
+  complete proposal and wait for approval. "The standard requires it" is not a reason, and "what do
+  you think?" is not design work. Register pages follow UI MASTER "Shared module page flow".
 - **Content decides column width**, never the table width. **Expand has exactly one job.**
   **An inline second line is the only exception.**
 - **Copy the POWER of the tools the team already uses, never their ASSUMPTIONS.** AutoCount's
