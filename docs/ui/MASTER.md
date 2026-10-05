@@ -57,14 +57,17 @@ and measurements.
 
 # §1 · Overview
 
-**Shared Register PDF preview — BRANCH ONLY, 2026-10-05.** DataGrid now composes the existing
-Modal and lazy PdfPreview after asynchronous export rendering, instead of relying on a new tab
-that may be blocked silently. Download remains available, and the blob is released on close or
-unmount. The 93 register tests pass. Receiving's actual local PDF paints. Long tokens now wrap using the PDF font metrics; generated
-PDF readback proves 15-column boundaries, identity preservation and 65 records across page breaks.
-The original template fails this boundary check. Actual browser download remains unverified. This is
-not complete PDF acceptance or production delivery. Evidence: Purchasing MASTER §7 receiving
-release notes and `/tmp/carres-receiving-list-pdf-local.png`.
+**Register list PDF — BUILT ON RELEASE BRANCH / NOT YET DEPLOYED, 2026-10-05.**
+The authenticated Receiving list PDF action opened no preview or error. The shared grid previously
+called `window.open` after asynchronous population loading/rendering and ignored a blocked return.
+It now composes existing Modal + lazy PdfPreview with Download; blob lifetime follows the preview.
+The PDF template wraps oversized tokens using actual font metrics without changing document
+identity characters. Generated-PDF readback verifies 15 column boundaries and all 65 sample records
+exactly once across page breaks; the original template fails the same boundary check. All 93 grid
+tests, two PDF render tests and Web typecheck pass on the originating branch. Local actual preview:
+`/tmp/carres-receiving-list-pdf-fitted-local.png`. Exact release-head CI, production preview and
+browser download acceptance remain required. This release changes no receipt writes, SQL or RLS;
+Warehouse automatic confirmation and extra-goods resolution remain in separate draft PR1910.
 
 **Shared document display implementation — 2026-10-04, branch only / NOT PRODUCTION VERIFIED.**
 `packages/shared/src/document-display.ts` provides `documentDisplayNumber` for known Carres-owned

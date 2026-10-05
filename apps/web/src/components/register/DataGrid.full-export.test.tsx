@@ -46,6 +46,7 @@ describe("shared full-population export", () => {
     expect(screen.getByRole("button", { name: "Download" })).toBeEnabled();
     const downloads: Array<{ href: string; name: string }> = [];
     vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (this: HTMLAnchorElement) {
+      expect(document.body.contains(this)).toBe(true);
       downloads.push({ href: this.href, name: this.download });
     });
     fireEvent.click(screen.getByRole("button", { name: "Download" }));

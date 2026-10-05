@@ -3947,7 +3947,8 @@ function DataGridInner<T>({
         const link = document.createElement("a");
         link.href = pdfPreview.src;
         link.download = `${pdfPreview.title}.pdf`;
-        link.click();
+        document.body.appendChild(link);
+        try { link.click(); } finally { link.remove(); }
       }}>Download</Button>}>
       <Suspense fallback={<p role="status">Loading…</p>}>
         <RegisterPdfPreview src={pdfPreview.src} title={pdfPreview.title} />
