@@ -105,7 +105,7 @@ export const POS: Po[] = [
   po("PO-260903-4585", SUP.nice, W_A, false, [1203, 1205], past(20)),
   po("PO-260903-7907", SUP.nice, W_A, false, [1205, 1206], past(20)),
   po("PO-260903-4316", SUP.ohana, W_A, true, [1203], past(20)),
-  ...Array.from({ length: 14 }, (_, i) => po(`PO-260904-${5101 + i}`, SUP.nice, W_B, false, [1369 + (i % 3)], past(10))),
+  ...Array.from({ length: 14 }, (_, i) => po(`PO-260904-${5101 + i}`, SUP.nice, W_B, false, [[1369, 1371, 1372][i % 3]!], past(10))),
   po("PO-260922-8987", SUP.nice, W_C, false, [1373], day(8)),
   po("PO-261009-1301", SUP.ohana, W_F, false, [1340], day(14)),
   /* A passed supplier date with no physical report — PO Duty asks. */
@@ -336,7 +336,7 @@ export function workFeed(): OperationWorkResponse {
     staff: [{ userId: ME, name: "Shasha", email: "sha@carres.example" }],
     sources: (["orders", "purchasing", "receiving", "delivery", "payment", "issue_tracker"] as const).map((key) => ({
       key,
-      state: SCENARIO === "failed" && key === "delivery" ? ("read_failed" as never) : ("healthy" as const),
+      state: SCENARIO === "failed" && key === "delivery" ? ("failed" as const) : ("healthy" as const),
       observedAt: `${TODAY}T01:00:00.000Z`, lastSuccessfulAt: `${TODAY}T02:42:00.000Z`,
       errorLabel: SCENARIO === "failed" && key === "delivery" ? "read failed" : null,
     })),

@@ -108,7 +108,7 @@ export function poWindowWords(row: WorkRow, facts: PoWindowFacts | null): { act:
   if (unsent.length > 0) {
     const parties = partiesWord(unsent.map((po) => po.supplierName));
     return unsent.length === 1
-      ? { act: `Send PO to ${parties}`, detail: unsent[0]!.documentNo }
+      ? { act: `Send PO to ${parties}`, detail: unsent[0]!.documentNo.replace(/ V(\d+)$/, "-V$1") }
       : { act: `Send ${unsent.length} POs to ${parties}`, detail: time };
   }
   if (window.demand.items > 0) {

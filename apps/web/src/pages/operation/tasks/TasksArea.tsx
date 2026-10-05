@@ -331,7 +331,7 @@ export default function TasksArea({ onClose, fill = false }: { onClose: () => vo
   ) : null;
 
   const listView = (
-    <div className="flex min-h-0 flex-1 flex-col" hidden={Boolean(task)} data-testid="tasks-list">
+    <div className={`${task ? "hidden" : "flex"} min-h-0 flex-1 flex-col`} hidden={Boolean(task)} data-testid="tasks-list">
       <div className="flex h-12 shrink-0 items-center gap-2 border-b border-kit-slate-4 px-3">
         <ListTodo size={18} aria-hidden className="text-kit-slate-11" />
         <h2 className="flex-1 text-strong text-kit-slate-12">{T.title}</h2>

@@ -77,7 +77,7 @@ export default function OperationRightRail() {
     <div className="flex h-screen sticky top-0">
       {mounted.size > 0 && (
         <div
-          className="flex w-[clamp(366px,32vw,560px)] max-w-drawer flex-col border-l border-base-200 bg-white"
+          className={`${active === null ? "hidden" : "flex"} w-[clamp(366px,32vw,560px)] max-w-drawer flex-col border-l border-base-200 bg-white`}
           hidden={active === null}
           data-testid="right-area"
           data-view={active ?? "closed"}
@@ -95,7 +95,7 @@ export default function OperationRightRail() {
           ) : null}
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
             {mounted.has("tasks") && (
-              <div hidden={active !== "tasks"} className="flex min-h-0 flex-1 flex-col">
+              <div hidden={active !== "tasks"} className={`${active === "tasks" ? "flex" : "hidden"} min-h-0 flex-1 flex-col`}>
                 <TasksArea onClose={() => show(null)} />
               </div>
             )}
