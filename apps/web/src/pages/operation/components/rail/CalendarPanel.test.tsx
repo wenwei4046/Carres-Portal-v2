@@ -21,6 +21,8 @@ function render(ui: ReactElement, route = "/operation?tab=receiving") {
 const h = vi.hoisted(() => ({
   orders: [] as unknown[],
   partners: [] as unknown[],
+  arrangements: [] as unknown[],
+  deliveryOrders: [] as unknown[],
   warehouse: { data: { events: [], sites: [], undatedReceipts: 0 }, isPending: false, error: null } as any,
 }));
 
@@ -28,6 +30,8 @@ vi.mock("@/lib/queries", () => ({
   useOperationOrders: () => ({ data: { orders: h.orders } }),
   useWarehouseCalendar: () => h.warehouse,
   useDeliveryPartners: () => ({ data: { partners: h.partners } }),
+  useDeliveryArrangements: () => ({ data: { arrangements: h.arrangements }, isPending: false }),
+  useDeliveryOrdersRegister: () => ({ data: { deliveryOrders: h.deliveryOrders } }),
 }));
 
 import CalendarPanel from "./CalendarPanel";
@@ -81,6 +85,8 @@ function day(iso: string) {
 beforeEach(() => {
   h.orders = [];
   h.partners = [];
+  h.arrangements = [];
+  h.deliveryOrders = [];
   h.warehouse = { data: { events: [], sites: [], undatedReceipts: 0 }, isPending: false, error: null };
   vi.useFakeTimers();
   vi.setSystemTime(new Date(`${TODAY}T09:00:00`));
@@ -130,11 +136,19 @@ describe("CalendarPanel — confirmed is the only green", () => {
     expect(row.textContent).toContain("NETS");
   });
 
-  it("the carrier's own date is never dressed as a confirmation", () => {
+  it("the carrier's own date is not a scheduled day — it puts nothing on the calendar (one day reader, 2026-09-25)", () => {
     h.orders = [provisional(TODAY, { so: 1210 })];
     render(<CalendarPanel />);
     const today = day(TODAY)!;
-    expect(within(today).getByText("Logistics' date")).toBeTruthy();
+    expect(within(today).queryByText("SO-1210")).toBeNull();
+    expect(within(today).queryByText("Logistics' date")).toBeNull();
+  });
+
+  it("a day without a time reads Scheduled, never the retired Confirmed", () => {
+    h.orders = [order({ so: 1212, ops_order_control: { booking_stage: "confirmed", confirmed_date: TODAY } })];
+    render(<CalendarPanel />);
+    const today = day(TODAY)!;
+    expect(within(today).getByText("Scheduled")).toBeTruthy();
     expect(within(today).queryByText("Confirmed")).toBeNull();
   });
 
@@ -209,7 +223,7 @@ describe("CalendarPanel — the carrier's day (T9 rules)", () => {
     ).toBeTruthy();
   });
 
-  it("a provisional date does not fill the carrier's limit", () => {
+  it("a provisional date is not on the calendar, so it never fills the carrier's limit", () => {
     h.orders = [confirmed(TODAY, { so: 1207 }), provisional(TODAY, { so: 1208 })];
     h.partners = [{ id: "p-nets", name: "NETS", daily_capacity: 2 }];
     render(<CalendarPanel />);
@@ -381,5 +395,37 @@ describe("shared Calendar navigation", () => {
     render(<CalendarPanel />);
     expect(screen.getByTestId("calendar-range-today").textContent).toBe(fmtDate(TODAY));
     expect(screen.getByTestId(`month-day-${TODAY}`).textContent).toBe("27");
+  });
+});
+
+/* ⭐ THE ONE DELIVERY-DAY READER (Delivery MASTER §15.1, Workspace §5.9 gap 9):
+   the rail Calendar reads the day Monitor and the Work feed read — the live
+   Delivery Order, then Delivery's arrangement, then a confirmed booking. */
+describe("CalendarPanel — Delivery's own records decide the day", () => {
+  it("Delivery's arrangement puts the order on its scheduled day, with the arrangement's company", () => {
+    h.orders = [order({ id: "o-arr", so: 1220, delivery_partner_id: null, delivery_partners: null })];
+    h.arrangements = [{ order_id: "o-arr", leg: 0, partner_id: "p-al", partner_name: "AL", confirmed_date: TODAY, confirmed_time: null }];
+    render(<CalendarPanel />);
+    const row = within(day(TODAY)!).getByText("SO-1220").closest("div")!.parentElement!;
+    expect(row.textContent).toContain("AL");
+    expect(row.textContent).toContain("Scheduled");
+  });
+
+  it("the live Delivery Order's day outranks the arrangement and the booking", () => {
+    h.orders = [confirmed(TODAY, { id: "o-doc", so: 1221 })];
+    h.arrangements = [{ order_id: "o-doc", leg: 0, partner_id: "p-nets", partner_name: "NETS", confirmed_date: TODAY, confirmed_time: null }];
+    h.deliveryOrders = [{ order_id: "o-doc", leg: 0, delivery_date: TOMORROW, time_slot: null, issued_at: "2026-07-26T02:00:00Z", voided_at: null }];
+    render(<CalendarPanel />);
+    expect(within(day(TODAY)!).queryByText("SO-1221")).toBeNull();
+    fireEvent.click(screen.getByTestId("calendar-range-tomorrow"));
+    expect(within(day(TOMORROW)!).getByText("SO-1221")).toBeTruthy();
+  });
+
+  it("a voided document is not the day", () => {
+    h.orders = [order({ id: "o-void", so: 1222 })];
+    h.arrangements = [{ order_id: "o-void", leg: 0, partner_id: "p-nets", partner_name: "NETS", confirmed_date: TODAY, confirmed_time: null }];
+    h.deliveryOrders = [{ order_id: "o-void", leg: 0, delivery_date: TOMORROW, time_slot: null, issued_at: "x", voided_at: "2026-07-26T03:00:00Z" }];
+    render(<CalendarPanel />);
+    expect(within(day(TODAY)!).getByText("SO-1222")).toBeTruthy();
   });
 });

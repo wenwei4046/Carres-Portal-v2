@@ -29,6 +29,7 @@ export function TwoLines({
   line2Tone = "none",
   line1Title,
   line2TestId,
+  cellTitle,
   reveal = false,
 }: {
   line1: string;
@@ -37,17 +38,24 @@ export function TwoLines({
   line2Tone?: "none" | "orange" | "red";
   line1Title?: string;
   line2TestId?: string;
+  /** One fact the whole cell carries as its tooltip and accessible name, in
+   *  place of its own words (Monitor's contact deadline on `Order details
+   *  incomplete`, owner ruling 2026-09-25). */
+  cellTitle?: string;
   reveal?: boolean;
 }) {
   const lines = (
-    <span className="block min-w-0">
-      <span className={`block truncate ${STATUS_TONE_TEXT[tone]}`} title={line1Title ?? line1}>
+    <span
+      className="block min-w-0"
+      {...(cellTitle ? { title: cellTitle, "aria-label": joinLines(joinLines(line1, line2), cellTitle) } : {})}
+    >
+      <span className={`block truncate ${STATUS_TONE_TEXT[tone]}`} title={cellTitle ?? line1Title ?? line1}>
         {line1}
       </span>
       {line2 ? (
         <span
           className={`block truncate text-label ${LINE2_TEXT[line2Tone]}`}
-          title={line2}
+          title={cellTitle ?? line2}
           data-testid={line2TestId}
         >
           {line2}

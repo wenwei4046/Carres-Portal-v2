@@ -78,6 +78,109 @@ export function bookingDayOf(read: BookingRead | null | undefined): BookingDay {
 }
 
 // ---------------------------------------------------------------------------
+// THE ONE DELIVERY-DAY READER — Delivery MASTER §15.1 (measured 2026-09-25,
+// Law D) · Workspace MASTER §5.9 gap 9
+// ---------------------------------------------------------------------------
+
+/** What each owner recorded about the day — the reader decides which wins. */
+export interface ScheduledDeliveryRead {
+  /** The LIVE Delivery Order's own day and window — the snapshot the
+   *  Warehouse and the partner work to. A voided document is not handed in. */
+  document?: { deliveryDate?: string | null; timeSlot?: string | null } | null;
+  /** Delivery's arrangement for the scope (the customer leg is leg 0). */
+  arrangement?: { confirmedDate?: string | null; confirmedTime?: string | null } | null;
+  /** The legacy D1 booking overlay (`ops_order_control`). */
+  booking?: BookingRead | null;
+}
+
+export interface ScheduledDelivery {
+  /** The scheduled day; null when nobody has scheduled one. */
+  iso: IsoDate | null;
+  /** The scheduled time when one was recorded — optional, never required. */
+  time: string | null;
+  source: "document" | "arrangement" | "booking" | null;
+}
+
+/**
+ * ⭐ WHICH DAY IS THIS DELIVERY SCHEDULED FOR — asked ONCE (Architecture Law D).
+ *
+ * The DOCUMENT wins when one exists; then Delivery's own arrangement; then the
+ * legacy booking, and only when it is CONFIRMED (stage word AND date). A
+ * carrier's provisional `logistic_eta` is never a scheduled day: nobody agreed
+ * it with the customer. Monitor, the Work feed and the rail Calendar read this
+ * — three readers once derived the day three ways.
+ */
+export function scheduledDeliveryOf(read: ScheduledDeliveryRead): ScheduledDelivery {
+  const doc = asDate(read.document?.deliveryDate);
+  if (doc) return { iso: doc, time: read.document?.timeSlot ?? null, source: "document" };
+  const arranged = asDate(read.arrangement?.confirmedDate);
+  if (arranged) return { iso: arranged, time: read.arrangement?.confirmedTime ?? null, source: "arrangement" };
+  const booking = bookingDayOf(read.booking);
+  if (booking.kind === "confirmed" && booking.date) {
+    return { iso: booking.date, time: booking.slot, source: "booking" };
+  }
+  return { iso: null, time: null, source: null };
+}
+
+/** One live Delivery Order, as an order-level reader sees it. */
+export interface CustomerLegDocumentRead {
+  leg?: number | null;
+  deliveryDate?: string | null;
+  timeSlot?: string | null;
+  issuedAt?: string | null;
+}
+
+/** One `ops_delivery_arrangements` row, as an order-level reader sees it. */
+export interface CustomerLegArrangementRead {
+  leg?: number | null;
+  confirmedDate?: string | null;
+  confirmedTime?: string | null;
+  partnerId?: string | null;
+}
+
+/**
+ * ⭐ THE CUSTOMER LEG'S SCHEDULED DAY — for a reader that sees a whole ORDER
+ * (the Work feed, the rail Calendar, Payment's collection clock) rather than
+ * one Monitor row. The customer leg is the highest leg Delivery recorded (0 on
+ * an ordinary order); its newest live document, then its arrangement, then a
+ * confirmed legacy booking — `scheduledDeliveryOf`'s one precedence. The
+ * caller hands in LIVE documents only.
+ */
+export function customerLegDeliveryOf(input: {
+  documents: ReadonlyArray<CustomerLegDocumentRead>;
+  arrangements: ReadonlyArray<CustomerLegArrangementRead>;
+  booking?: BookingRead | null;
+}): ScheduledDelivery & { leg: number; arrangement: CustomerLegArrangementRead | null } {
+  const leg = Math.max(
+    0,
+    ...input.documents.map((d) => Number(d.leg ?? 0) || 0),
+    ...input.arrangements.map((a) => Number(a.leg ?? 0) || 0),
+  );
+  const document =
+    input.documents
+      .filter((d) => (Number(d.leg ?? 0) || 0) === leg && asDate(d.deliveryDate))
+      .sort((a, b) => (b.issuedAt ?? "").localeCompare(a.issuedAt ?? ""))[0] ?? null;
+  const arrangement = input.arrangements.find((a) => (Number(a.leg ?? 0) || 0) === leg) ?? null;
+  return { ...scheduledDeliveryOf({ document, arrangement, booking: input.booking }), leg, arrangement };
+}
+
+/**
+ * ⭐ WHICH LOGISTICS COMPANY CARRIES THIS DELIVERY — asked ONCE.
+ *
+ * Delivery's own arrangement record wins (owner correction 2026-08-24: Delivery
+ * OWNS the arrangement); the order row's columns are only the fallback for a
+ * scope Delivery has not recorded. Monitor and the Work feed both read this,
+ * so `Assign logistics` cannot be open on one surface and closed on the other.
+ */
+export function assignedLogisticsIdOf(input: {
+  arrangementPartnerId?: string | null;
+  orderPartnerId?: string | null;
+  triagePartnerId?: string | null;
+}): string | null {
+  return input.arrangementPartnerId || input.orderPartnerId || input.triagePartnerId || null;
+}
+
+// ---------------------------------------------------------------------------
 // Ranges — Today / Tomorrow / This week
 // ---------------------------------------------------------------------------
 
