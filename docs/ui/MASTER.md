@@ -867,7 +867,7 @@ Everything you can see · Updated 10:42
 FRI, 25 SEP
 Delivery      2 scheduled deliveries      ›  Delivery Monitor ?date=
 Warehouse     1 arriving                  ›  ?tab=warehouse-arrival-schedule&date=
-Payment       2 promised payments         ›  Payment Monitor ?day=
+Payment       2 promised payments         ›  Payment Monitor ?status=
 ```
 
 **Customer lookup — capability APPROVED 2026-09-24/26; rail door removed 2026-10-05; placement OPEN.**
@@ -985,8 +985,9 @@ seconds, or the record fails.
             round. 8px left/right in every cell · 1px lines between cells · header 36px 11/600 ·
             footer 32px · 8px gaps. Second fact in a cell (where approved): 11px slate-11. One line
             per cell; a long value ends in … and shows whole on hover and focus; dates and numbers
-            never cut; the row never grows. Own approved heights: Delivery Monitor and Payment
-            Monitor 72px; two-line goods rows 51px (§6.8)
+            never cut; the row never grows. Own approved height: Delivery Monitor 72px (§7.1);
+            two-line goods rows 51px (§6.8). Payment Monitor uses this template's 32px row
+            (Payment MASTER §3, owner 2026-09-25, persisted #1934)
 6  HEADER   11px/600 grey band; the filter icon shows on hover, focus or while filtered — never
             on every column at rest; sort = a 12px ArrowUp/ArrowDown icon, spoken to a screen reader
 7  EXPAND   ▸ opens the record's goods and related facts (§6.9) — one job, not a second panel.
@@ -1059,7 +1060,7 @@ redesigns nothing there.
   chosen filters. Use the sidebar's panel-left icon pair, never a chevron or `X`.
 - **No `Clear filters` inside a rail** (Sales Orders, Purchase Orders): click a chosen facet again to
   clear it; selects keep `All`; the shared condition strip keeps its own clear.
-- **Special rails** (Payment Monitor weekly plans, Warehouse schedule day lists) use the same heading,
+- **Special rails** (Warehouse schedule day lists) use the same heading,
   divider and text treatment and keep their content and date meaning.
 
 **Per module (adoption of the mission rule):** Sales Orders — SO instance as above (owns no work).
@@ -1215,10 +1216,11 @@ The local filter/mission rail recipe is §6.1; this section holds the register's
   and arithmetic.
 - **Density — APPROVED / LOCKED.** The readable baseline is a 36px header (`text-label` 11/14) and a
   single-line parent row through frozen tokens; the accepted SO-derived template sets that row at 32px
-  (§6.0 rule 5) and other listings keep the 38px engine default until adopted. Ruled exceptions: the
-  Delivery Monitor work list (owner 2026-09-12) and Payment Monitor listing (owner 2026-09-16) use a
-  fixed 72px row through the shared `MonitorTwoLines` (one fact + one supporting line, never a third;
-  a cut value opens whole). Rows are gained by removing chrome, never by squeezing below the template.
+  (§6.0 rule 5) and other listings keep the 38px engine default until adopted. Ruled exception: the
+  Delivery Monitor work list (owner 2026-09-12) uses a fixed 72px row through the shared
+  `MonitorTwoLines` (one fact + one supporting line, never a third; a cut value opens whole). The
+  Payment Monitor's 72px row was retired by the owner on 2026-09-25 (Payment MASTER §3, #1934): it
+  takes the 32px template row. Rows are gained by removing chrome, never by squeezing below the template.
 - **Listing boundary — owner correction 2026-08-31.** A full DataGrid has **no enclosing outer
   border**; the toolbar keeps its bottom divider, the table its header/row/column lines, the footer its
   top divider. 8px breathing room above and below; available height fills with complete rows (one
@@ -1460,7 +1462,7 @@ into the section it belongs to, and this list loses it.
 | Delivery Monitor: 72px two-line rows; in-place panel write state in the expansion; `Delivery Status` word set | 2026-09-12 / 09-13 / 09-14 / 09-25 | Delivery MASTER §§8.3–8.5 |
 | Delivery Orders: DO brief recorded in place (two columns ≥1024px) | 2026-09-26 | Delivery MASTER §8.7 |
 | Delivery schedule card: two facts on two lines + type label | 2026-09-14 / 09-25 | Delivery MASTER §§8.2, 8.4 |
-| Payment Monitor: 72px rows; `Payment timing` fact + Work action + avatar cell | 2026-09-12 / 09-16 | Payment MASTER §3 |
+| Payment Monitor: `Payment timing` fact + Work action + avatar cell (the 72px row was retired 2026-09-25, #1934; this cell exception stays until Payment MASTER §3 and COPY are rewritten) | 2026-09-12 / 09-16 | Payment MASTER §3 |
 | SO Batch Purchase and Manual Purchase: their own approved listing designs (§6.8); the PO Duty owner chip only beside the selected `Issue PO` (`YJ`), Export at the far right | 2026-09-18 | Purchasing MASTER §§9.1–9.2 |
 | SO Batch `PO No` cell: every linked PO on one line, comma-separated, each its own link, 170px, no wrap (DEPLOYED #1924; signed-in check owed). Sales Orders keeps its own PO No cell; unifying them is NOT approved | 2026-10-05 | Purchasing MASTER §9.1 |
 | Supplier Claims leading order `☐ · ▸ · Claim status · Supplier Claim No · Claim Reported · …` (status leads; date never pinned; `pinnedPrefix`, BUILT on branch 2026-09-29) | 2026-09-18 | Purchasing MASTER §9.5 |

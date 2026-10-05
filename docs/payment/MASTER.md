@@ -1,5 +1,18 @@
 # PAYMENT — MASTER
 
+**SO amendment commercial exception boundary — OWNER-APPROVED 2026-10-01 / TARGET NOT BUILT.**
+Sales Approver must approve a customer price decrease, a customer refund or whole-SO
+cancellation after Proceed before it takes effect, under Orders MASTER § Staff amendments and
+Sales Approver. Ordinary SO amendments need no owner approval. This SO commercial decision does
+not itself send money, post a refund or rewrite a receipt/invoice. Existing money execution,
+accounting controls and audit ownership remain with their owning workflows; no second ledger
+or refund writer is created. **System-priced delivery charges — owner-confirmed 2026-10-01 /
+TARGET NOT BUILT:** address/delivery-service changes recalculate through the existing system price;
+Operation cannot manually override it, so there is no charge-approval lane on that SO path. A lower
+correct system charge is not a discretionary product discount, but any resulting customer refund
+still requires Sales Approver and the existing money execution controls. No automatic payout or
+live refund/build is authorised. See Orders MASTER § System-priced delivery charges.
+
 **All listing appearance — APPROVED / NOT BUILT (Jess, 2026-09-17):** follow
 [UI MASTER §6.7 Portal-wide listing readability](../ui/MASTER.md#portal-wide-listing-readability--built-2026-09-17-slice-1--authenticated-walk-owed).
 This is the shared default, not a PO visual pilot. Preserve this module's filter content,
@@ -153,9 +166,9 @@ SO No | Customer | Balance due | Items & Stock | Storage | Requested Delivery Da
   ring when covered; `Not assigned` link when nobody resolves); empty on a `Wait` row. The action
   word is not repeated here: it is the expansion's blue door and the Work card's line.
 
-- **SO No** — line 1 the SO number, which opens the formal Sales Order; line 2 the customer's own
-  reference(s) when recorded, else nothing. Never joined into one number.
-- **Customer** — line 1 the name; line 2 the phone on record.
+- **SO No** — the SO number on one line (owner direction 2026-09-25: one fact per cell); the
+  customer's own reference(s) move to the opened order, never joined into one number.
+- **Customer** — the name on one line; the phone moves to the opened order (2026-09-25).
 - **Balance due** = the Sales Order's total payable − money received (the one arithmetic; owner
   ruling 2026-09-25 — the word was `Amount needed` until then), right-aligned. Line 2 `includes storage RM {amount}` only while an issued
   Storage Invoice is inside it. An accrued, not yet issued storage charge stays in `Storage` as
@@ -184,18 +197,18 @@ SO No | Customer | Balance due | Items & Stock | Storage | Requested Delivery Da
   overlay's `confirmed_date` alone, which Delivery's `Save confirmed delivery` never writes, so a
   day Delivery agreed never started the clock. A day with a door opens the §17 Calendar at that
   week. The clock anchors on the agreed day; the requested day is never taken as confirmed.
-- **Payment timing** — the two-line fact/action surface. Line 1 the fact: `Payment due today` ·
-  `Ask customer today` · `Customer promised to pay today` · `Payment should have been received` ·
-  `Arrival not confirmed` · `Storage Invoice not paid` · `No delivery date` · `Payment due
-  {day}`. Line 2 **the shared Work item's own action** beside its owner avatar — when an order
-  carries two items, the one whose work is the printed fact (`Storage Invoice not paid` → the
-  storage item). **No Work item ⇒ no action and no person**; only `Wait` stands alone, for the
-  waiting facts. The assignment uses `Assigned to {name}` in its readable/accessibility presentation; completed
-  work separately names `Completed by`. No normal/acting/cover tooltip remains (Workspace §3). When no owner resolves
-  the avatar is `Not assigned`, whose name is `Nobody is assigned to this order. Assign it in
-  Sales Orders → Team` and whose door is the Sales Orders Team (0504: the owner is the individual
-  the Sales Order was dealt to). This is the ruled exception to the fact-only register cell (UI
-  MASTER).
+- **Payment timing** — ONE fact on one line (owner direction 2026-09-25: one fact per cell, the
+  acting person in its own `Collection owner` column, the action not repeated in the cell; this
+  overwrites the 2026-09-12/16 two-line fact/action cell and its ruled exception to the fact-only
+  register cell). The fact: `Payment due today` · `Ask customer today` · `Customer promised to pay
+  today` · `Payment should have been received` · `Arrival not confirmed` · `Storage Invoice not
+  paid` · `No delivery date` · `Payment due {day}` · `Paid`. When an order carries two Work items
+  (e.g. its balance and a Storage Invoice), the cell prints the fact that comes first in the risk
+  order below. The Work item's action (`Ask customer to pay` · `Wait` · `Send the invoice and
+  collect payment`) lives on the opened order and on the Work card, never in this cell. The person
+  and the assignment grammar (`Assigned to {name}` · `Completed by {name}` · `Not assigned` →
+  `Nobody is assigned to this order. Assign it in Sales Orders → Team`, door the Sales Orders Team;
+  0504: the owner is the individual the Sales Order was dealt to) live in `Collection owner`.
 - Rows sort by risk: should have been paid · Storage Invoice not paid · promised today · due today
   · ask today · due later · waiting · no date · value not recorded. Sorting `Payment timing`
   returns to that order. The footer says `{n} orders · RM {x} unpaid`.
@@ -547,6 +560,19 @@ Storage begins only when both facts exist: **Carres can complete the agreed deli
 **the customer delays/refuses it or will not arrange receipt**. Storage Start is the later fact.
 Supplier/Carres delay and goods-not-ready days are never charged. The system derives the date;
 staff cannot key an earlier one.
+
+**Early receipt declined — OWNER-APPROVED 2026-10-01 / TARGET NOT BUILT OR VERIFIED.**
+When Carres becomes ready earlier and Logistics offers earlier receipt, a customer who declines
+that offer but retains the original agreed receipt date/window is **not delaying**. Early goods
+readiness alone cannot start storage charges; that refusal is not a customer-delay witness. Keep
+the agreed-scope readiness AND actual customer-delay rule above. Existing valid Storage Start
+facts are not reset. Orders/Delivery MASTER record the readiness, customer evidence and unchanged
+SO Requested Delivery Date boundary. No rate, free period, waiver authority or live charge changes
+are authorised here. **Customer-requested later-date amendments — OWNER-APPROVED 2026-10-01 /
+TARGET NOT BUILT:** staff submit with customer evidence and the SO date change takes effect, per
+Orders MASTER. This does not remove the written-request/storage evidence requirements below,
+automatically start storage, or grant a waiver. Customer date changes require no PO Duty or
+supplier confirmation; money execution and storage authority remain unchanged.
 
 The first valid Storage Start is permanent. Later delay never resets it, a free period or a cycle.
 

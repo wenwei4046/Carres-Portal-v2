@@ -597,9 +597,10 @@ each supplier call the things they sell us?"*, derived from the catalog and neve
 > will be.**
 
 > ### 🔴 WHAT LEAVES THE CUSTOMER ORDER IN V2
-> V1's Orders module writes eleven kinds of record across five modules. **Four move out:**
-> receiving a line (D2, already removed) · reserving and releasing stock · editing carrier
-> configuration (D5) · recording a payment. **Each becomes a LINK.**
+> V1's Orders module writes eleven kinds of record across five modules. **Three move out:**
+> receiving a line (D2, already removed) · editing carrier configuration (D5) · recording a
+> payment. **Each becomes a LINK.** Exact-Unit reservation/release remains the Sales Order promise
+> under §3.5; Stock validates eligibility and reflects that binding, with no second editor.
 >
 > **What STAYS, and why it is not arbitrary:** the delivery BOOKING and the money GATE stay
 > with the order, because **both are promises to the customer, and the customer's promise is
@@ -962,7 +963,7 @@ These are engines. They have no page, they own no record, and every module calls
 |---|---|
 | Orders writes a receive | **Receiving.** Orders links. *(Already true — D2)* |
 | Orders reads "is it bought?" from an importer's column | **Purchasing**, through the purchase order. *(Already true — D1)* |
-| Orders reserves and releases stock units | **Stock.** Orders links |
+| Orders reserves and releases stock units | **Sales Order** owns the exact-Unit promise; Stock validates eligibility and reflects the binding (§3.5) |
 | Orders edits carrier configuration | **Delivery.** Orders links |
 | Orders records a payment into a ledger nothing reads | **Money In**, and the two stores become one |
 | Three functions answer "what category?" | **Catalog.** One answer, everyone asks |
