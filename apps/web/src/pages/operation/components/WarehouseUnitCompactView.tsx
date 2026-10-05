@@ -1,5 +1,7 @@
-/** Inventory adapter for the shared module card (UI MASTER "Shared module page flow"):
- *  Info · GRN tabs over the same Unit, issue and movement reads the Unit page uses.
+/** Inventory adapter for the shared module card (UI MASTER §0.2, §4.3.1–§4.3.3):
+ *  Info (the Unit record) · Warehouse (this page's main work tab, open by default) ·
+ *  Sales Order (the shared embedded SO, only when the Unit is bound to an order in this portal),
+ *  over the same Unit, issue and movement reads the Unit page uses.
  *  The full Unit page (↗) keeps the three acts and the History; this card writes nothing. */
 import { Link } from "react-router-dom";
 import {
@@ -17,6 +19,7 @@ import Button from "@/components/kit/Button";
 import { fmtDate } from "@/lib/fmt-date";
 import { useStockMovementEvidence, useStockUnit } from "@/lib/queries";
 import { EVENT_LABEL, OWNER_RULE_WORD, useUnitOpenIssues } from "../WarehouseUnitDetail";
+import EmbeddedSalesOrders from "./EmbeddedSalesOrders";
 
 const todayIso = () => new Date().toISOString().slice(0, 10);
 
@@ -85,28 +88,15 @@ export default function WarehouseUnitCompactView({ unit, onOpen, onClose }: {
       ))}
     </dl>
   );
+  const receiptLine = !code ? "Not recorded" : !movement.data ? pending(movement) : lastReceipt?.reference ?? "Not in this portal";
 
-  const grnSummary: CardFact[] = !code
-    ? [{ key: "grn", label: "GRN", value: "Not recorded" }, { key: "date", label: "Goods Received Date", value: receivedDate }]
-    : !movement.data
-      ? [{ key: "grn", label: "GRN", value: pending(movement) }]
-      : [
-          { key: "grn", label: "GRN", value: lastReceipt?.reference ?? "Not in this portal" },
-          { key: "date", label: "Goods Received Date", value: lastReceipt ? fmtDate(lastReceipt.at) : receivedDate },
-          { key: "site", label: "Goods arrived at", value: lastReceipt?.siteName ?? unit.siteName ?? "Not recorded" },
-        ];
-
-  const grnDetails = lastReceipt ? (
+  const receipts_ = receipts.length ? (
     <div className="flex flex-col gap-2 text-body">
       {receipts.map((r) => (
         <Link key={r.id} className="text-kit-blue-11 hover:underline" to={r.href}>{r.reference} · {fmtDate(r.at)}</Link>
       ))}
     </div>
-  ) : (
-    <p className="text-body text-kit-slate-11">
-      Booked in before Receiving existed, so there is no GRN. A Unit received through Receiving shows its GRN here.
-    </p>
-  );
+  ) : null;
 
   return (
     <div data-testid="inventory-unit-card">
@@ -120,13 +110,23 @@ export default function WarehouseUnitCompactView({ unit, onOpen, onClose }: {
         onClose={onClose}
         closeLabel="Close Unit"
         modulesLabel="Unit"
-        initialModule="info"
+        initialModule="warehouse"
         modules={[
           {
             key: "info",
             label: "Info",
             detailsLabel: "Unit details",
-            details: unitDetails,
+            details: <div className="flex flex-col gap-3">{unitDetails}{receipts_}</div>,
+            summary: [
+              { key: "supplier", label: "Supplier", value: unit.supplier ?? "Not recorded" },
+              { key: "po", label: "PO No / Ref No", value: unit.poNo ?? "Not recorded" },
+              { key: "received", label: "Goods Received Date", value: receivedDate },
+              { key: "grn", label: "GRN No", value: receiptLine },
+            ],
+          },
+          {
+            key: "warehouse",
+            label: "Warehouse",
             summary: [
               {
                 key: "status",
@@ -139,7 +139,11 @@ export default function WarehouseUnitCompactView({ unit, onOpen, onClose }: {
               work,
             ],
           },
-          { key: "grn", label: "GRN", detailsLabel: "Receipts", details: grnDetails, summary: grnSummary },
+          ...(unit.soldOrderId ? [{
+            key: "sales-order",
+            label: "Sales Order",
+            content: <EmbeddedSalesOrders orderIds={[unit.soldOrderId]} />,
+          }] : []),
         ]}
         timelineStatus={code && !detail.data ? pending(detail) : undefined}
         timeline={code ? (detail.data?.events ?? []).map((e) => ({

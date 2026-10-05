@@ -580,7 +580,7 @@ export default function WarehouseStockRegister({ showroom = false }: { showroom?
                 </div>
               )}
             >
-              <FilterRailGroup title="Missions" icon="flag" defaultOpen chosen={null}>
+              <FilterRailGroup title="Missions" icon="flag" chosen={status === "Cannot sell" ? "Problems to check" : status === "Incoming" ? stillToArriveLine(incomingCount) : null}>
                 <FilterRailRow
                   testId="rail-mission-problems"
                   label="Problems to check"
@@ -590,7 +590,7 @@ export default function WarehouseStockRegister({ showroom = false }: { showroom?
                 />
                 <FilterRailRow
                   testId="rail-mission-incoming"
-                  label={sourceReady ? stillToArriveLine(incomingCount) ?? "Nothing still to arrive" : "Still to arrive"}
+                  label={sourceReady ? stillToArriveLine(incomingCount) ?? stillToArriveLine(0) ?? "" : ""}
                   active={status === "Incoming"}
                   onClick={() => setStatus("Incoming")}
                 />
