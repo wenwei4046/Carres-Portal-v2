@@ -487,6 +487,19 @@ export const RECEIVING_UNIT_OUTCOME_LABEL: Record<ReceivingUnitOutcome, string> 
     not_received: "Not received",
   };
 
+/** Observed non-PO Unit results, not PO quantities or a claim of complete receipt. */
+export function warehouseArrivalReportSummary(
+  units: readonly { stockItemId: string; outcome: ReceivingUnitOutcome }[] | null | undefined,
+): string {
+  if (!units?.length || new Set(units.map(unit => unit.stockItemId)).size !== units.length)
+    return "Not recorded";
+  return (Object.keys(RECEIVING_UNIT_OUTCOME_LABEL) as ReceivingUnitOutcome[])
+    .flatMap(outcome => {
+      const count = units.filter(unit => unit.outcome === outcome).length;
+      return count ? [`${RECEIVING_UNIT_OUTCOME_LABEL[outcome]} · ${count}`] : [];
+    }).join(" · ");
+}
+
 export interface ReceivingUnitResult {
   stock_item_id: string;
   unit_code: string;

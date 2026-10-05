@@ -1204,6 +1204,7 @@ export {
   warehouseReceiptProblemText,
   warehouseReceiptTotals,
   warehouseReceiptSummary,
+  warehouseArrivalReportSummary,
   warehouseReceiptOpensClaims,
   countedOnLine,
   type WarehouseReceiptStatus,

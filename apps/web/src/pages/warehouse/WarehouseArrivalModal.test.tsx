@@ -92,6 +92,19 @@ describe("Warehouse non-PO physical confirmation", () => {
     fireEvent.click(screen.getByRole("button", { name: "Open Receiving" }));
     expect(screen.getByRole("dialog", { name: "Receiving · TR-261005-1234" })).toBeVisible();
   });
+  it.each([true, false])("shows non-PO observed outcomes without inventing PO zero counts (report=%s)", async hasReport => {
+    const previous = api.getMockImplementation()!;
+    api.mockImplementation((path: string, ...args: unknown[]) => path === "/api/warehouse/receipts" ? Promise.resolve({ receipts: [{
+      id: blocked.id, status: "posted", arrival_source_id: source.id, source_no: source.source_no,
+      raw_report: hasReport ? { arrival_source_id: source.id, arrival_units: [
+        { stock_item_id: source.units[0]!.id, outcome: "received_with_issue", issue_kind: "damaged" },
+      ] } : null, lines: [], submitted_at: "2026-10-05T01:00:00Z",
+    }] }) : previous(path, ...args));
+    wrap(<WarehouseMyReceipts />);
+    const row = await screen.findByTestId("warehouse-receipt-row");
+    expect(row).not.toHaveTextContent("0 good");
+    expect(row).toHaveTextContent(hasReport ? "Received with issue · 1" : "Not recorded");
+  });
   it("reopens the saved non-PO report from My receiving with its original evidence", async () => {
     const previous = api.getMockImplementation()!;
     api.mockImplementation((path: string, ...args: unknown[]) => path === "/api/warehouse/receipts" ? Promise.resolve({ receipts: [{

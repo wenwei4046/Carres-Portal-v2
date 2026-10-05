@@ -6,6 +6,7 @@ import {
   warehouseReceiptProblemText,
   warehouseReceiptStatusLabel,
   warehouseReceiptSummary,
+  warehouseArrivalReportSummary,
   warehouseReceiptTotals,
   warehouseReceiptOpensClaims,
   WAREHOUSE_RECEIPT_STATUS_LABEL,
@@ -439,3 +440,22 @@ describe("RECEIVING_AUTHORITY_LABEL — every Operation staff member may post (o
   });
 });
 
+
+
+describe("non-PO observed Unit summary", () => {
+  it("keeps issue results separate from good and missing results", () => {
+    expect(warehouseArrivalReportSummary([
+      { stockItemId: "one", outcome: "received" },
+      { stockItemId: "two", outcome: "received_with_issue" },
+      { stockItemId: "three", outcome: "not_received" },
+    ])).toBe("Received · 1 · Received with issue · 1 · Not received · 1");
+  });
+  it("does not manufacture zero from absent results or count duplicate Unit evidence", () => {
+    expect(warehouseArrivalReportSummary(undefined)).toBe("Not recorded");
+    expect(warehouseArrivalReportSummary([])).toBe("Not recorded");
+    expect(warehouseArrivalReportSummary([
+      { stockItemId: "one", outcome: "received" },
+      { stockItemId: "one", outcome: "not_received" },
+    ])).toBe("Not recorded");
+  });
+});

@@ -13,6 +13,7 @@ import {
   type WarehouseConfirmationResult,
   warehouseReceiptStatusLabel,
   warehouseReceiptSummary,
+  warehouseArrivalReportSummary,
   type WarehouseReceiptStatus,
 } from "@carres/shared";
 import { useWarehouseMyReceipts, useWarehouseIncoming, useWarehouseArrivals } from "@/lib/queries";
@@ -131,7 +132,9 @@ export default function WarehouseMyReceipts() {
                   {r.do_number ?? warehouseConfirmationReportFromWire(r.raw_report)?.doNumber ?? "Not recorded"}
                 </td>
                 <td className="px-4 py-3 text-base-800">
-                  <div>{r.status === "draft" && !r.lines.length ? "Not recorded" : warehouseReceiptSummary(r.lines)}</div>
+                  <div>{r.arrival_source_id || warehouseConfirmationReportFromWire(r.raw_report)?.arrivalSourceId
+                    ? warehouseArrivalReportSummary(warehouseConfirmationReportFromWire(r.raw_report)?.arrivalUnits)
+                    : r.lines.length ? warehouseReceiptSummary(r.lines) : "Not recorded"}</div>
                   {r.note && (
                     <div className="text-label text-base-600 mt-1">{r.note}</div>
                   )}

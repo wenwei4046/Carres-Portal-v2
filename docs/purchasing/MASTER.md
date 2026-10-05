@@ -964,6 +964,11 @@ The walk found and corrected simultaneous saved/not-saved messaging. Evidence:
 `/tmp/carres-warehouse-arrival-phone-local.jpg`. This uses illustrative API responses, not a real
 Warehouse login, proof upload, stock receipt or production acceptance. Broader source lifecycle,
 report history and complete Warehouse listing-template acceptance remain outstanding.
+The Warehouse report list now summarises non-PO reports from their saved exact-Unit outcomes,
+separating Received, Received with issue and Not received. It no longer reads an empty PO-line
+array as `0 good`; absent or duplicate Unit evidence remains Not recorded. This is observed report
+content, not a PO-fulfilment or claim-completion calculation. The 29 Warehouse form/list tests and
+38 shared receipt tests pass, including a posted non-PO issue report and a missing-report case.
 
 **Operation preserved-report visibility — BUILT ON BRANCH / NOT DEPLOYED, 2026-10-05.**
 Operation receipt reads carry the saved raw report and engine blockers without promoting raw
