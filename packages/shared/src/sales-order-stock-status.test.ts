@@ -9,6 +9,7 @@ import {
   stockStatusOfCounts,
   stockStatusWord,
 } from "./sales-order-stock-status";
+import { soBatchLineCoverageInput, soBatchOrderLineOutstandingQty } from "./so-batch-purchase";
 
 const po = (over: Record<string, unknown> & { id: string }) => ({
   status: "open",
@@ -177,6 +178,42 @@ describe("one order's Stock Status from the owners' records", () => {
 
   it("a line with no quantity is not required goods", () => {
     expect(salesOrderStockOf(facts({ lines: [{ id: "L1", sku: "B1201S", label: "a", qty: 0 }] })).status).toBeNull();
+  });
+});
+
+describe("⭐ Law D — Stock Status and SO Batch read ONE coverage fact", () => {
+  it("what Stock Status leaves uncovered is exactly what SO Batch still offers to buy", () => {
+    const cases: Array<[string, Partial<RouteGoodsFacts>]> = [
+      ["none covered", {}],
+      ["PO covers 2 of 3", { lines: [{ id: "L1", sku: "B1201S", label: "a", qty: 3 }], ...onPo(2, 0) }],
+      ["Ready Stock + PO", { lines: [{ id: "L1", sku: "B1201S", label: "a", qty: 3 }], ...onPo(1, 0), units: [reserved("U1")] }],
+      ["Use this PO (incoming)", { units: [reserved("U9", { status: "incoming", po_line_id: "other-pl" })] }],
+    ];
+    for (const [name, over] of cases) {
+      const f = facts(over);
+      const fact = salesOrderStockOf(f);
+      const line = f.lines[0]!;
+      const outstanding = soBatchOrderLineOutstandingQty(
+        soBatchLineCoverageInput({
+          qty: line.qty,
+          lineage: f.sources.map((s) => ({ poId: s.po_id, poLineId: s.po_line_id, qty: s.qty })),
+          units: f.units.map((u) => ({ status: u.status, poLineId: u.po_line_id ?? null })),
+        }),
+      );
+      expect(fact.lines[0]!.requiredQty - fact.lines[0]!.purchasedQty, name).toBe(outstanding);
+    }
+  });
+
+  it("goods received AND reserved on their own PO line count as covered once — never to buy again", () => {
+    const f = facts({ ...onPo(2, 2), units: [reserved("U1", { po_line_id: "pl1" }), reserved("U2", { po_line_id: "pl1" })] });
+    expect(salesOrderStockOf(f)).toMatchObject({ status: "ready", purchasedQty: 2 });
+    const input = soBatchLineCoverageInput({
+      qty: 2,
+      lineage: [{ poId: "PO-1", poLineId: "pl1", qty: 2 }],
+      units: [{ status: "reserved", poLineId: "pl1" }, { status: "reserved", poLineId: "pl1" }],
+    });
+    expect(input).toMatchObject({ stockTaken: 0, poReserved: [] });
+    expect(soBatchOrderLineOutstandingQty(input)).toBe(0);
   });
 });
 

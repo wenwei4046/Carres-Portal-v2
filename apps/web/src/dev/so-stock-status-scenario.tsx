@@ -17,7 +17,8 @@
  *                                                        simulated with its own
  *                                                        checks and refusals
  *            the simulated RECEIPT (walk panel buttons)  the owner's 2026-10-05
- *                                                        auto-reserve ruling
+ *                                                        auto-reserve ruling —
+ *                                                        APPROVED, NOT BUILT
  *
  * Nothing reaches a server: no reservation, receipt, Unit or order changes
  * anywhere. Customers are `{braces}`; SO-1319 · PO-20260903-4354 · U1-000-002
@@ -25,7 +26,14 @@
  */
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { readyStockRefusalWord, salesOrderStockOf, type RouteGoodsFacts, type SalesOrderStockFact } from "@carres/shared";
+import {
+  readyStockRefusalWord,
+  salesOrderStockOf,
+  soBatchLineCoverageInput,
+  soBatchOrderLineOutstandingQty,
+  type RouteGoodsFacts,
+  type SalesOrderStockFact,
+} from "@carres/shared";
 
 /* ── the world ─────────────────────────────────────────────────────────── */
 type Line = { id: string; sku: string; qty: number };
@@ -45,6 +53,9 @@ const uuid = (kind: number, n: number) => `00000000-0000-4${String(kind).padStar
 const orderIdOf = (so: number) => uuid(901, so);
 const lineIdOf = (so: number, k = 1) => uuid(902, so * 10 + k);
 const SKU = "B1201S-K";
+/* Three goods of one model, so SO-2901's three lines each have their own shelf. */
+const SKU_Q = "B1201S-Q";
+const SKU_SK = "B1201S-SK";
 
 function freshWorld() {
   const orders: Order[] = [];
@@ -60,25 +71,27 @@ function freshWorld() {
       date_in: "2026-09-20", ...over,
     };
   };
-  const order = (so: number, customer: string, qty: number, extra: Partial<Order> = {}) => {
-    const o: Order = { id: orderIdOf(so), so, customer, lines: [{ id: lineIdOf(so), sku: SKU, qty }], ...extra };
+  const order = (so: number, customer: string, lines: number | Array<[string, number]>, extra: Partial<Order> = {}) => {
+    const spec: Array<[string, number]> = typeof lines === "number" ? [[SKU, lines]] : lines;
+    const o: Order = { id: orderIdOf(so), so, customer, lines: spec.map(([sku, qty], k) => ({ id: lineIdOf(so, k + 1), sku, qty })), ...extra };
     orders.push(o);
     return o;
   };
   let seq = 0;
-  const onPo = (poId: string, poLineId: string, qty: number, shares: Array<[Order, number]>) => {
+  /** A PO line and the lineage shares naming it: `[order, share, line index]`. */
+  const onPo = (poId: string, poLineId: string, qty: number, shares: Array<[Order, number, number?]>, sku = SKU) => {
     let po = pos.find((p) => p.id === poId);
     if (!po) pos.push((po = { id: poId, status: "open", lines: [] }));
-    po.lines.push({ id: poLineId, sku: SKU, qty, received_qty: 0, damaged_qty: 0, wrong_item_qty: 0 });
-    for (const [o, share] of shares) {
+    po.lines.push({ id: poLineId, sku, qty, received_qty: 0, damaged_qty: 0, wrong_item_qty: 0 });
+    for (const [o, share, k = 0] of shares) {
       seq += 1;
       sources.push({
-        id: uuid(904, seq), order_id: o.id, order_line_id: o.lines[0]!.id, po_id: poId, po_line_id: poLineId, qty: share,
+        id: uuid(904, seq), order_id: o.id, order_line_id: o.lines[k]!.id, po_id: poId, po_line_id: poLineId, qty: share,
         created_at: `2026-09-01T00:${String(seq).padStart(2, "0")}:00Z`,
       });
     }
     /* Unit IDs are born with the official PO (Stock MASTER §3). */
-    for (let k = 0; k < qty; k += 1) units.push(unit({ status: "incoming", po_line_id: poLineId, po_no: poId, date_in: null }));
+    for (let k = 0; k < qty; k += 1) units.push(unit({ status: "incoming", sku, po_line_id: poLineId, po_no: poId, date_in: null }));
   };
   const reserveTo = (o: Order, u: Unit) => Object.assign(u, { status: "reserved", reserved_ref: `SO-${o.so}`, reserved_order_line_id: o.lines[0]!.id });
 
@@ -86,11 +99,13 @@ function freshWorld() {
   const so1319 = order(1319, "{customer 1319}", 1);
   onPo("PO-20260903-4354", uuid(905, 1), 1, [[so1319, 1]]);
   units[units.length - 1]!.unit_code = "U1-000-002";
-  /* 2 · nothing bought, shelf stock exists → To purchase + Reserve stock */
-  order(2901, "{customer 2901}", 2);
-  /* 3 · fully on a PO, not arrived, shelf stock exists → Awaiting goods + the door's real refusal */
-  const so2902 = order(2902, "{customer 2902}", 1);
-  onPo("PO-20260925-2902", uuid(905, 2), 1, [[so2902, 1]]);
+  /* 2 · Reserve stock follows the UNCOVERED quantity (owner ruling 2026-10-05):
+         line 1 needs 3, none covered → reserve up to 3
+         line 2 needs 3, a PO covers 2 → reserve the remaining 1
+         line 3 needs 1, a PO covers it → no action, stock or no stock */
+  const so2901 = order(2901, "{customer 2901}", [[SKU, 3], [SKU_Q, 3], [SKU_SK, 1]]);
+  onPo("PO-20260925-2901", uuid(905, 2), 2, [[so2901, 2, 1]], SKU_Q);
+  onPo("PO-20260925-2901", uuid(905, 7), 1, [[so2901, 1, 2]], SKU_SK);
   /* 4 · one of two reserved, one not bought → Partially ready + Reserve stock */
   const so2903 = order(2903, "{customer 2903}", 2);
   units.push(reserveTo(so2903, unit({ status: "free" })));
@@ -113,8 +128,10 @@ function freshWorld() {
   /* 10 · cancelled order whose goods are on a PO (not on the Register) */
   const so2910 = order(2910, "{customer 2910}", 1, { cancelled: true });
   onPo("PO-20260929-2910", uuid(905, 6), 1, [[so2910, 1]]);
-  /* shelf: free, exact, Carres-owned Ready Stock of the same goods */
-  for (let k = 0; k < 3; k += 1) units.push(unit({ status: "free", po_no: "PO-20260801-0001" }));
+  /* shelf: free, exact, Carres-owned Ready Stock of each of the goods */
+  for (let k = 0; k < 5; k += 1) units.push(unit({ status: "free", po_no: "PO-20260801-0001" }));
+  for (let k = 0; k < 2; k += 1) units.push(unit({ status: "free", sku: SKU_Q, po_no: "PO-20260801-0001" }));
+  for (let k = 0; k < 2; k += 1) units.push(unit({ status: "free", sku: SKU_SK, po_no: "PO-20260801-0001" }));
   return { orders, pos, sources, units, log: [] as string[] };
 }
 
@@ -127,9 +144,8 @@ const changed = () => listeners.forEach((fn) => fn());
 /* ── the walk's scenario cards ─────────────────────────────────────────── */
 type WalkReceipt = { poLineId: string; good: number; damaged?: number; wrong?: number; label: string };
 export const STOCK_STATUS_WALK: ReadonlyArray<{ so: number; title: string; expect: string; receipts?: WalkReceipt[] }> = [
-  { so: 1319, title: "Bought for this order, not arrived", expect: "Awaiting goods. Simulate the receipt: U1-000-002 is reserved to SO-1319 and it reads Ready.", receipts: [{ poLineId: uuid(905, 1), good: 1, label: "Receive U1-000-002" }] },
-  { so: 2901, title: "Nothing bought, stock on the shelf", expect: "To purchase · 3 in stock. Open SO-2901 → Items → Reserve stock → tick 2 → Choose Ready Unit → Ready." },
-  { so: 2902, title: "OPEN DECISION · On a PO, shelf stock exists", expect: "Awaiting goods · Reserve stock offered. The existing door refuses: every Unit reads No item line needs it. The button below sends the door a Unit anyway to show its own refusal." },
+  { so: 1319, title: "Bought for this order, not arrived", expect: "Awaiting goods. Receipt auto-reserve (approved, not built): U1-000-002 is reserved to SO-1319 and it reads Ready.", receipts: [{ poLineId: uuid(905, 1), good: 1, label: "Receive U1-000-002" }] },
+  { so: 2901, title: "Reserve stock follows the uncovered quantity", expect: "Items → line 1 (needs 3, none covered): Reserve stock, up to 3 · line 2 (needs 3, PO covers 2): Reserve stock for the remaining 1 · line 3 (PO covers it): no action. Reserve 3 + 1 → Partially ready (line 2's 2 still on the PO)." },
   { so: 2903, title: "One of two reserved", expect: "Partially ready · Reserve stock for the second piece → Ready." },
   { so: 2904, title: "Reserved", expect: "Ready (green). No offer." },
   { so: 2905, title: "Reserved Unit found damaged", expect: "Awaiting goods + amber 1 damaged or wrong. Damaged goods never count toward Ready (observation for the owner: nothing is owed by a supplier here)." },
@@ -162,22 +178,20 @@ function factsOf(o: Order): SalesOrderStockFact {
   return salesOrderStockOf(facts);
 }
 
-/** `so_line_remaining_requirement`, on this world (0600/0631). */
+/** `so_line_remaining_requirement` on this world — through its shared TS twin,
+ *  the one coverage arithmetic (Law D). */
 function remainingOf(line: Line, exclude?: string): number {
-  const cover = new Map<string, { units: number; lineage: number }>();
-  const add = (key: string, units: number, lineage: number) => {
-    const was = cover.get(key) ?? { units: 0, lineage: 0 };
-    cover.set(key, { units: was.units + units, lineage: was.lineage + lineage });
-  };
-  for (const u of world.units) {
-    if (u.id === exclude || u.reserved_order_line_id !== line.id || !["reserved", "sold", "incoming"].includes(u.status)) continue;
-    add(u.po_line_id ? `line:${u.po_line_id}` : `unit:${u.id}`, 1, 0);
-  }
-  for (const s of world.sources) {
-    if (s.order_line_id !== line.id || world.pos.find((p) => p.id === s.po_id)?.status === "cancelled") continue;
-    add(`line:${s.po_line_id}`, 0, s.qty);
-  }
-  return Math.max(0, line.qty - [...cover.values()].reduce((sum, c) => sum + Math.max(c.units, c.lineage), 0));
+  return soBatchOrderLineOutstandingQty(
+    soBatchLineCoverageInput({
+      qty: line.qty,
+      lineage: world.sources
+        .filter((s) => s.order_line_id === line.id && world.pos.find((p) => p.id === s.po_id)?.status !== "cancelled")
+        .map((s) => ({ poId: s.po_id, poLineId: s.po_line_id, qty: s.qty })),
+      units: world.units
+        .filter((u) => u.id !== exclude && u.reserved_order_line_id === line.id && ["reserved", "sold", "incoming"].includes(u.status))
+        .map((u) => ({ status: u.status, poLineId: u.po_line_id })),
+    }),
+  );
 }
 
 /** The EXISTING door's read (`GET /purchase/demands/:id/ready-stock`), on this world. */
@@ -190,13 +204,14 @@ function readyStockOf(o: Order) {
     remainingQty: remainingOf(l),
   }));
   const units = world.units
-    .filter((u) => u.sku === SKU && (u.status === "free" && u.condition !== "damaged" || (u.status === "reserved" && o.lines.some((l) => l.id === u.reserved_order_line_id))))
+    .filter((u) => o.lines.some((l) => l.sku === u.sku) && (u.status === "free" && u.condition !== "damaged" || (u.status === "reserved" && o.lines.some((l) => l.id === u.reserved_order_line_id))))
     .map((u) => {
-      const matching = u.status === "free" ? lines.filter((l) => l.remainingQty > 0).map((l) => l.orderLineId) : [];
+      const same = lines.filter((l) => l.sku === u.sku);
+      const matching = u.status === "free" ? same.filter((l) => l.remainingQty > 0).map((l) => l.orderLineId) : [];
       return {
         itemId: u.id, unitCode: u.unit_code, identityScope: "unit", sku: u.sku, condition: u.condition, siteName: "Carres Klang",
         warehouseId: "wh-klang", holderName: null, ownership: "carres_owned", supplier: null, qty: 1, dateIn: u.date_in, poNo: u.po_no,
-        matchingLineIds: matching, lineIds: o.lines.map((l) => l.id),
+        matchingLineIds: matching, lineIds: same.map((l) => l.orderLineId),
         reservedForLineId: u.status === "reserved" ? u.reserved_order_line_id : null,
         blocked: u.status === "free" && matching.length === 0 ? "no_line_needs_it" : null,
       };
@@ -269,7 +284,7 @@ export function simulateReceipt(poLineId: string, good: number, damaged = 0, wro
   const incoming = world.units.filter((u) => u.po_line_id === poLineId && u.status === "incoming");
   const arrived = incoming.slice(0, accepted);
   for (const u of arrived) Object.assign(u, { status: "free", date_in: "2026-10-05" });
-  const notes: string[] = [`SIMULATED receipt · ${po.id} · ${accepted} good${damaged ? ` · ${damaged} damaged` : ""}${wrong ? ` · ${wrong} wrong item` : ""}${extra ? ` · ${extra} extra` : ""}`];
+  const notes: string[] = [`SIMULATED receipt (auto-reserve approved, not built) · ${po.id} · ${accepted} good${damaged ? ` · ${damaged} damaged` : ""}${wrong ? ` · ${wrong} wrong item` : ""}${extra ? ` · ${extra} extra` : ""}`];
   const shares = world.sources.filter((s) => s.po_line_id === poLineId).sort((a, b) => a.created_at.localeCompare(b.created_at));
   const pool = [...arrived];
   for (const share of shares) {
@@ -300,24 +315,6 @@ export function simulateReceipt(poLineId: string, good: number, damaged = 0, wro
   if (damaged + wrong) notes.push(`${damaged + wrong} damaged or wrong piece(s) not reserved (issue shown on the order)`);
   world.log.unshift(...notes.reverse());
   changed();
-}
-
-/** OPEN DECISION evidence: send the existing door one free shelf Unit for a
- *  line its PO already covers, and print the door's own refusal. */
-function tryDoorOnCoveredLine(so: number) {
-  const o = world.orders.find((x) => x.so === so)!;
-  const shelf = world.units.find((u) => u.status === "free" && u.sku === o.lines[0]!.sku && !u.po_line_id);
-  if (!shelf) {
-    world.log.unshift("OPEN DECISION · no free shelf Unit left to try");
-    changed();
-    return;
-  }
-  try {
-    saveReadyUnits(o.id, o.lines[0]!.id, [shelf.id]);
-  } catch {
-    world.log[0] = `OPEN DECISION · ${world.log[0]}`;
-    changed();
-  }
 }
 
 /* ── the fetch wrapper ─────────────────────────────────────────────────── */
@@ -440,22 +437,16 @@ export function StockStatusWalkPanel() {
       </button>
       {open && (
         <div className="max-h-[60vh] space-y-2 overflow-auto px-3 pb-3">
-          <p className="text-kit-slate-6">Sales Orders → find the SO → click its number → Items. Every receipt and reservation here is simulated; nothing is saved anywhere.</p>
+          <p className="text-kit-slate-6">Sales Orders → find the SO → click its number → Items. Every receipt and reservation here is simulated; nothing is saved anywhere. Receipt auto-reserve is approved, not built.</p>
           <ol className="space-y-1.5">
             {STOCK_STATUS_WALK.map((s) => (
               <li key={s.so} className="rounded-control border border-kit-slate-9 p-1.5" data-testid={`walk-so-${s.so}`}>
                 <div className="font-semibold">SO-{s.so} · {s.title}</div>
                 <div className="text-kit-slate-6">{s.expect}</div>
-                {s.so === 2902 && (
-                  <button type="button" className="mr-1 mt-1 rounded-control border border-kit-amber-6 px-2" data-testid="walk-try-door-2902"
-                    onClick={() => { tryDoorOnCoveredLine(2902); refresh(); }}>
-                    Send the door a shelf Unit anyway (simulated)
-                  </button>
-                )}
                 {(s.receipts ?? []).map((r, i) => (
                   <button key={r.label} type="button" className="mr-1 mt-1 rounded-control border border-kit-slate-6 px-2" data-testid={`walk-receive-${s.so}-${i + 1}`}
                     onClick={() => { simulateReceipt(r.poLineId, r.good, r.damaged, r.wrong); refresh(); }}>
-                    {r.label} (simulated)
+                    {r.label} · approved, not built · simulated
                   </button>
                 ))}
               </li>
@@ -470,7 +461,7 @@ export function StockStatusWalkPanel() {
           </div>
           {world.log.length > 0 && (
             <ul className="space-y-0.5 border-t border-kit-slate-9 pt-1.5" data-testid="walk-log">
-              {world.log.slice(0, 14).map((line, i) => <li key={`${i}-${line}`} className={/^(EXCEPTION|OPEN DECISION)/.test(line) ? "text-kit-amber-6" : "text-kit-slate-6"}>{line}</li>)}
+              {world.log.slice(0, 14).map((line, i) => <li key={`${i}-${line}`} className={line.startsWith("EXCEPTION") ? "text-kit-amber-6" : "text-kit-slate-6"}>{line}</li>)}
             </ul>
           )}
         </div>

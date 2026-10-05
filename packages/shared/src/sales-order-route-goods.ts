@@ -22,6 +22,7 @@
 import { poExpectedArrivalsOf, type EffectiveArrivalPromise } from "./po-windows";
 import { tomorrowDeliveryCallOf } from "./purchasing-supplier-calls";
 import { normalizeSkuKey } from "./sku-code";
+import { soBatchLineCoverageInput, soBatchOrderLineOutstandingQty } from "./so-batch-purchase";
 import { isReservedUnitAtRisk } from "./unit-availability";
 import { receivingSummaryOf } from "./warehouse-receipt";
 
@@ -141,10 +142,10 @@ export interface RouteGoodsLine {
   /** `readyQty` less `atRiskQty`: goods held for this line in a condition that
    *  can be delivered, or already delivered. */
   usableQty: number;
-  /** What Carres has bought or bound for the line — Purchasing's
-   *  `so_line_remaining_requirement` read the other way round: per PO line the
-   *  greater of the Units bound and the non-cancelled lineage share, plus Units
-   *  bound from no PO line (Ready Stock). Never more than `qty`. */
+  /** What is covered for the line: `qty` less Purchasing's own
+   *  `soBatchOrderLineOutstandingQty` (TS twin of `so_line_remaining_requirement`)
+   *  — non-cancelled lineage and bound Units, a Unit on its own lineage PO
+   *  line counted once. Never more than `qty`. */
   purchasedQty: number;
   /** Goods RECEIVED on this line's own lineage that no Unit binding gives to
    *  it yet: they landed `free` (Receiving verifies, it never allocates; the
@@ -344,29 +345,34 @@ export function routeGoodsLinesOf(facts: RouteGoodsFacts): RouteGoodsLine[] {
       }),
     ).length;
     const usableQty = Math.max(0, Math.min(qty, bound.length - atRisk));
-    /* Purchasing's cover (`so_line_remaining_requirement`, 0600/0631): a Unit
-       born on a PO line and that line's lineage share cover ONCE — the greater
-       of the two — and a Unit from no PO line covers by itself. */
+    /* ⭐ ONE COVERAGE FACT (Law D, owner ruling 2026-10-05): what is still
+       uncovered is Purchasing's own `soBatchOrderLineOutstandingQty` — the
+       function SO Batch asks *what still needs buying* with, TS twin of the
+       SQL `so_line_remaining_requirement` — fed by its input builder. Never a
+       second arithmetic here. */
     const lineage = sourcesByLine.get(line.id) ?? [];
-    const cover = new Map<string, { units: number; lineage: number; arrived: number }>();
-    const add = (key: string, units: number, share: number, arrived: number) => {
-      const was = cover.get(key) ?? { units: 0, lineage: 0, arrived: 0 };
-      cover.set(key, { units: was.units + units, lineage: was.lineage + share, arrived: was.arrived + arrived });
-    };
-    [...bound, ...(incomingByLine.get(line.id) ?? [])].forEach((unit, index) =>
-      add(unit.po_line_id ? `line:${unit.po_line_id}` : `unit:${index}`, 1, 0, 0),
+    const linked = [...bound, ...(incomingByLine.get(line.id) ?? [])];
+    const outstanding = soBatchOrderLineOutstandingQty(
+      soBatchLineCoverageInput({
+        qty,
+        lineage: lineage.map(({ source }) => ({ poId: source.po_id, poLineId: source.po_line_id, qty: count(source.qty) })),
+        units: linked.map((unit) => ({ status: unit.status, poLineId: unit.po_line_id ?? null, poId: null })),
+      }),
     );
-    for (const { source, taken } of lineage) {
-      add(source.po_line_id ? `line:${source.po_line_id}` : `legacy:${source.po_id}`, 0, count(source.qty), taken);
-    }
-    const rows = [...cover.values()];
-    const purchasedQty = Math.min(qty, rows.reduce((sum, row) => sum + Math.max(row.units, row.lineage), 0));
+    const purchasedQty = Math.max(0, qty - outstanding);
     /* What this line's own lineage RECEIVED that no Unit of that PO line binds
-       to it. The received good Units are counted by Receiving; the binding by
-       Stock. Their difference landed `free`. */
+       to it (Receiving counts the good pieces; Stock binds them). Their
+       difference landed `free`. */
+    const arrived = new Map<string, number>();
+    for (const { source, taken } of lineage) {
+      if (source.po_line_id) arrived.set(source.po_line_id, (arrived.get(source.po_line_id) ?? 0) + taken);
+    }
+    for (const unit of linked) {
+      if (unit.po_line_id && arrived.has(unit.po_line_id)) arrived.set(unit.po_line_id, arrived.get(unit.po_line_id)! - 1);
+    }
     const arrivedUnallocatedQty = Math.min(
       Math.max(0, qty - readyQty),
-      rows.reduce((sum, row) => sum + Math.max(0, row.arrived - row.units), 0),
+      [...arrived.values()].reduce((sum, left) => sum + Math.max(0, left), 0),
     );
     /* Units that arrived through a Purchase Order are already counted as
        received; what is still ON ORDER is what has not arrived. */

@@ -2473,6 +2473,7 @@ export {
   SO_BATCH_RAIL_CLEAR,
   soBatchOrderSupplierNames,
   soBatchOrderLineOutstandingQty,
+  soBatchLineCoverageInput,
   soBatchPoDocumentState,
   soBatchToBuyState,
   type SoBatchToBuyState,

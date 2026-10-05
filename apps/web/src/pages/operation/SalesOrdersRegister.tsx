@@ -756,9 +756,10 @@ function ExpandedLines({ row, inspection = false, compact = false }: { row: Regi
  * THE QUICK VIEW'S ITEMS — goods and services with their money and the line's
  * own `Stock Status` (the server's one fact, by order line id).
  *
- * ⭐ `Reserve stock` — owner ruling 2026-10-05. A MANUAL line action, never a
- * status: where the line is not yet Ready and free exact Units of its goods
- * are on the shelf, the line says `{n} in stock. Reserve for this order.` and
+ * ⭐ `Reserve stock` — owner rulings 2026-10-05. A MANUAL line action, never a
+ * status: where part of the line is still UNCOVERED (the door's own
+ * `so_line_remaining_requirement`: ordered less non-cancelled PO lineage less
+ * bound Units) and free exact Units of its goods are on the shelf, the line says `{n} in stock. Reserve for this order.` and
  * `Reserve stock` opens the EXISTING reservation door under the line (the SO
  * Batch Ready Stock picker: `Choose Ready Unit` → `so_batch_save_ready_units`
  * → `ops_stock_pool_draw`, its eligibility checks and refusals unchanged).
@@ -790,7 +791,11 @@ function SalesOrderItemsTable({ row, lines, addons, miniLines }: {
       const service = line.selectable === false || (goodsLine != null && lineKind(goodsLine.sku) === "service");
       const lineFact = goodsLine ? row.stockFact?.lines.find((fact) => fact.lineId === goodsLine.id) : undefined;
       const lineId = goodsLine?.id ?? null;
-      const inStock = lineId && lineFact && lineFact.status !== "ready" ? readyStock.availableFor(lineId) : null;
+      /* Owner ruling 2026-10-05: the action follows the line's UNCOVERED
+         quantity (the door's own remainder). Fully covered by PO lineage and
+         reservations → no action; having a PO never hides it by itself. */
+      const uncovered = lineId && lineFact && lineFact.status !== "ready" ? readyStock.remainingFor(lineId) : null;
+      const inStock = lineId && uncovered != null && uncovered > 0 ? readyStock.availableFor(lineId) : null;
       const open = lineId ? readyStock.isOpen(lineId) : false;
       const stockCell = service
         ? <StatusPill tone="neutral">Service</StatusPill>
