@@ -261,6 +261,11 @@ vi.mock("../components/PoIssueEvidence", () => ({
 }));
 
 vi.mock("@/lib/api", () => ({ apiFetch: vi.fn().mockResolvedValue({}) }));
+/* The embedded Sales Order tab is proven in its own test; here only its input. */
+vi.mock("../components/EmbeddedSalesOrders", async () => ({
+  ...(await vi.importActual<typeof import("../components/EmbeddedSalesOrders")>("../components/EmbeddedSalesOrders")),
+  default: ({ orderIds }: { orderIds: readonly string[] }) => <div data-testid="embedded-sales-orders-stub">{orderIds.join(",")}</div>,
+}));
 vi.mock("@/lib/purchasing/po-bundle", () => ({ prepareSelectedPoDocuments: vi.fn(), zipPoBundle: vi.fn() }));
 import { prepareSelectedPoDocuments, zipPoBundle } from "@/lib/purchasing/po-bundle";
 vi.mock("@/lib/pdf/render", () => ({ renderPoPdf: vi.fn() }));
@@ -924,6 +929,25 @@ describe("Purchase Order object", () => {
     expect(within(screen.getByTestId("po-line-units-line-1")).getByText("U1-000-001")).toBeInTheDocument();
     expect(screen.getByText("DO-SUP-9")).toBeInTheDocument();
     expect(screen.getByText("SC-1001")).toBeInTheDocument();
+  });
+
+  it("shows the Sales Order view only when the PO links a Sales Order, with the linked order ids", () => {
+    /* The fixture's SO source carries no order id: no linked SO, so no empty tab. */
+    renderPage("/operation/procurement?po=PO-20260828-4827&view=Sales%20Order");
+    expect(screen.queryByRole("button", { name: "Sales Order" })).not.toBeInTheDocument();
+    expect(screen.queryByTestId("embedded-sales-orders-stub")).not.toBeInTheDocument();
+  });
+
+  it("opens the embedded Sales Order view for every linked Sales Order", () => {
+    const source = queryData.pos[0]!.sources[0] as { order_id?: string | null };
+    source.order_id = "order-1";
+    try {
+      renderPage("/operation/procurement?po=PO-20260828-4827");
+      fireEvent.click(screen.getByRole("button", { name: "Sales Order" }));
+      expect(screen.getByTestId("embedded-sales-orders-stub").textContent).toBe("order-1");
+    } finally {
+      delete source.order_id;
+    }
   });
 
   it("shows each goods line's effective Deliver To from the destination registry", () => {

@@ -716,10 +716,12 @@ pending review from completed stock, payment, delivery or approval. No new panel
 | Opens with | Info: address and sales facts open; Items, Communication and Timeline closed | address and sales facts open; money; the items table shown by default with `Item · Qty · Unit (RM) · Disc (RM) · Amount (RM)` |
 | Component | `CompactModuleCard` | the same component in its embedded presentation |
 
-A single-SO card whose Header is already that SO does not embed the same SO again. **Delivery: the
-embedded presentation's code and exact measurements are being delivered by the controlled build on
-branch `codex/embedded-sales-order-tab`** (BUILD IN PROGRESS at the time of writing; its measured
-numbers join 01 §7.6 and its rules join the card contract when it merges).
+A single-SO card whose Header is already that SO does not embed the same SO again. A host shows its
+`Sales Order` tab only when a Sales Order is linked. **BUILT** — PR #1926 (`dc631e1a`): the PO full page
+`Sales Order` view, one SO builder (`sales-order-card.tsx`) feeding the standalone and embedded cards, and
+the host entry `EmbeddedSalesOrders({ orderIds })`; owner acceptance owed. The PO working panel and round
+panel adopt it as approved hosts (their work-content layouts are localhost-first). Complete defaults,
+hidden parts, states and entry points: the contract's "Embedded presentation"; numbers: 01 §7.6.
 
 ### §4.3.4 · Adoption by module
 
@@ -729,6 +731,7 @@ numbers join 01 §7.6 and its rules join the card contract when it merges).
 | Delivery tab (inside the SO card) | `DeliveryBrief` summary + Delivery-owned editors | DEPLOYED with the SO card; editors reuse Delivery's governed doors | Delivery MASTER |
 | SO Batch Purchase quick view / Cards | `SoBatchCompactView`; opens on main tab `SO Batch Purchase` (§4.3.1, target) | DEPLOYED (#1891); its header still shows the current request with a today-based countdown — the original-date fix is LOCAL ONLY in the Purchasing lane | Purchasing MASTER §9.1 |
 | Receiving (GRN) | `ReceivingCompactView`: supplier/source + GRN No, `referenceStatus` `Cancelled` | DEPLOYED (#1894); wrapped summary labels PRODUCTION VERIFIED (#1906, `d4cca587`) | Purchasing MASTER §9.4 |
+| Purchase Orders full page | `Sales Order` view = `EmbeddedSalesOrders` (embedded presentation) | BUILT (PR #1926, `dc631e1a`); owner acceptance owed | Purchasing MASTER §9.3 |
 | Purchase Orders (PO working panel) | supplier · PO No + PO state; Info · `Purchase Order` (default) · `Sales Order` (embedded, §4.3.3) | tabs owner-approved 2026-10-05; the layout of the work content is PROPOSAL, localhost first; a `GRN` tab is pending owner decision; PO quick panel NOT BUILT (stale PR #1859 not authorised) | Purchasing MASTER §9.3 |
 | SO Batch Purchase purchasing round | round time/date + `Missed` / `Done`; Info · `SO Batch Purchase` (default) · `Sales Order` (embedded) | tabs owner-approved 2026-10-05; the layout of the work content is PROPOSAL, localhost only; NOT BUILT | Purchasing MASTER §5.6.1 |
 | Manual Purchase Request | Info · `Manual Purchase Request` (default) · related `Sales Order` (embedded) per its approved capability | APPROVED TARGET / NOT BUILT (owner 2026-10-05) | Purchasing MASTER §9.2 |
@@ -751,7 +754,8 @@ numbers join 01 §7.6 and its rules join the card contract when it merges).
 
 **Open items on the card** are in §7: the compact-card token decision, 40px phone tabs, the editable
 `To` versus Work's recorded channels, the native Input/Textarea cascade, the preview-versus-kit
-differences, ↗ only with `onOpen`, the link-style button inside the card and "several SOs → list first".
+differences, the link-style button inside the card and "several SOs → list first". (↗ renders only when
+the page passes `onOpen` — BUILT in PR #1926.)
 
 ## §4.4 · Document preview — the document the other party receives
 
@@ -1476,7 +1480,6 @@ into the section it belongs to, and this list loses it.
 | 40px phone module tabs on the card (controls stay 32px today) | card contract | Module-tab-row decision |
 | Expansion-only Columns (opt-in goods columns, OFF by default) | Purchasing 2026-10-05 | Owner has not decided (§6.3) |
 | "Several SOs → list first, then one" inside a host panel | Purchasing 2026-10-05 | Owner decision |
-| ↗ renders only when the page passes `onOpen` | Purchasing (LOCAL ONLY); being delivered by the controlled build | Record as built after it merges |
 | PO working panel and round panel content layouts; SO Batch round rail; `Match Ready Stock` placement; SO Batch optional goods columns replacing the details table | Purchasing lane, localhost | Owner review in the Purchasing lane |
 | Filled primary button on blue-11 (white on blue-9 measures 3.26:1); darker semantic foregrounds for small labels | research file §8 | Real component samples + owner review |
 | Field-card typography 16/14/12 (Houzs Loading List) versus 15/13/12 | 2026-10-01 | Same-content comparison |

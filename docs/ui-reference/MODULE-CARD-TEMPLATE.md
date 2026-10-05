@@ -1,7 +1,9 @@
 # Compact module card — contract
 
-The one card contract for the right Working Panel (owner rules 2026-10-03 / 10-04 / 10-05). The law
-that every module uses it, the host-module identity rule, standalone versus embedded Sales Order and
+The one card contract for the right Working Panel (owner rules 2026-10-03 / 10-04 / 10-05): one shared
+card structure and style for every module, with the owner's Stock and Customer corrections. **The outer
+identity belongs to the host module with the shared structure and style; an embedded SO uses the same
+component in embedded presentation** (owner 2026-10-05). The law that every module uses it, the host-module identity rule, standalone versus embedded Sales Order and
 the adoption status per module are in UI MASTER §4.3. **Numbers** live in
 [01 §7.6](../01-design-tokens.md#76-compact-module-card--compactmodulecard); **words** in COPY-STANDARD
 "Compact module card words" (`CARD_WORDS`). This file holds the card's rules once.
@@ -34,11 +36,16 @@ four columns above 440px and two at ≤440px. SO Doc Date reads `placed_at`; Pro
 fallback; Dealer is not a duplicate display field. Info summary is **Total payable / Paid to date /
 Balance due**, matching the saved PDF. No SO Info details panel, Email, Dealer, repeated
 Stock/Payment/Delivery status rows or Related documents: item-level PO/stock and module-owned
-documents stay in their owning surfaces. Items, Communication and Timeline start closed.
+documents stay in their owning surfaces. In the standalone card, Items, Communication and Timeline
+start closed.
 
-- **One shared Header:** name · order · phone; a ▾/▴ at the lower right of the customer cell opens the
-  sales facts (no `Order info` words); the address with its own toggle (▴ while open); the target
-  date; Open (↗) and Close (×). The phone glyph and number form one wrapping unit. The Header grows
+- **Host-owned identity:** every module card uses the same Header structure and style; the HOST module
+  fills it with its own identity (a Sales Order shows its customer, a Purchase Order its supplier and PO
+  number). A Sales Order shown inside another module is the same component in embedded presentation
+  (below), never a second Header. The standalone SO Header, as built:
+- **Standalone SO Header:** name · order · phone; a ▾/▴ at the lower right of the customer cell opens
+  the sales facts (no `Order info` words); the address with its own toggle (▴ while open); the target
+  date; Open (↗, only when the page passes `onOpen`) and Close (×). The phone glyph and number form one wrapping unit. The Header grows
   with a long name; nothing overlaps.
 - **Shared Header colour — owner approved 2026-10-04:** existing Radix slate-12 background, white
   primary text and day count, slate-4 contact text, slate-11 dividers/hover; the day count uses the
@@ -62,8 +69,9 @@ documents stay in their owning surfaces. Items, Communication and Timeline start
   `Not recorded` in the Header and leaves the required table cell blank; a failed list read stays a
   failed list. The retired today-based countdown is never reused. Delivery's Customer confirmation and
   Logistics ETA stay separate facts. Acceptance includes changing "today": the count must not move.
-- **Info opens sales facts and address; every other module starts with both closed.** Switching module
-  applies that module's default and closes items and editors.
+- **Standalone: Info opens sales facts and address; every other module starts with both closed.**
+  Switching module applies that module's default and closes items and editors. Embedded: both always
+  open (below).
 - **Summary cells:** title row, value, optional status line — top aligned on common baselines, left
   aligned, ▾ at the right of the title row for a fact with an editor; values take the fewest lines,
   four at most. Each module shows only its own facts: Info `Total payable · Paid to date · Balance due`;
@@ -89,7 +97,8 @@ documents stay in their owning surfaces. Items, Communication and Timeline start
 - **DO:** read-only conditions, one per line; no manual tick, no repeated explanation; cannot issue or
   release a document.
 - **Items contains goods and services only.**
-- **Items, Communication and Timeline start closed.** Times show without a zone suffix
+- **Standalone: Items, Communication and Timeline start closed** (embedded: items show at once, no
+  Communication or Timeline). Times show without a zone suffix
   (`30 Sep · 4:08 PM`); the full instant stays in the element; a date-only source shows the date and
   `Time unavailable`. Timeline uses recorded events and avatar identity without repeating names; its
   loading/error state stays inside its section.
@@ -104,6 +113,52 @@ documents stay in their owning surfaces. Items, Communication and Timeline start
   until its saved Blob exists; no separate Close row. Close PDF returns to Info and focuses the SO
   number; the dark Header `Close order` × closes the whole Register Drawer and returns to its opener.
   Neither control saves business facts or changes current or historical issued documents.
+
+## Embedded presentation — owner confirmed 2026-10-05 · BUILT (PO full page `Sales Order` view, PR #1926, `dc631e1a`); owner acceptance owed
+
+`<CompactModuleCard presentation="embedded" …>` draws one record inside a host module's tab. The host owns
+the outer Header, its tabs and every business action; the host's own tabs and which one opens first follow
+UI MASTER's shared module page flow (§0.2, §4.3.1), not this component. A host shows a `Sales Order` tab
+only when at least one Sales Order is linked; an empty list draws nothing. Hosts: the Purchase Order full
+page (`Sales Order` view, built) and the Purchase Order working panel and round panel (approved; their
+work-content layouts are localhost-first in the Purchasing lane). Standalone and embedded rules are
+separate; nothing below changes a standalone card. Numbers for both presentations: 01 §7.6.
+
+| | Standalone (default) | Embedded |
+|---|---|---|
+| Identity area | dark slate-12 Header, white text | light: `--cc-soft` background, `--cc-ink` text, `--cc-line` dividers, `--cc-muted` requested-date label; hover `--cc-toggle-hover` with `--cc-brand`; focus outline `--cc-brand` |
+| Header grid | `minmax(0,1fr) 156px 64px` (no area cell); ≤440px `142px 60px` | `minmax(0,1fr) 156px 32px`; ≤440px `142px 32px`; identity is one column (no toggle column) |
+| Close × / module tabs | drawn | not drawn |
+| Sales ▾/▴ and address toggle | drawn; Info opens both, other modules start closed | not drawn; address and sales facts always open — closing the PDF or a module reset cannot fold them |
+| Items | start closed behind the Items icon | the first module's items show at once, no toggle, no `Items` title |
+| Communication / Timeline | toggles in the module bar | not drawn |
+| ↗ full page | only when `onOpen` is passed (true for both) | same rule |
+| SO No | underlined; opens the saved-version PDF in place; Close PDF returns focus to the SO No | same |
+| Outer box | 1px `--cc-line` border, radius 8px, max width 560px | same when placed directly on a page (PO full page); border 0 and radius 0 when nested in a host card's tab (`.panel .embedded`) |
+| Body | 10px padding under the module bar | 1px `--cc-line` top rule (the rule the module bar gave), then 10px padding |
+
+**Embedded SO items:** the kit `DocumentTable` with five columns `Item / Qty / Unit (RM) / Disc (RM) /
+Amount (RM)`: goods then services, in the saved document's order; the item name with its configuration on a
+second line (the full SO page's `configWords`); `Disc (RM)` is `0.00` unless the line carries a discount, as
+on the PDF; digits as the full SO page (`2,499.00`); numbers right-aligned, tabular and unwrapped; the item
+text may wrap. Inside the card, `DocumentTable` descendants skip the card's reference border and button
+resets (the PR #1897 `data-kit` exclusion, narrowed to `[data-kit="document-table"] *`), so its rules and row
+doors keep their recipe; other kit components' descendants are unchanged. Table numbers: 01 §7.6.
+
+**Date meaning:** `{n}d · [calendar] {weekday, d Mon}` is the customer's original requested date (revision
+1, `originalRequestedDeliveryOf`) minus `proceed_date` (`originalRequestDays`): never today-based, never a
+later date; the count is omitted when either date is missing.
+
+**Entry points:** `components/kit/CompactModuleCard.tsx` (`presentation`, module `content`: a module that is
+only content draws no body inset); `pages/operation/components/sales-order-card.tsx` — the ONE SO builder
+(`salesOrderCardHeader`, `salesOrderMoneySummary`, `originalRequestDays`) used by both
+`SalesOrderCompactView` (standalone) and `EmbeddedSalesOrders`; `pages/operation/components/EmbeddedSalesOrders.tsx`
+— `EmbeddedSalesOrders({ orderIds })` (one block per linked SO, once each, source order),
+`linkedSalesOrderIds(sources)`, `SalesOrderItemsTable`. Reads only: the row from
+`GET /api/operation/orders?orderId=` (the Register's own one-order row), items from
+`/api/orders/:id/sales-order-data` (the saved PDF's source). States: `Loading…`; a failed read
+`Could not be loaded` + `Try again`; an SO the Operation list does not return `Order details unavailable`;
+a refused read `You cannot view this record`.
 
 ## Adapters
 
@@ -148,7 +203,12 @@ payable/Paid to date/Balance due, the payment at 2026-09-30T08:08:32Z, receipt R
 verified handoff sample. Stock `1/1 Ready` is a layout sample. Any Customer date or Logistics company
 saved on /ui exists only in that browser tab: **nothing is written to the ERP**, and it is not an order
 fact. `Preview: next save fails` simulates a failed save. ↗ opens the existing Sales Order page; ×
-closes the card.
+closes the card. `Purchase Order · Sales Order tab` shows the embedded presentation: a host card
+(`{Supplier}` · `{PO No}` in braces, because no real PO links SO-1368) opening on its own `Purchase Order`
+tab, with `Info` and `Sales Order`; the `Sales Order` tab holds the SO-1368 sample and the
+`SO2609-4827(1)` long-number, long-address layout sample. SO-1368's number opens its real saved PDF when
+signed in; the layout sample has no saved document and shows the real failure state, and has no ↗ because
+it has no full page.
 
 ## Differences from the reference page (125 checks: 25 states × 5 widths)
 

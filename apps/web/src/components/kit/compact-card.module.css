@@ -44,11 +44,13 @@
 /* ---------- restore the browser defaults the reference relied on ---------- */
 .panel,
 .panel * { box-sizing: border-box; }
-.panel :where(:not([data-kit])) { border: 0 none; }
-.panel table,
-.panel thead,
-.panel tbody,
-.panel tr { border-color: gray; }
+/* Kit controls keep their own skin (PR #1897). A kit DocumentTable also keeps its
+   row rules and row doors: its descendants skip the reference resets below. */
+.panel :where(:not([data-kit], [data-kit="document-table"] *)) { border: 0 none; }
+.panel table:where(:not([data-kit="document-table"] *)),
+.panel thead:where(:not([data-kit="document-table"] *)),
+.panel tbody:where(:not([data-kit="document-table"] *)),
+.panel tr:where(:not([data-kit="document-table"] *)) { border-color: gray; }
 .panel {
   background: var(--cc-surface);
   border: 1px solid var(--cc-line);
@@ -60,11 +62,11 @@
   text-align: left;
 }
 .panel svg { display: inline; vertical-align: baseline; width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.7; }
-.panel button:where(:not([data-kit])) { font: inherit; border: 0; background: transparent; cursor: pointer; color: inherit; padding: 1px 6px; margin: 0; text-align: center; }
-.panel button:where(:not([data-kit])):hover { background: var(--cc-soft); }
-.panel button:where(:not([data-kit])):active { background: var(--cc-line); }
-.panel button:where(:not([data-kit])):focus-visible { outline: 2px solid var(--cc-brand); outline-offset: 2px; }
-.panel button:where(:not([data-kit])):disabled { opacity: 0.5; cursor: not-allowed; }
+.panel button:where(:not([data-kit], [data-kit="document-table"] *)) { font: inherit; border: 0; background: transparent; cursor: pointer; color: inherit; padding: 1px 6px; margin: 0; text-align: center; }
+.panel button:where(:not([data-kit], [data-kit="document-table"] *)):hover { background: var(--cc-soft); }
+.panel button:where(:not([data-kit], [data-kit="document-table"] *)):active { background: var(--cc-line); }
+.panel button:where(:not([data-kit], [data-kit="document-table"] *)):focus-visible { outline: 2px solid var(--cc-brand); outline-offset: 2px; }
+.panel button:where(:not([data-kit], [data-kit="document-table"] *)):disabled { opacity: 0.5; cursor: not-allowed; }
 .panel input,
 .panel select,
 .panel textarea {
@@ -434,3 +436,17 @@ aside.section { background: var(--cc-surface); }
 .targetLabel:empty { display: none; }
 .target b small { font-size: 11px; font-weight: 500; }
 @container (max-width: 440px) { .header[data-layout="no-area"] { grid-template-columns: minmax(0, 1fr) 142px 60px; } .targetLabel { font-size: 9px; } }
+
+/* Embedded presentation (owner 2026-10-05): the host owns the dark Header and tabs.
+   Light identity area, no Close, no module tabs; address, sales facts and items open. */
+.panel .embedded { border: 0; border-radius: 0; }
+.embedded .header { background: var(--cc-soft); color: var(--cc-ink); grid-template-columns: minmax(0, 1fr) 156px 32px; }
+.embedded .identity { grid-template-columns: minmax(0, 1fr); }
+.embedded article { border-top: 1px solid var(--cc-line); }
+.embedded .header .contactLine { color: var(--cc-ink); }
+.embedded .header .identity, .embedded .header .target { border-color: var(--cc-line); }
+.embedded .header .targetLabel { color: var(--cc-muted); }
+.embedded .header .target small { color: var(--cc-ink); }
+.embedded .header button:hover, .embedded .header button:active { background: var(--cc-toggle-hover); color: var(--cc-brand); }
+.embedded .header button:focus-visible { outline-color: var(--cc-brand); }
+@container (max-width: 440px) { .embedded .header[data-layout="no-area"] { grid-template-columns: minmax(0, 1fr) 142px 32px; } }

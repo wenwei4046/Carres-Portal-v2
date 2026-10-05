@@ -463,7 +463,7 @@ own width (`narrowCanvas` below 768) · `available canvas` = content width after
 below: the card's own width (CSS container queries), never the viewport — except where a row names
 the viewport (the PDF Close button).** The card's rules live in
 [`ui-reference/MODULE-CARD-TEMPLATE.md`](ui-reference/MODULE-CARD-TEMPLATE.md); its law in UI MASTER §4.3.
-The embedded `Sales Order` tab presentation's measured numbers join this section when its build merges.
+The embedded `Sales Order` presentation's numbers joined on 2026-10-05 (PR #1926, `dc631e1a`).
 
 **Scope and authority:** this table describes the existing shared compact card, not every full-page table or the whole kit. CSS px throughout; padding is vertical × horizontal unless otherwise stated. Source is `apps/web/src/components/kit/compact-card.module.css`, plus `DeliveryBrief.tsx`, `field-recipe.ts`, `PdfPreview.tsx` and `DialogFrame.tsx`. These are implementation measurements, not new independently editable token definitions. Canonical tokens remain in01; update source and this lookup together. Do not copy these values into a page-local stylesheet.
 
@@ -472,17 +472,20 @@ The embedded `Sales Order` tab presentation's measured numbers join this section
 | Element | Current measurement and relationship | Basis |
 |---|---|---|
 | Card container |100% of available width, maximum560px; inline-size container queries | Source; live560/440/416/396/366 |
+| Embedded identity area | Light `--cc-soft` background, `--cc-ink` text, `--cc-line` dividers; columns `minmax(0,1fr) 156px 32px` (≤440px `142px 32px`); identity one column; no ×, module tabs or toggles | Source; local560/440/416/396/366, no overflow (PR #1926) |
+| Embedded outer box/body | Border1px/radius8px on a page; border0/radius0 nested in a host card (`.panel .embedded`); body top rule1px `--cc-line`, padding10px | Source (PR #1926) |
+| DocumentTable inside the card | Descendants of `[data-kit="document-table"]` skip the card's border/button resets; recipe 13/18 body, header11/14/500, 8px insets, 1px slate-5 rules; configuration second line 12px/16px slate-11 | Source; standalone/Receiving/SO Batch cards unchanged (before/after geometry identical) (PR #1926) |
 | Outer card | Border1px; overflow hidden; natural height | Source |
 | Card radius/font | Outer radius8px; system-ui; base13px/1.4 (18.2px line height); normal weight400 | Pending reference value |
 | Reference control/inner-box radius | Native reference controls4px; summary/editor/menu boxes6px; kit controls retain canonical6px | Pending reference value versus canonical field recipe |
 | General card glyph |16×16px, stroke1.7; contact glyph12×12px; address glyph stroke1.6 | Source; reference glyph decision remains pending |
-| Header | Minimum56px, natural growth; padding6×12px; columns `minmax(0,1fr) auto auto 64px`; gap8px, vertically centred | Source |
+| Header | Minimum56px, natural growth; padding6×12px; gap8px, vertically centred. Columns by layout: default `minmax(0,1fr) auto auto 64px`; SO `data-layout="no-area"` (#1920) `minmax(0,1fr) 156px 64px`; identity-only `minmax(0,1fr) auto`; embedded `minmax(0,1fr) 156px 32px` | Source (`compact-card.module.css`, origin/main `dc631e1a`) |
 | Identity layout | Text plus24px toggle column; row gap2px, column gap6px; right divider1px and8px inset | Source |
 | Customer name |14px/18px, weight700; wrap long words; title-group gap10px | Source; card font/weight fidelity exception |
 | Order/phone |11px; flex wrapping contact group gap4px; phone icon+number stays one wrapping unit, internal gap4px | Source |
 | Sales chevron |24×32px; lower-right of identity; font12px, chevron11px/1; margin-bottom−7px; no visible label | Source |
 | Address trigger column |38px high,6px right inset,1px right divider; bottom aligned; trigger11px/18px with4px icon/text gap | Source |
-| Target date column |38px high; vertical gap2px, right inset8px/divider1px; date13px, icon gap5px, no wrapping | Source |
+| Target date column |38px high (natural height with the two-line label); vertical gap2px, right inset8px/divider1px; requested-date label two lines10px/11px; date13px with the16px calendar glyph, icon gap5px, no wrapping; day count11px/500 | Source |
 | Countdown | Canonical label11px/500/14px; white on dark Header, no badge fill; existing0×5px inset | Source; visible26d live5Oct |
 | Header Open/Close |32×32px each; text-arrow/×18px; action column64px above460px | Source |
 | Header colours | slate-12 background, white primary/countdown, slate-4 contacts, slate-11 dividers/hover; white2px focus outline with−2px offset | Approved source tokens |
@@ -527,12 +530,23 @@ The embedded `Sales Order` tab presentation's measured numbers join this section
 | PDF zoom/render region | Controls on next row, gap8px/bottom margin8px; PDF pane flexes/scrolls. Paper height depends on actual document and zoom, no card-local fixed height | Source |
 | Full-page continuation | Use existing Block/DocumentTable/TotalsSummary/field recipes (UI MASTER §3 table recipes and §7.5 above); Slip uses the existing inline link-button with16px attachment icon,6px icon/text gap,13px/18px body text/weight500; not a new input or card | Source; Orders owns business grouping |
 
+**Shared measurements of both presentations (PR #1926, `compact-card.module.css`):** Header minimum 56px,
+padding 6×12px (≤460px card: 6×8px, gap 5px); name 14px/18px 700; SO No and phone 11px (≤460px: 10px),
+phone glyph 12×12px, SO No underline offset 2px; requested-date label two lines 10px/11px (≤440px: 9px); date
+13px with the 16px calendar glyph, day count 11px/500; ↗ 32×32px, 18px. Address detail padding 8×12px, 12px
+type, 16px pin glyph (stroke 1.6), full address left, access facts right in a 200px column with 12px gap,
+stacking at ≤440px. Sales facts padding 10×12px (≤460px: 10×8px), `SO Doc Date / Proceed date / Sales
+Location / Salesperson` in columns `1fr 1fr 1.55fr .75fr` with 12px gap, two columns at ≤440px (8px gap at
+≤420px); label 11px, value 12px/17px 500. Summary strip `Total payable · Paid to date · Balance due` as in
+Info. Card width is the available width up to 560px; checked at 560/440/416/396/366px with no overflow.
+
 **Responsive rules — actual card width, not viewport width:**
 
 | Width condition | Existing change |
 |---|---|
-| Card≤460px | Header inset6×8px, gap5px; columns `minmax(0,1fr) 28px auto 60px`; hide only the address-place word on its icon trigger; order text10px; title gaps2px/6px; sales-fact horizontal inset8px |
+| Card≤460px | Header inset6×8px, gap5px; default columns `minmax(0,1fr) 28px auto 60px`; hide only the address-place word on its icon trigger; order text10px; title gaps2px/6px; sales-fact horizontal inset8px |
 | Card≤420px | Reference arrange split becomes one column; original-date divider becomes bottom rule with8px bottom inset; event metadata wraps; sales-fact columns1fr/1.4fr/0.65fr, gap8px; Info items cells7×3px/type11px |
+| Card≤440px | SO no-area Header `minmax(0,1fr) 142px 60px`, embedded `142px 32px`; requested-date label9px; sales facts two columns; address and access facts stack |
 | Card≤400px | Four-fact strip becomes2×2; right divider removed from second cell; three-fact Info strip remains three columns; Info value12px/title11px; compact Customer fields one column |
 | Five verified card widths |560/440/416/396/366px; actual dimensions checked. Do not equate them to identical viewport sizes in a Drawer or reference page |
 
