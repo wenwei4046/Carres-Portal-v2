@@ -50,7 +50,7 @@ not a current pattern: do not copy it from a neighbouring page. Live examples ar
 | Register / listing | `register/DataGrid` | `components/register/DataGrid.tsx` | §6.0 · §6.2 · SO-derived template owner accepted 2026-10-01 · built; adoption per page |
 | Goods expansion | `GoodsMiniTable` + connector | `pages/operation/components/GoodsMiniTable.tsx` · `ConnectedSections.tsx` | §6.9 · built |
 | Simple and document tables | `DataTable` · `DocumentTable` · `TotalsSummary` · `TableScroller` | `components/kit/*` · `components/TableScroller.tsx` | §3 · built |
-| **Compact module card** (the right Working Panel: identity header, Info and module tabs, module summary, editors, Items, Communication, Timeline) | **`CompactModuleCard`** in kit `Drawer variant="compact-card"` — pass the header facts once and each module's own facts, editors and items | `components/kit/CompactModuleCard.tsx` · `/ui#compact-card` · contract `docs/ui-reference/MODULE-CARD-TEMPLATE.md` | §4.3 · shared component built · Sales Orders adoption PRODUCTION VERIFIED 2026-10-05 (PR #1893/#1896/#1897, `2ce91e2d`) · embedded presentation MERGED (PR #1926), deployment not verified · other modules per §4.3.4 table |
+| **Compact module card** (the right Working Panel: identity header, Info and module tabs, module summary, editors, Items, Communication, Timeline) | **`CompactModuleCard`** in kit `Drawer variant="compact-card"` — pass the header facts once and each module's own facts, editors and items | `components/kit/CompactModuleCard.tsx` · `/ui#compact-card` · contract `docs/ui-reference/MODULE-CARD-TEMPLATE.md` | §4.3 · shared component built · Sales Orders adoption PRODUCTION VERIFIED 2026-10-05 (PR #1893/#1896/#1897, `2ce91e2d`) · embedded presentation DEPLOYED (PR #1926, `dc631e1a`, production SHA verified 2026-10-05; owner review owed) · other modules per §4.3.4 table |
 | Object header + tabs | `SalesOrderTabs` recipe | `pages/operation/SalesOrderTabs.tsx` | §4.1 · accepted; page-owned — no generic ObjectHeader/ObjectPage kit API (KIT GAP) |
 | Object facts | `Block` — the one card · `Panel` · `StatusPill` · `EmptyState` · `Loading` | `components/kit/*` | LOCKED · built |
 | Forms | `Input` · `Textarea` · `Select` · `SearchInput` · `Checkbox` · `DatePicker` · `FieldFrame` | `components/kit/*`, `field-recipe.ts` | LOCKED · built |
@@ -718,7 +718,7 @@ pending review from completed stock, payment, delivery or approval. No new panel
 | Component | `CompactModuleCard` | the same component in its embedded presentation |
 
 A single-SO card whose Header is already that SO does not embed the same SO again. A host shows its
-`Sales Order` tab only when a Sales Order is linked. **MERGED (PR #1926, `dc631e1a`), deployment not verified (production reported `9418faa6a` at check time; deploy run in progress) — not live**: the PO full page
+`Sales Order` tab only when a Sales Order is linked. **DEPLOYED (PR #1926, `dc631e1a`; deploy run 37293312776; production SHA verified on all five surfaces 2026-10-05); owner review owed**: the PO full page
 `Sales Order` view, one SO builder (`sales-order-card.tsx`) feeding the standalone and embedded cards, and
 the host entry `EmbeddedSalesOrders({ orderIds })`; owner acceptance owed. The PO working panel and round
 panel adopt it as approved hosts (their work-content layouts are localhost-first). Complete defaults,
@@ -732,8 +732,8 @@ hidden parts, states and entry points: the contract's "Embedded presentation"; n
 | Delivery tab (inside the SO card) | `DeliveryBrief` summary + Delivery-owned editors | DEPLOYED with the SO card; editors reuse Delivery's governed doors | Delivery MASTER |
 | SO Batch Purchase quick view / Cards | `SoBatchCompactView`; opens on main tab `SO Batch Purchase` (§4.3.1, target) | DEPLOYED (#1891); its header still shows the current request with a today-based countdown — the original-date fix is LOCAL ONLY in the Purchasing lane | Purchasing MASTER §9.1 |
 | Receiving (GRN) | `ReceivingCompactView`: supplier/source + GRN No, `referenceStatus` `Cancelled` | DEPLOYED (#1894); wrapped summary labels PRODUCTION VERIFIED (#1906, `d4cca587`) | Purchasing MASTER §9.4 |
-| Shared embedded SO component (kit `CompactModuleCard presentation="embedded"`, `EmbeddedSalesOrders`, `sales-order-card`) | one SO builder for standalone and embedded cards | MERGED (PR #1926, `dc631e1a`), deployment not verified (production reported `9418faa6a` at check time; deploy run in progress) — not live | UI MASTER §4.3.3 · card contract |
-| Purchase Orders full page | `Sales Order` view = `EmbeddedSalesOrders` (embedded presentation) | MERGED (PR #1926, `dc631e1a`), deployment not verified (production reported `9418faa6a` at check time; deploy run in progress) — not live; owner acceptance owed | Purchasing MASTER §9.3 |
+| Shared embedded SO component (kit `CompactModuleCard presentation="embedded"`, `EmbeddedSalesOrders`, `sales-order-card`) | one SO builder for standalone and embedded cards | DEPLOYED (PR #1926, `dc631e1a`, production SHA verified 2026-10-05) | UI MASTER §4.3.3 · card contract |
+| Purchase Orders full page | `Sales Order` view = `EmbeddedSalesOrders` (embedded presentation) | DEPLOYED (PR #1926, `dc631e1a`, production SHA verified 2026-10-05); owner acceptance owed | Purchasing MASTER §9.3 |
 | Purchase Orders (PO working panel) | supplier · PO No + PO state; Info · `Purchase Order` (default) · `Sales Order` (embedded, §4.3.3) | APPROVED TARGET / NOT BUILT — tabs owner-approved 2026-10-05; the layout of the work content is PROPOSAL, localhost first; a `GRN` tab is pending owner decision (stale PR #1859 not authorised) | Purchasing MASTER §9.3 |
 | SO Batch Purchase purchasing round | round time/date + `Missed` / `Done`; Info · `SO Batch Purchase` (default) · `Sales Order` (embedded) | APPROVED TARGET / NOT BUILT — tabs owner-approved 2026-10-05; the layout of the work content is PROPOSAL, localhost only | Purchasing MASTER §5.6.1 |
 | Manual Purchase Request | Info · `Manual Purchase Request` (default) · related `Sales Order` (embedded) per its approved capability | APPROVED TARGET / NOT BUILT — tabs owner-approved 2026-10-05; the layout of the work content is PROPOSAL | Purchasing MASTER §9.2 |
@@ -760,7 +760,7 @@ hidden parts, states and entry points: the contract's "Embedded presentation"; n
 **Open items on the card** are in §7: the compact-card token decision, 40px phone tabs, the editable
 `To` versus Work's recorded channels, the native Input/Textarea cascade, the preview-versus-kit
 differences, the link-style button inside the card and "several SOs → list first". (↗ renders only when
-the page passes `onOpen` — MERGED in PR #1926, deployment not verified.)
+the page passes `onOpen` — DEPLOYED in PR #1926, production SHA verified.)
 
 ## §4.4 · Document preview — the document the other party receives
 

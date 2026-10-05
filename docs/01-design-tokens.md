@@ -465,7 +465,7 @@ own width (`narrowCanvas` below 768) · `available canvas` = content width after
 below: the card's own width (CSS container queries), never the viewport — except where a row names
 the viewport (the PDF Close button).** The card's rules live in
 [`ui-reference/MODULE-CARD-TEMPLATE.md`](ui-reference/MODULE-CARD-TEMPLATE.md); its law in UI MASTER §4.3.
-The embedded `Sales Order` presentation's numbers joined on 2026-10-05 (PR #1926, `dc631e1a`; merged, deployment not verified).
+The embedded `Sales Order` presentation's numbers joined on 2026-10-05 (PR #1926, `dc631e1a`; deployed, production SHA verified).
 
 **Scope and authority:** this table describes the existing shared compact card, not every full-page table or the whole kit. CSS px throughout; padding is vertical × horizontal unless otherwise stated. Source is `apps/web/src/components/kit/compact-card.module.css`, plus `DeliveryBrief.tsx`, `field-recipe.ts`, `PdfPreview.tsx` and `DialogFrame.tsx`. These are implementation measurements, not new independently editable token definitions. Canonical tokens remain in01; update source and this lookup together. Do not copy these values into a page-local stylesheet.
 
