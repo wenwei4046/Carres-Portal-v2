@@ -1131,7 +1131,10 @@ export default function PurchaseOrdersPage() {
           {pdfProblem ? (
             <ReadProblem
               problem={pdfProblem}
-              action="Use Download official PDF again. If it still fails, ask the system owner to check the PO document."
+              /* The row menu's door is `Print` since the one row menu
+                 (2026-10-05); the advice names no retired door — the same
+                 sentence the PO preview prints. */
+              action="Try again. If it still fails, ask the system owner to check the PO document."
             />
           ) : null}
             <DataGrid<RegisterRow>

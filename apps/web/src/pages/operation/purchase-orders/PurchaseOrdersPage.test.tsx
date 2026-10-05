@@ -364,6 +364,22 @@ describe("Purchase Orders Register", () => {
     expect(printPurchaseOrderSpy).toHaveBeenCalledWith("PO-20260828-4827");
     expect(screen.queryByTestId("purchase-order-object")).not.toBeInTheDocument();
   });
+  /* The strip under a failed row Print names the door that exists. The menu
+     word is `Print` since the one row menu (2026-10-05); the retired
+     `Download official PDF` must not be offered as the retry. */
+  it("a failed row Print says the PO preview's own retry sentence, never the retired door", async () => {
+    useRealRegisterGrid = true;
+    printPurchaseOrderSpy.mockClear();
+    printPurchaseOrderSpy.mockRejectedValueOnce(new Error("read failed"));
+    renderPage();
+    fireEvent.contextMenu(await screen.findByTestId("grid-row-PO-20260828-4827"));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Print" }));
+    const strip = await screen.findByText("The official PDF could not be opened");
+    const box = strip.parentElement!;
+    expect(box).toHaveTextContent("Try again. If it still fails, ask the system owner to check the PO document.");
+    expect(box).not.toHaveTextContent("Download official PDF");
+    expect(screen.getByTestId("po-register-content")).not.toHaveTextContent("Download official PDF");
+  });
   it("a cancelled PO has no paper, so its row menu offers View only", () => {
     renderPage();
     const cancelled = lastGridProps.rows.find((r: any) => r.id === "PO-LEGACY");
