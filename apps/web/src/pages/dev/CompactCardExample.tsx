@@ -22,6 +22,7 @@ const PRESETS = {
   receiving: { label: "Receiving · cancelled preview", module: "receipt", open: {}, warehouseLeg: false },
   info: { label: "Info · default", module: "info", open: {}, warehouseLeg: false },
   delivery: { label: "Delivery · default", module: "delivery", open: {}, warehouseLeg: false },
+  infoLong: { label: "Info · long address", module: "info", open: {}, warehouseLeg: false },
   infoAll: { label: "Info · all open", module: "info", open: { items: true, communication: true, timeline: true }, warehouseLeg: false },
   deliveryAll: { label: "Delivery · all open", module: "delivery", open: { items: true, communication: true, timeline: true }, warehouseLeg: false },
   warehouseLeg: { label: "Delivery · warehouse leg", module: "delivery", open: {}, warehouseLeg: true },
@@ -188,8 +189,8 @@ export default function CompactCardExample() {
           name="Jimmy"
           reference="SO-1368"
           phone="019-83372393"
-          sales={{ orderDate: "30 Sep 2026", salesLocation: "Carres Kota Damansara", salesperson: "Alvin" }}
-          address={{ area: "Ampang", full: "1888. jalan Pillow, 68000 Ampang, Selangor", facts: [{ kind: "building", label: "Building", value: "Condo · Floor 1" }, { kind: "access", label: "Access", value: "No lift" }] }}
+          sales={{ orderDate: "30 Sep 2026", proceedDate: "30 Sep 2026", salesLocation: "Carres Kota Damansara", salesperson: "Alvin" }}
+          address={{ area: "Ampang", full: preset === "infoLong" ? "Unit A-18-08, Block A, Residensi Example Heights, Jalan Example Utama 12, Taman Example Permai, 68000 Ampang, Selangor, Malaysia" : "1888. jalan Pillow, 68000 Ampang, Selangor", facts: [{ kind: "building", label: "Building", value: "Condo · Floor 1" }, { kind: "access", label: "Access", value: "No lift" }] }}
           target={{ date: "31 Oct", badge: `${days}d` }}
           onOpen={() => window.open(SAMPLE_ORDER_PATH, "_blank", "noopener")}
           onClose={() => setClosed(true)}
@@ -199,8 +200,8 @@ export default function CompactCardExample() {
             {
               key: "info", label: "Info", opensHeaderDetails: true,
               summary: [
-                { key: "total", label: "Total", value: "RM2,759.00" },
-                { key: "paid", label: "Paid", value: "RM1,380.00" },
+                { key: "total", label: "Total payable", value: "RM2,759.00" },
+                { key: "paid", label: "Paid to date", value: "RM1,380.00" },
                 { key: "outstanding", label: "Balance due", value: "RM1,379.00" },
               ],
               items: (

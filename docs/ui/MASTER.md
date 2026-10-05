@@ -41,7 +41,7 @@ before quoting. Built is not the same as owner-verified on every page.
 | Fact cards | `Block` — the one object card (§4.1) · `Panel` · `StatusPill` · `EmptyState` · `Loading` | `components/kit/*` | LOCKED · built |
 | Orders list / drawer band | `SectionPanel` (cream band) — that surface only, not a general card | `components/SectionPanel.tsx` | Governed by §4.1; not a `Block` duplicate |
 | Dialogs and panels | `Modal` · `Drawer` (incl. quick view) · `Toast` · `PdfPreview` · `SavedEvidenceViewer` | `components/kit/*` | Built |
-| **Compact module card** (shared customer header, module tabs, module summary, editors, items, Communication, Timeline) | **`CompactModuleCard`** — pass the header facts once and each module's own facts, editors and items | `components/kit/CompactModuleCard.tsx` · `/ui#compact-card` · contract `docs/ui-reference/MODULE-CARD-TEMPLATE.md` | Owner rules 2026-10-03/04 (§4.3) · shared component built · **Sales Orders adoption and confirmed corrections production verified 2026-10-05 (PR #1893/#1896/#1897; §4.3 evidence)** · palette/font/radius await the token decision |
+| **Compact module card** (shared customer header, module tabs, module summary, editors, items, Communication, Timeline) | **`CompactModuleCard`** — pass the header facts once and each module's own facts, editors and items | `components/kit/CompactModuleCard.tsx` · `/ui#compact-card` · contract `docs/ui-reference/MODULE-CARD-TEMPLATE.md` | Owner rules 2026-10-03/04/05 (§4.3): address first, left/right access; SO Doc Date then Proceed date; PDF-matched totals · shared component built · **Sales Orders adoption and confirmed corrections production verified 2026-10-05 (PR #1893/#1896/#1897; §4.3 evidence)** · palette/font/radius await the token decision |
 | Work right-panel Communication | `WorkCommunication` — recorded channels only | `pages/operation/work/WorkCommunication.tsx` | Owner ruling 2026-09-17 · built; differs from the compact card's editable `To` (open owner question) |
 | Record history | §5 three-rank grammar 13/12/11 | this MASTER §5 | LOCKED · no shared component; each page draws it |
 
@@ -3689,8 +3689,8 @@ complete rules, the sample-data boundary and the deviations from the reference p
 | Countdown | Canonical label11px/500/14px; white on dark Header, no badge fill; existing0×5px inset | Source; visible26d live5Oct |
 | Header Open/Close |32×32px each; text-arrow/×18px; action column64px above460px | Source |
 | Header colours | slate-12 background, white primary/countdown, slate-4 contacts, slate-11 dividers/hover; white2px focus outline with−2px offset | Approved source tokens |
-| Sales-fact disclosure | Padding10×12px; grid1fr/1.55fr/0.75fr; gap12px;1px top rule; label11px, value12px/17px weight500; label/value gap4px | Source |
-| Address disclosure | Padding8×12px; type12px;1px top rule; full-address icon gap6px; building/floor/lift group gap16px, top margin5px; fact internal gap5px | Source |
+| Sales-fact disclosure | Padding10×12px; SO grid1fr/1fr/1.55fr/0.75fr (two equal columns at≤440px); gap12px;1px top rule; label11px, value12px/17px weight500; label/value gap4px | Source |
+| Address disclosure | Padding8×12px; type12px;1px top rule; full-address icon gap6px; address left/access right150px, column gap12px; access group vertical gap4px, no top margin; stack at≤440px; fact internal gap5px | Source |
 | Module navigation | Horizontal inset10px;1px top/bottom rules; tabs12px with8×7px padding; selected underline2px, weight600 | Source |
 | Navigation disclosure icons |32×32px, padding8px; icon16px; active soft background/brand colour | Source |
 | Body | Padding10px; white surface | Source |
@@ -3751,10 +3751,13 @@ complete rules, the sample-data boundary and the deviations from the reference p
 
 **Shared Header colour — owner approved 2026-10-04:** use existing Radix slate-12 background, white primary text and countdown, slate-4 contact text, slate-11 dividers/hover. Countdown uses the existing label token (11px/500/14px), with no pale badge fill. Focus is visibly white inside the dark header. Only the identity Header changes; address details, tabs, summary and body stay light. Every CompactModuleCard consumer inherits this treatment; no per-module copy. This scoped approval does not decide the remaining card palette, font or radius.
 
+
+**Owner-confirmed SO template — 2026-10-05:** shared dark Header → address → sales facts → module tabs → module summary. Address stays visible by default in Info: full wrapping address left, access facts right (150px column, 12px gap); at card widths ≤440px access facts move below. Never truncate the address or reserve a fixed height. Sales facts follow in this exact order: **SO Doc Date / Proceed date / Sales Location / Salesperson**, label above value, four columns above440px and two at≤440px. SO Doc Date reads `placed_at`; Proceed date reads `proceed_date`, not the actual handoff `proceeded_at`. Missing Proceed date is `Not recorded`. Sales Location uses outlet name with dealer fallback; Dealer is not a duplicate display field. Info summary is **Total payable / Paid to date / Balance due**, matching the PDF. Remove the SO Info details panel, Email, Dealer, repeated Stock/Payment/Delivery status rows and Related documents. Item-level PO/stock and module-owned documents remain in their owning surfaces. Items, Communication and Timeline start closed. All chats must reuse `CompactModuleCard` and its `/ui#compact-card` example (including the long-address state); no copied preview HTML. Local actual-component checks passed at560/440/416/396/366px: address columns372+150/414/390/370/340px, sales facts four/two/two/two/two columns and no card overflow.
+
 In one line each: one shared customer header with sales facts behind a ▾/▴ (no words), address with
 its own toggle, target date, Open and Close; the source-owned SO number lazily opens the saved formal document; Info opens sales facts and address, other modules start
 closed; summary cells are label above value, left aligned, only the module's own facts (Info
-`Total · Paid · Balance due`, Delivery `Stock · Logistics · Customer · DO`, the Customer cell ruled by Delivery MASTER); title row, value
+`Total payable · Paid to date · Balance due`, Delivery `Stock · Logistics · Customer · DO`, the Customer cell ruled by Delivery MASTER); title row, value
 and optional status line are top aligned on common baselines with the ▾ at the right; values take the
 fewest lines, four at most; one editor at a time, folded on success, kept on failure, `Cancel` then
 `Save` at right; DO one condition per line; items, Communication and Timeline start closed; times show

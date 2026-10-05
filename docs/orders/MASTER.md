@@ -6790,9 +6790,8 @@ The acceptance matrix records current implementation and proof, not a new Bluepr
   name, SO, phone, independent sales/address expansion, source requested date plus Malaysia-day
   countdown, saved-version document, full-order door and Close. The visible SO document button owns
   initial focus; no hidden duplicate Close is focusable. Phone icon and number wrap together.
-  Info starts with sales/address open and Total/Paid/Balance due. Delivery starts with header
-  details closed and Stock/Logistics/Customer/DO. Items, Communication, Timeline and Info details
-  start closed. Info details owns Email, Dealer, Proceed Date, three statuses and document lineage;
+  Info starts with sales/address open and Total payable/Paid to date/Balance due. Delivery starts with header
+  details closed and Stock/Logistics/Customer/DO. Items, Communication and Timeline start closed. The SO Info details panel is removed; Email, Dealer, repeated statuses and document lineage are not shown in Info;
   Items owns only goods/services, Unit price, Qty, two-decimal Amount and source Stock Status.
   Services read Service for stock. Building type, Floor, named Lift and stair carry stay recorded
   facts; missing stair carry is Not recorded, never a fabricated0.
@@ -6949,3 +6948,5 @@ Remove the repeated Quantity/category and Services prose underneath that table; 
 are already visible in the rows. Payment transaction details and financial totals remain.
 
 **Confirmed card correction delivery — production verified 2026-10-05:** UI MASTER §4.3 owns shared Header, control skin/density, disclosures and current release proof (PR1893/1896/1897, production2ce91e2d). Orders owns the full-page Items and Payment rules above; MODULE-CARD-TEMPLATE is the only shared card contract. Real SO-1368 retains quantities1/1/2, totalRM2,759, paidRM1,380 and balanceRM1,379 after duplicate prose removal. Both Slip doors contain attachment icon + Slip. This is scoped presentation delivery, not whole Sales Order business/module completion or universal other-module adoption.
+
+**Owner-confirmed SO template — 2026-10-05:** shared dark Header → address → sales facts → module tabs → module summary. Address stays visible by default in Info: full wrapping address left, access facts right (150px column, 12px gap); at card widths ≤440px access facts move below. Never truncate the address or reserve a fixed height. Sales facts follow in this exact order: **SO Doc Date / Proceed date / Sales Location / Salesperson**, label above value, four columns above440px and two at≤440px. SO Doc Date reads `placed_at`; Proceed date reads `proceed_date`, not the actual handoff `proceeded_at`. Missing Proceed date is `Not recorded`. Sales Location uses outlet name with dealer fallback; Dealer is not a duplicate display field. Info summary is **Total payable / Paid to date / Balance due**, matching the PDF. Remove the SO Info details panel, Email, Dealer, repeated Stock/Payment/Delivery status rows and Related documents. Item-level PO/stock and module-owned documents remain in their owning surfaces. Items, Communication and Timeline start closed. All chats must reuse `CompactModuleCard` and its `/ui#compact-card` example; no copied preview HTML.

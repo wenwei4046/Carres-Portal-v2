@@ -23,6 +23,7 @@ export default function SoBatchCompactView({ row, status, supplier, safetyDays, 
     name={row.customer ?? "Not recorded"} reference={row.so == null ? "Not recorded" : `SO-${row.so}`}
     phone={order?.customer_phone ?? unavailable}
     sales={{ orderDate: order?.placed_at ? fmtDate(order.placed_at) : unavailable,
+      proceedDate: order?.proceed_date ? fmtDate(order.proceed_date) : unavailable,
       salesLocation: order ? salesLocationOf(order) || "Not recorded" : unavailable,
       salesperson: order?.salespersons?.name ?? unavailable }}
     address={{ area: [row.deliveryCity, row.deliveryState].filter(Boolean).join(", ") || "Not recorded",

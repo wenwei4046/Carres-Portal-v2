@@ -21,12 +21,12 @@ geometry, text and styles, and must report **no unexplained difference**.
   opens the sales facts (no `Order info` words); address with its own toggle (▴ while open); target
   date (`d Mon`) with the signed calendar-day countdown from Malaysia today (`27d`); Open and Close.
   The phone glyph and number form one wrapping unit. The header grows with a long name; nothing overlaps.
-- **Sales facts:** `Order date` · `Sales Location` · `Salesperson`, label above value.
+- **Sales facts:** `SO Doc Date` · `Proceed date` · `Sales Location` · `Salesperson`, label above value.
 - **Info opens sales facts and address; every other module starts with both closed.** Switching module
   applies that module's default and closes items and editors.
 - **Summary cells:** title row, value, optional status line — top aligned on common baselines, left
   aligned, ▾ at the right of the title row for a fact with an editor. Each module shows only its own
-  facts: Info `Total · Paid · Balance due`; Delivery `Stock · Logistics · Customer · DO`.
+  facts: Info `Total payable · Paid to date · Balance due`; Delivery `Stock · Logistics · Customer · DO`.
 - **Stock:** value `{ready}/{goods}`, status `Ready` on its own line; only goods count. Service lines
   are not goods: the item list reads `Service`, never a dash.
 - **Logistics:** empty value `Not assigned`.
@@ -41,10 +41,7 @@ geometry, text and styles, and must report **no unexplained difference**.
   stamp — the Timeline records who recorded it. Logistics contacts the customer; Operation may record
   Logistics' reply, and the Timeline names Operation only as the recorder.
 - **DO:** read-only conditions, one per line; no manual tick, no repeated explanation.
-- **Items contains goods and services only.** Info uses its separate `Info · Order details` disclosure
-  for Email, Dealer, Proceed Date, statuses and related documents; it starts closed. The requested
-  date stays in the shared Header. The compact goods table includes Unit price and Amount with two
-  decimal places, and service Stock Status reads `Service`. The shared Register expansion is unchanged.
+- **Items contains goods and services only.** SO Info has no separate details panel: remove Email, Dealer, repeated Stock/Payment/Delivery statuses and Related documents. Documents belong to their owning module; PO belongs with its item.
 - **Items, Communication and Timeline start closed.** Times show without a zone suffix
   (`30 Sep · 4:08 PM`); the full instant stays in the element; a date-only source shows the date and
   `Time unavailable`.
@@ -55,7 +52,7 @@ geometry, text and styles, and must report **no unexplained difference**.
 ## What the /ui example is — and is not
 
 It is a **UI example**. SO-1368 order facts (customer, order date, Sales Location, Salesperson,
-Total/Paid/Balance due, the payment at 2026-09-30T08:08:32Z, receipt RC-300926-3735) are the verified
+Total payable/Paid to date/Balance due, the payment at 2026-09-30T08:08:32Z, receipt RC-300926-3735) are the verified
 handoff sample. Stock `1/1 Ready` is a layout sample. Any Customer date or Logistics company saved on
 /ui exists only in that browser tab: **nothing is written to the ERP**, and it is not an order fact.
 `Preview: next save fails` is a /ui control that simulates a failed save. The header ↗ opens the existing Sales Order page. × closes the card.
@@ -69,10 +66,7 @@ HTML/CSS. The SO number lazily opens the Orders endpoint’s current saved-versi
 `SalesOrderCardDocument` / `PdfPreview`; ↗ opens the full order and its existing deliberate Edit gate.
 The shared Drawer `compact-card` variant supplies focus containment, Escape, background scroll lock
 and return focus with an accessible hidden title; visible identity and Close belong to this card.
-Info and Delivery retain their defaults. Email, Dealer, Proceed Date, payment/receipt/delivery status
-and related documents remain in the separate Info details disclosure; Items contains only goods and
-services. Address keeps the recorded building type, Floor, Lift and stair carry facts, with named
-unknowns rather than fabricated zero values. No sample dates, stock quantities or customer details become live facts.
+Info opens address and sales facts; Delivery starts with them collapsed. Items contains goods/services only. Missing facts remain unknowns rather than fabricated zero values. No sample dates, stock quantities or customer details become live facts.
 Delivery reads the existing Monitor projection for the final receiver; goods exclude services. Missing
 or failed reads stay explicit. Customer date and optional time remain separate from crew ETA.
 Existing Delivery-owned `DeliveryDatesEdit` / `LogisticsDetailsEdit` forms are reused through their
@@ -169,3 +163,5 @@ Orders. `referenceStatus` places an exceptional document state below its referen
 header tokens (`Cancelled` for a voided GRN); normal receipts omit it. When address and target
 are both absent, their empty header slots collapse; Sales Order geometry is unchanged. Receipt quantities and
 evidence come from Receiving; the existing full-page object owns PDF, amendment and void actions.
+
+**Owner-confirmed SO template — 2026-10-05:** shared dark Header → address → sales facts → module tabs → module summary. Address stays visible by default in Info: full wrapping address left, access facts right (150px column, 12px gap); at card widths ≤440px access facts move below. Never truncate the address or reserve a fixed height. Sales facts follow in this exact order: **SO Doc Date / Proceed date / Sales Location / Salesperson**, label above value, four columns above440px and two at≤440px. SO Doc Date reads `placed_at`; Proceed date reads `proceed_date`, not the actual handoff `proceeded_at`. Missing Proceed date is `Not recorded`. Sales Location uses outlet name with dealer fallback; Dealer is not a duplicate display field. Info summary is **Total payable / Paid to date / Balance due**, matching the PDF. Remove the SO Info details panel, Email, Dealer, repeated Stock/Payment/Delivery status rows and Related documents. Item-level PO/stock and module-owned documents remain in their owning surfaces. Items, Communication and Timeline start closed. All chats must reuse `CompactModuleCard` and its `/ui#compact-card` example; no copied preview HTML.

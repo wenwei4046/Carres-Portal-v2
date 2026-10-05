@@ -59,7 +59,7 @@ import {
 } from "@carres/shared";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
-import { useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
+import { useQueryClient, type QueryClient } from "@tanstack/react-query";
 import {
   DataGrid,
   type DataGridColumn,
@@ -82,8 +82,6 @@ import {
   useCatalog,
   useMonthlyDemandFacts,
   useSalesOrderRegisterFacts,
-  useOrderPayments,
-  useOrderServiceCases,
   useOperationOrders,
   useSalesOrderExpansion,
 } from "@/lib/queries";
@@ -555,21 +553,6 @@ function RailFieldWords({ label }: { label: string }) {
   return <p className="px-2 pt-1 text-meta text-kit-slate-11">{label}</p>;
 }
 
-function RelatedDocuments({ row }: { row: RegisterRow }) {
-  const navigate = useNavigate();
-  const payments = useOrderPayments(row.id);
-  const cases = useOrderServiceCases(row.id);
-  const refunds = useQuery({ queryKey: ["operation", "orders", row.id, "refunds"], queryFn: () => apiFetch<{ refunds: Array<{ id: string; status: string }> }>(`/api/operation/orders/${row.id}/refunds`) });
-  const link = (label: string, path: string) => <button key={label} type="button" className="text-left text-kit-blue-11 hover:underline" onClick={() => navigate(path)}>{label}</button>;
-  return <Block title="Related documents"><dl className="grid grid-cols-2 gap-3 text-body">
-    <div><dt>PO No</dt><dd className="flex flex-col">{row.poNumbers.length ? row.poNumbers.map(no => link(no, `/operation/procurement?po=${encodeURIComponent(no)}`)) : "No PO yet"}</dd></div>
-    <div><dt>DO No</dt><dd className="flex flex-col">{row.deliveryOrders.length ? row.deliveryOrders.map(doc => link(doc.do_number, `/operation/delivery-orders/${encodeURIComponent(doc.do_number)}`)) : "No DO yet"}</dd></div>
-    <div><dt>Invoice No</dt><dd>{row.o.invoice_no || "Not recorded"}</dd></div>
-    <div><dt>Receipt No</dt><dd className="flex flex-col">{payments.isError ? "Unable to read receipts" : !payments.data ? "Loading…" : payments.data.payments.filter(p => p.receipt_no).map(p => <span key={p.id}>{p.receipt_no}{p.voided_at ? " · Voided" : ""}</span>).length ? payments.data.payments.filter(p => p.receipt_no).map(p => <span key={p.id}>{p.receipt_no}{p.voided_at ? " · Voided" : ""}</span>) : "No receipt yet"}</dd></div>
-    <div><dt>Refund</dt><dd>{refunds.isError ? "Unable to read refunds" : !refunds.data ? "Loading…" : refunds.data.refunds.length ? refunds.data.refunds.map(r => <div key={r.id}>Refund · {r.status} · No document number recorded</div>) : "No refund"}</dd></div>
-    <div><dt>Service Case No</dt><dd className="flex flex-col">{cases.isError ? "Unable to read service cases" : !cases.data ? "Loading…" : cases.data.items.length ? cases.data.items.map(c => link(`${c.caseNo} · ${c.statusLabel ?? (c.statusIsClosed ? "Closed" : "Open")}`, `/operation?tab=service-notes&case=${encodeURIComponent(c.id)}`)) : "No service case"}</dd></div>
-  </dl></Block>;
-}
 
 function ExpandedLines({ row, inspection = false, compact = false }: { row: RegisterRow; inspection?: boolean; compact?: boolean }) {
   const lines = row.o.order_lines ?? [];
@@ -1247,11 +1230,7 @@ export default function SalesOrdersRegister() {
     <div className="flex h-full min-h-0 flex-col">
       <DestinationHeader />
       {quickOrder && <Drawer variant="compact-card" open onOpenChange={(open) => { if (!open) setQuickOrder(null); }} title={`SO-${quickOrder.so} · ${quickOrder.customer}`}>
-        <SalesOrderCompactView row={quickOrder} salesLocation={salesLocationOf(quickOrder.o)} items={<div className="min-w-0 overflow-x-auto"><ExpandedLines row={quickOrder} compact /></div>} documents={<RelatedDocuments row={quickOrder} />} statuses={<dl className="flex flex-col gap-3 text-body">{[
-          ["Stock Status", STOCK_STATUSES.find(status => status.key === stockStatusOf(quickOrder))!.label],
-          ["Payment Status", PAYMENT_STATUSES.find(status => status.key === paymentStatusOf(quickOrder))!.label],
-          ["Delivery Status", REGISTER_DELIVERY_CONDITIONS.find(status => status.key === registerDeliveryConditionOf(quickOrder.o.order_lines ?? [], quickOrder.o.allocated_units ?? []))?.label ?? "Not recorded"],
-        ].map(([label, value]) => <div key={label} className="flex justify-between"><dt>{label}</dt><dd><StatusPill tone={salesOrderStatusTone(value)}>{value}</StatusPill></dd></div>)}</dl>} onOpen={() => openWorkspace(quickOrder)} onClose={() => setQuickOrder(null)} />
+        <SalesOrderCompactView row={quickOrder} salesLocation={salesLocationOf(quickOrder.o)} items={<div className="min-w-0 overflow-x-auto"><ExpandedLines row={quickOrder} compact /></div>} onOpen={() => openWorkspace(quickOrder)} onClose={() => setQuickOrder(null)} />
       </Drawer>}
       {goodsTarget && <Drawer open onOpenChange={(open) => { if (!open) setGoodsTarget(null); }} title={`SO-${goodsTarget.so} · Items`}>
         <div className="min-w-0 max-w-full overflow-x-auto"><ExpandedLines row={goodsTarget} inspection /></div>

@@ -17,8 +17,8 @@ import { chaseMessageFor } from "../delivery-chase";
 import { useGoodsName } from "../work/goods-name";
 import type { RegisterRow } from "../sales-order-columns";
 
-export default function SalesOrderCompactView({ row, salesLocation, items, documents, statuses, onOpen, onClose }: {
-  row: RegisterRow; salesLocation: string; items: ReactNode; documents: ReactNode; statuses: ReactNode; onOpen: () => void; onClose: () => void;
+export default function SalesOrderCompactView({ row, salesLocation, items, onOpen, onClose }: {
+  row: RegisterRow; salesLocation: string; items: ReactNode; onOpen: () => void; onClose: () => void;
 }) {
   // Customer is only the final receiver, never an intermediate warehouse.
   const leg = Math.max(0, ...(row.o.delivery_stops ?? []).map(stop => stop.leg));
@@ -63,16 +63,10 @@ export default function SalesOrderCompactView({ row, salesLocation, items, docum
   // The same approved Delivery message as its Monitor; templates are drafts, never confirmation.
   const detailsTemplate = { key: "details", label: "Delivery details", body: chaseMessageFor({ reference, customer: row.customer, address: row.o.customer_address || null, building: row.o.building_type || null, goods: goodsLines.map(line => `${line.qty}× ${line.sku}`), requestedDate: row.customerDelivery ? fmtDate(row.customerDelivery) : null }) };
   const deliveryCommunication = card?.logisticsPartnerId && card.logisticsPartnerName ? { recipients: [{ value: card.logisticsPartnerName, label: card.logisticsPartnerName, whatsappUrl: partner?.whatsapp_group_url || undefined }], templates: deliveryTemplates.length ? deliveryTemplates : [detailsTemplate] } : null;
-  const details = <div className="flex flex-col gap-3"><dl className="grid grid-cols-2 gap-3 text-body">
-    <div><dt>Email</dt><dd className="break-words">{row.o.customer_email || "Not given"}</dd></div>
-    <div><dt>Dealer</dt><dd>{row.o.dealers?.name || "Not recorded"}</dd></div>
-    <div><dt>Proceed Date</dt><dd>{row.proceeded ? fmtDate(row.proceeded) : "Not recorded"}</dd></div>
-
-  </dl>{statuses}{documents}</div>;
   return <div data-testid="sales-order-quick-view"><CompactModuleCard
     key={row.id} name={row.customer} reference={`SO-${row.so}`} phone={row.phone}
     document={{ label: `Sales Order SO-${row.so}`, preview: (onClose) => <SalesOrderCardDocument orderId={row.id} reference={`SO-${row.so}`} onClose={onClose} /> }}
-    sales={{ orderDate: fmtDate(row.ordered), salesLocation, salesperson: row.o.salespersons?.name ?? "Not recorded" }}
+    sales={{ orderDate: fmtDate(row.ordered), proceedDate: row.o.proceed_date ? fmtDate(row.o.proceed_date) : "Not recorded", salesLocation, salesperson: row.o.salespersons?.name ?? "Not recorded" }}
     address={{ area: row.deliveryLocation || "Not recorded", full: row.o.customer_address || "Not recorded", facts: [
       { kind: "building", label: "Building type", value: row.o.building_type || "Building type: Not recorded" },
       { kind: "building", label: "Floor", value: row.o.delivery_floor == null ? "Floor: Not recorded" : `Floor ${row.o.delivery_floor}` },
@@ -82,7 +76,7 @@ export default function SalesOrderCompactView({ row, salesLocation, items, docum
     target={row.customerDelivery ? { date: fmtDateShort(row.customerDelivery), badge: `${Math.round((Date.parse(row.customerDelivery.slice(0, 10)) - Date.parse(appTodayIso())) / 86400000)}d` } : undefined}
     closeLabel="Close order" openLabel="Open full page" onOpen={onOpen} onClose={onClose}
     initialModule="info" modules={[
-      { key: "info", label: "Info", opensHeaderDetails: true, summary: [{ key: "total", label: "Total", value: money(row.total) }, { key: "paid", label: "Paid", value: money(row.paid) }, { key: "outstanding", label: "Balance due", value: money(row.balance) }], items, details },
+      { key: "info", label: "Info", opensHeaderDetails: true, summary: [{ key: "total", label: "Total payable", value: money(row.total) }, { key: "paid", label: "Paid to date", value: money(row.paid) }, { key: "outstanding", label: "Balance due", value: money(row.balance) }], items },
       { key: "delivery", label: "Delivery", summary: [stock, logistics, customer, doFact], items, communication: deliveryCommunication },
     ]}
     communication={{ recipients: [{ value: row.phone, label: row.customer, phone: row.phone }], templates: customerTemplates }}

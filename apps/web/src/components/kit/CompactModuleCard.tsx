@@ -44,7 +44,8 @@ function Glyph({ name }: { name: keyof typeof GLYPH }) {
 /* ---------- words: the owner-confirmed reference copy ---------- */
 export const CARD_WORDS = {
   orderDetails: "Order details",
-  orderDate: "Order date",
+  orderDate: "SO Doc Date",
+  proceedDate: "Proceed date",
   salesLocation: "Sales Location",
   salesperson: "Salesperson",
   address: "Delivery address",
@@ -208,7 +209,7 @@ export interface CompactModuleCardProps {
   /** Optional source-owned read-only document. Mounted only after the number is opened. */
   document?: { label: string; preview: (onClose: () => void) => ReactNode };
   phone?: string;
-  sales?: { orderDate: string; salesLocation: string; salesperson: string };
+  sales?: { orderDate: string; proceedDate?: string; salesLocation: string; salesperson: string };
   address?: { area: string; full: string; facts?: { kind: "building" | "access"; label: string; value: string }[] };
   target?: { date: string; badge?: string };
   openLabel?: string;
@@ -300,16 +301,9 @@ export default function CompactModuleCard(p: CompactModuleCardProps) {
             <button type="button" aria-label={p.closeLabel ?? "Close panel"} title={p.closeLabel ?? "Close panel"} onClick={p.onClose}>×</button>
           </div>
         </header>
-        {p.sales && sales ? (
-          <div id={`${ids}-sales`} className={s.salesGrid}>
-            <div className={s.salesFact}><span className={s.salesLabel}>{CARD_WORDS.orderDate}</span><strong>{p.sales.orderDate}</strong></div>
-            <div className={s.salesFact}><span className={s.salesLabel}>{CARD_WORDS.salesLocation}</span><strong>{p.sales.salesLocation}</strong></div>
-            <div className={s.salesFact}><span className={s.salesLabel}>{CARD_WORDS.salesperson}</span><strong>{p.sales.salesperson}</strong></div>
-          </div>
-        ) : null}
         {p.address && address ? (
           <div className={s.addressDetail}>
-            <div className={s.fullAddress}><Glyph name="addressPin" />{p.address.full}</div>
+            <div className={s.fullAddress}><Glyph name="addressPin" /><span>{p.address.full}</span></div>
             {p.address.facts?.length ? (
               <div className={s.locationFacts}>
                 {p.address.facts.map((f) => (
@@ -317,6 +311,14 @@ export default function CompactModuleCard(p: CompactModuleCardProps) {
                 ))}
               </div>
             ) : null}
+          </div>
+        ) : null}
+        {p.sales && sales ? (
+          <div id={`${ids}-sales`} className={`${s.salesGrid} ${p.sales.proceedDate !== undefined ? s.salesGridFour : ""}`}>
+            <div className={s.salesFact}><span className={s.salesLabel}>{CARD_WORDS.orderDate}</span><strong>{p.sales.orderDate}</strong></div>
+            {p.sales.proceedDate !== undefined ? <div className={s.salesFact}><span className={s.salesLabel}>{CARD_WORDS.proceedDate}</span><strong>{p.sales.proceedDate}</strong></div> : null}
+            <div className={s.salesFact}><span className={s.salesLabel}>{CARD_WORDS.salesLocation}</span><strong>{p.sales.salesLocation}</strong></div>
+            <div className={s.salesFact}><span className={s.salesLabel}>{CARD_WORDS.salesperson}</span><strong>{p.sales.salesperson}</strong></div>
           </div>
         ) : null}
         <nav className={s.moduleNav} aria-label={p.modulesLabel ?? CARD_WORDS.modules}>

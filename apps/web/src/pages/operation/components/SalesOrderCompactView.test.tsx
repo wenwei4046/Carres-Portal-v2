@@ -13,15 +13,30 @@ vi.mock("../delivery-scope-card", () => ({ useDeliveryScopeCard: (_id: string, l
 vi.mock("@/lib/queries", () => ({ useCatalog: () => ({ data: { models: [], skus: [] } }), useDeliverySettings: () => ({ data: { templates: state.templates } }), useDeliveryPartners: () => ({ data: { partners: [] } }), useOrderTimeline: () => ({ data: [{ id: "event", actor_name: "Recorder", kind: "annotation", content: "Saved note", occurred_at: "2026-09-30T08:08:32Z" }] }) }));
 vi.mock("./SalesOrderCardDocument", () => ({ default: () => <div>Saved document</div> }));
 vi.mock("./DeliveryBrief", () => ({ DeliveryDatesEdit: ({ onDone }: { onDone: () => void }) => <button onClick={onDone}>Date editor</button>, LogisticsDetailsEdit: ({ onDone }: { onDone: () => void }) => <button onClick={onDone}>Logistics editor</button> }));
-const row = buildRegisterRow({ id: "o", so: 1303, customer_name: "Kimmy", customer_phone: "0191234567", customer_email: "a@example.com", customer_address: "Recorded address", placed_at: "2026-09-30T08:00:00Z", delivery_date: "2026-10-31", proceeded_at: "2026-10-01T08:00:00Z", dealers: { name: "Recorded dealer" }, order_lines: [{ sku: "M", qty: 1, unit_price: 2499 }], paid: 1250 } as operationOrderListRow);
-function mount(source = row) { return render(<SalesOrderCompactView row={source} salesLocation="Recorded location" items={<div>Actual Items</div>} documents={<div>Related documents</div>} statuses={<div>Receipt unconfirmed</div>} onOpen={vi.fn()} onClose={vi.fn()} />); }
+const row = buildRegisterRow({ id: "o", so: 1303, customer_name: "Kimmy", customer_phone: "0191234567", customer_email: "a@example.com", customer_address: "Recorded address", placed_at: "2026-09-30T08:00:00Z", delivery_date: "2026-10-31", proceeded_at: "2026-10-01T08:00:00Z", proceed_date: "2026-10-02", dealers: { name: "Recorded dealer" }, order_lines: [{ sku: "M", qty: 1, unit_price: 2499 }], paid: 1250 } as operationOrderListRow);
+function mount(source = row) { return render(<SalesOrderCompactView row={source} salesLocation="Recorded location" items={<div>Actual Items</div>} onOpen={vi.fn()} onClose={vi.fn()} />); }
 beforeEach(() => { state.templates = []; state.paymentTemplates = []; state.role = "operation"; state.failed = false; state.loading = false; state.card = { leg: 0, items: [{ qty: 1 }], extras: [{ kind: "service", qty: 4 }], readiness: { shortQty: 0, ready: true }, confirmedDate: "2026-10-31", confirmedTime: null, logisticsPartnerId: "nets", logisticsPartnerName: "NETS", payment: { line1: "Paid" }, settled: false, doNumber: null } as unknown as DeliveryMonitorCard; });
 afterEach(cleanup);
 describe("real SO card", () => {
-  it("keeps saved documents lazy, Info defaults and all former facts reachable", () => {
+  it("keeps documents lazy and the confirmed lean Info template", () => {
     mount(); expect(screen.getByText("Recorded address")).toBeVisible(); expect(screen.getByText("Recorded location")).toBeVisible(); expect(screen.queryByText("Saved document")).toBeNull(); expect(screen.queryByText("Actual Items")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Sales Order SO-1303" })); expect(screen.getByText("Saved document")).toBeVisible();
-    fireEvent.click(screen.getByRole("button", { name: "Items" })); expect(screen.getByText("Actual Items")).toBeVisible(); expect(screen.queryByText("a@example.com")).toBeNull(); fireEvent.click(screen.getByRole("button", { name: "Info · Order details" })); expect(screen.getByText("a@example.com")).toBeVisible(); expect(screen.getByText("Recorded dealer")).toBeVisible(); expect(screen.getByText("Related documents")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Items" })); expect(screen.getByText("Actual Items")).toBeVisible(); expect(screen.queryByText("a@example.com")).toBeNull(); expect(screen.queryByRole("button", { name: "Info · Order details" })).toBeNull(); expect(screen.queryByText("Recorded dealer")).toBeNull(); expect(screen.queryByText("Related documents")).toBeNull(); expect(screen.getByText("Total payable")).toBeVisible(); expect(screen.getByText("Paid to date")).toBeVisible(); expect(screen.getByText("Fri, 2 Oct")).toBeVisible();
+  });
+  it("orders address before sales facts and uses the planned Proceed date, not the handoff stamp", () => {
+    mount();
+    const address = screen.getByText("Recorded address");
+    const docDate = screen.getByText("SO Doc Date");
+    const proceed = screen.getByText("Proceed date");
+    const location = screen.getByText("Sales Location");
+    expect(address.compareDocumentPosition(docDate) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(docDate.compareDocumentPosition(proceed) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(proceed.compareDocumentPosition(location) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByText("Fri, 2 Oct")).toBeVisible();
+    expect(screen.queryByText("Thu, 1 Oct")).toBeNull();
+    expect(screen.queryByText("Stock Status")).toBeNull();
+    expect(screen.queryByText("Payment Status")).toBeNull();
+    expect(screen.queryByText("Delivery Status")).toBeNull();
   });
   it("uses real goods only, date-only precision, one formal editor and read-only DO", () => {
     mount(); fireEvent.click(screen.getByRole("button", { name: "Delivery" })); expect(screen.queryByText("Recorded address")).toBeNull(); expect(screen.getByText("1/1")).toBeVisible(); expect(screen.getAllByText("31 Oct")).toHaveLength(2); expect(screen.getByText("Date confirmed")).toBeVisible();
