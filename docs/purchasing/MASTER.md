@@ -2615,6 +2615,14 @@ Fixture-walked in the real portal shell; the authenticated production walk is re
   registry, the registry names the convergence it owes; closing it is this page's own round.
   Customer, Supplier, Delivery Location and Deliver To never ellipsise: a long value takes an inline
   second line, so the full value is readable by keyboard and touch with no hover title.
+  **Width convergence — owner-approved 2026-10-05; implemented on release branch,
+  production verification pending.** SO Batch parent definitions now reference the existing
+  `REGISTER_FIELD_WIDTH` entries for Proceed Date, SO No, PO Safety Days, Customer Requested
+  Delivery Date, Customer Delivery Location, Customer, Items, Supplier, Supplier Deliver To,
+  PO No and PO Delivery Date. Existing header minimums, wrapping, facts, export readers and
+  `carres.soBatchPurchase.register.v7` remain unchanged; valid saved personal widths still win,
+  and Reset columns restores registry defaults. Registry values and shared behavior are unchanged.
+  This closes only width-reference drift; destination and Safety Days drafts remain unreleased.
 - **R8 · Issue workspace.** `Back to buying` returns to the SAME Register — it stays mounted and
   hidden behind the workspace, keeping search, rail filters, open groups, ticks and scroll offset,
   and the list is re-read so a line bought meanwhile drops its tick. `Esc` closes only transient

@@ -858,7 +858,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
            actual hand-off to Operations, `orders.proceeded_at`. */
         key: "proceededAt",
         label: W.colProceedDate,
-        width: 120, minWidth: 118,
+        width: REGISTER_FIELD_WIDTH.date, minWidth: 118,
         sortable: true,
         chooserGroup: "Order",
         accessor: (o) => (
@@ -876,7 +876,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
            loses WHICH record a row is (Card §9). */
         key: "soNo",
         label: W.colSoNo,
-        width: 90, minWidth: 80,
+        width: REGISTER_FIELD_WIDTH.soNo, minWidth: 80,
         sortable: true,
         chooserGroup: "Order",
         accessor: (o) => (
@@ -931,7 +931,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
         key: "poSafetyDays",
         label: W.colPoSafetyDays,
         headerLines: ["PO Safety", "Days"],
-        width: 120, minWidth: 104,
+        width: REGISTER_FIELD_WIDTH.poSafetyDays, minWidth: 104,
         sortable: true,
         chooserGroup: "Buying",
         accessor: (o) => {
@@ -980,7 +980,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
         key: "requestedDelivery",
         label: W.colRequestedDelivery,
         headerLines: ["Customer Requested", "Delivery Date"],
-        width: 144, minWidth: 118,
+        width: REGISTER_FIELD_WIDTH.customerRequestedDeliveryDate, minWidth: 118,
         sortable: true,
         chooserGroup: "Order",
         accessor: (o) => (
@@ -1007,7 +1007,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
         wrap: true,
         label: W.colDeliveryLocation,
         headerLines: ["Customer Delivery", "Location"],
-        width: 140, minWidth: 92,
+        width: REGISTER_FIELD_WIDTH.customerDeliveryLocation, minWidth: 92,
         sortable: true,
         chooserGroup: "Order",
         accessor: (o) => {
@@ -1027,7 +1027,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
         /* R7: the complete value is always on screen — a long value takes an inline second line, never an ellipsis behind a hover title. */
         wrap: true,
         label: W.colCustomer,
-        width: 136, minWidth: 100,
+        width: REGISTER_FIELD_WIDTH.customer, minWidth: 100,
         sortable: true,
         chooserGroup: "Order",
         accessor: (o) => (
@@ -1054,7 +1054,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
         key: "items",
         wrap: true,
         label: W.colItems,
-        width: 180, minWidth: 92,
+        width: REGISTER_FIELD_WIDTH.items, minWidth: 92,
         sortable: true,
         chooserGroup: "Order",
         accessor: (o) => (
@@ -1070,7 +1070,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
         /* R7: the complete value is always on screen — a long value takes an inline second line, never an ellipsis behind a hover title. */
         wrap: true,
         label: W.colSupplier,
-        width: 136, minWidth: 92,
+        width: REGISTER_FIELD_WIDTH.supplier, minWidth: 92,
         sortable: true,
         chooserGroup: "Buying",
         /* ⭐ A SUMMARY SAYS ONE THING (owner correction 2026-09-11). It used
@@ -1119,7 +1119,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
         /* R7: the complete value is always on screen — a long value takes an inline second line, never an ellipsis behind a hover title. */
         wrap: true,
         label: W.deliverTo,
-        width: 120, minWidth: 100,
+        width: REGISTER_FIELD_WIDTH.supplierDeliverTo, minWidth: 100,
         chooserGroup: "Buying",
         accessor: (o) => {
           const issued = soBatchCellSummary(
@@ -1144,7 +1144,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
       {
         key: "poNo",
         label: W.colPoNo,
-        width: 144, minWidth: 80,
+        width: REGISTER_FIELD_WIDTH.documentNo, minWidth: 80,
         sortable: true,
         chooserGroup: "Documents",
         /* ⭐ THE DOCUMENT COLUMN SAYS THERE IS NO DOCUMENT — once, and here.
@@ -1172,7 +1172,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
         key: "poDeliveryDate",
         label: W.colPoDeliveryDate,
         headerLines: ["PO", "Delivery Date"],
-        width: 120, minWidth: 110,
+        width: REGISTER_FIELD_WIDTH.poDefaultDeliveryDate, minWidth: 110,
         sortable: true,
         chooserGroup: "Documents",
         accessor: (o) => {
