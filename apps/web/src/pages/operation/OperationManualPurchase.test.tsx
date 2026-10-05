@@ -496,6 +496,21 @@ function pickDeliveryDate(dayOfMonth = 15) {
 }
 
 describe("the register — one request per row (card §7)", () => {
+  /* ONE ROW MENU — owner ruling 2026-10-05. A Manual Purchase Request has no
+     paper of its own, so its menu is `View` alone (plus `Open {PO}` after the
+     divider when it has exactly one PO); nothing fills the Print slot. */
+  it("the row menu reads View (no Print) and View opens the saved request", async () => {
+    seedDetail(false);
+    await loaded();
+    fireEvent.contextMenu(screen.getByTestId(`mp-row-${REQ1}`));
+    const menu = screen.getByRole("menu", { name: "Row actions" });
+    const words = within(menu).getAllByRole("menuitem").map((i) => i.textContent);
+    expect(words[0]).toBe("View");
+    expect(words).not.toContain("Print");
+    expect(words.slice(1).every((w) => /^Open /.test(w ?? ""))).toBe(true);
+    fireEvent.click(within(menu).getByRole("menuitem", { name: "View" }));
+    await screen.findByTestId("mp-detail");
+  });
   it("⭐ `MPR No` is the identity again — and a retired REQ number still never prints", async () => {
     await loaded();
     /* Owner ruling 2026-09-18, which OVERWRITES Card 08's 2026-09-04

@@ -4,6 +4,14 @@ import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 let useRealRegisterGrid = false;
+/* The stub grid keeps the page's last props so the row menu can be read for
+   rows the real grid draws collapsed (the Cancelled group). */
+let lastGridProps: any = null;
+const printPurchaseOrderSpy = vi.hoisted(() => vi.fn(async (_poId: string) => {}));
+vi.mock("../record-print", async () => {
+  const actual = await vi.importActual<typeof import("../record-print")>("../record-print");
+  return { ...actual, printPurchaseOrder: printPurchaseOrderSpy };
+});
 const navigate = vi.fn();
 /* The page's own doors are asserted, not React Router's: `useNavigate` is the
    one thing stubbed so a click can be read as the destination it asks for. */
@@ -151,6 +159,7 @@ const queryData = {
 vi.mock("@/components/register/DataGrid", async () => {
   const { DataGrid: RealDataGrid } = await vi.importActual<typeof import("@/components/register/DataGrid")>("@/components/register/DataGrid");
   return { DataGrid: (props: any) => {
+    lastGridProps = props;
     if (useRealRegisterGrid) return <RealDataGrid {...props} />;
     const { rows, columns, onRowDoubleClick, statusSummary, fixedGroups, leadingColumns, personalLayouts, activeConditions, expandable, toolbarEnd, renderResults, selectable, selectionPrimary, onFacetRowsChange } = props;
     useEffect(() => { onFacetRowsChange?.([...rows]); });
@@ -327,6 +336,35 @@ beforeEach(() => {
 /* ⭐ Purchasing MASTER §9.3 (Jess, 2026-09-17): nine columns, four groups,
    the SUPPLIER REPLY / RECEIVING / SUPPLIER / DELIVER TO rail and an ordered-goods category footer. */
 describe("Purchase Orders Register", () => {
+  /* ONE ROW MENU — owner ruling 2026-10-05: `View · Print`. */
+  it("the row menu reads View · Print; View opens the read-first PO page", async () => {
+    useRealRegisterGrid = true;
+    renderPage();
+    fireEvent.contextMenu(await screen.findByTestId("grid-row-PO-20260828-4827"));
+    const menu = screen.getByRole("menu", { name: "Row actions" });
+    expect(within(menu).getAllByRole("menuitem").map((i) => i.textContent)).toEqual(["View", "Print"]);
+    expect(within(menu).queryByRole("menuitem", { name: "Download official PDF" })).not.toBeInTheDocument();
+    fireEvent.click(within(menu).getByRole("menuitem", { name: "View" }));
+    expect(await screen.findByTestId("purchase-order-object")).toBeInTheDocument();
+    expect(screen.getByTestId("po-document-panes")).toHaveAttribute("data-layout", "50-50");
+    /* Read first: opening never enters a revise/issue edit. */
+    expect(screen.queryByTestId("po-document-split")).not.toBeInTheDocument();
+  });
+  it("Print opens the official PDF and records nothing", async () => {
+    useRealRegisterGrid = true;
+    printPurchaseOrderSpy.mockClear();
+    renderPage();
+    fireEvent.contextMenu(await screen.findByTestId("grid-row-PO-20260828-4827"));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Print" }));
+    expect(printPurchaseOrderSpy).toHaveBeenCalledWith("PO-20260828-4827");
+    expect(screen.queryByTestId("purchase-order-object")).not.toBeInTheDocument();
+  });
+  it("a cancelled PO has no paper, so its row menu offers View only", () => {
+    renderPage();
+    const cancelled = lastGridProps.rows.find((r: any) => r.id === "PO-LEGACY");
+    expect(cancelled).toBeTruthy();
+    expect(lastGridProps.contextMenu(cancelled).map((i: any) => i.label)).toEqual(["View"]);
+  });
   it("real shared grid settles facet membership and opens an actual PO object", async () => {
     useRealRegisterGrid = true;
     const errors = vi.spyOn(console, "error").mockImplementation(() => {});
