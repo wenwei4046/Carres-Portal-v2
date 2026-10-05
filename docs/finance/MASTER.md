@@ -126,7 +126,7 @@ Dealer commission rules:
   3. 「这个只是可能，暂时没有说每个dealer 不一样」. A rate per dealer can be kept; today no dealer differs.
   4. 「我是根据收到的钱给佣金，如果取消单没有退也要扣，但要做能toggle 决定」. Commission follows money received. A cancelled order's commission is taken back even when its money is not refunded, behind a switch Finance can turn.
   5. 「收到的钱的%」. The renovation rebate stays a rate of money received, up to its total.
-  6. 「每个月重新数，根据订单」. The 15-year guarantee KPI counts per month, from that month's orders.
+  6. 「每个月重新数，根据订单」, then 「暂时每个月算还是每年算我再决定」 (2026-10-05). The 15-year guarantee KPI counts from orders; whether the count restarts each month or each year is Chew's to decide later, so the period is a setting.
   7. 「这个确定，是根据订单的mattress 决定的」. A bundle's price is read from the order's mattress lines.
 - **Noted for later (Chew 2026-10-05).** A list's search box opens already typed-into, not behind a click. To change together with other UI items; first check whether it is the shared kit search.
 
