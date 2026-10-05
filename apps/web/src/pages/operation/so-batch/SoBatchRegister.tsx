@@ -988,7 +988,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
             {o.originalRequestedDeliveryDate ? (
               fmtDate(o.originalRequestedDeliveryDate)
             ) : (
-              <Absent>No delivery date yet</Absent>
+              <Absent>{NOT_RECORDED}</Absent>
             )}
           </span>
         ),
@@ -1545,15 +1545,15 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
               renderResults={presentation === "cards" ? visible => <div className="grid grid-cols-1 gap-3 p-3 xl:grid-cols-2" data-testid="so-batch-cards">
                 {visible.map(o => <div key={o.orderId} data-row-key={o.orderId}>{compactView(o)}</div>)}
               </div> : undefined}
-              toolbarEnd={<div className="flex min-w-0 flex-wrap items-center gap-2">
+              toolbarEnd={<div className={`${styles.toolbarTools} flex min-w-0 flex-wrap items-center gap-2`}>
                 {viewSwitch}
                 {stock.active ? <><Select id="round-stock-location" toolbar label="Stock Location" value={stock.location}
                   onValueChange={stock.setLocation} disabled={stock.busy} options={stock.locations} />
-                  <Button size="sm" disabled={stock.busy} onClick={stock.clear}>Cancel</Button></>
-                  : <Button size="sm" loading={stock.busy} disabled={isLoading || data.readyStockPriority == null} title={data.readyStockPriority == null ? "Not available" : undefined} onClick={() => {
+                  <Button disabled={stock.busy} onClick={stock.clear}>Cancel</Button></>
+                  : <Button loading={stock.busy} disabled={isLoading || data.readyStockPriority == null} title={data.readyStockPriority == null ? "Not available" : undefined} onClick={() => {
                     void stock.match(visibleOrders.current.filter(order => shown.some(row => row.orderId === order.orderId) && purchaseStatus(order) !== "Done"));
                   }}>Match Ready Stock</Button>}
-                {onOpenPurchaseOrders ? <Button size="sm" loading={purchaseOrdersLoading} disabled={isLoading} onClick={() => {
+                {onOpenPurchaseOrders ? <Button loading={purchaseOrdersLoading} disabled={isLoading} onClick={() => {
                 const visibleIds = new Set(shown.map(order => order.orderId));
                 onOpenPurchaseOrders([...new Set(visibleOrders.current.filter(order => visibleIds.has(order.orderId))
                   .flatMap(order => order.pos.map(po => po.poId)))]);

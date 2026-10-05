@@ -330,6 +330,12 @@ it("shows the original request while keeping purchasing planning facts separate"
   expect(screen.getByTestId("so-batch-requested-o1")).not.toHaveTextContent("Dec");
 });
 
+it("never substitutes the current request when original-date evidence is missing", () => {
+  renderRegister({ registerRows: [{ ...ORDER_O1, requestedDeliveryDate: "2026-12-01", originalRequestedDeliveryDate: null }] });
+  expect(screen.getByTestId("so-batch-requested-o1")).toHaveTextContent("Not recorded");
+  expect(screen.getByTestId("so-batch-requested-o1")).not.toHaveTextContent("Dec");
+});
+
 it("refuses manual whole-round matching when the persisted priority source is unavailable", () => {
   renderRegister({ readyStockPriority: null });
   expect(screen.getByRole("button", { name: "Match Ready Stock" })).toBeDisabled();

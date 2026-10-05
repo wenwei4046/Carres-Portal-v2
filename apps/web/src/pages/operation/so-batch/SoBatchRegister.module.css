@@ -41,7 +41,28 @@
   overflow: visible;
 }
 
-.page.page.page [data-testid="work-toolbar"] > div:has(> [data-kit="tabs"]) {
+.page .toolbarTools {
+  order: 3;
+  margin-left: auto;
   flex: 0 1 auto;
   max-width: 100%;
+}
+
+/* The shared row recipe is desktop32/touch40. The grid's canvas-based
+   checkbox hit area and wrap padding must not enlarge every desktop row. */
+@media (min-width: 768px) {
+  .page [data-row-height="32"] [data-testid^="so-batch-row-"] > td {
+    padding-block: 0;
+  }
+  .page [data-row-height="32"] [data-testid^="so-batch-row-"] > td > label {
+    height: 32px;
+  }
+}
+
+.page.page.page [data-testid="work-toolbar"] > div:last-child {
+  margin-left: auto;
+}
+@media (max-width: 767px) {
+  /* Reserve the shared40px touch Page tools control and its8px gap. */
+  .page .toolbarTools { max-width: calc(100% - 48px); }
 }

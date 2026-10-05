@@ -197,6 +197,12 @@ completion/sending, Safety Days, stock eligibility/reservation or multi-PO inter
 field-width delivery retains registry ownership. No live issue, supplier send, reservation or settings
 write is authorised for acceptance.
 
+**Measured local whole-shell evidence — 2026-10-05:** at1063×694,825×694 and390×694,
+the real OperationApp/SoBatchRegister fixture shows all toolbar controls within the listing,
+Search before Table/Cards, the right Page tools control and contained table scrolling. A single-line
+desktop row is32px; complete two-line facts naturally grow. The responsive rail retains its existing
+overlay/hide/show contract. This is seeded local evidence, not authenticated production acceptance.
+
 This BUILD mission is the complete approved SO Batch operating journey, not only its rail preview.
 The approved owner rulings carried by the Purchasing page-content review are persisted here for
 execution. Missing implementation does not reopen these decisions.
