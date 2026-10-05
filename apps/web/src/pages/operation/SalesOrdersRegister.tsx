@@ -57,6 +57,11 @@ import {
   monthlyDemandWindowOf,
   type MonthlyDemandCategory,
   type MonthlyDemandRow,
+  SALES_ORDER_STOCK_STATUSES,
+  STOCK_ISSUE_LEGEND,
+  lineKind,
+  stockIssueWord,
+  type SalesOrderStockStatus,
 } from "@carres/shared";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
@@ -67,6 +72,7 @@ import {
   type DataGridContextMenuItem,
 } from "@/components/register/DataGrid";
 import { documentRowMenu } from "@/components/register/row-menu";
+import { REGISTER_FIELD_WIDTH } from "@/components/register/register-field-widths";
 import Drawer from "@/components/kit/Drawer";
 import Block from "@/components/kit/Block";
 import Checkbox from "@/components/kit/Checkbox";
@@ -78,6 +84,7 @@ import SalesOrderReadFailure from "./SalesOrderReadFailure";
 import CancelSalesOrderDialog from "./CancelSalesOrderDialog";
 import { printSalesOrdersOrSay } from "./record-print";
 import Popover from "@/components/kit/Popover";
+import Tooltip from "@/components/kit/Tooltip";
 import { useAuth } from "@/lib/auth";
 import { appTodayIso, fmtMonth } from "@/lib/fmt-date";
 import {
@@ -188,7 +195,7 @@ function toGridColumn(
     sortable: true,
     defaultHidden: !defaultOnFor(f, role),
     chooserGroup: f.group,
-    accessor: (r) => ["stock_status", "delivery_status", "payment_status"].includes(f.key)
+    accessor: (r) => ["delivery_status", "payment_status"].includes(f.key)
       ? <StatusPill tone={salesOrderStatusTone(f.text(r))}>{f.text(r)}</StatusPill>
       : absenceAware(f.text(r)),
     searchValue: (r) => f.text(r),
@@ -417,30 +424,65 @@ const MONTHLY_PARAMS = ["start", "months", "dealer", "state", "city", "category"
    2026-09-22). Read-only FACT filters: none is a status or a work queue. */
 /* Requested delivery presets approved by the owner on 2026-10-01. */
 const LIST_PARAMS = ["dealer", "state", "city", "delivery", "completion", "obligations", "cases", "requested", "payment", "stock", "category"] as const;
-/** SO receipt, delivery and payment presentation; no business calculations. */
+/** SO delivery and payment presentation; no business calculations. */
 function salesOrderStatusTone(label: string): "success" | "info" | "warning" | "neutral" {
-  if (["Fully received", "Fully delivered", "Paid in full"].includes(label)) return "success";
-  if (["Partially received", "Partially delivered", "Partially paid"].includes(label)) return "info";
-  return label === "Received with issue" ? "warning" : "neutral";
+  if (["Fully delivered", "Paid in full"].includes(label)) return "success";
+  if (["Partially delivered", "Partially paid"].includes(label)) return "info";
+  return "neutral";
 }
 
-const STOCK_STATUSES = [
-  { key: "pending", label: "Awaiting receipt" },
-  { key: "partial", label: "Partially received" },
-  { key: "received", label: "Fully received" },
-  { key: "issue", label: "Received with issue" },
-  { key: "unknown", label: "Receipt unconfirmed" },
-] as const;
-function stockStatusOf(row: RegisterRow, sku?: string): string {
-  const facts = row.stockFacts;
-  const keys = [...new Set((row.o.order_lines ?? []).filter(line => !sku || line.sku === sku).map(line => line.sku))];
-  const values = keys.map(key => facts?.[key] ?? "unknown");
-  if (!values.length) return "unknown";
-  if (values.includes("issue")) return "issue";
-  if (values.includes("unknown")) return "unknown";
-  if (values.every(v => v === "received")) return "received";
-  if (values.some(v => v === "received" || v === "partial")) return "partial";
-  return "pending";
+/**
+ * ⭐ STOCK STATUS — ONE fact, ONE rule (owner-approved scope 2026-10-05;
+ * Orders MASTER § Stock Status). The server computes it with the shared
+ * `salesOrderStockOf` over the Order Route's own goods records; the column, the
+ * per-line pill in the items table, the `stock` filter and `Group by: Stock
+ * Status` all read it here and never re-derive it. A goods-free order is
+ * `Not applicable`. A fact not yet read prints `Loading…`; a failed read prints
+ * `Unavailable` — neither is a status, so neither enters a filter or a group.
+ */
+const STOCK_NOT_APPLICABLE = "Not applicable";
+const STOCK_UNREAD = "Unavailable";
+const STOCK_LOADING = "Loading…";
+type StockKey = SalesOrderStockStatus | "not_applicable";
+const STOCK_STATUSES: ReadonlyArray<{ key: StockKey; label: string }> = [
+  ...SALES_ORDER_STOCK_STATUSES.map(({ key, label }) => ({ key, label })),
+  { key: "not_applicable", label: STOCK_NOT_APPLICABLE },
+];
+function stockStatusOf(row: RegisterRow): StockKey | null {
+  if (!row.stockFact) return null;
+  return row.stockFact.status ?? "not_applicable";
+}
+/** The column's one string — filter, search, sort, group and export read it. */
+function stockStatusText(row: RegisterRow): string {
+  const key = stockStatusOf(row);
+  if (key) return STOCK_STATUSES.find((status) => status.key === key)!.label;
+  return row.stockFact === undefined ? STOCK_LOADING : STOCK_UNREAD;
+}
+/** Reading order for sort: To purchase → Ready, then the goods-free orders. */
+const stockRank = (row: RegisterRow) => {
+  const key = stockStatusOf(row);
+  return key ? STOCK_STATUSES.findIndex((status) => status.key === key) : STOCK_STATUSES.length;
+};
+
+/** The status pill with its legend, and — apart, never a fifth status — the
+ *  amber `{k} damaged or wrong` indicator. */
+function StockStatusView({ status, issueQty, absence }: { status: StockKey | null; issueQty: number; absence: string }) {
+  if (!status || status === "not_applicable") {
+    return <span className="text-kit-slate-11" data-absence="true">{status ? STOCK_NOT_APPLICABLE : absence}</span>;
+  }
+  const word = SALES_ORDER_STOCK_STATUSES.find((row) => row.key === status)!;
+  return (
+    <span className="inline-flex max-w-full items-center gap-1 whitespace-nowrap" data-testid="stock-status">
+      <Tooltip content={word.legend}>
+        <span className="inline-flex min-w-0"><StatusPill tone={word.tone}>{word.label}</StatusPill></span>
+      </Tooltip>
+      {issueQty > 0 && (
+        <Tooltip content={STOCK_ISSUE_LEGEND}>
+          <span className="inline-flex min-w-0"><StatusPill tone="warning">{stockIssueWord(issueQty)}</StatusPill></span>
+        </Tooltip>
+      )}
+    </span>
+  );
 }
 
 const PAYMENT_STATUSES = [
@@ -666,8 +708,19 @@ function ExpandedLines({ row, inspection = false, compact = false }: { row: Regi
     <thead className="sticky top-0 bg-kit-slate-3 text-label text-kit-slate-11"><tr><th className="p-2 text-left">Item</th><th className="p-2 text-right">Qty</th><th className="p-2 text-right">Unit price</th><th className="p-2 text-right">Amount</th><th className="p-2 text-left">Stock Status</th></tr></thead>
     <tbody>{miniLines.map((line, index) => {
       const source = index < lines.length ? lines[index] : addons[index - lines.length];
-      const stock = line.selectable === false ? "Service" : STOCK_STATUSES.find(status => status.key === stockStatusOf(row, line.sku))!.label;
-      return <tr key={line.key} className="border-b border-kit-slate-5"><td className="p-2">{line.item}{line.itemDetail && <div className="text-meta text-kit-slate-11">{line.itemDetail}</div>}</td><td className="p-2 text-right">{line.qty}</td><td className="p-2 text-right whitespace-nowrap">{source.unit_price == null ? "Not recorded" : Number(source.unit_price).toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td><td className="p-2 text-right whitespace-nowrap">{source.unit_price == null ? "Not recorded" : (Number(source.unit_price) * line.qty).toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td><td className="p-2"><StatusPill tone={salesOrderStatusTone(stock)}>{stock}</StatusPill></td></tr>;
+      /* The SAME fact, per line: the server's line status by the order line's
+         own id. A service is not goods; it reads `Service`. */
+      const goodsLine = index < lines.length ? lines[index] : null;
+      const service = line.selectable === false || (goodsLine != null && lineKind(goodsLine.sku) === "service");
+      const lineFact = goodsLine ? row.stockFact?.lines.find((fact) => fact.lineId === goodsLine.id) : undefined;
+      const stockCell = service
+        ? <StatusPill tone="neutral">Service</StatusPill>
+        : <StockStatusView
+            status={row.stockFact ? lineFact?.status ?? "not_applicable" : null}
+            issueQty={lineFact?.issueQty ?? 0}
+            absence={row.stockFact === undefined ? STOCK_LOADING : STOCK_UNREAD}
+          />;
+      return <tr key={line.key} className="border-b border-kit-slate-5"><td className="p-2">{line.item}{line.itemDetail && <div className="text-meta text-kit-slate-11">{line.itemDetail}</div>}</td><td className="p-2 text-right">{line.qty}</td><td className="p-2 text-right whitespace-nowrap">{source.unit_price == null ? "Not recorded" : Number(source.unit_price).toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td><td className="p-2 text-right whitespace-nowrap">{source.unit_price == null ? "Not recorded" : (Number(source.unit_price) * line.qty).toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td><td className="p-2">{stockCell}</td></tr>;
     })}</tbody>
   </table></div>;
   if (inspection) return <div className="space-y-3" data-testid="goods-side-inspection">
@@ -862,6 +915,9 @@ export default function SalesOrdersRegister() {
      and Service's own statuses); the list never guesses them. */
   const registerFactsQ = useSalesOrderRegisterFacts(!monthly);
   const registerFacts = registerFactsQ.data?.facts ?? null;
+  /* Stock Status's read: a failure is the band and `Unavailable`, never a
+     status (a refetch that fails keeps the facts already read). */
+  const stockFailed = (registerFactsQ.isError && !registerFactsQ.data) || Boolean(registerFactsQ.data?.failed.stock);
   /* A facet row clicked again is deselected (no Clear button in the rail). */
   const toggleParam = useCallback(
     (key: string, value: string) =>
@@ -928,10 +984,18 @@ export default function SalesOrdersRegister() {
            page served beside an OLDER Worker still shows no rental. */
         .filter((o) => !isRental(o))
         .map((o) =>
-          ({ ...buildRegisterRow(o, o.ops_delivery_orders ?? [], (sku) => catalogNames.get(skuKey(sku))?.name), stockFacts: registerFacts?.[o.id]?.stock }),
+          ({
+            ...buildRegisterRow(o, o.ops_delivery_orders ?? [], (sku) => catalogNames.get(skuKey(sku))?.name),
+            /* undefined = not read yet · null = could not be read · else the fact. */
+            stockFact: stockFailed ? null : registerFacts ? registerFacts[o.id]?.stock ?? null : undefined,
+          }),
         ),
-    [data, catalogNames, registerFacts],
+    [data, catalogNames, registerFacts, stockFailed],
   );
+
+  /* Grouping and the column filter take Stock Status only when every row has
+     its fact: a row that could not be read is never put in a status. */
+  const stockReadable = useMemo(() => all.every((row) => Boolean(row.stockFact)), [all]);
 
   const chooseListValues = useCallback((key: string, values: string[]) => writeParams(params => {
     params.delete(key); values.forEach(value => params.append(key,value));
@@ -1020,12 +1084,23 @@ export default function SalesOrdersRegister() {
   const quickOrder = quickOrderSnapshot ? all.find(row => row.id === quickOrderSnapshot.id) ?? quickOrderSnapshot : null;
   const columns = useMemo(
     () => [
-      { key: "stock_status", label: "Stock Status", width: REGISTER_FIELDS.find(f => f.key === "salesperson")!.width, group: "Operation" as const, on: true as const, text: (r: RegisterRow) => STOCK_STATUSES.find(status => status.key === stockStatusOf(r))!.label },
+      { key: "stock_status", label: "Stock Status", width: REGISTER_FIELD_WIDTH.stockStatus, group: "Operation" as const, on: true as const, text: stockStatusText, sortBy: stockRank },
       ...REGISTER_FIELDS.filter(f => f.key !== "delivery_location"),
       { key: "category", label: "Category", width: REGISTER_FIELDS.find(f => f.key === "items")!.width, group: "Items" as const, on: true as const, text: (r: RegisterRow) => [...new Set((r.o.order_lines ?? []).map(goodsCategoryOf))].join(" · ") || "Not recorded" },
       { key: "payment_status", label: "Payment Status", width: REGISTER_FIELDS.find(f => f.key === "salesperson")!.width, group: "Operation" as const, on: true as const, text: (r: RegisterRow) => PAYMENT_STATUSES.find(status => status.key === paymentStatusOf(r))!.label },
-    ].map((f) => toGridColumn(f, role, navigate, setGoodsTarget, setQuickOrder)),
-    [navigate, role],
+    ].map((f) => toGridColumn(f, role, navigate, setGoodsTarget, setQuickOrder))
+      /* Stock Status: the pill with its legend and the separate issue
+         indicator; its funnel exists only while every row has a fact. */
+      .map((column) => column.key !== "stock_status" ? column : {
+        ...column,
+        accessor: (r: RegisterRow) => (
+          <StockStatusView status={stockStatusOf(r)} issueQty={r.stockFact?.issueQty ?? 0} absence={stockStatusText(r)} />
+        ),
+        exportValue: (r: RegisterRow) =>
+          (r.stockFact?.issueQty ?? 0) > 0 ? `${stockStatusText(r)} · ${stockIssueWord(r.stockFact!.issueQty)}` : stockStatusText(r),
+        filterable: stockReadable,
+      }),
+    [navigate, role, stockReadable],
   );
   /* The version resets a SUPERSEDED default. v2 dropped Stage A's nine
      columns; v3 was the owner's eight (2026-08-15); v4 (owner ruling
@@ -1265,8 +1340,11 @@ export default function SalesOrdersRegister() {
             fixedGroups={urlParams.get("group") === "delivery" ? {
               groups: [...REGISTER_DELIVERY_CONDITIONS, { key: "not_applicable", label: "Not applicable" }],
               groupOf: row => registerDeliveryConditionOf(row.o.order_lines ?? [], row.o.allocated_units ?? []) ?? "not_applicable",
-            } : urlParams.get("group") === "stock" ? {
-              groups: STOCK_STATUSES.map(c => ({ key: c.key, label: c.label })), groupOf: stockStatusOf,
+            } : urlParams.get("group") === "stock" && stockReadable ? {
+              /* Only while every row has its fact: a row that could not be
+                 read is never filed under a status (the list stays flat and
+                 the band says why). */
+              groups: STOCK_STATUSES.map(c => ({ key: c.key, label: c.label })), groupOf: (row: RegisterRow) => stockStatusOf(row) ?? "not_applicable",
             } : urlParams.get("group") === "payment" ? {
               groups: PAYMENT_STATUSES.map(c => ({ key: c.key, label: c.label })), groupOf: paymentStatusOf,
             } : undefined}
@@ -1307,6 +1385,12 @@ export default function SalesOrdersRegister() {
             /* ONE kit error INSIDE the work surface: the toolbar — and New
                Sales Order with it — stays, because creating an order does not
                depend on the list loading. No raw transport message. */
+            warning={stockFailed ? (
+              <span className="flex min-w-0 items-center gap-2" data-testid="stock-status-unread">
+                <span>Stock Status could not be loaded.</span>
+                <Button variant="ghost" size="sm" onClick={() => void registerFactsQ.refetch()}>Try again</Button>
+              </span>
+            ) : undefined}
             errorState={
               isError ? (
                 <SalesOrderReadFailure

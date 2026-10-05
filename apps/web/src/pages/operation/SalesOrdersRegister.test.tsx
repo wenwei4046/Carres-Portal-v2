@@ -1638,17 +1638,27 @@ describe("the isolated shared-template pilot", () => {
 });
 
 
+/** A server Stock Status fact for one order whose only goods line is `line-1`. */
+const stockFact = (status: string | null, issueQty = 0) => ({
+  status,
+  requiredQty: status ? 2 : 0,
+  usableQty: 0,
+  purchasedQty: 0,
+  issueQty,
+  arrivedUnallocatedQty: 0,
+  lines: status ? [{ lineId: "line-1", sku: "B1201S-K", status, requiredQty: 2, usableQty: 0, purchasedQty: 0, issueQty, arrivedUnallocatedQty: 0 }] : [],
+});
+
 describe("approved solid SO status presentation", () => {
   it.each([
-    ["received", "Fully received", "success", 2, "Fully delivered", "success", 100, "Paid in full", "success"],
-    ["partial", "Partially received", "info", 1, "Partially delivered", "info", 40, "Partially paid", "info"],
-    ["pending", "Awaiting receipt", "neutral", 0, "Not delivered", "neutral", 0, "Unpaid", "neutral"],
-    ["issue", "Received with issue", "warning", 0, "Not delivered", "neutral", 0, "Unpaid", "neutral"],
-    ["unknown", "Receipt unconfirmed", "neutral", 0, "Not delivered", "neutral", 0, "Unpaid", "neutral"],
+    ["ready", "Ready", "success", 2, "Fully delivered", "success", 100, "Paid in full", "success"],
+    ["partially_ready", "Partially ready", "info", 1, "Partially delivered", "info", 40, "Partially paid", "info"],
+    ["awaiting_goods", "Awaiting goods", "neutral", 0, "Not delivered", "neutral", 0, "Unpaid", "neutral"],
+    ["to_purchase", "To purchase", "neutral", 0, "Not delivered", "neutral", 0, "Unpaid", "neutral"],
   ])("keeps %s status meaning and quick-view parity", async (stockKey, stockLabel, stockTone, sold, deliveryLabel, deliveryTone, paid, paymentLabel, paymentTone) => {
-    const source = order({ paid: Number(paid), order_lines: [{ sku: "B1201S-K", qty: 2, unit_price: 50 }], allocated_units: Number(sold) ? [{ sku: "B1201S-K", status: "sold", qty: Number(sold) }] : [] });
+    const source = order({ paid: Number(paid), order_lines: [{ id: "line-1", sku: "B1201S-K", qty: 2, unit_price: 50 }], allocated_units: Number(sold) ? [{ sku: "B1201S-K", status: "sold", qty: Number(sold) }] : [] });
     listHookState.data = { orders: [source] };
-    registerFactsState = { data: { facts: { [source.id]: { stock: { "B1201S-K": stockKey } } }, failed: {} } };
+    registerFactsState = { data: { facts: { [source.id]: { stock: stockFact(String(stockKey)) } }, failed: {} } };
     mount();
     const check = (root: HTMLElement, word: string, tone: string) => {
       const pills = [...root.querySelectorAll('[data-kit="status-pill"]')].filter(node => node.textContent === word);
@@ -1667,6 +1677,8 @@ describe("approved solid SO status presentation", () => {
     fireEvent.click(within(drawer).getByRole("button", { name: "Items" }));
     expect(within(drawer).queryByRole("button", { name: "Info · Order details" })).toBeNull();
     expect(within(drawer).getByRole("columnheader", { name: "Stock Status" })).toBeVisible();
+    /* The items table reads the SAME fact, per line. */
+    check(drawer, String(stockLabel), String(stockTone));
     expect(within(drawer).queryByText("Payment Status")).toBeNull();
     expect(within(drawer).queryByText("Delivery Status")).toBeNull();
     expect(within(drawer).getByText("Total payable")).toBeVisible();
@@ -1674,9 +1686,91 @@ describe("approved solid SO status presentation", () => {
   });
 });
 
+describe("⭐ Stock Status reads the server's one fact (owner scope 2026-10-05)", () => {
+  const three = () => {
+    const a = order({ id: "a", so: 1601, order_lines: [{ id: "line-1", sku: "B1201S-K", qty: 2, unit_price: 50 }] });
+    const b = order({ id: "b", so: 1602, order_lines: [{ id: "line-1", sku: "B1201S-K", qty: 2, unit_price: 50 }] });
+    const c = order({ id: "c", so: 1603, order_lines: [] });
+    listHookState.data = { orders: [a, b, c] };
+  };
+  const shown = () => {
+    const grid = screen.getByTestId("register-column");
+    return [1601, 1602, 1603].filter((n) => within(grid).queryByText(`SO-${n}`));
+  };
+  const facts = (a: string | null, b: string | null, issue = 0) => ({
+    data: { facts: { a: { stock: stockFact(a, issue) }, b: { stock: stockFact(b) }, c: { stock: stockFact(null) } }, failed: {} },
+  });
+  afterEach(() => {
+    registerFactsState = { data: { facts: {}, failed: { obligations: false, cases: false } } };
+  });
+
+  it("the issue indicator is amber and apart from the status — never a fifth status", () => {
+    three();
+    registerFactsState = facts("partially_ready", "ready", 1);
+    mount();
+    const row = screen.getAllByTestId("grid-parent-row").find((r) => within(r).queryByText("SO-1601"))!;
+    const pills = [...row.querySelectorAll('[data-kit="status-pill"]')];
+    expect(pills.map((p) => [p.textContent, p.getAttribute("data-tone")])).toEqual(
+      expect.arrayContaining([["Partially ready", "info"], ["1 damaged or wrong", "warning"]]),
+    );
+    /* A goods-free order is Not applicable, muted, no pill. */
+    const goodsFree = screen.getAllByTestId("grid-parent-row").find((r) => within(r).queryByText("SO-1603"))!;
+    expect(within(goodsFree).getByText("Not applicable")).toHaveAttribute("data-absence", "true");
+    expect(screen.queryByText(/Receipt unconfirmed/)).toBeNull();
+  });
+
+  it("the stock filter keeps only orders whose fact says so", () => {
+    three();
+    registerFactsState = facts("awaiting_goods", "ready");
+    mount("/operation/orders?stock=ready");
+    expect(shown()).toEqual([1602]);
+    expect(screen.getByTestId("active-conditions")).toHaveTextContent("Stock Status: Ready");
+  });
+
+  it("an old link's retired word filters nothing", () => {
+    three();
+    registerFactsState = facts("awaiting_goods", "ready");
+    mount("/operation/orders?stock=unknown");
+    expect(shown()).toEqual([1601, 1602, 1603]);
+  });
+
+  it("a failed read is the band with Try again and `Unavailable` cells — it matches no status filter", () => {
+    three();
+    const refetch = vi.fn();
+    registerFactsState = { data: { facts: { a: { stock: null }, b: { stock: null }, c: { stock: null } }, failed: { obligations: false, cases: false, stock: true } }, refetch } as never;
+    mount("/operation/orders?stock=ready");
+    const band = screen.getByTestId("stock-status-unread");
+    expect(band).toHaveTextContent("Stock Status could not be loaded.");
+    fireEvent.click(within(band).getByRole("button", { name: "Try again" }));
+    expect(refetch).toHaveBeenCalled();
+    expect(shown()).toEqual([]);
+  });
+
+  it("a failed read offers no Stock Status funnel and files no row under a status", () => {
+    three();
+    registerFactsState = { isError: true, refetch: vi.fn() } as never;
+    mount("/operation/orders?group=stock");
+    expect(screen.getByTestId("stock-status-unread")).toBeInTheDocument();
+    expect(screen.getAllByText("Unavailable").length).toBe(3);
+    expect(screen.queryByRole("button", { name: "Filter Stock Status" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^(Ready|To purchase|Awaiting goods|Partially ready|Unavailable) \d/ })).toBeNull();
+    expect(screen.getAllByTestId("grid-parent-row")).toHaveLength(3);
+  });
+
+  it("groups by the four statuses plus Not applicable, losing no order", async () => {
+    three();
+    registerFactsState = facts("awaiting_goods", "awaiting_goods");
+    mount("/operation/orders?group=stock");
+    expect(await screen.findByRole("button", { name: "Awaiting goods 2" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Not applicable 1" })).toBeInTheDocument();
+    expect(screen.getAllByTestId("grid-parent-row")).toHaveLength(3);
+  });
+});
+
 
 describe("confirmed optional listing grouping", () => {
-  it.each([['delivery', 'Not delivered'], ['stock', 'Receipt unconfirmed'], ['payment', 'Partially paid']])("groups by %s, collapses without changing totals and restores None", async (key, label) => {
+  it.each([['delivery', 'Not delivered'], ['stock', 'Awaiting goods'], ['payment', 'Partially paid']])("groups by %s, collapses without changing totals and restores None", async (key, label) => {
+    registerFactsState = { data: { facts: { "00000000-0000-0000-0000-00000000cafe": { stock: stockFact("awaiting_goods") } }, failed: {} } };
     mount(`/operation/orders?group=${key}`);
     const group = await screen.findByRole('button', { name: `${label} 1` });
     expect(group).toHaveAttribute('aria-expanded', 'true');

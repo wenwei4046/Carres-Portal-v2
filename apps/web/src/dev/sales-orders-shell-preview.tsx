@@ -155,11 +155,25 @@ window.fetch = async (input, init) => {
   }
   /* The Order list's server facts: a spread so every rail value has rows. */
   if (/\/api\/operation\/orders\/register-facts/.test(url)) {
-    const facts = Object.fromEntries(orders.map((o, i) => [o.id, {
-      obligations: i % 3 === 0 ? "none" : "outstanding",
-      cases: i % 5 === 0 ? "open" : i % 7 === 0 ? "closed" : "none",
-    }]));
-    return new Response(JSON.stringify({ facts, failed: { obligations: false, cases: false } }), { status: 200, headers: { "content-type": "application/json" } });
+    /* Stock Status: every state, the issue indicator (up to two digits, the
+       widest content the column holds) and a goods-free order. `?stock=fail`
+       answers the failed read. */
+    if (new URLSearchParams(window.location.search).get("stock") === "fail") {
+      const facts = Object.fromEntries(orders.map((o) => [o.id, { obligations: "outstanding", cases: "none", stock: null }]));
+      return new Response(JSON.stringify({ facts, failed: { obligations: false, cases: false, stock: true } }), { status: 200, headers: { "content-type": "application/json" } });
+    }
+    const STOCK = ["to_purchase", "awaiting_goods", "partially_ready", "ready", null] as const;
+    const facts = Object.fromEntries(orders.map((o, i) => {
+      const status = STOCK[i % STOCK.length]!;
+      const issueQty = i % 7 === 2 ? (i % 2 ? 12 : 1) : 0;
+      const lines = status ? o.order_lines.map((l) => ({ lineId: l.id, sku: l.sku, status, requiredQty: l.qty, usableQty: 0, purchasedQty: 0, issueQty, arrivedUnallocatedQty: 0 })) : [];
+      return [o.id, {
+        obligations: i % 3 === 0 ? "none" : "outstanding",
+        cases: i % 5 === 0 ? "open" : i % 7 === 0 ? "closed" : "none",
+        stock: { status, requiredQty: status ? 1 : 0, usableQty: 0, purchasedQty: 0, issueQty, arrivedUnallocatedQty: 0, lines },
+      }];
+    }));
+    return new Response(JSON.stringify({ facts, failed: { obligations: false, cases: false, stock: false } }), { status: 200, headers: { "content-type": "application/json" } });
   }
   if (/\/api\/operation\/purchase\/demands/.test(url)) {
     return new Response(JSON.stringify(demandPurchase), { status: 200, headers: { "content-type": "application/json" } });

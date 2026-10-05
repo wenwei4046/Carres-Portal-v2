@@ -67,6 +67,9 @@ export function salesOrderRouteInputOf(a: SalesOrderRouteInputArgs): SalesOrderR
       goods: a.facts.goods
         ? routeGoodsLinesOf({
             ...a.facts.goods,
+            /* The read brings other orders' shares of the same PO lines; they
+               take their goods and join none of this order's lanes. */
+            orderId: a.orderId,
             todayIso: appTodayIso(),
             holidays: myHolidaySet(),
             lines: a.facts.goods.lines

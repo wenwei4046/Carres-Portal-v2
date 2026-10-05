@@ -141,6 +141,12 @@ export const REGISTER_FIELD_WIDTH = {
   shortFact: 96,
   /** A small count with a two-line header: Stair carry items, Instalment months. */
   smallCount: 120,
+  /**
+   * `Stock Status` — the Sales Order's goods readiness pill (`Partially ready`
+   * is the longest of the four) and, beside it, the amber issue indicator
+   * `{k} damaged or wrong`. MEASURED 2026-10-05 — see UI MASTER §6.11.
+   */
+  stockStatus: 216,
 } as const;
 
 export type RegisterFieldWidth = keyof typeof REGISTER_FIELD_WIDTH;

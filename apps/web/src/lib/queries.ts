@@ -330,7 +330,7 @@ import {
   type RepairOrderEligibleUnit,
   type RepairOrderListRow,
 } from "@carres/shared";
-import { operationWorkResponseSchema, type LogisticsCardFacts, type RouteGoodsFacts, type SupplierClaimInspection } from "@carres/shared";
+import { operationWorkResponseSchema, type LogisticsCardFacts, type RouteGoodsFacts, type SalesOrderStockFact, type SupplierClaimInspection } from "@carres/shared";
 import {
   soBatchOrderLineOutstandingQty,
   soBatchPurchaseResponseSchema,
@@ -6204,12 +6204,15 @@ export function useMonthlyDemandFacts(enabled: boolean) {
   });
 }
 
-/** The Order list's two server-owned fact filters (Orders MASTER §Left rail):
- *  obligations through the object page's completion, cases from Service. A
- *  fact the server could not establish is `null` and matches no filter. */
+/** The Order list's server-owned facts (Orders MASTER §Left rail and
+ *  § Stock Status): obligations through the object page's completion, cases
+ *  from Service, and `Stock Status` through the shared `salesOrderStockOf`
+ *  over the Order Route's own goods records. A fact the server could not
+ *  establish is `null` and matches no filter; a failed stock read is
+ *  `failed.stock`, never a status. */
 export interface SalesOrderRegisterFacts {
-  facts: Record<string, { obligations: "outstanding" | "none" | null; cases: "open" | "closed" | "none" | null; stock?: Record<string, string> }>;
-  failed: { obligations: boolean; cases: boolean };
+  facts: Record<string, { obligations: "outstanding" | "none" | null; cases: "open" | "closed" | "none" | null; stock?: SalesOrderStockFact | null }>;
+  failed: { obligations: boolean; cases: boolean; stock?: boolean };
 }
 
 export function useSalesOrderRegisterFacts(enabled: boolean) {
