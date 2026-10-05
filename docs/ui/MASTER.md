@@ -429,10 +429,12 @@ StatusPill · Tabs · Textarea · Toast · Tooltip · TotalsSummary`, plus `regi
   meaning (a confirmed document is not a completed physical job); state is readable without colour.
 - **Solid status pills — owner confirmed 2026-10-02, PRODUCTION VERIFIED (PR #1842, `68d133c4`).**
   White text on a solid semantic fill, no circular mark or decorative icon; `StatusPill` owns it,
-  neutral `Badge` counts are unaffected. Complete = green (`Fully received` · `Fully delivered` ·
-  `Paid in full`); partial progress = blue (`Partially …`); waiting/not started = neutral grey
-  (`Awaiting receipt` · `Not delivered` · `Unpaid`); issue = amber (`Received with issue`); unknown =
-  neutral grey (`Receipt unconfirmed` · `Amount unconfirmed`). Red needs a proven late/blocking
+  neutral `Badge` counts are unaffected. Complete = green (`Fully delivered` · `Paid in full`);
+  partial progress = blue (`Partially …`); waiting/not started = neutral grey (`Not delivered` ·
+  `Unpaid`); issue = amber; unknown = neutral grey (`Amount unconfirmed`). The Sales Order Stock
+  Status words (`To purchase` · `Awaiting goods` · `Partially ready` · `Ready`) and their tones are
+  Orders MASTER "Stock Status" (owner ruling 2026-10-05, APPROVED / NOT BUILT; production still
+  prints the retired receipt words). Red needs a proven late/blocking
   condition; unpaid alone is not one. Accessible, filter, sort, search and export strings keep the full
   text.
 - **Action grammar (owner amendment 2026-10-01, correction 2026-10-02).** Full-object Print, Export
@@ -1402,7 +1404,7 @@ never truncate; content may wrap; user resizing stays. **The registry is code:**
 | PO Safety Days | 110 | prototype | |
 | Order By | 112 | **MEASURED** | Manual Purchase |
 | Category (parent) | 112 | prototype | Sales Orders live 2026-10-05 renders Category at 208 — reconcile in the SO round |
-| Stock Status (status pill) | 120 | **MEASURED — too narrow** | Sales Orders live 2026-10-05: cuts every `Receipt unconfirmed` pill; widen after re-measuring (§7.2) |
+| Stock Status (status pill) | 120 | **MEASURED — old words** | Sales Orders live 2026-10-05 cut the retired `Receipt unconfirmed` pill; re-measure against the Orders MASTER Stock Status words when they are built |
 | Qty | 64 | **MEASURED** | header floor 24px + 16 |
 | Item / Items | 208 | **MEASURED** | PO 2026-09-18. **Owed:** Manual Purchase built 180 |
 | Supplier / Ready Stock | 140 | **MEASURED** | longest live supplier 17 characters; PO widened 136 → 140 |
@@ -1476,7 +1478,6 @@ into the section it belongs to, and this list loses it.
 | WarehouseIncoming modal close | focus lands on the page, not the Count trigger (research file §9) | Adopt `DialogFrame` focus return |
 | Picker inside a dialog renders UNDER it | a real P1 defect, approved, not built | Kit fix |
 | **Customer lookup placement** | The caller-lookup capability (name/phone/order number across all a customer's orders and recorded history) is approved 2026-09-24/26; its rail door was removed 2026-10-05. Tasks → `Sales Order` tab shows only the linked SO's customer | Owner decision on where the cross-order lookup lives (PROPOSAL in §5) |
-| Stock Status column truncates its pill | Live SO register 2026-10-05: the 120px Stock Status width cuts every `Receipt unconfirmed` pill (natural width >103px of content) — content must decide width (Constitution §2) | GAP: re-measure and widen the registry role in the SO round |
 
 ## §7.3 · KIT GAPs — admit once, never draw locally
 

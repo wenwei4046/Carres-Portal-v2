@@ -4958,7 +4958,16 @@ Workspace message availability: `Message not available` replaces a placeholder d
 
 ### Accepted Sales Orders shared template — 2026-10-01
 
-Owner-accepted screen vocabulary: `Order summary` · `Stock Status` · `Receipt unconfirmed` · `Not applicable` · `Clear all` · `Open full page` · `Related documents`. These describe the accepted read-only template; receipt uncertainty never asserts a posted receipt.
+Owner-accepted screen vocabulary: `Order summary` · `Stock Status` · `Not applicable` · `Clear all` · `Open full page` · `Related documents`. These describe the accepted read-only template. `Receipt unconfirmed` is retired (owner ruling 2026-10-05): a failed stock read shows its error with `Try again`.
+
+### Sales Order Stock Status — owner ruling 2026-10-05 · APPROVED / NOT BUILT
+
+Goods only (never Delivery release, never a service line); meanings and tones in Orders MASTER "Stock Status".
+
+| Where | Words | Never |
+|---|---|---|
+| Stock Status | `To purchase` · `Awaiting goods` (legend `Waiting for goods from the supplier.`) · `Partially ready` · `Ready` (all required quantity usable and reserved to this order) | `Receipt unconfirmed` · `Awaiting receipt` / `Partially received` / `Fully received` as an SO Stock Status · `Ready` for goods that are not reserved to this order |
+| Manual line action | `Reserve stock` · `{n} in stock. Reserve for this order.` | reserving goods that were bought for the line (they are reserved on receipt) |
 
 ### Purchasing PO monitoring rail — owner-approved 2026-10-01 / TARGET NOT BUILT
 

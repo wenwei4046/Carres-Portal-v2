@@ -4090,7 +4090,8 @@ The physical spine is:
 
 ```
 PO placed → Unit ID born → supplier can label it → Receiving confirms arrival
-→ Warehouse location / condition → system offers suitable stock → human decides
+→ goods bought for this SO line: reserved to it on receipt (owner ruling 2026-10-05)
+→ other stock: Warehouse location / condition → system offers suitable stock → human decides
 → reserve to SO or keep purchasing demand → out for delivery → delivered / returned
 ```
 
@@ -4103,7 +4104,10 @@ born with no Unit ID and are reconciled by count; Receiving verifies IDs and nev
 which SO it is reserved for and the PO it came from.
 
 **Ready Stock law:** the system may offer compatible existing warehouse stock; a human decides
-whether to allocate it. Never silently auto-allocate or reallocate. A wrong, surplus, released or
+whether to allocate it (`Reserve stock`). Never silently auto-allocate or reallocate. The one
+automatic reservation is not reallocation: goods bought for an explicit SO goods line
+(`po_line_sources`) are reserved to that original line when Receiving posts the accepted usable
+quantity (owner ruling 2026-10-05, APPROVED / NOT BUILT; Stock MASTER §4 holds the full rule). A wrong, surplus, released or
 customer-rejected Unit returns through location + inspection to **Available or Hold**; it does not
 disappear with the old SO. The original SO continues to owe the correct commitment.
 
@@ -6907,12 +6911,38 @@ all approved evolution, every role or every live business action.
 ### Solid SO status pills — owner confirmed 2026-10-02
 
 APPROVED / implementation authorised. Listing and quick view use the shared StatusPill recipe:
-white text, solid canonical semantic fill, no decorative icons. Fully received / Fully delivered /
-Paid in full are green; Partially received / Partially delivered / Partially paid are blue;
-Awaiting receipt / Not delivered / Unpaid / Receipt unconfirmed / Amount unconfirmed are grey;
-Received with issue is amber. Red requires an actual late/blocking condition, never unpaid alone.
+white text, solid canonical semantic fill, no decorative icons. Fully delivered / Paid in full are
+green; Partially delivered / Partially paid are blue; Not delivered / Unpaid / Amount unconfirmed
+are grey. Stock Status words and tones follow "Stock Status" below (owner ruling 2026-10-05; the
+receipt-based stock words are retired). Red requires an actual late/blocking condition, never
+unpaid alone.
 Existing source calculations, full labels, filter/search/sort/export and permissions are preserved.
 Related-document discovery and unrelated Route/Monthly previews are excluded from this release.
+
+### Stock Status — owner ruling 2026-10-05 · APPROVED / NOT BUILT (local preview first)
+
+One Stock Status per goods line and per order, about **goods only** — never Delivery release and
+never a service line. It reads Stock's reservation facts (Stock MASTER §4) and Purchasing's PO
+lineage; it calculates no second stock truth.
+
+| Word | Meaning | Pill tone (UI MASTER §3) |
+|---|---|---|
+| `To purchase` | required goods are still to be bought for this order | grey (waiting) |
+| `Awaiting goods` | the goods are bought; legend `Waiting for goods from the supplier.` | grey (waiting) |
+| `Partially ready` | some, not all, of the required quantity is usable and reserved to this SO | blue (partial) |
+| `Ready` | all required quantity is usable AND reserved to this SO | green (complete) |
+
+- **Damaged or wrong goods** show as a separate indicator beside the status, never as a fifth state;
+  they are never counted as ready.
+- **A failed read** shows the error with `Try again`, never a status (the former `Receipt
+  unconfirmed` wording is retired).
+- **Manual line action `Reserve stock`** — sentence `{n} in stock. Reserve for this order.` — reserves
+  ordinary warehouse stock through Stock's reservation door. Goods bought for the line need no action:
+  they are reserved on receipt (Ready Stock law above).
+- **REAL GAP — owner decision pending:** `Reserve stock` on a line already covered by a PO. The
+  existing door refuses it (`line_already_covered`; Stock MASTER §4 "There is no override").
+- **PROPOSAL / NOT LAW (shown in the local preview):** which word an order or line shows when its
+  quantities mix states, e.g. part bought, part not.
 
 ### Related-document discovery in Listing — owner approved 2026-10-02
 
