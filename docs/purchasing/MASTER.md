@@ -2881,14 +2881,27 @@ shell with the rail open during the build.
   guard is kept because it is the only thing standing between a future unevidenced original and a
   cell that would silently read as *nothing ordered* — but it is currently unreachable here, and
   this MASTER does not claim otherwise.
-- **⭐ A PARENT SUMMARY SAYS ONE THING, AND NEVER EDITS — owner correction 2026-09-11.** One
-  value prints itself; several print `2 POs` · `2 suppliers` · `Multiple`, with the exact
-  item-to-PO/supplier/destination/date mapping in the expansion. **The measured
-  first-value-plus-`+N more` presentation is retired**: it measured its own text against its own
-  width, so the visible text, the exported text and the accessible name were three different
-  answers and a narrower window silently changed what the screen said. `2 POs` opens the row's
-  own expansion, where every number is a door beside the item line it covers; a single PO still
-  links straight to Purchase Orders.
+- **⭐ A PARENT SUMMARY SAYS ONE THING, AND NEVER EDITS — owner correction 2026-09-11.** For
+  `Supplier`, `Supplier Deliver To` and `PO Delivery Date`, one value prints itself; several print
+  `2 suppliers` · `Multiple`, with the exact item-to-supplier/destination/date mapping in the
+  expansion. **The measured first-value-plus-`+N more` presentation is retired**: it measured its
+  own text against its own width, so the visible text, the exported text and the accessible name
+  were three different answers and a narrower window silently changed what the screen said.
+- **⭐ `PO No` LISTS EVERY LINKED PO NUMBER — OWNER RULING 2026-10-05 · APPROVED / LOCKED.** The
+  parent `PO No` cell prints ALL the real PO numbers linked to the Sales Order, from the row's
+  `po_line_sources` lineage only, on ONE line separated by `, `. Each PO prints once even when
+  several item lines link to it, ordered by stored PO number ascending, in the shared display form
+  with its actual version (`documentDisplayNumber`, e.g. `PO-260903-7907-V1`); stored numbers,
+  historical PDFs and lineage are unchanged. Each number is its own link in the shared
+  document-link style (the Sales Orders register's PO link) and opens that exact PO
+  (`/operation/procurement?po={stored PO No}`) without selecting, ticking or expanding the row;
+  the commas are plain text. Returning keeps the Register's list state through the shared grid
+  session. The column keeps its registry default width and the standard row height: no wrapping;
+  a longer list is clipped inside the cell and staff drag the column wider or scroll the grid. No
+  `2 POs` count, no popover, no small window. A row with no PO keeps `Not ordered yet`. Search
+  (stored `PO-20260903-7907` and display `PO-260903-7907-V1` forms), the column filter and Export
+  all carry the complete comma-separated list. The row expansion's item ↔ supplier ↔ PO ↔ Unit
+  mapping is unchanged; the withdrawn merged-expansion-table proposal is not built.
 - **`Supplier Deliver To` on the parent is READ-ONLY for every row, and it states the ISSUED document's
   destination.** It used to BE the arrangement control — one eligible demand drew the full
   editor, several drew a `<select>` whose own text was made transparent so a summary could be

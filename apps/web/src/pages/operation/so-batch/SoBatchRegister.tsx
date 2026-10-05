@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -147,20 +147,6 @@ const STORAGE_KEY = "carres.soBatchPurchase.register.v7";
 const FILTER_RAIL_STORAGE_KEY = "carres.soBatchPurchase.filters.open";
 
 /**
- * ⭐ ONE PO IS A DOOR; SEVERAL ARE A COUNT — owner correction 2026-09-11.
- *
- * This cell measured its own text against its own width and printed as many
- * numbers as happened to fit, plus `+2 more`. Three readers got three answers:
- * the eye saw one-and-a-half numbers, `Export` saw the full list, and a
- * narrower window silently changed what the screen said without anything
- * having changed about the order.
- *
- * A summary now says exactly one thing. One purchase order prints in full and
- * opens Purchase Orders; several print how many there are and open the row's
- * own expansion, where every number is its own door beside the item line it
- * actually covers. No measurement, no truncation, no resize behaviour.
- */
-/**
  * `{first item} + {n} more` — the `Items` summary. ONE statement, whatever the
  * width: it never measures itself, so the screen, the export and the accessible
  * name are the same answer.
@@ -199,47 +185,64 @@ function safetyDaysWord(cell: SoBatchSafetyDaysCell | undefined): string {
   return cell.days < 0 ? "Production late" : String(cell.days);
 }
 
+/**
+ * ⭐ EVERY LINKED PO, ON ONE LINE — OWNER RULING 2026-10-05 (Purchasing §9.1).
+ *
+ * Replaces the 2026-09-11 `2 POs` count, which sent the operator into the
+ * row's expansion to find a number the cell already knew. The cell now prints
+ * every real PO linked to the order (`order.pos`, the server's
+ * `po_line_sources` lineage) once each, by stored PO number ascending, in the
+ * shared display form with its actual version (`PO-260903-7907-V1`),
+ * separated by `, `. Each number is its own door to that exact PO; the commas
+ * are plain text. One line, default width, the standard 32px row: a longer
+ * list is clipped inside the cell and the operator drags the column wider.
+ * No count, no popover. Search, the column filter and Export carry the same
+ * complete list, so the screen, the funnel and the sheet never disagree.
+ */
+function soBatchPoNumbers(order: Pick<SoBatchOrderRow, "pos">): Array<{ poId: string; display: string }> {
+  const versions = new Map<string, number | undefined>();
+  for (const po of order.pos) if (!versions.has(po.poId)) versions.set(po.poId, po.version);
+  return [...versions]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([poId, version]) => ({
+      poId,
+      display: documentDisplayNumber(version == null ? poId : `${poId}-V${version}`),
+    }));
+}
+
+/** The same list as ONE string — the column filter and every export. */
+function soBatchPoNumbersText(order: Pick<SoBatchOrderRow, "pos">): string {
+  return soBatchPoNumbers(order).map((po) => po.display).join(", ");
+}
+
+/** The shared document-link recipe (the Sales Orders register's PO link). */
+const DOCUMENT_LINK_CLASS = "font-medium text-kit-blue-11 underline-offset-2 hover:underline";
+
 function PoNumbersCell({ order }: { order: SoBatchOrderRow }) {
   const navigate = useNavigate();
-  const numbers = useMemo(() => [...new Set(order.pos.map((po) => po.poId))], [order.pos]);
+  const numbers = useMemo(() => soBatchPoNumbers(order), [order]);
   if (numbers.length === 0) return null;
-  if (numbers.length === 1) {
-    const number = numbers[0]!;
-    const version = order.pos.find(po => po.poId === number)?.version;
-    return (
-      <button
-        type="button"
-        className="truncate text-kit-blue-11 underline-offset-2 hover:underline"
-        data-testid={`so-batch-po-link-${order.orderId}`}
-        onClick={(event) => {
-          event.stopPropagation();
-          navigate(`/operation/procurement?po=${encodeURIComponent(number)}`);
-        }}
-      >
-        {documentDisplayNumber(`${number}${version == null ? "" : `-V${version}`}`)}
-      </button>
-    );
-  }
   return (
-    <button
-      type="button"
-      className="truncate text-kit-blue-11 underline-offset-2 hover:underline"
-      data-testid={`so-batch-po-many-${order.orderId}`}
-      title="Open the row to see every purchase order"
-      onClick={(event) => {
-        event.stopPropagation();
-        const row = event.currentTarget.closest("tr");
-        const arrow = row?.querySelector<HTMLButtonElement>("button[aria-expanded]");
-        if (arrow?.getAttribute("aria-expanded") === "false") arrow.click();
-        requestAnimationFrame(() => {
-          row?.nextElementSibling
-            ?.querySelector('[data-testid="grid-expansion-cell"]')
-            ?.scrollIntoView?.({ behavior: "smooth", block: "nearest" });
-        });
-      }}
-    >
-      {`${numbers.length} POs`}
-    </button>
+    <>
+      {numbers.map((po, index) => (
+        <Fragment key={po.poId}>
+          {index > 0 ? ", " : null}
+          <button
+            type="button"
+            className={DOCUMENT_LINK_CLASS}
+            data-testid={`so-batch-po-link-${order.orderId}`}
+            data-po-id={po.poId}
+            onClick={(event) => {
+              event.stopPropagation();
+              navigate(`/operation/procurement?po=${encodeURIComponent(po.poId)}`);
+            }}
+            onDoubleClick={(event) => event.stopPropagation()}
+          >
+            {po.display}
+          </button>
+        </Fragment>
+      ))}
+    </>
   );
 }
 
@@ -445,8 +448,8 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
    * ⛔ THE MENU CARRIES ONLY DOORS THAT EXIST. The sibling Sales Orders menu
    * ends in `Cancel SO`; a buying register must not offer that — it records
    * what was bought, it does not amend the sale. `Open <PO>` appears only when
-   * the order has exactly one, which is the same test the PO No cell makes;
-   * the exact numbers for a multi-PO order live in the expansion. */
+   * the order has exactly one; for a multi-PO order every number is already
+   * its own door in the PO No cell and beside its item line in the expansion. */
   const openOrder = useCallback(
     (o: SoBatchOrderRow) => setQuickOrderId(o.orderId),
     [],
@@ -1151,15 +1154,22 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
            `Deliver To` and `PO Delivery Date` describe a purchase order, so on
            a row that has none they stay blank rather than repeating the same
            sentence three times across one row. */
+        /* One line, never wrapped: a list longer than the cell is clipped
+           inside it, and the column is dragged wider (owner ruling
+           2026-10-05). The row keeps the standard 32px recipe. */
         accessor: (o) => (
           <span className="block truncate" data-testid={`so-batch-po-${o.orderId}`}>
             {o.pos.length ? <PoNumbersCell order={o} /> : <Absent>Not ordered yet</Absent>}
           </span>
         ),
-        searchValue: (o) => o.pos.map((p) => `${p.poId} ${documentDisplayNumber(p.poId)}`).join(" "),
-        filterValue: (o) =>
-          summaryText(soBatchCellSummary(o.pos.map((p) => documentDisplayNumber(`${p.poId}${p.version == null ? "" : `-V${p.version}`}`))), (n) => `${n} POs`) ?? "",
-        exportValue: (o) => o.pos.map((p) => p.poId).join(" · "),
+        /* Both forms of every number: the stored `PO-20260903-7907`, the
+           display `PO-260903-7907` and the versioned `PO-260903-7907-V1`. */
+        searchValue: (o) =>
+          soBatchPoNumbers(o)
+            .map((p) => `${p.poId} ${documentDisplayNumber(p.poId)} ${p.display}`)
+            .join(" "),
+        filterValue: (o) => soBatchPoNumbersText(o),
+        exportValue: (o) => soBatchPoNumbersText(o),
       },
       {
         /* `purchase_orders.official_delivery_date` — the ORIGINAL
@@ -1874,9 +1884,8 @@ function SoBatchOrderExpansion({
   const poById = useMemo(() => new Map(order.pos.map((p) => [p.poId, p])), [order.pos]);
 
   /**
-   * The details section opens with the row, because the parent's `2 POs`
-   * summary is a door and a door that opens onto a closed box has not answered
-   * anything.
+   * The details section opens with the row: the item-to-PO mapping is what the
+   * operator opened the row for, and a closed box answers nothing.
    *
    * ⭐ NOTHING SCROLLS TO IT ANY MORE. `Ordered Qty` was the door that did, and
    * the owner's 2026-09-18 goods table has no such column: the section is
