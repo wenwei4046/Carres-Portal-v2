@@ -49,7 +49,7 @@ import {
   word,
   VOUCHER_STATUS_WORD,
 } from "./payables-words";
-import { FactRow, Facts, FilesCard, HistoryCard, PayablesSwitch, ReadFailed, ReasonModal } from "./PayablesParts";
+import { FactRow, Facts, FilesCard, HistoryCard, ReadFailed, ReasonModal } from "./PayablesParts";
 import { attachPages, formLines, ReadPaperButton, readPaperNotes } from "./ReadPaper";
 import { answerPaymentRequest, usePaymentRequest } from "@/lib/payment-request-queries";
 import type { BillReadAnswer } from "@carres/shared/bill-reading";
@@ -143,7 +143,6 @@ function BillRegister() {
                 >
                   + New Bill
                 </button>
-                <PayablesSwitch current="bills" />
               </span>
             }
             emptyMessage="No bills yet. A supplier's invoice appears here once it is entered."

@@ -7,7 +7,7 @@ import ModuleHeader from "@/pages/operation/components/ModuleHeader";
 import { fmtDate } from "@/lib/fmt-date";
 import { useApBillOutstanding, useApOutstanding } from "@/lib/payables-queries";
 import { cents, creditorKindWord, money, num } from "./payables-words";
-import { PayablesSwitch, ReadFailed } from "./PayablesParts";
+import { ReadFailed } from "./PayablesParts";
 import { supplierUnpaid, unpaidTotal } from "../money-owed";
 import SupplierAdvancesOf from "./SupplierAdvancesOf";
 import SupplierCreditsOf from "./SupplierCreditsOf";
@@ -77,7 +77,6 @@ export default function ApOutstanding() {
             stickyIdentity
             isLoading={!query.isSuccess}
             searchPlaceholder="Search suppliers…"
-            toolbarStart={<PayablesSwitch current="unpaid" />}
             emptyMessage="Nothing is owed. A supplier appears here once one of their bills is confirmed."
             expandTitle="Show unpaid bills"
             expandable={{ renderExpansion: (r) => <UnpaidBillsOf row={r} /> }}

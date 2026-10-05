@@ -215,24 +215,23 @@ describe("Bills register", () => {
     expect(screen.queryByText("confirmed")).not.toBeInTheDocument();
     expect(screen.getByTestId("bills-summary")).toHaveTextContent("2 bills · RM 1,025.00 unpaid");
     expect(screen.getByTestId("new-bill")).toHaveTextContent("+ New Bill");
-    expect(within(screen.getByTestId("payables-switch")).getByRole("link", { name: "Payment Vouchers" }))
-      .toHaveAttribute("href", "/finance/payment-vouchers");
   });
 
-  it("the switch is one segmented control: the current view is the white chip, the other two are links", async () => {
-    show("/finance/bills");
-    const bar = await screen.findByTestId("payables-switch");
-    expect(bar.tagName).toBe("NAV");
-    expect(bar).toHaveAttribute("aria-label", "Payables");
-    expect(bar).toHaveClass("bg-base-100", "rounded-full");
-    const current = within(bar).getByText("Bills");
-    expect(current).toHaveAttribute("aria-current", "page");
-    expect(current.tagName).toBe("SPAN");
-    expect(current).toHaveClass("bg-white", "text-base-900", "px-3");
-    const links = within(bar).getAllByRole("link");
-    expect(links.map((a) => a.getAttribute("href"))).toEqual(["/finance/payment-vouchers", "/finance/ap-outstanding"]);
-    for (const a of links) expect(a).toHaveClass("text-base-500", "px-3");
-  });
+  /* Chew 2026-10-05: the menu is the one way between Bills, Payment Vouchers
+     and Unpaid by Supplier, so no page repeats it with a switch of its own. */
+  it.each([
+    ["/finance/bills", () => screen.findByText("BILL-4XK2")],
+    // The toolbar that held the switch, drawn with its New button.
+    ["/finance/payment-vouchers", () => screen.findByTestId("new-voucher")],
+    ["/finance/ap-outstanding", () => screen.findByText("Lumen Sofa Works")],
+  ] as const)("%s carries no switch to the other payables pages", async (at, loaded) => {
+      show(at);
+      await loaded();
+      expect(screen.queryByTestId("payables-switch")).not.toBeInTheDocument();
+      expect(screen.queryByRole("navigation", { name: "Payables" })).not.toBeInTheDocument();
+      const elsewhere = ["/finance/bills", "/finance/payment-vouchers", "/finance/ap-outstanding"].filter((p) => p !== at);
+      for (const href of elsewhere) expect(document.querySelector(`a[href="${href}"]`)).toBeNull();
+    });
 
   it("says a failed read failed — never an empty register", async () => {
     api.fail.add(`${B}/bills`);

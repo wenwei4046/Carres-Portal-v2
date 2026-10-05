@@ -1,5 +1,4 @@
 import { useRef, useState, type ReactNode } from "react";
-import { SegmentedLinks } from "@/components/Segmented";
 import { toast } from "sonner";
 import type { ApEvent, ApFile } from "@carres/shared/schemas/finance-ap";
 import { SectionCard } from "@/components/SectionPanel";
@@ -9,17 +8,6 @@ import { fieldAreaCls } from "@/components/Field";
 import { fmtDate } from "@/lib/fmt-date";
 import { openApFile, useUploadApFile, type ApDocKind } from "@/lib/payables-queries";
 import { EVENT_WORD, refusal, word } from "./payables-words";
-
-/** The three payables views, on the app's one segmented control: a grey rail
- *  with the current view as the white chip, each other view a link. */
-export function PayablesSwitch({ current }: { current: "bills" | "vouchers" | "unpaid" }) {
-  const views = [
-    { value: "bills", to: "/finance/bills", label: "Bills" },
-    { value: "vouchers", to: "/finance/payment-vouchers", label: "Payment Vouchers" },
-    { value: "unpaid", to: "/finance/ap-outstanding", label: "Unpaid by Supplier" },
-  ] as const;
-  return <SegmentedLinks options={views} value={current} ariaLabel="Payables" testId="payables-switch" />;
-}
 
 export function Facts({ title, children, testId, right }: {
   title: string;

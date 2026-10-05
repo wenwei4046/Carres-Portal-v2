@@ -4042,7 +4042,7 @@ Pages: Finance → `Bills`, `Payment Vouchers`, `Unpaid by Supplier`; the AP dra
 
 | Where | Word on screen | Stored value it replaces | Note |
 |---|---|---|---|
-| Destination / nav | **Bills** · **Payment Vouchers** · **Unpaid by Supplier** | — | three listings, one toolbar switch; the Finance sidebar names the third **AP · Payables** (RULING below) |
+| Destination / nav | **Bills** · **Payment Vouchers** · **Unpaid by Supplier** | — | three listings, each its own menu row; their toolbar switch is retired (Chew, 5 Oct 2026: the menu is the one way between them); the Finance sidebar names the third **AP · Payables** (RULING below) |
 | Bill status | **Draft** · **Confirmed** · **Cancelled** | `draft` · `confirmed` · `cancelled` | `Posted` never reaches the screen: a confirmed bill *is* entered in the ledger |
 | Voucher status | **Draft** · **Prepared** · **Checked** · **Approved** · **Cancelled** | same, lower case | `Voided` never reaches the screen |
 | Voucher purpose | **Pay supplier bills** · **Direct payment** | `SUPPLIER_BILLS` · `DIRECT` | |
@@ -4201,7 +4201,8 @@ payment voucher's Approve.
 **RULING — YH, 2026-09-14.** The Finance sidebar row that opens `/finance/ap-outstanding` is
 **`AP · Payables`** again (PR #1248 had renamed it `Unpaid by Supplier`), and it sits above
 `AR · Receivables`: `Dashboard` · `AP · Payables` · `AR · Receivables`, then the rest. The page
-it opens is unchanged; its header and the Bills toolbar switch keep `Unpaid by Supplier`. The
+it opens is unchanged; its header keeps `Unpaid by Supplier` (the Bills toolbar switch that also
+said it is retired, Chew 2026-10-05). The
 Dashboard keeps its pre-#1248 layout (figure tiles, then the Payables card) with every number
 read through `money-owed.ts`.
 
@@ -5009,7 +5010,7 @@ The Finance area of the Portal sidebar groups Finance's own pages into modules. 
 | `Reports` | `Profit and Loss` · `Balance Sheet` · `Cash Flow` · `AP Aging` · `Collection` · `Card charges` · `Dealer commission` · `Stock value` · `Payment` (Payment's own report, unchanged) |
 
 - `Dashboard` stays a plain row at the top. `Forecast` is a plain row after `Reports` (Chew, 3 Oct 2026).
-- A menu row's word is its page's title. The Profit and Loss and the Balance Sheet are two pages, titled `Profit and Loss` and `Balance Sheet`; the browser tab reads `{title} · Carres`. The Reports page's door cards (`Open →`) are retired, because every report is a row.
+- A menu row's word is its page's title; the one exception is `AP · Payables`, which opens `Unpaid by Supplier` (RULING YH 2026-09-14). The Profit and Loss and the Balance Sheet are two pages, titled `Profit and Loss` and `Balance Sheet`; the browser tab reads `{title} · Carres`. The Reports page's door cards (`Open →`) are retired, because every report is a row.
 - The rows' words above are approved as menu words. A page's own words keep the status of their own entry below.
 - `Payables` sits above `Receivables` to keep the ruling of 2026-09-14 that `AP · Payables` sits above AR.
 - The modules are not named `Money in` / `Money out`, because customer `Money In` is Payment's word (Payment MASTER §1) and `Money in full` is already a governed phrase.
