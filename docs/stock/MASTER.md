@@ -202,8 +202,9 @@ page or integration maintains another available quantity.
 |---|---|
 | received, inspected, complete, unreserved and uncontrolled | Available |
 | bound by Sales Order | Reserved / sold |
-| ordered but not received | Incoming |
-| ordered, not received, and bound to a Sales Order line by `Use this PO` (owner ruling 2026-09-28, Purchasing §9.1; BUILT on branch build/purchasing-use-this-po, migration 0600 not yet applied) | Incoming with its SO No until Receiving posts it, then Reserved for that line; the binding sets only `reserved_ref` + `reserved_order_line_id` and never changes status before receipt |
+| ordered for no Sales Order line, not received | Incoming; after receipt Available, and reserved only when staff choose `Reserve stock` |
+| ordered for an explicit Sales Order goods line (`po_line_sources` lineage), not received (owner ruling 2026-10-05, APPROVED / NOT BUILT) | Incoming with its source SO line; when Receiving posts it, the accepted usable quantity becomes Reserved for that original line automatically (rule below) |
+| ordered, not received, and bound to a Sales Order line by `Use this PO` (owner ruling 2026-09-28, Purchasing §9.1; MERGED #1723, migration 0600 APPLIED 2026-09-28) | Incoming with its SO No until Receiving posts it, then Reserved for that line; the binding sets only `reserved_ref` + `reserved_order_line_id` and never changes status before receipt |
 | between confirmed handovers | In transit |
 | issue, inspection, repair, missing component or other control | Not available |
 | customer accepted or lifecycle ended | Delivered / history |
@@ -220,8 +221,9 @@ or automatic Ready Stock qualification. Unknown evidence is not zero supply. Eac
 checks existing coverage before additional procurement; enough quantity arriving late is a timing
 risk, not an automatic new purchase. Preserve the eligibility and exact-Unit authority below.
 
-Sales Order owns choosing, binding, changing and releasing the exact promised Unit. Stock validates
-eligibility and reflects the result. Warehouse may report a problem but cannot silently release or
+Sales Order owns choosing, binding, changing and releasing the exact promised Unit; the one
+automatic binding is goods bought for that SO line, reserved on receipt (rule below). Stock
+validates eligibility and reflects the result. Warehouse may report a problem but cannot silently release or
 substitute a reserved Unit.
 
 **A RESERVATION NAMES THE ITEM LINE, NOT JUST THE ORDER — BUILT AND PRODUCTION-VERIFIED
@@ -240,6 +242,19 @@ line still has a remaining requirement of ordered quantity less bound Ready Stoc
 non-cancelled purchase-order lineage. There is no override. A caller that names no line has one
 RESOLVED — a single candidate, or a refusal by name; the door never picks out of several.
 
+**RECEIPT RESERVES GOODS BOUGHT FOR A SALES ORDER LINE — owner ruling (Jess) 2026-10-05 · APPROVED /
+NOT BUILT.** Goods bought for an explicit Sales Order goods line (`po_line_sources` lineage) are
+reserved automatically to that original SO line when Receiving posts them; staff do not allocate them
+again. Only the accepted, usable received quantity is reserved. When several SOs share one PO line,
+allocation follows the existing source rows (lineage), never a guess. Damaged, wrong-item and
+over-received quantities are never auto-reserved. If the original SO is cancelled, its requirement has
+fallen, or the source is unclear, nothing is forced: the exception is kept and shown for handling.
+Ordinary warehouse stock is still reserved only when staff choose `Reserve stock`; Match Ready Stock
+stays an optional, user-started mode. Each module keeps its own write responsibility: Receiving posts
+the receipt (Purchasing §7.3); the reservation is written through Stock's existing reservation door
+above, with the same validation and one remaining-requirement arithmetic, so a piece is never counted
+both as bound Ready Stock and as open PO lineage. `Use this PO` is unchanged.
+
 Ready stock contains only exact Units satisfying every eligibility rule; every total drills to IDs.
 A customer shortage separates available Units from remaining demand: Warehouse receives dated
 preparation work for available Units, Purchasing receives dated arrival work for the missing demand,
@@ -252,7 +267,8 @@ NETS Warehouse scans each actual ID, checks product, visible condition, required
 packages and label, supplies governed evidence, and records one outcome per Unit: Check in,
 check in with issue, reject, or not delivered. A bulk total cannot replace Unit results. Partial
 receipt preserves received Units and leaves the remainder Incoming. Unexpected Units are
-investigated, never added through a shortcut.
+investigated, never added through a shortcut. Accepted usable goods bought for an explicit Sales
+Order line are reserved to that line when the receipt posts (§4, APPROVED / NOT BUILT).
 
 Showrooms are formal Sites. Staff scan arrival and departure, report observations and perform dated
 counts. A reserved display Unit remains at its Site but leaves Ready stock. Display start and last
@@ -982,7 +998,9 @@ Unit; they do not require permanent rail rows. `Needs checking` states the exact
 Unit, recorded holder/Site, finding, resolved owner/avatar, actual date and concrete action. It never
 uses a vague `Attention` label. Ready Stock groups eligible Units by Catalog product and Site and
 expands to exact IDs. Sales uses `Choose Ready Unit`; Operations uses `Make available for sale` only
-after the Unit passes eligibility. Stock owns neither reservation nor release from an SO.
+after the Unit passes eligibility. Stock decides no reservation or release on its own: every
+reservation is written through its one reserve door, on the Sales Order's choice, on a `Use this PO`
+arrival, or automatically when a receipt posts goods bought for that SO line (§4).
 
 `Make available for sale` is permitted only for an existing Unit whose current Site and `Who has
 it` are confirmed, condition and required components/packages are acceptable, ownership permits
