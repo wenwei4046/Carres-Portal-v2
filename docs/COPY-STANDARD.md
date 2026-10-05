@@ -4980,7 +4980,8 @@ The words of UI MASTER §4.3's card, as confirmed on the owner's reference pages
 | Where | Words |
 |---|---|
 | Header | accessible names `Order details` (the ▾/▴, no visible words) · `Delivery address` · `Open order` · `Close panel`; sales facts `SO Doc Date` · `Proceed date` · `Sales Location` · `Salesperson` |
-| SO and SO Batch table and filters | `Customer’s original requested delivery` means version 1’s preserved request; its table, card, filtering and export use the same original source. The mutable requested date in other module-owned forms remains separate. Customer-confirmed date and Logistics ETA remain separate. |
+| SO table and filters | `Customer’s original requested delivery` means version 1’s preserved request; its table, card, filtering and export use the same original source. The mutable requested date in other module-owned forms remains separate. Customer-confirmed date and Logistics ETA remain separate. |
+| SO Batch listing date | `Customer’s original requested delivery`, with two header lines `Customer’s original` / `requested delivery`. Table display, date filtering, sorting and export read the preserved revision 1 request; missing/TBD original evidence reads `Not recorded`, never the later current request. Purchasing planning and stock-priority inputs remain separate. |
 | SO access facts | Group building and floor on one line, lift and positive `Stair carry: {n} items` on the next; omit missing or zero stair carry. |
 | SO requested-date header | `Customer’s original` / `requested delivery` (two small lines); `{n}d` = original requested date minus Proceed date in calendar days, never a today-based countdown. Example `30 Sep` → `31 Oct` = `31d`; missing either date omits the count. Tooltip: `Customer’s original requested delivery` |
 | Module bar | `Order modules` · icon names `Communication` · `Items` · `Show timeline` / `Hide timeline` |
