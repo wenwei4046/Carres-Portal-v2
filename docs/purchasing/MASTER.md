@@ -430,7 +430,8 @@ The actual Register now opens the kit compact-card Drawer from SO No, row double
 Its CompactModuleCard header reads exact Sales-owned SO facts; neighbouring search results,
 failed reads and placeholder data cannot supply another customer's phone, address or sales facts.
 Missing reads remain explicit with retry. Goods and stock selection use the existing item
-expansion; PO lineage remains separate in Order details. The panel issues only its own prepared
+expansion; the Quick View carries no `Purchase order details` table (owner ruling 2026-10-06 —
+the PO facts are on the row listing). The panel issues only its own prepared
 SO scope, retaining other selected SOs, and recovers only its exact deduplicated existing POs.
 The explicit full-page door retains the source SO destination. Table and Cards share one DataGrid
 filter/sort scope, selection and footer; URL presentation/group parameters preserve cutoff/deep-link
@@ -2809,7 +2810,7 @@ below 768px canvas, issue layout governed by §8.2, truthful no-match and true-e
 states, clearable SO deep-link Search over the full Register, singular footer, unified
 `Production days not set`, kit panel-toggle icons and 32px Buttons, explicit issue-permission
 copy, two-line headers, token-based blocker panel and the retired Purchase Demands redirect.
-Existing sidebar, rail sections, summaries, read-only PO details, Ready Stock, stale-selection
+Existing sidebar, rail sections, summaries, Ready Stock, stale-selection
 removal, coverage refusal, sticky identity and replacement selection toolbar remain intact.
 Unreserve/Reassign restores item-line demand through current reservation truth; append-only
 usage remains History, never a released-before purchasing badge or a second coverage table.
@@ -3017,8 +3018,9 @@ shell with the rail open during the build.
   this MASTER does not claim otherwise.
 - **⭐ A PARENT SUMMARY SAYS ONE THING, AND NEVER EDITS — owner correction 2026-09-11.** For
   `Supplier`, `Supplier Deliver To` and `PO Delivery Date`, one value prints itself; several print
-  `2 suppliers` · `Multiple`, with the exact item-to-supplier/destination/date mapping in the
-  expansion. **The measured first-value-plus-`+N more` presentation is retired**: it measured its
+  `2 suppliers` · `Multiple`. Each goods line in the expansion states its own Supplier and
+  Supplier Deliver To; each document's own date and detail are on its PO page, which the row's
+  `PO No` opens. **The measured first-value-plus-`+N more` presentation is retired**: it measured its
   own text against its own width, so the visible text, the exported text and the accessible name
   were three different answers and a narrower window silently changed what the screen said.
 - **⭐ `PO No` LISTS EVERY LINKED PO NUMBER — OWNER RULING 2026-10-05 · APPROVED / LOCKED.** The
@@ -3034,8 +3036,9 @@ shell with the rail open during the build.
   a longer list is clipped inside the cell and staff drag the column wider or scroll the grid. No
   `2 POs` count, no popover, no small window. A row with no PO keeps `Not ordered yet`. Search
   (stored `PO-20260903-7907` and display `PO-260903-7907-V1` forms), the column filter and Export
-  all carry the complete comma-separated list. The row expansion's item ↔ supplier ↔ PO ↔ Unit
-  mapping is unchanged; the withdrawn merged-expansion-table proposal is not built.
+  all carry the complete comma-separated list. The row expansion names no PO and no Unit (see
+  **No `Purchase order details` table** below); the withdrawn merged-expansion-table proposal is
+  not built.
 - **`Supplier Deliver To` on the parent is READ-ONLY for every row, and it states the ISSUED document's
   destination.** It used to BE the arrangement control — one eligible demand drew the full
   editor, several drew a `<select>` whose own text was made transparent so a summary could be
@@ -3113,107 +3116,33 @@ change procurement quantities: save or cancel before Issue PO. No per-Unit Undo/
 Saving must atomically validate additions AND releases against current stock/line state and downstream
 locks; all or none, no second stock writer. A failure retains the draft and explains the refusal.
 These editing controls are approved targets, not a claim that current production supports replacement.
-An all-stock SO must be savable without creating a PO. Read-only Purchase order details remain separate.
+An all-stock SO must be savable without creating a PO.
 
 Shared appearance and connector geometry are governed only by UI MASTER §6.8–6.9; words by COPY.
 The HTML quantity dialog is NOT approved as the Issue PO workspace. §8.2 still governs formal draft
 review (approved desktop split in §8.2); that preview remains unfinished in this design review.
 
-**THE READ-ONLY RECORD — `Purchase order details`, its own heading, its own table.**
-
-```text
-PO No              Unit ID              SKU       Item              Qty  Deliver To    Supplier  PO Delivery Date
-PO-20260820-4827   U1-000-078           L1201S-K  Laveo · King       1   Carres Klang  Nice F…   Thu, 17 Sep
-PO-20260820-4827   U1-000-079           L1201S-K  Laveo · King       1   Carres Klang  Nice F…   Thu, 17 Sep
-                   Item line not recorded
-PO-20260904-4665   Not allocated        JAGER-SS  Jager · SS         1   Carres Klang  Ohana     Not recorded
-```
-
-- **ONE ROW PER DOCUMENT *LINE*, NOT PER DOCUMENT.** A purchase order may carry one SKU to two
-  destinations through two lines and source both to the same customer item line (the governed
-  `Supplier Deliver To` split). Keyed by `po_id` alone the two collapsed and only the PARENT document's
-  destination was left to print — **a parent summary standing in for a line's own recorded fact**,
-  which is exactly what this correction removed from the row above. `po_line_sources.po_line_id`
-  now rides through, and each entry carries **the LINE's `destination_id`, falling back to the
-  document's ONLY where the line records none** — the same rule the Sales Order expansion door uses,
-  and the only case in which a parent summary may speak for a line.
-- **`PO No`, not `Covered by` and not `ON PO`**, and `PO No` and `Unit ID` are NEIGHBOURS: they are
-  the two identifiers a person copies, and a reader who must look across four columns to pair a
-  document with its goods pairs them wrongly. Both print in FULL and stay selectable.
-  Stored PO identity remains unchanged. Where the current official version is presented,
-  apply §9.3's approved two-digit-year `PO Version` display and resolve it to the same source PO;
-  do not restore the retired blanket prohibition on removing `20`. Never invent a version for
-  a source link whose version is unknown.
-- **Ordinary readable rows, no control, no grey block.** A record cannot be bought again, so it
-  carries no checkbox and no destination editor; what makes it read-only is the ABSENCE of controls,
-  not a disabled-looking wash over the module's own audit evidence.
-- **Columns that would only ever print a dash here are absent** — `Ready Stock`, `To buy`,
-  `Category` and the tick column.
-- **Every `po_line_sources` unit gets a row.** Units the read can evidence for that document are
-  named one per row; the quantity the document carries beyond them is stated as a remainder. A Unit
-  naming a document this line's lineage does not carry is **still printed** — a disagreement between
-  two authoritative reads is what an audit register exists to show. A Unit with no document behind it
-  is Ready Stock's answer and stays out of this table.
-- The section renders only when the order has lineage; an order with no purchase order says
-  `Not ordered yet` once, on the item table, and has no details section at all.
-
-**⭐ A UNIT'S ITEM LINE IS READ FROM THE RECORD, NOT INFERRED FROM ITS SKU — owner correction
-2026-09-11.** The Sales Order expansion door grouped every reserved/sold Unit of an order by
-NORMALIZED SKU, so a Sales Order with two item lines of one SKU — SO-1251, SO-1207 and SO-1246 carry
-exactly that — printed the SAME Unit IDs under BOTH lines. `ops_stock_items.reserved_order_line_id`
-has answered that question since 0471 and the read simply did not ask it. It asks now:
-
-- a Unit bound to a line appears under THAT line and nowhere else;
-- a Unit incoming on a purchase-order line sourced EXCLUSIVELY to one SO item line is exact by the
-  document, exactly as before;
-- a Unit that carries NO binding (a pre-0471 reservation), or one bound to another line, keeps the
-  SKU reading — evidence is never dropped to tidy a screen — and the row says
-  **`Item line matched by SKU`**, so an INFERENCE stays inspectable and can never be read as
-  evidence.
-- a read that carries no binding for that Unit at all says **`Item line unknown`**. A gap in
-  the READ is not a gap in the RECORD, and it may not borrow the other sentence: that one would be a
-  claim about this browser wearing the clothes of a fact about the goods.
-- **⭐ ABSENCE PROVES NOTHING — owner correction 2026-09-11.** A Unit MISSING from the binding map
-  was read as EXACT, on the true-but-fragile ground that only incoming goods are absent and those
-  are evidenced by a purchase-order line sourced exclusively to the item line. That let a gap in the
-  DATA prove a fact about the GOODS: any later read that stopped populating the map, or populated it
-  partially, would silently begin certifying inferences. **The server now WRITES the
-  incoming-exclusive binding into the map**, so the fact is declared rather than inferred from its
-  own absence, and absence means `unresolved` — never exact. A purchase-order line SHARED with
-  another Sales Order evidences nothing and names no line, exactly as before.
-- **⭐ AN INFERENCE IS NEVER COUNTED AS COVERAGE.** The same physical Unit is offered by the SKU
-  reading to EVERY item line of that SKU on the order, so an inferred Unit row carries **no
-  quantity** and does **not** draw the document line's remainder down. Only an exact Unit does.
-  Without that rule one Unit accounted for two item lines' quantities at once and the section's own
-  numbers stopped adding up; with it, `Σ(exact rows) + remainder = the document line's quantity`.
-  **The section renders no total row at all**, so no footer can silently sum a `—`, and the table
-  feeds no export: the Register above exports the ORDER's own columns, none of which is a per-Unit
-  quantity.
-- **⭐ A COUNTED ROW IS NOT A UNIT (0453).** `identity_scope` rides the wire as `unitScopes`, and
-  every Unit ID on this table is resolved through the ONE shared rule (`unitIdOf`), which answers
-  `null` for counted goods and keeps its `QTY-` shape backstop. Such a row prints
-  **`Counted stock`** — there is no Unit ID and there never will be — and its quantity is still
-  stated. The technical key never reaches a `Unit ID` heading.
-- The response carries the stored value verbatim as `unitLines`; it is optional, so a browser on
-  this build against an older Worker reads it as absent and says the association is unknown rather
-  than inventing one. The field is ADDITIVE — Sales Orders and Delivery are unaffected.
-
-**⭐ FIVE ANSWERS FOR AN EMPTY UNIT CELL, AND NONE OF THEM IS A SPARE.** `Loading…` while the Unit
-read is in flight · `Could not be loaded` when it failed (with the existing retry) ·
-**`Not checked`** when the read answered for the ORDER and carried no entry for THIS item line —
-Carres did not look here, which is not the same as looking and finding nothing · **`Counted stock`**
-when the goods are counted rather than individually tracked · and `Not allocated` ONLY when the read
-answered for this line and no Unit is tied to the quantity. Printing any of the first four as the last is how a reader
-concludes goods do not exist because a request was slow.
+**⭐ NO `Purchase order details` TABLE — OWNER RULING 2026-10-06 · APPROVED / LOCKED.** Jess,
+after seeing the table: *"it should show at row listing, why we need another table?"* → *"yes"*.
+She never approved it; it was added by build `acd0666c7` (2026-09-11) and wrongly written here as a
+rule. The SO Batch **row listing** carries the PO facts: `PO No` (every number, comma-separated,
+each a link to its exact PO), `Supplier`, `Supplier Deliver To`, `PO Delivery Date` and
+`PO Status`. There is **no second `Purchase order details` table** in the row expansion or in the
+Quick View: the expansion is the goods table only, and the PO page holds each document's own
+detail (lines, quantities, Units, state, original date). **Unit ID is a Warehouse/PO-page fact,
+not shown on SO Batch** for ordered goods, so expanding a row makes no Unit read; the only Unit IDs
+on this page are the shelf Units the Ready Stock picker (above) offers for choosing. Add no new
+table or column for these facts; moving per-PO facts into the goods rows is the withdrawn design.
 
 **Coverage safeguards remain independent of the new display.** Exact `po_line_sources` records
 are historical lineage; the open-PO pool is effective remaining supply. Do not equate them, count
 received quantities twice, invent a third arithmetic, or change grouping/coverage allocation in this
 UI change. `fullyOnPo` must explicitly be false to authorize the pool gate; true or unknown is not
 buyable. The issue API independently recomputes and rejects already-covered quantities before any
-PO is created. Preserve existing lineage guards as well. Read-only PO details retain document
-states (`Completed`, `Waiting for goods from supplier`, `Sending not confirmed`); raw `Open` is not
-operator copy. Remaining purchasing quantities belong in selection/review, not removed goods columns.
+PO is created. Preserve existing lineage guards as well. Each document's own state
+(`Completed`, `Waiting for goods from supplier`, `Sending not confirmed`) is the PO page's; raw
+`Open` is not operator copy. Remaining purchasing quantities belong in selection/review, not removed
+goods columns.
 
 **Footer — owner correction 2026-09-11, ruling R6 2026-09-16.** The footer answers SCOPE with ONE
 total: `{n} of {total} Sales Orders`, the bare total when nothing is filtered, and `1 Sales Order`

@@ -748,8 +748,8 @@ export default function GoodsMiniTable({
    * FIVE COLUMNS LEFT, and none of the facts did.
    *   · `SKU` — the item and its configuration already identify the goods, and
    *     a code nobody types on this page took the width the item needs.
-   *   · `Ordered Qty` and `PO Safety Days` — `Purchase order details` below is
-   *     the table that is ABOUT documents, and the parent carries the margin.
+   *   · `Ordered Qty` and `PO Safety Days` — the row listing's `PO No` opens
+   *     each document's own page, and the parent carries the margin.
    *   · `To buy` — the remaining purchasing quantity belongs where the act is:
    *     the selection bar and the issue review, on the AUTHORITATIVE
    *     recomputation. Removing the column removed no coverage arithmetic and

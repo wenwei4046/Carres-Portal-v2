@@ -1354,9 +1354,9 @@ table (`GoodsMiniTable`) with real headings, aligned values and exact identity l
 exactly one job: it is **not a second Working Panel**, not an editing form and never concatenated
 prose. Module-specific goods facts stay the module's (receiving and loading results are not forced
 into Sales columns). Only explicitly ruled in-place write states (§4.1, Delivery) edit inside it.
-Purchasing's approved deletion of SO Batch's separate `Purchase order details` table is
-Purchasing-specific and conditional on a localhost proof that no fact is lost — see Purchasing
-MASTER §9.1; it does not generalise to other modules.
+SO Batch's separate `Purchase order details` table is deleted (owner ruling 2026-10-06): its PO
+facts are on the row listing and each PO page — see Purchasing MASTER §9.1. The deletion is
+Purchasing-specific and does not generalise to other modules.
 
 **The connector belongs to the table (BUILT 2026-09-18 / 2026-09-21).** Only the grid knows where its
 caret cell is, so the line is drawn by CSS inside that cell, never by arithmetic over declared widths

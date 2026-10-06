@@ -183,18 +183,6 @@ export const SO_BATCH_PURCHASE_WORDS = {
   poDeliveryDateUnknown: "Not recorded",
 
   /**
-   * ⭐ THE READ-ONLY SECTION'S OWN HEADING (owner correction 2026-09-11).
-   *
-   * `Purchase order details` — the section under the expanded row that holds
-   * every document covering the Sales Order, each with its own Unit, quantity,
-   * destination, supplier and original date. Deliberately NOT `Covered by`
-   * (retired: one heading for three questions) and NOT `ON PO` (that is the
-   * goods table's QUANTITY column, and a heading that repeats a column name
-   * makes the number and the section read as the same thing).
-   */
-  poDetails: "Purchase order details",
-
-  /**
    * ⭐ WHAT `To buy` MEANS WHEN IT IS NOT A REMAINDER (owner correction
    * 2026-09-11).
    *

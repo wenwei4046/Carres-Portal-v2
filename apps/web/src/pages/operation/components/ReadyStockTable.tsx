@@ -438,9 +438,9 @@ export default function ReadyStockTable({
  * pages cannot drift into three handles.
  *
  * `title` and `className` are both defaulted to what Ready Stock has always
- * rendered, so Manual Purchase and SO Batch's own Ready Stock section are
- * byte-identical. SO Batch's `Purchase order details` names itself, and hands
- * its own spacing to the connector stack that draws the line to it.
+ * rendered, so every purchasing page's Ready Stock disclosure is
+ * byte-identical; a caller that sits in a connector stack hands its own
+ * spacing to the stack that draws the line to it.
  */
 export function ReadyStockDisclosure({
   testId,
