@@ -149,6 +149,18 @@ Dealer commission rules:
   - Suppliers and whoever earns the commission should have a login to see their subscriptions' status. External logins are Jess's to authorise (ERP-ARCHITECTURE §6.4–6.5).
   - Who the commission is for: Chew reads it as the agent's; the code does not say (screens call it "store" or "sales").
   - Finance's own part: how a collected month enters the books is to be confirmed. Today it posts the whole month as rental income (Dr bank, cash or card; Cr 4200), with no supplier payable, commission payable or interest.
+- **Chew's answers on subscription (2026-10-06).**
+  - Billing starts the month after the customer receives the goods (「收到货的下个月开始算」). For Jess.
+  - Recording a payment must let Finance choose the day it was received, because customers do not always say (「一个有得选我几时收到」). For Jess.
+  - Late interest: a month Carres records late is never charged interest as long as nobody pressed `Charge interest` before it was recorded; a recorded month cannot be charged (measured: interest is refused on a month that is not owing).
+  - Early settlement, buyout, default and repossession go to management (「这个要和management 确认」 / 「就是我要确定」).
+  - The commission's recipient goes to management.
+  - The 22 July memo is for dealers only; subscription ignores it (「那个memo是给dealer 罢了，所以subscription不理」).
+  - **What Finance wants in its books** (Finance's own, except where noted):
+    1. One group per customer: each customer's subscriptions, bills, paid and unpaid.
+    2. A bill each month, made and emailed to the customer automatically. The bill document (SINV) is Rental's approved target, and emailing customers is a new outside channel, so both need Jess.
+    3. Money received knocks off its bill.
+    4. The supplier's share and the commission are settled once a month: worked out at month end and paid the next month. The cycle may change, so it is a setting.
 - **Subscription, measured 2026-10-05.** Subscription commission is a separate mechanism inside Rental (Jess's module). Each plan carries its own commission rate, set in Rental's plan settings. The rate is copied onto the agreement when it is signed. Each collected month records commission = the month's payment × that rate, beside the supplier's share. It is not in the dealer commission report and has no payout. It shows only on Rental's collection screen, and it does not say whether it is the dealer's or a salesperson's. A subscription's sales order is priced at RM 0, so it earns nothing in the dealer report and is not counted twice.
 - **Noted for later (Chew 2026-10-05).** A list's search box opens already typed-into, not behind a click. To change together with other UI items; first check whether it is the shared kit search.
 
