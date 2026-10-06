@@ -14,15 +14,11 @@
 
 ---
 
-**RESUME HERE — 2026-10-06, Service Case PLAN lane.** §7 below is the complete business-layer
-Blueprint drafted for owner review; every line in it is **PROPOSAL / NOT LAW** unless its heading says
-otherwise. Its UI composition (§7.11–§7.14, §7.18) is deliberately **not written**: the owner ruled
-on 2026-10-06 that Service waits for the UI/UX update master's latest shared kit and adopts it as
-published; a Service-specific variant of the shared Register, Working Panel or Object page is not
-drawn here. The alignment request was sent to that chat on 2026-10-06 (UI MASTER §0.3 item 11);
-state: sent, not acknowledged, not aligned. Production could not be walked (login required);
-measurements are from a local fixture preview of `origin/main` `9ad7231d0`, evidence in
-`docs/evidence/service/2026-10-06-*.jpg`.
+**RESUME HERE — 2026-10-06, Service PLAN / final review.** Read §7.25 (approval scope and remaining decisions) → §7.27 (complete operator workflow, Excel mapping and business acceptance) → §7.28–§7.29 (cross-module review evidence). The approved rulings below are in force; the entire Blueprint is not yet approved. Code baseline is main `678c27346`; this documentation branch contains subsequent scoped owner rulings, not proof of delivery. The old Oct-03 HTML is historical review evidence, not the current shared UI acceptance.
+
+**APPROVED IN THIS CHAT — one current scope:** Operation shares routine service work with one per-Case owner and helpers (§7.9); every Case receives a substantive first response within two Office working days (§7.2); the scoped internal processing deadlines are §7.9; every formal repair/replacement/charge/customer-movement decision goes through Service Case Approver (§7.4), with no repeat approval for unchanged approved-scope follow-up. Original Case clock, source-module permissions and actual completion facts remain.
+
+**NOT COMPLETE:** Service Register/Working Panel/Object/Tasks shared UI is still awaiting the UI controller's combined review, not a local variant. No-remedy/withdrawn/reopen, unapproved Excel extensions, settings changes and other explicitly marked proposals must not be silently implemented. No READY scope, Card, application code, live data change or deployment is authorised by this PLAN. Seven module reviews are recorded; they do not prove interfaces are connected. All scoped owner approvals must be available in the exact reviewed Git version before BUILD.
 
 **STATUS IS DERIVED AND READS WHO + ACTION + OBJECT — OWNER RULING 2026-10-06 (Jess).** On
 being shown the current `Pending / In Progress / Follow-up / Resolved` dropdown, the owner ruled:
@@ -618,15 +614,15 @@ Constitution's engineering/design rule, recorded here so no chat asks it again:
 Falsifier: the owner says one person a month must hold every Case (the PO/GRN monthly pattern); then
 the Duty switches from per-Case round robin to monthly allocation and nothing else changes.
 
-**CURRENT ADMISSION LIMIT — measured at main `678c27346`, 2026-10-06.** The owner rule above is resolved; do not re-interview the owner or revive a monthly single-holder proposal. Workspace §6.1/§11.5 still records the earlier admission hold, and the Work reader does not demonstrate routine Service actions. The remaining boundary is implementation plus approval of proposed per-step clock laws, not absence of the routine owner decision. The existing 14-working-day deadline/day-10 event is a reusable Case source, not evidence that Service is already in Tasks. No Service routine Tasks production verification is claimed.
+**CURRENT ADMISSION LIMIT — measured at main `678c27346`, 2026-10-06.** The owner rule above is resolved; do not re-interview the owner or revive a monthly single-holder proposal. Workspace §6.1/§11.5 still records the earlier admission hold, and the Work reader does not demonstrate routine Service actions. The remaining boundary is implementation plus any per-step clock not explicitly approved in §7.9, not absence of the routine owner decision. The existing 14-working-day deadline/day-10 event is a reusable Case source, not evidence that Service is already in Tasks. No Service routine Tasks production verification is claimed.
 
 **Action catalogue for later Workspace admission — owner rule and explicitly scoped deadlines in §7.9 are APPROVED; unlisted clocks and new actions remain PROPOSAL / NOT LAW; formal decision approval scope is approved in §7.4.**
 
 | Action identity | Fact (line 1) · act (line 2) | Owner rule | Due | Closes when |
 |---|---|---|---|---|
 | `service.first_response` | `{Case No} has no reply yet` · `Reply to {customer} · Record what you told them` | Service Duty | 2 Office working days from `opened_at` | `first_response` event |
-| `service.obtain_evidence` | `{evidence} is missing` · `Ask {customer} for {evidence} · Record their reply` | Service Duty | next Office working day | required slots filled |
-| `service.decide_remedy` | `Evidence is complete` · `Decide the remedy for {Case No}` | Service Duty (Approver when §7.4 says so) | next Office working day | `decision` event |
+| `service.obtain_evidence` | `{evidence} is missing` · `Ask {customer} for {evidence} · Record their reply` | Service Duty | next Office working day is still PROPOSAL for missing-evidence chasing | required slots filled; a contact result does not complete missing evidence |
+| `service.decide_remedy` | `Evidence is complete` · `Prepare the remedy decision for {Case No}` | Case owner prepares; Service Case Approver approves every formal decision (§7.4) | next Office working day, scoped trigger §7.9 APPROVED | recorded proposal then authorised decision; preparing is not approval or execution |
 | `service.approve_exception` | `{remedy} needs approval` · `Approve or refuse {remedy} for {Case No}` | Service Case Approver | next Office working day | approval event |
 | `service.pickup_photos` | `Pickup photos not approved` · `Check {customer}'s photos · Approve or refuse the pickup` | Service Duty | next Office working day | `pickup approved` / refused |
 | `service.deadline_call` | `{n} working days left` · `Call {customer} to say why it is taking longer` | Service Duty | day 10 | `customer_told` bound to the deadline (BUILT engine) |
@@ -777,7 +773,7 @@ Payment · Sales Order. Tally recorded here as sent / acknowledged / aligned.
 
 ## 7.25 · 批准范围与最终审阅门 — NOT READY FOR CARD
 
-**RULING / APPROVED — scoped owner confirmation 2026-10-06 in Service PLAN chat.** Jess confirmed the recommended processing chain: first substantive reply → required evidence → remedy decision / exception approval when required → collection, repair or replacement execution → communicate the outcome → customer confirmation. Each obligation names its owner, authoritative source and completion evidence. Delivery, Stock/Warehouse, Purchasing and Payment keep their own task identities and write ownership; Service reads their outcomes and does not create duplicate tasks. This scoped confirmation does not approve the full Blueprint, other proposed per-action clocks, proposed approval scope, settings changes, shared UI composition or deployment. No READY scope or BUILD commission follows from this confirmation.
+**RULING / APPROVED — scoped owner confirmation 2026-10-06 in Service PLAN chat.** Jess confirmed the recommended processing chain: first substantive reply → required evidence → remedy decision / exception approval when required → collection, repair or replacement execution → communicate the outcome → customer confirmation. Each obligation names its owner, authoritative source and completion evidence. Delivery, Stock/Warehouse, Purchasing and Payment keep their own task identities and write ownership; Service reads their outcomes and does not create duplicate tasks. This scoped confirmation does not approve the full Blueprint, unapproved per-action clocks, settings changes, shared UI composition or deployment. No READY scope or BUILD commission follows from this confirmation.
 
 **RULING / APPROVED — all-Case first response, owner 2026-10-06.** Every Case receives a substantive first response within two Office working days (§7.2); acknowledgment alone is not completion.
 
