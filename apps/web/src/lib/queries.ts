@@ -3099,8 +3099,15 @@ export interface operationOrdersListResponse {
    * rentals excluded, search NOT applied — counted by the server. `null` when
    * the count could not be read; absent from an older Worker. Never derive it
    * from `orders.length` (the list stops at 500 and a search replaces it).
+   * A paged read carries it on its first page only.
    */
   salesOrderTotal?: number | null;
+  /**
+   * `paged=1` only: the cursor of the next page, `null` on the last page.
+   * Absent from an unpaged read and from an older Worker that ignores
+   * `paged` — either way there is no next page to ask for.
+   */
+  nextCursor?: string | null;
 }
 
 /** GET /api/operation/orders/:id — composed drawer payload (orders.ts §97). */
@@ -5836,6 +5843,65 @@ export function useOperationOrders(
     // unmounts the search input mid-keystroke and steals focus).
     placeholderData: keepPreviousData,
     ...opts,
+  });
+}
+
+/**
+ * ⭐ EVERY PAGE OF THE SALES ORDERS REGISTER, OR NONE (SO A3-3, 2026-10-06 ·
+ * Orders MASTER §0.0 "Register, filters, reports and exports").
+ *
+ * Follows `nextCursor` from the first page to the last and answers ONE list:
+ * every order the caller may read in this scope, once each, in the server's
+ * order, with the first page's `salesOrderTotal`. Nothing is answered until
+ * the last page is in, so no count, total, group or export can be built from
+ * part of the population; a page that fails fails the whole read. A cursor
+ * that does not move on is an error, never a loop.
+ */
+export async function fetchEverySalesOrderPage(
+  readPage: (after: string | null) => Promise<operationOrdersListResponse>,
+): Promise<operationOrdersListResponse> {
+  const byId = new Map<string, operationOrderListRow>();
+  const asked = new Set<string>();
+  let salesOrderTotal: number | null | undefined;
+  let after: string | null = null;
+  for (;;) {
+    const page = await readPage(after);
+    if (after === null) salesOrderTotal = page.salesOrderTotal;
+    for (const order of page.orders ?? []) if (!byId.has(order.id)) byId.set(order.id, order);
+    const next = page.nextCursor ?? null;
+    if (next === null) break;
+    if (asked.has(next)) throw new Error("Sales orders could not be loaded.");
+    asked.add(next);
+    after = next;
+  }
+  return {
+    orders: [...byId.values()],
+    ...(salesOrderTotal === undefined ? {} : { salesOrderTotal }),
+  };
+}
+
+/**
+ * The Sales Orders Register's list: the WHOLE permitted population for these
+ * filters (`stage=proceeded`, optional search), read page by page through
+ * `paged=1` and answered once complete. Paging changes how it loads, never
+ * what it holds — the rail summary, the footer, the groups, Cards and Export
+ * all read the same complete list. Keyed under `["operation","orders"]`, so
+ * an order write's blunt invalidation refreshes it with every other list.
+ */
+export function useSalesOrderRegisterOrders(filters: operationOrderFilters) {
+  return useQuery({
+    queryKey: [...qk.operation.orders(filters), "every-page"],
+    queryFn: ({ signal }) =>
+      fetchEverySalesOrderPage((after) => {
+        const params = new URLSearchParams(operationOrdersSearch(filters).slice(1));
+        params.set("paged", "1");
+        if (after) params.set("after", after);
+        return apiFetch<operationOrdersListResponse>(`/api/operation/orders?${params}`, { signal });
+      }),
+    staleTime: 30_000,
+    /* Same reason as `useOperationOrders`: a new search keeps the last
+       complete list on screen instead of unmounting the grid mid-keystroke. */
+    placeholderData: keepPreviousData,
   });
 }
 
