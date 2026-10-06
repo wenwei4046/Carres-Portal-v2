@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { MANAGER_ASSIGNS_IN_STAFF_DUTIES_HREF } from "@carres/shared/payment-collection-owner";
 import SettingsWorkspace from "./SettingsWorkspace";
 
 vi.mock("./StaffDuties", () => ({ default: ({ settingsNavigation }: { settingsNavigation?: ReactNode }) => <div data-testid="duties-stub">{settingsNavigation}Duties</div> }));
@@ -222,6 +223,14 @@ describe("SettingsWorkspace — the Delivery group", () => {
 
 
 describe("Staff & Duties Settings entry", () => {
+  it("the Payment unassigned-order door (owner ruling 2026-09-26) lands on this page", () => {
+    expect(MANAGER_ASSIGNS_IN_STAFF_DUTIES_HREF).toBe("/operation/settings/staff-duties");
+    render(<MemoryRouter initialEntries={[MANAGER_ASSIGNS_IN_STAFF_DUTIES_HREF]}><Routes>
+      <Route path="/operation/settings/*" element={<SettingsWorkspace />} />
+    </Routes></MemoryRouter>);
+    expect(screen.getByTestId("duties-stub")).toBeVisible();
+  });
+
   it("opens with navigation hidden and returns to the same duty after choosing the section", () => {
     render(<MemoryRouter initialEntries={["/operation/settings/staff-duties"]}><Routes>
       <Route path="/operation/settings/*" element={<SettingsWorkspace />} />
