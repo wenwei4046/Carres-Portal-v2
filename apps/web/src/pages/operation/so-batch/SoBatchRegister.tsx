@@ -10,7 +10,6 @@ import Select from "@/components/kit/Select";
 import Block from "@/components/kit/Block";
 import Drawer from "@/components/kit/Drawer";
 import Checkbox from "@/components/kit/Checkbox";
-import DocumentTable from "@/components/kit/DocumentTable";
 import SoBatchCompactView from "./SoBatchCompactView";
 import ReadyStockTable from "../components/ReadyStockTable";
 import { useWholeRoundReadyStock } from "./useWholeRoundReadyStock";
@@ -83,16 +82,10 @@ import PurchasingTabs from "../PurchasingTabs";
 import styles from "./SoBatchRegister.module.css";
 import DestinationAllocationEditor from "./DestinationAllocationEditor";
 import { useSoBatchReadyStock } from "./ReadyStockCell";
-import { ReadyStockDisclosure } from "../components/ReadyStockTable";
 import ConnectedSections, {
-  CONNECT_AT_DISCLOSURE,
   CONNECT_AT_TABLE_HEADER,
   type ConnectedSection,
 } from "../components/ConnectedSections";
-import PoDetailsTable, {
-  poDetailRowsForLine,
-  type UnitReadState,
-} from "./PoDetailsTable";
 import GoodsMiniTable, {
   categoryWord,
   type GoodsMiniLine,
@@ -1308,12 +1301,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
     return <SoBatchCompactView row={o} status={purchaseStatus(o)} supplier={supplierOf(o)}
       safetyDays={safetyDaysWord(safetyDaysFacts.get(o.orderId))}
       items={renderExpansion(o, true)}
-      details={<DocumentTable label="Purchase order details" columns={[
-        { key: "po", label: "PO No" }, { key: "supplier", label: "Supplier" },
-        { key: "destination", label: "Supplier Deliver To" }, { key: "date", label: "PO Delivery Date" },
-      ]} rows={o.pos.map(po => ({ key: po.poId, onOpen: () => navigate(`/operation/procurement?po=${encodeURIComponent(po.poId)}`),
-        openLabel: `Open ${documentDisplayNumber(po.poId)}`, cells: { po: `${documentDisplayNumber(po.poId)}${po.version == null ? " · Not recorded" : `-V${po.version}`}`, supplier: po.supplierName ?? "Supplier not set",
-          destination: destinationName(po.destinationId), date: po.officialDeliveryDate ? fmtDate(po.officialDeliveryDate) : "Not recorded" } }))} />}
+      details={null}
       actions={<>
         <Checkbox id={`so-batch-card-select-${o.orderId}`} ariaLabel={`Select ${o.so == null ? "Not recorded" : `SO-${o.so}`}`} checked={checked}
           disabled={!canSelect} onCheckedChange={next => stock.active ? stock.toggle(stockIds(o.orderId), next) : setOrderSelected(o.orderId, next)} />
@@ -1824,7 +1812,6 @@ function SoBatchOrderExpansion({
   safetyDays,
   onReserved,
   onStockPending,
-  itemsOnly = false,
 }: {
   itemsOnly?: boolean;
   order: SoBatchOrderRow;
@@ -1859,31 +1846,18 @@ function SoBatchOrderExpansion({
     onSaved: onReserved,
     onPendingChange: onStockPending,
   });
-  const unitIdsByLine = useMemo(
-    () => new Map((expansion.data?.lines ?? []).map((l) => [l.lineId, l.unitIds])),
-    [expansion.data],
-  );
   /**
    * ⭐ UNKNOWN IS NOT `None` (2026-09-11). Three different things can be true
    * of a Unit cell — the goods exist, no Unit is tied to this line yet, or the
    * read has not answered — and printing the third as the second is how an
    * operator concludes goods do not exist because a request was slow.
    */
-  const unitRead: UnitReadState = expansion.isError
-    ? "error"
-    : expansion.isPending
-      ? "loading"
-      : "ready";
   /**
    * ⭐ AN ANSWER THAT DID NOT COVER THIS LINE IS NOT AN ANSWER ABOUT IT
    * (2026-09-11). The read answers for the ORDER; a line it carries no entry
    * for has not been looked at, and `Not allocated` — which claims Carres
    * looked and found nothing — would be a fact the read never established.
    */
-  const linesAnswered = useMemo(
-    () => new Set((expansion.data?.lines ?? []).map((l) => l.lineId)),
-    [expansion.data],
-  );
   const leafByLineId = useMemo(() => {
     const m = new Map<string, PurchaseDemandRow>();
     for (const leaf of leafs) for (const id of leaf.lineIds) m.set(id, leaf);
@@ -1900,7 +1874,6 @@ function SoBatchOrderExpansion({
    * already open beneath the goods when the row opens, so a scroll handler
    * pointing at a box the operator can see is a moving screen for nothing.
    */
-  const [poOpen, setPoOpen] = useState(true);
 
   /* ⭐ THE TICK AND THE EDITOR BELONG TO THE DEMAND, NOT TO EVERY ROW THAT
      SHOWS IT (owner correction 2026-09-11). A matched set spans several item
@@ -2095,24 +2068,6 @@ function SoBatchOrderExpansion({
    * one, and stated as a quantity where it cannot. Nothing is counted as
    * coverage without that lineage, and nothing with it is dropped.
    */
-  const poRows = order.lines.flatMap((l) =>
-    poDetailRowsForLine({
-      lineKey: l.orderLineId,
-      sku: l.sku,
-      item: l.item,
-      itemDetail: l.variant,
-      lineage: l.pos,
-      unitIds: unitIdsByLine.get(l.orderLineId) ?? [],
-      unitCoverage: expansion.data?.unitCoverage ?? {},
-      unitLines: expansion.data?.unitLines,
-      unitScopes: expansion.data?.unitScopes,
-      orderLineId: l.orderLineId,
-      unitRead,
-      lineRead: linesAnswered.has(l.orderLineId) ? "answered" : "absent",
-      po: (poId) => poById.get(poId),
-      destinationName,
-    }),
-  );
 
   if (lines.length === 0) {
     return <div className="px-2 py-2 text-body text-kit-slate-11">No items on this order</div>;
@@ -2188,35 +2143,6 @@ function SoBatchOrderExpansion({
    */
   const sections: ConnectedSection[] = [
     { key: "goods", connectAt: CONNECT_AT_TABLE_HEADER, node: goodsTable },
-    ...(!itemsOnly && poRows.length > 0
-      ? [
-          {
-            key: "po-details",
-            connectAt: CONNECT_AT_DISCLOSURE,
-            node: (
-              <ReadyStockDisclosure
-                testId={`so-batch-po-details-${order.orderId}`}
-                open={poOpen}
-                onToggle={() => setPoOpen((v) => !v)}
-                title={W.poDetails}
-                className=""
-              >
-                <PoDetailsTable
-                  label={
-                    order.so == null
-                      ? "Purchase order details"
-                      : `Purchase order details for SO-${order.so}`
-                  }
-                  rows={poRows}
-                  onPoClick={(poId) =>
-                    navigate(`/operation/procurement?po=${encodeURIComponent(poId)}`)
-                  }
-                />
-              </ReadyStockDisclosure>
-            ),
-          },
-        ]
-      : []),
   ];
 
   return (
