@@ -19,6 +19,7 @@
 // never a register of records: no rows to filter, sort, page or open.
 import { useState } from "react";
 import Button from "@/components/kit/Button";
+import Icon from "@/components/kit/Icon";
 import DatePicker from "@/components/kit/DatePicker";
 import Textarea from "@/components/kit/Textarea";
 import { fmtDate } from "@/lib/fmt-date";
@@ -65,7 +66,26 @@ function Consequences({ items }: { items: string[] }) {
   );
 }
 
+/** CONCURRENT EDITING (orders/MASTER §0.0, owner-approved 2026-10-01): the
+ *  commit was refused because a colleague changed the order after this page
+ *  opened. Nothing was written; the draft is kept. The governed stale words
+ *  (COPY-STANDARD, `Action changed · Review again` with the warning icon), then
+ *  what the colleague changed in the same Change · Before · After table. */
+function ChangedSinceOpened({ rows }: { rows: DiffRow[] }) {
+  return (
+    <div className="mb-3 border-b border-kit-blue-6 pb-3" data-testid="changed-since-opened">
+      <p role="alert" className="mb-2 flex items-center gap-2 text-label font-semibold text-kit-amber-11">
+        <Icon name="late" size={14} />
+        Action changed · Review again
+      </p>
+      {rows.length > 0 && <DiffTable rows={rows} label="Action changed · Review again" />}
+    </div>
+  );
+}
+
 export function DraftReview(props: {
+  /** Set after a commit was refused because the order moved since it opened. */
+  changedSinceOpened?: DiffRow[] | null;
   rows: DiffRow[];
   consequences: string[];
   commercial: boolean;
@@ -86,6 +106,7 @@ export function DraftReview(props: {
       data-testid="draft-review"
       aria-label="Your changes"
     >
+      {props.changedSinceOpened && <ChangedSinceOpened rows={props.changedSinceOpened} />}
       <p className="mb-2 text-body font-semibold text-kit-slate-12">
         {props.blocked
           ? props.blocked
