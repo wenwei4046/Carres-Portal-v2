@@ -5,7 +5,7 @@ import Checkbox from "@/components/kit/Checkbox";
 import Select from "@/components/kit/Select";
 import Input from "@/components/kit/Input";
 import Textarea from "@/components/kit/Textarea";
-import { ApiError, apiFetch } from "@/lib/api";
+import { apiFetch } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { fmtDate } from "@/lib/fmt-date";
 import { renderPoPdf } from "@/lib/pdf/render";
@@ -14,13 +14,10 @@ import { preparePoBundle, poBundleDocumentList, zipPoBundle } from "@/lib/purcha
 import { Block } from "../SalesOrderWorkspace";
 import { CHANNEL_WORD, confirmedSendFor, doorsForIssuedPo, refreshPurchasingReads, type IssuedPo, type PoSendEvidence } from "../components/PoIssueEvidence";
 
-type EmailAttempt = {
-  id: string;
-  status: "unknown" | "dispatched";
-  providerId?: string;
-  recipient: string;
-  documents: Array<{ id: string; version: number; recorded: boolean }>;
-};
+import {
+  dispatchSupplierEmail, documentFailureOf, emailAttemptsKeyOf, loadPoDocument, loadPoSendFacts, mergeEmailAttempts,
+  readEmailAttempts, recordEmailEvidence, SupplierEmailFailure, type EmailAttempt,
+} from "./po-supplier-send";
 
 /** Presentation only. Fresh owning reads still supply every document/version and send fact. */
 export type PoSupplierPreparation = {
@@ -38,21 +35,13 @@ export function readPoSupplierPreparation(value: unknown): PoSupplierPreparation
     subject: state.subject, messageIntroduction: state.messageIntroduction, scope: state.scope, roundWindow: state.roundWindow };
 }
 
-function readEmailAttempts(key: string): EmailAttempt[] {
-  try {
-    const value: unknown = JSON.parse(sessionStorage.getItem(key) ?? "[]");
-    if (!Array.isArray(value)) return [];
-    return value.filter((attempt): attempt is EmailAttempt => Boolean(attempt) && typeof attempt.id === "string" &&
-      (attempt.status === "unknown" || attempt.status === "dispatched") && typeof attempt.recipient === "string" &&
-      (attempt.providerId === undefined || typeof attempt.providerId === "string") && Array.isArray(attempt.documents) &&
-      attempt.documents.every((document: { id?: unknown; version?: unknown; recorded?: unknown }) =>
-        typeof document.id === "string" && typeof document.version === "number" && Number.isInteger(document.version) && document.version > 0 && typeof document.recorded === "boolean"));
-  } catch { return []; }
-}
-
 /** Same issued POs, grouped for supplier preparation and human-triggered dispatch. */
-export default function PoSupplierBundle({ pos, onPreview, roundWindow, onEvidenceChanged, onOpenObject, initialPreparation }: {
+export default function PoSupplierBundle({ pos, onPreview, roundWindow, onEvidenceChanged, onOpenObject, initialPreparation, title = "Purchase orders", onOpenSettings }: {
   pos: readonly IssuedPo[];
+  /** The Purchasing Settings door for a PDF blocked by a missing Supplier Deliver To address. */
+  onOpenSettings?: () => void;
+  /** The containing step's name (the round panel's `Send PDFs`). */
+  title?: string;
   roundWindow?: string;
   onPreview: (id: string, po: IssuedPo) => void;
   onEvidenceChanged?: () => void;
@@ -60,7 +49,7 @@ export default function PoSupplierBundle({ pos, onPreview, roundWindow, onEviden
   initialPreparation?: PoSupplierPreparation;
 }) {
   const userId = useAuth(state => state.user?.id ?? "unidentified");
-  const attemptsKey = `carres-po-email-attempts:${userId}`;
+  const attemptsKey = emailAttemptsKeyOf(userId);
   const attemptsStorageKey = useRef(attemptsKey);
   const [scope, setScope] = useState(initialPreparation?.scope ?? "round");
   const [roundPos, setRoundPos] = useState<readonly IssuedPo[] | null>(null);
@@ -83,7 +72,7 @@ export default function PoSupplierBundle({ pos, onPreview, roundWindow, onEviden
     : pos.filter(po => po.supplierId === supplier).map(po => po.id)));
   const [documents, setDocuments] = useState<Record<string, PoTemplateData>>({});
   const [documentsLoading, setDocumentsLoading] = useState(true);
-  const [documentFailures, setDocumentFailures] = useState<Array<{ id: string; message: string }>>([]);
+  const [documentFailures, setDocumentFailures] = useState<Array<{ id: string; message: string; settings?: boolean }>>([]);
   const [documentRefresh, setDocumentRefresh] = useState(0);
   const [sendHistory, setSendHistory] = useState<Record<string, PoSendEvidence[]>>({});
   const [historyLoading, setHistoryLoading] = useState(true);
@@ -135,19 +124,13 @@ export default function PoSupplierBundle({ pos, onPreview, roundWindow, onEviden
     setDocumentsLoading(true);
     setDocumentFailures([]);
     setError(null);
-    Promise.allSettled(supplierPos.map(async po => {
-      const document = await apiFetch<PoTemplateData>(`/api/operation/pos/${encodeURIComponent(po.id)}/print-data`);
-      if (document.draft || document.po_id !== po.id || typeof document.po_number !== "string" || !document.po_number.trim()
-        || !Number.isInteger(document.version) || document.version < 1) throw new Error("invalid_po_document");
-      return [po.id, document] as const;
-    })).then(results => {
+    Promise.allSettled(supplierPos.map(async po => [po.id, await loadPoDocument(po)] as const)).then(results => {
       if (cancelled) return;
       setDocuments(Object.fromEntries(results.flatMap(result => result.status === "fulfilled" ? [result.value] : [])));
-      setDocumentFailures(results.flatMap((result, index) => result.status === "rejected" ? [{
-        id: supplierPos[index].id,
-        message: result.reason instanceof ApiError && (result.reason.body as { code?: string } | null)?.code === "destination_address_missing"
-          ? "Address not recorded. Check Purchasing Settings." : "Could not be loaded",
-      }] : []));
+      /* ⭐ A MISSING ADDRESS BLOCKS ONLY THIS PO's PDF, AND SAYS WHICH ONE
+         (owner correction 2026-10-05); the supplier can still be sent its
+         other POs by WhatsApp or Email. */
+      setDocumentFailures(results.flatMap((result, index) => result.status === "rejected" ? [documentFailureOf(supplierPos[index], result.reason)] : []));
       setDocumentsLoading(false);
     });
     return () => { cancelled = true; };
@@ -159,31 +142,14 @@ export default function PoSupplierBundle({ pos, onPreview, roundWindow, onEviden
     setSendHistory({});
     setHistoryFailed([]);
     void Promise.allSettled(supplierPos.map(async po => {
-      const result = await apiFetch<{ sends: PoSendEvidence[] }>(`/api/operation/pos/${encodeURIComponent(po.id)}/sends`);
-      if (!Array.isArray(result.sends)) throw new Error("invalid_send_history");
-      const recovery = emailConfigured
-        ? await apiFetch<{ attempts: Array<Omit<EmailAttempt, "status"> & { status: EmailAttempt["status"] | "failed" }> }>(`/api/operation/pos/${encodeURIComponent(po.id)}/email-attempts`)
-        : { attempts: [] };
-      const failed = recovery.attempts.filter(attempt => attempt.status === "failed").map(attempt => attempt.id);
-      const attempts = recovery.attempts.filter((attempt): attempt is EmailAttempt => attempt.status !== "failed").map(attempt => ({ ...attempt,
-        documents: attempt.documents.map(document => ({ ...document,
-          recorded: result.sends.some(event => event.kind === "confirmed_sent" && event.po_version === document.version && event.note?.includes(`po-email/${attempt.id}`)) })) }));
-      return [po.id, result.sends, attempts, failed] as const;
+      const facts = await loadPoSendFacts(po, emailConfigured);
+      return [po.id, facts.sends, facts.attempts, facts.failed] as const;
     })).then(results => {
       if (cancelled) return;
       setSendHistory(Object.fromEntries(results.flatMap(result => result.status === "fulfilled" ? [[result.value[0], result.value[1]]] : [])));
       const restored = results.flatMap(result => result.status === "fulfilled" ? result.value[2] : []);
-      setEmailAttempts(previous => {
-        const failed = new Set(results.flatMap(result => result.status === "fulfilled" ? result.value[3] : []));
-        const merged = new Map(previous.filter(attempt => !failed.has(attempt.id)).map(attempt => [attempt.id, attempt]));
-        for (const attempt of restored) {
-          const existing = merged.get(attempt.id);
-          const documents = new Map((existing?.documents ?? []).map(document => [document.id, document]));
-          for (const document of attempt.documents) documents.set(document.id, document);
-          merged.set(attempt.id, { ...attempt, documents: [...documents.values()] });
-        }
-        return [...merged.values()];
-      });
+      const failed = new Set(results.flatMap(result => result.status === "fulfilled" ? result.value[3] : []));
+      setEmailAttempts(previous => mergeEmailAttempts(previous, restored, failed));
       setHistoryLoading(false);
       setHistoryFailed(results.flatMap((result, index) => result.status === "rejected" ? [supplierPos[index].id] : []));
     });
@@ -304,39 +270,20 @@ export default function PoSupplierBundle({ pos, onPreview, roundWindow, onEviden
     if (!ready || !emailConfigured || !contact?.contactEmail || sendBlocked || historyLoading || historyFailed.length) return;
     setBusy(true);
     setError(null);
-    const attemptId = crypto.randomUUID();
     try {
-      const prepared = await preparePoBundle(supplier, picked.map(po => ({ id: po.id, supplierId: po.supplierId, version: documents[po.id].version })),
-        id => apiFetch<PoTemplateData>(`/api/operation/pos/${encodeURIComponent(id)}/print-data`), renderPoPdf);
-      if (poBundleDocumentList(prepared) !== message) throw new Error("stale_po_version");
-      const files = await Promise.all(prepared.map(async po => {
-        const bytes = new Uint8Array(await po.pdf.arrayBuffer());
-        let binary = "";
-        for (let start = 0; start < bytes.length; start += 8192) binary += String.fromCharCode(...bytes.subarray(start, start + 8192));
-        return { id: po.id, version: po.version, filename: po.filename, content: btoa(binary) };
-      }));
       // Once dispatch begins, an ambiguous response blocks another send in this visit.
       // No automatic retry; known dispatch failures retry the evidence writer only.
-      const reserved: EmailAttempt = { id: attemptId, status: "unknown", recipient: contact.contactEmail.trim(),
-        documents: files.map(({ id, version }) => ({ id, version, recorded: false })) };
-      // Metadata only, no PDF bytes or credentials. A reload cannot silently forget an unknown send.
-      const attempts = [...emailAttempts, reserved];
-      sessionStorage.setItem(attemptsKey, JSON.stringify(attempts));
-      setEmailAttempts(attempts);
-      const result = await apiFetch<{ status: "dispatched"; providerId: string; documents: Array<{ id: string; version: number; recorded: boolean }> }>("/api/operation/pos/supplier-email", {
-        method: "POST", body: JSON.stringify({ supplierId: supplier, recipient: contact.contactEmail.trim(), subject,
-          message: messageIntroduction, attemptId, documents: files, resend }),
-      });
-      if (result.status !== "dispatched") throw new Error("email_unknown");
+      const result = await dispatchSupplierEmail({ supplierId: supplier,
+        picked: picked.map(po => ({ id: po.id, supplierId: po.supplierId, version: documents[po.id].version })), expectedMessage: message,
+        recipient: contact.contactEmail.trim(), subject, message: messageIntroduction, resend, attemptsKey, attempts: emailAttempts,
+        onReserved: setEmailAttempts });
       setResend(false);
-      setEmailAttempts(previous => previous.map(attempt => attempt.id === attemptId ? { ...attempt, status: "dispatched", providerId: result.providerId, documents: result.documents } : attempt));
+      setEmailAttempts(previous => previous.map(attempt => attempt.id === result.attemptId ? { ...attempt, status: "dispatched", providerId: result.providerId, documents: result.documents } : attempt));
       if (result.documents.some(document => document.recorded)) { setHistoryRefresh(previous => previous + 1); refreshPurchasingReads(); onEvidenceChanged?.(); }
     } catch (failure) {
-      if (failure instanceof ApiError && ([403, 409, 422, 503].includes(failure.status) ||
-        (failure.body as { code?: unknown } | null)?.code === "email_failed")) {
-        setEmailAttempts(previous => previous.filter(attempt => attempt.id !== attemptId));
-      }
-      setError(failure instanceof Error && failure.message === "stale_po_version"
+      const attemptId = (failure as { attemptId?: string }).attemptId;
+      if (failure instanceof SupplierEmailFailure && failure.definite) setEmailAttempts(previous => previous.filter(attempt => attempt.id !== attemptId));
+      setError(failure instanceof SupplierEmailFailure && failure.stale
         ? "Purchase order changed. Open the latest PDF and send it again."
         : "Sending not confirmed");
     } finally { setBusy(false); }
@@ -346,35 +293,27 @@ export default function PoSupplierBundle({ pos, onPreview, roundWindow, onEviden
     if (!emailEvidence.providerId || busy) return;
     setBusy(true);
     setError(null);
-    const results = await Promise.all(emailEvidence.documents.map(async document => {
-      if (document.recorded) return document;
-      try {
-        await apiFetch(`/api/operation/pos/${encodeURIComponent(document.id)}/confirm-sent`, { method: "POST", body: JSON.stringify({
-          channel: "email", recipient: emailEvidence.recipient, poVersion: document.version, note: `Email dispatch ${emailEvidence.providerId}; po-email/${emailEvidence.id}`,
-        }) });
-        return { ...document, recorded: true };
-      } catch { return document; }
-    }));
+    const results = await recordEmailEvidence(emailEvidence);
     setEmailAttempts(previous => previous.map(attempt => attempt.id === emailEvidence.id ? { ...attempt, documents: results } : attempt));
     if (results.some(document => document.recorded)) { setHistoryRefresh(previous => previous + 1); refreshPurchasingReads(); onEvidenceChanged?.(); }
     setBusy(false);
   }
 
-  return <Block title="Purchase orders">
+  return <Block title={title}>
     <div className="flex flex-col gap-3" data-testid="po-supplier-bundle">
       <Select id="po-bundle-scope" label="Purchase orders" value={scope} disabled={busy || scopeLoading} onValueChange={value => void changeScope(value === "today" ? "today" : "round")} options={[{ value: "round", label: roundWindow ? "This round" : "Purchase orders" }, { value: "today", label: "Today" }]} />
       <Select id="po-bundle-supplier" label="Supplier" value={supplier} onValueChange={changeSupplier}
         disabled={busy || scopeLoading} options={groups.map(([value, label]) => ({ value, label }))} />
       {scope === "round" && roundUnavailable && <div role="alert" className="flex flex-col gap-2">
-        <p className="text-meta text-kit-red-11">Evidence could not be loaded</p>
+        <div className="text-meta text-kit-red-11">Evidence could not be loaded</div>
         <Button disabled={scopeLoading} onClick={() => setRoundRefresh(value => value + 1)}>Try again</Button>
       </div>}
       {scope === "round" && returnedUnavailable && <div role="alert" className="flex flex-col gap-2">
-        <p className="text-meta text-kit-red-11">Evidence could not be loaded</p>
+        <div className="text-meta text-kit-red-11">Evidence could not be loaded</div>
         <Button disabled={scopeLoading || busy} onClick={() => setReturnedRefresh(value => value + 1)}>Try again</Button>
       </div>}
       {scopeUnavailable && <div role="alert" className="flex flex-col gap-2">
-        <p className="text-meta text-kit-red-11">Evidence could not be loaded</p>
+        <div className="text-meta text-kit-red-11">Evidence could not be loaded</div>
         <Button disabled={scopeLoading || busy} onClick={() => void changeScope("today", true)}>Try again</Button>
       </div>}
       <Checkbox id="po-bundle-all" label="Select all" disabled={busy || scopeLoading || !supplierPos.length} checked={supplierPos.length > 0 && picked.length === supplierPos.length ? true : picked.length ? "indeterminate" : false}
@@ -391,15 +330,18 @@ export default function PoSupplierBundle({ pos, onPreview, roundWindow, onEviden
           subject, messageIntroduction, scope, roundWindow,
         }, activePos)}>Open full page</Button>}</div>
         </div>
-        <p className="text-body">{documents[po.id]?.destination?.name ?? po.destination}</p>
-        {documents[po.id]?.so_refs?.length ? <p className="text-meta text-kit-slate-11">SO {documents[po.id].so_refs!.join(", ")}</p> : null}
-        {sendHistory[po.id] && documents[po.id] && <p className="text-meta text-kit-slate-11">
+        <div className="text-body">{documents[po.id]?.destination?.name ?? po.destination}</div>
+        {documents[po.id]?.so_refs?.length ? <div className="text-meta text-kit-slate-11">SO {documents[po.id].so_refs!.join(", ")}</div> : null}
+        {sendHistory[po.id] && documents[po.id] && <div className="text-meta text-kit-slate-11">
           {confirmedSendFor(sendHistory[po.id], documents[po.id].version) ? "PO sent to supplier" : "Sending not confirmed"}
-        </p>}
+        </div>}
       </div>)}
       {documentFailures.length > 0 && <div role="alert" className="flex flex-col gap-2">
-        {documentFailures.map(failure => <p key={failure.id} className="text-meta text-kit-red-11">{documentDisplayNumber(failure.id)} · {failure.message}</p>)}
-        <Button disabled={documentsLoading || busy} onClick={() => setDocumentRefresh(value => value + 1)}>Try again</Button>
+        {documentFailures.map(failure => <div key={failure.id} className="text-meta text-kit-red-11">{documentDisplayNumber(failure.id)} · {failure.message}</div>)}
+        <div className="flex flex-wrap gap-2">
+          <Button disabled={documentsLoading || busy} onClick={() => setDocumentRefresh(value => value + 1)}>Try again</Button>
+          {onOpenSettings && documentFailures.some(failure => failure.settings) && <Button onClick={onOpenSettings}>Open Settings</Button>}
+        </div>
       </div>}
       <Select id="po-bundle-channel" label="Communication channel" value={channel} onValueChange={value => setChannel(value === "email" ? "email" : "whatsapp")}
         disabled={busy}
@@ -410,7 +352,7 @@ export default function PoSupplierBundle({ pos, onPreview, roundWindow, onEviden
       </>}
       <Textarea id="po-bundle-introduction" label="Message" value={messageIntroduction} disabled={busy || sendBlocked} onChange={event => { setMessageIntroduction(event.target.value); setCopied(false); }} />
       <Textarea id="po-bundle-message" label="PO No" value={message} readOnly />
-      {channel === "email" && picked.map(po => documents[po.id] && <p key={po.id} className="text-meta text-kit-slate-11">{documents[po.id].po_number.replace(/[^a-zA-Z0-9._-]/g, "_")}-V{documents[po.id].version}.pdf</p>)}
+      {channel === "email" && picked.map(po => documents[po.id] && <div key={po.id} className="text-meta text-kit-slate-11">{documents[po.id].po_number.replace(/[^a-zA-Z0-9._-]/g, "_")}-V{documents[po.id].version}.pdf</div>)}
       {channel === "email" && alreadySent && <Checkbox id="po-bundle-resend" label="Send again" checked={resend}
         disabled={busy || historyLoading || historyFailed.length > 0 || emailOutcome === "unknown"}
         onCheckedChange={checked => setResend(checked === true)} />}
@@ -421,26 +363,34 @@ export default function PoSupplierBundle({ pos, onPreview, roundWindow, onEviden
         }}>Copy message</Button>
         {channel === "whatsapp" ? <Button variant="neutral" size="sm" disabled={!ready || !doors?.whatsapp}
           onClick={() => { if (doors?.whatsapp) window.open(doors.whatsapp.url, "_blank", "noopener,noreferrer"); }}>Open WhatsApp</Button>
-          : <Button variant="primary" size="sm" disabled={!ready || !emailConfigured || !contact?.contactEmail || !subject.trim() || sendBlocked || historyLoading || historyFailed.length > 0} loading={busy}
-            title={!emailConfigured ? "Not available" : undefined} onClick={() => void sendEmail()}>Send Email</Button>}
+          : <>
+            {/* ⭐ EMAIL IS ALWAYS A WAY TO SEND (owner correction 2026-10-05: Ohana
+                sends POs by Email today). Portal dispatch needs its provider;
+                without it the operator emails from their own mail with the
+                downloaded PDFs and records `PO sent to supplier` on the PO. */}
+            {!emailConfigured && <Button variant="neutral" size="sm" disabled={!ready || !contact?.contactEmail}
+              onClick={() => { if (contact?.contactEmail) window.location.href = `mailto:${encodeURIComponent(contact.contactEmail.trim())}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(preparedMessage)}`; }}>Open email</Button>}
+            <Button variant="primary" size="sm" disabled={!ready || !emailConfigured || !contact?.contactEmail || !subject.trim() || sendBlocked || historyLoading || historyFailed.length > 0} loading={busy}
+              title={!emailConfigured ? "Not available" : undefined} onClick={() => void sendEmail()}>Send Email</Button>
+          </>}
       </div>
-      {emailOutcome === "unknown" && <p role="status" className="text-meta text-kit-amber-11">Sending not confirmed</p>}
+      {emailOutcome === "unknown" && <div role="status" className="text-meta text-kit-amber-11">Sending not confirmed</div>}
       {emailAttempts.filter(attempt => attempt.status === "dispatched").map(emailEvidence => <div key={emailEvidence.id} className="flex flex-col gap-2">
-        <p className="text-strong">PO sent to supplier · Email</p>
-        {emailEvidence.documents.map(document => <p key={document.id} className="text-meta text-kit-slate-11">{documentDisplayNumber(`${document.id}-V${document.version}`)} · {document.recorded ? "PO sent to supplier" : "Not confirmed · Try again"}</p>)}
+        <div className="text-strong">PO sent to supplier · Email</div>
+        {emailEvidence.documents.map(document => <div key={document.id} className="text-meta text-kit-slate-11">{documentDisplayNumber(`${document.id}-V${document.version}`)} · {document.recorded ? "PO sent to supplier" : "Not confirmed · Try again"}</div>)}
         {emailEvidence.documents.some(document => !document.recorded) && <Button disabled={busy} onClick={() => void recordDispatchedEmail(emailEvidence)}>Save</Button>}
       </div>)}
-      {copied && <p className="text-meta text-kit-slate-11">Copied. Contact result is unchanged.</p>}
-      {error && <p role="alert" className="text-meta text-kit-red-11">{error}</p>}
+      {copied && <div className="text-meta text-kit-slate-11">Copied. Contact result is unchanged.</div>}
+      {error && <div role="alert" className="text-meta text-kit-red-11">{error}</div>}
       {historyFailed.length > 0 && <Block title="History">
-        {historyFailed.map(id => <p key={id} role="alert" className="text-meta text-kit-red-11">{id} · Evidence could not be loaded</p>)}
+        {historyFailed.map(id => <div key={id} role="alert" className="text-meta text-kit-red-11">{id} · Evidence could not be loaded</div>)}
         <Button onClick={() => setHistoryRefresh(value => value + 1)}>Try again</Button>
       </Block>}
       {supplierPos.some(po => sendHistory[po.id]?.length) && <Block title="History">
         {supplierPos.flatMap(po => (sendHistory[po.id] ?? []).map((event, index) => <div key={`${po.id}-${index}`} className="flex flex-col gap-1">
-          <p className="text-strong">{event.kind === "confirmed_sent" ? "PO sent to supplier" : `${CHANNEL_WORD[event.channel] ?? event.channel} opened`}</p>
-          <p className="text-body">{documentDisplayNumber(`${po.id}${event.po_version ? `-V${event.po_version}` : ""}`)} · {CHANNEL_WORD[event.channel] ?? event.channel}</p>
-          <p className="text-meta text-kit-slate-11">{fmtDate(event.sent_at, { time: true })}{event.sent_by_name ? ` · ${event.sent_by_name}` : ""}</p>
+          <div className="text-strong">{event.kind === "confirmed_sent" ? "PO sent to supplier" : `${CHANNEL_WORD[event.channel] ?? event.channel} opened`}</div>
+          <div className="text-body">{documentDisplayNumber(`${po.id}${event.po_version ? `-V${event.po_version}` : ""}`)} · {CHANNEL_WORD[event.channel] ?? event.channel}</div>
+          <div className="text-meta text-kit-slate-11">{fmtDate(event.sent_at, { time: true })}{event.sent_by_name ? ` · ${event.sent_by_name}` : ""}</div>
         </div>))}
       </Block>}
     </div>

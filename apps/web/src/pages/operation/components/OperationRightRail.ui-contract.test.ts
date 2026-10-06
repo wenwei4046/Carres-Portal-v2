@@ -11,26 +11,28 @@ describe("ERP Shell V1 quick rail contract", () => {
     const src = read("OperationRightRail.tsx");
     expect(src).not.toContain('label: "Team"');
     expect(src).toContain('label: "Calendar"');
-    expect(src).toContain('label: "My Work"');
+    expect(src).toContain('label: "Tasks"');
     expect(src).toContain('label: "Activity"');
     expect(src).not.toContain('label: "Follow-ups"');
-    expect(src).toContain("w-[340px]");
+    expect(src).not.toContain('label: "My Work"');
+    /* The ONE right area is at most the governed drawer width (owner direction 2026-10-05). */
+    expect(src).toContain("max-w-drawer");
   });
 
   /**
-   * The rail's My Work is the `Work` destination's PEEK (ui/MASTER.md §5), so
+   * The rail's Tasks door is the `Work` destination's PEEK (ui/MASTER.md §5), so
    * it wears that destination's face — owner ruling 2026-08-15. It used to
    * wear the Flag borrowed from the Orders follow-up column, a different
    * system entirely. One TABS entry drives both the collapsed icon strip and
    * the expanded panel header, so the two states cannot drift apart.
    */
-  it("gives My Work the same icon as the left-navigation Work destination", () => {
+  it("gives Tasks the same icon as the left-navigation Work destination", () => {
     const rail = read("OperationRightRail.tsx");
     const nav = read("../../portal/portal-nav.ts");
     const navIcon = /\{\s*key:\s*"work",[^}]*icon:\s*(\w+)/.exec(nav)?.[1];
     expect(navIcon).toBe("ListTodo");
     expect(rail).toMatch(
-      new RegExp(`key:\\s*"tasks",\\s*label:\\s*"My Work",\\s*icon:\\s*${navIcon}\\b`),
+      new RegExp(`key:\\s*"tasks",\\s*label:\\s*"Tasks",\\s*icon:\\s*${navIcon}\\b`),
     );
     expect(rail).not.toContain("icon: Flag");
   });
