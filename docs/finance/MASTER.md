@@ -173,6 +173,7 @@ Dealer commission rules:
 - **Subscription in Finance's books, confirmed by Chew 2026-10-06.**
   - An invoice is income when it is issued: Dr the customer's subscription debtor, Cr rental income. Money received: Dr bank, Cr the customer's debtor, knocking off the invoice (「我开单时就是我的income … 我收到钱就是银行增加，knock off invoice」). This replaces "income when collected".
   - The parent account holds subscription customers only. Chew will give a new chart of accounts.
+  - The parent is a debtor control account. Each customer is its sub-account (debtor code), and every invoice and receipt posts to that customer's sub-account; the control account shows their total (「母账是debtor control account，所以每个顾客都应该是子账」, Chew 2026-10-06).
   - The invoice shows the customer's details. Its description names the agreement number, which instalment and the amount; the rest follows the standard invoice.
   - Invoices are made automatically each month. Chew looks them over, then sends them from accounts@carresofficial.com.
   - Late interest is invoiced too.
