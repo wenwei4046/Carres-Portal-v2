@@ -51,6 +51,12 @@ append-only history.
 Delivery never creates a second commercial-order, stock, money, duty, calendar, Service or
 Guarantee editor. It records what happened and links the owner that must decide a remedy.
 
+**Supplier inbound is the supplier's leg — owner ruling 2026-10-06 (relayed from the UI Master
+chat).** Every supplier delivers to Carres with its own transport except Nice Future, where Carres
+collects (the governed `Nice Future → NETS → Carres Klang` arrangement, Purchasing MASTER). For the
+other suppliers the supplier → warehouse movement is not a Delivery Journey leg and Delivery
+arranges no collection for it; Purchasing owns the supplier route fact and Receiving the arrival.
+
 **Supplier-delay boundary — owner-approved 2026-09-24.** A revised supplier/PO arrival remains a
 Purchasing and stock-planning fact. Delivery may show its derived stock-risk/customer-impact signal,
 but never labels it a confirmed or scheduled customer delivery, places it in the confirmed-delivery
@@ -2047,11 +2053,16 @@ ride a Delivery Journey leg with its own DO scope, handover and arrival — neve
 Inventory prints only the two events, OUT at origin (`Ship Date · Pickup By {company} · Delivery
 Location`) and IN at the transit point; nobody records the road.
 
-**Singapore.** A Singapore address creates two arrangement rows from the day the order arrives:
-leg 1 `Klang WH → JB partner` and leg 2 `JB partner → Singapore customer`, each with its own
-Logistics, dates, DO, handover, `Who has it` fact and result. Leg 1 completion means the
-goods reached the named JB warehouse, never that the customer received them. The route prints
-without a `Leg` word; the leg number rides the URL only.
+**Singapore — owner ruling 2026-10-06 (Jess: "eu is 2nd leg to send to singapore … eu is jb, then
+eu send to singapore").** A Singapore address creates two arrangement rows from the day the order
+arrives. Leg 1 `Klang WH → EU (JB)`: any Logistics company Carres assigns carries the goods from
+Kuala Lumpur to EU at Johor Bahru. Leg 2 `EU (JB) → Singapore customer`: EU delivers to the
+customer in Singapore. EU is the Logistics company of the second leg and the JB handover point; it
+is never a supplier collector and never a Carres warehouse. Each leg keeps its own Logistics,
+dates, DO, handover, `Who has it` fact and result; leg 1's company is chosen per order and is not
+fixed to EU. Leg 1 completion means the goods reached EU at JB, never that the customer received
+them. The route prints without a `Leg` word; the leg number rides the URL only. Falsifier: a
+Singapore order whose second leg an evidenced company other than EU carries.
 
 **East Malaysia (owner approval 2026-09-01).** A Sabah or Sarawak order travels through HOUZS:
 Carres hands the goods to HOUZS with exact-Unit handover facts and proof, and HOUZS owns the
