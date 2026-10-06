@@ -195,7 +195,12 @@ message sent; do not promote that report to a full live issue-to-send journey.
 
 ### SO Batch complete delivery boundary — owner-approved 2026-10-04
 
-**Bounded presentation correction — owner confirmed 2026-10-05; BUILD, production proof pending.**
+**Bounded presentation correction — owner confirmed 2026-10-05; PRODUCTION-VERIFIED 2026-10-06 at
+`6a5734d2a`.** Measured on the official page (erp.carresofficial.com; web deploy proof and API
+`/health` both report `6a5734d2a`): 32px single-line rows, Search before Table/Cards, the approved
+columns `PO Status · Proceed Date · SO No · PO Safety Days · Customer’s original requested delivery ·
+Customer Delivery Location · Customer · Items · Supplier · Supplier Deliver To · PO No · PO Delivery
+Date`, rail `Listing` / `Report` with `Order time` (11:00 AM · 4:00 PM) and `PO Safety Days`.
 SO Batch adopts the confirmed SO-derived shared listing recipe: 32px desktop baseline rows,
 12px body/18px line height, natural growth for complete wrapped facts; 40px desktop toolbar with
 responsive wrapping. Table/Cards belongs after Search in the existing right tools cluster; all
@@ -207,10 +212,11 @@ The listing heading is `Customer’s original requested delivery`, in two lines 
 / `requested delivery`, using the preserved revision-1 SO request for display, date filtering,
 sorting and export. Missing/TBD original evidence remains absent; never substitute a later request.
 The existing current-request field remains separate and still supplies purchasing planning
-arithmetic. Measured 2026-10-05: optional Ready Stock matching still orders demand by that
-current-request field (`orders.delivery_date`, `packages/shared/src/so-batch-stock-match.ts`); the
-owner-approved matching priority below (Customer’s original requested delivery, then Proceed Date)
-is APPROVED TARGET / NOT BUILT. This presentation correction does not change cutoffs, carryover, counts,
+arithmetic. Measured 2026-10-06: the Settings priority (0650, §11) now decides the order and Match is
+refused when it is unreadable, but `customer_delivery` still sorts by the current-request field
+(`requestedDeliveryDate` in `packages/shared/src/so-batch-stock-match.ts`); the owner-approved
+ordering below (Customer’s original requested delivery, then Proceed Date) remains APPROVED
+TARGET / NOT BUILT. This presentation correction does not change cutoffs, carryover, counts,
 completion/sending, Safety Days, stock eligibility/reservation or multi-PO interaction. The independent
 field-width delivery retains registry ownership. No live issue, supplier send, reservation or settings
 write is authorised for acceptance.
@@ -363,7 +369,9 @@ when present and keeps chosen/saved Units from other locations visible; location
 nothing. 44 picker tests pass, including a saved Unit outside the default location. These stock
 changes are local build facts, not production proof.
 
-**Ready Stock priority Settings — LOCAL BUILD, production proof pending.** The approved default
+**Ready Stock priority Settings — PRODUCTION-VERIFIED 2026-10-06.** `Settings → Purchasing` shows
+the `Ready Stock` block on the official page and `purchasing_settings.ready_stock_priority` reads
+`customer_delivery` (0650 applied); SO Batch receives the value through the purchase-demand read. The approved default
 Customer Requested Delivery Date priority and optional Proceed Date priority now share one
 persisted `purchasing_settings.ready_stock_priority` value. Migration 0650 adds the default and
 the existing manager-gated, row-locked, audited Settings write door. The Settings page preserves
@@ -4203,7 +4211,10 @@ PO**, and a decorative arrow concatenated into a document number makes one targe
   actual receipt in Receiving. `Received Qty` is the shared `warehouseReceiptTotals` reader, so the
   count beside a GRN here and the count on the GRN itself cannot drift (Law D); damaged and
   wrong-item units are not received, which is that same arithmetic, not a second one.
-- **PO Version display — owner ruling 2026-10-01 / APPROVED TARGET, NOT BUILT:**
+- **PO Version display — owner ruling 2026-10-01 / PARTLY BUILT, measured 2026-10-06:** the row
+  preview and full detail print `documentDisplayNumber` (`PO-260903-4389-V1`); the register's
+  `PO No` column still prints `PO-20260903-4316` and a separate `PO Version` column still prints
+  `PO V1`. That remaining deviation is the open fix. The rule:
   display dated PO numbers as `PO-YYMMDD-RRRR-V{n}`, for example
   `PO-260903-4389-V1` (owner correction: remove the leading `20` from the displayed year).
   Apply the same displayed identity to the register, preview, full detail, revision labels and
@@ -4256,7 +4267,8 @@ current group's header is sticky inside its own group and stops at its boundary.
 number on desktop, number only on narrow screens. **UI MASTER §6.10 owns this**, once, for every
 grouped listing page; this section neither restates its mechanics nor varies them.
 
-**Rail — owner-approved 2026-10-01 / APPROVED TARGET, NOT BUILT.** Preserve the
+**Rail — owner-approved 2026-10-01 / BUILT, PRODUCTION-VERIFIED 2026-10-06 except the rows named
+below.** Preserve the
 supplier-follow-up purpose and adopt the confirmed shared template. **Owner correction 2026-10-02:**
 remove the visible `Filters` heading and follow the annotated deployed Sales Order vertical
 navigation with both **`Listing`** and **`Monthly demand`**, including its shared icons,
@@ -4264,7 +4276,13 @@ spacing and selected-tab presentation. Listing retains the approved PO monitor c
 The local Monthly demand preview reuses the existing Sales Order monthly-demand reader and
 presentation with explicitly fictional source demand; this is not production integration proof.
 Preserve source-owned demand and SO Batch to-buy facts rather than deriving customer demand
-from issued PO quantities. Full production adoption and source connections remain unbuilt. The complete monitor rail is:
+from issued PO quantities. Measured on the official page 2026-10-06 at `6a5734d2a`: `Listing` /
+`Monthly demand` tabs; groups `Sending` (Confirm PO sent to supplier), `Supplier reply` (Confirm
+tomorrow's supplier delivery · Supplier Confirmed Delivery Date changed · Supplier delivery date
+passed), `Receiving` (Partly received), `Supplier`, `Supplier Deliver To`. Not yet present: `Balance
+delivery date not confirmed` and the `Exceptions` group (Supplier cannot supply · Waiting for
+supplier to agree · Open supplier claims); Monthly demand's production source connection is
+unverified. The complete monitor rail is:
 
 | Group | Filters |
 |---|---|
