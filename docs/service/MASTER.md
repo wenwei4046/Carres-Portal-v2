@@ -474,9 +474,7 @@ at {customer}` or `Call {supplier} …`; supplier legs are **read** from the lin
 `{n} working days late` · `First reply late`. They print as a second line or a pill and open their own
 Work item; they never replace the step sentence.
 
-**PROPOSAL — the 2-working-day first response applies to every source, not only Dealer.** The
-owner ruled it for Dealer requests (2026-10-02). One clock for all sources is one rule to learn and one
-Work item. Falsifier: the owner says customer complaints need a different first-response promise.
+**RULING / APPROVED — owner confirmation in Service PLAN chat, 2026-10-06.** Every Service Case, regardless of source (customer, Dealer or staff reporting on their behalf), receives a substantive first response within two Office working days from the recorded Case report/open date. It includes an initial assessment, a specific request for required evidence or a concrete next arrangement; acknowledgment alone is not completion. The assigned Operation Case owner / authorised cover is responsible. The first-response completion record retains actor, channel, business date/time and available evidence. This is not a two-day repair, collection or delivery guarantee. The existing §4 fourteen-working-day completion clock is unchanged. Shared calendar defines working days; no page-local calendar, midnight assumption or undocumented time-of-day deadline is introduced. Approval is business truth, not implementation / production proof. Falsifier for future review: measured staff coverage cannot sustain the promise.
 
 ## 7.3 · Intake — the doors and the guided questions
 
@@ -560,7 +558,7 @@ remaining Unit's leg open. Case closure never moves a Unit (Stock §12.8).
 
 | Clock | Rule | Owner of the call | BUILT? |
 |---|---|---|---|
-| First response | 2 Office working days from `opened_at` (RULING for Dealer; PROPOSAL for all) | Service Duty | NOT BUILT |
+| First response | 2 Office working days from `opened_at` (APPROVED for all Cases, owner 2026-10-06) | Service Duty | NOT BUILT |
 | Completion promise | 14 working days from `opened_at` (Mon–Sat, MY holidays) | derived (BUILT) | BUILT |
 | Day-10 call | `Call {customer} to say why it is taking longer`, reason from the locked list | Service Duty | engine BUILT; Work NOT admitted |
 | Extension | once, ≤ one more period, measured from the base deadline | Service Duty records; no approver | BUILT |
@@ -780,9 +778,11 @@ Payment · Sales Order. Tally recorded here as sent / acknowledged / aligned.
 
 ## 7.25 · 批准范围与最终审阅门 — NOT READY FOR CARD
 
-**RULING / APPROVED — scoped owner confirmation 2026-10-06 in Service PLAN chat.** Jess confirmed the recommended processing chain: first substantive reply → required evidence → remedy decision / exception approval when required → collection, repair or replacement execution → communicate the outcome → customer confirmation. Each obligation names its owner, authoritative source and completion evidence. Delivery, Stock/Warehouse, Purchasing and Payment keep their own task identities and write ownership; Service reads their outcomes and does not create duplicate tasks. This scoped confirmation does not approve the full Blueprint, proposed response/per-action clocks, proposed approval scope, settings changes, shared UI composition or deployment. No READY scope or BUILD commission follows from this confirmation.
+**RULING / APPROVED — scoped owner confirmation 2026-10-06 in Service PLAN chat.** Jess confirmed the recommended processing chain: first substantive reply → required evidence → remedy decision / exception approval when required → collection, repair or replacement execution → communicate the outcome → customer confirmation. Each obligation names its owner, authoritative source and completion evidence. Delivery, Stock/Warehouse, Purchasing and Payment keep their own task identities and write ownership; Service reads their outcomes and does not create duplicate tasks. This scoped confirmation does not approve the full Blueprint, other proposed per-action clocks, proposed approval scope, settings changes, shared UI composition or deployment. No READY scope or BUILD commission follows from this confirmation.
 
-**PROPOSAL / NOT LAW — consolidated business recommendation for owner review, 2026-10-06.** Apply Dealer's substantive first-response promise of two Office working days to all customer Cases; acknowledging receipt alone is not a substantive reply. Internal evidence review, remedy decisions, approval and final-confirmation follow-up should have a next-Office-working-day action deadline from the triggering fact; failed collection and public escalation should be handled the same Office working day (after hours: next Office working day). These are proposed action response deadlines, never promised supplier repair, stock arrival or customer-response dates. Waiting or sending never closes an obligation or pauses the existing 14-working-day Case deadline. Preserve §4's derived calendar rule, bounded extension and deadline-bound call events; do not introduce the conflicting proposed settings snapshot for existing Case deadlines. New source obligations keep their occurrence, original trigger, owner and due across repeated events and reassignment.
+**RULING / APPROVED — all-Case first response, owner 2026-10-06.** Every Case receives a substantive first response within two Office working days (§7.2); acknowledgment alone is not completion.
+
+**PROPOSAL / NOT LAW — remaining response timing for owner review.** Internal evidence review, remedy decisions, approval and final-confirmation follow-up should have a next-Office-working-day action deadline from the triggering fact; failed collection and public escalation should be handled the same Office working day (after hours: next Office working day). These are proposed action response deadlines, never promised supplier repair, stock arrival or customer-response dates. Waiting or sending never closes an obligation or pauses the existing 14-working-day Case deadline. Preserve §4's derived calendar rule, bounded extension and deadline-bound call events; do not introduce the conflicting proposed settings snapshot for existing Case deadlines. New source obligations keep their occurrence, original trigger, owner and due across repeated events and reassignment.
 
 Recommend ordinary policy-authorised remedies proceed with the assigned Case owner's recorded decision; exceptions (goodwill, charge waiver, refusing an eligible entitlement, refund, condition waiver, public-escalation decision) require the governed Approver and cannot override an absolute policy safety/condition prohibition. Payment executes approved customer money; Purchasing owns supplier recovery independently. Trade-off: faster normal handling with clearer response expectations increases Operation workload and requires monitored Duty coverage; exception control remains. This recommendation is overturned by evidence that two-day replies cannot be staffed, that ordinary remedies require commercial approval by policy, or that existing source deadlines would be duplicated. Any contrary approved policy wins and the conflict stays visible for resolution.
 
@@ -792,14 +792,14 @@ Recommend ordinary policy-authorised remedies proceed with the assigned Case own
 
 | 待审项 | 已批准边界 | 推荐与操作影响 |
 |---|---|---|
-| 首次实质回复覆盖 | Dealer两Office工作日已批准 | 扩展到所有Case；Operation需覆盖，收到式回复不算 |
+| 首次实质回复覆盖 | 全部Case两Office工作日已批准，2026-10-06 | 已解决，不重问；Operation owner／cover负责，收到式回复不算 |
 | 新内部动作期限 | 原14日／四日前联系／一次有界延期保持 | 下一Office工作日，拒收和公开投诉当日／非办公时间下一Office日；不替代外部执行承诺 |
 | 审批范围 | Service Case Approver与绝对政策限制保持 | 普通政策内由Case owner执行，例外走Approver；绝对禁止项不能被审批绕过 |
 | No remedy／Withdrawn／reopen | 现有close gate保留 | 需要明确各自证据、授权、客户告知、重开触发和期限；不得默认当Solved或绕过确认 |
 | Excel发现的扩展 | Excel事实不等于新增rule批准 | §7.26 A1–A9仍提案，尤重复维修、多个SO、外部表单替换；先核对现有authority，不把它们漏交工程猜 |
 | Settings期限改变 | §4现有calendar-derived rule | 保留原规则，暂不引入existing Case snapshot冲突；可编辑哪些设置须明确批准 |
 
-新screen copy以及shared host/tabs/layout不包含在以上业务批准内。正式handoff只用可取得的合并commit，不用本地草稿替代main。
+首次回复规则已批准；其他新screen copy以及shared host/tabs/layout不包含在以上业务批准内。正式handoff只用可取得的合并commit，不用本地草稿替代main。
 
 ## 7.26 · Measured evidence — the two workbooks the team runs today (read 2026-10-06)
 
@@ -901,7 +901,7 @@ Case instead of a sheet per case; counts that withhold themselves when unmeasura
 ### 7.27.3 · 首次回应与补证
 
 1. 负责人打开原 Case 的服务工作，先读客户原话、来源及已有证据；页面说明缺什么、为什么需要、下一动作和期限来源。
-2. 初次实质回复应包含评估、明确补证要求或下一处理安排。单纯“收到”不构成实质回复。两办公室工作日对 Dealer 已批准，对所有 Case 的统一要求仍是本 Blueprint 提案。
+2. 初次实质回复应包含评估、明确补证要求或下一处理安排。单纯“收到”不构成实质回复。所有Case在两办公室工作日内回复已由owner于2026-10-06批准（§7.2）；不是两日修复承诺。
 3. 沟通入口带入原记录真实联系人；员工核对收件人后准备信息。复制／打开渠道／附件选择只是草稿操作，不代表已发送、已回复或已保存证据。
 4. 员工记录实际渠道、联系对象、发生时间、内容和可用证据；系统保留实际记录人与记录时间。无人接听、未回复、要求稍后联系分别保留真实结果，不能标为 customer_confirmed。
 5. 客户提供资料后，逐项确认适用清单。收到文件不自动等于通过政策检查；检查通过、拒绝或授权豁免均有理由和记录人。
@@ -951,7 +951,7 @@ Case instead of a sheet per case; counts that withhold themselves when unmeasura
 ### 7.27.7 · 期限与每日操作
 
 - Case 完成期限沿用 §4：14工作日、适用公司日历、期限前四工作日联系、一次有界延期、联系事件绑定当时的期限。不得把 Office 日历和 Case 的 Mon–Sat 日历混成一个。
-- 新的首次回复／内部动作期限是提案；必须有 original trigger、calendar、owner、completion fact，不能只写“urgent”。等待客户／供应商和发消息均不暂停 Case 时钟。
+- 全Case首次回复两Office工作日已批准；其他新内部动作期限仍是提案；必须有 original trigger、calendar、owner、completion fact，不能只写“urgent”。等待客户／供应商和发消息均不暂停 Case 时钟。
 - 新期限不得与 Delivery、Payment、Purchasing 原动作产生第二个 due。多人协助、重复消息、刷新页面不重开同一 action occurrence 或推迟 due。
 - **早上：**看分配给自己的未完成动作、新回复和到期事项；打开 exact Case，先处理必需动作，不从表格筛选猜工作优先级。
 - **白天：**接报 → 核对重复 → 回复／补证 → 决定／审批 → 原模块安排执行。客户来电时读相同 Case 历史，不再找多份表格。
