@@ -994,6 +994,36 @@ Visual Service Note 是照片／QR 工作辅助，不代替 DO、GRN、Claim/RO�
 | 无权限／读取失败 | 明确受限／失败，不泄漏字段和数量 | 空白当作没有记录／已完成，Export 泄漏 |
 
 **进入 BUILD 前的门槛：**完整业务规则获批，所有用于执行的 deadline／approval／closure 路径无未决定分支；共用 UI controller 的统一组合获批，COPY 准入完成；每个 business fact 的 owner、source、scope 和 completion 清楚。未满足的 capability标为未批准／未实现，不交给工程猜。该 Blueprint 本身不是上线证明，不据此宣告 PLAN MISSION COMPLETE。
+### 7.27.11 · Excel → Blueprint → BUILD 的唯一交接要求
+
+**OWNER REQUIREMENT，2026-10-06：**Jess要求所有步骤、操作方式和验收明确，BUILD不能重复询问本文件／Excel／代码可以回答的案件工作流。此要求不批准尚未决定的业务规则，不授权本PLAN建应用。
+
+**原Excel证据复核：**本次直接读取 Downloads 的 `Carres_Service Note_ (2).xlsx`（SHA256前16位4f5912597d85f15e）及 `Carres_Issue Tracker (3).xlsx`（01c08304e2128b52）的workbook/sharedStrings，确认Section A Logistic、B Supplier、C Warehouse、Warehouse received by、deadline、两段follow-up，以及Issue Tracker的What happened、Carres action与三段Ops Follow Up。§7.26所指(5)/(4)版本为先前报告，本次没有定位/重新读取这两版本，不假称本次已核对所有最新行。Excel证明实际工作及例子，不自动批准remarks中的每个商业例外。
+
+| Excel员工认识的事实 | Carres承接位置／唯一owner | BUILD业务验收依据 |
+|---|---|---|
+| SN No／Ref／PO No／Product | Case历史编号与原来源链接；SO/PO/Unit原owner | 可从案件找回准确原记录；Ref不代替关系键，缺来源明确 |
+| What Happened／照片 | Case原投诉和证据 | 原话／照片可查，保留人和时间；不是仅存一个summary |
+| START／DEADLINE | Case报告日期与§4日历规则 | 起算、假期、延期、告知记录可解释；不另造表格日期 |
+| SECTION A LOGISTIC | Delivery收取／送回安排与结果 | 预约、实际收取、到仓、实际送达分别可查；未收取货仍客户 |
+| SECTION B SUPPLIER | Purchasing Claim/RO及原Unit关系 | 承诺和实际收到／维修／归还分开，不用Case自由文字代替 |
+| SECTION C WAREHOUSE／received by／Date | Receiving/Stock真实receipt、Unit、检查 | 谁实际收货、何时、哪个Unit及检查结果可追溯；到仓不等于修好 |
+| Carres Remark／Follow Up 1–2／Ops Follow Up 1–3 | Case沟通事件及source义务 | 后续可继续增加事件，不建三个固定空格；Assigned to与Completed by分开 |
+| Incurred charges | 原事实备注与Payment正式义务/付款分别保留 | 备注不等于收款/退款；正式金额和completion读Payment |
+| Status Done／Yet Discuss | 历史原值与证据；Case当前义务／Issue review flag分别保留 | 不把Excel Done当客户确认，Yet Discuss不作Case阶段 |
+
+**节省时间的交接约定：**
+
+1. **只有一个执行依据。** 最终批准后覆写本MASTER，移除重复、过时或相反正文；已批准、提案和测量状态分明。本文目前仍有未批准Blueprint，不能据此宣告ready。
+2. **指定可取得版本。** 交接必须是已提交且接收chat可取得的版本；跨chat读取不同checkout不能混用。正式BUILD以合并后的commit及owningMASTER/UI/COPY为准。本localbranch不是main。
+3. **BUILD先证明理解，再动应用。** 在自己的chat用业务语言说明选定已批准范围的入口→人→原事实→操作→完成→异常，并对照本节Excel映射；只核对，不重新设计政策。遗漏或与MASTER冲突先从资料解决，不让Jess重讲正常流程。
+4. **用同一批情景贯穿验收。** §7.27.10的情景，加§7.30开案分支、§7.31逐腿完成条件，分别注明source fixture/Excel case/真实生产记录。Excel真实案例允许缺历史事实，不为演示补造actor、Unit或付款；生产只读证据与可回滚测试数据明确分开。未获授权不新增真实生产Case。
+5. **以员工结果验收，而非按钮存在。** 能从问题做到正确结果，跨模块写入正确、证据可查、partial/failed保留，才完成范围。截图／编译／测试文件存在不足；真实测试、实际运行及生产验证分别列证据，未核实不能标通过。
+6. **未完成事项不会消失。** 交接／MASTER记录每个blocking依赖的owner、准确缺口、批准状态与证据，不以“后面再做”跳过理解。工程实施方式由BUILD负责，不由Jess挑文件、策略或测试方案。
+7. **问题只留真正业务例外。** 可以从MASTER、Excel、代码或测量回答的由agent解决。出现未批准商业规则或两个当前明确ruling冲突时，给出查过的权威、推荐、影响与取舍再向owner提一项决定；不问“这个Case怎么运作”。
+
+**没有空白通行证：**普通路线清楚不代表No remedy、Withdrawn、reopen、多SO范围、deadline设置或审批例外已批准。它们若仍有未决定的分支，相关范围不进入BUILD。共享UI缺口交给kitowner统一处理，不做page-local替代。PLAN完成后再另开BUILD；不能把这份说明当作Card或部署授权。
+
 ## 7.28 · 跨模块通知记录 — FACT，2026-10-06
 
 Jess 在本 Service chat 明确授权向 UI、Workspace、Sales Orders、Delivery、Warehouse、Purchasing、Payment、Guarantee 和 Rental chats 发送 PLAN 依赖核对通知。已发送消息明确限定：不授权 Cards、实施、合并、部署、外部联系或恢复暂停 BUILD；本 Blueprint 未全部批准。要求各模块核对 source identity、原门、权限、completion facts 和冲突，在各自 chat 报告；不要求越权回复或转发。
