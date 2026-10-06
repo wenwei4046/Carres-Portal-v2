@@ -637,15 +637,36 @@ export function useFilterRailOpen(
     }
   });
   const [open, setOpen] = useState(stored !== "0");
+  /* The canvas BECAME narrow after load (the right-hand Tasks area opened, the
+     window shrank): the rail would float over the very rows the operator is
+     reading, so it steps aside for this visit. Nothing is written to storage —
+     the operator's choice comes back as soon as the canvas is wide again, and
+     opening it while narrow is honoured (production acceptance 2026-10-06). */
+  const [narrowHidden, setNarrowHidden] = useState(false);
   useLayoutEffect(() => {
     if (stored != null) return;
     const width = canvasRef.current?.clientWidth ?? 0;
     if (width > 0 && width < FILTER_RAIL_FLOAT_BELOW_PX) setOpen(false);
-    // Measured once, at mount: a later resize never overrides what is on screen.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  useEffect(() => {
+    const el = canvasRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    let wasNarrow = el.clientWidth > 0 && el.clientWidth < FILTER_RAIL_FLOAT_BELOW_PX;
+    const observer = new ResizeObserver(() => {
+      const width = el.clientWidth;
+      if (width <= 0) return;
+      const narrow = width < FILTER_RAIL_FLOAT_BELOW_PX;
+      if (narrow && !wasNarrow) setNarrowHidden(true);
+      if (!narrow && wasNarrow) setNarrowHidden(false);
+      wasNarrow = narrow;
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [canvasRef]);
   const setVisible = useCallback(
     (next: boolean) => {
+      setNarrowHidden(false);
       setOpen(next);
       try {
         localStorage.setItem(storageKey, next ? "1" : "0");
@@ -655,7 +676,7 @@ export function useFilterRailOpen(
     },
     [storageKey],
   );
-  return [open, setVisible];
+  return [open && !narrowHidden, setVisible];
 }
 
 /**

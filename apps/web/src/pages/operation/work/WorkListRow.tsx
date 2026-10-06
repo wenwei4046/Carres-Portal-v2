@@ -78,11 +78,12 @@ export default function WorkListRow({
         {selected ? <span aria-hidden className="absolute inset-y-0 left-0 w-[3px] bg-kit-blue-9" /> : null}
         <span aria-hidden className="shrink-0 text-kit-slate-11">{task.icon}</span>
         <span className="flex min-w-0 flex-1 flex-col">
-          <span className="truncate text-[13px] font-semibold leading-[18px] text-kit-slate-12" title={action} data-testid="task-row-act">{action}</span>
-          <span className="truncate text-[11px] leading-4 text-kit-slate-11" data-testid="task-row-detail">
-            {task.detail}
-            {task.missedDate ? <> · <span className="font-semibold text-danger">{task.missedDate}</span></> : null}
-            {task.noDate ? <>{task.detail ? " · " : ""}<span className="font-semibold text-kit-amber-11">{task.noDate}</span></> : null}
+          <span className="line-clamp-2 break-words text-[13px] font-semibold leading-[18px] text-kit-slate-12" title={action} data-testid="task-row-act">{action}</span>
+          {/* The detail may be long; the date that makes the row urgent never is cut. */}
+          <span className="flex min-w-0 items-baseline text-[11px] leading-4 text-kit-slate-11" data-testid="task-row-detail">
+            <span className="min-w-0 truncate" title={task.detail}>{task.detail}</span>
+            {task.missedDate ? <span className="shrink-0 whitespace-pre">{" · "}<span className="font-semibold text-danger">{task.missedDate}</span></span> : null}
+            {task.noDate ? <span className="shrink-0 whitespace-pre">{task.detail ? " · " : ""}<span className="font-semibold text-kit-amber-11">{task.noDate}</span></span> : null}
           </span>
         </span>
         <ChevronRight aria-hidden size={14} className="shrink-0 text-kit-slate-9" />
