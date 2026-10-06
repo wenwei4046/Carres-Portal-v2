@@ -780,6 +780,8 @@ Payment · Sales Order. Tally recorded here as sent / acknowledged / aligned.
 
 ## 7.25 · Review boundary — NOT READY FOR CARD
 
+**RULING / APPROVED — scoped owner confirmation 2026-10-06 in Service PLAN chat.** Jess confirmed the recommended processing chain: first substantive reply → required evidence → remedy decision / exception approval when required → collection, repair or replacement execution → communicate the outcome → customer confirmation. Each obligation names its owner, authoritative source and completion evidence. Delivery, Stock/Warehouse, Purchasing and Payment keep their own task identities and write ownership; Service reads their outcomes and does not create duplicate tasks. This scoped confirmation does not approve the full Blueprint, proposed response/per-action clocks, proposed approval scope, settings changes, shared UI composition or deployment. No READY scope or BUILD commission follows from this confirmation.
+
 The complete Blueprint is not owner-approved or persisted as final operating truth. There are no READY scopes, Cards or implementation sequence in this PLAN. Shared UI composition remains with the UI controller's combined review (§7.11–§7.14). Existing module owner rulings are preserved; approval of shared ownership is not approval of this entire proposal.
 
 **PROPOSAL / NOT LAW — Tasks admission and business acceptance summary, 2026-10-06.**
