@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -65,6 +65,13 @@ import {
   type DataGridContextMenuItem,
 } from "@/components/register/DataGrid";
 import { documentRowMenu } from "@/components/register/row-menu";
+import PoNumberLinks from "@/components/register/PoNumberLinks";
+import {
+  poNumberLinks,
+  poNumberLinksSearch,
+  poNumberLinksText,
+  poObjectPath,
+} from "@/components/register/po-number-links";
 import { printSalesOrdersOrSay } from "../record-print";
 import { fmtDate } from "@/lib/fmt-date";
 import { conciseLocality, NOT_RECORDED } from "@/lib/locality";
@@ -177,67 +184,6 @@ function safetyDaysWord(cell: SoBatchSafetyDaysCell | undefined): string {
   if (cell == null || cell.kind === "none") return "";
   if (cell.kind === "absent") return soBatchOrderByAbsenceWord(cell.absence);
   return cell.days < 0 ? "Production late" : String(cell.days);
-}
-
-/**
- * ⭐ EVERY LINKED PO, ON ONE LINE — OWNER RULING 2026-10-05 (Purchasing §9.1).
- *
- * Replaces the 2026-09-11 `2 POs` count, which sent the operator into the
- * row's expansion to find a number the cell already knew. The cell now prints
- * every real PO linked to the order (`order.pos`, the server's
- * `po_line_sources` lineage) once each, by stored PO number ascending, in the
- * shared display form with its actual version (`PO-260903-7907-V1`),
- * separated by `, `. Each number is its own door to that exact PO; the commas
- * are plain text. One line, default width, the standard 32px row: a longer
- * list is clipped inside the cell and the operator drags the column wider.
- * No count, no popover. Search, the column filter and Export carry the same
- * complete list, so the screen, the funnel and the sheet never disagree.
- */
-function soBatchPoNumbers(order: Pick<SoBatchOrderRow, "pos">): Array<{ poId: string; display: string }> {
-  const versions = new Map<string, number | undefined>();
-  for (const po of order.pos) if (!versions.has(po.poId)) versions.set(po.poId, po.version);
-  return [...versions]
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([poId, version]) => ({
-      poId,
-      display: documentDisplayNumber(version == null ? poId : `${poId}-V${version}`),
-    }));
-}
-
-/** The same list as ONE string — the column filter and every export. */
-function soBatchPoNumbersText(order: Pick<SoBatchOrderRow, "pos">): string {
-  return soBatchPoNumbers(order).map((po) => po.display).join(", ");
-}
-
-/** The shared document-link recipe (the Sales Orders register's PO link). */
-const DOCUMENT_LINK_CLASS = "font-medium text-kit-blue-11 underline-offset-2 hover:underline";
-
-function PoNumbersCell({ order }: { order: SoBatchOrderRow }) {
-  const navigate = useNavigate();
-  const numbers = useMemo(() => soBatchPoNumbers(order), [order]);
-  if (numbers.length === 0) return null;
-  return (
-    <>
-      {numbers.map((po, index) => (
-        <Fragment key={po.poId}>
-          {index > 0 ? ", " : null}
-          <button
-            type="button"
-            className={DOCUMENT_LINK_CLASS}
-            data-testid={`so-batch-po-link-${order.orderId}`}
-            data-po-id={po.poId}
-            onClick={(event) => {
-              event.stopPropagation();
-              navigate(`/operation/procurement?po=${encodeURIComponent(po.poId)}`);
-            }}
-            onDoubleClick={(event) => event.stopPropagation()}
-          >
-            {po.display}
-          </button>
-        </Fragment>
-      ))}
-    </>
-  );
 }
 
 /** Governed absence — a muted sentence, never a bare dash. */
@@ -1154,22 +1100,26 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
            `Deliver To` and `PO Delivery Date` describe a purchase order, so on
            a row that has none they stay blank rather than repeating the same
            sentence three times across one row. */
-        /* One line, never wrapped: a list longer than the cell is clipped
-           inside it, and the column is dragged wider (owner ruling
-           2026-10-05). The row keeps the standard 32px recipe. */
+        /* ⭐ EVERY LINKED PO, ON ONE LINE — owner ruling 2026-10-05
+           (Purchasing §9.1), replacing the 2026-09-11 `2 POs` count. The rule
+           and its one render are the shared register cell
+           (`po-number-links.ts` · `PoNumberLinks.tsx`), which the Sales Orders
+           register uses too; this page supplies its lineage (`o.pos`, the
+           server's `po_line_sources`) with each PO's actual version. */
         accessor: (o) => (
-          <span className="block truncate" data-testid={`so-batch-po-${o.orderId}`}>
-            {o.pos.length ? <PoNumbersCell order={o} /> : <Absent>Not ordered yet</Absent>}
-          </span>
+          <PoNumberLinks
+            numbers={poNumberLinks(o.pos)}
+            onOpen={(poId) => navigate(poObjectPath(poId))}
+            empty={<Absent>Not ordered yet</Absent>}
+            testId={`so-batch-po-${o.orderId}`}
+            linkTestId={`so-batch-po-link-${o.orderId}`}
+          />
         ),
         /* Both forms of every number: the stored `PO-20260903-7907`, the
            display `PO-260903-7907` and the versioned `PO-260903-7907-V1`. */
-        searchValue: (o) =>
-          soBatchPoNumbers(o)
-            .map((p) => `${p.poId} ${documentDisplayNumber(p.poId)} ${p.display}`)
-            .join(" "),
-        filterValue: (o) => soBatchPoNumbersText(o),
-        exportValue: (o) => soBatchPoNumbersText(o),
+        searchValue: (o) => poNumberLinksSearch(poNumberLinks(o.pos)),
+        filterValue: (o) => poNumberLinksText(poNumberLinks(o.pos)),
+        exportValue: (o) => poNumberLinksText(poNumberLinks(o.pos)),
       },
       {
         /* `purchase_orders.official_delivery_date` — the ORIGINAL

@@ -1090,10 +1090,12 @@ as the stored digits without punctuation, and the Sales Order page's `Existing c
 link (it carries the stored phone) lands on the orders; a different punctuation or the other country-code
 form (`+60…` against a stored `0…`) is found by the server and then hidden by that re-filter — and is
 still counted in `{n}`, which counts the server's answer, until that re-filter is fixed.
-**Several PO numbers — OWNER RULING 2026-10-06 (Jess) · APPROVED / NOT BUILT; it replaces the
-2026-09-27 `{first No} + {n} more` wording, which is withdrawn.** The `PO No` cell prints EVERY linked PO
+**Several PO numbers — OWNER RULING 2026-10-06 (Jess) · APPROVED · CODE on branch
+`fix/so-po-no-every-number`, not merged or deployed; it replaces the 2026-09-27 `{first No} + {n} more`
+wording, which is withdrawn.** The `PO No` cell prints EVERY linked PO
 number on one line, comma-separated, each number its own link to that PO (the same rule as SO Batch's
-`PO No`, Purchasing §9.1). No popover and no count-only entry. The column keeps its registry width and
+`PO No`, Purchasing §9.1, drawn by the one shared cell `PoNumberLinks`), in the shared short form
+(`documentDisplayNumber`). No popover and no count-only entry. The column keeps its registry width and
 does not wrap; the operator drags the column wider to read more. One PO stays a direct link. **`DO No`
 is unchanged** (one DO is a direct link; several open the existing `{n} Delivery Orders` list); it
 changes only with the owner's approval.

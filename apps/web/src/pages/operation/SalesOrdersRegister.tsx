@@ -69,6 +69,8 @@ import {
   type DataGridContextMenuItem,
 } from "@/components/register/DataGrid";
 import { documentRowMenu } from "@/components/register/row-menu";
+import PoNumberLinks from "@/components/register/PoNumberLinks";
+import { poNumberLinks, poNumberLinksSearch, poObjectPath } from "@/components/register/po-number-links";
 import Drawer from "@/components/kit/Drawer";
 import Block from "@/components/kit/Block";
 import Checkbox from "@/components/kit/Checkbox";
@@ -240,35 +242,22 @@ function toGridColumn(
     };
   }
   if (f.key === "po_number") {
+    /* ⭐ EVERY LINKED PO, ON ONE LINE — owner ruling 2026-10-06 (Jess),
+       replacing the `{n} Purchase Orders` popover: every number,
+       comma-separated, each its own link, at the registry width (the operator
+       drags the column wider). The same shared cell as SO Batch's `PO No`. */
+    const numbersOf = (r: RegisterRow) => poNumberLinks(r.poNumbers.map((poId) => ({ poId })));
     return {
       ...base,
-      accessor: (r) =>
-        r.poNumbers.length === 0 ? (
-          absenceAware(NO_PO_YET)
-        ) : r.poNumbers.length === 1 ? (
-          <button type="button" className="font-medium text-kit-blue-11 underline-offset-2 hover:underline" onClick={(event) => {
-            event.stopPropagation();
-            navigate(`/operation/procurement?po=${encodeURIComponent(r.poNumbers[0]!)}`);
-          }}>{r.poNumbers[0]}</button>
-        ) : (
-          <Popover label="Purchase Orders" trigger={<Button variant="ghost" size="sm" onClick={event => event.stopPropagation()}>{r.poNumbers.length} Purchase Orders</Button>}>
-          <div className="flex flex-col gap-2">
-            {r.poNumbers.map((po) => (
-              <button
-                key={po}
-                type="button"
-                className="font-medium text-kit-blue-11 underline-offset-2 hover:underline"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  navigate(`/operation/procurement?po=${encodeURIComponent(po)}`);
-                }}
-              >
-                {po}
-              </button>
-            ))}
-          </div>
-          </Popover>
-        ),
+      accessor: (r) => (
+        <PoNumberLinks
+          numbers={numbersOf(r)}
+          onOpen={(poId) => navigate(poObjectPath(poId))}
+          empty={absenceAware(NO_PO_YET)}
+        />
+      ),
+      /* Both forms of every number, so the stored and the printed one find the row. */
+      searchValue: (r) => poNumberLinksSearch(numbersOf(r)),
     };
   }
   if (f.key === "receipt_no" || f.key === "invoice_no") {

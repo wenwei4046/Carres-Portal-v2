@@ -42,6 +42,7 @@
 import { parseEmergencyContact, REGISTER_DELIVERY_CONDITIONS, registerDeliveryConditionOf } from "@carres/shared";
 
 import { REGISTER_FIELD_WIDTH as W } from "@/components/register/register-field-widths";
+import { poNumberLinks, poNumberLinksText } from "@/components/register/po-number-links";
 import { fmtDate } from "@/lib/fmt-date";
 import { displayCustomerName } from "@/lib/customer-name";
 import type { DeliveryOrderRow, operationOrderListRow } from "@/lib/queries";
@@ -350,8 +351,11 @@ export const REGISTER_FIELDS: readonly RegisterField[] = [
     text: (r) => r.customer, sortBy: (r) => r.customer },
   { key: "items", label: "Items", width: W.items, group: "Items", on: true,
     text: (r) => r.items },
+  /* ⭐ EVERY LINKED PO, ON ONE LINE — owner ruling 2026-10-06 (Jess): every
+     number, comma-separated, in the shared short form; the same text the cell
+     prints (`po-number-links.ts`), so the filter and Export agree with it. */
   { key: "po_number", label: "PO No", width: W.documentNo, group: "Document", on: true,
-    text: (r) => r.poNumbers.join(" · ") || NO_PO_YET },
+    text: (r) => poNumberLinksText(poNumberLinks(r.poNumbers.map((poId) => ({ poId })))) || NO_PO_YET },
   { key: "do_number", label: "DO No", width: W.documentNo, group: "Document", on: true,
     text: (r) =>
       r.deliveryOrders.length === 0
