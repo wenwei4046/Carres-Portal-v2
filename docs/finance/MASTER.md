@@ -161,6 +161,15 @@ Dealer commission rules:
     2. A bill each month, made and emailed to the customer automatically. The bill document (SINV) is Rental's approved target, and emailing customers is a new outside channel, so both need Jess.
     3. Money received knocks off its bill.
     4. The supplier's share and the commission are settled once a month: worked out at month end and paid the next month. The cycle may change, so it is a setting.
+- **Confirmed by Chew, 2026-10-06.**
+  - The first bill falls due on the 7th of the month after the customer receives the goods (「5. 对」).
+  - Recording a payment asks for the day it was received, today by default. Chew authorises adding it to Rental's recording screen (「直接加」).
+  - The late-interest reading above stands (「可以」). Early settlement, buyout, default and repossession are recorded for management (「记录起来」).
+  - Each customer has a debtor code, all under one parent account for subscription debtors (「每个顾客一个debtor code, 但全部under subscription debtor」).
+  - An invoice is made each month and sent to the customer automatically, until the contract ends or the customer buys out.
+  - Each plan has a supplier from a short list, with one default; Chew provides the list.
+  - The commission goes to whoever submitted the subscription (「根据谁提交这个subscription 决定的」).
+- **Measured for the invoice email.** Every subscription agreement today reaches a customer email address (test data). The system already sends email through Resend, used for purchase orders to suppliers when a person presses send.
 - **Subscription, measured 2026-10-05.** Subscription commission is a separate mechanism inside Rental (Jess's module). Each plan carries its own commission rate, set in Rental's plan settings. The rate is copied onto the agreement when it is signed. Each collected month records commission = the month's payment × that rate, beside the supplier's share. It is not in the dealer commission report and has no payout. It shows only on Rental's collection screen, and it does not say whether it is the dealer's or a salesperson's. A subscription's sales order is priced at RM 0, so it earns nothing in the dealer report and is not counted twice.
 - **Noted for later (Chew 2026-10-05).** A list's search box opens already typed-into, not behind a click. To change together with other UI items; first check whether it is the shared kit search.
 
