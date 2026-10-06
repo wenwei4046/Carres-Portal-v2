@@ -44,7 +44,11 @@ Finance must show clearly where each sum of money comes in and goes out, channel
 2. A supplier bill's channel comes from the order its goods were bought for, never typed by hand (「不应该经过人手，而是根据订单决定」).
 3. Office costs stay in Office.
 4. The channel follows the debtor account (「根据debtor account 来决定」); Chew provides the chart of accounts.
-5. Transport is recorded as a cost of each order even though customers pay nothing for it and Carres bears it (「虽然是我们出，但是还是要记录运输费用啊，根据订单」). Reading pending: the logistics partner's bill is split by the orders it delivered.
+5. Transport is recorded as a cost of each order even though customers pay nothing for it and Carres bears it (「虽然是我们出，但是还是要记录运输费用啊，根据订单」). The logistics partner's bill is split by the delivery orders it lists; a bill with only a total is split equally (「如果一个总数就平除」).
+6. Debtors follow the channel in two levels for dealers (「Dealer 一个overall 母账，然后每个dealer under 这个母账 … 就是两层了」): Dealer Debtors, then each dealer, then that dealer's customers or orders. Showroom and Subscription each have one control account with their customers under it.
+7. Open (Chew 2026-10-06): goods bought without an order would leave money paid to suppliers outside every channel in Receipts & Payments (「这样我看receipt & payment 就不太对了」); how such a payment is placed is still to decide.
+
+**Chart of accounts (Chew's, AutoCount, dated 22 Sep 2026; kept by Chew, not in this repository).** It has one debtor control (Trade Debtors) and one Other Debtor control, so dealer and subscription customers are not separated (「本身里面没有分dealer customer 和 subscription customer」). Measured: the ledger already accepts its code shape (`ledgerAccountCodeShape`, for example 300-0000 and 900-A001). PROPOSAL, not law, for Chew to confirm: add Showroom, Dealer and Subscription debtor controls under Trade Debtors, with each dealer under Dealer; add subscription rental income, the subscription supplier's share as a cost, the renovation rebate, the KPI allowance and a card-and-online clearing account; name one account for delivery transport.
 
 ## 1 · Boundary: Finance only
 
