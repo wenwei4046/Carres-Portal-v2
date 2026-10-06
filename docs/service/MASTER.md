@@ -401,7 +401,7 @@ fact. Any potentially contaminated item accepted in error goes to quarantine, ne
 
 > **Status words:** `RULING` = owner's word, in force · `RESOLVED FROM AUTHORITY` = already decided
 > elsewhere, cited · `PROPOSAL` = this chat's recommendation, carries its falsifier, must be
-> challenged · `OWNER DECISION` = the one genuine business choice this Blueprint asks.
+> challenged · `OWNER DECISION` = a genuine unresolved business choice; the current complete list is §7.25.
 > Read it top to bottom once; correct what is wrong; silence is not approval. When the owner
 > approves, the approved parts overwrite §1–§6 under the Override Law and this heading becomes
 > `APPROVED / LOCKED`.
@@ -778,39 +778,28 @@ Payment · Sales Order. Tally recorded here as sent / acknowledged / aligned.
 | `opened_at` editable | read-only after day one |
 | Service Note modal / print page | retired from the UI; Visual Service Note from the Case |
 
-## 7.25 · Review boundary — NOT READY FOR CARD
+## 7.25 · 批准范围与最终审阅门 — NOT READY FOR CARD
+
+**RULING / APPROVED — scoped owner confirmation 2026-10-06 in Service PLAN chat.** Jess confirmed the recommended processing chain: first substantive reply → required evidence → remedy decision / exception approval when required → collection, repair or replacement execution → communicate the outcome → customer confirmation. Each obligation names its owner, authoritative source and completion evidence. Delivery, Stock/Warehouse, Purchasing and Payment keep their own task identities and write ownership; Service reads their outcomes and does not create duplicate tasks. This scoped confirmation does not approve the full Blueprint, proposed response/per-action clocks, proposed approval scope, settings changes, shared UI composition or deployment. No READY scope or BUILD commission follows from this confirmation.
 
 **PROPOSAL / NOT LAW — consolidated business recommendation for owner review, 2026-10-06.** Apply Dealer's substantive first-response promise of two Office working days to all customer Cases; acknowledging receipt alone is not a substantive reply. Internal evidence review, remedy decisions, approval and final-confirmation follow-up should have a next-Office-working-day action deadline from the triggering fact; failed collection and public escalation should be handled the same Office working day (after hours: next Office working day). These are proposed action response deadlines, never promised supplier repair, stock arrival or customer-response dates. Waiting or sending never closes an obligation or pauses the existing 14-working-day Case deadline. Preserve §4's derived calendar rule, bounded extension and deadline-bound call events; do not introduce the conflicting proposed settings snapshot for existing Case deadlines. New source obligations keep their occurrence, original trigger, owner and due across repeated events and reassignment.
 
 Recommend ordinary policy-authorised remedies proceed with the assigned Case owner's recorded decision; exceptions (goodwill, charge waiver, refusing an eligible entitlement, refund, condition waiver, public-escalation decision) require the governed Approver and cannot override an absolute policy safety/condition prohibition. Payment executes approved customer money; Purchasing owns supplier recovery independently. Trade-off: faster normal handling with clearer response expectations increases Operation workload and requires monitored Duty coverage; exception control remains. This recommendation is overturned by evidence that two-day replies cannot be staffed, that ordinary remedies require commercial approval by policy, or that existing source deadlines would be duplicated. Any contrary approved policy wins and the conflict stays visible for resolution.
 
-**Review scope:** the complete business Blueprint includes intake/source matching, preserved numbering, policy-version evidence, remedy/movement decisions, cross-module completion legs, assigned ownership, proposed response timing, documents/history, reporting/settings boundaries and the intentional rejects in §7.23. Shared Register/Working Panel/Tasks composition is still excluded pending the UI controller's combined review. Owner acceptance of business truth does not mean UI acceptance, production verification, full PLAN completion or permission to implement.
+**唯一阅读路径：**§7.1–§7.9定义业务／来源／政策／负责人及动作；§7.27定义逐步操作和业务验收；§7.26是Excel事实与尚未批准扩展；§7.28–§7.29是协调／测量证据。已有裁定不重问；其他建议尚未成为LAW。UI组合仍交共享UI controller，不由本chat画新variant。
 
-**RULING / APPROVED — scoped owner confirmation 2026-10-06 in Service PLAN chat.** Jess confirmed the recommended processing chain: first substantive reply → required evidence → remedy decision / exception approval when required → collection, repair or replacement execution → communicate the outcome → customer confirmation. Each obligation names its owner, authoritative source and completion evidence. Delivery, Stock/Warehouse, Purchasing and Payment keep their own task identities and write ownership; Service reads their outcomes and does not create duplicate tasks. This scoped confirmation does not approve the full Blueprint, proposed response/per-action clocks, proposed approval scope, settings changes, shared UI composition or deployment. No READY scope or BUILD commission follows from this confirmation.
+完整Blueprint尚未全部批准，未合并，不存在READY scopes、Cards或BUILD执行顺序。必须先完成下列真正业务决定，清除与原批准规则的冲突，再接受共享UI和COPY，才能完成PLAN：
 
-The complete Blueprint is not owner-approved or persisted as final operating truth. There are no READY scopes, Cards or implementation sequence in this PLAN. Shared UI composition remains with the UI controller's combined review (§7.11–§7.14). Existing module owner rulings are preserved; approval of shared ownership is not approval of this entire proposal.
+| 待审项 | 已批准边界 | 推荐与操作影响 |
+|---|---|---|
+| 首次实质回复覆盖 | Dealer两Office工作日已批准 | 扩展到所有Case；Operation需覆盖，收到式回复不算 |
+| 新内部动作期限 | 原14日／四日前联系／一次有界延期保持 | 下一Office工作日，拒收和公开投诉当日／非办公时间下一Office日；不替代外部执行承诺 |
+| 审批范围 | Service Case Approver与绝对政策限制保持 | 普通政策内由Case owner执行，例外走Approver；绝对禁止项不能被审批绕过 |
+| No remedy／Withdrawn／reopen | 现有close gate保留 | 需要明确各自证据、授权、客户告知、重开触发和期限；不得默认当Solved或绕过确认 |
+| Excel发现的扩展 | Excel事实不等于新增rule批准 | §7.26 A1–A9仍提案，尤重复维修、多个SO、外部表单替换；先核对现有authority，不把它们漏交工程猜 |
+| Settings期限改变 | §4现有calendar-derived rule | 保留原规则，暂不引入existing Case snapshot冲突；可编辑哪些设置须明确批准 |
 
-**PROPOSAL / NOT LAW — Tasks admission and business acceptance summary, 2026-10-06.**
-
-| Operator need | Authoritative source / owner | Completion evidence | Current admission boundary |
-|---|---|---|---|
-| Give the first substantive reply | Case first-response record; assigned Operation Case owner | dated assessment, request for missing facts or proposed next step, with actor/channel | two Office working days approved for Dealer; extending to all sources remains PROPOSAL |
-| Obtain and check missing evidence | Case policy-required slots; Case owner follows up, customer supplies | accepted evidence or authorised waiver; asking/sending alone does not fill the slots | intake evidence exists; next-day action clock remains PROPOSAL |
-| Decide the remedy | versioned Guarantee policy and Case decision; Case owner, Approver for governed exceptions | remedy, reason, movement and charge decision; approval result where required | full engine and proposed approval scope are not thereby approved |
-| Approve an exception | Service Case Approver through shared resolver | dated approval/refusal, reason and actual actor | approver duty exists; proposed action timing NOT LAW |
-| Approve collection evidence | Case evidence plus Delivery condition law; assigned Case owner within authority | approved/refused pre-check, not a message sent | collection gate is approved target; action timing NOT LAW |
-| Explain impending delay | original Case deadline and bound SLA event; assigned Case owner | customer_told event naming the exact deadline and reason | existing 14-day / four-days-before rule reusable; Work projection not demonstrated |
-| Handle failed collection | Delivery refusal and proof, then Case customer communication | customer outcome recorded; revised movement/charge uses its owning facts | source failure does not silently close Case; same-day deadline remains PROPOSAL |
-| Handle a public complaint | recorded escalation; Service Case Approver/spokesperson | recorded response and evidence; policy entitlement unchanged | public-escalation business rule exists; urgent clock remains PROPOSAL |
-| Confirm customer outcome | Case plus every required owned leg | customer_confirmed record and required completion gates | close gate exists; legacy closed records without confirmation are retained explicitly, not invented |
-
-**Shared display contract (business payload, not a new UI variant):** task identity is the Case plus its exact obligation/occurrence; record identity remains distinct from an action. The entry names the responsible party, action and object, carries the source due and missing completion fact, and opens the exact Case's Service work through the shared host. UI controller decides the common placement/tabs in the combined review. A Case with no SO uses its own customer/source evidence; no fabricated SO header or actor. Row selection cannot change an open task or erase a draft. Delivery/Stock/Purchasing/Payment actions are linked read-only and retain their existing identities, owners, clocks and completion doors.
-
-**Exceptions and acceptance:** no eligible Operation owner → visible unassigned work for the manager, never hidden or assigned to Sales/Approver by convenience; missing source → factual no-source intake and later audited linking; source read failure → unavailable, never “completed”; multiple Units → retain each leg's remaining obligations; supplier waiting does not stop customer updates; duplicate submissions cannot create duplicate outcomes; amendments retain original evidence and actor/time; withdrawn/no-remedy/reopened outcomes retain reasons and traceability. Policy, reassignment, completion and money permissions are checked at their original owner. No bulk close, copied completed evidence or imported Resolved value may bypass completion gates. Historical SC references stay searchable; copying creates new intake facts, never copied approval, policy consumption or completion. External accounts, supplier channels and live cutover remain outside this PLAN.
-
-**Actual real-data limitation:** the 2026-10-03 read-only snapshot of SC2607-01 shows a legacy Resolved record with no linked SO, structured Unit/quantity, photos or customer-confirmation date. It supports a missing-data review, not proof of new numbering, ownership allocation, Work admission or the complete new lifecycle. The current main's fixture preview is separate evidence and must not be labelled production.
-
-**Open business proposals to review with the complete Blueprint:** extending Dealer's two-day first response to every Case; proposed per-action timing; proposed ordinary-versus-exception approval scope; editable timing settings and whether future settings changes snapshot existing promises. Existing §4 derives deadlines from the calendar; a proposed snapshot policy must not silently override it. No setting is “built” merely because its proposed row names a default. Screen wording remains pending COPY admission. Shared kit review is a dependency, not a request to re-approve resolved Service ownership.
+新screen copy以及shared host/tabs/layout不包含在以上业务批准内。正式handoff只用可取得的合并commit，不用本地草稿替代main。
 
 ## 7.26 · Measured evidence — the two workbooks the team runs today (read 2026-10-06)
 
@@ -895,6 +884,20 @@ Case instead of a sheet per case; counts that withhold themselves when unmeasura
 
 **明确边界：**仓库／Receiving 发现纯供应商商品问题，直接走 Purchasing Claim；没有客户补救旅程不强制建 Case。纯内部 SOP／系统失误走 Issue Tracker。两者确实同时存在时只关联，不把一宗事件复制为两个同义任务。
 
+**来源异常分支（PROPOSAL / NOT LAW）：**
+
+| 情况 | 员工工作流 | 保存／验收边界 |
+|---|---|---|
+| 原SO与单件商品确定 | 显示只读source身份，选择真正属于订单的商品，补问题／愿望／证据 | source与line归属由服务端核对；case保存当时来源关联及用来决定政策／承诺的可追溯版本，不改SO |
+| 多件商品同一问题 | 逐件确认affected范围，保留各自line/Unit和证据缺口 | 不能用一个sku代表所有商品；当前代码只单行，完整多行目标尚未实现；不同完成结果逐件保留 |
+| 找到同一未完成问题 | 查看原Case摘要、来源、范围、尚欠事项；把新证据追加到原案 | 保留追加人和时间，不新建重复任务，不覆盖原投诉 |
+| 同来源但不同问题 | 记录为什么是不同问题，建立独立Case并关联原来源 | 不因同customer/order就强制把全部投诉合一 |
+| 来源有多个匹配／同名 | 明确呈现有权限候选，由员工核实原编号和商品 | 不自动选第一个；Reference仅别名，不作关系键 |
+| 原资料读失败 | 显示失败及重试，保留已填草稿；授权允许时明确改走no-source | 失败不是无来源；不能静默建一宗丢关联Case |
+| 未找到原记录 | 手填已知客户／商品和原始证据，明确来源未确认 | 后续关联有核对和审计，不反写SO客户；缺日期不能假定资格 |
+| 订单已取消／商品行修改 | 读取实际保留历史及当时版本，记录当前问题 | 原记录取消不构成已解决投诉；入口及历史关联实现仍欠核，不承诺当前已支持 |
+| 重复按提交／两人同时开同问题 | 返回已存在提交结果／提示相关案件，保留真实不同问题分支 | 不能仅靠UI禁用按钮防重复；来源冲突／权限变化返回明确原因，不丢草稿 |
+
 ### 7.27.3 · 首次回应与补证
 
 1. 负责人打开原 Case 的服务工作，先读客户原话、来源及已有证据；页面说明缺什么、为什么需要、下一动作和期限来源。
@@ -932,6 +935,8 @@ Case instead of a sheet per case; counts that withhold themselves when unmeasura
 | 退款例外 | 已批准决策与 Payment 关联 | Payment 的正式 obligation／refund／receipt lineage | Payment 的实际退款事实 | 审批通过或截图不能伪造完成；失败继续显示待处理 |
 
 每条腿显示 source、owner、精确记录、商品范围、completion fact。页面只读摘要与跳转原拥有模块的门，不提供能在 Service 偷写库存、维修、送货或金额的“完成”按钮。
+
+**完成范围的精确限制：**Supplier收到只完成receipt义务；全部Unit归还及GRN只能证明return跟进，不自动证明修好。维修完成还需要适用检查结果。Case读取的是原模块已接受的结果，任何取消／失败／无权限／读失败都不是成功；源task关闭不自动关闭Case。Payment存在不同退款门时先依原Payment authority决定适用source，不由Service挑一条新门。
 
 ### 7.27.6 · 告知、确认与关案
 
@@ -1017,7 +1022,7 @@ Visual Service Note 是照片／QR 工作辅助，不代替 DO、GRN、Claim/RO�
 1. **只有一个执行依据。** 最终批准后覆写本MASTER，移除重复、过时或相反正文；已批准、提案和测量状态分明。本文目前仍有未批准Blueprint，不能据此宣告ready。
 2. **指定可取得版本。** 交接必须是已提交且接收chat可取得的版本；跨chat读取不同checkout不能混用。正式BUILD以合并后的commit及owningMASTER/UI/COPY为准。本localbranch不是main。
 3. **BUILD先证明理解，再动应用。** 在自己的chat用业务语言说明选定已批准范围的入口→人→原事实→操作→完成→异常，并对照本节Excel映射；只核对，不重新设计政策。遗漏或与MASTER冲突先从资料解决，不让Jess重讲正常流程。
-4. **用同一批情景贯穿验收。** §7.27.10的情景，加§7.30开案分支、§7.31逐腿完成条件，分别注明source fixture/Excel case/真实生产记录。Excel真实案例允许缺历史事实，不为演示补造actor、Unit或付款；生产只读证据与可回滚测试数据明确分开。未获授权不新增真实生产Case。
+4. **用同一批情景贯穿验收。** §7.27.10的情景，加§7.27.2开案分支、§7.27.5逐腿完成条件，分别注明source fixture/Excel case/真实生产记录。Excel真实案例允许缺历史事实，不为演示补造actor、Unit或付款；生产只读证据与可回滚测试数据明确分开。未获授权不新增真实生产Case。
 5. **以员工结果验收，而非按钮存在。** 能从问题做到正确结果，跨模块写入正确、证据可查、partial/failed保留，才完成范围。截图／编译／测试文件存在不足；真实测试、实际运行及生产验证分别列证据，未核实不能标通过。
 6. **未完成事项不会消失。** 交接／MASTER记录每个blocking依赖的owner、准确缺口、批准状态与证据，不以“后面再做”跳过理解。工程实施方式由BUILD负责，不由Jess挑文件、策略或测试方案。
 7. **问题只留真正业务例外。** 可以从MASTER、Excel、代码或测量回答的由agent解决。出现未批准商业规则或两个当前明确ruling冲突时，给出查过的权威、推荐、影响与取舍再向owner提一项决定；不问“这个Case怎么运作”。
@@ -1062,43 +1067,12 @@ Jess 在本 Service chat 明确授权向 UI、Workspace、Sales Orders、Deliver
 **依赖结论：**不用等每个模块全部完成，但进入本Case流程的真实来源与实际完成证据必须闭合。若界面能开Case却丢原承诺、误关联line或没有duplicate检查，不能称“完整开案”；若能显示RO却没有逐Unit有效完成证据，不能称“完整维修闭环”；未授权或失败的source读取不能显示为已完成。现阶段不声明READY或PLAN COMPLETE。
 
 
-## 7.30 · 开案来源完整性复核与分支 — 2026-10-06
+
+
+**本chat独立来源复核（事实，非运行验证）：**
 
 **FACT，独立只读复核基准 main678c27346，未运行测试／未生产写入。** `ServiceCaseWizard.tsx` saveMut 保存 orderId、单个orderLineId、SKU、原Reference及客户资料；没有把 deliveryDate／原承诺版本传入 create input。`service-cases.ts` POST / 插入 order_id/order_line_id，不见同route的line-belongs-to-order检查或Case重复匹配。`0285_service_case_guided_intake.sql` 为 order_line_id 建外键，证明line存在，不单独证明该line属于本案order；此次未穷尽所有后续DB约束，归属保证仍UNVERIFIED。来源lookup多匹配要求SO号码，不等于Case duplicate检查；同名不合并。
 
-**PROPOSAL / NOT LAW — 必须明确的开案分支：**
-
-| 情况 | 员工工作流 | 保存／验收边界 |
-|---|---|---|
-| 原SO与单件商品确定 | 显示只读source身份，选择真正属于订单的商品，补问题／愿望／证据 | source与line归属由服务端核对；case保存当时来源关联及用来决定政策／承诺的可追溯版本，不改SO |
-| 多件商品同一问题 | 逐件确认affected范围，保留各自line/Unit和证据缺口 | 不能用一个sku代表所有商品；当前代码只单行，完整多行目标尚未实现；不同完成结果逐件保留 |
-| 找到同一未完成问题 | 查看原Case摘要、来源、范围、尚欠事项；把新证据追加到原案 | 保留追加人和时间，不新建重复任务，不覆盖原投诉 |
-| 同来源但不同问题 | 记录为什么是不同问题，建立独立Case并关联原来源 | 不因同customer/order就强制把全部投诉合一 |
-| 来源有多个匹配／同名 | 明确呈现有权限候选，由员工核实原编号和商品 | 不自动选第一个；Reference仅别名，不作关系键 |
-| 原资料读失败 | 显示失败及重试，保留已填草稿；授权允许时明确改走no-source | 失败不是无来源；不能静默建一宗丢关联Case |
-| 未找到原记录 | 手填已知客户／商品和原始证据，明确来源未确认 | 后续关联有核对和审计，不反写SO客户；缺日期不能假定资格 |
-| 订单已取消／商品行修改 | 读取实际保留历史及当时版本，记录当前问题 | 原记录取消不构成已解决投诉；入口及历史关联实现仍欠核，不承诺当前已支持 |
-| 重复按提交／两人同时开同问题 | 返回已存在提交结果／提示相关案件，保留真实不同问题分支 | 不能仅靠UI禁用按钮防重复；来源冲突／权限变化返回明确原因，不丢草稿 |
-
-该复核只把可证实事实与未证实保证写清楚，不授权实现或把未来模型选择写成工程方案。当前既有按钮不足以证明完整开案能力。
-
-
-## 7.31 · 执行腿完成矩阵 — PROPOSAL / NOT LAW，代码事实分列
-
 **FACT，main678c27346只读复核，未运行测试／生产验证：**`routes/operation/repair-orders.ts` 201–204 的 inspected 从 returned fact + 当前 inspection hold 不存在推导，未在该返回字段提供独立inspection结果/执行人。`lib/repair-order-work.ts` 的 returnDatePassed 完成依据为每Unit goods_received_date 与GRN；它证明原RO归还跟进条件，不证明每Unit修好。`routes/operation/order-payments.ts` 有 refund_request/refund_decide/refund_mark_paid；另有 `routes/finance/refunds.ts` 的refund_pay路径。不能把两套现存门任意选一或合并成Service退款引擎；必须按Payment MASTER的适用客户金额/source规则读写。接口存在不是部署或到账验证。
-
-| 原模块事实 | Service可显示的完成范围 | 下一步／尚欠事实 | 绝不能由什么代替 |
-|---|---|---|---|
-| Case补救决定及必要批准 | 决定／批准义务完成 | 仍需原执行模块接收授权范围 | customer_wants／点击审批／自由文字 |
-| Delivery实际Collected，确切Units与proof | 这些Units的收取腿完成 | Warehouse实际接收及检查 | 预约日期／出车／员工消息／同案其他Unit已收 |
-| Warehouse实际received，有效receipt/GRN与Units | 这些Units到仓事实完成 | inspection结果及适用处置 | Logistics报已退回／解除某hold／Case Closed |
-| 适用inspection有结果及必要证据 | 对应inspection义务完成 | 修复／报废／替换等真实决策和执行 | 当前hold缺失自动推断所有检查通过；缺结果显示未验证 |
-| Supplier收到确切Unit并确认 | supplier receipt义务完成 | 原RO维修、归还及适用检查 | document sent／Supplier承诺完成日期 |
-| RO每Unit实际归还，随后确认修复结果 | 满足其范围的维修执行腿完成 | 若客户仍需商品，Delivery交付腿继续 | 原return-date-follow-up完成或RO cancelled自动算修好 |
-| Delivery实际Delivered，确切出货Units及适用proof接受 | 对应送回／替换交付腿完成 | 旧品待收、其他Unit、费用及客户确认仍分别检查 | 新品已送=旧品已收；预约=Delivered |
-| Payment批准的客户退款原记录实际paid结果 | 对应客户退款义务完成 | 其他必需腿及客户结果确认 | 另一个Finance退款／审批决定／message／未核对截图 |
-| 所有适用执行腿完成＋客户实际确认 | 适用Solved路径可经过关案gate | 系统保留历史、policy与文件版本 | no-remedy／withdrawn名称、批量勾选、历史Resolved文字 |
-
-**业务验收：**同Case两个Unit，每个incoming/outgoing身份保留；每行必须可打开对应source record，来源与Case范围一致；取消／失败／无权限／未读到数据不是成功；source事实变更时保留原历史，Case不会反写或静默重置源动作。Source task已完成只关闭它对应的义务，不自动关闭Case或其他模块task。每个费用只由唯一金额owner计算，只有原权限门执行；历史receipt／signed document不由Case覆盖。
 
 **尚欠核实而非owner重问：**hold解除的正式权限/证据模型、有效取消receipt的排除、客户refund适用原门、Case到各腿的真实关系、跨源action去重。未证实前不得将这些行标READY或VERIFIED。以上是完整业务完成要求，不是迁移/测试文件/工程执行方案。
