@@ -36,6 +36,10 @@ import {
   classifySalesOrderChange,
   SALES_ORDER_EDIT_HEADER_KEYS,
   type SalesOrderChangeSide,
+  salesOrderEditBaseline,
+  sameSalesOrderEditBaseline,
+  salesOrderChangedSinceOpened,
+  type SalesOrderEditBaseline,
   stockMatchKey,
 } from "@carres/shared";
 import { findSalesOrderDocuments } from "../../lib/sales-order-document-search";
@@ -1400,6 +1404,10 @@ operationOrdersRouter.get("/:id", requireOperation, async (c) => {
   });
 
   return c.json({
+    /* CONCURRENT EDITING (orders/MASTER §0.0, owner-approved 2026-10-01): the
+       order exactly as the edit page opens it, built from THESE rows. The page
+       freezes it with its draft and the commit carries it back. */
+    editBaseline: salesOrderEditBaseline(order as Record<string, unknown>, rawLines, addons),
     order,
     lines: linesWithCategory,
     addons,
@@ -2972,6 +2980,16 @@ const changeAddonInput = z
     attrs: z.record(z.unknown()).nullable().optional(),
   })
   .strict();
+const editBaselineItem = { id: z.string(), qty: z.number(), unit_price: z.number(), attrs: z.record(z.unknown()).nullable() };
+const editBaselineInput = z
+  .object({
+    status: z.string(),
+    header: z.record(z.unknown()),
+    lines: z.array(z.object({ ...editBaselineItem, sku: z.string() }).strict()),
+    addons: z.array(z.object({ ...editBaselineItem, addon_key: z.string() }).strict()),
+    installment_months: z.number().nullable(),
+  })
+  .strict();
 const salesOrderChangesInput = z.object({
   header: revisionHeaderInput
     .extend({
@@ -2993,6 +3011,11 @@ const salesOrderChangesInput = z.object({
   agreement: amendmentAgreementInput.optional(),
   /** Proposing again over an OUT-OF-DATE request withdraws that request first. */
   replaceAmendmentId: z.string().uuid().nullable().optional(),
+  /* CONCURRENT EDITING (orders/MASTER §0.0, owner-approved 2026-10-01) — the
+     order exactly as this page opened it (`editBaseline` from GET /:id). Absent
+     is refused as changed: a commit that cannot say what it was computed from
+     cannot prove it overwrites nobody. */
+  expected: editBaselineInput.optional(),
 });
 
 type StoredOrder = Record<string, unknown> & {
@@ -3008,6 +3031,31 @@ function headerOf(order: StoredOrder): SalesOrderChangeSide["header"] {
     out[k] = k === "entry_fields" ? (order.entry_data?.fields ?? {}) : order[k];
   }
   return out;
+}
+
+/** The governed stale answer: `Action changed · Review again` (COPY-STANDARD,
+ *  the stale-action words) plus WHICH facts moved since the page opened, so the
+ *  page can show the colleague's change Before/After while keeping the draft. */
+function editStaleAnswer(opened: SalesOrderEditBaseline | null, current: SalesOrderEditBaseline | null) {
+  return {
+    error: "conflict",
+    code: "order_edit_stale",
+    message: "Action changed · Review again",
+    changed: opened && current ? salesOrderChangedSinceOpened(opened, current) : [],
+  };
+}
+/** The database refused under its lock: a colleague's commit won the race
+ *  after this route's own read. Read the order again to say what moved. */
+async function editStaleAfterRefusal(sb: ReturnType<typeof userClient>, id: string, opened: SalesOrderEditBaseline) {
+  const [o, l, a] = await Promise.all([
+    sb.from("orders").select("*").eq("id", id).maybeSingle(),
+    sb.from("order_lines").select("id, sku, qty, unit_price, attrs").eq("order_id", id),
+    sb.from("order_addons").select("id, addon_key, qty, unit_price, attrs").eq("order_id", id),
+  ]);
+  const current = o.data && !o.error && !l.error && !a.error
+    ? salesOrderEditBaseline(o.data as Record<string, unknown>, l.data ?? [], a.data ?? [])
+    : null;
+  return editStaleAnswer(opened, current);
 }
 
 operationOrdersRouter.post("/:id/changes", requireOperation, async (c) => {
@@ -3041,6 +3089,17 @@ operationOrdersRouter.post("/:id/changes", requireOperation, async (c) => {
   const order = orderRes.data as StoredOrder | null;
   if (!order) return c.json({ error: "not_found", code: "not_found", message: "Order not found" }, 404);
 
+  /* ⛔ TWO EDITORS CANNOT SILENTLY OVERWRITE ONE ANOTHER. The draft carries
+     every field the page shows, so a field a colleague changed after this page
+     opened would come back below as THIS editor's change. Refuse before
+     classifying; the database repeats the same comparison under the order's
+     lock (`sales_order_commit_staff_change`), which is what makes it atomic. */
+  const opened = (body.expected ?? null) as SalesOrderEditBaseline | null;
+  const stored = salesOrderEditBaseline(order, linesRes.data ?? [], addonsRes.data ?? []);
+  if (!opened || !sameSalesOrderEditBaseline(opened, stored)) {
+    return c.json(editStaleAnswer(opened, stored), 409);
+  }
+
   const current: SalesOrderChangeSide = {
     header: headerOf(order),
     lines: ((linesRes.data ?? []) as SalesOrderChangeSide["lines"]).map((l) => ({ ...l, unit_price: Number(l.unit_price) })),
@@ -3067,13 +3126,21 @@ operationOrdersRouter.post("/:id/changes", requireOperation, async (c) => {
   if (cls.action === "save") {
     const header: Record<string, unknown> = {};
     for (const k of cls.header) header[k] = (body.header as Record<string, unknown>)[k] ?? null;
-    const { data, error } = await sb.rpc("sales_order_save_revision", {
+    /* The same save as before — header only, a staff correction — behind the
+       one guarded door that compares the opened order under the lock first. */
+    const { data, error } = await sb.rpc("sales_order_commit_staff_change", {
       p_order_id: id,
+      p_expected: opened,
+      p_action: "save",
       p_header: header,
-      p_lines: null,
-      p_change: { change_type: "staff_correction", note: body.reason },
+      p_proposed: null,
+      p_reason: body.reason,
+      p_customer_asked_on: null,
+      p_agreement: null,
+      p_replace: null,
     });
     if (error) {
+      if (error.details === "order_edit_stale") return c.json(await editStaleAfterRefusal(sb, id, opened), 409);
       const m = mapPipelineV2Error(error);
       return c.json(m.body, m.status);
     }
@@ -3106,45 +3173,34 @@ operationOrdersRouter.post("/:id/changes", requireOperation, async (c) => {
   if (cls.addonsChanged) proposed.addons = draft.addons.map(({ id: aid, ...a }) => (aid ? { id: aid, ...a } : a));
   if (cls.installmentChanged) proposed.installment_months = draft.installment_months;
 
-  if (body.replaceAmendmentId) {
-    const live = await sb.rpc("sales_order_amendment_live", { p_order_id: id });
-    const a = (live.data as { amendment?: { id?: string; stale?: boolean } | null } | null)?.amendment;
-    if (a?.id === body.replaceAmendmentId && a.stale) {
-      const w = await sb.rpc("sales_order_withdraw_amendment", {
-        p_amendment_id: a.id,
-        p_reason: "Out of date - proposed again on the current order",
-      });
-      if (w.error) {
-        const m = mapPipelineV2Error(w.error);
-        return c.json(m.body, m.status);
-      }
-    }
-  }
-  const { data, error } = await sb.rpc("sales_order_submit_amendment", {
+  /* One guarded transaction: compare the opened order under the lock, then
+     withdraw an OUT-OF-DATE request being proposed again (only that one, only
+     when stale — unchanged), submit, and record the agreement. "The request
+     may remain recorded while evidence is incomplete; it cannot take effect" —
+     a refused agreement rolls back only itself and the page is told. */
+  const { data, error } = await sb.rpc("sales_order_commit_staff_change", {
     p_order_id: id,
+    p_expected: opened,
+    p_action: "submit",
+    p_header: null,
     p_proposed: proposed,
     p_reason: body.reason,
     p_customer_asked_on: body.customerAskedOn ?? null,
+    p_agreement: body.agreement
+      ? { kind: body.agreement.kind, reference: body.agreement.reference, detail: body.agreement.detail ?? null }
+      : null,
+    p_replace: body.replaceAmendmentId ?? null,
   });
   if (error) {
+    if (error.details === "order_edit_stale") return c.json(await editStaleAfterRefusal(sb, id, opened), 409);
     const m = mapPipelineV2Error(error);
     return c.json(m.body, m.status);
   }
-  const submitted = data as { id: string; base_revision: number };
-  let agreementRecorded = false;
-  if (body.agreement) {
-    const ag = await sb.rpc("sales_order_record_amendment_agreement", {
-      p_amendment_id: submitted.id,
-      p_kind: body.agreement.kind,
-      p_reference: body.agreement.reference,
-      p_detail: body.agreement.detail ?? null,
-    });
-    /* The REQUEST survives a refused agreement - "the request may remain
-       recorded while evidence is incomplete; it cannot take effect". The page
-       is told which it got and offers the door again. */
-    agreementRecorded = !ag.error;
-  }
-  return c.json({ action: "submitted", amendmentId: submitted.id, baseRevision: submitted.base_revision, agreementRecorded }, 201);
+  const submitted = data as { id: string; base_revision: number; agreement_recorded?: boolean };
+  return c.json(
+    { action: "submitted", amendmentId: submitted.id, baseRevision: submitted.base_revision, agreementRecorded: submitted.agreement_recorded === true },
+    201,
+  );
 });
 
 const amendmentWithdrawInput = z.object({ reason: z.string().trim().min(1, "A withdrawal says why").max(500) });

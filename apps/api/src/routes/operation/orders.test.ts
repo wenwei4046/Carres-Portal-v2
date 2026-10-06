@@ -936,6 +936,44 @@ describe("GET /api/operation/orders/:id", () => {
     expect(from.mock.calls.map(([table]) => table)).not.toContain("order_payments");
   });
 
+  it("answers the order exactly as the edit page opens it — the baseline a commit carries back", async () => {
+    /* Concurrent editing (orders/MASTER §0.0, owner-approved 2026-10-01). Built
+       from the SAME rows the page renders: every edit header fact (absent ones
+       null), entry fields as an object, lines and services by id with only
+       the five facts, the plan and the status. */
+    const L1 = "00000000-0000-0000-0000-00000000l002";
+    const L2 = "00000000-0000-0000-0000-00000000l001";
+    mockDetailQueries({
+      order: {
+        id: ORDER_ID, so: 4001, status: "proceed_order", customer_name: "Tan Ah Kow", customer_phone: "+60123456789",
+        entry_data: { fields: { building_type: "Landed" } }, delivery_floor: 3, delivery_has_lift: false, installment_months: 6,
+      },
+      lines: [
+        { id: L1, sku: "MAT-K-001", qty: 2, unit_price: 1500, attrs: { gap: "KIV" }, source_po: "PO-1" },
+        { id: L2, sku: "BED-K-002", qty: 1, unit_price: 800.5, attrs: null, source_po: null },
+      ],
+      addons: [{ id: "00000000-0000-0000-0000-00000000a001", addon_key: "DELIVERY", qty: 1, unit_price: 250, attrs: null }],
+    });
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(new Request(`http://t/api/operation/orders/${ORDER_ID}`, {
+      headers: { Authorization: `Bearer ${jwt}` },
+    }), env);
+    expect(res.status).toBe(200);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const b = ((await res.json()) as any).editBaseline;
+    expect(b.status).toBe("proceed_order");
+    expect(b.header.customer_name).toBe("Tan Ah Kow");
+    expect(b.header.customer_email).toBeNull();
+    expect(b.header.entry_fields).toEqual({ building_type: "Landed" });
+    expect(b.header.delivery_floor).toBe(3);
+    expect(b.lines).toEqual([
+      { id: L2, sku: "BED-K-002", qty: 1, unit_price: 800.5, attrs: null },
+      { id: L1, sku: "MAT-K-001", qty: 2, unit_price: 1500, attrs: { gap: "KIV" } },
+    ]);
+    expect(b.addons).toEqual([{ id: "00000000-0000-0000-0000-00000000a001", addon_key: "DELIVERY", qty: 1, unit_price: 250, attrs: null }]);
+    expect(b.installment_months).toBe(6);
+  });
+
   it("returns aggregated detail for an in_production order", async () => {
     mockDetailQueries({
       order: {
