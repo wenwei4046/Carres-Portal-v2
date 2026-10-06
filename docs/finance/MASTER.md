@@ -61,9 +61,13 @@ Chew's answers on the chart, 2026-10-06:
 
 **Account mapping, Chew's answers 2026-10-06** (the mapping table is being confirmed line by line):
 - Banks are Maybank, Hong Leong, RHB and Alliance Bank only. The test chart's "Bank — current account" and Public Bank go.
-- Every way of receiving money that waits before reaching the bank gets its own clearing account (「card & online clearing是每个收钱途径都要」).
+- Every way of receiving money that waits before reaching the bank gets its own clearing account (「card & online clearing是每个收钱途径都要」): the Public Bank, GHL, Hong Leong and Maybank card machines, AhaPay (rarely used now, but kept as a card merchant) and Stripe. DuitNow QR and FPX go straight into the bank, so they have none.
+- A card instalment plan needs nothing of its own: the card company pays the full amount at once, less a higher fee.
 - Service charges (disposal, no-lift), storage charges and the 15-year guarantee are each their own income account. After-sales and warranty cost is its own expense account.
-- Explained to Chew, answers pending: supplier claims receivable, deposits paid to suppliers, and the opening-balance account.
+- The 15-year guarantee is income in full when it is sold, not spread over the years (「15年保固费不需要慢慢转一部分进收入」).
+- No supplier claims account. A claim is settled by a supplier credit note on that supplier's own account.
+- No Deposit - suppliers account. A payment made before the bill stays on that supplier's own account, as in AutoCount (「照理也是扣在供应商的户口」). The Balance Sheet's separate asset line for suppliers paid ahead (0507, YH 2026-09-14) goes when the Balance Sheet is next changed.
+- An opening-balance account is opened for go-live only. Once every balance is in, it is zero, so it should never appear (「可以，但我认为不应该会出现」).
 
 **A purchase without an order** takes its channel from the Manual Purchase Request's required purpose (Purchasing §5.2), so nothing extra is marked on the PO. Confirmed by Chew 2026-10-06 (「1 对，2 对，3 可以」):
 - Showroom Display → that showroom; Ready Stock → stock not yet in a channel; Service Case → the case's order; Internal Staff Purchase and Other Purchase → Office; Subsidiary Purchase → the amount due from that related company (350-00xx). The approved Diglant advance PO, when built → Subscription; a dealer display request, when built → that dealer.
