@@ -417,6 +417,10 @@ export default function OperationApp() {
           tab !== "manual-purchase" &&
           tab !== "receiving" &&
           tab !== "claims" &&
+          /* SERVICE CASES — template adoption 2026-10-06: the register draws
+             its own 50px Destination Header (ModuleHeader embeds TopBarIcons),
+             so the slim bar would be a second top row. */
+          tab !== "service-notes" &&
           /* §9.6 Purchase Returns — the SIXTH page to ship this exact defect.
              It draws PurchasingTabs, which is a ModuleHeader and embeds
              TopBarIcons, so the slim bar put a second Jump to, a second bell,

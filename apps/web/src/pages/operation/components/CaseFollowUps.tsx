@@ -108,7 +108,7 @@ export default function CaseFollowUps({
           Save and being refused. */}
       <p className="text-meta mt-2 text-base-600">
         {canClose
-          ? "Everything is done. Set the status to Resolved to close this case."
+          ? "Everything is done. Press Close case to seal the record."
           : "This case can only be closed once every step above has a date on it."}
       </p>
     </div>

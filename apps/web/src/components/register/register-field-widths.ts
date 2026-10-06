@@ -141,6 +141,17 @@ export const REGISTER_FIELD_WIDTH = {
   shortFact: 96,
   /** A small count with a two-line header: Stair carry items, Instalment months. */
   smallCount: 120,
+
+  /* ── SERVICE CASES' ADDITION — template adoption 2026-10-06 (prototype). ── */
+
+  /**
+   * `Latest step` — the last RECORDED fact on a Service Case in the chain's own
+   * words (`Hooka gave a date` · `Customer says it is solved`) with its date on
+   * line two. The longest shipped fact is `Customer says it is solved`
+   * (≈170px at 13px Inter) plus the shared 16px of padding; 220 holds it on
+   * one line. Prototype: re-measure in the real font before calling it done.
+   */
+  caseStep: 220,
 } as const;
 
 export type RegisterFieldWidth = keyof typeof REGISTER_FIELD_WIDTH;

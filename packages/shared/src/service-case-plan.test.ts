@@ -96,7 +96,7 @@ describe("caseFollowUpPlan — what the customer asked for decides what happens"
       "Call the supplier to confirm the repair date",
     );
     expect(plan.find((s) => s.key === "collect")?.label).toBe(
-      "Collect the item from the customer",
+      "Pick up the item from the customer",
     );
   });
 
@@ -131,7 +131,7 @@ describe("the close gate — the card's acceptance", () => {
   it("names what is still open, so the refusal tells the reader what to do", () => {
     const open = caseOpenSteps(plan, [recorded("supplier_date")]);
     const msg = caseCloseBlockerMessage(open);
-    expect(msg).toContain("Collect the item from Ryan Chong");
+    expect(msg).toContain("Pick up the item from Ryan Chong");
     expect(msg).toContain("Call Ryan Chong to confirm the problem is solved");
     expect(msg).not.toContain("confirm the replacement date");
   });
@@ -167,7 +167,7 @@ describe("caseTimeline", () => {
   it("reads as the action while open and as the fact once done", () => {
     const rows = caseTimeline(repair, [recorded("supplier_date")]);
     expect(rows[0].label).toBe("Ohana gave a date");
-    expect(rows[1].label).toBe("Collect the item from Ryan Chong");
+    expect(rows[1].label).toBe("Pick up the item from Ryan Chong");
   });
 
   it("keeps a recorded step the plan no longer asks for, and still names the factory", () => {

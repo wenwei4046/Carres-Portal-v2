@@ -119,6 +119,11 @@ vi.mock("./components/OperationRightRail", () => ({
 vi.mock("./components/GlobalTopBar", () => ({
   default: () => <div data-testid="global-topbar-stub">topbar</div>,
 }));
+// Service Cases self-fetches and draws its own Destination Header (template
+// adoption 2026-10-06) — stubbed; this suite owns the one-header suppression.
+vi.mock("./OperationServiceCases", () => ({
+  default: () => <div data-testid="service-cases-stub">cases</div>,
+}));
 vi.mock("./ArrivalSourceWorkspace", () => ({
   default: () => <div data-testid="arrival-workspace-stub">Transfer</div>,
 }));
@@ -265,6 +270,14 @@ describe("OperationApp — the Sales Order cutover's two doors", () => {
  * 54. The suppression is the fix; the page's own PurchasingTabs row is the ONE
  * header.
  */
+describe("OperationApp — one header on Service Cases", () => {
+  it("?tab=service-notes mounts Service Cases and stands the global top bar down", () => {
+    renderApp("/operation?tab=service-notes");
+    expect(screen.getByTestId("service-cases-stub")).toBeInTheDocument();
+    expect(screen.queryByTestId("global-topbar-stub")).not.toBeInTheDocument();
+  });
+});
+
 describe("OperationApp — one header on Manual Purchase", () => {
   it("?tab=manual-purchase suppresses the global top bar like its siblings", () => {
     renderApp("/operation?tab=manual-purchase");

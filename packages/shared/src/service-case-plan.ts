@@ -185,8 +185,8 @@ export function caseFollowUpPlan(input: CaseFollowUpInput): CaseStep[] {
   if (has(wants, WANTS_BRINGING_IT_BACK)) {
     steps.push({
       key: "collect",
-      label: `Collect the item from ${customer}`,
-      done: "Collected",
+      label: `Pick up the item from ${customer}`,
+      done: "Picked up",
       dateLabel: "Date it was collected",
       noteRequired: false,
       why: "Nothing can be done to the item while it is still in the house.",
