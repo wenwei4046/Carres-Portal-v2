@@ -1030,3 +1030,24 @@ Jess 在本 Service chat 明确授权向 UI、Workspace、Sales Orders、Deliver
 **不得凭接收方报告改写已批准业务：**Delivery报告将movement顺序整体称proposal，与Service已有四种movement裁定不应混淆；已批准词义/能力保持，具体新增组合和链接尚未批准／实现。Warehouse/Payment的128328c6b与main差异需要统一版本复核。跨模块新动作、关闭权限和商业政策不会因为另一chat建议就成为LAW。
 
 **依赖结论：**不用等每个模块全部完成，但进入本Case流程的真实来源与实际完成证据必须闭合。若界面能开Case却丢原承诺、误关联line或没有duplicate检查，不能称“完整开案”；若能显示RO却没有逐Unit有效完成证据，不能称“完整维修闭环”；未授权或失败的source读取不能显示为已完成。现阶段不声明READY或PLAN COMPLETE。
+
+
+## 7.30 · 开案来源完整性复核与分支 — 2026-10-06
+
+**FACT，独立只读复核基准 main678c27346，未运行测试／未生产写入。** `ServiceCaseWizard.tsx` saveMut 保存 orderId、单个orderLineId、SKU、原Reference及客户资料；没有把 deliveryDate／原承诺版本传入 create input。`service-cases.ts` POST / 插入 order_id/order_line_id，不见同route的line-belongs-to-order检查或Case重复匹配。`0285_service_case_guided_intake.sql` 为 order_line_id 建外键，证明line存在，不单独证明该line属于本案order；此次未穷尽所有后续DB约束，归属保证仍UNVERIFIED。来源lookup多匹配要求SO号码，不等于Case duplicate检查；同名不合并。
+
+**PROPOSAL / NOT LAW — 必须明确的开案分支：**
+
+| 情况 | 员工工作流 | 保存／验收边界 |
+|---|---|---|
+| 原SO与单件商品确定 | 显示只读source身份，选择真正属于订单的商品，补问题／愿望／证据 | source与line归属由服务端核对；case保存当时来源关联及用来决定政策／承诺的可追溯版本，不改SO |
+| 多件商品同一问题 | 逐件确认affected范围，保留各自line/Unit和证据缺口 | 不能用一个sku代表所有商品；当前代码只单行，完整多行目标尚未实现；不同完成结果逐件保留 |
+| 找到同一未完成问题 | 查看原Case摘要、来源、范围、尚欠事项；把新证据追加到原案 | 保留追加人和时间，不新建重复任务，不覆盖原投诉 |
+| 同来源但不同问题 | 记录为什么是不同问题，建立独立Case并关联原来源 | 不因同customer/order就强制把全部投诉合一 |
+| 来源有多个匹配／同名 | 明确呈现有权限候选，由员工核实原编号和商品 | 不自动选第一个；Reference仅别名，不作关系键 |
+| 原资料读失败 | 显示失败及重试，保留已填草稿；授权允许时明确改走no-source | 失败不是无来源；不能静默建一宗丢关联Case |
+| 未找到原记录 | 手填已知客户／商品和原始证据，明确来源未确认 | 后续关联有核对和审计，不反写SO客户；缺日期不能假定资格 |
+| 订单已取消／商品行修改 | 读取实际保留历史及当时版本，记录当前问题 | 原记录取消不构成已解决投诉；入口及历史关联实现仍欠核，不承诺当前已支持 |
+| 重复按提交／两人同时开同问题 | 返回已存在提交结果／提示相关案件，保留真实不同问题分支 | 不能仅靠UI禁用按钮防重复；来源冲突／权限变化返回明确原因，不丢草稿 |
+
+该复核只把可证实事实与未证实保证写清楚，不授权实现或把未来模型选择写成工程方案。当前既有按钮不足以证明完整开案能力。
