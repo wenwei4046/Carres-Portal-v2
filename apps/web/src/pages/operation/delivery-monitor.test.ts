@@ -28,7 +28,7 @@
 import { NO_PROOF_REVIEW } from "./delivery-orders-register";
 import { describe, it, expect } from "vitest";
 import type { DeliveryOrderRow, DeliveryProofReviewRow, operationOrderListRow } from "@/lib/queries";
-import { orderActionLines, type DeliveryArrangementRow } from "@carres/shared";
+import { deliveryMoneyHolds, orderActionLines, type DeliveryArrangementRow } from "@carres/shared";
 import type { DeliveryScopeRow } from "./delivery-work";
 import {
   operatingDaysFrom,
@@ -57,6 +57,7 @@ import {
   missingProofLabels,
   monitorRowAction,
   monitorScheduleStatusOf,
+  monitorPaymentOf,
   monitorRowActionText,
   sortByRequestedDeliveryDate,
   needsProof,
@@ -140,6 +141,67 @@ describe("schedule progress and departure blockers", () => {
     const card = subject({ order_lines: [{ id: "one", sku: "mattress:M1401F-K", qty: 1 }] });
     expect(monitorScheduleStatusOf(card).supporting).toBe("Order details incomplete");
     expect(card.payment.line1).toBe("No price yet");
+  });
+});
+
+describe("the Payment column says Hold delivery (owner ruling 2026-09-25, §3 · §8.3)", () => {
+  /* RM 1,200.00 of goods; `paid` decides what is owed. */
+  const priced = (over: Partial<operationOrderListRow> = {}) =>
+    order({ id: "pay", so: 1500, paid: 0, order_lines: [{ id: "l", sku: "mattress:M1401F-K", qty: 1, unit_price: 1200 }], ...over });
+  const open = (reason: string | null = "Cheque bounced") => ({ status: "open" as const, reason });
+  const cleared = { status: "cleared" as const, reason: "Old hold" };
+
+  it.each([
+    ["money owed, no approval", priced(), { line1: "Hold delivery", line2: "RM 1,200.00 unpaid", tone: "red" }],
+    ["a pending approval keeps the hold", priced({ order_delivery_payment_approvals: [{ status: "pending" }] }), { line1: "Hold delivery", line2: "RM 1,200.00 unpaid", tone: "red" }],
+    ["a refused approval keeps the hold", priced({ order_delivery_payment_approvals: [{ status: "refused" }] }), { line1: "Hold delivery", line2: "RM 1,200.00 unpaid", tone: "red" }],
+    ["part paid prints what is left", priced({ paid: 450.5 }), { line1: "Hold delivery", line2: "RM 749.50 unpaid", tone: "red" }],
+    ["one open Finance exception", priced({ paid: 1200, order_finance_exceptions: [open()] }), { line1: "Hold delivery", line2: "Finance hold · Cheque bounced", tone: "red" }],
+    ["several open — the Order Route's count", priced({ paid: 1200, order_finance_exceptions: [open(), open("Duplicate payment")] }), { line1: "Hold delivery", line2: "Finance hold · 2 reasons", tone: "red" }],
+    ["an open exception read without its reason", priced({ paid: 1200, order_finance_exceptions: [{ status: "open" }] }), { line1: "Hold delivery", line2: "Finance hold", tone: "red" }],
+    ["Finance wins over money owed", priced({ order_finance_exceptions: [open()] }), { line1: "Hold delivery", line2: "Finance hold · Cheque bounced", tone: "red" }],
+    ["an approval never clears a Finance hold", priced({ order_finance_exceptions: [open()], order_delivery_payment_approvals: [{ status: "approved" }] }), { line1: "Hold delivery", line2: "Finance hold · Cheque bounced", tone: "red" }],
+    ["paid in full", priced({ paid: 1200 }), { line1: "Paid", line2: null, tone: "green" }],
+    ["a cleared exception holds nothing", priced({ paid: 1200, order_finance_exceptions: [cleared] }), { line1: "Paid", line2: null, tone: "green" }],
+    ["an approval granted before the closure", priced({ order_delivery_payment_approvals: [{ status: "approved" }] }), { line1: "Collect RM 1,200.00", line2: "Cash on delivery", tone: "none" }],
+    ["an unpriced order", order({ id: "np", so: 1501, paid: 0 }), { line1: "No price yet", line2: null, tone: "none" }],
+  ] as const)("%s", (_name, row, expected) => {
+    expect(monitorPaymentOf(row)).toEqual(expected);
+  });
+
+  it("is red exactly when the DO money gate holds — one predicate (Law D)", () => {
+    for (const paid of [0, 600, 1200]) {
+      for (const approvals of [[], [{ status: "pending" }], [{ status: "approved" }]]) {
+        for (const exceptions of [[], [open()], [cleared]]) {
+          const row = priced({ paid, order_delivery_payment_approvals: approvals, order_finance_exceptions: exceptions });
+          expect(monitorPaymentOf(row).tone === "red").toBe(
+            deliveryMoneyHolds({ outstanding: 1200 - paid, paymentApprovals: approvals as never, financeExceptions: exceptions }),
+          );
+        }
+      }
+    }
+  });
+
+  it("never prints a retired word, never a doubled marker, and the retired keys are gone", () => {
+    const words = [priced(), priced({ order_finance_exceptions: [open()] })].flatMap((r) => {
+      const p = monitorPaymentOf(r);
+      return [p.line1, p.line2 ?? ""];
+    });
+    for (const w of words) {
+      expect(w).not.toMatch(/Do not deliver|still to collect|Finance is holding|RM RM/);
+    }
+    for (const key of ["doNotDeliver", "stillToCollect", "financeHolding"]) {
+      expect(MONITOR_COPY).not.toHaveProperty(key);
+    }
+  });
+
+  it("the schedule card's readiness line reads the same function", () => {
+    const card = buildDeliveryMonitorCards({
+      orders: [priced({ order_finance_exceptions: [open()], paid: 1200 })],
+      deliveryOrders: [], attempts: [], handoverEvents: [], partnerNameById: new Map(), todayIso: TODAY,
+    })[0]!;
+    expect(card.payment).toEqual({ line1: "Hold delivery", line2: "Finance hold · Cheque bounced", tone: "red" });
+    expect(monitorScheduleStatusOf(card).supporting).toBe("Hold delivery");
   });
 });
 const WINDOW = [
