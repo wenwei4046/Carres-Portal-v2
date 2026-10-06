@@ -133,7 +133,10 @@ describe("the default list is what Carres holds", () => {
   it("names the page Inventory and keeps the Request Transfer door", async () => {
     await renderLoaded();
     expect(screen.getByTestId("stock-register-destination-header")).toHaveTextContent("Inventory");
-    expect(screen.getByRole("link", { name: "Request Transfer" })).toBeInTheDocument();
+    /* The create door is a toolbar pill, never a control in the Shell header
+       row (UI MASTER §4). */
+    expect(screen.getByTestId("stock-register-destination-header")).not.toHaveTextContent("Request Transfer");
+    expect(screen.getByRole("button", { name: "Request Transfer" })).toBeInTheDocument();
   });
 
   it("reads the Unit authority endpoint, never a stored total", async () => {

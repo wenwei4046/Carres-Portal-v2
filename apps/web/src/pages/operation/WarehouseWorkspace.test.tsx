@@ -801,6 +801,11 @@ describe("finding today", () => {
     const marked = document.querySelectorAll('[data-today="yes"]');
     expect(marked).toHaveLength(1);
     expect(screen.getByTestId("ws-head-2026-09-14")).toHaveAttribute("data-today", "yes");
+    /* The weekday ALWAYS prints (COPY: never `Today` as a date word); today
+       is marked by its data attribute and ink, and a screen reader still
+       hears the word. 2026-09-14 is a Monday. */
+    expect(screen.getByTestId("ws-head-2026-09-14")).toHaveTextContent("Mon");
+    expect(screen.getByTestId("ws-head-2026-09-14")).toHaveAttribute("data-today", "yes");
     expect(screen.getByTestId("ws-head-2026-09-14")).toHaveTextContent("Today");
   });
 

@@ -36,6 +36,7 @@ import {
   useRecordOutboundPrep,
 } from "@/lib/queries";
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
+import { REGISTER_FIELD_WIDTH } from "@/components/register/register-field-widths";
 import { appTodayIso, fmtDate } from "@/lib/fmt-date";
 import ModuleHeader from "./components/ModuleHeader";
 import { Modal, ModalActions } from "./components/Modal";
@@ -88,6 +89,20 @@ function useIsNarrow(): boolean {
     return () => mq.removeEventListener("change", onChange);
   }, [query]);
   return narrow;
+}
+
+/** A fact that has not happened yet (no ship, no vehicle) stays BLANK —
+ *  never a dash and never an absence word. */
+function OutboundBlank() {
+  return <span aria-hidden="true" />;
+}
+
+/** `Done` only when every required Unit is loaded AND driver-confirmed —
+ *  loading alone never claims the driver's act (Stock MASTER §7). */
+export function outboundLoadingDone(
+  c: Pick<WarehouseOutboundCard, "unitsRequired" | "handedOver" | "driverConfirmed">,
+): boolean {
+  return c.unitsRequired > 0 && c.handedOver >= c.unitsRequired && c.driverConfirmed >= c.unitsRequired;
 }
 
 const STATUSES = [
@@ -165,118 +180,231 @@ export default function WarehouseOutboundWork() {
   const workKey = (c: WarehouseOutboundCard) => `${c.deliveryOrderId ?? c.doNumber}:${c.warehouseSiteId ?? c.fromLocation}`;
   const workCard = allCards.find((c) => workKey(c) === workId);
 
+  /**
+   * THE OUTBOUND REGISTER — owner ruling 2026-09-25 (Stock MASTER §7).
+   *
+   * One row is one DO + Site scope, 40px, ONE FACT PER CELL, in the owner's
+   * order:
+   *
+   *   Scheduled handover · Ship Date · DO No · SO No · Pickup By ·
+   *   Delivery Location · Item · Required · Loaded · Driver confirmed · Loading
+   *
+   * `Scheduled handover` is Delivery's planned pickup day; `Ship Date` is the
+   * day the Warehouse recorded the goods loaded (blank until then). `Pickup
+   * By` is the company whose driver comes; `Delivery Location` is the customer
+   * address or the next Site. `Required · Loaded · Driver confirmed` are three
+   * columns, never one number. `Loading` prints `Done` once every required
+   * Unit is loaded AND driver-confirmed. The 2026-09-07 composite cells
+   * (`Document` · `Units`) are retired as design; `From` · `Assigned Driver` ·
+   * `Status` · `Exceptions` · `SO date` · `Vehicle` · `Loaded at` · `Driver
+   * collected at` stay one click away in Columns.
+   */
   const columns = useMemo<DataGridColumn<WarehouseOutboundCard>[]>(
     () => [
       {
         key: "date",
-        defaultHidden: true,
         label: "Scheduled handover",
-        width: 140,
-        wrap: true,
+        headerLines: ["Scheduled", "handover"] as const,
+        width: REGISTER_FIELD_WIDTH.date,
+        sortable: true,
+        filterType: "date",
+        chooserGroup: "Dates",
+        dateValue: (c) => c.eventDate,
         searchValue: (c) => c.eventDate,
+        exportValue: (c) =>
+          `${c.eventDate}${c.expectedCollectionWindow ? ` · Driver pickup ${c.expectedCollectionWindow}` : " · Time not provided"}`,
+        /* The approved second line (COPY: `Driver pickup {time}` or exactly
+           `Time not provided`) — 11px slate-11 under the 13px date, inside
+           the one 40px row. */
         accessor: (c) => (
-          <div className="py-0.5 leading-[18px]">
-            <div>{fmtDate(c.eventDate)}</div>
-            <div className="text-base-500">
+          <span className="block leading-[18px]" data-testid={`wo-date-${c.doNumber}`}>
+            <span className="block">{fmtDate(c.eventDate)}</span>
+            <span className="block text-label font-normal leading-[14px] text-kit-slate-11">
               {c.expectedCollectionWindow
                 ? `Driver pickup ${c.expectedCollectionWindow}`
                 : "Time not provided"}
-            </div>
-          </div>
+            </span>
+          </span>
         ),
+      },
+      {
+        key: "shipDate",
+        label: "Ship Date",
+        width: REGISTER_FIELD_WIDTH.date,
+        sortable: true,
+        filterType: "date",
+        chooserGroup: "Dates",
+        dateValue: (c) => c.actualHandoverAt?.slice(0, 10) ?? null,
+        searchValue: (c) => c.actualHandoverAt?.slice(0, 10) ?? "",
+        exportValue: (c) => c.actualHandoverAt?.slice(0, 10) ?? "",
+        accessor: (c) =>
+          c.actualHandoverAt ? (
+            <span data-testid={`wo-ship-date-${c.doNumber}`}>{fmtDate(c.actualHandoverAt)}</span>
+          ) : (
+            <OutboundBlank />
+          ),
       },
       {
         key: "document",
-        label: "Document",
-        width: 245,
-        wrap: true,
-        searchValue: (c) => `DO No ${c.doNumber} ${c.source}`,
+        label: "DO No",
+        width: REGISTER_FIELD_WIDTH.documentNo,
+        sortable: true,
+        chooserGroup: "Documents",
+        searchValue: (c) => `DO No ${c.doNumber}`,
+        exportValue: (c) => c.doNumber,
         accessor: (c) => (
-          <div className="py-0.5 leading-[18px]">
-            <div className="text-label font-semibold text-kit-slate-11">
-              DO No
-            </div>
-            <Link
-              className="font-mono text-kit-blue-11 hover:underline"
-              onClick={(e) => e.stopPropagation()}
-              to={c.deliveryOrderHref}
-              data-testid={`outbound-document-${c.doNumber}`}
-            >
-              {c.doNumber}
-            </Link>
-            <div><Link className="font-mono text-kit-blue-11 hover:underline" to={c.sourceHref}>{c.source}</Link></div>
-            <div>Scheduled handover {fmtDate(c.eventDate)}</div>
-            <div className="text-meta text-base-600">{c.expectedCollectionWindow ? `Driver pickup ${c.expectedCollectionWindow}` : "Time not provided"}</div>
-            <div className="text-meta text-base-600">{c.fromLocation} → {c.toCustomer}</div>
-            <div className="text-meta text-base-600">{c.logisticsPartner}</div>
-            <div className="text-meta text-base-600" data-testid={`wo-driver-${c.doNumber}`}>{warehouseAssignedDriverLine(c.logisticsPartner, c.driverName)}</div>
-          </div>
+          <Link
+            className="font-mono text-kit-blue-11 hover:underline"
+            onClick={(e) => e.stopPropagation()}
+            to={c.deliveryOrderHref}
+            data-testid={`outbound-document-${c.doNumber}`}
+          >
+            {c.doNumber}
+          </Link>
         ),
       },
       {
-        key: "loading", label: "Loading", width: 85, wrap: true, filterable: false,
-        accessor: (c) => <button type="button" className="inline-flex h-7 items-center rounded-control border border-kit-slate-5 bg-white px-2 text-meta text-kit-blue-11 hover:bg-hovertint" data-testid={`wo-open-loading-${c.doNumber}`} onClick={() => setFilter("loading", workKey(c))}>Loading</button>,
+        key: "so",
+        label: "SO No",
+        width: REGISTER_FIELD_WIDTH.soNo,
+        sortable: true,
+        chooserGroup: "Documents",
+        searchValue: (c) => c.source,
+        exportValue: (c) => c.source,
+        accessor: (c) => (
+          <Link
+            className="font-mono text-kit-blue-11 hover:underline"
+            onClick={(e) => e.stopPropagation()}
+            to={c.sourceHref}
+            data-testid={`wo-so-${c.doNumber}`}
+          >
+            {c.source}
+          </Link>
+        ),
+      },
+      {
+        key: "partner",
+        label: "Pickup By",
+        width: REGISTER_FIELD_WIDTH.partyName,
+        sortable: true,
+        filterType: "enum",
+        chooserGroup: "Movement",
+        searchValue: (c) => c.logisticsPartner,
+        filterValue: (c) => c.logisticsPartner,
+        exportValue: (c) => c.logisticsPartner,
+        accessor: (c) => <span className="block truncate" title={c.logisticsPartner} data-testid={`wo-pickup-by-${c.doNumber}`}>{c.logisticsPartner}</span>,
+      },
+      {
+        key: "to",
+        label: "Delivery Location",
+        headerLines: ["Delivery", "Location"] as const,
+        width: REGISTER_FIELD_WIDTH.address,
+        sortable: true,
+        chooserGroup: "Movement",
+        searchValue: (c) => c.toCustomer,
+        exportValue: (c) => c.toCustomer,
+        accessor: (c) => <span className="block truncate" title={c.toCustomer} data-testid={`wo-delivery-location-${c.doNumber}`}>{c.toCustomer}</span>,
       },
       {
         key: "products",
-        label: "Product",
-        width: 200,
-        wrap: true,
+        label: "Item",
+        width: REGISTER_FIELD_WIDTH.items,
+        sortable: true,
+        chooserGroup: "Goods",
         searchValue: (c) =>
           c.products
             .map((x) => `${x.name ?? ""} ${x.sku ?? ""}`)
             .concat(c.units.map((u) => u.unitId))
             .join(" "),
+        exportValue: (c) =>
+          c.products.map((x) => `${x.name ?? x.sku ?? "Product not recorded"} × ${x.qty}`).join(" · "),
+        accessor: (c) => {
+          if (c.products.length === 0) return <span data-testid={`wo-item-${c.doNumber}`}>Products not recorded</span>;
+          /* Several goods print `{n} items` and keep the expansion; one good
+             prints its name with the SKU on the approved 11px second line. */
+          if (c.products.length > 1)
+            return <span data-testid={`wo-item-${c.doNumber}`}>{c.products.length} items</span>;
+          const x = c.products[0]!;
+          return (
+            <span className="block leading-[18px]" data-testid={`wo-item-${c.doNumber}`}>
+              <span className="block">{x.name ?? x.sku ?? "Product not recorded"}</span>
+              {x.name && x.sku ? (
+                <span className="block text-label font-normal leading-[14px] text-kit-slate-11">{x.sku}</span>
+              ) : null}
+            </span>
+          );
+        },
+      },
+      ...(
+        [
+          ["required", "Required", "unitsRequired", ["Required", ""]],
+          ["loaded", "Loaded", "handedOver", ["Loaded", ""]],
+          ["driverConfirmed", "Driver confirmed", "driverConfirmed", ["Driver", "confirmed"]],
+        ] as const
+      ).map(([key, label, field, lines]) => ({
+        key,
+        label,
+        headerLines: lines[1] ? (lines as readonly [string, string]) : undefined,
+        width: REGISTER_FIELD_WIDTH.smallCount,
+        align: "right" as const,
+        sortable: true,
+        filterType: "number" as const,
+        chooserGroup: "Goods",
+        numberValue: (c: WarehouseOutboundCard) => c[field],
+        searchValue: (c: WarehouseOutboundCard) => String(c[field]),
+        exportValue: (c: WarehouseOutboundCard) => c[field],
+        accessor: (c: WarehouseOutboundCard) => (
+          <span className="tabular-nums" data-testid={`wo-count-${key}-${c.doNumber}`}>{c[field]}</span>
+        ),
+      })),
+      {
+        key: "loading",
+        label: "Loading",
+        width: REGISTER_FIELD_WIDTH.shortFact,
+        sortable: false,
+        filterable: false,
+        exportLabel: "Loading",
+        exportValue: (c) => (outboundLoadingDone(c) ? "Done" : ""),
+        /* `Done` only once every required Unit is loaded AND driver-confirmed;
+           loading alone never claims the driver's act. */
         accessor: (c) =>
-          c.products.length === 0 ? (
-            <span>Products not recorded</span>
+          outboundLoadingDone(c) ? (
+            <span data-testid={`wo-loading-done-${c.doNumber}`}>Done</span>
           ) : (
-            <div className="space-y-0.5 py-0.5 leading-[18px]">
-              {c.products.map((x) => (
-                <div key={x.sku ?? "no-sku"}>
-                  {x.name ?? x.sku ?? "Product not recorded"}
-                  {x.name && x.sku ? (
-                    <span className="text-base-500"> · {x.sku}</span>
-                  ) : null}
-                  <span className="tabular-nums"> × {x.qty}</span>
-                </div>
-              ))}
-            </div>
+            <button
+              type="button"
+              className="inline-flex h-7 items-center rounded-control border border-kit-slate-5 bg-white px-2 text-meta text-kit-blue-11 hover:bg-hovertint"
+              data-testid={`wo-open-loading-${c.doNumber}`}
+              onClick={() => setFilter("loading", workKey(c))}
+            >
+              Loading
+            </button>
           ),
       },
+      /* ── One click away in Columns ────────────────────────────────────── */
       {
         key: "from",
         defaultHidden: true,
         label: "From",
-        width: 140,
-        wrap: true,
+        width: REGISTER_FIELD_WIDTH.placeWord,
+        sortable: true,
+        filterType: "enum",
+        chooserGroup: "Movement",
         searchValue: (c) => c.fromLocation,
+        filterValue: (c) => c.fromLocation,
+        exportValue: (c) => c.fromLocation,
         accessor: (c) => c.fromLocation,
-      },
-      {
-        key: "to",
-        defaultHidden: true,
-        label: "To",
-        width: 190,
-        wrap: true,
-        searchValue: (c) => c.toCustomer,
-        accessor: (c) => c.toCustomer,
-      },
-      {
-        key: "partner",
-        defaultHidden: true,
-        label: "Logistics Partner",
-        width: 125,
-        searchValue: (c) => c.logisticsPartner,
-        accessor: (c) => c.logisticsPartner,
       },
       {
         key: "driver",
         defaultHidden: true,
         label: "Assigned Driver",
-        width: 150,
-        wrap: true,
+        width: REGISTER_FIELD_WIDTH.partyName,
+        sortable: true,
+        chooserGroup: "Movement",
         searchValue: (c) => c.driverName ?? "",
+        exportValue: (c) => warehouseAssignedDriverLine(c.logisticsPartner, c.driverName),
+        overflowText: (c) => warehouseAssignedDriverLine(c.logisticsPartner, c.driverName),
         accessor: (c) => (
           <span data-testid={`wo-driver-${c.doNumber}`}>
             {warehouseAssignedDriverLine(c.logisticsPartner, c.driverName)}
@@ -284,98 +412,82 @@ export default function WarehouseOutboundWork() {
         ),
       },
       {
-        key: "tally",
-        label: "Units",
-        width: 165,
-        wrap: true,
-        accessor: (c) => (
-          <div
-            className="py-0.5 tabular-nums leading-[18px]"
-            data-testid={`outbound-tally-${c.doNumber}`}
-          >
-            <div>
-              Required {c.unitsRequired} · Loaded {c.handedOver}
-            </div>
-            <div>Not loaded {c.notHandedOver}</div>
-            <div>Driver confirmed {c.driverConfirmed}</div>
-            {outboundExceptionLines(c, today, fmtDate).map((line) => <div key={line} className="text-meta text-base-600">{line}</div>)}
-          </div>
-        ),
-      },
-      {
         key: "status",
         defaultHidden: true,
         label: "Status",
-        width: 125,
+        width: REGISTER_FIELD_WIDTH.status,
+        sortable: true,
+        filterType: "enum",
+        chooserGroup: "Goods",
         searchValue: (c) => outboundStatusWordOf(c),
+        filterValue: (c) => outboundStatusWordOf(c),
+        exportValue: (c) => outboundStatusWordOf(c),
         accessor: (c) => outboundStatusWordOf(c),
       },
       {
         key: "exceptions",
         defaultHidden: true,
         label: "Exceptions",
-        width: 230,
-        wrap: true,
+        width: REGISTER_FIELD_WIDTH.address,
+        chooserGroup: "Goods",
         searchValue: (c) => outboundExceptionLines(c, today, fmtDate).join(" "),
+        exportValue: (c) => outboundExceptionLines(c, today, fmtDate).join(" · "),
+        overflowText: (c) => outboundExceptionLines(c, today, fmtDate).join(" · "),
         accessor: (c) => {
           const lines = outboundExceptionLines(c, today, fmtDate);
-          return lines.length === 0 ? (
-            ""
-          ) : (
-            <div className="space-y-0.5 py-0.5 leading-[18px]">
-              {lines.map((line) => (
-                <div key={line}>{line}</div>
-              ))}
-            </div>
-          );
+          return lines.length === 0 ? <OutboundBlank /> : <span>{lines.join(" · ")}</span>;
         },
-      },
-      {
-        key: "so",
-        label: "SO No",
-        defaultHidden: true,
-        width: 110,
-        accessor: (c) => (
-          <Link
-            className="font-mono text-kit-blue-11 hover:underline"
-            onClick={(e) => e.stopPropagation()}
-            to={c.sourceHref}
-          >
-            {c.source}
-          </Link>
-        ),
       },
       {
         key: "soDate",
         label: "SO date",
         defaultHidden: true,
-        width: 110,
-        accessor: (c) => (c.soDate ? fmtDate(c.soDate) : ""),
+        width: REGISTER_FIELD_WIDTH.date,
+        sortable: true,
+        filterType: "date",
+        chooserGroup: "Dates",
+        dateValue: (c) => c.soDate,
+        exportValue: (c) => c.soDate ?? "",
+        accessor: (c) => (c.soDate ? fmtDate(c.soDate) : <OutboundBlank />),
       },
       {
         key: "vehicle",
         label: "Vehicle",
         defaultHidden: true,
-        width: 110,
-        accessor: (c) => c.vehicle ?? "",
+        width: REGISTER_FIELD_WIDTH.shortFact,
+        sortable: true,
+        chooserGroup: "Movement",
+        searchValue: (c) => c.vehicle ?? "",
+        exportValue: (c) => c.vehicle ?? "",
+        accessor: (c) => c.vehicle ?? <OutboundBlank />,
       },
       {
         key: "loadedAt",
         label: "Loaded at",
         defaultHidden: true,
-        width: 150,
+        width: REGISTER_FIELD_WIDTH.goodsReceivedDate,
+        sortable: true,
+        filterType: "date",
+        chooserGroup: "Dates",
+        dateValue: (c) => c.actualHandoverAt?.slice(0, 10) ?? null,
+        exportValue: (c) => c.actualHandoverAt ?? "",
         accessor: (c) =>
-          c.actualHandoverAt ? fmtDate(c.actualHandoverAt, { time: true }) : "",
+          c.actualHandoverAt ? fmtDate(c.actualHandoverAt, { time: true }) : <OutboundBlank />,
       },
       {
         key: "collectedAt",
         label: "Driver collected at",
         defaultHidden: true,
-        width: 150,
+        width: REGISTER_FIELD_WIDTH.goodsReceivedDate,
+        sortable: true,
+        filterType: "date",
+        chooserGroup: "Dates",
+        dateValue: (c) => c.actualCollectionAt?.slice(0, 10) ?? null,
+        exportValue: (c) => c.actualCollectionAt ?? "",
         accessor: (c) =>
           c.actualCollectionAt
             ? fmtDate(c.actualCollectionAt, { time: true })
-            : "",
+            : <OutboundBlank />,
       },
     ],
     [today, setFilter],
@@ -551,7 +663,9 @@ export default function WarehouseOutboundWork() {
               columns={columns}
               rowKey={(c) => `${c.deliveryOrderId ?? c.doNumber}:${c.warehouseSiteId ?? c.fromLocation}`}
               rowTestId={(c) => `wo-row-${c.doNumber}`}
-              storageKey="carres.outbound.register.v2"
+              storageKey="carres.outbound.register.v3"
+              rowHeight={40}
+              chooserGroupOrder={["Dates", "Documents", "Movement", "Goods"]}
               exportName="Outbound"
               searchPlaceholder="DO, SO, product, customer, driver or Unit ID…"
               initialSearch={params.get("q") ?? ""}
@@ -617,6 +731,9 @@ export default function WarehouseOutboundWork() {
                 renderExpansion: (c) => <div className="space-y-2 p-3 text-body" data-testid={`wo-product-detail-${c.doNumber}`}>
                   {c.products.map((p) => <div key={p.sku ?? "no-sku"}>{p.name ?? p.sku} · {p.sku} · Qty {p.qty}</div>)}
                   {c.units.map((u) => <div key={u.unitId}><Link className="font-mono text-kit-blue-11" to={`/operation/stock/unit/${encodeURIComponent(u.unitId)}`}>{u.unitId}</Link> · {u.productName ?? u.sku}</div>)}
+                  {/* The reason prints where the row's details live (UI §6.8):
+                      each difference names its exact Unit or fact. */}
+                  {outboundExceptionLines(c, today, fmtDate).map((line) => <div key={line} className="text-meta text-kit-slate-11" data-testid={`wo-exception-${c.doNumber}`}>{line}</div>)}
                 </div>,
               }}
               statusSummary={(visible) => {
@@ -724,6 +841,7 @@ export function OutboundUnitWork({ card }: { card: WarehouseOutboundCard }) {
           submission and the driver's independent confirmation. */}
       <div className="mb-2 space-y-0.5 text-meta text-base-600">
         <p>{card.fromLocation} → {card.toCustomer} · {card.logisticsPartner}</p>
+        <p data-testid={`wo-driver-${card.doNumber}`}>{warehouseAssignedDriverLine(card.logisticsPartner, card.driverName)}</p>
         <p>Scheduled handover {fmtDate(card.eventDate)}</p>
         <Link className="font-mono text-kit-blue-11 hover:underline" to={card.deliveryOrderHref}>{card.doNumber}</Link>
         <p data-testid={`wo-loaded-${card.doNumber}`}>
