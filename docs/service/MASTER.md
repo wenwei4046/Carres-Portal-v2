@@ -74,6 +74,8 @@ member on their first working day must be able to complete the next correct acti
   memory.
 
 ### WHAT IS ON SCREEN TODAY
+**Template adoption — BUILT 2026-10-06 (owner directive LINE 1).** `/operation?tab=service-notes` now runs the shared Register: one Destination Header (`Service Cases`, global top bar suppressed), the 240px FilterRail (Status · Item · Problem · Supplier), the shared DataGrid (date + identity pinned, 51px two-line rows, search/export/columns, footer count), `New Case` on the toolbar, `Numbers` under `⋯`. Cells carry facts only. The record opens in the kit `Drawer` (Escape, focus return); the wizard runs in the kit `Modal`. The status dropdown is gone: the record shows `In progress` / `Closed` and one `Close case` button gated by the same close rule as the server. `Collect the item` became `Pick up the item`. Not in this fix: the Working Panel (`CompactModuleCard`) host, mission-rail entries and §7 Blueprint behaviour, which wait for the UI master kit and owner approval.
+
 `OperationServiceCases.tsx` **369 lines** · `OperationServiceNotes.tsx` **293 lines** ·
 *measured 2026-08-05 from size, route and the shipped card records; **not read line by line.***
 **Live: ONE case on file**, opened 2026-06-16, before the intake wizard existed.

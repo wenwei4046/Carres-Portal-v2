@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { ArrowLeft, Check, Search, X } from "lucide-react";
+import { Check, Search } from "lucide-react";
+import Button from "@/components/kit/Button";
+import Modal from "@/components/kit/Modal";
 import { apiFetch } from "@/lib/api";
 import {
   CASE_REPORTERS,
@@ -235,46 +237,31 @@ export default function ServiceCaseWizard({
     setIssueType(null);
   }
 
+  const footer = (
+    <>
+      <Button variant="neutral" onClick={onClose}>Cancel</Button>
+      {step < LAST_STEP ? (
+        <Button variant="primary" onClick={goNext} disabled={!canAdvance[step]}>Next</Button>
+      ) : (
+        <Button variant="primary" onClick={() => saveMut.mutate()} disabled={!canAdvance[LAST_STEP] || saveMut.isPending} loading={saveMut.isPending}>Create Case</Button>
+      )}
+    </>
+  );
+
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4 sm:p-8">
-      <div className="w-full max-w-2xl rounded-lg bg-white shadow-xl">
-        {/* Header + progress */}
-        <div className="border-b border-base-200 px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              {step > 1 && (
-                <button
-                  type="button"
-                  onClick={() => setStep((step - 1) as Step)}
-                  className="text-base-400 hover:text-base-700"
-                  aria-label="Back"
-                >
-                  <ArrowLeft size={18} />
-                </button>
-              )}
-              <h2 className="text-strong text-base-900">New Case</h2>
-            </div>
-            <button type="button" onClick={onClose} className="text-base-400 hover:text-base-700" aria-label="Close">
-              <X size={18} />
-            </button>
-          </div>
-
-          <div className="mt-3 flex items-center gap-1.5">
-            {STEPS.map((s) => (
-              <span
-                key={s}
-                className={`h-1 flex-1 rounded-full ${
-                  s < step ? "bg-base-900" : s === step ? "bg-primary" : "bg-base-200"
-                }`}
-              />
-            ))}
-          </div>
-          <p className="text-meta mt-2 text-base-500">
-            Step {step} of {LAST_STEP}
-          </p>
+    <Modal open onOpenChange={(open) => { if (!open) onClose(); }} title="New Case" description={`Step ${step} of ${LAST_STEP}`} width="wide" footer={footer}>
+      <div className="mb-3 flex items-center gap-2">
+        {step > 1 && (
+          <Button variant="ghost" size="sm" icon="back" aria-label="Back" onClick={() => setStep((step - 1) as Step)} />
+        )}
+        <div className="flex flex-1 items-center gap-1.5">
+          {STEPS.map((s) => (
+            <span key={s} className={`h-1 flex-1 rounded-full ${s < step ? "bg-base-900" : s === step ? "bg-primary" : "bg-base-200"}`} />
+          ))}
         </div>
+      </div>
+      <div>
 
-        <div className="px-6 py-5">
           <h3 className="text-strong mb-4 text-base-900">{STEP_TITLE[step]}</h3>
 
           {/* ── 1 · who found it ─────────────────────────────────────────── */}
@@ -559,34 +546,7 @@ export default function ServiceCaseWizard({
             </div>
           )}
         </div>
-
-        {/* Footer */}
-        <div className="flex items-center justify-between border-t border-base-200 px-6 py-4">
-          <button type="button" onClick={onClose} className="btn-secondary py-1.5 text-body">
-            Cancel
-          </button>
-          {step < LAST_STEP ? (
-            <button
-              type="button"
-              onClick={goNext}
-              disabled={!canAdvance[step]}
-              className="btn-primary py-1.5 text-body disabled:opacity-40"
-            >
-              Next
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => saveMut.mutate()}
-              disabled={!canAdvance[LAST_STEP] || saveMut.isPending}
-              className="btn-hero py-1.5 text-body disabled:opacity-40"
-            >
-              {saveMut.isPending ? "Saving…" : "Create Case"}
-            </button>
-          )}
-        </div>
-      </div>
-    </div>
+    </Modal>
   );
 }
 
