@@ -76,10 +76,11 @@ describe.skipIf(!URL || !LOCAL)("0651 · a commit carries the order the editor o
     await setup.query(
       `insert into order_lines(order_id, sku, qty, unit_price, attrs) values
          ($1,'TRION-Q',1,2749.50,'{"gap":"KIV","size":{"w":183,"l":190.5},"specials":[{"code":"Front Drawer"}]}'::jsonb),
-         ($1,'MEMORY-FOAM-PILLOW-asd',2,220,null)`,
+         ($1,'MEMORY-FOAM-PILLOW-asd',2,220,null),
+         ($1,'BOLSTER',1,99.9,'null'::jsonb)`, /* a JSON null, as 140 production lines carry (probe 2026-10-06) */
       [o.id],
     );
-    await setup.query("insert into order_addons(order_id, addon_key, qty, unit_price, attrs) values ($1,'DELIVERY',1,250.00,null)", [o.id]);
+    await setup.query("insert into order_addons(order_id, addon_key, qty, unit_price, attrs) values ($1,'DELIVERY',1,250.00,null),($1,'DELIVERY',1,0,'null'::jsonb)", [o.id]);
     return o.id as string;
   }
 
