@@ -168,12 +168,12 @@ function mount(ui: React.ReactNode, qc = client(), url = "/operation?tab=work") 
   return { ...view, qc };
 }
 
-const railButton = () => screen.getByRole("button", { name: /^My Work/ });
+const railButton = () => screen.getByRole("button", { name: /^Tasks/ });
 
-/** `My Work · {n} missed · {n} today` → [missed, today]. */
+/** `Tasks · {n} missed · {n} today` → [missed, today]. */
 function badgeCounts(): [number, number] {
   const name = railButton().getAttribute("aria-label") ?? "";
-  const match = /^My Work · (\d+) missed · (\d+) today$/.exec(name);
+  const match = /^Tasks · (\d+) missed · (\d+) today$/.exec(name);
   if (!match) throw new Error(`badge accessible name does not state the counts: "${name}"`);
   return [Number(match[1]), Number(match[2])];
 }
@@ -241,19 +241,31 @@ describe("HF-3 · one count definition", () => {
   ] as const)("2 · badge = panel Missed + Today = Work focus list on %s", async (_label, generatedOn, items, expected) => {
     net.work = response([...items], { generatedOn });
     const qc = client();
-    const rail = mount(<OperationRightRail />, qc);
+    const rail = mount(<><OperationRightRail /><TasksPanel /></>, qc);
     await waitFor(() => expect(badgeNumber()).not.toBeNull());
     expect(badgeNumber()).toBe(expected[0] + expected[1]);
     expect(badgeCounts()).toEqual(expected);
     const [missed, today] = badgeCounts();
 
-    fireEvent.click(railButton());
     await screen.findByTestId("my-work-panel");
     expect([panelCount("Missed"), panelCount("Today")]).toEqual([missed, today]);
+    /* The rail's Tasks door opens the ONE Tasks list; its Missed section
+       carries the badge's own Missed number. */
+    fireEvent.click(railButton());
+    await screen.findByTestId("tasks-list");
+    expect(within(await screen.findByTestId("task-section-missed")).getByTestId("section-count")).toHaveTextContent(String(missed));
     rail.unmount();
 
     mount(<OperationWork />, qc);
     await waitFor(() => expect(workFocusRows()).toBe(missed + today));
+  });
+
+  it("2b · the Tasks list's today section carries the badge's today number", async () => {
+    mount(<OperationRightRail />);
+    await waitFor(() => expect(badgeCounts()).toEqual([1, 1]));
+    fireEvent.click(railButton());
+    await screen.findByTestId("tasks-list");
+    expect(within(await screen.findByTestId("task-section-2026-09-17")).getByTestId("section-count")).toHaveTextContent("1");
   });
 
   it("3 · a staff email different from the login email is still the same person in the rail and in My Work", async () => {
