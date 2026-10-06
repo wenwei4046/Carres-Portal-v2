@@ -689,7 +689,8 @@ named (entitlement result block · document checklist row with a state word · s
 | Paid-policy cutover | 2026-08-01 (code constant) | Service Settings | NOT BUILT |
 | Mattress threshold | `> 2 cm` (code) | read-only display | NOT BUILT |
 | Trial length / transport minimum | 100 days / RM 250 (code) | Service Settings | NOT BUILT |
-| Completion promise · notice day · first response | 14 · day 10 · 2 working days (code) | read-only display | engine BUILT |
+| `First response within {n} working days` | 2 (code constant) | Service Settings, editable 1–5, Office working days (owner asked 2026-10-06 "got setting?"; answer: yes, this row) | NOT BUILT |
+| `Finish within {n} working days` · `Call the customer at day {n}` | 14 · 10 (code) | Service Settings, editable; a change never moves an existing case's deadline (snapshot on `opened_at`, the Purchasing §9.5 pattern) | engine BUILT, setting NOT BUILT |
 | Delay reasons · condition refusal reasons | code constants (shared with Delivery) | read-only display | BUILT |
 
 ## 7.17 · Reports and export
@@ -792,3 +793,57 @@ Payment · Sales Order. Tally recorded here as sent / acknowledged / aligned.
 6. Settings → Service; Reports → Service.
 
 Card authoring belongs to the BUILD lane after takeover; none of the above is a Card.
+
+## 7.26 · Measured evidence — the two workbooks the team runs today (read 2026-10-06)
+
+**FACT — `Carres_Issue Tracker (4).xlsx`** (23 sheets): Legend · REFERENCE_LIST (29 coded
+categories P1–P7 / D1–D11 / S1–S8 / I1–I29) · Issue Tracker SOP (weekly Wednesday 2:15 pm review,
+"who do what by when", target 0 open) · WhatsApp/Google-Form `Template` sheet · partner minutes
+(`Minute_GAI`, `Minute_TSDD`, `Minute_Carress` 174 rows, `28 Apr QnA` supplier review) · eleven
+monthly issue sheets Nov 25 → Sep 26. Row counts: Nov 91 · Dec 69 · Jan 41 · Feb 16 · Mar 19 ·
+Apr 30 · May 10 · Jun 34 · Jul 16 · Aug 15 · Sep 14 (≈355 rows). Current columns: `KeyIN Date ·
+Ref · Status (Done / Yet Discuss) · PIC · Product · Issue Title · Fault Owner · Incurred charges ·
+Who involved · What happened · Carres Action Taken On The Spot · What was affected · Ops Follow Up
+1–3 · Solution 1–4`. 132 rows carry an incurred charge. Top issue titles: production defect/damage
+(76) · wrong model/size/colour/spec (22) · SOP failure (17 + 5) · missing items/parts (16) ·
+missing key-in (15) · logistic delay/no call (13). Top fault owners: Hookka 32 · Red Sofa/Todern 18 ·
+Ops 13 · Sales 9 · NETS 8. Older months use a different header (`Date · Ref No · Product Type ·
+Partner · Department · Issue Category · What Happened · Action Taken · Status`).
+
+**FACT — `Carres_Service Note_ (5).xlsx`** (69 sheets, 79 embedded photos): `Dashboard` (cases per
+product per month: Jan 14 · Feb 10 · Mar 10 · Apr 10 · May 7 · Jun 4 · Jul 6 · Aug 3 · Sep 1 = 66) ·
+`Summary` (one row per SN: status · category · type · Ref No · PO No · start · deadline · logistic ·
+logistic/supplier/warehouse remarks · what happened · Carres remark · follow-up 1–2) · one printed
+`SN/YYMM-NN` sheet per case with **Section A Logistic · Section B Supplier · Section C Warehouse**,
+items with PO No, deadline, `Warehouse received by / Date` signature. Types used: Manufacturing
+Defect · 100-Day Exchange · Logistic Damage · Warehouse Damage · Customer Damage - Under Warranty ·
+Handling Issue · Others. Category: Sofa 33 · Bedframe 16 · Mattress 14 · accessory 3. Logistics:
+NETS, TSDD, AL, HOUZS, GAI, `Supplier Own Transport`.
+
+**What the workbooks prove about this Blueprint (INFERENCE, each with its row above):**
+
+| Seen in the workbook | Blueprint section it validates | Change made |
+|---|---|---|
+| One SN = customer problem + three department sections + items + deadline | §7.5 legs per owning module; §7.8 Visual Service Note | none — confirmed |
+| `START → DEADLINE` ≈ 14 days on every SN | §7.6 completion promise | none — confirmed |
+| `Ongoing / Overdue / Total Open` counters on Summary | mission rail counts (§7.11 facts) | none — confirmed |
+| Dashboard per product per month | §7.17 Reports (BUILT engine) | none — confirmed |
+| Issue Tracker mixes customer problems, supplier faults, internal SOP failures, partner minutes and templates in one book | ERP separation: Service Case · Supplier Claim · Issue Tracker | none — the 29 reference codes map 1:1 (P-codes → Claim/Case, D-codes → Delivery exception/Issue, S-codes → Case, I-codes → Issue) |
+| `Fault Owner` + `Incurred charges` on 132 rows; monthly tracker sent to Hookka; Wednesday review with `Yet Discuss` | Issue Tracker owns accountability, cost and the partner report | **PROPOSAL A1:** when a Case records a fault owner other than the customer (Logistics · Supplier · Staff), the Case candidates a linked Issue automatically, so the weekly meeting and the monthly partner report keep their feed. Falsifier: the owner wants Issues recorded only by hand |
+| `take back 2 seater only` · `bedrest only` · `headboard only` · `legs only` | §7.5 legs name exact Units | **PROPOSAL A2:** a leg may name a component of a Unit (seater · backrest · headboard · divan · legs) when the Unit stays with the customer; the component word is recorded, the Unit ID is unchanged |
+| Loan sofa while the sofa is repaired (SN/2603-04) | Orders owns the Loan | **PROPOSAL A3:** the Case links the Loan record read-only; `Collect the loan item` stays Delivery's action |
+| Exchange from ready stock; old unit "keep as resale item" at GAI; repair then "replace ready stock with the repaired divan" | Stock §12.8 (`Needs checking` → inspection → outcome) | none — confirmed; the Case reads the inspection outcome |
+| Same item complained three times (TCF0197), twice (TCF0124, TCF0189); third time exchanged for a new set | repeat handling | **PROPOSAL A4:** the Case shows `Earlier cases on this item: {n}` with their outcomes; a repeat after a completed repair routes the decision to the Approver; no automatic "third time → replace" rule is written |
+| One SN covering three references (CR0963 + CR0198 + TCF0308) | Case ↔ source links | **PROPOSAL A5:** a Case may link several Sales Orders / lines; the first-linked SO is the identity shown in the header |
+| `on hold waiting for cust to pay rm250 delivery fees` | §7.4 charge + Payment link | **PROPOSAL A6:** a charged leg is `Waiting for payment` until Payment records it; the leg sentence reads `{customer} to pay RM {amount}` |
+| Supplier service team goes to the customer's house (Dorsettloft, Armani, Hookka via NETS); NETS re-adjusts backrest on site | §1 NO CARRES ON-SITE INSPECTION; supplier/Logistics own visits | none — confirmed; the leg reads `{Supplier} to repair the {item} at {customer}` and its completion is the supplier's recorded result on the Claim/RO |
+| Logistics tore/scratched goods (NETS) → exchange 1-to-1, cost on NETS | fault owner ≠ remedy owner | none — Service remedies; Issue Tracker recovers the cost (A1) |
+| Customer rejected the exchange item (wrong side again, SN/2601-04 → SN/2601-12) | re-decision after a failed leg | **PROPOSAL A7:** a failed or refused leg reopens §7.4 on the same Case (`Carres to decide the remedy` again) instead of a second Case; the first leg's facts stay |
+| `Canceled · wrongly keyed in` (SN/2601-05) | §7.2 `Closed · Withdrawn` | none — confirmed |
+| `Template` sheet: WhatsApp scripts (balance payment · 100-Day exchange explanation · RM250 fee refusal) + four Google Forms (100-Day Exchange · 15-Year Warranty · Sofa Warranty · Bedframe Warranty) | §7.7 approved wording | **PROPOSAL A8:** seed the approved-wording library from this sheet (balance-payment scripts belong to Payment); **PROPOSAL A9:** replace the four Google Forms with one customer-facing claim form on the external-link pattern (Delivery §5.5): the customer uploads photos/video and accepts the terms version; the answers land in the Case intake as `Customer` reporter. Falsifier for A9: the owner keeps Google Forms |
+| Partner minutes (GAI · TSDD · Hookka) and the supplier QnA | not Service | none — they belong to the partner/supplier records and Issue Tracker's review; out of this Blueprint |
+| `Status: Done / Yet Discuss` | derived status (RULING) | none — `Yet Discuss` is the Issue Tracker's review flag, not a Case stage |
+
+**What the ERP already does better than the workbooks (no change):** evidence stamped and
+append-only; deadline derived, not typed; close gated on the customer's confirmation; one number per
+Case instead of a sheet per case; counts that withhold themselves when unmeasurable.
