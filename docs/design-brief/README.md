@@ -78,5 +78,4 @@ BUILT = in code on main · APPROVED = written in a MASTER, may not be built · P
 - | 16 | GRN, Purchase Order, Payment Record and Service Case object pages are `?param` views inside their register routes, not separate routes. |
 - | 17 | `Out for delivery` is kept on the DO document ladder (docs/delivery/MASTER.md:1575) but retired on Monitor (:1398, :1425); two vocabularies on purpose, easy to mix up. |
 - | 18 | Service MASTER §7 is PROPOSAL / NOT LAW (docs/service/MASTER.md:396) yet contains RULING lines (e.g. :473); records.md labels each line separately. |
-- | 19 | `Needs an owner` ruling exists only in the caller's brief, not in the repo; it is UNKNOWN in dont-copy.md and unknowns-part-b.md. |
 - | 20 | Purchasing report, Delivery report and Receiving & Inbound report purposes are taken from COPY section headings, not from a module page definition. |

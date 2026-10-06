@@ -50,7 +50,7 @@ Statuses (exact words): `Placed` · `Proceed` · `Delivered` · `Cancelled` — 
 | Pending Delivery Qty | Order Qty minus Received Qty, in pieces | COPY:3162 | APPROVED |
 | Current action | The PO page's one work block and its one primary button | COPY:3180 | APPROVED |
 
-Statuses (exact words): `Waiting for goods from supplier` · `In Production` · `Receiving` · `Completed` · `Cancelled`; no current sending confirmation reads `Sending not confirmed`; `Open` is never shown — COPY:3117-3118 · COPY:3127-3134. SO Batch `PO Status` (a separate cell): `Pending` · `Partial` · `Done` — docs/purchasing/MASTER.md:2695-2697 (conflicts with banned `Pending`, see unknowns-part-b.md).
+Statuses (exact words): `Waiting for goods from supplier` · `In Production` · `Receiving` · `Completed` · `Cancelled`; no current sending confirmation reads `Sending not confirmed`; `Open` is never shown — COPY:3117-3118 · COPY:3127-3134. SO Batch `PO Status` (a separate cell): `Pending` · `Partial` · `Done` — docs/purchasing/MASTER.md:2695-2697 (conflicts with banned `Pending`, see unknowns.md).
 
 ## GRN — Goods Received Note
 
