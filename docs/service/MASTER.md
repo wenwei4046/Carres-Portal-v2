@@ -681,7 +681,7 @@ named (entitlement result block · document checklist row with a state word · s
 
 | Row | Value today | Where it is set | State |
 |---|---|---|---|
-| `Service Duty` holder / rotation | none (Duty does not exist) | Staff & Duties | waits for the OWNER DECISION |
+| `Service Duty` eligible Operation staff / per-Case assignment | runtime eligibility and assignment not verified | Staff & Duties, shared resolver; one Case owner, helpers retain ownership | owner rule APPROVED §7.9; implementation/admission NOT VERIFIED |
 | `Service Case Approver` | Duty key exists in the catalogue | Staff & Duties | APPROVED, assignment NOT VERIFIED |
 | Paid-policy cutover | 2026-08-01 (code constant) | Service Settings | NOT BUILT |
 | Mattress threshold | `> 2 cm` (code) | read-only display | NOT BUILT |
@@ -778,18 +778,31 @@ Payment · Sales Order. Tally recorded here as sent / acknowledged / aligned.
 | `opened_at` editable | read-only after day one |
 | Service Note modal / print page | retired from the UI; Visual Service Note from the Case |
 
-## 7.25 · READY scopes after approval (unnumbered, dependency order)
+## 7.25 · Review boundary — NOT READY FOR CARD
 
-1. Lifecycle + decision engine (shared module: derived step, policy snapshot, remedy/movement/charge
-   events, revised intake keys, numbering) — business layer, no UI change needed to be correct.
-2. Work admission (needs the OWNER DECISION on `Service Duty`) — nine actions.
-3. Shared-template adoption (Register, Working Panel, Object page) — after the UI master publishes
-   the kit and the combined review accepts the Service row.
-4. Doors: DO page, Payment Records, Showroom request, Rental visit.
-5. Documents panel + Visual Service Note; retire Service Note UI.
-6. Settings → Service; Reports → Service.
+The complete Blueprint is not owner-approved or persisted as final operating truth. There are no READY scopes, Cards or implementation sequence in this PLAN. Shared UI composition remains with the UI controller's combined review (§7.11–§7.14). Existing module owner rulings are preserved; approval of shared ownership is not approval of this entire proposal.
 
-Card authoring belongs to the BUILD lane after takeover; none of the above is a Card.
+**PROPOSAL / NOT LAW — Tasks admission and business acceptance summary, 2026-10-06.**
+
+| Operator need | Authoritative source / owner | Completion evidence | Current admission boundary |
+|---|---|---|---|
+| Give the first substantive reply | Case first-response record; assigned Operation Case owner | dated assessment, request for missing facts or proposed next step, with actor/channel | two Office working days approved for Dealer; extending to all sources remains PROPOSAL |
+| Obtain and check missing evidence | Case policy-required slots; Case owner follows up, customer supplies | accepted evidence or authorised waiver; asking/sending alone does not fill the slots | intake evidence exists; next-day action clock remains PROPOSAL |
+| Decide the remedy | versioned Guarantee policy and Case decision; Case owner, Approver for governed exceptions | remedy, reason, movement and charge decision; approval result where required | full engine and proposed approval scope are not thereby approved |
+| Approve an exception | Service Case Approver through shared resolver | dated approval/refusal, reason and actual actor | approver duty exists; proposed action timing NOT LAW |
+| Approve collection evidence | Case evidence plus Delivery condition law; assigned Case owner within authority | approved/refused pre-check, not a message sent | collection gate is approved target; action timing NOT LAW |
+| Explain impending delay | original Case deadline and bound SLA event; assigned Case owner | customer_told event naming the exact deadline and reason | existing 14-day / four-days-before rule reusable; Work projection not demonstrated |
+| Handle failed collection | Delivery refusal and proof, then Case customer communication | customer outcome recorded; revised movement/charge uses its owning facts | source failure does not silently close Case; same-day deadline remains PROPOSAL |
+| Handle a public complaint | recorded escalation; Service Case Approver/spokesperson | recorded response and evidence; policy entitlement unchanged | public-escalation business rule exists; urgent clock remains PROPOSAL |
+| Confirm customer outcome | Case plus every required owned leg | customer_confirmed record and required completion gates | close gate exists; legacy closed records without confirmation are retained explicitly, not invented |
+
+**Shared display contract (business payload, not a new UI variant):** task identity is the Case plus its exact obligation/occurrence; record identity remains distinct from an action. The entry names the responsible party, action and object, carries the source due and missing completion fact, and opens the exact Case's Service work through the shared host. UI controller decides the common placement/tabs in the combined review. A Case with no SO uses its own customer/source evidence; no fabricated SO header or actor. Row selection cannot change an open task or erase a draft. Delivery/Stock/Purchasing/Payment actions are linked read-only and retain their existing identities, owners, clocks and completion doors.
+
+**Exceptions and acceptance:** no eligible Operation owner → visible unassigned work for the manager, never hidden or assigned to Sales/Approver by convenience; missing source → factual no-source intake and later audited linking; source read failure → unavailable, never “completed”; multiple Units → retain each leg's remaining obligations; supplier waiting does not stop customer updates; duplicate submissions cannot create duplicate outcomes; amendments retain original evidence and actor/time; withdrawn/no-remedy/reopened outcomes retain reasons and traceability. Policy, reassignment, completion and money permissions are checked at their original owner. No bulk close, copied completed evidence or imported Resolved value may bypass completion gates. Historical SC references stay searchable; copying creates new intake facts, never copied approval, policy consumption or completion. External accounts, supplier channels and live cutover remain outside this PLAN.
+
+**Actual real-data limitation:** the 2026-10-03 read-only snapshot of SC2607-01 shows a legacy Resolved record with no linked SO, structured Unit/quantity, photos or customer-confirmation date. It supports a missing-data review, not proof of new numbering, ownership allocation, Work admission or the complete new lifecycle. The current main's fixture preview is separate evidence and must not be labelled production.
+
+**Open business proposals to review with the complete Blueprint:** extending Dealer's two-day first response to every Case; proposed per-action timing; proposed ordinary-versus-exception approval scope; editable timing settings and whether future settings changes snapshot existing promises. Existing §4 derives deadlines from the calendar; a proposed snapshot policy must not silently override it. No setting is “built” merely because its proposed row names a default. Screen wording remains pending COPY admission. Shared kit review is a dependency, not a request to re-approve resolved Service ownership.
 
 ## 7.26 · Measured evidence — the two workbooks the team runs today (read 2026-10-06)
 
