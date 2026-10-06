@@ -60,7 +60,7 @@ import { deliveryGroupOf, type DeliveryGroupKey } from "./delivery-groups";
    asked the shared one. They agreed, which is the condition Law D names: two
    implementations that merely happen to match. */
 import { paymentApprovalOpensGate } from "./delivery-payment-approval";
-import { openFinanceExceptions } from "./finance-exception";
+import { financeHoldLineOf } from "./finance-exception";
 import { paymentDeadlineOf } from "./logistics-card";
 import type { DeliveryHandoverKind, DeliveryOrderAttemptFact } from "./delivery-order-status";
 import {
@@ -1246,13 +1246,9 @@ function paymentDraft(input: SalesOrderRouteInput): NodeDraft {
   if (input.unreadable?.payments) {
     return unreadableDrafts("payments", [base])[0]!;
   }
-  const holds = openFinanceExceptions(input.financeExceptions);
-  const financeLine =
-    holds.length === 0
-      ? null
-      : holds.length === 1
-        ? `Finance hold · ${holds[0]!.reason}`
-        : `Finance hold · ${holds.length} reasons`;
+  /* The ONE spelling of the Finance line (`financeHoldLineOf`, Law D): the
+     Monitor `Payment` column and the DO's Exceptions print the same words. */
+  const financeLine = financeHoldLineOf(input.financeExceptions);
   const owing = input.money.known && input.money.outstanding > 0;
 
   if (!owing) {
@@ -1437,18 +1433,11 @@ function goodsRequirement(
  * `collect`, and the truck goes regardless.
  */
 function financeExceptionRequirement(input: SalesOrderRouteInput): GateRequirement {
-  const openOnes = openFinanceExceptions(input.financeExceptions);
-  if (openOnes.length === 0) {
+  const financeLine = financeHoldLineOf(input.financeExceptions);
+  if (financeLine === null) {
     return { id: "finance-exception", met: true, text: "No Finance hold" };
   }
-  return {
-    id: "finance-exception",
-    met: false,
-    text:
-      openOnes.length === 1
-        ? `Hold delivery · Finance hold · ${openOnes[0]!.reason}`
-        : `Hold delivery · Finance hold · ${openOnes.length} reasons`,
-  };
+  return { id: "finance-exception", met: false, text: `Hold delivery · ${financeLine}` };
 }
 
 /**

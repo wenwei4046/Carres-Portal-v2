@@ -22,29 +22,40 @@ const NETS = "00000000-0000-0000-0000-0000000b0001";
 
 type Res = { data?: unknown; error?: unknown };
 
-/** Table-keyed mock: each table answers from its own queue (last answer repeats). */
-function mockSb(byTable: Record<string, Res[]>) {
+/** Table-keyed mock: each table answers from its own queue (last answer repeats).
+ *  The `Hold delivery` read (`heldDeliveryScopes`: `orders` with the money
+ *  embeds) answers from `hold` instead — default: no rows, so nothing holds. */
+function mockSb(byTable: Record<string, Res[]>, hold: Res = { data: [] }) {
   const writes: Array<{ table: string; op: string; rows: unknown }> = [];
   const from = vi.fn().mockImplementation((table: string) => {
     const queue = byTable[table] ?? [];
-    const res = (queue.length > 1 ? queue.shift() : queue[0]) ?? { data: null, error: null };
+    let selected = "";
     const chain: Record<string, unknown> = {};
     const self = () => chain;
-    for (const m of ["select", "eq", "neq", "is", "in", "ilike", "order", "limit", "maybeSingle", "single"]) {
+    for (const m of ["eq", "neq", "is", "in", "ilike", "order", "limit", "maybeSingle", "single"]) {
       chain[m] = vi.fn().mockImplementation(self);
     }
+    chain.select = vi.fn().mockImplementation((cols: string) => {
+      selected = cols ?? "";
+      return chain;
+    });
     for (const op of ["insert", "upsert", "update"]) {
       chain[op] = vi.fn().mockImplementation((rows: unknown) => {
         writes.push({ table, op, rows });
         return chain;
       });
     }
-    (chain as { then: unknown }).then = (resolve: (v: unknown) => unknown, reject: (e: unknown) => unknown) =>
-      Promise.resolve({ data: res.data ?? null, error: res.error ?? null }).then(resolve, reject);
+    (chain as { then: unknown }).then = (resolve: (v: unknown) => unknown, reject: (e: unknown) => unknown) => {
+      const res =
+        table === "orders" && selected.includes("order_delivery_payment_approvals")
+          ? hold
+          : ((queue.length > 1 ? queue.shift() : queue[0]) ?? { data: null, error: null });
+      return Promise.resolve({ data: res.data ?? null, error: res.error ?? null }).then(resolve, reject);
+    };
     return chain;
   });
   vi.mocked(adminClient).mockReturnValue({ from } as never);
-  return { writes };
+  return { writes, from };
 }
 
 const liveOrder = {
@@ -62,7 +73,7 @@ const liveOrder = {
   order_lines: [{ sku: "B1201S-K", qty: 1 }],
 };
 
-function live(extra: Record<string, Res[]> = {}) {
+function live(extra: Record<string, Res[]> = {}, hold?: Res) {
   return mockSb({
     ops_delivery_partner_links: [{ data: { id: "link-1", order_id: ORDER, leg: 0, partner_id: AL } }],
     orders: [{ data: liveOrder }],
@@ -71,8 +82,32 @@ function live(extra: Record<string, Res[]> = {}) {
     app_users: [{ data: [] }],
     product_skus: [{ data: [{ sku: "B1201S-K", variant: "King Mattress" }] }],
     ...extra,
-  });
+  }, hold);
 }
+
+/** The `Hold delivery` read's row for ORDER: RM 1,200.00 of goods, `paid` and
+ *  the two money records as given; the scheduled facts as given. */
+function holdRow(over: Record<string, unknown> = {}): Res {
+  return {
+    data: [
+      {
+        id: ORDER,
+        paid: 0,
+        delivery_stops: null,
+        order_lines: [{ sku: "B1201S-K", qty: 1, unit_price: 1200 }],
+        order_addons: [],
+        ops_order_control: null,
+        invoices: [],
+        order_finance_exceptions: [],
+        order_delivery_payment_approvals: [],
+        ops_delivery_orders: [],
+        ...over,
+      },
+    ],
+  };
+}
+
+const SCHEDULED = { ops_delivery_arrangements: [{ data: { partner_id: AL, confirmed_date: "2026-10-27", confirmed_time: null } }] };
 
 function call(path: string, init?: RequestInit) {
   return app.fetch(
@@ -123,6 +158,70 @@ describe("the view is the governed minimum", () => {
     expect(view.goods).toEqual([{ name: "King Mattress", qty: 1 }]);
     expect(text).not.toMatch(/SO-?1362|"so"|1362/);
     expect(text).not.toMatch(/price|outstanding|RM /i);
+  });
+});
+
+describe("Hold delivery — one yes/no, never money, never why (owner ruling 2026-09-25, §3/§5.5)", () => {
+  async function viewOf(extra: Record<string, Res[]>, hold: Res) {
+    live(extra, hold);
+    const res = await call(TOKEN);
+    expect(res.status).toBe(200);
+    const text = await res.text();
+    return { text, view: JSON.parse(text) as Record<string, unknown> };
+  }
+
+  it("scheduled and unpaid → holdDelivery true, and the body carries no amount and no reason", async () => {
+    const { text, view } = await viewOf(SCHEDULED, holdRow());
+    expect(view.holdDelivery).toBe(true);
+    expect(text).not.toMatch(/1,?200|unpaid|outstanding|paid|amount|reason|Finance|RM /i);
+    expect(Object.keys(view).sort()).toEqual(
+      ["address", "building", "company", "customerName", "customerPhone", "goods", "holdDelivery", "pickup", "reference", "requestedDate", "scheduledDate", "scheduledTime"].sort(),
+    );
+  });
+
+  it("scheduled and an OPEN Finance exception on a paid order → true, and the reason never leaves", async () => {
+    const { text, view } = await viewOf(
+      SCHEDULED,
+      holdRow({ paid: 1200, order_finance_exceptions: [{ status: "open", reason: "Cheque bounced" }] }),
+    );
+    expect(view.holdDelivery).toBe(true);
+    expect(text).not.toMatch(/Cheque bounced|Finance|reason/i);
+  });
+
+  it("scheduled and paid in full → false", async () => {
+    expect((await viewOf(SCHEDULED, holdRow({ paid: 1200 }))).view.holdDelivery).toBe(false);
+  });
+
+  it("scheduled, owed, under an approval granted before the closure → false (the gate is open)", async () => {
+    expect(
+      (await viewOf(SCHEDULED, holdRow({ order_delivery_payment_approvals: [{ status: "approved" }] }))).view.holdDelivery,
+    ).toBe(false);
+  });
+
+  it("NOT scheduled → false, however much is owed: booking runs in parallel with payment", async () => {
+    expect((await viewOf({}, holdRow({ order_finance_exceptions: [{ status: "open", reason: "X" }] }))).view.holdDelivery).toBe(false);
+  });
+
+  it("a confirmed legacy booking on the order counts as Scheduled (the one day reader)", async () => {
+    const { view } = await viewOf(
+      {},
+      holdRow({ ops_order_control: { booking_stage: "confirmed", confirmed_date: "2026-10-27", confirmed_time_slot: null } }),
+    );
+    expect(view.holdDelivery).toBe(true);
+  });
+
+  it("a held delivery still takes the company's three answers", async () => {
+    const { writes } = live(SCHEDULED, holdRow());
+    const save = await call(`${TOKEN}/arrangement`, { method: "PUT", body: JSON.stringify({ scheduledDate: "2026-10-27" }) });
+    expect(save.status).toBe(200);
+    const another = await call(`${TOKEN}/another-date`, {
+      method: "POST",
+      body: JSON.stringify({ proposedDate: "2026-10-28", reason: "customer_asked" }),
+    });
+    expect(another.status).toBe(200);
+    const cannot = await call(`${TOKEN}/cannot-deliver`, { method: "POST", body: JSON.stringify({ reason: "no_capacity" }) });
+    expect(cannot.status).toBe(200);
+    expect(writes.filter((w) => w.table === "ops_delivery_arrangement_events")).toHaveLength(3);
   });
 });
 
