@@ -606,8 +606,9 @@ is not asked to do service work. The sharing mechanism below is the planner's de
 Constitution's engineering/design rule, recorded here so no chat asks it again:
 
 - **One Case, one owner, assigned by round robin.** A new Case goes to the next eligible active
-  Operation person in Staff & Duties order (today Shasha → Yu Jun → Khor Yee → …); the Case stays
-  with that person until it closes, so the customer hears one voice.
+  Operation person in Staff & Duties order; the Case stays with that person until it closes, so the
+  customer hears one voice. No name is written here (GLOBAL DUTY LAW): who is eligible today is
+  People's fact, and a departed person leaves the cycle on their last working day.
 - **Leave moves it automatically** through the shared resolver's leave/cover rule; the owner takes
   the Case back on return only through a recorded reassignment, never silently.
 - **Anyone may help** (Workspace §3 STAFF HELP): `Assigned to` is the owner, `Completed by` is whoever
