@@ -2,19 +2,23 @@
 
 > **The only Issue Tracker document.** Overwritten when re-ruled; never versioned.
 > **APPROVED / LOCKED business architecture — Jess, 2026-08-14; complete page Blueprint ready for
-> owner review, 2026-09-15.**
+> owner review, 2026-09-15; business words, operating rules and shared MASTER UI composition
+> owner-confirmed, 2026-10-06. Final screen UI/UX is NOT APPROVED and implementation is NOT
+> AUTHORISED. Plan and align first; do not build merely because this Blueprint is detailed.**
 > Read `CLAUDE.md`, `docs/ERP-ARCHITECTURE.md`, this file and the affected module MASTERs.
 
 | I am working on | Read |
 |---|---|
 | anything | **§1–§3** |
 | recording an issue | **§4** |
-| current action / cover | **§5** |
+| current action / cover | **§5 and §12.5** |
 | responsibility and evidence | **§6** |
 | money and recovery | **§7** |
-| Wednesday review / training | **§8** |
-| Related Party monthly report | **§9** |
-| pages, permissions and legacy SN | **§10–§12** |
+| Weekly Review / training | **§8 and §12.8–§12.9** |
+| Related Party monthly report | **§9 and §12.10** |
+| lifecycle, pages and permissions | **§10–§11** |
+| exact owner-approved end-to-end behaviour and exceptions | **§12** |
+| legacy Service Notes | **§13** |
 
 ---
 
@@ -30,7 +34,7 @@ Issue Tracker records **every operational issue** so Carres can answer:
 6. What did it cost, what can Carres recover, and what was recovered?
 7. What must staff learn or change?
 
-It is the evidence used for internal training, every Wednesday review, Finance explanation and the
+It is the evidence used for internal training, every Weekly Review, Finance explanation and the
 monthly report sent to each Related Party. Small mistakes, corrected mistakes, internal staff
 errors, supplier/logistics failures, missed SOP steps and problems caught before customer impact
 are all recorded.
@@ -165,13 +169,15 @@ LINE 1     FACT / PROBLEM
 LINE 2     ACTION AND OBJECT + RECIPIENT + REQUIRED RESULT
 ```
 
-The authoritative record is one versioned `issue_actions` occurrence. Exactly one may be open for
-an Issue. `Issue Triage Duty` owns evidence gathering and operational coordination;
+The authoritative record is a versioned `issue_actions` occurrence. One Issue may have several
+active actions when genuinely different work can proceed in parallel, but every action has exactly
+one accountable owner. One governed **Primary Current Action** is selected for the Listing; the
+Working Panel shows every active action and their dependencies. `Issue Triage Duty` owns evidence gathering and operational coordination;
 `Issue Review Approver` owns the governed accountability decision. A module-specific action stays
-in its owning module and is only linked here. Recording a result closes the occurrence and preserves
-normal owner, dated cover and actual actor; if the result requires another Issue action, the same
-transition replaces it with the next sequence. Workspace projects the open occurrence and never
-creates an `ops_tasks` copy.
+in its owning module and is only linked here. Recording a result closes, partly completes or blocks
+that occurrence and preserves normal owner, dated cover and actual actor; the same transition may
+create the governed next action or release a dependent action. Workspace projects each active
+occurrence once and never creates an `ops_tasks` copy.
 
 Every action must answer:
 
@@ -281,9 +287,10 @@ Finance record. Partial recovery is allowed. Waived/not pursued needs authorised
 rewrites incurred cost to zero. Issue Tracker explains the incident; Finance owns payment,
 receivable/recovery and ledger truth.
 
-# §8 · Wednesday review and learning
+# §8 · Weekly Review and learning
 
-Every Wednesday review covers:
+`Weekly Review` is the permanent capability name. Wednesday is only the default setting and may be
+changed for future sessions. Every Weekly Review covers:
 
 - every Issue recorded since the last meeting;
 - every still-open Issue;
@@ -298,8 +305,8 @@ Routine Issues are confirmed quickly: fact · responsibility · current action �
 The meeting spends deeper time on repeats, significant/critical Issues, internal mistakes, high
 cost and overdue recovery.
 
-The Issue stores `Issue discussed`, meeting date, training needed/not needed, SOP change needed/not
-needed and linked complete actions. A solved operational problem remains in Wednesday review until
+The Issue stores `Issue discussed`, session identity/date, training needed/not needed, SOP change needed/not
+needed and linked complete actions. A solved operational problem remains in Weekly Review until
 its required learning result is recorded. Do not maintain a second meeting spreadsheet.
 
 # §9 · Related Party monthly report
@@ -356,7 +363,7 @@ Finance action.
 ```text
 Observed → recorded/matched → facts/evidence → operational links/Work
 → accountability review → money follow-through → learning review
-→ Wednesday review where required → closure gate → Closed
+→ Weekly Review where required → closure gate → Closed
 ```
 
 Close only when:
@@ -377,12 +384,15 @@ Issue.
 Issue Tracker is a **WORKSPACE** destination beside Work, because it crosses every module. Use the
 governed Register, Object Detail, Work Toolbar, central Settings and Carres UI/copy authority.
 
-Register default columns: Issue No. · Observed · Issue · Linked object · Fault Owners · current
-complete action · money consequence · review state.
+Register default columns, in order: `Observed On · Issue No · Issue · Work Needed · Current Action ·
+Fault Owners · Money · Linked Records`. `Observed On` and `Issue No` are the non-hideable leading
+columns. `Issue State` and all audit facts remain available through the shared Columns menu.
 
-Saved views: All Issues · Needs triage · Wednesday review · Internal issues · Waiting staff response
-· Waiting reviewer finding · Monthly report — Related Party · Cost not recorded · Recovery not
-requested · Recovery not received · Closed · Voided.
+The left mission rail is not a second ordinary filter menu. It shows system-derived work that a
+normal column filter cannot explain: `Need Facts · Need Action · Need Responsibility · Need Money ·
+Waiting for Reply · Weekly Review · Need Learning · Ready to Close`. One Issue may appear in several
+queues; counts are real non-additive counts. `All/Open/Closed/Voided`, people, party, source, type,
+date and state remain Search, column filters or saved views. Monthly Reports live under Page tools.
 
 Issue workspace: identity/summary · Current Action · linked records · four accountability identities
 · three money tracks · evidence/timeline · review/learning · related/repeat Issues · history.
@@ -413,30 +423,29 @@ Issue Tracker is a `Workspace` destination beside `Work`; Staff & Duties belongs
 Settings (Workspace §4, owner-approved placement 2026-09-28 / NOT BUILT). Issue Tracker is not a
 Work scope and not a Dashboard. The Register answers what incidents exist and where accountability,
 money or learning remains incomplete. Shared Work answers who must perform the current admitted
-Issue action. One Issue and one versioned `issue_actions` occurrence retain the same identities on
+Issue action. One Issue and its versioned `issue_actions` occurrences retain the same identities on
 both pages.
 
 ```text
 ┌ Issue Tracker ───────────────────────────────────────────────────────────────┐
 │ Every issue stays for facts, money and learning.                            │
-│ Search issues…   Views   Filters                  Monthly report  Record issue│
-├ VIEW / FILTER ───────┬ ISSUE REGISTER ───────────────────────────────────────┤
-│ All Issues           │ Issue No. · Observed · Issue · Linked object          │
-│ Needs triage         │ Fault Owners · Current Action · Money · Review state  │
-│ Wednesday review     │                                                       │
-│ Internal issues      │ IS-2608-0001 · 14 Sep                                │
-│ Waiting response     │ Unit CU-000128 was damaged…                          │
-│ Waiting finding      │ PO-2041 · Hookka                                     │
-│ Cost not recorded    │ Supplier has not answered                            │
-│ Recovery not…        │ Ask supplier for an answer                           │
-│ Closed · Voided      │ RM80 incurred · Waiting review                       │
+│ Search issues…   Table / Cards        ⋯ Page tools              Record issue│
+├ WORK NEEDED ─────────┬ ISSUE REGISTER ───────────────────────────────────────┤
+│ Need Facts           │ Observed On · Issue No · Issue · Work Needed          │
+│ Need Action          │ Current Action · Fault Owners · Money · Linked Records│
+│ Need Responsibility  │                                                       │
+│ Need Money           │ IS-2608-0001 · 14 Sep                                │
+│ Waiting for Reply    │ Unit CU-000128 was damaged…                          │
+│ Weekly Review        │ Need Responsibility +2                               │
+│ Need Learning        │ Mei Ling → Hookka · Ask for written proof            │
+│ Ready to Close       │ RM80 incurred · recovery not ready                   │
 └──────────────────────┴───────────────────────────────────────────────────────┘
 
-The default view is `All Issues`; materiality never removes routine Issues. Search matches Issue No.,
+The default listing scope contains all authorised Issues; materiality never removes routine Issues. Search matches Issue No.,
 official English, linked object number, governed Related Party and authorised staff identity. Filters
 are `Observed`, `Source module`, `Issue type`, `Materiality`, `Related Party`, `Internal team/person`,
-`Review state`, `Current-action state`, `Money state` and `Repeat/related`. Saved views are governed
-combinations of these filters, not separately calculated lists. Search, selected view, filters and
+`Issue state`, `Current-action state`, `Money state` and `Repeat/related`. Saved views are governed
+combinations of ordinary filters, not substitutes for the mission rail. Search, selected work queue, filters and
 opened `issue` identity are URL-visible and individually removable under one `Clear filters`.
 
 The Register is reference truth. Selecting a row opens the Issue workspace; no row-level fault,
@@ -458,7 +467,7 @@ The Issue workspace is a full object detail, not a wide generic modal. Its fixed
    Provider kept distinct;
 5. `Money` — incurred, recoverable and recovered tracks with Finance doors, never local arithmetic;
 6. `Evidence & timeline` — append-only evidence, responses, findings, actions and corrections;
-7. `Review & learning` — standard/full review, Wednesday outcome and prevention evidence;
+7. `Review & learning` — standard/full review, Weekly Review outcome and prevention evidence;
 8. `Related Issues & history` — repeat links, merge/split/reopen/void evidence.
 
 Only the current relevant section expands by default. On desktop, a quiet section index may remain
@@ -532,11 +541,12 @@ database, validation-library or status-code sentence never reaches the operator.
 | Save failed/uncertain | Keep answers/evidence; reconcile original request before retry; never fabricate success |
 | Closed/voided | Read-only full authorised history with closure/void actor, reason and surviving links |
 
-At 1440px and above use filter rail + Register and full-width object detail. At 1024–1439px collapse
-the filter rail behind `Filters` while retaining the table's identity and action columns. Below
-1024px each Issue becomes a vertical reference row in the same column order; no sideways eight-column
-table, clipped official English or three-card accountability grid. Intake and result flows are
-single-column, touch-safe and resumable. Hover evidence is also accessible by focus/tap.
+Reuse the responsive behaviour of the shared `DataGrid`, `Drawer variant="compact-card"` and
+`CompactModuleCard`; Issue Tracker must not invent a second breakpoint or card system. On narrow
+screens the shared Cards presentation is one column and the Working Panel is full width. No page
+horizontal overflow, clipped official English or three-card accountability grid is admitted. Intake
+and result flows are single-column, touch-safe and resumable. Hover evidence is also accessible by
+focus/tap.
 
 ## §11.5 · Current → proposed gap audit — 2026-09-15
 
@@ -581,8 +591,9 @@ The page is ready for owner acceptance only when all are demonstrable:
 - source module, materiality/review rule, owner rule, action choices, required result and due law are
   system-derived; staff cannot type an arbitrary action/date to create a valid Issue;
 - evidence branches that say proof exists retain an actual governed file/evidence record;
-- exactly one open versioned action exists, projects once into Work and completes/replaces atomically
-  with normal owner, cover, actual actor, result, evidence and time;
+- every active versioned action has exactly one accountable owner, projects once into Work, and
+  completes/partly-completes/blocks or creates its governed successor atomically with normal owner,
+  cover, actual actor, result, evidence and time; one Primary Current Action is selected for Listing;
 - all accountability identities and all three money tracks remain separate and reconcile to their
   owning sources;
 - saved views are reproducible filters; URL search/view/filter/Issue selection survives detail and
@@ -594,10 +605,484 @@ The page is ready for owner acceptance only when all are demonstrable:
   preserve one incident/action history without deletion;
 - Register, object detail, intake, result and monthly-report paths remain readable and keyboard/touch
   operable at 1440, 1024 and 390px;
-- Wednesday review and Related Party report totals trace back to distinct Issues and Finance links,
+- Weekly Review and Related Party report totals trace back to distinct Issues and Finance links,
   never duplicated action/task rows.
 
-# §12 · Legacy Service Notes
+# §12 · Owner-approved business operating contract — 2026-10-06
+
+This section resolves the business-word, workflow and shared-composition review held on 2026-10-06.
+It is **APPROVED / LOCKED for business meaning and planning**. It is not approval of a screen design,
+localhost, implementation Card or deployment. Earlier business wording is read through this section
+where it conflicts. A future authorised build must demonstrate each trigger, staff step, system
+transition, completion gate, exception and audit fact below. Do not ask the Owner to choose
+engineering details.
+
+## §12.0 · Build and review protocol
+
+Every new Issue Tracker chat must first pull current `origin/main` and read `CLAUDE.md`,
+`docs/ERP-ARCHITECTURE.md`, `docs/UI-DICTIONARY.md`, `docs/ui/MASTER.md`, this MASTER, the affected
+module MASTERs and the current shared component source. It must inspect the current localhost UI and
+real supplied sources before proposing or building. An old screenshot or standalone HTML is never
+UI authority.
+
+Keep four states explicit: **APPROVED**, **PROPOSAL — OWNER REVIEW REQUIRED**, **BUILT LOCALLY — NOT
+DEPLOYED**, and **DEPLOYED**. Silence is not approval. Approval of one surface does not approve the
+next. `Yes` approves only the item immediately presented; it never silently means final UI/UX or
+implementation approval. Before implementation, the relevant cross-module alignment and complete
+Blueprint review require Owner approval. Before deployment, the complete real-data localhost flow
+and final UI/UX require the Owner's explicit words `UI/UX approved`. No deployment follows from
+Blueprint or localhost review alone.
+
+**Current authority status (2026-10-06):**
+
+| Scope | Status |
+|---|---|
+| Business purpose, words and workflows in this MASTER | **OWNER CONFIRMED** |
+| Listing words: `Problem Date · Issue No · What Happened · Work Needed · Current Action · Fault Owners · Money · Linked Records` | **OWNER CONFIRMED** |
+| Shared composition: global ERP shell · shared Header · mission rail · DataGrid Table/Cards · Drawer + CompactModuleCard · Full Issue | **OWNER CONFIRMED** |
+| Exact visual result, dimensions in context, responsive UX and complete localhost | **OWNER REVIEW REQUIRED — NOT APPROVED** |
+| Existing standalone or real-component Issue Tracker previews | **REJECTED AS UI/UX AUTHORITY** |
+| Implementation plan/Cards, production code and deployment | **NOT AUTHORISED** |
+
+The confirmed shared composition means Issue Tracker must reuse the current UI MASTER and actual
+shared components; it does not approve any module-local arrangement. A future UI review must show
+the real current ERP shell and reference module, then receive explicit final approval.
+
+For every workflow state, the build specification and acceptance evidence must state:
+
+1. trigger and source;
+2. person responsible and person accountable;
+3. facts shown to the operator;
+4. exact structured answers available;
+5. automatic system work;
+6. authoritative output and owning module;
+7. completion and exit condition;
+8. permission and approval;
+9. failure, unavailable-source and correction behaviour;
+10. timeline/audit facts and downstream consumers.
+
+Use real records and real counts in localhost review. Unknown source values render `Not recorded`,
+`Needs review` or `Source unavailable`; never invent a person, status, amount, date, action or result.
+Every review visibly says `Real source data · Localhost review · Not deployed`. Customer personal
+information is hidden unless the reviewed work requires it.
+
+Core RACI:
+
+| Process | Responsible | Accountable | Consulted | Informed |
+|---|---|---|---|---|
+| Record/confirm facts | authorised reporter or Issue Triage Duty | Operations supervisor | owning module staff/customer service | involved staff |
+| Perform Current Action | resolved Action Owner or recorded Cover | owner-rule supervisor | target party/owning module | Issue reviewer |
+| Confirm responsibility | authorised Issue reviewer | governed manager for dispute/high materiality | involved staff/Related Party | Action Owner and Finance where relevant |
+| Confirm money/posting | Finance operator | Finance authority | Issue reviewer/Cost Bearer | Action Owner |
+| Weekly Review and Minutes | actual chair/Backup | configured Minutes approver | participants/Finance where relevant | Action and Learning Owners |
+| Learning/improvement | Trainer or improvement Owner | supervisor/manager | SOP/system/HR owner where relevant | affected staff |
+| Monthly Report | authorised report owner | governed business approver | Issue reviewer and Finance | Related Party and Action Owners |
+| Close/reopen/void/correct | authorised lifecycle actor | governed authority | owning modules/Finance | affected owners and parties where required |
+
+## §12.1 · Shared UI composition — no page-local imitation
+
+Issue Tracker uses the one shared ERP composition:
+
+```text
+module entry → left mission rail → shared DataGrid Listing → shared Working Panel
+             → action/result → return to the same Listing context
+```
+
+- Listing uses the shared `PageShell`, `register/DataGrid`, Search, Table/Cards, Page tools, Columns,
+  typed column filters, sorting, pagination, loading, empty, no-match and error states.
+- Cards consume the DataGrid's exact filtered/sorted result. They are not a dashboard or Kanban.
+- A row or Card opens the shared `Drawer variant="compact-card"` containing the real
+  `CompactModuleCard`; Issue Tracker must not recreate its header, tabs, helpers or responsive CSS.
+- The card identity is the Issue. It opens on `Issue`; `Info` is factual read-only context.
+  Communication, Timeline and any linked-record/evidence door reuse the shared admitted component.
+  If the shared kit lacks an Evidence door, evidence stays inside `Issue` until the UI authority
+  closes that kit gap; the module may not invent a helper icon.
+- The Working Panel shows Work Needed, all active actions and the Primary Current Action. Full Issue
+  opens the complete record. Closing either preserves rail scope, Search, filters, sort, page,
+  selection and scroll.
+- Mobile uses the shared one-column Cards result and full-width Drawer. It never presents an
+  eight-column sideways page.
+
+Default Listing columns, in order:
+
+| Column | Contract |
+|---|---|
+| `Observed On` | real/estimated/unknown observed date; never substitute Created On; pinned and non-hideable |
+| `Issue No` | permanent identity and Full Issue door; pinned and non-hideable |
+| `Issue` | short generated fact, with `reported` wording while unconfirmed |
+| `Work Needed` | highest-priority mission condition plus `+N`; all conditions in panel |
+| `Current Action` | Primary Action in `owner → target · act · due` compact form and exact no-action reason |
+| `Fault Owners` | all-party summary and confirmation/dispute state; never hide additional parties |
+| `Money` | amount plus `not known/estimated/confirmed/paid/recovery` state, not a naked number |
+| `Linked Records` | typed doors to owning records; Service Note/Claim/Message is not a duplicate Issue |
+
+The grouped Columns chooser exposes Issue; Action; Responsibility; Money; Source and People;
+Review and Learning; Communication and Evidence; and Monthly Report facts. Personal layout is saved
+per user. Team saved views never silently replace another user's layout. Dates use date filters,
+people/parties use governed identities, money and responsibility use typed states. There is no
+duplicate generic Filters button.
+
+The left mission rail shows only work that ordinary listing filters cannot explain:
+
+| Queue | Enter when | Staff must do | Exit when |
+|---|---|---|---|
+| `Need Facts` | required observed/object/event/party/source/evidence fact missing | confirm structured facts and proof | minimum factual statement is complete |
+| `Need Action` | no valid Current Action, or prior action ended without a successor | confirm governed owner, target, act, due and proof | valid active action exists |
+| `Need Responsibility` | possible/multiple/disputed owner, missing reason/evidence/percentage/approval | review every possible owner | responsibility completion gate passes |
+| `Need Money` | incurred/paid/recovery fact or Finance proof incomplete | complete cost and Finance-owned links | money completion gate passes |
+| `Waiting for Reply` | actual outbound request is waiting | monitor, record reply or execute overdue follow-up | reply result recorded or new action replaces wait |
+| `Weekly Review` | governed review/decision/learning trigger | record structured meeting decision | decision, actions, learning and approved Minutes exist |
+| `Need Learning` | training/SOP/system/prevention result incomplete | perform and prove learning/improvement | learning gate passes |
+| `Ready to Close` | every other gate passes | perform final authorised check | Issue is Closed |
+
+One Issue may occur in several queues and the counts therefore do not add to the distinct Issue
+total. Counts are live calculated facts. Closed/Voided Issues do not appear. `All/Open/Closed/
+Voided`, internal/external party, people, source, type, date and status belong to Search, column
+filters or saved views. Monthly Reports belong to Page tools, not the rail.
+
+## §12.2 · Five intake doors and one Issue
+
+An Issue enters through exactly one recorded origin, while later sources link to it:
+
+1. **System-created Draft** — an approved module event creates `Needs Staff Confirmation`.
+2. **Report Issue** — an authorised person invokes the door from a real ERP object; that object is
+   prefilled and linked.
+3. **Customer Claim** — a secure external submission creates/matches a Draft, never a confirmed fact.
+4. **WhatsApp/API** — the immutable inbound event creates/matches a Draft and preserves message ID.
+5. **Manual New Issue** — for phone,现场/internal/system-outside events with no usable source object.
+
+Before creation, duplicate detection compares source record, customer, product/object, governed
+problem type, observed time, party, Service Case, Claim, message ID and evidence checksum. A likely
+duplicate shows the surviving Issue and why. The authorised operator chooses `Link to existing
+issue`, `Create a separate issue` with a governed reason, or `Not the same problem`. A Service Note,
+Claim, Message or API event linked to an existing incident never becomes a second Issue row.
+
+The guided steps are: how found → observed date/time and certainty → affected object and Primary
+Source → module-specific `What happened` choice → confirm/correct each source fact without
+overwriting it → involved/witness/reporter/possible-owner roles → `Yes/No/Not known yet` money →
+actual evidence and `What does this prove?` → generated English preview → system-calculated Work
+Needed and first Current Action → `Confirm Issue`.
+
+`Involved` never implies `Responsible`. A possible Fault Owner is never confirmed at intake.
+Customer/external statements remain labelled statements until authorised review. Dates preserve
+Observed, Reported and Created separately. `Other` branches into further simple questions, never a
+large required English textarea. The staff member corrects structured facts rather than rewriting
+the generated sentence.
+
+On confirmation the system atomically creates the permanent Issue No, source links, immutable source
+facts, evidence, Draft/confirmed transition, Work Needed, first action(s), timeline and owning-module
+Issue link. If a rule cannot derive a safe action, show `Waiting for triage rule` and enter `Need
+Action`; never invent one. Rejected/spam/not-an-Issue Drafts keep actor, reason and original source.
+
+Every module proposal and Blueprint chat currently in progress must align with this common handoff
+contract before that module is declared complete: source module/type/identity/URL, event time,
+customer/party, affected object/product, involved staff, original state/message/evidence, known money,
+creation origin and duplicate candidates. When each module is completed, perform an **Issue Tracker Integration Audit**
+covering trigger events, auto-Draft versus suggested/manual door, excluded normal
+events, prefill, evidence, money, duplicate detection, return result, permissions and timeline. After
+all modules, perform the whole-domain audit again. Module completion without this audit is incomplete.
+
+This alignment happens in two passes and does not wait silently until the end:
+
+1. **During each active module Blueprint/build:** tell that module chat which events auto-create a
+   Draft, suggest `Report Issue`, remain manual or must not create an Issue; define exact prefill,
+   evidence, Money/Finance ownership, duplicate key, Issue link and result returned to the module.
+2. **After that module is complete:** run the Issue Tracker Integration Audit against the actual
+   built module, then record gaps without inventing a second Issue workflow.
+
+The final whole-domain audit reconciles Sales Orders, Purchasing, Receiving, Stock, Delivery,
+Payment, Service Case, Customer Service WhatsApp/API and secure Claim/Reply links. Until those module
+contracts are available, keep their mappings as explicit alignment work—not guessed implementation.
+
+## §12.3 · Facts, evidence and source corrections
+
+Original source facts and files are immutable. A correction appends original value, corrected value,
+reason, actor, time and evidence. The official fact always distinguishes `Customer reported`, `Staff
+recorded`, `Delivery proof shows`, `System confirmed` and `Not confirmed`.
+
+Every evidence record holds type, immutable file/message, source, actor/time, original filename,
+the fact/owner/cost/action/learning it proves, verification state and external-sharing permission.
+States are `Not reviewed · Verified · Needs clarification · Rejected · Source unavailable ·
+Restricted`. Rejection preserves the file and reason. Supported meanings are what happened/when,
+involvement, responsibility, amount/payment/recovery, communication, action completion and learning.
+The system preserves original files, validates permitted type/size/safety, produces a view copy and
+shows `Evidence file unavailable` instead of blank content.
+
+## §12.4 · Working Panel and Full Issue
+
+The card header shows Issue No, short fact and highest-priority Work Needed (`+N` when more). It never
+borrows a fake customer, order, address, requested date or Delivery countdown. Its four summary facts
+are Observed On, Current Action, Fault Owners and Money; linked records retain typed doors.
+
+`Info` contains identity/state/dates/source, confirmed versus reported facts, affected object/type/
+impact/materiality, people/parties, typed linked records and money summary. `Issue` begins `This issue
+needs N things`, then shows why, owner, due, state and completion door for each, followed by Primary
+Current Action and relevant Responsibility, Money and Evidence work. Buttons are `Do Action`, `Record
+Result`, `Cannot Do`, `Ask for Help` and the authorised management doors—never a generic Save/Done.
+
+Full Issue keeps complete facts, all owners, costs, evidence, communication, timeline, Weekly Review,
+Monthly Report, learning, correction and lifecycle history. The panel is quick work, not a replacement.
+
+## §12.5 · Current Action, parallel work and result
+
+Every action contains structured `Action Owner · Object · Target Party · Required Action · Due date/
+time · Required Proof · Completion Rule · Reason`. Visible sentences use Primary School English.
+Bare `Call/Ask/Check/Follow up/Send/Upload` are invalid.
+
+One Issue may have multiple active actions, but each has one accountable owner; contributors,
+reviewer, approver and Cover are separate. If people own different completion results, create separate
+actions. Dependencies are `blocked by`, `starts after` or `parallel`. Primary Action priority is:
+overdue blocker → overdue external wait → missing key fact → responsibility → money → Weekly Review
+decision → learning/closure. Listing shows it plus `+N actions`.
+
+States are `Ready · In Progress · Waiting for Reply · Blocked · Overdue · Result Review · Completed ·
+Cancelled`. `Start` records actual actor/time. `Do Action` opens the owning tool: Communication,
+Evidence, Money, Responsibility, Weekly Review, Learning or linked record.
+
+`Record Result` asks completed `Yes/Partly/No`, an action-specific result, confirmed fields, proof and
+whether a successor is required. The system generates the English result and atomically records it,
+updates the Issue, releases dependencies and creates only the governed successor. Completion is
+refused with an exact missing-items list until the Completion Rule passes. Part completion preserves
+confirmed results and leaves/refines the remaining action.
+
+Sending/opening/copying a message never completes a wait. Waiting starts only from recorded outbound
+evidence and ends only when a reviewed reply result exists. Due expiry makes the action Overdue,
+retains the original due, notifies Owner and escalates by rule. A due change appends old/new/reason/
+actor/approval; it cannot erase lateness.
+
+`Cannot Do` records a governed reason: no reply, unavailable information/evidence/source, wrong
+owner/party, manager/Finance/Weekly Review needed, staff unavailable or approved other. It creates a
+blocker, reassignment, escalation, follow-up or review—never silent closure. `Ask for Help` creates a
+support/review relationship but leaves accountability with the owner.
+
+Short absence uses Cover while retaining normal owner; long leave/departure requires audited
+reassignment. The new person receives fact, action, previous results, missing information, evidence
+and due—no oral handoff dependency. Cancellation is restricted to duplicate/wrong/replaced/voided
+work with reason and replacement. A completed result changes only through a versioned Correction,
+which recalculates downstream work and preserves both versions.
+
+## §12.6 · Responsibility and multiple Fault Owners
+
+Each possible party/person/team/process/system has an independent finding state: `Not reviewed ·
+Possible responsibility · Waiting for evidence · For confirmation · Confirmed · Partly responsible ·
+Not responsible · Disputed · Unable to decide`.
+
+For every candidate the review records what the party did, what it should have done, evidence,
+finding, reason, optional percentage, reviewer/date, party/staff response, dispute and approval.
+System-generated English never replaces these structured facts. Internal staff need not self-report
+or admit; they may respond/disagree but cannot delete, hide, rewrite evidence or decide their own
+finding. Issue Tracker supports learning; sensitive discipline remains in the HR-owned record.
+
+Percentage is used only for a real commercial or cost allocation. Confirmed allocations total 100%,
+`Not responsible` is 0%, and undecided evidence cannot receive a confirmed percentage. Money may
+differ from fault percentage only with reason and approval. Process/system gaps may coexist with
+staff/external fault.
+
+External parties receive only their finding, permitted evidence, percentage/amount and deadline.
+They choose Agree, Partly agree, Do not agree or Need more information. Disagreement must identify
+the wrong fact, proposed correct fact/reason and proof. No reply never equals admission; it produces
+follow-up/escalation and may still allow an internally approved finding that states no reply.
+Disputes preserve original finding/reply/evidence, list disputed points, enter authorised review and
+record the final version. A confirmed finding changes only by `Correct Finding`, with new evidence/
+wrong party/percentage/fact/calculation/review reason and downstream Money/Report recalculation.
+
+The queue exits only when every candidate is reviewed; confirmed findings have reason/evidence;
+percentage is complete or explicitly unnecessary; disputes are resolved or explicitly unable to
+decide; approvals and money recalculation are complete; and the next action exists.
+
+## §12.7 · Cost, Finance and recovery
+
+An Issue has multiple typed Cost Items, never one money note. Each holds type (transport, repair,
+replacement, redelivery, return, refund, compensation, labour, installation, storage, disposal,
+discount, loss/damage or approved other), description, `Not known/Estimated/Waiting for quotation/
+Confirmed/Paid/Cancelled`, original currency, tax, date, Paid By/To, Finance record, proof and recovery
+facts. Estimated, confirmed, paid and recovered are distinct. Paid By, Fault Owner and Recovery Party
+are distinct.
+
+Staff submit known facts; Finance confirms/corrects/rejects/requests proof and owns ledger truth.
+Possible duplicate costs compare Issue, invoice, amount, payee, date, payment and evidence. Allocation
+records recoverable basis, party, percentage, rounding and approved adjustment. Recovery decisions
+are full/partial/not pursue/wait/customer goodwill/internal cost/supplier credit/insurance/unable.
+Non-recovery, waiver, write-off, absorption or settlement requires governed reason and approval; it
+never rewrites incurred cost to zero.
+
+Finance Recovery states are `Not ready · Ready for Finance · Request not sent · Sent · Waiting for
+reply · Agreed · Disputed · Partly recovered · Fully recovered · Waiver requested · Written off`.
+Partial payments create a remaining-amount action. Credit Note/offset counts only when Finance
+confirms its actual application. Customer Refund/compensation and Related Party Recovery are separate
+records. Foreign currency preserves original amount, rate, rate date/source and MYR equivalent.
+
+`Need Money` exits when every Cost Item has a valid status; confirmed amounts have Finance review;
+Paid By/To and required proof exist; recovery decision/allocation/party are complete; Finance link
+exists; and duplicate warnings are resolved. Business closure may coexist with a still-open Finance
+Recovery only when that authoritative action remains visible and owned. Confirmed money changes only
+through audited Correction, recalculating Recovery and sent-report consequences.
+
+## §12.8 · Communication, WhatsApp/API and secure links
+
+One communication record stores Issue, direction, channel, sender/recipient, sent/received time,
+body, original language/translation, attachments, delivery/open result, related action/evidence,
+actor and immutable source message ID. Channels are official Customer Service WhatsApp, ordinary
+WhatsApp handoff, Email, Call record, Customer Claim, Related Party link, supplier/transporter API,
+Internal note, Monthly Report and face-to-face record.
+
+The operator chooses purpose (facts/evidence/amount/payer/responsibility/no-reply/report/completion),
+and the system generates simple text containing identity, issue/object, exact request, proof,
+deadline and secure link. Official WhatsApp API records Queued/Sent/Delivered/Read/Failed/Replied.
+Opening ordinary WhatsApp records only `Opened in WhatsApp`; the operator must confirm sent time and
+proof. Email preserves subject/thread/failure. Calls use structured contacted/answered/confirmed/
+missing/promise/due/proof answers; financial or fault assertions still require written proof unless
+an authorised exception exists.
+
+Inbound matching uses secure reference/message ID, Issue No, phone/email, linked object and governed
+context. A phone number alone is insufficient. One high-confidence match may be proposed; multiple/
+no matches require staff linking or a new duplicate-checked Draft. Original inbound content is
+immutable.
+
+Customer Claim links expose only necessary customer/order/product/problem/date/upload/contact and
+privacy facts, with scoped random token, expiry, access/submission audit and OTP where risk requires.
+They never expose internal fault, staff, cost, Minutes or other customer data. Submission receives a
+reference and remains external statement/Draft.
+
+Related Party links expose only that party's Issue facts, permitted evidence, proposed finding,
+percentage/amount and deadline. Agree/partial/disagree/more information/payment/credit replies and
+uploads remain External Submissions until authorised review; they never overwrite internal truth.
+API events require authenticated source, unique external event ID, type/time, party, record reference,
+payload and attachment references. Authentication, duplicate, unknown record/party, invalid amount,
+attachment and processing failures enter review and safe retry; they are never silently lost or
+duplicated.
+
+Customer personal/contact/payment identity and restricted/internal/other-party evidence are removed
+from external copies by default. Templates are purpose/channel/language/required-fact/proof/deadline/
+approved-wording/version controlled. Original language is retained; translation never replaces it.
+Replies are checked against the required result before completing an action. No reply produces
+overdue follow-up and escalation. Sent content cannot be edited; use `Sent in error` plus a linked
+Correction Message.
+
+## §12.9 · Weekly Review, automatic Minutes and learning
+
+Settings own Review day (Wednesday default), time/duration, chair, Backup, participants, reminders,
+inclusion/public-holiday/unavailable rules, Minutes reviewer/approval and carry-forward law. A change
+states effective date and affected future sessions; completed/approved/in-progress sessions never
+move or rewrite.
+
+The system creates a numbered Session and Agenda. It includes unresolved responsibility/money,
+multiple/disputed parties, repeats, internal error, material customer/cost impact, training/SOP/
+system gaps, overdue escalation and carry-forward—not every open Issue. Agenda readiness names exact
+missing facts/evidence/amount/reply before the meeting.
+
+Before start the authorised chair may `Continue with backup`, `Move meeting` with old/new/reason/
+notifications, or `Skip meeting` with governed reason. Skip completes no Issue; all work carries to
+the next session with origin. Start records actual chair, time, present/absent/late participants.
+
+For each Issue the session confirms facts → each responsibility → money decision → next actions →
+learning → carry-forward. Structured choices drive generated Minutes; staff do not compose English.
+Carry-forward requires missing item, reason, owner, due, proof and next session. `Finish Review`
+refuses until every Issue has an outcome, every action has owner/due/proof, money/learning decisions
+are complete and attendance is recorded.
+
+`Minutes Review` corrects structured facts/people/decisions, not generated prose independently.
+Approval creates immutable version/PDF, updates Issues, activates actions, notifies participants and
+recalculates queues. Later change is a versioned Minutes Correction. External parties see only their
+approved permitted outcome; Finance sees money decisions; customer never sees internal staff/other
+party/training content.
+
+Learning types are staff training, SOP reminder/update, system improvement, manager coaching, team/
+supplier/transporter briefing, monitoring or approved no-learning. Each record holds problem, people,
+lesson/correct method, trainer/owner, due, method, proof, understanding check, result and approval.
+Every person has an independent state: `Not started · In progress · Waiting for trainer/proof ·
+Understanding check needed · Failed check · Completed · Monitoring`.
+
+Completion requires knowledge/practical/observation/evidence and risk-appropriate monitoring; reading
+and acknowledgement alone is insufficient for high risk. Failure creates repeat training and keeps
+the old result. Manager coaching addresses known-but-not-followed work without turning Issue Tracker
+into HR discipline. SOP/system improvements retain owner/version/effective date/verification and may
+continue after business Issue closure.
+
+Repeat detection considers type, module, staff/team, party, product, root cause, time and SOP step.
+A proposed repeat is reviewed, not auto-confirmed. The Pattern records Issues, first/latest/count,
+people/parties, total money, learning and improvements. Repetition after completed training forces
+analysis of training, SOP, system control, workload/permission and higher review; never merely repeat
+the same course and close. `Need Learning` exits only after decision, people, owner/trainer, due,
+proof, understanding result and required improvement/monitoring exist.
+
+## §12.10 · Related Party Monthly Reports
+
+Monthly Reports are an Issue Tracker-specific Page-tools destination, not a mandatory feature of
+every module and not a Left Rail queue. Its shared Listing defaults to Report Month, Related Party,
+Report No, Issues, Amount Requested, Missing Information, Report Status, Reply Due and Last Activity.
+States are `Preparing · Needs Information · Ready for Review · Approved · Sent · Delivered · Opened ·
+Replied · Partly Resolved · Resolved · Superseded · Cancelled`.
+
+`Prepare Monthly Report` selects month, Related Party, responsibility/cost/service-quality/combined
+type and reply deadline. Inclusion considers period, party finding, money, previous report, Void and
+external-sharing law. A multi-owner Issue appears in each applicable party report with only that
+party's finding, evidence, percentage and amount; company distinct totals count it once. Late-confirmed
+old Issues name original month and why included now.
+
+Readiness validates Issue statement/date/object, finding/reason/percentage/approval, confirmed cost/
+request/Finance, permitted evidence, recipient and deadline. It names every missing fact and opens
+the original Issue to fix it; the report stores no second truth. External copy strips customer
+contact/payment identity, internal staff/HR/discussion, other-party data and restricted evidence.
+Preview shows the exact PDF, secure-link view, message, attachments, recipient and deadline.
+
+Approval threshold follows materiality, dispute, multiple owners, customer sensitivity and money.
+Approval creates permanent Report No/version, Issue snapshot, PDF and evidence manifest. Delivery
+may use Email, official WhatsApp API, ordinary handoff, secure link or download, with Created/Opened
+in app/Sent/Delivered/Opened/Replied kept distinct.
+
+The secure response supports per-report contact/extension and per-Issue agree/partial/disagree/more
+information/payment/credit/evidence. Disagreement requires exact fact/amount correction, reason and
+proof. Replies are external submissions reviewed into original Issues. Deadline extensions append
+old/new/reason/requester/approver. No reply never means agreement; it creates report and Issue
+follow-up/escalation. Each Issue resolves independently, so a report may be Partly Resolved.
+
+Agreed money creates/updates the Finance Recovery; Finance confirms actual payment/Credit Note. Sent,
+Replied and Recovered never collapse. An error in sent content uses Correction Version, retains and
+supersedes the prior PDF and sends a correction notice. Later new information uses an Addendum.
+Cancellation is restricted to duplicate/wrong party/period/creation, retains reason and replacement,
+and a sent recipient is notified. Every inclusion, removal, approval, version, recipient, send/open/
+reply/upload, deadline, follow-up, Recovery, Correction and Addendum is audited.
+
+## §12.11 · Closure, correction and authoritative continuation
+
+`Ready to Close` requires complete minimum facts; all Issue actions completed/cancelled with reason;
+responsibility complete; money gate complete or separately owned Finance continuation; required
+reply/evidence/review/learning complete; linked module consequence explicit; and an authorised closure
+summary. Closing never closes Service Case, Claim, Delivery or Finance. A continuing authoritative
+record remains linked with owner and state.
+
+Close records actor/time/reason, what changed and what continues. Reopen requires new evidence,
+missed consequence, failed preventive change or approved correction and recalculates every queue.
+Void is false/test/duplicate only and retains surviving link. Merge/split preserve aliases and all
+sources. No confirmed fact/finding/money/result/Minutes/report/learning is overwritten; each uses its
+named Correction workflow and recalculates downstream consumers.
+
+## §12.12 · Permissions, failure states and acceptance cases
+
+Permissions are capability-specific and rechecked on write. Seeing an Issue does not grant fault,
+Finance, waiver, external-send, Minutes approval, correction, Void/Reopen or close authority. Staff
+may report/respond/upload; supervisors review ordinary facts/findings/actions/training; governed
+management approves disputes, percentages, high materiality, customer responsibility, reports,
+waiver/write-off and restricted lifecycle; Finance alone confirms ledger truth; external parties see
+only scoped secure views. Involved staff cannot suppress or decide their own record.
+
+Every screen implements healthy loading skeleton, true empty, no match, source/detail partial failure,
+permission refusal without data/count leakage, duplicate submit lock, uncertain save reconciliation,
+not assigned, overdue, closed/voided read-only, link expired, external submission pending review and
+unsupported/unavailable source. Failed upload/API/send preserves operator input and original event.
+
+Acceptance must cover, with real data and positive/negative permissions: all five intake doors;
+duplicate Service Note/Claim/Message matching; uncertain retry; multiple and disputed Fault Owners;
+internal non-admission; parallel/dependent actions; part result/no reply/overdue/absence/reassignment;
+multiple costs, partial Recovery, Credit Note, refund, waiver/write-off and correction; official and
+ordinary WhatsApp, email, call, claim/reply link and API failure; evidence privacy; normal/rescheduled/
+Backup/skipped/holiday Weekly Review, carry-forward and Minutes correction; failed learning and repeat
+after training; multi-party Monthly Report, missing/sensitive data, partial/no reply, deadline,
+Correction/Addendum and Finance reconciliation; close with continuing Finance work; and shared UI at
+1440, 1024 and 390px with keyboard, touch, focus and restored Listing context.
+
+# §13 · Legacy Service Notes
 
 The existing Service Notes workbook and repository subsystem prove useful needs: permanent SN
 identity, customer/order/item context, Logistics/Supplier/Warehouse handoff, printable evidence and
