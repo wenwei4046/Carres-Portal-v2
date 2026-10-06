@@ -238,7 +238,7 @@ export default function TasksArea({ onClose, fill = false }: { onClose: () => vo
           {!expanded ? preview(rows) : null}
         </span>
         {empty ? (
-          <span className="shrink-0 text-meta text-kit-slate-10" data-testid="section-nothing-due">{T.nothingDue}</span>
+          <span className="shrink-0 text-meta text-kit-slate-11" data-testid="section-nothing-due">{T.nothingDue}</span>
         ) : countBadge(rows.length, tone === "missed" ? "red" : tone === "today" ? "blue" : "grey")}
       </>
     );
@@ -285,7 +285,7 @@ export default function TasksArea({ onClose, fill = false }: { onClose: () => vo
       <span className="sr-only" role="status">Loading tasks</span>
       {["", "MON", "TUE", "WED"].map((d, i) => (
         <div key={i} className="flex min-h-[52px] items-center gap-3 border-b border-kit-slate-4 px-3">
-          <span className="w-8 text-label text-kit-slate-10">{d}</span>
+          <span className="w-8 text-label text-kit-slate-9">{d}</span>
           <span className="h-3 w-24 animate-pulse rounded bg-kit-slate-3" />
           <span className="ml-auto h-5 w-5 animate-pulse rounded-full bg-kit-slate-3" />
         </div>
@@ -295,7 +295,7 @@ export default function TasksArea({ onClose, fill = false }: { onClose: () => vo
 
   const nothing = (
     <div className="flex flex-col items-center gap-1 px-3 py-10 text-center" data-testid="tasks-nothing">
-      <ListTodo size={18} className="text-kit-slate-10" aria-hidden />
+      <ListTodo size={18} className="text-kit-slate-9" aria-hidden />
       <p className="text-body font-semibold text-kit-slate-12">{T.nothingAssigned}</p>
       <p className="text-meta text-kit-slate-11">{T.thisWeek}</p>
     </div>
@@ -391,7 +391,7 @@ export default function TasksArea({ onClose, fill = false }: { onClose: () => vo
                   <span className="text-body font-semibold">{day.month}</span>
                 </span>
               ) : (
-                <span className={`flex items-baseline gap-1.5 ${day.rows.length ? "text-kit-slate-12" : "text-kit-slate-10"}`}>
+                <span className={`flex items-baseline gap-1.5 ${day.rows.length ? "text-kit-slate-12" : "text-kit-slate-11"}`}>
                   <span className="text-label font-semibold uppercase tracking-wider">{day.weekday}</span>
                   <span className="text-body font-semibold">{day.dayNumber} {day.month}</span>
                 </span>
