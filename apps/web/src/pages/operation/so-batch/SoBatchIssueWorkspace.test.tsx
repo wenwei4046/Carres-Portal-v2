@@ -230,7 +230,7 @@ describe("50% work + 50% the actual document", () => {
     expect(renderPoPdf).toHaveBeenLastCalledWith(expect.objectContaining({
       draft: true, po_number: "DRAFT", po_id: "", issue_date: "", eta_date: null,
       supplier: expect.objectContaining({ name: "Hooka" }),
-      lines: [{ sku: "B1201S-K", description: "Booqit · King", qty: 2, unit: "unit", sources: [{ so: 1318, qty: 2 }] }],
+      lines: [{ sku: "B1201S-K", model_name: "Booqit", description: "King", qty: 2, unit: "unit", sources: [{ so: 1318, qty: 2 }] }],
     }));
     expect(apiFetch.mock.calls.some(([p]) => String(p).includes("issue-batch"))).toBe(false);
     fireEvent.click(screen.getByTestId("so-batch-issue-next"));

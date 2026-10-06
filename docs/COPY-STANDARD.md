@@ -1197,7 +1197,7 @@ visible words, top to bottom:
 | Purpose | Exact visible words |
 |---|---|
 | Form and identity | `Add Supplier` · `Supplier Name` |
-| Goods movement | `Delivery Method` · `Supplier delivers` · `We collect` |
+| Goods movement | `Delivery Method` · `Supplier delivers` · `Carres collects` (owner ruling 2026-09-30: every line names WHO; `We collect` is retired everywhere) |
 | Existing Catalog classification | `Product Categories` · `Mattress` · `Bedframe` · `Sofa` |
 | One value for every selected category | `Production Days` · `working days` |
 | Factory calendar | `Supplier work week` |
