@@ -40,12 +40,39 @@
 import { isSundayIso, type BookingGateResult } from "./booking-gate";
 import {
   financeExceptionReason,
+  isOpenFinanceException,
   type FinanceException,
 } from "./finance-exception";
 import {
+  paymentApprovalOpensGate,
   paymentApprovalReason,
   type DeliveryPaymentApproval,
 } from "./delivery-payment-approval";
+
+/**
+ * ⭐ `Hold delivery` — DOES MONEY HOLD THIS DELIVERY ORDER? (owner ruling
+ * 2026-09-25, `docs/delivery/MASTER.md` §3.)
+ *
+ * Exactly the money half of `deliveryOrderIssueGate` below, as a yes/no for
+ * a party that may never be told WHY: outstanding > 0 with no APPROVED
+ * Delivery Payment Approval (0362), or an OPEN Finance exception (0355). The
+ * NETS portal and the external logistics link print `Hold delivery` from
+ * this and nothing more; `delivery-order.test.ts` pins it to the gate's own
+ * refusals so the two can never disagree (Law D).
+ *
+ * Only `status` is read from either record, so a reader that carries the
+ * narrow rows (the Monitor list, the partner feed) can ask it too.
+ */
+export function deliveryMoneyHolds(input: {
+  /** `orderMoney(...).outstanding` — the gate's own figure. */
+  outstanding: number;
+  financeExceptions: ReadonlyArray<Pick<FinanceException, "status">>;
+  paymentApprovals: ReadonlyArray<Pick<DeliveryPaymentApproval, "status">>;
+}): boolean {
+  const owedWithoutApproval =
+    input.outstanding > 0 && !paymentApprovalOpensGate(input.paymentApprovals);
+  return owedWithoutApproval || input.financeExceptions.some(isOpenFinanceException);
+}
 
 export interface DeliveryOrderIssueInput {
   /** D1/0277 — the CUSTOMER confirmed (not the logistics company's word). */

@@ -1104,6 +1104,40 @@ set is `Carres Klang` · `AL Sungai Buloh` · `HOUZS` · `Ohana`; an authorised 
 add a future destination, record its address, make it the default or stop offering it for new POs.
 Historical POs keep the destination name and address saved on their issued version.
 
+**WHO MOVES THE GOODS — OWNER RULING (Jess, 2026-10-06), APPROVED / LOCKED.** Jess: *"all supplier
+send by the own supplier transport, except Nice Future we pick up."* Every supplier delivers its own
+goods to the PO's `Deliver To` (`suppliers.kind = own_logistics`). The single exception today is
+Nice Future, which Carres collects (`factory_pickup`: NETS collects, goods go to Carres Klang).
+`kind` is Supplier Master data and is the only fact that decides this; it is never inferred from a
+supplier's location, product category or address. A supplier Carres collects from is registered as
+`factory_pickup` with its collector and fixed destination in `Settings → Purchasing → Supplier
+collection`. A supplier that delivers has NO collector row; the issue routes pass
+`procurement_partner_id = null` and the `purchase_orders` guard refuses a PO carrying a collector
+(`pickup_partner_not_allowed`). The PO paper prints `Delivery method` from the same fact —
+`Supplier delivers` for `own_logistics`, `We collect` for `factory_pickup` — and a KEPT version
+reprints exactly what the supplier received.
+
+EU is a Delivery second-leg partner, never a supplier collector (Jess, 2026-10-06: Carres moves
+stock KL → JB by any logistics, EU receives in JB and delivers to Singapore). That leg chain belongs
+to Delivery's multi-leg model (`../delivery/MASTER.md`), not to Purchasing.
+
+**MEASURED 2026-10-06 — PRODUCTION NOT CHANGED; PER-SUPPLIER CORRECTION PENDING OWNER
+CONFIRMATION.** Supplier Master still records all 11 suppliers as `factory_pickup`. Ohana
+(EU → `Ohana`) and Hookka Industries (NETS → `HOUZS`) carry collector rows saved 2026-09-03 that
+contradict the ruling; the 14 open Ohana POs issued 2026-09-03/06 carry EU and the `Ohana`
+destination, were never sent (no `po_sends`) and received nothing. The rule above is locked; which
+supplier rows actually change is confirmed by the owner per supplier from one list of current
+value · proposed value · real basis (Jess, 2026-10-06: a rehearsal proves the mechanism, not that
+every supplier's business arrangement changes). Until that confirmation nothing in production
+moves; Production Days, the supplier work week and historical POs are outside the correction in
+any case. Replay rehearsal reported by the coordinator chat, 2026-10-06: clearing a collector
+through `purchasing_set_supplier_collection(supplier, null, null)` keeps the row, its work week and
+`transit_days` and writes history; an `own_logistics` supplier's PO issues with no collector
+(replay PO261006-9588); a collector forced onto an `own_logistics` PO is refused
+`pickup_partner_not_allowed`; Nice Future's path is unchanged. Nothing in Orders, Stock, Delivery,
+Payment or Receiving reads these rows; the guard fires only when a PO is inserted or its supplier,
+destination or collector changes.
+
 Every active destination also resolves the receiving station/party, applicable arrival calendar,
 whether it links to a Carres warehouse or is external/no-Stock, and whether Unit scan and signed-DO
 evidence are required. A warehouse-linked destination derives its address and Stock consequence
@@ -1254,6 +1288,10 @@ Production Days       one required value for every selected category
 Supplier work week
 Add Supplier
 ```
+
+`Delivery Method` defaults to `Supplier delivers`; `We collect` is chosen only for a supplier Carres
+actually collects from (today Nice Future) and then requires the collector and fixed destination
+(§5.4, owner ruling 2026-10-06).
 
 `Product Categories` is a multi-select of the governed Purchasing production categories:
 `Mattress` · `Bedframe` · `Sofa`. MP/protectors and pillows follow the warehouse-stock
@@ -1433,12 +1471,15 @@ facts, the one send area and the completion fact below.
   transaction. A missing or changed Catalog cost must not block ordinary issue under the 2026-10-01 ruling above. Commercial
   exceptions are approved and maintained in their governed Catalog/approval flow, never typed into
   SO Batch or Manual Purchase Issue review.
-- **SUPPLIER COLLECTION IS MASTER DATA.** A factory-pickup supplier's collector and optional fixed
-  destination come from `purchasing_supplier_settings`. SO Batch Purchase, Manual Purchase, the API
-  and the `purchase_orders` database guard all use that same rule. Review neither repeats the
-  collection arrangement nor asks the operator to choose a collector for one PO. Managers maintain
-  both fields in `Settings → Purchasing → Supplier collection`; future factory-pickup suppliers appear from master
-  data and future destinations continue to come from the adjacent `Supplier Deliver To` setting.
+- **SUPPLIER TRANSPORT IS MASTER DATA.** `suppliers.kind` decides who moves the goods (§5.4, owner
+  ruling 2026-10-06). For a `factory_pickup` supplier the collector and optional fixed destination
+  come from `purchasing_supplier_settings`; for an `own_logistics` supplier there is no collector
+  and the issue route passes `procurement_partner_id = null`. SO Batch Purchase, Manual Purchase,
+  the API and the `purchase_orders` database guard all use that same rule. Review neither repeats
+  the collection arrangement nor asks the operator to choose a collector for one PO. Managers
+  maintain the collector and fixed destination in `Settings → Purchasing → Supplier collection` for
+  collected suppliers only; destinations continue to come from the adjacent `Supplier Deliver To`
+  setting.
 - **COMMERCIAL APPROVAL — EXISTING IMPLEMENTATION, NOT AN OPERATIONAL PRICE GATE.** A hand-entered cost and a Free of Charge each
   require an open, unexpired `po_cost_approvals` record. `purchasing_approve_po_cost` admits only
   `principal` or `finance`, and refuses a manager who is also today's PO actor: one person cannot be
@@ -7831,10 +7872,12 @@ and Ohana use `hookka.manufacturing@gmail.com` and default to Email; Nice Future
 by the authenticated shared `principal` account, not Jess personally. Existing groups, historical
 recipients and supplier access were not changed. No email or WhatsApp message was sent.
 
-Hookka's fixed Deliver To is the existing HOUZS destination, with NETS collection and a populated
-warehouse address. Its supplier factory address is not a substitute destination. Ohana's actual
-fixed destination still has no address and correctly remains a named issue blocker; no address was
-invented or copied from Hookka.
+Under the 2026-10-06 transport ruling (§5.4) a supplier that delivers its own goods has no
+Supplier collection row. Hookka Industries (NETS → HOUZS) and Ohana (EU → Ohana, both saved
+2026-09-03) still carry one; whether and when each row changes is confirmed per supplier by the
+owner (§5.4), and their supplier work week and Production Days stay in any case. Ohana's supplier
+address is still blank and remains a named Settings gap; no address is invented or copied from
+Hookka.
 
 **PRODUCTION-DAY VALUES — OWNER CONFIRMED 2026-10-01, APPROVED / LOCKED.** Mattress: **7 working
 days**; Bedframe: **7 working days**; Sofa: **14 working days**. Apply these values to missing
@@ -7952,6 +7995,10 @@ Nice Future's confirmed contact email is **farithazelam@gmail.com**; retain its 
 and access arrangements. A possible end to Nice Future supply after Subscription launches is
 future context, not a present cutover instruction. Historical recipients remain as recorded.
 Opening email is never sent evidence; the current-version confirmation remains required.
+
+**TRANSPORT BOUNDARY (owner ruling 2026-10-06, §5.4).** Every supplier delivers its own goods except
+Nice Future, which Carres collects. A Delivery second-leg partner (EU for JB → Singapore) is never a
+supplier collector; supplier collection exists only for `factory_pickup` suppliers.
 
 A future Hookka/Ohana API must use canonical PO, supplier and evidence records and needs separate
 owner authorisation. No API replacement, external contact or supplier login/access change is

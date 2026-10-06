@@ -668,7 +668,8 @@ describe("DeliveryOrderPage", () => {
       }),
     );
     const exceptions = screen.getAllByTestId("do-exceptions").at(-1)!;
-    expect(exceptions).toHaveTextContent("Finance is holding this delivery: Cheque bounced");
+    expect(exceptions).toHaveTextContent("Hold delivery · Finance hold · Cheque bounced");
+    expect(exceptions).not.toHaveTextContent("Finance is holding this delivery");
     expect(exceptions).toHaveTextContent("Payment approval requested: COD by transfer");
   });
 

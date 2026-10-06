@@ -76,7 +76,7 @@ import {
   type MissingDeliveryProof,
 } from "./delivery-orders-register";
 import { lineName, moneyOfOrder } from "./sales-order-facts";
-import { fmtMoney, paymentApprovalOpensGate } from "@carres/shared";
+import { financeHoldLineOf, fmtMoney, paymentApprovalOpensGate } from "@carres/shared";
 
 /**
  * ⭐ EVERY VISIBLE WORD, IN ONE PLACE (COPY-STANDARD, Delivery section).
@@ -153,9 +153,12 @@ export const MONITOR_COPY = {
   confirmed: "Scheduled",
   notConfirmed: "Not scheduled",
   paid: "Paid",
-  doNotDeliver: "Do not deliver",
-  stillToCollect: (amount: string) => `${amount} still to collect`,
-  financeHolding: "Finance is holding this delivery",
+  /* Owner ruling 2026-09-25 (§3): `Hold delivery` over the party's own second
+     line. `{amount}` arrives spelled by `fmtMoney` (`RM 1,200.00`), so the
+     word adds no marker of its own. The three older payment words are retired
+     (COPY "Hold delivery"; `hold-delivery-words.test.ts` keeps them out); the
+     Finance line is the shared `financeHoldLineOf`. */
+  unpaid: (amount: string) => `${amount} unpaid`,
   collect: (amount: string) => `Collect ${amount}`,
   cashOnDelivery: "Cash on delivery",
   ofPieces: (have: number, total: number) => `${have} of ${total}`,
@@ -695,17 +698,19 @@ export interface MonitorStock {
  * ⭐ `Payment` ARITHMETIC (Delivery MASTER §8.3): `orderMoney.outstanding`
  * through the one money rule and the OPEN Finance exception — the same
  * predicate the DO gate asks. `Paid` when nothing is outstanding and no
- * exception holds; `Do not deliver` over `RM {amount} still to collect` while
- * money is owed, or over `Finance is holding this delivery` while an exception
- * is open; `Collect RM {amount}` over `Cash on delivery` only when an approval
- * opened the gate. Monitor adds no payment door.
+ * exception holds; `Hold delivery` over `RM {amount} unpaid` while money is
+ * owed, or over `Finance hold · {reason}` while an exception is open (owner
+ * ruling 2026-09-25, §3); `Collect RM {amount}` over `Cash on delivery` only
+ * when an approval granted before the 2026-09-01 closure opened the gate.
+ * The register cell, its Search/Export/filter values and the schedule card's
+ * readiness line all read THIS function. Monitor adds no payment door.
  */
 export function monitorPaymentOf(o: DeliveryScopeRow["o"]): MonitorPayment {
   const money = moneyOfOrder(o);
-  const financeHolds = (o.order_finance_exceptions ?? []).some((e) => e.status === "open");
+  const financeLine = financeHoldLineOf(o.order_finance_exceptions ?? []);
   const owed = money.known ? money.outstanding : 0;
-  if (financeHolds) {
-    return { line1: MONITOR_COPY.doNotDeliver, line2: MONITOR_COPY.financeHolding, tone: "red" };
+  if (financeLine !== null) {
+    return { line1: MONITOR_COPY.holdDelivery, line2: financeLine, tone: "red" };
   }
   if (!money.known) return { line1: MONITOR_COPY.noPrice, line2: null, tone: "none" };
   if (owed <= 0) return { line1: MONITOR_COPY.paid, line2: null, tone: "green" };
@@ -720,8 +725,8 @@ export function monitorPaymentOf(o: DeliveryScopeRow["o"]): MonitorPayment {
     };
   }
   return {
-    line1: MONITOR_COPY.doNotDeliver,
-    line2: MONITOR_COPY.stillToCollect(fmtMoney(owed)),
+    line1: MONITOR_COPY.holdDelivery,
+    line2: MONITOR_COPY.unpaid(fmtMoney(owed)),
     tone: "red",
   };
 }

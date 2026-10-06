@@ -51,6 +51,12 @@ append-only history.
 Delivery never creates a second commercial-order, stock, money, duty, calendar, Service or
 Guarantee editor. It records what happened and links the owner that must decide a remedy.
 
+**Supplier inbound is the supplier's leg — owner ruling 2026-10-06 (relayed from the UI Master
+chat).** Every supplier delivers to Carres with its own transport except Nice Future, where Carres
+collects (the governed `Nice Future → NETS → Carres Klang` arrangement, Purchasing MASTER). For the
+other suppliers the supplier → warehouse movement is not a Delivery Journey leg and Delivery
+arranges no collection for it; Purchasing owns the supplier route fact and Receiving the arrival.
+
 **Supplier-delay boundary — owner-approved 2026-09-24.** A revised supplier/PO arrival remains a
 Purchasing and stock-planning fact. Delivery may show its derived stock-risk/customer-impact signal,
 but never labels it a confirmed or scheduled customer delivery, places it in the confirmed-delivery
@@ -198,7 +204,8 @@ result, proof, problems and history.
   `COLLECT RM {amount} BY ONLINE TRANSFER BEFORE UNLOADING — NO CASH.` on the document. The gate
   record and the Finance exception are defined once in [`../orders/MASTER.md`](../orders/MASTER.md)
   §8; Delivery reads them and never writes them. No new payment exception door may be added.
-- **A hold is shown to every party — owner ruling 2026-09-25 · APPROVED TARGET / NOT BUILT.**
+- **A hold is shown to every party — owner ruling 2026-09-25 · Operation and Logistics surfaces
+  BUILT 2026-10-06 (PR #1947, §15.1 · §16); Payment and Warehouse surfaces NOT BUILT (their lanes).**
   The moment a Scheduled delivery exists and the DO cannot issue because money is unpaid or an
   OPEN Finance exception holds the order, every surface that carries that delivery prints
   **`Hold delivery`** on line one, from the ONE gate predicate, and a second line written for the
@@ -500,7 +507,9 @@ special requirements, then `Scheduled date`, `Scheduled time (optional)`, `ETA`,
 and reply screenshot (owner ruling 2026-09-26 aligns the page to the 2026-09-24 words; `Confirmed
 date` and `Time window` retired). Its two acts are **`Save delivery date`** and **`Cannot deliver`**
 (`Save Delivery Arrangement` retired). While the gate holds the page prints `Hold delivery` and
-nothing more (§3). Operation
+nothing more (§3). **BUILT 2026-10-06 (PR #1947):** the four field/act words and `Hold delivery`
+(the server sends a yes/no, never money or the reason); the remaining fact and field words of the
+COPY row are named in §15.1. Operation
 proxy records state `Recorded by {person} on behalf of {partner}` with source, reporter, reported
 time, recorded time and original evidence.
 
@@ -2047,11 +2056,16 @@ ride a Delivery Journey leg with its own DO scope, handover and arrival — neve
 Inventory prints only the two events, OUT at origin (`Ship Date · Pickup By {company} · Delivery
 Location`) and IN at the transit point; nobody records the road.
 
-**Singapore.** A Singapore address creates two arrangement rows from the day the order arrives:
-leg 1 `Klang WH → JB partner` and leg 2 `JB partner → Singapore customer`, each with its own
-Logistics, dates, DO, handover, `Who has it` fact and result. Leg 1 completion means the
-goods reached the named JB warehouse, never that the customer received them. The route prints
-without a `Leg` word; the leg number rides the URL only.
+**Singapore — owner ruling 2026-10-06 (Jess: "eu is 2nd leg to send to singapore … eu is jb, then
+eu send to singapore").** A Singapore address creates two arrangement rows from the day the order
+arrives. Leg 1 `Klang WH → EU (JB)`: any Logistics company Carres assigns carries the goods from
+Kuala Lumpur to EU at Johor Bahru. Leg 2 `EU (JB) → Singapore customer`: EU delivers to the
+customer in Singapore. EU is the Logistics company of the second leg and the JB handover point; it
+is never a supplier collector and never a Carres warehouse. Each leg keeps its own Logistics,
+dates, DO, handover, `Who has it` fact and result; leg 1's company is chosen per order and is not
+fixed to EU. Leg 1 completion means the goods reached EU at JB, never that the customer received
+them. The route prints without a `Leg` word; the leg number rides the URL only. Falsifier: a
+Singapore order whose second leg an evidenced company other than EU carries.
 
 **East Malaysia (owner approval 2026-09-01).** A Sabah or Sarawak order travels through HOUZS:
 Carres hands the goods to HOUZS with exact-Unit handover facts and proof, and HOUZS owns the
@@ -2158,10 +2172,10 @@ their absence as a design blind spot:
 | Driver-phone storage and immutable template identity remain absent; name/plate template selection is implemented, with release state in §16 | `ops_delivery_arrangements`, `partner_drivers`, `partner_fleet` |
 | Independent split-trip arrangement, earlier-leg arrival enforcement and one scheduled-date writer remain incomplete | Orders §0.0 A2 records these gaps. Split-trip mint already exists in `delivery-order-issue.ts` through `delivery_trip_document_mint`; do not invent a second issuing engine or claim the whole capability is absent |
 | Delivery reports exist; convergence with newly approved timing, agreement and proof rules still needs validation | `OperationDeliveryReport.tsx` and §12; this pass is source inspection, not a new production verification |
-| `Hold delivery` on the Payment, Warehouse and Logistics surfaces, and the Operation words `RM {amount} unpaid` · `Finance hold · {reason}` (§3, owner ruling 2026-09-25) | `delivery-work-status.ts`, `logistics-card.ts`, `delivery-warehouse-schedule.ts`, `PaymentMonitor.tsx`, the partner arrange page and `DeliveryLinkPage.tsx` |
+| **`Hold delivery` on Delivery's own surfaces — BUILT 2026-10-06, PR #1947 (production record in §16; owner walk owed).** Monitor `Payment` column: `Hold delivery` over `RM {amount} unpaid` or `Finance hold · {reason}` (several open: `Finance hold · {n} reasons`), `Paid`, `No price yet`, pre-closure `Collect RM {amount}` over `Cash on delivery`; the register cell, Search, Export, the filter value and the schedule card's readiness line read `monitorPaymentOf`, the retired keys are deleted, no door added; the operation list read carries `order_finance_exceptions(status, reason)`. ONE Finance line spelling, shared `financeHoldLineOf`, read by Monitor, the Order Route and the DO object's Exceptions (now `Hold delivery · Finance hold · {reason}`, COPY Card 16). NETS arrange page and external link: the server sends `holdDelivery` (a Scheduled delivery exists through `scheduledDeliveryOf` AND `deliveryMoneyHolds` over the gate's own figure, `bookingMoneyOf` extracted from `loadBookingContext`); the page prints `Hold delivery` alone; no money field and no reason in either response (tested by exact key set); one batched read for every card. NETS words `Scheduled date` · `Scheduled time (optional)` · `ETA (optional)` · `Save delivery date`; link save results in the 2026-09-26 words. **Still open, by owner:** Payment Monitor row and collection workspace (Payment lane, `PaymentMonitor.tsx`); Warehouse Schedule row and Outbound `Hold delivery` over `Payment incomplete` · `Do not pack` (Warehouse lane, `delivery-warehouse-schedule.ts`); the Work Logistics card and Order Route already print the words. **Named limit (measured 2026-10-06):** Monitor's `RM {amount} unpaid` and its red tone read `moneyOfOrder` (goods money only, no keyed balance, no storage paper), while the DO gate also blocks on unpaid storage papers (0441, Payment §2 `Pay before delivery`, owner ruling 2026-10-06): a goods-paid order with an unpaid storage paper prints `Paid` on Monitor while NETS and the link print `Hold delivery`. The fix is Monitor reading Payment's `Pay before delivery` figure once Payment builds it. The NETS page's remaining COPY words (`Reference` · `Area` · `Requested delivery` for `Customer asked` · `Result` · `Reply screenshot` · `Cannot deliver` casing) are not built | `delivery-monitor.ts` (`moneyOfOrder`), `PartnerArrangePage.tsx`, `PaymentMonitor.tsx`, `delivery-warehouse-schedule.ts` |
 | `View Sales Order` in panel 1 of the brief, replacing `Open Sales Order to change` (§8.5) | `DeliveryBrief.tsx`, the governed SO renderer |
 | **ONE status function and ONE label function — BUILT 2026-10-05, DEPLOYED PR #1935 `f1bb6005` (Delivery scope 1 · one status ladder; production record in §16; owner walk owed).** Measured 2026-09-25: the register printed the 2026-09-13 spellings while the schedule card printed the §8.4 words through a second function. Now `deliveryWorkStatusOf` returns the §8.4 words itself and `deliveryWorkStatusLabelOf(kind, {partner, stop})` is the only label function: the register column, the `DELIVERY STATUS` dropdown (one option per printed word, 17 rungs, role words `logistics` · `warehouse`), the schedule card, the phone card (the same status cell component as the register), the Order Route DELIVER node and Reports → Delivery all read it. The relabeller `deliveryJourneyProgressFromStatus`, the local `legWorkStatusOf` (a leg without a DO now translates its stop record into facts) and the `confirm_time` rung are deleted; a stored `?status=confirm_time` opens `Scheduled`. `Order details incomplete` prints the missing fact on line two and carries the contact deadline as the cell's title, accessible name, Search and Export. One delivery-day reader (`scheduledDeliveryOf` / `customerLegDeliveryOf`: live DO → arrangement → confirmed booking, customer leg) serves Monitor, the Work feed, the rail Calendar and Payment's collection clock; one assignment reader (`assignedLogisticsIdOf`) makes the Work feed name and assign the company from Delivery's arrangement. Consequences stated, not hidden: a carrier's provisional `logistic_eta` no longer puts an order on the rail Calendar (the one reader counts scheduled days only, §10); `Arrived at {stop}` carries the stop on line one, so its line two stays empty rather than printing the stop twice. Tests: §8.4 table test over every row; source scans that fail on a second label path, a journey word spelled outside the ladder file, or a retired word; Work-feed tests that fail on the previous `work.ts`. | `packages/shared/src/delivery-work-status.ts`, `packages/shared/src/delivery-calendar.ts`, `apps/web/src/pages/operation/delivery-work.ts`, `delivery-monitor.ts`, `OperationDelivery.tsx`, `apps/api/src/routes/operation/work.ts`, `components/rail/CalendarPanel.tsx` |
-| Still open after scope 1, named so no build reads them as done: the §2.1 assignment deadline on `Assign logistics` line two (prints nothing until §2.1's configured lead is built); the Monitor `Payment` column still prints `Do not deliver` · `{amount} still to collect` · `Finance is holding this delivery` (the `Hold delivery` row above); the calendar card footer `Open DO` / `Edit Delivery` and the `Show delivery brief` disclosure (§8.2 doors ruling 2026-09-25); `Why is the logistics partner changing?` in Logistics Details (COPY governs no replacement yet); the reason library's catch-all label `Delivery failed` (`delivery_failed`), which can print under `Failed Delivery` (no governed replacement) | `delivery-monitor.ts` (`monitorPaymentOf`, `MONITOR_COPY`), `OperationDelivery.tsx` (`MonitorCard`), `DeliveryBrief.tsx`, `packages/shared/src/delivery-reasons.ts` |
+| Still open after scope 1, named so no build reads them as done: the §2.1 assignment deadline on `Assign logistics` line two (prints nothing until §2.1's configured lead is built); the calendar card footer `Open DO` / `Edit Delivery` and the `Show delivery brief` disclosure (§8.2 doors ruling 2026-09-25); `Why is the logistics partner changing?` in Logistics Details (COPY governs no replacement yet); the reason library's catch-all label `Delivery failed` (`delivery_failed`), which can print under `Failed Delivery` (no governed replacement) | `delivery-monitor.ts` (`MONITOR_COPY`), `OperationDelivery.tsx` (`MonitorCard`), `DeliveryBrief.tsx`, `packages/shared/src/delivery-reasons.ts` |
 | the Delivery Orders register's date-first pair `DO Date · DO No` (§8.7, UI §6.7) | `DeliveryOrdersRegister.tsx` (`stickyIdentity` → `leadingColumns`) |
 | the Delivery Order brief inside the register row and the two-column DO object (§8.7, §9, owner ruling 2026-09-26) | `DeliveryOrdersRegister.tsx` (`DoExpansion`), `DeliveryOrderPage.tsx`; the acts reuse `DeliveryResultAction`, `WarehouseHandoverBlock`, `DeliveryEvidencePanel` |
 | the POS required-facts gate for address, state, building type, floor, lift and access | **BUILT 2026-09-13 (Delivery Card 18)** — `createOrderInputSchema`, `rawCreateOrderInputSchema`, the POS wizard and the office create door refuse the facts with one wording; `Order details incomplete` now names legacy rows only |
@@ -2288,6 +2302,15 @@ below as they occur; takeover is not proof of completion.
 
 
 ## 16 · Production closure
+
+**2026-10-06 Hold delivery on Delivery's own surfaces — CODE, PR #1947 (deploy record follows on merge).**
+Status only; the law is §3 · §5.4 · §5.5 · §8.3 and the built record is §15.1. Local sequential
+runs on the build head: 4,115 shared · 4,163 API (352 optional skipped) passed; the web suite's
+touched files (Monitor, words scan, NETS page, link page, DO object, Monitor page) 300/300; a
+loaded-machine full web run timed out two unrelated finance tests at 20s, both 128/128 when run
+alone. Every new regression test was run once against the unfixed code and failed (7 shared · 13
+API · 19 web). No migration, RLS change or production data write. **The authenticated owner walk is
+owed (Jess).**
 
 **2026-10-05 Delivery scope 1 · ONE STATUS LADDER — DEPLOYED, PR #1935, main `f1bb6005e3b233d28ded3c2945cae886f5c723f8`.**
 Status only; the law is §8.4 and the built record is §15.1. Exact-head PR CI (run `37330397842`,

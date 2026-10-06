@@ -2916,7 +2916,10 @@ export interface operationOrderListRow {
    *  Finance exception (0355) and a loan still out (0209/0217). Optional so an
    *  older Worker that does not select them raises nothing (UNKNOWN never
    *  accuses). */
-  order_finance_exceptions?: { status: "open" | "cleared" }[];
+  /** `reason` rides the read since 2026-10-06 so Monitor's `Payment` cell can
+   *  print `Finance hold · {reason}` (Delivery MASTER §3). Optional: an older
+   *  Worker without it prints `Finance hold`. */
+  order_finance_exceptions?: { status: "open" | "cleared"; reason?: string | null }[];
   /** 0362 — the delivery payment approvals; Monitor's `Payment` cell reads
    *  `paymentApprovalOpensGate` over them for the authoritative COD line
    *  (Delivery MASTER §8.3). Optional: absent = no approval carried. */
