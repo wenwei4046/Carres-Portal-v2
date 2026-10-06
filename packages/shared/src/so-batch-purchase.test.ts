@@ -239,6 +239,10 @@ describe("the rail — latest Owner ruling 2026-08-30", () => {
     expect(W).not.toHaveProperty("buy");
     expect(W).not.toHaveProperty("colWork");
     expect(W).not.toHaveProperty("goodsMustArrive");
+    /* ⛔ No second PO table under the row or in the Quick View (Jess,
+       2026-10-06): the PO facts are on the row listing. */
+    expect(W).not.toHaveProperty("poDetails");
+    expect(Object.values(W), "Purchase order details").not.toContain("Purchase order details");
   });
 
   it("no banned or retired Purchasing word is spelt anywhere in the dictionary or the rail", () => {
