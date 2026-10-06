@@ -134,7 +134,7 @@ export const SO_BATCH_PURCHASE_WORDS = {
    * The ORIGINAL supplier-facing date stamped at the document's birth (§5.7).
    * `PO Delivery Date` is retired for this fact on all four reviewed pages.
    */
-  colPoDeliveryDate: "PO Default Delivery Date",
+  colPoDeliveryDate: "PO Delivery Date",
 
   /**
    * ⭐ STATUS IS THE NEW-PO NEED, NOT A PROGRESS BADGE — owner ruling

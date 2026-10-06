@@ -1310,7 +1310,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
       items={renderExpansion(o, true)}
       details={<DocumentTable label="Purchase order details" columns={[
         { key: "po", label: "PO No" }, { key: "supplier", label: "Supplier" },
-        { key: "destination", label: "Supplier Deliver To" }, { key: "date", label: "PO Default Delivery Date" },
+        { key: "destination", label: "Supplier Deliver To" }, { key: "date", label: "PO Delivery Date" },
       ]} rows={o.pos.map(po => ({ key: po.poId, onOpen: () => navigate(`/operation/procurement?po=${encodeURIComponent(po.poId)}`),
         openLabel: `Open ${documentDisplayNumber(po.poId)}`, cells: { po: `${documentDisplayNumber(po.poId)}${po.version == null ? " · Not recorded" : `-V${po.version}`}`, supplier: po.supplierName ?? "Supplier not set",
           destination: destinationName(po.destinationId), date: po.officialDeliveryDate ? fmtDate(po.officialDeliveryDate) : "Not recorded" } }))} />}
