@@ -144,6 +144,11 @@ describe("the default row is the owner's ELEVEN, in the owner's order (2026-09-2
     expect(REGISTER_FIELDS.find((f) => f.key === "do_number")!.text(row)).toBe(NO_DO_YET);
   });
 
+  it("PO No is every linked number, comma-separated, in the shared short form", () => {
+    const row = buildRegisterRow(order({ po_numbers: ["PO-20260911-5002", "PO-20260910-4001"] }), []);
+    expect(REGISTER_FIELDS.find((f) => f.key === "po_number")!.text(row)).toBe("PO-260910-4001, PO-260911-5002");
+  });
+
   it("Items is {first item} + {n} more, named by the catalog, never the SKU when it is known", () => {
     const o = order({
       order_lines: [

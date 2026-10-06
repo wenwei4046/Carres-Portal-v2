@@ -845,6 +845,22 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     expect(screen.getByTestId("location")).toHaveTextContent("/operation/delivery-orders/DO-210826-5678");
   });
 
+  /* ⭐ EVERY LINKED PO, ON ONE LINE — owner ruling 2026-10-06 (Jess): every
+     number, comma-separated, each its own link; no count, no popover. */
+  it("prints every PO number on one line, comma-separated, each its own link", () => {
+    listHookState.data = {
+      orders: [order({ po_numbers: ["PO-20260911-5002", "PO-20260910-4001"], do_number: null })],
+    };
+    mount();
+    const cell = screen.getByRole("button", { name: "PO-260910-4001" }).parentElement!;
+    expect(cell.textContent).toBe("PO-260910-4001, PO-260911-5002");
+    expect(cell).toHaveClass("block", "truncate");
+    expect(within(cell).getAllByRole("button")).toHaveLength(2);
+    expect(screen.queryByRole("button", { name: "2 Purchase Orders" })).toBeNull();
+    fireEvent.click(within(cell).getByRole("button", { name: "PO-260911-5002" }));
+    expect(screen.getByTestId("location")).toHaveTextContent("/operation/procurement?po=PO-20260911-5002");
+  });
+
   it.each(["RC-SECOND", "INV-SECOND", "DO-SECOND"])("searches hidden linked number %s", async (term) => {
     listHookState.data = { orders: [order({
       receipt_documents: [{ id: "p1", receipt_no: "RC-FIRST" }],
