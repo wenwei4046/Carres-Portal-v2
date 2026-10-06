@@ -154,3 +154,102 @@ export function classifySalesOrderChange(
 export function salesOrderCommitWord(action: SalesOrderChangeClass["action"]): string {
   return action === "submit" ? "Submit amendment request" : "Save";
 }
+
+/* ═══ CONCURRENT EDITING — owner-approved 2026-10-01 (orders/MASTER §0.0
+ * "Approved handoff scopes": "Two editors cannot silently overwrite one
+ * another; conflict keeps the draft and exposes what changed; same amendment
+ * entry, no new draft engine").
+ *
+ * The whole-page edit sends back EVERY field it shows, so a commit computed
+ * from an older read would quietly put a colleague's newer value back. The
+ * page therefore keeps the order exactly as it opened it — this baseline — and
+ * the commit carries it. The database compares it with the order under the
+ * order's own lock before anything is written (`sales_order_commit_staff_change`)
+ * and refuses with `order_edit_stale` when they differ.
+ *
+ * ONE builder (Law D): the API's GET answer, the API's pre-check and the test
+ * of the database's own copy (`_sales_order_edit_baseline`) all call this.
+ * Its shape is the database's shape key for key: header values or null,
+ * `entry_fields` an object, lines and services ordered by id with exactly
+ * id · sku/addon_key · qty · unit_price · attrs. ═══ */
+
+export interface SalesOrderEditBaselineLine {
+  id: string;
+  sku: string;
+  qty: number;
+  unit_price: number;
+  attrs: Record<string, unknown> | null;
+}
+export interface SalesOrderEditBaselineAddon {
+  id: string;
+  addon_key: string;
+  qty: number;
+  unit_price: number;
+  attrs: Record<string, unknown> | null;
+}
+export interface SalesOrderEditBaseline {
+  status: string;
+  header: Record<SalesOrderEditHeaderKey, unknown>;
+  lines: SalesOrderEditBaselineLine[];
+  addons: SalesOrderEditBaselineAddon[];
+  installment_months: number | null;
+}
+
+const plainObject = (v: unknown): Record<string, unknown> | null =>
+  v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : null;
+/** Byte order, never locale order — the database orders by `id::text collate "C"`. */
+const byId = (a: { id: string }, b: { id: string }) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+
+export function salesOrderEditBaseline(
+  order: Record<string, unknown> & { status?: unknown; entry_data?: unknown; installment_months?: unknown },
+  lines: ReadonlyArray<{ id?: unknown; sku?: unknown; qty?: unknown; unit_price?: unknown; attrs?: unknown }>,
+  addons: ReadonlyArray<{ id?: unknown; addon_key?: unknown; qty?: unknown; unit_price?: unknown; attrs?: unknown }>,
+): SalesOrderEditBaseline {
+  const header = {} as Record<SalesOrderEditHeaderKey, unknown>;
+  for (const k of SALES_ORDER_EDIT_HEADER_KEYS) {
+    header[k] = k === "entry_fields"
+      ? (plainObject(plainObject(order.entry_data)?.fields) ?? {})
+      : (order[k] ?? null);
+  }
+  return {
+    status: String(order.status ?? ""),
+    header,
+    lines: lines
+      .map((l) => ({ id: String(l.id), sku: String(l.sku), qty: Number(l.qty), unit_price: Number(l.unit_price), attrs: plainObject(l.attrs) }))
+      .sort(byId),
+    addons: addons
+      .map((a) => ({ id: String(a.id), addon_key: String(a.addon_key), qty: Number(a.qty), unit_price: Number(a.unit_price), attrs: plainObject(a.attrs) }))
+      .sort(byId),
+    installment_months: order.installment_months == null ? null : Number(order.installment_months),
+  };
+}
+
+/** Key-order independent, like the database's `jsonb` equality. */
+const canonical = (v: unknown): unknown => {
+  if (Array.isArray(v)) return v.map(canonical);
+  if (v && typeof v === "object") {
+    return Object.fromEntries(
+      Object.keys(v as Record<string, unknown>).sort().map((k) => [k, canonical((v as Record<string, unknown>)[k])]),
+    );
+  }
+  return v;
+};
+export function sameSalesOrderEditBaseline(a: unknown, b: unknown): boolean {
+  return JSON.stringify(canonical(a)) === JSON.stringify(canonical(b));
+}
+
+/** What moved on the order between the baseline the editor opened and now:
+ *  header keys, then `lines` · `addons` · `installment_months` · `status`. */
+export function salesOrderChangedSinceOpened(
+  opened: SalesOrderEditBaseline,
+  current: SalesOrderEditBaseline,
+): string[] {
+  const out: string[] = SALES_ORDER_EDIT_HEADER_KEYS.filter(
+    (k) => !sameSalesOrderEditBaseline(opened.header?.[k] ?? null, current.header[k] ?? null),
+  );
+  if (!sameSalesOrderEditBaseline(opened.lines ?? [], current.lines)) out.push("lines");
+  if (!sameSalesOrderEditBaseline(opened.addons ?? [], current.addons)) out.push("addons");
+  if ((opened.installment_months ?? null) !== current.installment_months) out.push("installment_months");
+  if (opened.status !== current.status) out.push("status");
+  return out;
+}
