@@ -432,7 +432,7 @@ solved and every outcome is proven.
 | APPROVED TARGET / NOT BUILT | Read-only link Case ↔ Supplier Claim/RO; `opened_at` read-only after day one; `draft/` evidence sweep; new numbering; Dealer display coverage; collection/replacement arrangement; Documents panel; department Work views | §6, §1 |
 | BUILT / VERIFIED (local preview of main `9ad7231d0`) | Guided intake (5 questions + evidence gate, server-stamped) · derived follow-up chain + two-layer close gate · derived deadline + bound events · Numbers tab with coverage · `Report a problem` from SO · `?orderId=` list filter · DO page / Arrival Source links to a Case | code read in full: `service-cases.ts`, 5 shared modules, 0210/0285/0289/0293/0298 |
 | BUILT / NON-CONFORMING | Self-drawn table/tab row/modal (no DataGrid, rail, Working Panel; Escape does not close; 390px row 215px, button 16px) · dropdown status/type · banned words `Pending` `Follow-up` `Collect the item` · `Inspection` and `Refund` wants · `Call {supplier}` step inside the Case · `SC` prefix shared with Supplier Claims, 2-digit serial | §7.24 lists each with its replacement |
-| REAL GAP → OWNER DECISION | Who owns routine Case work (Workspace §6.1 "not admitted", §11.5) | §7.9 asks it with the gate filled |
+| RESOLVED FROM AUTHORITY / NOT BUILT | Operation shares routine Case work through Service Duty; one Case owner assigned by round robin; helpers do not change ownership | §7.9 owner ruling 2026-10-06; Workspace admission text predates this ruling |
 
 ## 7.1 · Purpose, ownership and boundaries
 
@@ -597,7 +597,7 @@ who needs it · when`:
 The legacy `service_notes` table and `ServiceNotePrintPage` are retired from the UI once the Visual
 Service Note prints from the Case; data stays.
 
-## 7.9 · Work Engine actions — and the ONE owner decision
+## 7.9 · Work Engine actions — resolved shared Operation ownership and pending admission
 
 **RULING 2026-10-06 (Jess) — routine Service Case work stays inside Operation and is SHARED.**
 *"operation wont pass back to sales person. service duty ppl need to share."* Therefore a governed
@@ -621,34 +621,9 @@ Constitution's engineering/design rule, recorded here so no chat asks it again:
 Falsifier: the owner says one person a month must hold every Case (the PO/GRN monthly pattern); then
 the Duty switches from per-Case round robin to monthly allocation and nothing else changes.
 
-The decision record that led here is kept for the reasoning only:
+**CURRENT ADMISSION LIMIT — measured at main `678c27346`, 2026-10-06.** The owner rule above is resolved; do not re-interview the owner or revive a monthly single-holder proposal. Workspace §6.1/§11.5 still records the earlier admission hold, and the Work reader does not demonstrate routine Service actions. The remaining boundary is implementation plus approval of proposed per-step clock laws, not absence of the routine owner decision. The existing 14-working-day deadline/day-10 event is a reusable Case source, not evidence that Service is already in Tasks. No Service routine Tasks production verification is claimed.
 
-```
-AUTHORITY SEARCHED        Service MASTER §1 ("route each owner its Work" — names no rule) ·
-                          Workspace §6.1 (Service "Not admitted: routine owner rule is not yet
-                          governed") and §11.5 ("Define a routine Service Case owner rule/Duty") ·
-                          ERP-ARCHITECTURE Law F (customer follow-up → initially Sales Order PIC;
-                          Delivery Duty only as no-PIC fallback) · Workspace §4 Duty catalogue
-                          (Service Case Approver = decisions only)
-WHY NOT RESOLVED          two current authorities point different ways: Law F's default is the
-                          SO PIC; Service §1 says Operation triages and Workspace refuses to reuse
-                          the Approver as a fallback. Dealer-sold orders have a dealer salesperson
-                          as PIC who cannot do Carres service work; no-source Cases have no PIC.
-OPTION A (recommended)    a governed `Service Duty` in Settings → Staff & Duties, monthly rotation
-                          over eligible Operation staff on the same engine as PO/GRN Duty; cover by
-                          the shared resolver; SO PIC receives a read-only notification only.
-OPTION B                  Sales Order PIC owns routine Case work; `Service Duty` only as the
-                          no-PIC fallback (mirrors Delivery).
-OPTION C                  Service Case Approver owns everything (rejected: Workspace §10 forbids
-                          the Approver as a routine fallback; one person becomes the bottleneck).
-RECOMMENDATION            A. One person a month answers every customer problem; the customer hears
-                          one voice; the dealer salesperson is never asked to do HQ work.
-OPERATIONAL CONSEQUENCE   Staff & Duties gains one Duty; My Work shows Case items to that person;
-                          Delivery/Warehouse/Finance legs keep their own owners.
-FALSIFIER                 the owner says the salesperson who sold it must handle its complaint.
-```
-
-**Actions admitted once the owner rule exists (Workspace §6 contract):**
+**PROPOSAL / NOT LAW — action catalogue for later Workspace admission (owner rule is resolved; proposed step clocks are not automatically approved):**
 
 | Action identity | Fact (line 1) · act (line 2) | Owner rule | Due | Closes when |
 |---|---|---|---|---|
@@ -665,10 +640,10 @@ FALSIFIER                 the owner says the salesperson who sold it must handle
 Delivery, Warehouse, Payment and Purchasing legs raise their own existing actions (Workspace §6.1);
 the Case shows them read-only. No second task store.
 
-## 7.10 · Daily operator journey (Service Duty holder)
+## 7.10 · Daily operator journey (assigned Operation Case owner; PROPOSAL)
 
 ```
-08:30  My Work → Service items first: replies due today · evidence to check · decisions · day-10 calls
+08:30  Shared Tasks → assigned Service items: replies due today · evidence to check · decisions · day-10 calls
        each item opens the Case in the Working Panel on the Service Case tab
 09:00  Service Cases page → mission rail: Reply due 2 · Evidence to check 1 · Decision needed 1 ·
        Pickup photos 1 · Customer confirm owed 3  (counts from Case facts)
