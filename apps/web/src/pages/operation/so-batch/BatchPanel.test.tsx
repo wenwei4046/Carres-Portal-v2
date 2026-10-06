@@ -138,6 +138,29 @@ describe("BatchPanel — one count with the Tasks row and the Work completion (L
   });
 });
 
+describe("BatchPanel — a PO belongs to its earliest window only (§5.6.1)", () => {
+  /* Production acceptance 2026-10-06: the window-scoped read could not see an
+     earlier window's stamp, so a PO already counted on 27 Jul was counted again
+     on 1 Sep (row 11, panel 13). */
+  it("a PO that served an earlier window is counted there, never again here", async () => {
+    const base = api.getMockImplementation()!;
+    api.mockImplementation(async (path: string, init?: { method?: string; body?: string }) => {
+      if (path.startsWith("/api/operation/purchase/demands")) {
+        const r = read();
+        if (!path.includes("window=")) {
+          const first = r.registerRows[0]!;
+          r.registerRows.push({ ...first, orderId: "o0", so: 1100, pos: first.pos.map((p) => ({ ...p, poWindow: "2026-07-27T11:00" })) });
+        }
+        return r;
+      }
+      return base(path, init);
+    });
+    mount();
+    await loaded();
+    expect(within(panel()).getByText("1 PO to send · Sending not confirmed")).toBeInTheDocument();
+  });
+});
+
 describe("BatchPanel — opened by window key from any page", () => {
   it("header is the supplier over the time and date; tabs open on SO Batch Purchase; every PO is ticked", async () => {
     mount();

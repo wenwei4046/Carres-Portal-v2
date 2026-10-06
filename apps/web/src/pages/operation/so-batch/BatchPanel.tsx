@@ -178,14 +178,25 @@ export function BatchPanel({ item, windowKey, host }: { item: BatchPanelItem; wi
     queryFn: async () => soBatchPurchaseResponseSchema.parse(await apiFetch<unknown>(
       `/api/operation/purchase/demands?window=${encodeURIComponent(windowKey)}`)) as SoBatchPurchaseResponse,
   });
+  /* A PO serving orders of several windows belongs to its EARLIEST window only
+     (§5.6.1). The window-scoped read cannot see the earlier stamp, so it would
+     count that PO again here; the PO list therefore comes from the same FULL
+     read the Tasks row and the Work completion use (production acceptance
+     2026-10-06: row `Send 11 POs`, panel Ohana 11 + Nice Future 2). */
+  const full = useQuery<SoBatchPurchaseResponse>({
+    queryKey: [SO_BATCH_QUERY, null],
+    queryFn: async () => soBatchPurchaseResponseSchema.parse(await apiFetch<unknown>("/api/operation/purchase/demands")) as SoBatchPurchaseResponse,
+    staleTime: 15_000,
+  });
   const data = batch.data;
+  const allPos = full.data ?? null;
   /* The whole batch: every supplier's POs and lines stamped in this window. */
   /* Law D · ONE count: the same POs and the same `sentCurrentVersion` fact the
      Tasks row and the Work completion read (`poWindowWorkFromSoBatch`). A
      received PO whose current version is not marked sent still keeps the window
      open there, so it is listed here too (production acceptance 2026-10-06:
      row 11, panel 13, Info 16). */
-  const windowPos = useMemo(() => data ? batchPos(data).filter((po) => po.poWindow === windowKey) : [], [data, windowKey]);
+  const windowPos = useMemo(() => allPos ? batchPos(allPos).filter((po) => po.poWindow === windowKey) : [], [allPos, windowKey]);
   const windowLines = useMemo(() => data ? buyLines(data).filter((row) => row.poWindow === windowKey) : [], [data, windowKey]);
   /* Suppliers with work first (POs to send, then lines to buy), then the rest. */
   const suppliers = useMemo(() => {
@@ -525,7 +536,7 @@ export function BatchPanel({ item, windowKey, host }: { item: BatchPanelItem; wi
     </div>
   );
 
-  const purchaseContent = batch.isPending || (pos.length > 0 && (facts.isPending || (facts.isPlaceholderData && rows.length !== pos.length)))
+  const purchaseContent = batch.isPending || full.isPending || (pos.length > 0 && (facts.isPending || (facts.isPlaceholderData && rows.length !== pos.length)))
     ? <p role="status" className="px-3 py-3 text-body text-kit-slate-11">Loading…</p>
     : batch.isError || facts.isError
       ? <div role="alert" className="flex items-center gap-2 px-3 py-3 text-body text-kit-slate-11"><span>Could not be loaded</span>
@@ -549,11 +560,11 @@ export function BatchPanel({ item, windowKey, host }: { item: BatchPanelItem; wi
     return data.registerRows.filter((order) => ids.has(order.orderId))
       .sort((a, b) => (a.proceededAt ?? "9999").localeCompare(b.proceededAt ?? "9999") || (a.so ?? 0) - (b.so ?? 0));
   }, [data, windowPos, windowLines]);
-  const batchSuppliers = data ? [...new Set([...batchPos(data).filter((po) => po.poWindow === windowKey).map((po) => po.supplierName ?? ""),
+  const batchSuppliers = data && allPos ? [...new Set([...batchPos(allPos).filter((po) => po.poWindow === windowKey).map((po) => po.supplierName ?? ""),
     ...data.rows.filter((row) => row.poWindow === windowKey).map((row) => row.supplier ?? "")].filter(Boolean))].sort() : [];
   /* The whole batch from the same read's own window stamps (the two counts
      are never added together). */
-  const batchPoCount = data ? batchPos(data).filter((po) => po.poWindow === windowKey).length : 0;
+  const batchPoCount = allPos ? batchPos(allPos).filter((po) => po.poWindow === windowKey).length : 0;
   const batchToBuy = new Set(windowLines.map((row) => row.orderId)).size;
   /* "This task" is what the row says: the POs still to send (the row's
      `Send {n} POs`), never every PO the window ever issued. */
