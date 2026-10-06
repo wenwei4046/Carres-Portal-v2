@@ -39,7 +39,12 @@ Carres buys and sells furniture through three channels (「我们的生意是买
 2. **Dealer:** a dealer sells; the customer pays HQ; the dealer earns commission, the renovation rebate and the KPI allowance.
 3. **Subscription:** the customer pays monthly; part of each month goes to the supplier (Diglant) and part to commission.
 
-Finance must show clearly where each sum of money comes in and goes out, channel by channel (「我finance 这里记录需要分的很清楚这笔钱是从哪里进哪里出」). Measured: since 0540 every income and expense line carries a department. A department is a showroom outlet, a dealer, Subscription, or Office; Office carries costs only. Sales invoices, customer payments and rental collections take their department from the order. The four hand-made documents (supplier bill, payment voucher, other debtor invoice, other receipt) are set line by line. The P&L and other reports filter by department. Still to settle with Chew: how bills, bank movements and shared Office costs are separated, and whether the new chart of accounts splits income by channel.
+Finance must show clearly where each sum of money comes in and goes out, channel by channel (「我finance 这里记录需要分的很清楚这笔钱是从哪里进哪里出」). Measured: since 0540 every income and expense line carries a department. A department is a showroom outlet, a dealer, Subscription, or Office; Office carries costs only. Sales invoices, customer payments and rental collections take their department from the order. The four hand-made documents (supplier bill, payment voucher, other debtor invoice, other receipt) are set line by line. The P&L and other reports filter by department. Chew's rulings, 2026-10-06:
+1. Cash flow is split by channel (「现金留要能分起来」).
+2. A supplier bill's channel comes from the order its goods were bought for, never typed by hand (「不应该经过人手，而是根据订单决定」).
+3. Office costs stay in Office.
+4. The channel follows the debtor account (「根据debtor account 来决定」); Chew provides the chart of accounts.
+5. Transport is recorded as a cost of each order even though customers pay nothing for it and Carres bears it (「虽然是我们出，但是还是要记录运输费用啊，根据订单」). Reading pending: the logistics partner's bill is split by the orders it delivered.
 
 ## 1 · Boundary: Finance only
 
