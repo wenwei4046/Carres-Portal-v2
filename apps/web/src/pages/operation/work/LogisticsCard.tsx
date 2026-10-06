@@ -34,6 +34,7 @@ import {
   logisticsCardModel,
   moneyAffectsDelivery,
   myHolidaySet,
+  mytDayOf,
   type LogisticsAction,
   type LogisticsCheckRow,
   type LogisticsGap,
@@ -201,7 +202,11 @@ export function useLogisticsModel(orderId: string, leg = 0) {
       requestedIso: card.scope.customerDeliveryIso ?? null,
       scheduledIso: card.confirmedDate,
       partnerName,
-      startedIso: (o.proceeded_at ?? o.proceed_date ?? null)?.slice(0, 10) ?? null,
+      /* The PROCEED day is `proceeded_at` (the Sales → Operation hand-off),
+         read as the Kuala Lumpur day exactly as the Order Route reads it.
+         Never `proceed_date` — that is the Planned production start, a
+         different fact with its own name (owner ruling 2026-10-06). */
+      startedIso: o.proceeded_at ? mytDayOf(o.proceeded_at) : null,
       detailsReceivedIso: facts?.detailsReceivedAt?.slice(0, 10) ?? null,
       answer,
       settled: card.settled,
