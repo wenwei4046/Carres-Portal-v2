@@ -207,7 +207,7 @@ SO No | Customer | Balance due | Items & Stock | Storage | Requested Delivery Da
   order below. The Work item's action (`Ask customer to pay` · `Wait` · `Send the invoice and
   collect payment`) lives on the opened order and on the Work card, never in this cell. The person
   and the assignment grammar (`Assigned to {name}` · `Completed by {name}` · `Not assigned` →
-  `Nobody is assigned to this order. Assign it in Sales Orders → Team`, door the Sales Orders Team;
+  `Nobody assigned to this order` over `Manager assigns in Settings → Staff & Duties` (owner ruling 2026-09-26);
   0504: the owner is the individual the Sales Order was dealt to) live in `Collection owner`.
 - Rows sort by risk: should have been paid · Storage Invoice not paid · promised today · due today
   · ask today · due later · waiting · no date · value not recorded. Sorting `Payment timing`
@@ -286,7 +286,7 @@ zero. Empty: `No customer money is needed right now.` / `No follow-up planned on
 `No paid orders yet.` Error: `The collection desk could not be loaded.` + `Try again`, the last
 good list kept. Permission (Finance): the same statuses from Payment's own read, no owner avatars,
 `Stock facts are Operation's.`, `Owner facts are Operation's.`; the page's acts hidden, the paper
-readable. Missing data: `No delivery date` · `Not assigned` → `Assign it in Sales Orders → Team` ·
+readable. Missing data: `No delivery date` · `Not assigned` → `Manager assigns in Settings → Staff & Duties` ·
 `No reference` · `No phone recorded`. A failed posting keeps everything typed and writes nothing.
 
 ### Monitor versus shared Work
@@ -736,10 +736,12 @@ else, a filter or a page reload never changes it, and a split delivery has one o
 owner is keyed by the Sales Order. Work assignment can change through the shared recorded policy; source PIC changes require a
 formal handover (`payment_collection_owner_handover`, gated like Staff & Duties), which now moves
 the assignment with it and refuses a new owner who is not an individual. Nobody resolvable →
-nothing is established and the action stays visible with its governed failure: `Nobody is
-assigned to this order.` with the door `Assign it in Sales Orders → Team` (owner instruction
-2026-09-16; the Monitor row's short word is `Not assigned`). Staff & Duties is not named, because
-it cannot fix an unassigned order. `Payment Duty` is RETIRED: no caller remained,
+nothing is established and the action stays visible with its governed failure: `Nobody assigned
+to this order` over `Manager assigns in Settings → Staff & Duties` (owner ruling 2026-09-26, which
+overwrites the 2026-09-16 `Assign it in Sales Orders → Team` door: the system deals every order, an
+unassigned order is a system error, and only a manager adds a person or assigns the order; the
+Team door does not exist on the current register; the Monitor row's short word is `Not assigned`;
+code still prints the 2026-09-16 words, Delivery MASTER §15.1). `Payment Duty` is RETIRED: no caller remained,
 so the catalogue no longer offers it. There is no universal Sales Order Owner.
 
 My Work omits self avatar; Team Work groups by owner. Cover preserves normal owner, today's cover
