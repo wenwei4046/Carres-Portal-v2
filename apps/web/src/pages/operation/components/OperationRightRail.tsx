@@ -1,95 +1,124 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { CalendarDays, ListTodo, ScrollText, X, type LucideIcon } from "lucide-react";
 import { useActiveOrder } from "@/lib/active-order";
 import CalendarPanel from "./rail/CalendarPanel";
-import TasksPanel from "./rail/TasksPanel";
 import AnnotationTimeline from "./AnnotationTimeline";
 import GlobalActivity from "./GlobalActivity";
+import TasksArea from "../tasks/TasksArea";
+import { useTasksHost } from "../tasks/tasks-host";
 import { useOpenWorkSet } from "../use-open-work";
 import { myMissedAndToday } from "../work/work-model";
 
 /**
- * OperationRightRail — Gmail-style collapsible right rail (Jess COO ask).
- * A 52px icon strip (Calendar / Keep notes / Follow-ups) that expands a 320px panel.
- * The Follow-ups icon carries a red badge = count of overdue tasks (open past the
- * 60-min SLA) so the team is nudged to take action within the hour. Follow-ups is
- * the same ops_tasks data the Orders list flag column drives.
+ * OperationRightRail — the Quick Rail and the ONE right area beside the page.
+ *
+ * Owner direction 2026-10-05; shipped with the Purchasing Tasks slice 2026-10-06.
+ *
+ * Three ICON-ONLY doors, `Calendar · Tasks · Activity`: no visible word, each
+ * door keeps its name as tooltip and accessible name, its icon, its 60×44 hit
+ * area and its selected style. `Tasks` replaces `My Work` with the same icon
+ * (the left navigation's `Work` face, ListTodo) and the same badge: Missed +
+ * today, red while anything is missed, none while loading or failed.
+ *
+ * The area shows ONE view at a time and is at most 560px wide. Opening Tasks
+ * never changes the page on the left. A view, once opened, stays MOUNTED
+ * (hidden) — so the Tasks list keeps its place and an open task keeps its
+ * draft — but leaving a task with unsaved input through another door or ×
+ * still asks `Leave without saving?` first (storyboard screen 26).
  */
-type Panel = "calendar" | "tasks" | "activity";
-// Calendar (blue) · Team (green — the duty board) · Follow-ups — the
-// Follow-ups rail is the SAME flag system as the Orders list flag column
-// (both ops_tasks), so it uses the Flag icon + amber (Jess 2026-06-29).
-// Team REPLACED Notes (Jess 2026-07-19): Keep notes shipped 6/12 and held
-// exactly ONE note ever — dead slot, repurposed as the DUTY & ROLES board.
-const TABS: { key: Panel; label: string; icon: LucideIcon; active: string }[] = [
+type Door = "calendar" | "tasks" | "activity";
+
+/* Calendar (blue) · Tasks · Activity. Tasks wears the SAME icon as the left
+   navigation's `Work` destination (`portal-nav.ts`, ListTodo — owner ruling
+   2026-08-15). */
+const TABS: { key: Door; label: string; icon: LucideIcon; active: string }[] = [
   { key: "calendar", label: "Calendar", icon: CalendarDays, active: "bg-info-soft text-info" },
-  // My Work wears the SAME icon as the left navigation's `Work` destination
-  // (`portal-nav.ts`, ListTodo) — owner ruling 2026-08-15. The rail is that
-  // destination's peek (ui/MASTER.md §5), and a peek that wears a different
-  // face than the door it previews reads as a different feature. The Flag it
-  // replaced was borrowed from the Orders follow-up column, which is a
-  // different system entirely.
-  { key: "tasks", label: "My Work", icon: ListTodo, active: "bg-warning-soft text-warning" },
-  // Activity = the open order's history timeline (Jess 2026-06-30: moved off the
-  // page into the rail, after the flag). Shows only when an order is open.
+  { key: "tasks", label: "Tasks", icon: ListTodo, active: "bg-warning-soft text-warning" },
+  // Activity = the open order's history timeline when an order is open,
+  // otherwise recent business changes the signed-in person may see.
   { key: "activity", label: "Activity", icon: ScrollText, active: "bg-base-100 text-base-700" },
 ];
 
 export default function OperationRightRail() {
-  const [active, setActive] = useState<Panel | null>(null);
+  const [active, setActive] = useState<Door | null>(null);
+  const [mounted, setMounted] = useState<ReadonlySet<Door>>(() => new Set());
   const activeOrderId = useActiveOrder((s) => s.orderId);
+  const guard = useTasksHost((s) => s.guard);
 
-  const { items, myUserId, myFocus, hasData } = useOpenWorkSet();
-  // ONE count (Workspace MASTER §7.1): the same Missed + focus-day number the
-  // panel prints and My Work's focus list holds. Later days never count, and
-  // no response yet means no number — never `0`.
+  const show = (next: Door | null) => {
+    setActive(next);
+    if (next) setMounted((current) => (current.has(next) ? current : new Set([...current, next])));
+  };
+  /* Leaving Tasks with an unsaved task asks first; Tasks itself never does. */
+  const requestDiscard = useTasksHost((s) => s.requestDiscard);
+  const go = (next: Door | null) => {
+    if (active !== "tasks" || next === "tasks" || !useTasksHost.getState().dirty) return show(next);
+    /* `Leave` discards the unsaved task, then the other door opens. */
+    guard(() => { requestDiscard(); show(next); });
+  };
+  /* `View tasks` (the first-entry reminder) opens the same Tasks list. */
+  const tasksRequest = useTasksHost((s) => s.tasksRequest);
+  useEffect(() => {
+    if (tasksRequest > 0) show("tasks");
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- a request, not a dependency
+  }, [tasksRequest]);
+
+  const { items, myUserId, myFocus, hasData, error } = useOpenWorkSet();
+  // ONE count (Workspace MASTER §7.1): the same Missed + today number the list
+  // prints. No response yet, or a failed read, means no number — never `0`.
   const { missed, today } = myMissedAndToday(items, myUserId, myFocus);
 
-  const badgeFor = (key: Panel): { n: number; tone: string } | null => {
-    if (key === "tasks" && hasData && missed + today > 0)
+  const badgeFor = (key: Door): { n: number; tone: string } | null => {
+    if (key === "tasks" && hasData && !error && missed + today > 0)
       return { n: missed + today, tone: missed > 0 ? "bg-danger" : "bg-base-700" };
     return null;
   };
   const nameFor = (tab: (typeof TABS)[number]): string =>
-    tab.key === "tasks" && hasData ? `My Work · ${missed} missed · ${today} today` : tab.label;
+    tab.key === "tasks" && hasData ? `Tasks · ${missed} missed · ${today} today` : tab.label;
+
+  const doorTab = active && active !== "tasks" ? TABS.find((t) => t.key === active) : undefined;
 
   return (
     <div className="flex h-screen sticky top-0">
-      {/* Active panel */}
-      {active && (
-        <div className="w-[340px] flex flex-col border-l border-base-200 bg-white">
-          <div className="flex items-center justify-between px-3.5 h-12 border-b border-base-100 shrink-0">
-            <div className="text-strong text-base-900 flex items-center gap-2">
-              {(() => {
-                const Icon = TABS.find((t) => t.key === active)?.icon;
-                return Icon ? <Icon size={18} className="text-base-500" /> : null;
-              })()}
-              {TABS.find((t) => t.key === active)?.label}
+      {mounted.size > 0 && (
+        <div
+          className={`${active === null ? "hidden" : "flex"} w-[clamp(366px,32vw,560px)] max-w-drawer flex-col border-l border-base-200 bg-white`}
+          hidden={active === null}
+          data-testid="right-area"
+          data-view={active ?? "closed"}
+        >
+          {doorTab ? (
+            <div className="flex h-12 shrink-0 items-center justify-between gap-2 border-b border-base-100 px-3.5">
+              <div className="flex min-w-0 items-center gap-2 text-strong text-base-900">
+                <doorTab.icon size={18} className="shrink-0 text-base-500" />
+                <span className="truncate">{doorTab.label}</span>
+              </div>
+              <button type="button" onClick={() => show(null)} className="rounded p-1 text-base-500 hover:bg-hovertint" aria-label="Close panel">
+                <X size={16} />
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={() => setActive(null)}
-              className="p-1 rounded text-base-500 hover:bg-hovertint"
-              aria-label="Close panel"
-            >
-              <X size={16} />
-            </button>
-          </div>
-          <div className="flex-1 overflow-auto p-3.5 min-h-0">
-            {active === "calendar" && <CalendarPanel />}
-            {active === "tasks" && <TasksPanel />}
-            {active === "activity" &&
-              (activeOrderId ? (
-                <AnnotationTimeline orderId={activeOrderId} />
-              ) : (
-                <GlobalActivity />
-              ))}
+          ) : null}
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+            {mounted.has("tasks") && (
+              <div hidden={active !== "tasks"} className={`${active === "tasks" ? "flex" : "hidden"} min-h-0 flex-1 flex-col`}>
+                <TasksArea onClose={() => show(null)} />
+              </div>
+            )}
+            {mounted.has("calendar") && (
+              <div hidden={active !== "calendar"} className="min-h-0 flex-1 overflow-auto p-3.5">
+                <CalendarPanel />
+              </div>
+            )}
+            {mounted.has("activity") && (
+              <div hidden={active !== "activity"} className="min-h-0 flex-1 overflow-auto p-3.5">
+                {activeOrderId ? <AnnotationTimeline orderId={activeOrderId} /> : <GlobalActivity />}
+              </div>
+            )}
           </div>
         </div>
       )}
 
-      {/* Icon strip */}
-      {/* Each icon carries its name (owner review 2026-09-25 item 14). */}
+      {/* Icon strip — ICON ONLY; the name is the tooltip and the accessible name. */}
       <div className="w-[64px] flex flex-col items-center py-3 gap-2 border-l border-base-200 bg-white">
         {TABS.map((t) => {
           const isActive = active === t.key;
@@ -98,15 +127,16 @@ export default function OperationRightRail() {
             <button
               key={t.key}
               type="button"
-              onClick={() => setActive(isActive ? null : t.key)}
+              onClick={() => go(isActive ? null : t.key)}
               title={t.label}
               aria-label={nameFor(t)}
-              className={`relative w-[60px] rounded-md flex flex-col items-center gap-0.5 py-1.5 transition-colors ${
+              aria-pressed={isActive}
+              data-testid={`rail-door-${t.key}`}
+              className={`relative flex h-11 w-[60px] items-center justify-center rounded-md transition-colors ${
                 isActive ? t.active : "text-base-500 hover:bg-hovertint"
               }`}
             >
-              <t.icon size={18} strokeWidth={2} />
-              <span className="text-[10px] font-medium leading-3">{t.label}</span>
+              <t.icon size={18} strokeWidth={2} aria-hidden />
               {badge && (
                 <span
                   data-rail-badge

@@ -41,6 +41,26 @@ export default function PoSupplierResultPanel({ open, onOpenChange, pos, roundWi
   onChanged: () => void;
   initialPreparation?: PoSupplierPreparation;
 }) {
+  return <Drawer open={open} onOpenChange={onOpenChange} title="Purchase Orders">
+    <PoSupplierResultContent open={open} onClose={() => onOpenChange(false)} pos={pos} roundWindow={roundWindow}
+      onChanged={onChanged} initialPreparation={initialPreparation} />
+  </Drawer>;
+}
+
+/**
+ * The supplier send area — `PoSupplierBundle`, the chosen PO's own evidence
+ * (`PO sent to supplier`) and its PDF — without a container, so the round
+ * panel can hold the very same controls (§5.6.1 "one send area").
+ */
+export function PoSupplierResultContent({ open, onClose, pos, roundWindow, onChanged, initialPreparation, title }: {
+  open: boolean;
+  onClose: () => void;
+  pos: readonly IssuedPo[];
+  roundWindow?: string;
+  onChanged: () => void;
+  initialPreparation?: PoSupplierPreparation;
+  title?: string;
+}) {
   const navigate = useNavigate();
   const location = useLocation();
   const [current, setCurrent] = useState<IssuedPo | null>(null);
@@ -70,24 +90,23 @@ export default function PoSupplierResultPanel({ open, onOpenChange, pos, roundWi
   }, [current, open, refresh]);
   function changed() { setRefresh(previous => previous + 1); onChanged(); }
   return <>
-    <Drawer open={open} onOpenChange={onOpenChange} title="Purchase Orders">
-      <div className="flex flex-col gap-3" data-testid="po-supplier-result-panel">
-        <PoSupplierBundle pos={pos} roundWindow={roundWindow} onEvidenceChanged={changed} initialPreparation={initialPreparation}
-          onOpenObject={(id, preparation, sourcePos) => { onOpenChange(false); navigate(`/operation/procurement?po=${encodeURIComponent(id)}`, { state: { soBatchReturn: { path: `${location.pathname}${location.search}`, pos: sourcePos, preparation } } }); }} onPreview={(_id, po) => { setCurrent(po); setPdfOpen(true); }} />
-        {current && <Block title={document ? documentDisplayNumber(`${document.po_number}-V${document.version}`) : documentDisplayNumber(current.id)}>
-          {document && <><p className="text-body">{document.supplier.name} · {document.destination.name}</p>
-            {document.so_refs?.length ? <p className="text-body">SO {document.so_refs.join(", ")}</p> : null}
-          </>}
-          <Button disabled={!pdfUrl} onClick={() => setPdfOpen(true)}>Open PDF</Button>
-          {document && <PoIssueEvidence key={`${current.id}-${document.version}`} po={current} version={document.version}
-            evidence={evidence} onConfirmed={changed} hidePreparationTools mayConfirm={pdfReady} recordedRecipient />}
-          {error && <p role="alert" className="text-meta text-kit-red-11">{error}</p>}
-        </Block>}
-      </div>
-    </Drawer>
+    <div className="flex flex-col gap-3" data-testid="po-supplier-result-panel">
+      <PoSupplierBundle pos={pos} roundWindow={roundWindow} onEvidenceChanged={changed} initialPreparation={initialPreparation} title={title}
+        onOpenSettings={() => { onClose(); navigate("/operation/settings/purchasing"); }}
+        onOpenObject={(id, preparation, sourcePos) => { onClose(); navigate(`/operation/procurement?po=${encodeURIComponent(id)}`, { state: { soBatchReturn: { path: `${location.pathname}${location.search}`, pos: sourcePos, preparation } } }); }} onPreview={(_id, po) => { setCurrent(po); setPdfOpen(true); }} />
+      {current && <Block title={document ? documentDisplayNumber(`${document.po_number}-V${document.version}`) : documentDisplayNumber(current.id)}>
+        {document && <><div className="text-body">{document.supplier.name} · {document.destination.name}</div>
+          {document.so_refs?.length ? <div className="text-body">SO {document.so_refs.join(", ")}</div> : null}
+        </>}
+        <Button disabled={!pdfUrl} onClick={() => setPdfOpen(true)}>Open PDF</Button>
+        {document && <PoIssueEvidence key={`${current.id}-${document.version}`} po={current} version={document.version}
+          evidence={evidence} onConfirmed={changed} hidePreparationTools mayConfirm={pdfReady} recordedRecipient />}
+        {error && <div role="alert" className="text-meta text-kit-red-11">{error}</div>}
+      </Block>}
+    </div>
     <Modal open={open && pdfOpen} onOpenChange={setPdfOpen} title={document ? documentDisplayNumber(`${document.po_number}-V${document.version}`) : current ? documentDisplayNumber(current.id) : "Purchase Orders"} width="viewer">
       {pdfUrl ? <PdfPreview src={pdfUrl} title={document?.po_number ?? current?.id ?? "Purchase Orders"} onReady={setPdfReady} />
-        : <p className="text-body">{error ?? "Loading PDF…"}</p>}
+        : <div className="text-body">{error ?? "Loading PDF…"}</div>}
     </Modal>
   </>;
 }

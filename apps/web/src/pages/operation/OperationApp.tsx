@@ -3,6 +3,8 @@ import { Menu } from "lucide-react";
 import Button from "@/components/kit/Button";
 import Drawer from "@/components/kit/Drawer";
 import CalendarPanel from "./components/rail/CalendarPanel";
+import PhoneTasksDoor from "./components/rail/PhoneTasksDoor";
+import PendingWorkReminder from "./tasks/PendingWorkReminder";
 import {
   Navigate,
   Route,
@@ -379,8 +381,12 @@ export default function OperationApp() {
               <Menu size={18} />
               Menu
             </button>
-            <div className="ml-auto">
+            <div className="ml-auto flex items-center gap-1">
               <Button variant="ghost" icon="date" onClick={() => setCalendarOpen(true)} aria-expanded={calendarOpen}>Calendar</Button>
+              {/* The phone shell has no Quick Rail, so `Tasks` sits beside
+                  `Calendar` in the same form and opens the same Tasks area in
+                  a Drawer (owner direction 2026-10-05). */}
+              <PhoneTasksDoor />
             </div>
             <Drawer open={calendarOpen} onOpenChange={setCalendarOpen} title="Calendar">
               {calendarOpen && <CalendarPanel onOpenRecord={() => setCalendarOpen(false)} />}
@@ -722,6 +728,8 @@ export default function OperationApp() {
           supersedes SO-1's "rail not mounted" ruling — later owner statement
           wins (BUILD-QUEUE governance). */}
       {phone ? null : <OperationRightRail />}
+      {/* The first-entry `Pending work` reminder (owner direction 2026-10-05). */}
+      <PendingWorkReminder />
     </div>
   );
 }
