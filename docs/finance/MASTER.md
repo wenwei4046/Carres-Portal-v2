@@ -48,7 +48,18 @@ Finance must show clearly where each sum of money comes in and goes out, channel
 6. Debtors follow the channel in two levels for dealers (「Dealer 一个overall 母账，然后每个dealer under 这个母账 … 就是两层了」): Dealer Debtors, then each dealer, then that dealer's customers or orders. Showroom and Subscription each have one control account with their customers under it.
 7. Open (Chew 2026-10-06): goods bought without an order would leave money paid to suppliers outside every channel in Receipts & Payments (「这样我看receipt & payment 就不太对了」); how such a payment is placed is still to decide.
 
-**Chart of accounts (Chew's, AutoCount, dated 22 Sep 2026; kept by Chew, not in this repository).** It has one debtor control (Trade Debtors) and one Other Debtor control, so dealer and subscription customers are not separated (「本身里面没有分dealer customer 和 subscription customer」). Measured: the ledger already accepts its code shape (`ledgerAccountCodeShape`, for example 300-0000 and 900-A001). PROPOSAL, not law, for Chew to confirm: add Showroom, Dealer and Subscription debtor controls under Trade Debtors, with each dealer under Dealer; add subscription rental income, the subscription supplier's share as a cost, the renovation rebate, the KPI allowance and a card-and-online clearing account; name one account for delivery transport.
+**Chart of accounts (Chew's, AutoCount, dated 22 Sep 2026; kept by Chew, not in this repository).** It has one debtor control (Trade Debtors) and one Other Debtor control, so dealer and subscription customers are not separated (「本身里面没有分dealer customer 和 subscription customer」). Measured: the ledger already accepts its code shape (`ledgerAccountCodeShape`, for example 300-0000 and 900-A001). Customers sit under a control account as parties on each line (`gl_entry_lines.party_type` / `party_id`), not as accounts, so a control account holds any number of customers.
+
+Chew's answers on the chart, 2026-10-06:
+- **Debtor controls as proposed:** 300-1000 Showroom Debtors, 300-2000 Dealer Debtors with one control per dealer under it, 300-3000 Subscription Debtors, all under 300-0000 Trade Debtors.
+- **500-2000** is subscription rental income.
+- **560-0000 "Agents Subscription Fees"** is small fees Carres pays agents. It sits under Other Incomes in the chart; to correct.
+- **Diglant's subscription share** is a cost of goods sold account, not opened yet.
+- **What Carres owes Diglant for subscription** stays out of 400-0000 Trade Creditors, which is for buying goods (「这个是我和supplier 买货的，不要参」).
+- **Dealer commission** is accrued (see Dealer commission rules).
+- Open: how the renovation rebate is recorded.
+
+**A purchase without an order** takes its channel from the Manual Purchase Request's required purpose (Purchasing §5.2), so nothing extra is marked on the PO. PROPOSAL, not law: Showroom Display → that showroom; Ready Stock → stock not yet in a channel; Service Case → the case's order; Internal Staff Purchase and Other Purchase → Office; Subsidiary Purchase → the amount due from that related company (350-00xx); the approved Diglant advance PO, when built → Subscription; a dealer display request, when built → that dealer.
 
 ## 1 · Boundary: Finance only
 
@@ -131,7 +142,7 @@ Deposit invoice rules:
 
 Dealer commission rules:
 - Each month a **draft** payment voucher is raised automatically.
-- There is **no monthly accrual**, because CLAUDE.md §7 says there is no HQ→dealer debt. The commission posts to the ledger when the voucher is approved.
+- **Commission is accrued at month end** (Chew 2026-10-06, 「dealer 佣金对」): Dr 900-C007 Commission - Dealer, Cr 410-0061 Accruals - Commission Dealer. The payment voucher clears it: Dr 410-0061, Cr bank. This replaces the 2026-10-03 rule of no accrual. Chew reads CLAUDE.md §7's "no HQ→dealer credit or debt" as goods money, not commission Carres owes a dealer.
 - The calculation itself is checked with Chew step by step before anything about commission changes, including the automatic draft voucher (Chew 2026-10-03).
 
 **Dealer commission check with Chew — in progress (2026-10-05).**
