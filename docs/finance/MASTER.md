@@ -246,6 +246,17 @@ Dealer commission rules:
 - 0647 fixes a fault 0642 shipped with: a credit note's two account columns did not follow a renumbered account (0570 says every key that names the chart must), so renumbering an account a credit note used was refused. Both now follow, and the file refuses to apply while any key onto the chart still does not. A test renumbers an account under a confirmed credit note.
 - Falsifier: in Chew's test, a supplier's `Unpaid After Advance and Credit` differs from its balance in the books, or a bill shows a credit note Chew did not knock off.
 
+**Credit notes to follow up — Chew's need 2026-10-06; the design below is PROPOSAL / NOT LAW, waiting for Chew.**
+- Chew needs one list of the credit notes suppliers still owe Carres, so he can follow each one up (「我需要有一个listing 关于supplier 那边要follow up 的cn, 可能是我转pi 时记录还是怎样」). It is a reminder only and posts nothing, because there is no supplier claims account (Chew 2026-10-06).
+- One record per credit note owed:
+  - supplier, reason, and the bill, GRN, PO, claim or return it belongs to;
+  - the amount owed and the date it was noted;
+  - each follow-up (the date and what the supplier said) and the next follow-up date.
+- It is noted mostly on the bill, when the bill is made from the GRN. A bill line priced above its PO line offers the difference. Anything else, such as a rebate or a return, is added on the list itself.
+- It closes when the supplier's credit note arrives: entering the note on Credit Notes offers that supplier's open ones to settle, and a part leaves the rest open. It can also be closed with a reason, for example the supplier refused or replaced the goods instead.
+- Purchasing's supplier claims and purchase returns join the list read-only once Purchasing records the credit the supplier agreed (§9.5, approved target, not built). Until then Finance notes them by hand.
+- Falsifier: in Chew's test, a credit note he is waiting for is not on the list, or one the supplier already sent still shows as owed.
+
 **Bill scanning approach — PROPOSAL / NOT LAW, built for Chew's test (no migration).**
 - `Read the bill` on the bill form and `Read the credit note` on the credit note form. The person picks the pages (PDF or photos, up to 8, 10 MB each); they go once to Anthropic's Claude model (`claude-sonnet-5-5`, changeable with the `BILL_READER_MODEL` setting), which answers the supplier's name, the paper's number, date, due date, currency, total and lines.
 - What is read fills only what the form does not have yet: the supplier when one has that name (never a guess between two), the number, the date, the due date, and the lines when the form has none. A person still picks each line's account and department and saves. Notes under the card say what to check: a close name, a proforma, another currency, lines that do not add up to the total, a discount read as its own line. A credit note printed with minus signs is read as the credit it is.
