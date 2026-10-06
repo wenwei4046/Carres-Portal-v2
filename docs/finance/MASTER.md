@@ -59,6 +59,12 @@ Chew's answers on the chart, 2026-10-06:
 - **Dealer commission** is accrued (see Dealer commission rules).
 - **The renovation rebate is accrued the same way** (「装修回扣这样记可以」): at month end Dr a new Commission - Dealer Renovation Rebate expense (proposed 900-C008), Cr a new Accruals - Dealer Renovation Rebate (proposed 410-0064). The monthly payment voucher clears it. It never mixes with Carres's own renovation (200-4000, 340-0001). The KPI allowance follows the same pattern (900-C009 / 410-0065), confirmed below.
 
+**Account mapping, Chew's answers 2026-10-06** (the mapping table is being confirmed line by line):
+- Banks are Maybank, Hong Leong, RHB and Alliance Bank only. The test chart's "Bank — current account" and Public Bank go.
+- Every way of receiving money that waits before reaching the bank gets its own clearing account (「card & online clearing是每个收钱途径都要」).
+- Service charges (disposal, no-lift), storage charges and the 15-year guarantee are each their own income account. After-sales and warranty cost is its own expense account.
+- Explained to Chew, answers pending: supplier claims receivable, deposits paid to suppliers, and the opening-balance account.
+
 **A purchase without an order** takes its channel from the Manual Purchase Request's required purpose (Purchasing §5.2), so nothing extra is marked on the PO. Confirmed by Chew 2026-10-06 (「1 对，2 对，3 可以」):
 - Showroom Display → that showroom; Ready Stock → stock not yet in a channel; Service Case → the case's order; Internal Staff Purchase and Other Purchase → Office; Subsidiary Purchase → the amount due from that related company (350-00xx). The approved Diglant advance PO, when built → Subscription; a dealer display request, when built → that dealer.
 - When Purchasing allocates such stock or PO quantity to a Sales Order, the goods take that order's channel. Allocated before the supplier is paid: the bill and the payment carry the order's channel. Allocated after: that month's Receipts & Payments keeps it under stock and does not change, and the cost reaches the order's channel when the goods are sold. A PO split between orders is split unit by unit.
