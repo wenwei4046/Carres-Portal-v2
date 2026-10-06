@@ -101,6 +101,18 @@ describe("POST /api/operation/orders/:id/changes — the server chooses the comm
     });
   });
 
+  it("a save the database refuses for a recorded planned date answers in the governed words (owner ruling 2026-10-06)", async () => {
+    mockDb(() => ({
+      data: null,
+      error: { code: "22023", message: "The proceed date is already recorded and cannot be changed here", details: "proceed_date_recorded" },
+    }));
+    const res = await post({ header: header({ customer_phone: "0199999999" }), lines: lines(), addons: addons(), reason: "New number" });
+    expect(res.status).toBe(422);
+    const body = await bodyOf(res);
+    expect(body.code).toBe("proceed_date_recorded");
+    expect(body.message).toBe("The planned production start is already recorded and cannot be changed here");
+  });
+
   it("an emergency-contact correction preserves an old delivery promise and missing building facts", async () => {
     const oldDate = "2026-08-01";
     const rpc = mockDb(() => ({ data: { revision: 2 }, error: null }), {

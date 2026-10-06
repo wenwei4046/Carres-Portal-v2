@@ -56,6 +56,7 @@ import {
   touchesStairInputs,
 } from "../lib/stair-carry-restamp";
 import { SERVER_EXCLUSIVE_ADDON_KEYS } from "@carres/shared";
+import { refusalMessage } from "../lib/route-helpers";
 import { recomputeDeliveryFee } from "../lib/delivery-fee-recompute";
 import { validateFreeItemClaims, resolveDefaultFreeGiftLines } from "../lib/free-gift-resolve";
 import { recomputePwpLines } from "../lib/pwp-recompute";
@@ -1000,7 +1001,7 @@ ordersRouter.post("/", async (c) => {
           422,
         );
       }
-      throw new HTTPException(400, { message: error.message });
+      throw new HTTPException(400, { message: refusalMessage(error) });
     }
     throw new HTTPException(500, { message: error.message });
   }
@@ -1253,7 +1254,7 @@ ordersRouter.post("/raw", async (c) => {
           422,
         );
       }
-      throw new HTTPException(400, { message: error.message });
+      throw new HTTPException(400, { message: refusalMessage(error) });
     }
     throw new HTTPException(500, { message: error.message });
   }
@@ -2074,7 +2075,7 @@ ordersRouter.post("/:id/unproceed", async (c) => {
         {
           error: "unproceed_blocked",
           code: rpcError.details ?? null,
-          message: rpcError.message,
+          message: refusalMessage(rpcError),
         },
         422,
       );
@@ -2191,7 +2192,7 @@ async function dispatchOrderMutation<TBody>(
         {
           error: opts.errorTag,
           code: rpcError.details ?? null,
-          message: rpcError.message ?? "Unprocessable entity",
+          message: refusalMessage(rpcError) ?? "Unprocessable entity",
         },
         422,
       );
@@ -3839,7 +3840,7 @@ ordersRouter.patch("/:id", async (c) => {
         {
           error: "update_order_blocked",
           code: rpcError.details ?? null,
-          message: rpcError.message ?? "Unprocessable entity",
+          message: refusalMessage(rpcError) ?? "Unprocessable entity",
         },
         422,
       );
