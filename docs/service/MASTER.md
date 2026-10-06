@@ -1051,3 +1051,24 @@ Jess 在本 Service chat 明确授权向 UI、Workspace、Sales Orders、Deliver
 | 重复按提交／两人同时开同问题 | 返回已存在提交结果／提示相关案件，保留真实不同问题分支 | 不能仅靠UI禁用按钮防重复；来源冲突／权限变化返回明确原因，不丢草稿 |
 
 该复核只把可证实事实与未证实保证写清楚，不授权实现或把未来模型选择写成工程方案。当前既有按钮不足以证明完整开案能力。
+
+
+## 7.31 · 执行腿完成矩阵 — PROPOSAL / NOT LAW，代码事实分列
+
+**FACT，main678c27346只读复核，未运行测试／生产验证：**`routes/operation/repair-orders.ts` 201–204 的 inspected 从 returned fact + 当前 inspection hold 不存在推导，未在该返回字段提供独立inspection结果/执行人。`lib/repair-order-work.ts` 的 returnDatePassed 完成依据为每Unit goods_received_date 与GRN；它证明原RO归还跟进条件，不证明每Unit修好。`routes/operation/order-payments.ts` 有 refund_request/refund_decide/refund_mark_paid；另有 `routes/finance/refunds.ts` 的refund_pay路径。不能把两套现存门任意选一或合并成Service退款引擎；必须按Payment MASTER的适用客户金额/source规则读写。接口存在不是部署或到账验证。
+
+| 原模块事实 | Service可显示的完成范围 | 下一步／尚欠事实 | 绝不能由什么代替 |
+|---|---|---|---|
+| Case补救决定及必要批准 | 决定／批准义务完成 | 仍需原执行模块接收授权范围 | customer_wants／点击审批／自由文字 |
+| Delivery实际Collected，确切Units与proof | 这些Units的收取腿完成 | Warehouse实际接收及检查 | 预约日期／出车／员工消息／同案其他Unit已收 |
+| Warehouse实际received，有效receipt/GRN与Units | 这些Units到仓事实完成 | inspection结果及适用处置 | Logistics报已退回／解除某hold／Case Closed |
+| 适用inspection有结果及必要证据 | 对应inspection义务完成 | 修复／报废／替换等真实决策和执行 | 当前hold缺失自动推断所有检查通过；缺结果显示未验证 |
+| Supplier收到确切Unit并确认 | supplier receipt义务完成 | 原RO维修、归还及适用检查 | document sent／Supplier承诺完成日期 |
+| RO每Unit实际归还，随后确认修复结果 | 满足其范围的维修执行腿完成 | 若客户仍需商品，Delivery交付腿继续 | 原return-date-follow-up完成或RO cancelled自动算修好 |
+| Delivery实际Delivered，确切出货Units及适用proof接受 | 对应送回／替换交付腿完成 | 旧品待收、其他Unit、费用及客户确认仍分别检查 | 新品已送=旧品已收；预约=Delivered |
+| Payment批准的客户退款原记录实际paid结果 | 对应客户退款义务完成 | 其他必需腿及客户结果确认 | 另一个Finance退款／审批决定／message／未核对截图 |
+| 所有适用执行腿完成＋客户实际确认 | 适用Solved路径可经过关案gate | 系统保留历史、policy与文件版本 | no-remedy／withdrawn名称、批量勾选、历史Resolved文字 |
+
+**业务验收：**同Case两个Unit，每个incoming/outgoing身份保留；每行必须可打开对应source record，来源与Case范围一致；取消／失败／无权限／未读到数据不是成功；source事实变更时保留原历史，Case不会反写或静默重置源动作。Source task已完成只关闭它对应的义务，不自动关闭Case或其他模块task。每个费用只由唯一金额owner计算，只有原权限门执行；历史receipt／signed document不由Case覆盖。
+
+**尚欠核实而非owner重问：**hold解除的正式权限/证据模型、有效取消receipt的排除、客户refund适用原门、Case到各腿的真实关系、跨源action去重。未证实前不得将这些行标READY或VERIFIED。以上是完整业务完成要求，不是迁移/测试文件/工程执行方案。
