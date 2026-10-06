@@ -599,7 +599,28 @@ Service Note prints from the Case; data stays.
 
 ## 7.9 · Work Engine actions — and the ONE owner decision
 
-**OWNER DECISION — who owns routine Service Case work?**
+**RULING 2026-10-06 (Jess) — routine Service Case work stays inside Operation and is SHARED.**
+*"operation wont pass back to sales person. service duty ppl need to share."* Therefore a governed
+`Service Duty` exists in Settings → Staff & Duties; the Sales Order PIC is never the Case owner and
+is not asked to do service work. The sharing mechanism below is the planner's decision under the
+Constitution's engineering/design rule, recorded here so no chat asks it again:
+
+- **One Case, one owner, assigned by round robin.** A new Case goes to the next eligible active
+  Operation person in Staff & Duties order (today Shasha → Yu Jun → Khor Yee → …); the Case stays
+  with that person until it closes, so the customer hears one voice.
+- **Leave moves it automatically** through the shared resolver's leave/cover rule; the owner takes
+  the Case back on return only through a recorded reassignment, never silently.
+- **Anyone may help** (Workspace §3 STAFF HELP): `Assigned to` is the owner, `Completed by` is whoever
+  recorded the fact. Helping never changes the owner.
+- **Reassignment is one governed act** on the Case (who, when, why), never a second staff list.
+- **Approver decisions do not rotate:** goodwill, waived charge, refund, declined eligible claim,
+  public escalation go to `Service Case Approver`.
+- **Team Work** shows per person: open Cases · late Cases · replies due today.
+
+Falsifier: the owner says one person a month must hold every Case (the PO/GRN monthly pattern); then
+the Duty switches from per-Case round robin to monthly allocation and nothing else changes.
+
+The decision record that led here is kept for the reasoning only:
 
 ```
 AUTHORITY SEARCHED        Service MASTER §1 ("route each owner its Work" — names no rule) ·
