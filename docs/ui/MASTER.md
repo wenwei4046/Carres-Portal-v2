@@ -693,6 +693,13 @@ Never copy reference HTML or CSS into a page; never draw a lookalike panel.
   **once** in [`MODULE-CARD-TEMPLATE.md`](../ui-reference/MODULE-CARD-TEMPLATE.md). Its numbers live in
   [01 §7.6](../01-design-tokens.md#76-compact-module-card--compactmodulecard); its words in
   COPY-STANDARD "Compact module card words" (`CARD_WORDS`); `/ui#compact-card` shows it live.
+- **Sales fact word — UI Master approved 2026-10-06 (owner ruling: two dates, two names).** The
+  card's planned-date fact (`orders.proceed_date`) and its `{n}d` tooltip say **`Planned production
+  start`** (`CARD_WORDS.proceedDate`, `CARD_WORDS.dayCountTitle`); `Proceed Date` names only the actual
+  hand-off (`orders.proceeded_at`) and never appears on this card. Name only: the card reads the same
+  date. On a card wider than 440px the longer label wraps to two lines in its `1fr` column, so the four
+  labels share one row and the four values the next (CSS subgrid; sizes and fractions unchanged, +16px
+  on the 560px card); ≤440px is unchanged. BUILT on branch, not yet deployed.
 
 ### §4.3.1 · The panel opens on the current page's own main work tab — owner-approved 2026-10-05
 
@@ -724,7 +731,7 @@ pending review from completed stock, payment, delivery or approval. No new panel
 | | Standalone SO card | Embedded SO (`Sales Order` tab inside a host panel) |
 |---|---|---|
 | Where | the Sales Orders register (and any surface whose main record is the SO) | a PO panel, a purchasing round panel or another approved host whose main record is not the SO |
-| Identity | the dark shared Header (customer · SO No · phone · original requested delivery · ↗ · ×) | light identity in the tab: name, underlined SO No → saved PDF, phone, two-line `Customer’s original` / `requested delivery`, `31d · Sat, 31 Oct` (original revision-1 date minus Proceed date, calendar days), ↗ full SO page. No second dark header, no nested tabs, no × |
+| Identity | the dark shared Header (customer · SO No · phone · original requested delivery · ↗ · ×) | light identity in the tab: name, underlined SO No → saved PDF, phone, two-line `Customer’s original` / `requested delivery`, `31d · Sat, 31 Oct` (original revision-1 date minus Planned production start, calendar days), ↗ full SO page. No second dark header, no nested tabs, no × |
 | Tabs | `Info · Delivery` | none inside the tab |
 | Opens with | Info: address and sales facts open; Items, Communication and Timeline closed | address and sales facts open; money; the items table shown by default with `Item · Qty · Unit (RM) · Disc (RM) · Amount (RM)` |
 | Component | `CompactModuleCard` | the same component in its embedded presentation |
@@ -1460,7 +1467,7 @@ into the section it belongs to, and this list loses it.
 | Delivery Orders: DO brief recorded in place (two columns ≥1024px) | 2026-09-26 | Delivery MASTER §8.7 |
 | Delivery schedule card: two facts on two lines + type label | 2026-09-14 / 09-25 | Delivery MASTER §§8.2, 8.4 |
 | SO Batch Purchase and Manual Purchase: their own approved listing designs (§6.8); the PO Duty owner chip only beside the selected `Issue PO` (`YJ`), Export at the far right | 2026-09-18 | Purchasing MASTER §§9.1–9.2 |
-| SO Batch `PO No` cell: every linked PO on one line, comma-separated, each its own link, 170px, no wrap (DEPLOYED #1924; signed-in check owed). Sales Orders keeps its own PO No cell; unifying them is NOT approved | 2026-10-05 | Purchasing MASTER §9.1 |
+| SO Batch `PO No` cell: every linked PO on one line, comma-separated, each its own link, 170px, no wrap (DEPLOYED #1924; signed-in check owed). Sales Orders' `PO No` cell follows the same rule (owner 2026-10-06, NOT BUILT); Sales Orders' `DO No` is unchanged | 2026-10-05 / 10-06 | Purchasing MASTER §9.1 |
 | Supplier Claims leading order `☐ · ▸ · Claim status · Supplier Claim No · Claim Reported · …` (status leads; date never pinned; `pinnedPrefix`, BUILT on branch 2026-09-29) | 2026-09-18 | Purchasing MASTER §9.5 |
 | Purchase Orders rail: section icons (message/goods/supplier/warehouse, 16px, aria-hidden), no `Clear filters`; Purchasing `reserveConditionRow` | 2026-09-18 / 10-02 | Purchasing MASTER §9.3 |
 | Purchase Returns rail reuses the Supplier Claims supplier list | 2026-09-18 | Purchasing MASTER §9.6 |
@@ -1474,8 +1481,7 @@ into the section it belongs to, and this list loses it.
 
 | Gap | The conflict | Next step |
 |---|---|---|
-| **`Proceed Date` names two facts** | Register first column `Proceed Date` = `orders.proceeded_at` (actual hand-off; Orders MASTER, COPY SO Batch row). SO page / PDF / Work `Proceed Date` = `orders.proceed_date` (planned production start). Card `Proceed date` = `proceed_date`. One word, two facts | Owner word decision (COPY) |
-| **Owner-confirmed standalone SO preview versus the kit — 3 differences** | Preview (`127.0.0.1:5465 sales-order-requested-date-preview.html`, owner-confirmed 2026-10-05) versus kit: (1) money facts centred vs left aligned — the kit follows the card contract's summary-cell rule (left aligned, the reference's centring was recorded as a defect); (2) Proceed date cell 12/13px weight 400 vs 11/12px weight 500 — the kit follows 01 §7.6 (label 11, value 12/17 weight 500); (3) four equal sales columns vs `1fr 1fr 1.55fr .75fr` — the written owner rule says only "four columns above 440px", the kit follows 01 §7.6. Neither side wins automatically | Owner / controller decides; then card contract and 01 §7.6 update once |
+| **Owner-confirmed standalone SO preview versus the kit — 3 differences** | Preview (`127.0.0.1:5465 sales-order-requested-date-preview.html`, owner-confirmed 2026-10-05) versus kit: (1) money facts centred vs left aligned — the kit follows the card contract's summary-cell rule (left aligned, the reference's centring was recorded as a defect); (2) Planned production start (then `Proceed date`) cell 12/13px weight 400 vs 11/12px weight 500 — the kit follows 01 §7.6 (label 11, value 12/17 weight 500); (3) four equal sales columns vs `1fr 1fr 1.55fr .75fr` — the written owner rule says only "four columns above 440px", the kit follows 01 §7.6. Neither side wins automatically | Owner / controller decides; then card contract and 01 §7.6 update once |
 | **Touch sizes switch by canvas for rows but by viewport for the toolbar** | Live SO register 2026-10-05 (viewport 1058×804, register column 694px, rail open): main rows render 39px, not the accepted 32px, because DataGrid switches to `narrowCanvas` below a 768px GRID CANVAS and wraps the checkbox in a 40×40 hit area (`checkHitNarrow`, `DataGrid.tsx` ~2548 / `DataGrid.module.css` ~1229), while the toolbar and search follow the VIEWPORT (`@media (max-width: 767px)`) and stay desktop — one screen mixes a desktop toolbar with touch rows (01 §7.5 live table) | Owner presentation decision; controller recommends touch sizes follow the device/viewport (or pointer), not the canvas |
 | Card editable `To` vs Work recorded channels | `CompactModuleCard` Communication offers an editable `To`; Work's `WorkCommunication` allows recorded channels only (owner ruling 2026-09-17) | Owner decision |
 | `Jump to…` empty word | The locked contract prints `No results`; COPY-STANDARD rule 5 lists `No results` as the ✘ empty-state example. Reconcilable (a search matched nothing; a worklist is empty) but COPY does not yet carry that split | COPY ruling |

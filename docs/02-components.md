@@ -446,7 +446,7 @@ keeps arrival evidence at receipt scope; no Unit attribution is inferred.
 **Purpose.** The owner-confirmed compact module card (UI MASTER §4.3): one shared customer header
 (sales facts behind ▾, address, target date), module tabs, the module's own summary cells, inline
 editors, items, Communication and Timeline. Live on `/ui#compact-card` with Info and Delivery; Sales Orders, SO Batch and Receiving use the shared component.
-It is the right Working Panel of the shared module page flow (UI MASTER §0.2, §4.3). The current owner-confirmed arrangement (5 Oct 2026: Header, wrapping address left/access right, then SO Doc Date / Proceed date / Sales Location / Salesperson, tabs and module-owned summary; Info has no duplicate details/status/document panel) lives once in `docs/ui-reference/MODULE-CARD-TEMPLATE.md`.
+It is the right Working Panel of the shared module page flow (UI MASTER §0.2, §4.3). The current owner-confirmed arrangement (5 Oct 2026: Header, wrapping address left/access right, then SO Doc Date / Planned production start / Sales Location / Salesperson, tabs and module-owned summary; Info has no duplicate details/status/document panel) lives once in `docs/ui-reference/MODULE-CARD-TEMPLATE.md`.
 
 **Contract.** The card takes the header facts once and a list of modules; each module passes its own
 summary facts (`label`, `value`, optional `editor` or `opensItems`), items and whether it opens the

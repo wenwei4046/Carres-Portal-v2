@@ -419,6 +419,15 @@ aside.section { background: var(--cc-surface); }
 .panel .documentNumber { padding: 0; text-align: left; text-decoration: underline; text-underline-offset: 2px; }
 
 .salesGridFour { grid-template-columns: 1fr 1fr 1.55fr .75fr; }
+/* Two dates, two names (owner ruling 2026-10-06): `Planned production start`
+   wraps to two lines in its 1fr column on a wide card. The four labels share
+   one row and the four values the next (subgrid), so every value still reads
+   on one line instead of one date dropping below the others. No size changes:
+   the 4px label/value gap and the column fractions are 01 §7.6's. */
+@container (width > 440px) {
+  .salesGridFour { grid-template-rows: auto auto; row-gap: 4px; }
+  .salesGridFour > .salesFact { display: grid; grid-row: span 2; grid-template-rows: subgrid; grid-template-columns: minmax(0, 1fr); }
+}
 @container (max-width: 440px) {
   .salesGridFour { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }

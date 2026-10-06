@@ -101,7 +101,7 @@ describe("EmbeddedSalesOrders — one embedded block per linked SO", () => {
     expect(block.getByText("Condo · Floor 1")).toBeTruthy();
     expect(block.getByText("No lift · Stair carry: 4 items")).toBeTruthy();
     const address = block.getByText("Recorded address 1368");
-    const labels = ["SO Doc Date", "Proceed date", "Sales Location", "Salesperson"].map((label) => block.getByText(label));
+    const labels = ["SO Doc Date", "Planned production start", "Sales Location", "Salesperson"].map((label) => block.getByText(label));
     for (const [before, after] of [[address, labels[0]], ...labels.slice(1).map((label, i) => [labels[i], label])] as const) {
       expect(before.compareDocumentPosition(after) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     }

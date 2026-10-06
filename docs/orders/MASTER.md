@@ -70,7 +70,7 @@ evidenced.
 | Staff amendments | KEEP the single whole-page draft and evidence gate; implement the current Staff amendments and Sales Approver, date and system-charge rulings in this MASTER | One request, one effective result after applicable gates; mixed changes never partially apply; ordinary changes do not wait for owner approval; actual submitter/confirmers and PIC notification preserved |
 | Concurrent editing | IMPROVE save/submit with the editor's original baseline, in addition to approval-time stale checks | Two editors cannot silently overwrite one another; conflict keeps the draft and exposes what changed; same amendment entry, no new draft engine |
 | Documents, history and failures | KEEP issued originals, immutable revisions, labelled reconstruction and real actor history; make failed original capture visible and retryable, with governed actionable write errors | File failure does not undo an effective revision, impersonate an actor, fabricate a signature or pass reconstruction off as the issued original; retry cannot duplicate the business change |
-| Existing approved document details | IMPROVE multiple-PO cell to first reference plus more, and deliver already-approved numbering with compatibility | Old references remain searchable/linked, historical documents are never renumbered, no unrelated Subscription redesign |
+| Existing approved document details | IMPROVE the multiple-PO cell to every PO number on one line, comma-separated, each its own link (owner 2026-10-06), and deliver already-approved numbering with compatibility | Old references remain searchable/linked, historical documents are never renumbered, no unrelated Subscription redesign |
 | Direct Purchasing / Delivery dependencies | IMPROVE PO revision/source-share consistency and prove preceding-leg arrival, split-trip and Unit/line consequences in owning modules | No understated procurement demand or premature next-leg release; SO reads and links rather than writing PO, stock, delivery or money facts |
 | Work, Quick Rail and Calendar | KEEP shared Work/duty/history engines; integrate approved shared destinations and exact object/date deep-links | No duplicate personnel list, customer centre or SO-private task engine; shared customer identity/portal scope remains Workspace/UI-owned |
 
@@ -407,9 +407,26 @@ This is the current owner-approved Sales Order operating model and UI authority.
 older Sales Order placement, route-copy and action-presentation wording wherever they conflict.
 The implementation record that follows is evidence, not a competing target.
 
-**SO Header composition correction — owner approved 2026-10-05:** remove the separate Ampang/area cell; retain the full address below Header. Requested-date label has two small lines, date and day count together beneath. The day-count tooltip states `Calendar days from Proceed date to customer’s original requested date`. This changes no SO numbering or existing issued documents.
+**Two dates, two names — OWNER RULING 2026-10-06 (Jess) · APPROVED / BUILT ON BRANCH (rename PR open, not merged or deployed).**
+`Proceed Date` = the actual day the order was handed to Operation (`orders.proceeded_at`, written by
+the system at final submit). `Planned production start` = the day Sales plans production to start
+(`orders.proceed_date`, asked at order entry, on or before the delivery date). Names only: no date
+fact and no calculation changes. Verified 2026-10-06: the planned date sets only the pull-back
+deadline (Sales may return an order to `Placed` only until it passes; `unproceed_order`) and the
+header day count; it does not set purchasing timing, SO Batch admission, Ready Stock priority or any
+reservation. The old name `Proceed date` for the planned date is retired on every surface (Sales
+Portal, SO page, compact card and its tooltip, SO PDF, Workspace, To Order); stale PR #1494 (move the
+PDF to `proceeded_at`) is withdrawn. The rename build covers the Sales Portal Step 3 field and refusals, the POS order
+detail, the principal raw-order form, the SO page field/Edit/change review/revision history, the Sales Orders
+optional column, the compact card fact and its `{n}d` tooltip (SO register and SO Batch), the SO PDF, Workspace,
+To Order, the old Orders control export header and every API refusal (mapped by DETAIL code; the database
+sentences are unchanged). `Proceed Date` stays on the register's first column, SO Batch and Ready Stock priority
+(all `proceeded_at`). 🟡 The SO page change review still says `Planned production start: Purchasing's release
+timing moves`, which contradicts the verified fact above; rewording it needs its own approval.
 
-**Customer original requested date and day count — owner correction 2026-10-05 / BUILT ON RELEASE BRANCH; production verification pending.** Header label uses two small lines: `Customer’s original` / `requested delivery`. `{n}d` means **calendar days from Proceed date (`proceed_date`) to the customer’s original requested delivery date**, calculated as original requested date minus Proceed date using calendar dates in Asia/Kuala_Lumpur. It is not days remaining from today, order age, days since SO Doc Date, actual delivery duration, a confirmed delivery date or Logistics ETA. Example: Proceed date `30 Sep 2026` and original requested date `31 Oct 2026` show `31d · Sat, 31 Oct`; the number does not change each day. Same date shows `0d`. Missing either date: omit the day count; never invent a date or show a placeholder count. An original requested date before Proceed date requires a data check; omit the count rather than present a negative delivery duration. Changing a later requested/confirmed date must not overwrite the original date used here. The SO table, card, requested-delivery filter and export read the same revision 1’s immutable `snapshot.header.delivery_date` (respecting its `delivery_date_tbd`), not the mutable order `delivery_date`. The list embeds only revision 1 via its existing user-authorized read; missing revision 1 has no original date (Header `Not recorded`, required table cell blank). A failed list read remains a failed list. Never silently substitute the current date. Other chats must not reuse the retired today-based countdown for this SO Header. Delivery’s Customer confirmation and Logistics ETA remain separate facts. Acceptance must include changing today without changing either stored date: the day count stays unchanged.
+**SO Header composition correction — owner approved 2026-10-05:** remove the separate Ampang/area cell; retain the full address below Header. Requested-date label has two small lines, date and day count together beneath. The day-count tooltip states `Calendar days from Planned production start to customer’s original requested date`. This changes no SO numbering or existing issued documents.
+
+**Customer original requested date and day count — owner correction 2026-10-05 / BUILT ON RELEASE BRANCH; production verification pending.** Header label uses two small lines: `Customer’s original` / `requested delivery`. `{n}d` means **calendar days from Planned production start (`proceed_date`) to the customer’s original requested delivery date**, calculated as original requested date minus Planned production start using calendar dates in Asia/Kuala_Lumpur. It is not days remaining from today, order age, days since SO Doc Date, actual delivery duration, a confirmed delivery date or Logistics ETA. Example: Planned production start `30 Sep 2026` and original requested date `31 Oct 2026` show `31d · Sat, 31 Oct`; the number does not change each day. Same date shows `0d`. Missing either date: omit the day count; never invent a date or show a placeholder count. An original requested date before Planned production start requires a data check; omit the count rather than present a negative delivery duration. Changing a later requested/confirmed date must not overwrite the original date used here. The SO table, card, requested-delivery filter and export read the same revision 1’s immutable `snapshot.header.delivery_date` (respecting its `delivery_date_tbd`), not the mutable order `delivery_date`. The list embeds only revision 1 via its existing user-authorized read; missing revision 1 has no original date (Header `Not recorded`, required table cell blank). A failed list read remains a failed list. Never silently substitute the current date. Other chats must not reuse the retired today-based countdown for this SO Header. Delivery’s Customer confirmation and Logistics ETA remain separate facts. Acceptance must include changing today without changing either stored date: the day count stays unchanged.
 
 ## External numbering privacy — owner requirements 2026-09-23
 
@@ -1073,12 +1090,13 @@ as the stored digits without punctuation, and the Sales Order page's `Existing c
 link (it carries the stored phone) lands on the orders; a different punctuation or the other country-code
 form (`+60…` against a stored `0…`) is found by the server and then hidden by that re-filter — and is
 still counted in `{n}`, which counts the server's answer, until that re-filter is fixed.
-**Several PO numbers print like Items — OWNER RULING 2026-09-27 (Jess: "show all PO No like +"):** the
-first document number as its own link, then `+ {n} more` (`PO-20260902-8370 + 1 more`), the `+ {n} more`
-being the door to the popover that lists every number as a link; the count-only entry (`2 Purchase
-Orders`, `14 Purchase Orders`) is retired. `DO No` reads the same way (`DO-130926-0842 + 1 more`).
-One PO or DO stays a direct link. The `documentNo` width grows from 170 to 210 so a full number
-plus ` + 1 more` fits on one line at 13px; the number itself is never cut.
+**Several PO numbers — OWNER RULING 2026-10-06 (Jess) · APPROVED / NOT BUILT; it replaces the
+2026-09-27 `{first No} + {n} more` wording, which is withdrawn.** The `PO No` cell prints EVERY linked PO
+number on one line, comma-separated, each number its own link to that PO (the same rule as SO Batch's
+`PO No`, Purchasing §9.1). No popover and no count-only entry. The column keeps its registry width and
+does not wrap; the operator drags the column wider to read more. One PO stays a direct link. **`DO No`
+is unchanged** (one DO is a direct link; several open the existing `{n} Delivery Orders` list); it
+changes only with the owner's approval.
 The footer explicitly labels goods category values as `Qty:`; services print apart as `Services {n}`. **No `Other goods` (owner ruling, Jess 2026-09-22: "no such other goods, write clear").** Every product must carry its catalogue category; an order line the system cannot classify is a data error reported for the catalogue to fix, never printed to staff as a kind of goods. Services never enter `Qty:` — the Register footer prints them as a separate `Services {n}`; the object page and document name them (`Services: Delivery fee · Stair carry`). **Register footer — merged + deployed 2026-09-22 ([PR #1518](https://github.com/wenwei4046/Carres-Portal-v2/pull/1518), `340e5e00`); the live walk found a silent under-count, corrected by [PR #1522](https://github.com/wenwei4046/Carres-Portal-v2/pull/1522) (merged/deployed/live-verified stated there):** `{n} sales orders · Qty: {goods} · Services {n} · Not in catalog {n}` — the last only when a goods line has no catalog row. An unclassified line is never printed as a kind of goods and never vanishes: it is counted apart under the dictionary's `Not in catalog`, and its goods Category cell reads `Not in catalog` (muted). The shared ladder is untouched (Receiving, SO Batch, PO, Delivery Orders read it; their own `Other goods` prints are their rounds). The one live such line is **SO-1206 `M1201F-K`** — no `product_skus` row. Whether it is a wrong order code or a catalogue gap is **undetermined** (owner 2026-09-22: a matching price is not evidence of a typo); no product is added and no data is changed. **OWNER RULING 2026-09-22 (Jess):** keep the approved `Not in catalog {n}` — no `Items to check`. `{n}` is the PHYSICAL QUANTITY of goods lines not matched to the Catalog (never an order or line count); it stays in the quantity reconciliation and is never silently dropped. Clicking it lists the orders, original SKU, product name and qty. No typo inference, no product auto-created. SO Batch and Warehouse Schedule still print `Other goods`: recorded as separate impacts. Object page and document wording follow in their own rounds.
 Default column widths fit the eight-column sample at 1180px without shrinking typography;
 existing saved column layouts are preserved. Destination header padding and spacing adapt on
@@ -1130,7 +1148,7 @@ with no `Delivery address` / `Delivery access` headings (international furniture
 billing relationship and billing address move to `Customer` (who pays). `SO info` (renamed from
 `Order info`: this is the original Sales Order the showroom opened for the customer) comes FIRST, before
 `Customer`; `MONEY` is renamed `Payment`. The left pane and the Sales Order PDF must tally — the same card
-order and the same words on both sides (`SO info` · `SO Doc Date` · `Proceed Date` · `Customer Requested
+order and the same words on both sides (`SO info` · `SO Doc Date` · `Planned production start` · `Customer Requested
 Delivery Date` · `Sales Location` · `Salesperson`). **`Sales Location` IS the word for where the order was sold —
 OWNER RULING (Jess, 2026-09-21): "showroom is sales location".** It replaces `Showroom` on the page, the Register
 column and every field catalog, one word with the PDF; it is the outlet, falling back to the dealer when the order
@@ -1144,7 +1162,7 @@ amounts never borrow the heading size: every amount is 13px, and `Total payable`
 are weight 600 (owner card "KEEP Existing UI Kit Sizes", 2026-09-23 — overwrites "only the balance line").
 
 ```
-SO info                 SO Doc Date · Proceed Date · Customer’s original requested delivery · Sales Location · Salesperson ·
+SO info                 SO Doc Date · Planned production start · Customer’s original requested delivery · Sales Location · Salesperson ·
                         Dealer (+ the approval lane) — no `Sales ownership` heading. `Customer reference` is
                         REMOVED from the page (owner ruling 2026-09-21)
   └ Change delivery date  the governed three fields · creates a Revision · needs approval
@@ -1252,7 +1270,8 @@ second index of facts the map already draws, and it cost three network round-tri
 Orders, Payments, Guarantees) on every open. **The completeness rule that governed it is retired
 with it**; what survives is the rule it existed to serve — *a door, never a duplicate* (Law C).
 
-**PROCEED DATE CAN BE EDITED — OWNER RULING (Jess, 2026-09-22): "proceed date can edit".** This
+**PLANNED PRODUCTION START CAN BE EDITED — OWNER RULING (Jess, 2026-09-22): "proceed date can edit"**
+(the field was then called Proceed date; renamed 2026-10-06). This
 overwrites the 2026-08-26 read-only rule. On the SO page it is a grey (editable) field like the rest;
 it changes through `Edit` with `Reason for change`, is recorded in History, and — like the other
 contractual facts — goes through the governed approval path regardless of supplier commitment. The CREATE door keeps the
@@ -1262,7 +1281,7 @@ picker.
 means "this can be changed with `Edit`" and nothing else ("every grey meaning can edit"; "all can
 edit"). Every fact on the page is a grey box — customer, delivery, SO info, Sales Location ·
 Salesperson · Dealer (approval), catalogue-backed Item Code · Qty · Unit (governed commercial amendment),
-Proceed Date — EXCEPT three, which print as plain text because they are not this page's to change:
+Planned production start — EXCEPT three, which print as plain text because they are not this page's to change:
 `SO Doc Date` (the order's birth stamp), the payment rows (Payments owns them; the door is `Open this
 order in Payments →`) and the computed totals (`TOTAL PAYABLE` · `Paid to date` · `Balance due`).
 Type order: card title 15px/600 black (largest) → value 13px dark → label 11px/500 grey (smallest) — the kit's
@@ -1361,7 +1380,7 @@ the draft; reason and customer-agreement gates remain unchanged.
 - **Before submitting** the reason (required) and a `Before` / `After` review show the category quantities and changed service quantities, the
   amount change and each affected object with its owner: purchase demand, an issued PO or promised
   production (Purchasing settles it with the supplier), received goods and Units (Receiving / Stock),
-  DO (Delivery), money and refunds (Payments), and — for Proceed Date — the purchase-release timing, and —
+  DO (Delivery), money and refunds (Payments), and — for Planned production start — the pull-back deadline (it does not set purchasing timing), and —
   for Sales Location / Salesperson / Dealer — ownership and commission. Issued PO, receipts, Units, DOs and
   payments are never rewritten by an SO change.
 - **Decisions.** Pending: the effective SO, its official PDF and its signature are unchanged. Reject:
@@ -2187,7 +2206,7 @@ today" is retired with that ruling; until built, the shipped node still prints i
   `b7d68eed`; its production acceptance exposed only the Edit notice occupying a document column.
   PR #788 corrected that composition and merged as `ebc8fb5d`; deploy run `31790978222` proved the
   exact final SHA. Authenticated checks covered the Register and approved goods expansion, Object
-  View/Edit/Revisions/History/Order Route, and coexistence with My Work open. Proceed date used the
+  View/Edit/Revisions/History/Order Route, and coexistence with My Work open. Planned production start (then called Proceed date) used the
   pre-existing Operations writer — **superseded 2026-08-26: it is read-only on an existing order,
   see § THE MERGED ORDER TAB**; Requested Delivery Date remains read-only and Delivery's Confirmed
   Delivery Date remains distinct. No new address, access, delivery-date or destination field was
@@ -2656,13 +2675,13 @@ is the owner-accepted `SO-FINAL` document, and **`docs/pdf/SO-PDF-STANDARD.md` i
 widths, words and the pagination mechanism live there, not here. The Sales Portal (new-order step 3) and this
 page render through the one `sales-order-template.tsx`; never a second layout. In short: Carres mark beside the
 legal name and SSM; the SO number with `SALES ORDER` beneath it on the right; `BILL TO` · `SALES ORDER INFO`
-(SO No · SO Doc Date · Proceed Date · Customer Requested / Delivery Date · Sales Location · Salesperson; Access
+(SO No · SO Doc Date · Planned production start · Customer Requested / Delivery Date · Sales Location · Salesperson; Access
 removed — it is a Delivery Order fact); the category-banded box table closing on `TOTAL PAYABLE`, its column bar
 repeated on every goods page; the payment table listing its rows with no total row (`No payments recorded.` when none);
 the totals card whose words `docs/pdf/SO-PDF-STANDARD.md` §7 owns; the customer signature box; the five terms from
 `lib/order-terms.ts`; footer `{SO no} · Issued by {creation actor}`. **Open (standard §10):** the API must send
-`issued_by`, `lines[].category` and `lines[].discount`; Proceed Date must read `orders.proceeded_at`, not the
-planned `proceed_date`.
+`issued_by`, `lines[].category` and `lines[].discount`. The PDF prints the planned `proceed_date` under
+`Planned production start` (owner 2026-10-06); the earlier open item to print `orders.proceeded_at` is withdrawn.
 
 - **The right pane renders through THE SAME template call the Print/PDF path uses.** One
   `renderSalesOrderPdf` call, one blob; pdf.js paints those bytes and `Print ▾` opens that same
@@ -3176,7 +3195,7 @@ official Card numbers.
    `New Sales Order` carrying the badge `Copied from SO-1303 · review before creating`, with
    customer, contact, address, dealer/showroom/salesperson and the goods lines (RM 2,499) copied.
    **The copy boundary held on every excluded fact:** the source's `paid` RM 1,250 rendered as
-   `Paid RM 0`, and its fixed `2026-08-30` promised delivery and `2026-08-09` proceed date both
+   `Paid RM 0`, and its fixed `2026-08-30` promised delivery and `2026-08-09` planned production start both
    rendered empty — a copy inherits goods and counterparty, never money, never a promise, never
    execution. Completing the draft minted **SO-1320 · Rev 1** as a NEW identity with
    `paid = 0.00`, `delivery_date = null`, `delivery_date_tbd = true`, `proceed_date = null`, zero
@@ -7244,4 +7263,4 @@ are already visible in the rows. Payment transaction details and financial total
 
 **Confirmed card correction delivery — production verified 2026-10-05:** UI MASTER §4.3 owns shared Header, control skin/density, disclosures and current release proof (PR1893/1896/1897, production2ce91e2d). Orders owns the full-page Items and Payment rules above; MODULE-CARD-TEMPLATE is the only shared card contract. Real SO-1368 retains quantities1/1/2, totalRM2,759, paidRM1,380 and balanceRM1,379 after duplicate prose removal. Both Slip doors contain attachment icon + Slip. This is scoped presentation delivery, not whole Sales Order business/module completion or universal other-module adoption.
 
-**Owner-confirmed SO template — 2026-10-05:** shared dark Header → address → sales facts → module tabs → module summary. Address stays visible by default in Info: full wrapping address left, access facts right (200px column, 12px gap), grouped as `Condo · Floor 1` and `No lift · Stair carry: 4 items`; omit stair carry when empty, not recorded or zero; at card widths ≤440px access facts move below. Never truncate the address or reserve a fixed height. Sales facts follow in this exact order: **SO Doc Date / Proceed date / Sales Location / Salesperson**, label above value, four columns above440px and two at≤440px. SO Doc Date reads `placed_at`; Proceed date reads `proceed_date`, not the actual handoff `proceeded_at`. Missing Proceed date is `Not recorded`. Sales Location uses outlet name with dealer fallback; Dealer is not a duplicate display field. Info summary is **Total payable / Paid to date / Balance due**, matching the PDF. Remove the SO Info details panel, Email, Dealer, repeated Stock/Payment/Delivery status rows and Related documents. Item-level PO/stock and module-owned documents remain in their owning surfaces. Items, Communication and Timeline start closed. All chats must reuse `CompactModuleCard` and its `/ui#compact-card` example; no copied preview HTML.
+**Owner-confirmed SO template — 2026-10-05:** shared dark Header → address → sales facts → module tabs → module summary. Address stays visible by default in Info: full wrapping address left, access facts right (200px column, 12px gap), grouped as `Condo · Floor 1` and `No lift · Stair carry: 4 items`; omit stair carry when empty, not recorded or zero; at card widths ≤440px access facts move below. Never truncate the address or reserve a fixed height. Sales facts follow in this exact order: **SO Doc Date / Planned production start / Sales Location / Salesperson**, label above value, four columns above440px and two at≤440px. SO Doc Date reads `placed_at`; Planned production start reads `proceed_date`, not the actual hand-off `proceeded_at`. Missing Planned production start is `Not recorded`. Sales Location uses outlet name with dealer fallback; Dealer is not a duplicate display field. Info summary is **Total payable / Paid to date / Balance due**, matching the PDF. Remove the SO Info details panel, Email, Dealer, repeated Stock/Payment/Delivery status rows and Related documents. Item-level PO/stock and module-owned documents remain in their owning surfaces. Items, Communication and Timeline start closed. All chats must reuse `CompactModuleCard` and its `/ui#compact-card` example; no copied preview HTML.

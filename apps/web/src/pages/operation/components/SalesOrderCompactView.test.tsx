@@ -23,11 +23,13 @@ describe("real SO card", () => {
     fireEvent.click(screen.getByRole("button", { name: "Sales Order SO-1303" })); expect(screen.getByText("Saved document")).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: "Items" })); expect(screen.getByText("Actual Items")).toBeVisible(); expect(screen.queryByText("a@example.com")).toBeNull(); expect(screen.queryByRole("button", { name: "Info · Order details" })).toBeNull(); expect(screen.queryByText("Recorded dealer")).toBeNull(); expect(screen.queryByText("Related documents")).toBeNull(); expect(screen.getByText("Total payable")).toBeVisible(); expect(screen.getByText("Paid to date")).toBeVisible(); expect(screen.getByText("Fri, 2 Oct")).toBeVisible();
   });
-  it("orders address before sales facts and uses the planned Proceed date, not the handoff stamp", () => {
+  it("orders address before sales facts and names the planned date `Planned production start`, not the handoff stamp (owner ruling 2026-10-06)", () => {
     mount();
     const address = screen.getByText("Recorded address");
     const docDate = screen.getByText("SO Doc Date");
-    const proceed = screen.getByText("Proceed date");
+    const proceed = screen.getByText("Planned production start");
+    // Two dates, two names: `Proceed Date` is the hand-off, never this card fact.
+    expect(screen.queryByText(/^Proceed date$/i)).toBeNull();
     const location = screen.getByText("Sales Location");
     expect(address.compareDocumentPosition(docDate) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(docDate.compareDocumentPosition(proceed) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -65,9 +67,9 @@ describe("real SO card", () => {
     expect(screen.queryByRole("button", { name: /^Customer/ })).toBeNull();
     expect(screen.queryByRole("button", { name: /^Logistics/ })).toBeNull();
   });
-  it("counts from Proceed date independently of today and keeps the phone pair together", () => {
+  it("counts from Planned production start independently of today and keeps the phone pair together", () => {
     vi.useFakeTimers(); vi.setSystemTime(new Date("2026-10-03T17:00:00Z"));
-    try { mount(); expect(screen.getByText("29d")).toBeVisible(); const phone = screen.getByText("0191234567"); expect(phone.querySelector("svg")).not.toBeNull(); } finally { vi.useRealTimers(); }
+    try { mount(); expect(screen.getByText("29d")).toBeVisible(); expect(screen.getByText("29d").getAttribute("title")).toBe("Calendar days from Planned production start to customer’s original requested delivery"); const phone = screen.getByText("0191234567"); expect(phone.querySelector("svg")).not.toBeNull(); } finally { vi.useRealTimers(); }
   });
   it("preserves the original date despite a changed current request and omits empty stair carry", () => {
     mount(buildRegisterRow({ ...row.o, delivery_date: "2026-12-31", delivery_stair_items: 0 }));

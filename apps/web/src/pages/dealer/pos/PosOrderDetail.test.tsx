@@ -300,7 +300,8 @@ describe("place lane", () => {
       "Delivery address",
       "Delivery date",
       "≥ 50% paid",
-      "Proceed date",
+      // Two dates, two names (owner ruling 2026-10-06).
+      "Planned production start",
     ]) {
       expect(within(checklist).getByText(label)).toBeTruthy();
     }
@@ -378,7 +379,7 @@ describe("proceed lane", () => {
   it("Move to Order placed shows while canUnproceed; success does NOT close the drawer", async () => {
     const onClose = renderDrawer(proceedOrder());
     const btn = screen.getByTestId("pos-od-unproceed");
-    expect(screen.getByText("Move back to edit · only before the proceed date")).toBeTruthy();
+    expect(screen.getByText("Move back to edit · only before the planned production start")).toBeTruthy();
     fireEvent.click(btn);
     await waitFor(() => expect(h.unproceedMutateAsync).toHaveBeenCalled());
     expect(onClose).not.toHaveBeenCalled();

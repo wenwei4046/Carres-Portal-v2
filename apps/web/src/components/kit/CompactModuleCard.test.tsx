@@ -93,6 +93,22 @@ describe("CompactModuleCard — shared header", () => {
     expect(screen.getByText("{full address}")).toBeTruthy();
   });
 
+  /* TWO DATES, TWO NAMES (owner ruling 2026-10-06; UI Master approved the kit
+     word). The planned date is `Planned production start` on the card and in
+     its day-count tooltip; `Proceed Date` is only the actual hand-off. The words
+     are written out, not read from CARD_WORDS, so the old name cannot return
+     through the constant. */
+  it("names the planned date `Planned production start`, in the sales facts and the day-count tooltip", () => {
+    card({
+      sales: { orderDate: "{order date}", proceedDate: "{planned date}", salesLocation: "{location}", salesperson: "{salesperson}" },
+      target: { date: "{original date}", badge: "{n}d", label: "Customer’s original requested delivery", labelLines: ["Customer’s original", "requested delivery"] },
+    });
+    const label = screen.getByText("Planned production start");
+    expect(label.nextElementSibling?.textContent).toBe("{planned date}");
+    expect(screen.getByText("{n}d").getAttribute("title")).toBe("Calendar days from Planned production start to customer’s original requested delivery");
+    expect(document.body.innerHTML).not.toMatch(/Proceed date/i);
+  });
+
   it("another module starts with sales facts and address closed", () => {
     card({ initialModule: "delivery" });
     expect(screen.queryByText("{location}")).toBeNull();

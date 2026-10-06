@@ -29,10 +29,10 @@ tabs → module summary. In Info the address is visible by default: the full wra
 access facts right (200px column, 12px gap), grouped as `Condo · Floor 1` and
 `No lift · Stair carry: 4 items`; omit stair carry when empty, not recorded or zero; at card widths
 ≤440px the access facts move below. Never truncate the address or reserve a fixed height. Sales facts
-in this exact order: **SO Doc Date / Proceed date / Sales Location / Salesperson**, label above value,
-four columns above 440px and two at ≤440px. SO Doc Date reads `placed_at`; Proceed date reads
-`proceed_date`, not the actual hand-off `proceeded_at` (the word conflict is a REAL GAP in UI MASTER
-§7.2). Missing Proceed date is `Not recorded`. Sales Location uses the outlet name with dealer
+in this exact order: **SO Doc Date / Planned production start / Sales Location / Salesperson**, label above value,
+four columns above 440px and two at ≤440px. SO Doc Date reads `placed_at`; Planned production start reads
+`proceed_date`, not the actual hand-off `proceeded_at` (`Proceed Date`; two names owner-ruled
+2026-10-06, COPY-STANDARD). Missing Planned production start is `Not recorded`. Sales Location uses the outlet name with dealer
 fallback; Dealer is not a duplicate display field. Info summary is **Total payable / Paid to date /
 Balance due**, matching the saved PDF. No SO Info details panel, Email, Dealer, repeated
 Stock/Payment/Delivery status rows or Related documents: item-level PO/stock and module-owned
@@ -57,13 +57,13 @@ start closed.
   beneath.
 - **Customer’s original requested date and day count — owner correction 2026-10-05 (DEPLOYED #1919 /
   #1920, `9294659a2`; production verification pending).** Label: `Customer’s original` /
-  `requested delivery`. `{n}d` = **calendar days from Proceed date (`proceed_date`) to the customer’s
-  original requested delivery date** (original minus Proceed, calendar dates in Asia/Kuala_Lumpur).
+  `requested delivery`. `{n}d` = **calendar days from Planned production start (`proceed_date`) to the customer’s
+  original requested delivery date** (original minus Planned production start, calendar dates in Asia/Kuala_Lumpur).
   It is not days remaining from today, order age, days since SO Doc Date, actual delivery duration, a
-  confirmed date or a Logistics ETA. Example: Proceed `30 Sep 2026`, original `31 Oct 2026` →
+  confirmed date or a Logistics ETA. Example: Planned production start `30 Sep 2026`, original `31 Oct 2026` →
   `31d · Sat, 31 Oct`; the number never changes day by day; same date → `0d`; either date missing →
-  omit the count; an original before Proceed needs a data check and omits the count. Tooltip:
-  `Calendar days from Proceed date to customer’s original requested date`. The SO table, card,
+  omit the count; an original before Planned production start needs a data check and omits the count. Tooltip:
+  `Calendar days from Planned production start to customer’s original requested date`. The SO table, card,
   requested-delivery filter and export read revision 1’s immutable `snapshot.header.delivery_date`
   (respecting `delivery_date_tbd`), never the mutable `delivery_date`; a missing revision 1 reads
   `Not recorded` in the Header and leaves the required table cell blank; a failed list read stays a
@@ -225,6 +225,7 @@ because three global fixes touch every state. Card height equal: **118 of 125**.
 | Owner rule | 5 | After a not-agreed result the cell keeps `Date not confirmed` (reference prints `No Answer`) | same |
 | Owner rule | 10 | Service lines read `Service`, not `—` | same |
 | Reference behaviour removed | Customer saves | No `Preview only · Recorded at …` note | same |
+| Owner rule · governed word (2026-10-06) | sales facts shown | The planned-date fact reads `Planned production start` (the hash-pinned reference still prints the retired `Proceed date`); on a card wider than 440px the label wraps to two lines and the four values share one row below the labels | **+16px** on the 560px card; same at ≤440px |
 
 ## Open — not approved (tracked in UI MASTER §7)
 

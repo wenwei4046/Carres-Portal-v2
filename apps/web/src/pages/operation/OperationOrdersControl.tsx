@@ -1735,7 +1735,7 @@ interface Props {
  *  (Jess 2026-06-25, #4 top-bar Export menu). */
 const EXPORT_HEADER = [
   "SO", "Customer", "Phone", "Address", "Units", "Items",
-  "Deadline", "Proceed", "Location", "Logistics", "Status",
+  "Deadline", "Planned production start", "Location", "Logistics", "Status",
 ] as const;
 
 /** One order → its export cells (strings). Shared by CSV + print so the two

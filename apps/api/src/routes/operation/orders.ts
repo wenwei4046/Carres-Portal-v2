@@ -46,7 +46,7 @@ import type { DoTemplateData } from "../../lib/pdf/types";
 import { loadBookingContext } from "../../lib/booking-context";
 import { drawDeliveryOrderNumber } from "../../lib/delivery-order-issue";
 import { requireOperation, requireOperationOrPrincipal } from "../../lib/auth-guards";
-import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
+import { mapPgError, parseJsonBody, refusalMessage } from "../../lib/route-helpers";
 import { storageBlock } from "../../lib/storage-gate";
 import { userClient } from "../../lib/supabase";
 import { todayIsoMYT } from "../../lib/today";
@@ -115,7 +115,7 @@ function mapPipelineV2Error(error: { code?: string; message?: string; details?: 
       body: {
         error: "rule_violation",
         code: error.details ?? "invalid_param",
-        message: error.message ?? "rule violation",
+        message: refusalMessage(error) ?? "rule violation",
       },
     };
   }
