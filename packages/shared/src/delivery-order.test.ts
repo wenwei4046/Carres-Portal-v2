@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { deliveryOrderIssueGate, type DeliveryOrderIssueInput } from "./delivery-order";
+import { deliveryMoneyHolds, deliveryOrderIssueGate, type DeliveryOrderIssueInput } from "./delivery-order";
 import type { FinanceException } from "./finance-exception";
 import type { DeliveryPaymentApproval } from "./delivery-payment-approval";
 
@@ -273,5 +273,43 @@ describe("deliveryOrderIssueGate — the Request Delivery Order door", () => {
     expect(
       run({ waitBookingConfirm: false, confirmedDateIso: "2026-08-23" }).ok,
     ).toBe(false);
+  });
+});
+
+describe("deliveryMoneyHolds — `Hold delivery` is the gate's own money answer (owner ruling 2026-09-25)", () => {
+  const outstandings = [0, 0.01, 1200];
+  const approvalSets: DeliveryPaymentApproval[][] = [
+    [],
+    [approval({ status: "pending", decidedAt: null, decisionReason: null })],
+    [approval({ status: "refused" })],
+    [approval()],
+  ];
+  const exceptionSets: FinanceException[][] = [[], [openException()], [clearedException()], [clearedException(), openException()]];
+
+  it("answers exactly when the issue gate refuses on money — every combination (Law D)", () => {
+    for (const outstanding of outstandings) {
+      for (const paymentApprovals of approvalSets) {
+        for (const financeExceptions of exceptionSets) {
+          /* Every non-money requirement is met, so the gate refuses ONLY on money. */
+          const gate = run({ gate: { ...OK_GATE, outstanding }, paymentApprovals, financeExceptions });
+          const holds = deliveryMoneyHolds({ outstanding, paymentApprovals, financeExceptions });
+          expect({ outstanding, paymentApprovals: paymentApprovals.map((a) => a.status), financeExceptions: financeExceptions.map((e) => e.status), holds }).toEqual({
+            outstanding,
+            paymentApprovals: paymentApprovals.map((a) => a.status),
+            financeExceptions: financeExceptions.map((e) => e.status),
+            holds: !gate.ok,
+          });
+        }
+      }
+    }
+  });
+
+  it("the named cases", () => {
+    expect(deliveryMoneyHolds({ outstanding: 0, financeExceptions: [], paymentApprovals: [] })).toBe(false);
+    expect(deliveryMoneyHolds({ outstanding: 1200, financeExceptions: [], paymentApprovals: [] })).toBe(true);
+    expect(deliveryMoneyHolds({ outstanding: 1200, financeExceptions: [], paymentApprovals: [{ status: "approved" }] })).toBe(false);
+    expect(deliveryMoneyHolds({ outstanding: 0, financeExceptions: [{ status: "open" }], paymentApprovals: [] })).toBe(true);
+    /* An approval never clears a Finance judgement. */
+    expect(deliveryMoneyHolds({ outstanding: 1200, financeExceptions: [{ status: "open" }], paymentApprovals: [{ status: "approved" }] })).toBe(true);
   });
 });

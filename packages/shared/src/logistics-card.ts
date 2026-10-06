@@ -432,9 +432,12 @@ export const LINK_COPY = {
   sendAnotherDate: "Save another date",
   cannotDeliver: "Cannot deliver",
   cannotDeliverNote: "Tell us more (optional)",
-  savedScheduled: "Saved. Carres can see your scheduled delivery.",
-  savedAnother: "Saved. Carres will call the customer about your date.",
-  savedCannot: "Saved. Carres will decide the next step.",
+  /* Owner ruling 2026-09-26 (COPY "Link page results"): six words or fewer. */
+  savedScheduled: "Saved. Carres has your delivery date.",
+  savedAnother: "Saved. Carres will call the customer.",
+  savedCannot: "Saved. Carres will reply.",
+  /* Owner ruling 2026-09-25 (Delivery MASTER §3): alone, while the gate holds. */
+  holdDelivery: "Hold delivery",
   dead: "This link no longer works. Ask Carres for a new link.",
   loadFailed: "The delivery could not be loaded. Try again.",
   tryAgain: "Try again",
@@ -478,6 +481,10 @@ export interface ExternalDeliveryLinkView {
   pickup: string[];
   scheduledDate: string | null;
   scheduledTime: string | null;
+  /** `Hold delivery` (owner ruling 2026-09-25, Delivery MASTER §3): a
+   *  Scheduled delivery exists AND the DO money gate holds. A yes/no only —
+   *  never money, never why. */
+  holdDelivery: boolean;
 }
 
 /** The facts the Logistics card reads from Delivery beyond the Monitor card. */

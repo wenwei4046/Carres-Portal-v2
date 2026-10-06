@@ -57,6 +57,7 @@ beforeEach(() => {
     pickup: ["Supplier sends directly to logistics · AL Sungai Buloh"],
     scheduledDate: null,
     scheduledTime: null,
+    holdDelivery: false,
   };
 });
 
@@ -84,6 +85,36 @@ describe("the external link page", () => {
     await screen.findByText("AL Logistics");
     fireEvent.click(screen.getByRole("radio", { name: "Cannot deliver" }));
     expect((screen.getByTestId("delivery-link-submit") as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("prints Hold delivery alone while the gate holds, and the three answers keep working", async () => {
+    /* A far-future Tuesday, so the page's own past-day refusal never trips. */
+    view = { ...(view as object), scheduledDate: "2099-10-27", holdDelivery: true };
+    draw();
+    await screen.findByText("AL Logistics");
+    expect(screen.getByTestId("delivery-link-hold").textContent).toBe("Hold delivery");
+    /* Never money, never why, never a door. */
+    expect(document.body.textContent).not.toMatch(/RM\s?\d|unpaid|Finance|Payment/);
+    expect(screen.queryByRole("link", { name: /pay/i })).toBeNull();
+    expect(screen.getAllByRole("radio").map((r) => r.textContent)).toEqual(["Scheduled date", "Another date", "Cannot deliver"]);
+    expect((screen.getByTestId("delivery-link-submit") as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("before a Scheduled delivery, or once the gate opens, it says nothing about money", async () => {
+    draw();
+    await screen.findByText("AL Logistics");
+    expect(screen.queryByTestId("delivery-link-hold")).toBeNull();
+    expect(screen.queryByText("Hold delivery")).toBeNull();
+  });
+
+  it("after a save it says the 2026-09-26 words and reads the delivery again, so a new hold shows", async () => {
+    view = { ...(view as object), scheduledDate: "2099-10-27" };
+    draw();
+    await screen.findByText("AL Logistics");
+    view = { ...(view as object), holdDelivery: true };
+    fireEvent.click(screen.getByTestId("delivery-link-submit"));
+    expect(await screen.findByTestId("delivery-link-done")).toHaveTextContent("Saved. Carres has your delivery date.");
+    expect(await screen.findByTestId("delivery-link-hold")).toHaveTextContent("Hold delivery");
   });
 
   it("a dead link says one sentence and nothing else", async () => {
