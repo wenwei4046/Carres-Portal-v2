@@ -79,6 +79,20 @@ describe("Collection owner", () => {
     expect(screen.queryByText(/Delivery Duty|Staff & Duties/)).not.toBeInTheDocument();
   });
 
+  it("REGRESSION 2026-09-26 ruling: nobody established prints line 1 over line 2, and line 2 opens Settings → Staff & Duties", async () => {
+    state.owner = null;
+    show();
+    const line1 = await screen.findByTestId("collection-owner-none");
+    expect(line1.textContent).toBe("Nobody assigned to this order");
+    const door = screen.getByTestId("collection-owner-none-door");
+    expect(door.textContent).toBe("Manager assigns in Settings → Staff & Duties");
+    expect(door).toHaveAttribute("href", "/operation/settings/staff-duties");
+    expect(line1.compareDocumentPosition(door) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    const section = screen.getByTestId("collection-owner");
+    expect(section).not.toHaveTextContent(/Nobody is assigned|Assign it in Sales Orders|Sales Orders → Team/);
+    expect(section.querySelector('a[href="/operation/orders"]')).toBeNull();
+  });
+
   it("the handover door exists only for someone the Staff & Duties gate admits", async () => {
     show();
     await screen.findByTestId("collection-owner-facts");
